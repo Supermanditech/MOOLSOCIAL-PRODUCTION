@@ -13,6 +13,7 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
@@ -396,6 +397,285 @@ void main() {
             'UklGRhQKAABXRUJQVlA4IAgKAABwKAGdASpABiADPhkMhUIhBCEABABhLS3cLv/AAzv1BfgH4AaoVwD8AP0A/sHOGaBdgP0AzvsAi1Eq81tfTp06dOnTp06dOnTp06dOm+9FOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dHTE7m81tfTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTo6Ync3mtr6dOnTp06dOnTp06dOnTp06ObJvDeG8N4bw3hvDeG8N4bw3hvDeG8N4bw3hvDeG8N4bw3hvDeG8N4bw3hvDeG8N4bw3hvDeG8N4bw3hvDeG8N4bw3hu/qWmtNaa01prTWmtNaa01prTWmtNaa01prTWmtNaa01prTWmtNaa01prTWmtNaa01prTWmtNaa01prTWmtNaa01prTXHTT3GolXmtr6dOnTp06dOnTp06dOm+/kIGVX09xqJV5ra+nTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp0dMTubzW19OnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOnTp06dOjpidzea2vp06dOnTp06dOnTp06dOnTo4AAP7/AsOU7mwcdyGuyuVR2A7fxUF438BUa3u1VOahh1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC2/rtj78auDreEl0/wPsvOOwJv/f0DlO5sHHchrsrlUdgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       ),
     ];
+
+    for (final destination in [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+    ]) {
+      for (final width in [320.0, 360.0, 390.0, 430.0]) {
+        for (final scale in [1.0, 2.0]) {
+          for (final surface in ['catalogue', 'store', 'offers']) {
+            final storeContext = surface == 'store';
+            final offersContext = surface == 'offers';
+            final savedContext = width == 430;
+            if (savedContext &&
+                (destination != BuyV2Destination.shop ||
+                    scale != 1.0 ||
+                    storeContext)) {
+              continue;
+            }
+            testWidgets(
+              'SKU media grid ${destination.name} $width $scale store $storeContext'
+              '${savedContext ? ' saved long badge' : ''}${offersContext ? ' offers aligned' : ''}',
+              (tester) async {
+                tester.view.devicePixelRatio = 1;
+                tester.view.physicalSize = Size(width, 844);
+                addTearDown(tester.view.reset);
+                final shapes = [(800, 1600), (1600, 800), (800, 800)];
+                final responses = <Uri, Uint8List>{};
+                final products = <BuyV2Product>[];
+                final bases = BuyV2Catalogue.allProducts
+                    .where((item) => item.destination == destination)
+                    .take(3)
+                    .toList();
+                expect(bases, hasLength(3));
+                for (var i = 0; i < 3; i++) {
+                  final shape = shapes[i];
+                  final bytes = (await tester.runAsync(
+                    () => _mediaFitFixture(shape.$1, shape.$2),
+                  ))!;
+                  final base = bases[i];
+                  final supplied = asset(
+                    id: 'grid-photo-${base.id}',
+                    sku: base.id,
+                    canonical: base.canonicalId,
+                    store: 'supplier-store',
+                    file: photo(
+                      mime: 'image/png',
+                      width: shape.$1,
+                      height: shape.$2,
+                      bytes: bytes.length,
+                    ),
+                  );
+                  responses[Uri.parse(supplied.source!)] = bytes;
+                  products.add(
+                    base.copyWith(
+                      storeId: 'supplier-store',
+                      mediaAssets: [supplied],
+                      badge: savedContext
+                          ? 'Verified offer with complete product and pack information '
+                                'supplied by the provider store for the selected item '
+                                'and its available quantity'
+                          : base.badge,
+                    ),
+                  );
+                }
+                final media = installMediaClient(
+                  responses.values.first,
+                  responses: responses,
+                );
+                final core = BuySession();
+                final session = BuyV2Session(
+                  core: core,
+                  reviewDataEnabled: false,
+                  commerceAdapter: _MediaCommerce(
+                    products.first,
+                    otherProducts: products.skip(1).toList(),
+                  ),
+                );
+                addTearDown(core.dispose);
+                addTearDown(session.dispose);
+                try {
+                  await session.restoreCommerce();
+                  session.destination = destination;
+                  if (savedContext) {
+                    for (final product in products) {
+                      session.toggleSaved(product.id);
+                    }
+                  }
+                  await tester.pumpWidget(
+                    MaterialApp(
+                      debugShowCheckedModeBanner: false,
+                      theme: MoolTheme.light(),
+                      builder: (context, child) => MediaQuery(
+                        data: MediaQuery.of(
+                          context,
+                        ).copyWith(textScaler: TextScaler.linear(scale)),
+                        child: RepaintBoundary(
+                          key: const ValueKey('r66-cart-capture'),
+                          child: child!,
+                        ),
+                      ),
+                      home: Scaffold(
+                        body: SingleChildScrollView(
+                          child: BuyV2ProgressiveProductGrid(
+                            session: session,
+                            products: products,
+                            storageKey: 'sku-media-grid',
+                            semanticLabel: 'Products',
+                            alignMediaAtTop: true,
+                            productCardBuilder: offersContext
+                                ? (product) => BuyV2ProductCard(
+                                    session: session,
+                                    product: product,
+                                    compact: true,
+                                    alignMediaAtTop: true,
+                                    savedContext: savedContext,
+                                  )
+                                : null,
+                            storeContext: storeContext,
+                            savedContext: savedContext,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                  await tester.pumpAndSettle();
+                  for (var i = 0; i < products.length; i++) {
+                    final product = products[i];
+                    final frame = find.byKey(
+                      ValueKey('buy-grid-packshot-${product.id}'),
+                    );
+                    await tester.ensureVisible(frame);
+                    await tester.pump();
+                    final decoded = find.descendant(
+                      of: frame,
+                      matching: find.byType(RawImage),
+                    );
+                    await awaitMedia(
+                      tester,
+                      () => tester
+                          .widgetList<RawImage>(decoded)
+                          .any((raw) => raw.image != null),
+                    );
+                    final raw = tester
+                        .widgetList<RawImage>(decoded)
+                        .singleWhere((raw) => raw.image != null);
+                    expect(raw.fit, BoxFit.contain);
+                    // The existing thumbnail cache decodes to the frame width.
+                    // Preserve that memory bound and verify the full aspect ratio.
+                    expect(raw.image!.width, inInclusiveRange(1, shapes[i].$1));
+                    expect(
+                      raw.image!.height,
+                      closeTo(
+                        raw.image!.width * shapes[i].$2 / shapes[i].$1,
+                        1,
+                      ),
+                    );
+                    expect(tester.getSize(frame).width, greaterThan(0));
+                    expect(
+                      tester.getSize(frame).height,
+                      greaterThanOrEqualTo(70),
+                    );
+                    final photoBounds = tester.getRect(frame);
+                    expect(
+                      photoBounds.height,
+                      closeTo(photoBounds.width, 1),
+                      reason: 'Every SKU grid needs a square media frame',
+                    );
+                    expect(photoBounds.height, greaterThan(70));
+                    expect(
+                      photoBounds.overlaps(
+                        tester.getRect(
+                          find.byKey(ValueKey('buy-save-${product.id}')),
+                        ),
+                      ),
+                      isFalse,
+                      reason: 'Save must not obscure the supplier photo',
+                    );
+                    final badge = find.byKey(
+                      ValueKey('buy-product-card-badge-${product.id}'),
+                    );
+                    if (badge.evaluate().isNotEmpty) {
+                      if (savedContext) {
+                        final badgeBounds = tester.getRect(badge);
+                        final removeBounds = tester.getRect(
+                          find.byKey(ValueKey('buy-save-${product.id}')),
+                        );
+                        expect(
+                          badgeBounds.top,
+                          greaterThanOrEqualTo(removeBounds.bottom),
+                          reason:
+                              'A thin footer may share a boundary without overlapping Save',
+                        );
+                        expect(
+                          badgeBounds.width,
+                          greaterThanOrEqualTo(photoBounds.width),
+                          reason: 'Long provider facts must use the card width',
+                        );
+                      }
+                      expect(
+                        photoBounds.overlaps(tester.getRect(badge)),
+                        isFalse,
+                        reason: 'The product badge must not obscure the photo',
+                      );
+                    }
+                    expect(
+                      find.descendant(
+                        of: frame,
+                        matching: find.text('Illustration'),
+                      ),
+                      findsNothing,
+                    );
+                    expect(
+                      find.descendant(
+                        of: frame,
+                        matching: find.text('Photo unavailable'),
+                      ),
+                      findsNothing,
+                    );
+                    expect(
+                      media.client.requested,
+                      contains(Uri.parse(product.mediaAssets.single.source!)),
+                    );
+                    expect(tester.takeException(), isNull);
+                  }
+                  final frames = [
+                    for (final product in products)
+                      tester.getRect(
+                        find.byKey(ValueKey('buy-grid-packshot-${product.id}')),
+                      ),
+                  ];
+                  if (scale == 1) {
+                    expect(
+                      frames[1].left,
+                      greaterThanOrEqualTo(frames[0].right),
+                    );
+                    expect(
+                      frames[2].left,
+                      greaterThanOrEqualTo(frames[1].right),
+                    );
+                    final cards = [
+                      for (final product in products)
+                        tester.getRect(
+                          find.byKey(
+                            ValueKey('buy-product-compare-${product.id}'),
+                          ),
+                        ),
+                    ];
+                    expect(cards.map((rect) => rect.top).toSet(), hasLength(1));
+                    for (var i = 0; i < cards.length; i++) {
+                      expect(frames[i].top, greaterThanOrEqualTo(cards[i].top));
+                      expect(
+                        frames[i].bottom,
+                        lessThanOrEqualTo(cards[i].bottom),
+                      );
+                    }
+                  }
+                  await tester.ensureVisible(
+                    find.byKey(
+                      ValueKey('buy-grid-packshot-${products.first.id}'),
+                    ),
+                  );
+                  await tester.pumpAndSettle();
+                  if (width == 320 || savedContext) {
+                    await capturePack(
+                      tester,
+                      'sku-media-grid-${destination.name}-$scale-store-$storeContext'
+                      '${savedContext ? '-saved-long-badge' : ''}',
+                    );
+                  }
+                  expect(session.itemCount, 0);
+                  await tester.pumpWidget(const SizedBox.shrink());
+                } finally {
+                  media.restore();
+                }
+              },
+            );
+          }
+        }
+      }
+    }
 
     for (final encoded in encodedPhotos) {
       for (final scale in [1.0, 2.0]) {
@@ -1178,6 +1458,18 @@ void main() {
         }
         final source = session.product(sourceId);
         final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
+        if (offers) {
+          await tester.scrollUntilVisible(
+            sourceCard,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-offers')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+        }
         await Scrollable.ensureVisible(
           tester.element(sourceCard),
           alignment: .5,
@@ -1226,7 +1518,7 @@ void main() {
         expect(addLabel, findsOneWidget);
         expect(find.textContaining(RegExp(r'\b1 packs\b')), findsNothing);
         await capturePack(tester, 'r5-pack-$offers-$scale-minimum');
-        final trade = find.text('MOQ 1 pack');
+        final trade = find.text('Minimum order 1 pack');
         await tester.scrollUntilVisible(
           trade,
           160,
@@ -1302,6 +1594,24 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
+        final cartFacts = find.byKey(
+          ValueKey('buy-wholesale-cart-line-facts-$selectedId'),
+        );
+        final cartScroll = find
+            .descendant(
+              of: find.byKey(
+                PageStorageKey('buy-cart-${session.cartScope.name}'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          cartFacts,
+          180,
+          scrollable: cartScroll,
+          maxScrolls: 30,
+        );
+        await tester.pumpAndSettle();
         expect(
           find.byWidgetPredicate(
             (widget) =>
@@ -1323,9 +1633,6 @@ void main() {
           findsWidgets,
         );
         await capturePack(tester, 'r5-pack-$offers-$scale-cart');
-        final cartFacts = find.byKey(
-          ValueKey('buy-wholesale-cart-line-facts-$selectedId'),
-        );
         await Scrollable.ensureVisible(
           tester.element(cartFacts),
           alignment: .45,
@@ -1333,7 +1640,7 @@ void main() {
         await tester.pumpAndSettle();
         final cartPackLabel = find.descendant(
           of: cartFacts,
-          matching: find.textContaining('MOQ 1 pack'),
+          matching: find.textContaining('Minimum order 1 pack'),
         );
         expect(cartPackLabel.hitTestable(), findsOneWidget);
         expect(

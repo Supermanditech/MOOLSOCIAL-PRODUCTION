@@ -9,6 +9,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_discovery_refinement_test.dart' show r669BrandedSession;
@@ -43,6 +44,93 @@ void main() {
     );
   }
 
+  for (final areaControl in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('RV6 D001 empty guidance area $areaControl text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          initialCatalogueRegionId: 'jodhpur',
+          cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+            destination: BuyV2Destination.shop,
+            providerCount: 1,
+            skusPerStore: 4,
+          ),
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: RepaintBoundary(
+                key: const ValueKey('rv6-d001-capture'),
+                child: child!,
+              ),
+            ),
+            home: Scaffold(
+              body: SafeArea(
+                child: BuyV2PagedProductCatalogue(
+                  session: session,
+                  query: session.catalogueQuery(search: 'zzzzzz'),
+                  scopeKey: 'rv6-d001-$areaControl-$scale',
+                  storeContext: !areaControl,
+                  showAreaControl: areaControl,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final expected = areaControl
+            ? 'Try another search, category or area.'
+            : 'Try another search or category.';
+        expect(
+          find.text('No matching products'),
+          findsOneWidget,
+          reason: tester
+              .widgetList<Text>(find.byType(Text))
+              .map((w) => w.data)
+              .join(' | '),
+        );
+        expect(find.text(expected), findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.text(expected),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(tester.takeException(), isNull);
+        const captureRoot = String.fromEnvironment('RV6_D001_CAPTURE_DIR');
+        if (captureRoot.isNotEmpty) {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(const ValueKey('rv6-d001-capture')),
+          );
+          await tester.runAsync(() async {
+            await Directory(captureRoot).create(recursive: true);
+            final file = File('$captureRoot/area-$areaControl-text-$scale.png');
+            if (await file.exists()) throw StateError('Capture exists');
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              final bytes = await image.toByteData(format: ImageByteFormat.png);
+              await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+            } finally {
+              image.dispose();
+            }
+          });
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
   for (final width in [320.0, 390.0]) {
     for (final scale in [1.0, 2.0]) {
       for (final keyboard in [0.0, 280.0]) {
@@ -72,12 +160,21 @@ void main() {
           final second = find.byKey(ValueKey('buy-product-${products[1].id}'));
           final firstRect = tester.getRect(first);
           final secondRect = tester.getRect(second);
-          expect(firstRect.top, closeTo(secondRect.top, 0.01));
-          expect(secondRect.left, greaterThan(firstRect.right));
+          if (scale > 1.6) {
+            expect(secondRect.top, greaterThan(firstRect.bottom));
+            expect(secondRect.left, closeTo(firstRect.left, .01));
+          } else {
+            expect(firstRect.top, closeTo(secondRect.top, 0.01));
+            expect(secondRect.left, greaterThan(firstRect.right));
+          }
           expect(secondRect.right, lessThanOrEqualTo(width));
           expect(
-            find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-            findsNothing,
+            find.byKey(
+              ValueKey(
+                'buy-vertical-product-grid-buy-search-${session.destination.name}-tomato',
+              ),
+            ),
+            findsOneWidget,
           );
           expect(tester.takeException(), isNull);
           if (const bool.fromEnvironment('BUY_R66_SPARSE_CAPTURE')) {

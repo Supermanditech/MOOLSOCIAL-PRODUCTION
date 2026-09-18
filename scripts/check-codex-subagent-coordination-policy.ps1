@@ -227,7 +227,74 @@ function Test-StoreHistoricalAdmissionSubject([string]$Commit, [string]$Subject)
     $trees[0] -ceq $trees[1])
 }
 
+# BEGIN founder RV6 historical evidence label exception 20260914
+# Founder directed following the exact448d4a2c proposal with production discipline.
+# This admits one immutable evidence commit, not another commit-prefix pattern.
+function Test-RedmiV6HistoricalEvidenceFacts([hashtable]$Facts) {
+  $expected = @{
+    Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913'
+    Role = 'subagent'
+    Task = '/root/cursor_redmi_v6_audit_20260913'
+    Lane = 'cursor_ui'
+    WorkId = 'redmi-v6-audit-20260913'
+    TicketId = 'UAW-CURSOR-REDMI-V6-AUDIT-20260913'
+    Branch = 'work/cursor-ui/redmi-v6-audit-20260913'
+    Commit = '448d4a2c7c10ee195e711e49aa4cc69a593ff37b'
+    Parent = 'd0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c'
+    Subject = 'docs(redmi): close D005 persistence with r66.22 device evidence'
+    AppsTree = 'e37147034016157ab241e26f0c8be091d4561a9c'
+    ParentAppsTree = 'e37147034016157ab241e26f0c8be091d4561a9c'
+  }
+  if ($null -eq $Facts -or $Facts.Count -ne ($expected.Count + 1)) { return $false }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
+  }
+  $blobs = $Facts['Blobs']
+  if ($blobs -isnot [hashtable]) { return $false }
+  $prefix = 'docs/quality/cursor-redmi-v6-audit-20260913/'
+  $expectedBlobs = @{
+    ($prefix + 'DEFECTS.md') = 'dd866dd5ee2f4e7637236095563bb15f568680ce'
+    ($prefix + 'EVIDENCE.csv') = '18c272611cb3ffd9e815cbfd476eef073778b8cd'
+    ($prefix + 'UAT.md') = 'd687685148c71995378459ec909e825c72b97050'
+    ($prefix + 'scope-state.json') = '17ae58a35b227394f23d8afb65ab8153f00d6137'
+  }
+  if ((@($blobs.Keys | Sort-Object) -join '|') -cne
+      (@($expectedBlobs.Keys | Sort-Object) -join '|')) { return $false }
+  foreach ($owner in $expectedBlobs.Keys) {
+    if ([string]$blobs[$owner] -cne $expectedBlobs[$owner]) { return $false }
+  }
+  return $true
+}
+
+function Test-RedmiV6HistoricalEvidenceCommit([string]$Commit, [string]$Subject) {
+  if ($Commit -cne '448d4a2c7c10ee195e711e49aa4cc69a593ff37b') { return $false }
+  $parents = @(& git -C $root show -s --format=%P $Commit)
+  if ($LASTEXITCODE -ne 0 -or $parents.Count -ne 1) { return $false }
+  $owners = @(& git -C $root diff-tree --no-commit-id --name-only -r $Commit)
+  if ($LASTEXITCODE -ne 0 -or $owners.Count -ne 4) { return $false }
+  $trees = @(& git -C $root rev-parse "${Commit}:apps" "$($parents[0]):apps")
+  if ($LASTEXITCODE -ne 0 -or $trees.Count -ne 2) { return $false }
+  $blobs = @{}
+  foreach ($owner in $owners) {
+    if ($blobs.ContainsKey([string]$owner)) { return $false }
+    $blob = @(& git -C $root rev-parse "${Commit}:$owner")
+    if ($LASTEXITCODE -ne 0 -or $blob.Count -ne 1) { return $false }
+    $blobs[[string]$owner] = [string]$blob[0]
+  }
+  return (Test-RedmiV6HistoricalEvidenceFacts @{
+    Root = $root.Replace('\','/').TrimEnd('/')
+    Role = $AgentRole; Task = $AgentTask; Lane = $ProductionLane
+    WorkId = $ProductionWorkId; TicketId = $ProductionTicketId; Branch = $branch
+    Commit = $Commit; Parent = [string]$parents[0]; Subject = $Subject
+    AppsTree = [string]$trees[0]; ParentAppsTree = [string]$trees[1]; Blobs = $blobs
+  })
+}
+# END founder RV6 historical evidence label exception 20260914
+
 function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
+  # BEGIN founder RV6 historical evidence label call 20260914
+  if (Test-RedmiV6HistoricalEvidenceCommit $Commit $Subject) { return $true }
+  # END founder RV6 historical evidence label call 20260914
   # R66-BUILD-003: retain two pushed label mistakes without rewriting history.
   # This is not an alternative prefix for any other task or future commit.
   if ($AgentRole -cne 'subagent' -or
@@ -484,7 +551,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   ) 'qualified integration repair tip is unavailable.'
   $repairBinding = @($continuationBindings | Where-Object {
     [string]$_.lane -ceq 'integration_repair' -and
-    [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904'
+    $(if ($storeBuySkuSeptember18) { [string]$_.id -ceq 'integration_repair_store_buy_sku_20260918' } else { [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904' })
   })
   Assert-Coordination ($repairBinding.Count -eq 1) `
     'qualified integration repair continuation is missing or ambiguous.'
@@ -553,7 +620,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
     Assert-Coordination (
       $LASTEXITCODE -eq 0 -and $preMergeSubject.Count -eq 1 -and
       [string]$preMergeSubject[0] -cmatch
-        '^repair\(store-buy-conflict-repair-v3-20260904\): .+' -and
+        $(if ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' }) -and
       @($preMergeCommitOwners | Where-Object {
         -not $preMergeAllowedKeys.Contains(([string]$_).ToLowerInvariant())
       }).Count -eq 0
@@ -565,7 +632,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   Assert-Coordination (
     $LASTEXITCODE -eq 0 -and $repairMergeSubject.Count -eq 1 -and
     [string]$repairMergeSubject[0] -cmatch
-      '^repair\(store-buy-conflict-repair-v3-20260904\): .+'
+      $(if ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' })
   ) 'qualified integration repair merge subject changed.'
   $repairMergeTree = (& git -C $root show -s --format='%T' `
       $repairMergeCommit).Trim()
@@ -606,7 +673,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $postMergeSubject.Count -eq 1 -and
         [string]$postMergeSubject[0] -cmatch
-          '^repair\(store-buy-conflict-repair-v3-20260904\): .+' -and
+          $(if ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' }) -and
         @($postMergeCommitOwners | Where-Object {
           -not $postMergeAllowedKeys.Contains(
             ([string]$_).ToLowerInvariant()
@@ -805,8 +872,45 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 76) `
+Assert-Coordination ($continuationBindings.Count -eq 77) `
   'founder-authorized continuation binding inventory changed.'
+
+$redmiExpectedBinding = @'
+{
+  "id": "cursor_redmi_v6_audit_20260913",
+  "state": "founder_authorized_2026_09_13",
+  "lane": "cursor_ui",
+  "role": "subagent",
+  "task": "/root/cursor_redmi_v6_audit_20260913",
+  "workId": "redmi-v6-audit-20260913",
+  "ticketId": "UAW-CURSOR-REDMI-V6-AUDIT-20260913",
+  "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "baselineHead": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+  "bootstrapCommitSubject": "coordination(redmi-v6-audit-20260913): admit exact V6 Redmi audit lane",
+  "bootstrapOwners": [
+    "config/codex-subagent-coordination-policy.json",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-buy-protected-baseline.ps1",
+    "docs/quality/UAW-CURSOR-REDMI-V6-AUDIT-20260913.md"
+  ],
+  "cursorIndependent": true,
+  "integrationRequiredBeforeSuccessorApk": true
+}
+'@ | ConvertFrom-Json
+$redmiActualBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_redmi_v6_audit_20260913' })
+Assert-Coordination ($redmiActualBindings.Count -eq 1) 'Exact Redmi continuation is missing or duplicated.'
+foreach ($property in $redmiExpectedBinding.PSObject.Properties) {
+  $expected = $property.Value
+  $actual = $redmiActualBindings[0].($property.Name)
+  if ($property.Name -ceq 'bootstrapOwners') {
+    Assert-Coordination ((@($actual | Sort-Object) -join '|') -ceq (@($expected | Sort-Object) -join '|')) 'Redmi bootstrap owners changed.'
+  } else {
+    Assert-Coordination ((ConvertTo-Json -InputObject $actual -Compress) -ceq (ConvertTo-Json -InputObject $expected -Compress)) "Redmi continuation changed: $($property.Name)"
+  }
+}
+
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
   Assert-ExactNames $continuationBinding @(
@@ -823,7 +927,10 @@ foreach ($continuationBinding in $continuationBindings) {
   }
   Assert-Coordination (
     [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
-    [string]$continuationBinding.state -cin @(
+    (
+      ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_13') -or
+      [string]$continuationBinding.state -cin @(
       'founder_authorized_2026_08_25',
       'founder_authorized_2026_08_26',
       'founder_authorized_2026_08_28',
@@ -834,6 +941,7 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_09_05',
       'founder_authorized_2026_09_12',
       'founder_authorized_2026_09_18'
+      )
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -1236,13 +1344,18 @@ if ($storeBuySeptember12 -or $storeBuySkuSeptember18) {
   $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-REPAIR-20260912.md')
   $integrationRepair.maximumPostMergeClosureCommits = 1
 }
-$storeBuySkuSeptember18 = $ProductionLane -ceq 'integration_repair' -and
-  $ProductionWorkId -ceq 'store-buy-sku-20260918'
+$storeBuySkuSeptember18 = ($ProductionLane -ceq 'integration_repair' -and
+  $ProductionWorkId -ceq 'store-buy-sku-20260918') -or
+  ($ProductionLane -ceq 'integration' -and $ProductionWorkId -ceq 'store-buy-sku-baseline-20260918')
 if ($storeBuySkuSeptember18) {
   Assert-Coordination (
     $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
-    $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-SKU-20260918' -and
-    (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-sku-20260918'
+    (($ProductionLane -ceq 'integration_repair' -and
+      $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-SKU-20260918' -and
+      (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-sku-20260918') -or
+     ($ProductionLane -ceq 'integration' -and
+      $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918' -and
+      (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-20260918'))
   ) 'September18 repair identity changed.'
   $literalBinding = @($continuationBindings | Where-Object {
     $_.id -ceq 'integration_repair_store_buy_sku_20260918'
@@ -1437,6 +1550,73 @@ foreach ($readOwner in $mandatoryReads) {
 
 $claims = @($policy.activeClaims)
 Assert-Coordination ($claims.Count -ge 1) 'active claim inventory is empty.'
+
+if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913') {
+  $redmiClaim = @($claims | Where-Object { $_.task -ceq '/root/cursor_redmi_v6_audit_20260913' })
+  $redmiEvidenceOwners = @(
+        'docs/quality/cursor-redmi-v6-audit-20260913/scope-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/UAT.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/JOURNEYS.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PUBLIC-DATA.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/BLOCKERS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/EVIDENCE.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/HANDOFF.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/apk-regression-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt',
+        'docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart',
+        'apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart',
+        'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
+        'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart',
+        'apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_security_v2_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+        'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
+        'apps/mobile/lib/features/chat/screens/chat_settings_screen.dart',
+        'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart',
+        'apps/mobile/lib/main.dart',
+        'apps/mobile/lib/app/ui_review_language_store.dart',
+        'apps/mobile/test/app/ui_review_language_store_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart'
+  )
+  Assert-Coordination ($redmiClaim.Count -eq 1 -and $redmiClaim[0].role -ceq 'subagent' -and
+    ((@($redmiClaim[0].owners | Sort-Object) -join '|') -ceq (@($redmiEvidenceOwners | Sort-Object) -join '|'))) 'Redmi operational claim changed.'
+}
+
 $missingOwnerNegativeFixture = Join-Path $root `
   '.codex-coordination-missing-owner-negative-fixture'
 Assert-Coordination (
@@ -1540,6 +1720,28 @@ foreach ($claim in $claims) {
       $owner -cmatch
         '^artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/[^/]+$'
     )
+    $predeclaredRedmiV6EvidenceOwner = (
+      [string]$claim.task -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+      $root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' -and
+      $pendingEvidenceBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913' -and
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+      $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and
+      $owner -cin @(
+        'docs/quality/cursor-redmi-v6-audit-20260913/scope-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/UAT.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/JOURNEYS.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PUBLIC-DATA.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/BLOCKERS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/EVIDENCE.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/HANDOFF.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/apk-regression-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt',
+        'docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt'
+      )
+    )
     $predeclaredFounderReferenceOwner = (
       [string]$claim.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905' -and
       $ProductionLane -ceq 'cursor_ui' -and
@@ -1584,7 +1786,7 @@ foreach ($claim in $claims) {
         $predeclaredR65TenEvidenceOwner -or
         $predeclaredR65ElevenEvidenceOwner -or
         $predeclaredR6615EvidenceOwner -or
-        $predeclaredR669PortableOwner -or $predeclaredFounderReferenceOwner)
+        $predeclaredR669PortableOwner -or $predeclaredFounderReferenceOwner -or $predeclaredRedmiV6EvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -2272,6 +2474,13 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/.flutter-plugins-dependencies'
         )
       )
+      # Founder D005-C01 admission: exact review startup/persistence owners only.
+      $redmiLanguageOwner = (
+        $root.Replace([char]92,[char]47).TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' -and
+        $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+        $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+        $effectiveOwner -cin @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -2284,7 +2493,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2296,7 +2505,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -2342,6 +2551,184 @@ if ($ProductionLane -ceq 'baseline') {
     $r66OwnerAmendmentPending = $false
     $r665CollectionAdmissionPending = $false
     $r678PersistenceAdmissionPending = $false
+    # BEGIN founder SUCCESSOR BUILD admission 20260914
+    if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913') {
+      $successorParent = '9018535597239296871f9cf026e1e2a7328aca50'
+      $successorChecker = 'scripts/check-codex-subagent-coordination-policy.ps1'
+      $successorHashes = @{
+        'scripts/check-buy-data-egress-boundary.ps1' = '55F9A5992C38E09C3FBE0EEA8B3FFA8336066766F3F1BFE9A2CB1B3EADD6405E'
+        'scripts/check-approved-ui-locks.ps1' = '2BB3F7727C5103C1F5D1FA34CC2017A38A01AD230D72D5C3180F3970A0860661'
+        'scripts/check-buy-protected-baseline.ps1' = 'F661D4DA63FDA3EDD30696D8D2D59D488B95D3CA61B84BDE4218677D20058F56'
+        'scripts/check-buy-backend-contract-boundary.ps1' = '451417F68C884054FA4BB4826922AAEF63A0BE85B826F25F2377F058D8283224'
+      }
+      $successorControls = @($successorChecker) + @($successorHashes.Keys)
+      Assert-Coordination ($AgentRole -ceq 'subagent' -and $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+        $ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+        $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and $branch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') 'Successor admission identity differs.'
+      & git -C $root merge-base --is-ancestor $successorParent $head
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission requires qualified parent.'
+      # Founder authorizes exactly three D005-C01 owners; all other policy is retained.
+      $languageAddedOwners = @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
+      # Founder SKU metadata scope includes these exact regression-test prerequisites.
+      $skuAddedTestOwners = @(
+        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart'
+      )
+      $languagePolicyBefore = Get-R66Utf8GitJson $successorParent 'config/codex-subagent-coordination-policy.json'
+      $languagePolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+      $languageClaim = @($languagePolicyAfter.activeClaims | Where-Object task -CEQ '/root/cursor_redmi_v6_audit_20260913')
+      Assert-Coordination ($languageClaim.Count -eq 1 -and $languageClaim[0].owners.Count -eq 58) 'SKU and language admission requires exactly58 owners including pharmacy and Delivered-order continuity qualification.'
+      foreach ($languageOwner in ($languageAddedOwners + $skuAddedTestOwners)) {
+        Assert-Coordination (@($languageClaim[0].owners | Where-Object { $_ -ceq $languageOwner }).Count -eq 1) "Language owner absent or duplicated: $languageOwner"
+      }
+      $languageClaim[0].owners = @($languageClaim[0].owners | Where-Object { $_ -cnotin ($languageAddedOwners + $skuAddedTestOwners) })
+      # Founder SKU-M01..M05 scope adds only the eight named tests above.
+      # Bind the exact primary regression generation, then compare
+      # the rest of the policy against the original authority unchanged.
+      Assert-Coordination ($languagePolicyAfter.registryBinding.entryCount -eq 4589 -and
+        $languagePolicyAfter.registryBinding.sha256 -ceq 'A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB') 'SKU regression generation differs.'
+      $languagePolicyAfter.registryBinding = $languagePolicyBefore.registryBinding
+      Assert-Coordination (($languagePolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($languagePolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Language admission changed unrelated policy.'
+      $successorPriorLines = @(& git -C $root show "${successorParent}:$successorChecker")
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor prior checker missing.'
+      $successorPriorScript = ($successorPriorLines -join "`n") + "`n"
+      $successorScript = [IO.File]::ReadAllText((Join-Path $root $successorChecker)).Replace("`r`n", "`n")
+      $successorPriorBlock = [regex]::Match($successorPriorScript, '(?ms)^    # BEGIN founder QUALIFICATION admission 20260914\n.*?^    # END founder QUALIFICATION admission 20260914\n')
+      $successorCurrentBlock = [regex]::Match($successorScript, '(?ms)^    # BEGIN founder SUCCESSOR BUILD admission 20260914\n.*?^    # END founder SUCCESSOR BUILD admission 20260914\n')
+      Assert-Coordination ($successorPriorBlock.Success -and $successorCurrentBlock.Success) 'Successor preservation blocks missing.'
+      $successorRestored = $successorScript.Substring(0, $successorCurrentBlock.Index) + $successorPriorBlock.Value + $successorScript.Substring($successorCurrentBlock.Index + $successorCurrentBlock.Length)
+      $successorRestored = $successorRestored.Replace((',
+        ''apps/mobile/lib/main.dart'',
+        ''apps/mobile/lib/app/ui_review_language_store.dart'',
+        ''apps/mobile/test/app/ui_review_language_store_test.dart''').Replace("`r`n", "`n"), '')
+      $successorRestored = $successorRestored.Replace((@'
+      # Founder D005-C01 admission: exact review startup/persistence owners only.
+      $redmiLanguageOwner = (
+        $root.Replace([char]92,[char]47).TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' -and
+        $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+        $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+        $effectiveOwner -cin @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
+      )
+'@).Replace("`r`n", "`n") + "`n", '')
+      $successorRestored = $successorRestored.Replace(' -or $redmiLanguageOwner', '')
+      # Remove the exact additional pharmacy test claim before baseline comparison.
+      $successorRestored = $successorRestored.Replace("        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',`n", '')
+      $successorRestored = $successorRestored.Replace("        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart',`n", '')
+      # Remove only the seven exact SKU test-claim additions for preservation comparison.
+      $successorRestored = $successorRestored.Replace((',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart''').Replace("`r`n", "`n"), '')
+      # Verify exact admitted label code, then restore it before the unchanged
+      # outside-admission digest. Arbitrary code inside these markers fails.
+      $rv6LabelBlock = [regex]::Matches($successorRestored, '(?ms)^# BEGIN founder RV6 historical evidence label exception 20260914\n.*?^# END founder RV6 historical evidence label exception 20260914\n\n')
+      $rv6LabelCall = [regex]::Matches($successorRestored, '(?ms)^  # BEGIN founder RV6 historical evidence label call 20260914\n.*?^  # END founder RV6 historical evidence label call 20260914\n')
+      Assert-Coordination ($rv6LabelBlock.Count -eq 1 -and $rv6LabelCall.Count -eq 1) 'RV6 label admission markers differ.'
+      $rv6LabelHasher = [Security.Cryptography.SHA256]::Create()
+      try {
+        $rv6LabelHash = [BitConverter]::ToString($rv6LabelHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($rv6LabelBlock[0].Value + $rv6LabelCall[0].Value))).Replace('-', '')
+        Assert-Coordination ($rv6LabelHash -ceq 'A983D81EDDB98AC06164FCE7F00405BCA5453873365BE8B9DF99CF5BD51F40C4') 'RV6 label exception differs from exact reviewed code.'
+      } finally { $rv6LabelHasher.Dispose() }
+      $successorRestored = $successorRestored.Replace($rv6LabelBlock[0].Value, '').Replace($rv6LabelCall[0].Value, '')
+      $successorHasher = [Security.Cryptography.SHA256]::Create()
+      try {
+        $successorRestoredHash = [BitConverter]::ToString($successorHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($successorRestored))).Replace('-', '')
+        Assert-Coordination ($successorRestoredHash -ceq 'D74ED97ED1495017099BA32414022F961F061E3AC90112E9B6C39EF2497298E9') 'Successor admission changed another coordination rule.'
+        foreach ($successorOwner in $successorHashes.Keys) {
+          $successorText = [IO.File]::ReadAllText((Join-Path $root $successorOwner)).Replace("`r`n", "`n")
+          $successorHash = [BitConverter]::ToString($successorHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($successorText))).Replace('-', '')
+          Assert-Coordination ($successorHash -ceq $successorHashes[$successorOwner]) "Successor exact reviewed checker differs: $successorOwner"
+        }
+      } finally { $successorHasher.Dispose() }
+      # Founder-approved RV6 fixture, D005-C01 and reproduced D014 correction:
+      # exact seven-file source delta within the existing owner claim only.
+      # This admits local qualification, not a build or device acceptance.
+      $fixtureHashes = @{
+        'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
+        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = 'F4283186F4D33111951B5003EE344260C6D0490578FD108F02E9CF8E0022A00D'
+        'apps/mobile/lib/main.dart' = '5FE1A6762CBB516D4935AACABF5DA0A81D0307ABD78EA96026335659AEB196EB'
+        'apps/mobile/lib/app/ui_review_language_store.dart' = '30816600AEDA842CBE06BBF38B11F6EA79D41679A03D3F8CF31BF9C975372A74'
+        'apps/mobile/test/app/ui_review_language_store_test.dart' = '921F901A32EE5A5BEB905CF07F8E05E1C7B9ED97D38A912B96631E0D17494A3F'
+        # Founder handoff preserves exact archived WIP 72f5d36a, not qualified
+        # runtime acceptance. Existing APK/boundary gates remain unchanged.
+        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = '0770772C953D85C1DB861EF2444F492063AC39C092916BAEF8CC6E78AD1A659A'
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = '858B2FC79D514E9738ED3A3460BE11A1ABDD74B79E35CB1A9FC2791C0AD50189'
+      }
+      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'] = '761A5F4BB1A4C5EB3EAA56C139D969E86BF3796CB4311E66CBD04A31C4CFCA60'
+      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'] = '9AFD18E028F175E45E30885E9473EBC605AC79CC8063711730C8D31FBB0E66BA'
+      $skuRegressionHashes = @{
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart' = '51D79606E60CBF5AEC889BF5D0835FE5F1969A54BDA9EA9A8A93F8F734F86201'
+        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart' = '5B01679CEBFED7076F3419F827ADBEEA95B007C3AC8B4E3CB04ECF3DE36B5A79'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart' = '85B196CD57C7C3C7B26BEC41B9F480599EBC8A25FE51FB474E4D49B2F9B410E3'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart' = 'F43A88269777CC52BC8EB8D619A87027CF9085F1D5DA9D1AA9BC94A5E62BCDD4'
+        'apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart' = 'FBB49DF8E52F40914ABBF7B1F05FDBCF129E91674E5C846BA9199E3338DC9E11'
+        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart' = 'C25112CB171E1C0DF2E4BC67E02052079E71A8B642B3A3D7C83D05C8B040DB72'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart' = 'AAEB5EC44802A1610B553477B318C336E94B586EB84909144EBB78B2ECFCDF00'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart' = 'C703D079A27F127A71C957022FD2CA319438784FB7D3112D0C926894489A104D'
+        'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart' = 'C6E00B5159AE0E5075D28C11A0B86607CE5FC630DEAB7B6E3DAECD9A2F7D0DBE'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart' = '0D4A54A2B44C6E842C8B53E9821B2CF5C9C56057D1B95B575EA274C9708B7BB6'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart' = '9DD977762A59981BAF01496A88E13925917097E8553284BB9EAED4F183E32177'
+        'apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart' = 'B4A86F91743FFD459543858589B756DF3C33B2DB4C82E85446939DE547E8ED64'
+        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart' = 'F033EB7252AA6B0C3BF750F66BA6A8F357E53688660D6B75FF95DACE9D1D495E'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart' = '5EBE92844E92D559FBE45D3C0FF57DDE514F2F92CB47018CE228353BED1672CD'
+      }
+      $fixtureDelta = @(& git -C $root diff --name-only $successorParent -- apps backend contracts packages package.json package-lock.json pubspec.yaml pubspec.lock)
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Fixture source inventory failed.'
+      foreach ($skuTestOwner in $skuRegressionHashes.Keys) {
+        if ($fixtureDelta -ccontains $skuTestOwner) { $fixtureHashes[$skuTestOwner] = $skuRegressionHashes[$skuTestOwner] }
+      }
+      $languageUntracked = @(& git -C $root ls-files --others --exclude-standard -- apps backend contracts packages)
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Language untracked inventory failed.'
+      $fixtureDelta = @($fixtureDelta) + @($languageUntracked)
+
+      if ($fixtureDelta.Count -gt 0) {
+        & git -C $root merge-base --is-ancestor 'b437a216b3c61db9a7ef67968828b71ef7243474' $head
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Fixture admission requires the preserved Redmi checkpoint.'
+        Assert-Coordination ((@($fixtureDelta | Sort-Object) -join '|') -ceq (@($fixtureHashes.Keys | Sort-Object) -join '|')) 'Fixture admission changed an unrelated source owner.'
+        foreach ($fixtureOwner in $fixtureHashes.Keys) {
+          $fixtureText = [IO.File]::ReadAllText((Join-Path $root $fixtureOwner)).Replace("`r`n", "`n")
+          $fixtureHasher = [Security.Cryptography.SHA256]::Create()
+          try {
+            $fixtureHash = [BitConverter]::ToString($fixtureHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($fixtureText))).Replace('-', '')
+          } finally { $fixtureHasher.Dispose() }
+          Assert-Coordination ($fixtureHash -ceq $fixtureHashes[$fixtureOwner]) "Fixture admission source hash differs: $fixtureOwner"
+        }
+      }
+      if ($head -ceq $successorParent) {
+        $successorDirty = @(Get-ProductionChangedOwners $head $head)
+        Assert-Coordination ((@($successorDirty | Sort-Object) -join '|') -ceq (@($successorControls | Sort-Object) -join '|')) 'Successor admission must contain exactly five reviewed checker owners.'
+      } else {
+        $successorFollowing = @(& git -C $root rev-list --first-parent --reverse "${successorParent}..$head")
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorFollowing.Count -gt 0) 'Successor admission commit missing.'
+        $successorCommit = [string]$successorFollowing[0]
+        $successorParents = @(& git -C $root show -s --format=%P $successorCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorParents.Count -eq 1 -and $successorParents[0] -ceq $successorParent) 'Successor admission parent differs.'
+        $successorSubject = @(& git -C $root show -s --format=%s $successorCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorSubject[0] -ceq 'ui(redmi-v6-audit-20260913): admit exact qualified successor review source') 'Successor admission subject differs.'
+        $successorChanged = @(& git -C $root diff-tree --no-commit-id --name-only -r $successorCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($successorChanged | Sort-Object) -join '|') -ceq (@($successorControls | Sort-Object) -join '|')) 'Successor admission changed unrelated owners.'
+        # The enclosing block is the sole founder-authorized amendment; the
+        # restored prior checker hash above still binds every other rule.
+        # Current four controls are exact-hash bound above. Their only new
+        # admissions reference committed11b6562e; native projections, scanner
+        # rules and the unchanged clipboard/sound content checks are retained.
+        # The original five-owner admission commit remains verified above.
+      }
+      # Preserve the already-sealed historical policy owner; current policy stays byte-bound above.
+      $primaryEvidenceCoordinationOwnerKeys = @('config/codex-development-regression-registry.json','config/codex-subagent-coordination-policy.json') + @($successorControls | ForEach-Object { $_.ToLowerInvariant() })
+    }
+    # END founder SUCCESSOR BUILD admission 20260914
     if (
       $ProductionLane -ceq 'cursor_ui' -and
       $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
@@ -5566,7 +5953,7 @@ if ($ProductionLane -ceq 'baseline') {
     }
     if ($approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq
-          'work/integration-repair/store-buy-conflict-repair-v3-20260904') {
+          $(if ($storeBuySkuSeptember18) { 'work/integration-repair/store-buy-sku-20260918' } else { 'work/integration-repair/store-buy-conflict-repair-v3-20260904' })) {
       $qualifiedRepairCommit = [string]$approvedCommits[0]
       Assert-QualifiedIntegrationRepairTip `
         -RepairCommit $qualifiedRepairCommit

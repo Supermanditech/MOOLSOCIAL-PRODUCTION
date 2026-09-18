@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   BuyV2TaxInvoiceDetails invoice({
@@ -49,6 +50,7 @@ void main() {
     required BuyV2Destination destination,
     required BuyV2TaxInvoiceDetails sellerInvoice,
     BuyV2TaxInvoiceDetails? platformInvoice,
+    String promise = 'Delivered',
   }) => BuyV2Order(
     id: destination == BuyV2Destination.wholesale ? 'PO-1' : 'MS-1',
     destination: destination,
@@ -57,7 +59,7 @@ void main() {
     total: 1050,
     partner: 'Direct supplier',
     partnerType: 'Verified seller',
-    promise: 'Delivered',
+    promise: promise,
     destinationLabel: 'Jodhpur',
     progress: 1,
     status: BuyV2OrderStatus.delivered,
@@ -70,6 +72,62 @@ void main() {
     theme: MoolTheme.light(),
     home: BuyV2InvoicePage(order: order),
   );
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'RV6 D003 invoice estimate is historical ${destination.name} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.reset);
+          final placed = order(
+            destination: destination,
+            promise: 'Delivery in 12 min',
+            sellerInvoice: invoice(
+              seller: 'Store A',
+              invoiceNumber: 'RV6-D003-INVOICE',
+            ),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: r66VisualCaptureRoot(child!),
+              ),
+              home: BuyV2InvoicePage(order: placed),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text('Recorded delivery estimate'),
+            250,
+            maxScrolls: 60,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('Expected'), findsNothing);
+          expect(find.text('Recorded delivery estimate'), findsOneWidget);
+          final disclosure = find.textContaining('recorded time unavailable');
+          expect(disclosure, findsOneWidget);
+          expect(find.textContaining('not a live countdown'), findsOneWidget);
+          await tester.ensureVisible(disclosure);
+          await tester.pumpAndSettle();
+          expect(disclosure.hitTestable(), findsOneWidget);
+          await captureR66Visual(
+            tester,
+            'rv6-d003-invoice-${destination.name}-text-$scale-v2',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets('retail invoice exposes seller and food compliance context', (
     tester,

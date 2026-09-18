@@ -505,6 +505,75 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   String _cacheKey(BuyV2CatalogueQuery query, String? cursor) =>
       jsonEncode([query.key, cursor]);
 
+  final Map<String, Future<BuyV2CataloguePage<T>?>> _previews = {};
+  int _previewEpoch = 0;
+
+  bool acceptsCursor(String? cursor) =>
+      requestedCursor == cursor ||
+      (cursor != null && _previews.containsKey(cursor));
+
+  BuyV2CataloguePage<T>? adjacentPage({required bool forward}) {
+    final cursor = forward ? _page?.nextCursor : _page?.previousCursor;
+    if (_query == null || cursor == null) return null;
+    return _cache[_cacheKey(_query!, cursor)];
+  }
+
+  Future<void> prefetchAdjacent() async {
+    final query = _query;
+    final page = _page;
+    if (_disposed || _loading || query == null || page == null) return;
+    for (final cursor in [page.nextCursor, page.previousCursor]) {
+      if (cursor == null || _cache.containsKey(_cacheKey(query, cursor))) {
+        continue;
+      }
+      if (_previews.containsKey(cursor)) continue;
+      final epoch = _previewEpoch;
+      final originCursor = _cursor;
+      // Schedule after registration so the shared request limiter can admit it.
+      _previews[cursor] =
+          Future<BuyV2CataloguePage<T>?>.microtask(() async {
+            try {
+              final result = await load(
+                query,
+                cursor: cursor,
+                pageSize: pageSize,
+              );
+              if (_disposed || epoch != _previewEpoch || query != _query) {
+                return null;
+              }
+              _validate(result, query, cursor, page, originCursor);
+              // A speculative result must still neighbour the currently visible page.
+              if (cursor != _page?.nextCursor &&
+                  cursor != _page?.previousCursor &&
+                  cursor != _requestedCursor) {
+                return null;
+              }
+              _cache[_cacheKey(query, cursor)] = result;
+              while (_cache.length > maximumCachedPages) {
+                final currentKey = _cacheKey(query, _cursor);
+                _cache.remove(
+                  _cache.keys.firstWhere((key) => key != currentKey),
+                );
+              }
+              final retainedOffsets = _cache.values
+                  .map((p) => _pageScrollKey(query, p))
+                  .toSet();
+              _scrollOffsets.removeWhere(
+                (key, _) => !retainedOffsets.contains(key),
+              );
+              notifyListeners();
+              return result;
+            } on Object {
+              // A preview failure never replaces the current page or its status.
+              return null;
+            }
+          }).whenComplete(() {
+            if (epoch == _previewEpoch) _previews.remove(cursor);
+          });
+    }
+    await Future.wait(_previews.values.toList());
+  }
+
   Future<void> open(BuyV2CatalogueQuery query, {String? cursor}) {
     if (_disposed) return Future.value();
     if (_query == query &&
@@ -515,6 +584,8 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
     }
     final changedQuery = _query != query;
     if (changedQuery) {
+      _previewEpoch++;
+      _previews.clear();
       _page = null;
       _cursor = null;
       _cache.clear();
@@ -568,6 +639,8 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   Future<void> refresh() {
     final currentQuery = _query;
     if (currentQuery == null || _disposed) return Future.value();
+    _previewEpoch++;
+    _previews.clear();
     _cache.clear();
     _scrollOffsets.clear();
     _page = null;
@@ -586,11 +659,16 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
       final previous = _page;
       final previousCursor = _cursor;
       try {
-        final result = await load(
-          request.query,
-          cursor: request.cursor,
-          pageSize: pageSize,
-        );
+        final pendingPreview = _previews.remove(request.cursor);
+        final preview = pendingPreview == null ? null : await pendingPreview;
+        if (_disposed || request.generation != _generation) continue;
+        final result =
+            preview ??
+            await load(
+              request.query,
+              cursor: request.cursor,
+              pageSize: pageSize,
+            );
         if (_disposed || request.generation != _generation) continue;
         _validate(
           result,
@@ -681,6 +759,8 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _previewEpoch++;
+    _previews.clear();
     _scrollOffsets.clear();
     _generation += 1;
     _pending = null;
@@ -2762,7 +2842,7 @@ class BuyV2Session extends ChangeNotifier {
         isCurrent: () =>
             !pager.isDisposed &&
             pager.query == query &&
-            pager.requestedCursor == cursor,
+            pager.acceptsCursor(cursor),
       ),
     );
     pager.addListener(_retainCataloguePages);
@@ -2801,7 +2881,7 @@ class BuyV2Session extends ChangeNotifier {
         isCurrent: () =>
             !pager.isDisposed &&
             pager.query == query &&
-            pager.requestedCursor == cursor,
+            pager.acceptsCursor(cursor),
       ),
     );
     pager.addListener(_retainCataloguePages);
@@ -2874,7 +2954,7 @@ class BuyV2Session extends ChangeNotifier {
         isCurrent: () =>
             !pager.isDisposed &&
             pager.query == query &&
-            pager.requestedCursor == cursor,
+            pager.acceptsCursor(cursor),
       ),
     );
     pager.addListener(_retainCataloguePages);
@@ -3990,7 +4070,9 @@ class BuyV2Session extends ChangeNotifier {
   // Ephemeral Offers presentation state survives product/store Back navigation.
   // Publication validity and product facts still come from the source contracts.
   String? featuredOfferPublicationId;
+  bool featuredOffersMoolSocial = false;
   String finiteOffersCategoryId = 'all';
+  BuyV2OfferPublisherType? finiteOffersPublisher;
   final Map<String, BuyV2CartBenefitsLoadState> _productBenefitStates = {};
   final Map<String, String> _productBenefitMessages = {};
   final Map<String, int> _productBenefitRequestSequences = {};

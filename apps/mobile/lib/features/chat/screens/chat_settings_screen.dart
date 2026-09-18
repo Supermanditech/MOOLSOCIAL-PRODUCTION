@@ -82,6 +82,9 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
       isScrollControlled: true,
       sheetAnimationStyle: ChatMotion.sheetStyle(context),
       builder: (sheetContext) => SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewPaddingOf(sheetContext).bottom,
+        ),
         child: Padding(
           key: const Key('chat-message-permission-picker'),
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),

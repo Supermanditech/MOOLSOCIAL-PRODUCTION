@@ -6,6 +6,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show
@@ -119,7 +120,11 @@ final class _R669ContinuityComparison implements BuyV2ComparisonSource {
   }
 }
 
-Future<BuyV2Session> r669ComparisonContinuitySession(BuySession core) async {
+Future<BuyV2Session> r669ComparisonContinuitySession(
+  BuySession core, {
+  BuyV2ProductContentAdapter productContentAdapter =
+      const BuyV2CatalogueProductContentAdapter(),
+}) async {
   final now = DateTime.utc(2026, 9, 10, 12);
   final products = BuyV2Catalogue.allProducts
       .map(
@@ -148,6 +153,7 @@ Future<BuyV2Session> r669ComparisonContinuitySession(BuySession core) async {
     reviewDataEnabled: false,
     catalogueNow: () => now,
     comparisonSource: _R669ContinuityComparison(products, now),
+    productContentAdapter: productContentAdapter,
   );
   commerce.snapshot = BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
@@ -256,8 +262,17 @@ void main() {
             await tester.pumpAndSettle();
           }
           final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
-          await tester.ensureVisible(sourceCard);
-          await tester.tap(sourceCard);
+          final sourceTitle = find.descendant(
+            of: sourceCard,
+            matching: find.text(session.product(sourceId).customerTitle),
+          );
+          await Scrollable.ensureVisible(
+            tester.element(sourceTitle),
+            alignment: .4,
+          );
+          await tester.pumpAndSettle();
+          expect(sourceTitle.hitTestable(), findsOneWidget);
+          await tester.tap(sourceTitle);
           await tester.pumpAndSettle();
           expect(session.selectedProductId, sourceId);
           final product = session.product(sourceId);
@@ -877,7 +892,7 @@ void main() {
     }
   }
 
-  testWidgets('R66 Saved return retains the horizontal browsing position', (
+  testWidgets('R66 Saved return retains the vertical browsing position', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -896,28 +911,78 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
     await tester.pumpAndSettle();
+    final grid = find.byKey(
+      ValueKey(
+        'buy-vertical-product-grid-buy-products-shop-${session.selectedCategoryId}-saved',
+      ),
+    );
     final lane = find
-        .byWidgetPredicate(
-          (widget) =>
-              widget is Scrollable &&
-              widget.axisDirection == AxisDirection.right,
+        .ancestor(
+          of: grid,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
         )
-        .last;
-    final tile = find.byKey(ValueKey('buy-product-${products[2].id}'));
-    await tester.scrollUntilVisible(tile, 200, scrollable: lane);
-    await tester.pumpAndSettle();
+        .first;
+    final selected = products[3];
+    final image = find.descendant(
+      of: find.byKey(ValueKey('buy-product-${selected.id}')),
+      matching: find.byKey(ValueKey('buy-grid-packshot-${selected.id}')),
+    );
+    const imagePoint = Alignment(-.5, .55);
+    for (
+      var attempt = 0;
+      attempt < 100 &&
+          (image.hitTestable(at: imagePoint).evaluate().isEmpty ||
+              tester.state<ScrollableState>(lane).position.pixels <= 0);
+      attempt++
+    ) {
+      final point =
+          const [
+            Alignment(-.85, 0),
+            Alignment(.85, 0),
+            Alignment(-.85, -.5),
+            Alignment(.85, -.5),
+          ].firstWhere(
+            (point) => lane.hitTestable(at: point).evaluate().isNotEmpty,
+          );
+      await tester.dragFrom(
+        point.withinRect(tester.getRect(lane)),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(image.hitTestable(at: imagePoint), findsOneWidget);
     final before = tester.state<ScrollableState>(lane).position.pixels;
     expect(before, greaterThan(0));
-    await tester.tap(tile);
+    await tester.tapAt(imagePoint.withinRect(tester.getRect(image)));
     await tester.pumpAndSettle();
-    expect(session.selectedProductId, products[2].id);
+    expect(session.selectedProductId, selected.id);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Saved in Shop'), findsOneWidget);
+    expect(session.showingSavedProducts, isTrue);
     expect(
       tester.state<ScrollableState>(lane).position.pixels,
       closeTo(before, 1),
     );
+    // The heading can be outside the lazy list's retained viewport. First
+    // prove exact return position, then reveal and verify the Saved heading.
+    for (
+      var attempt = 0;
+      attempt < 10 && tester.state<ScrollableState>(lane).position.pixels > 0;
+      attempt++
+    ) {
+      final bounds = tester.getRect(lane);
+      await tester.dragFrom(
+        Offset(bounds.left + 4, bounds.top + 60),
+        const Offset(0, 600),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(tester.state<ScrollableState>(lane).position.pixels, 0);
+    expect(find.text('Saved in Shop'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1036,91 +1101,147 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('product detail continues directly through genuine products', (
-    tester,
-  ) async {
-    final session = BuyV2Session(core: BuySession());
-    session.updateQuery('tomato');
-    final origin = session.visibleProducts.first;
-    await tester.pumpWidget(app(session));
-    session.openProduct(origin.id);
-    await tester.pumpAndSettle();
+  for (final fromSaved in [false, true]) {
+    testWidgets(
+      'D007 related products restore each visit from Saved $fromSaved',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(core: BuySession());
+        if (fromSaved) {
+          if (!session.isSaved('s-atta')) session.toggleSaved('s-atta');
+          session.showSavedProducts(true);
+        } else {
+          session.updateQuery('tomato');
+        }
+        final origin = fromSaved
+            ? session.product('s-atta')
+            : session.visibleProducts.first;
+        await tester.pumpWidget(app(session));
+        session.openProduct(origin.id);
+        await tester.pumpAndSettle();
 
-    final firstNext = session.productContinuationsFor(origin).first;
-    final firstSection = find.byKey(
-      ValueKey('buy-product-continuations-${origin.id}'),
-    );
-    final firstCard = find.byKey(
-      ValueKey('buy-product-continuation-${firstNext.id}'),
-    );
-    await tester.scrollUntilVisible(
-      find.text('You may also like'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(
-        ValueKey('buy-product-continuation-${firstNext.id}'),
-        skipOffstage: false,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(firstSection, findsOneWidget);
-    expect(find.text('You may also like'), findsOneWidget);
-    expect(
-      find.text('Compare related products, prices and delivery'),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(ValueKey('buy-product-continuation-${origin.id}')),
-      findsNothing,
-    );
-    final firstCardSemantics = tester
-        .getSemantics(firstCard)
-        .getSemanticsData();
-    expect(firstCardSemantics.label, 'View ${firstNext.title} product details');
-    expect(firstCardSemantics.hasAction(SemanticsAction.tap), isTrue);
+        final firstNext = session.productContinuationsFor(origin).first;
+        final firstSection = find.byKey(
+          ValueKey('buy-product-continuations-${origin.id}'),
+        );
+        final firstCard = find.byKey(
+          ValueKey('buy-product-continuation-${firstNext.id}'),
+        );
+        await tester.scrollUntilVisible(
+          find.text('You may also like'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(
+            ValueKey('buy-product-continuation-${firstNext.id}'),
+            skipOffstage: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(firstSection, findsOneWidget);
+        expect(find.text('You may also like'), findsOneWidget);
+        expect(
+          find.text('Compare related products, prices and delivery'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('buy-product-continuation-${origin.id}')),
+          findsNothing,
+        );
+        final firstCardSemantics = tester
+            .getSemantics(firstCard)
+            .getSemanticsData();
+        expect(
+          firstCardSemantics.label,
+          'View ${firstNext.title} product details',
+        );
+        expect(firstCardSemantics.hasAction(SemanticsAction.tap), isTrue);
 
-    await tester.tap(firstCard);
-    await tester.pumpAndSettle();
-    expect(session.selectedProductId, firstNext.id);
-    expect(session.view, BuyV2View.product);
+        final originOffset = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position
+            .pixels;
+        await tester.tap(firstCard);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, firstNext.id);
+        expect(session.view, BuyV2View.product);
 
-    final secondNext = session.productContinuationsFor(firstNext).first;
-    final secondSection = find.byKey(
-      ValueKey('buy-product-continuations-${firstNext.id}'),
-    );
-    final secondCard = find.byKey(
-      ValueKey('buy-product-continuation-${secondNext.id}'),
-    );
-    await tester.scrollUntilVisible(
-      find.text('You may also like'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(
-        ValueKey('buy-product-continuation-${secondNext.id}'),
-        skipOffstage: false,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(secondSection, findsOneWidget);
-    await tester.tap(secondCard);
-    await tester.pumpAndSettle();
+        final secondNext = session.productContinuationsFor(firstNext).first;
+        final secondSection = find.byKey(
+          ValueKey('buy-product-continuations-${firstNext.id}'),
+        );
+        final secondCard = find.byKey(
+          ValueKey('buy-product-continuation-${secondNext.id}'),
+        );
+        await tester.scrollUntilVisible(
+          find.text('You may also like'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(
+            ValueKey('buy-product-continuation-${secondNext.id}'),
+            skipOffstage: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(secondSection, findsOneWidget);
+        final nextOffset = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position
+            .pixels;
+        await tester.tap(secondCard);
+        await tester.pumpAndSettle();
 
-    expect(session.selectedProductId, secondNext.id);
-    session.closeProduct();
-    await tester.pumpAndSettle();
-    expect(session.destination, BuyV2Destination.shop);
-    expect(session.view, BuyV2View.catalogue);
-    expect(session.query, 'tomato');
-    expect(tester.takeException(), isNull);
-  });
+        expect(session.selectedProductId, secondNext.id);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, firstNext.id);
+        expect(session.view, BuyV2View.product);
+        expect(
+          tester
+              .state<ScrollableState>(find.byType(Scrollable).first)
+              .position
+              .pixels,
+          closeTo(nextOffset, 1),
+        );
+        await captureR66Visual(
+          tester,
+          'rv6-d007-related-return-saved-$fromSaved',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, origin.id);
+        expect(session.view, BuyV2View.product);
+        expect(
+          tester
+              .state<ScrollableState>(find.byType(Scrollable).first)
+              .position
+              .pixels,
+          closeTo(originOffset, 1),
+        );
+        await captureR66Visual(
+          tester,
+          'rv6-d007-original-return-saved-$fromSaved',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.destination, BuyV2Destination.shop);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.query, fromSaved ? '' : 'tomato');
+        expect(session.showingSavedProducts, fromSaved);
+        if (fromSaved) expect(session.isSaved(origin.id), isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('Medicine continuation is isolated and not medical advice', (
     tester,

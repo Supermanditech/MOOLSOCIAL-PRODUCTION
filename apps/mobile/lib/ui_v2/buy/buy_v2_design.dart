@@ -16,6 +16,69 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+String buyV2CustomerStoreName(String name, String? storeId) {
+  final match = RegExp(
+    r'^buy-catalogue-dev-v1-(shop|wholesale|medicine)-store-([0-9]{6})$',
+  ).firstMatch(storeId ?? '');
+  if (match == null || name != 'Mool Market ${match.group(2)}') return name;
+  final number = int.parse(match.group(2)!);
+  if (number < 1 || number > 100000) return name;
+  return 'Mool Market $number';
+}
+
+/// Presentation only: development catalogue bookkeeping is not a product name.
+/// Require the complete generated identity and matching decoration so genuine
+/// model numbers, pack sizes and all non-fixture supplier content stay intact.
+extension BuyV2CustomerProductCopy on BuyV2Product {
+  String customerSeller(String name) => buyV2CustomerStoreName(name, storeId);
+
+  String? get _developmentSku {
+    final match = RegExp(
+      r'^buy-catalogue-dev-v1-(shop|wholesale|medicine)-store-([0-9]{6})-sku-([0-9]{4})$',
+    ).firstMatch(id);
+    if (match == null || match.group(1) != destination.name) return null;
+    final sku = int.parse(match.group(3)!);
+    if (sku < 1 ||
+        sku > 5000 ||
+        storeId !=
+            'buy-catalogue-dev-v1-${destination.name}-store-${match.group(2)}' ||
+        canonicalId !=
+            'buy-catalogue-dev-v1-${destination.name}-product-$sku') {
+      return null;
+    }
+    return '$sku';
+  }
+
+  String get customerTitle {
+    final sku = _developmentSku;
+    final suffix = ' $sku';
+    return sku != null && title.endsWith(suffix)
+        ? title.substring(0, title.length - suffix.length)
+        : title;
+  }
+
+  /// Normalize only complete, known generated field values, never substrings
+  /// inside supplier prose or genuine model numbers.
+  String customerContent(String value) {
+    if (_developmentSku == null) return value;
+    if (value == title) return customerTitle;
+    if (value == variant) return customerVariant;
+    final generatedDescription = '$title \u00b7 $variant. $pack at $unitPrice.';
+    if (value == generatedDescription) {
+      return '$customerTitle \u00b7 $customerVariant. $pack at $unitPrice.';
+    }
+    return customerSeller(value);
+  }
+
+  String get customerVariant {
+    final sku = _developmentSku;
+    final suffix = ' · SKU $sku';
+    return sku != null && variant.endsWith(suffix)
+        ? variant.substring(0, variant.length - suffix.length)
+        : variant;
+  }
+}
+
 /// Mode artwork is illustrative, never evidence of a vehicle assignment.
 enum BuyV2DeliveryArtwork { quick, wholesale, bulk, courier }
 
@@ -695,6 +758,55 @@ String buyV2OrderPromiseSummary(BuyV2Order order) {
   return order.status == BuyV2OrderStatus.delivered
       ? 'Original promise: $summary'
       : summary;
+}
+
+/// A stored estimate is never a current countdown without a qualified refresh.
+String buyV2OrderEstimateSummary(
+  BuyV2Order order, {
+  BuyV2CommerceLoadState? refreshState,
+  bool refreshing = false,
+  bool revised = false,
+}) {
+  final summary = revised
+      ? order.updatedDeliveryEstimate ?? buyV2OrderPromiseSummary(order)
+      : buyV2OrderPromiseSummary(order);
+  if (order.status == BuyV2OrderStatus.delivered) {
+    if (!revised &&
+        const [
+          '',
+          'delivered',
+          'completed',
+        ].contains(order.promise.trim().toLowerCase())) {
+      return buyV2HistoricalOrderEstimate(order);
+    }
+    return revised ? 'Recorded revised estimate · $summary' : summary;
+  }
+  final kind = revised ? 'revised estimate' : 'estimate';
+  if (refreshing) return 'Updating · last recorded $kind · $summary';
+  if (refreshState == BuyV2CommerceLoadState.ready) {
+    return 'Updated $kind · $summary';
+  }
+  if (refreshState != null && refreshState != BuyV2CommerceLoadState.loading) {
+    return 'Last recorded $kind (update unavailable) · $summary';
+  }
+  return 'Last recorded $kind · $summary';
+}
+
+/// Invoices are historical documents, not live delivery-tracking surfaces.
+/// Do not infer a timestamp from the download time or a relative promise.
+String buyV2HistoricalOrderEstimate(BuyV2Order order) {
+  final promisedWindow = order.promisedByLabel?.trim();
+  if (promisedWindow != null && promisedWindow.isNotEmpty) {
+    return 'Original promised window: $promisedWindow';
+  }
+  final recorded = order.promise.trim();
+  if (recorded.isEmpty ||
+      recorded.toLowerCase() == 'delivered' ||
+      recorded.toLowerCase() == 'completed') {
+    return 'Original delivery estimate unavailable';
+  }
+  return 'Original estimate (recorded time unavailable; not a live countdown): '
+      '$recorded';
 }
 
 String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
@@ -1766,10 +1878,7 @@ class BuyV2ProductPackshot extends StatelessWidget {
   final double borderRadius;
   final bool animateFirstFrame;
 
-  static String illustrationLabel(BuyV2Product product) =>
-      resolveMedia(product)?.kind == BuyV2ProductMediaKind.category
-      ? 'Category illustration'
-      : 'Illustration';
+  static String illustrationLabel(BuyV2Product product) => 'Illustration';
 
   @override
   Widget build(BuildContext context) {
@@ -1787,7 +1896,7 @@ class BuyV2ProductPackshot extends StatelessWidget {
       return Semantics(
         image: true,
         label:
-            'Product photo unavailable for ${product.title}, ${product.pack}',
+            'Product photo unavailable for ${product.customerTitle}, ${product.pack}',
         excludeSemantics: true,
         child: BuyV2ProductPhotoUnavailable(
           key: ValueKey('buy-product-media-fallback-${product.id}'),
@@ -1801,7 +1910,7 @@ class BuyV2ProductPackshot extends StatelessWidget {
     return Semantics(
       image: true,
       label:
-          '${illustrationLabel(product)} for ${product.title}. '
+          '${illustrationLabel(product)} for ${product.customerTitle}. '
           'Supplier photo of this pack is unavailable.',
       excludeSemantics: true,
       child: ClipRRect(
@@ -1919,7 +2028,7 @@ class BuyV2ProductPackshot extends StatelessWidget {
                       )
                     : Semantics(
                         label:
-                            'Loading supplier photo for ${product.title}, ${product.pack}',
+                            'Loading supplier photo for ${product.customerTitle}, ${product.pack}',
                         child: const Center(
                           child: Icon(
                             Icons.photo_outlined,
@@ -2111,7 +2220,8 @@ class BuyV2ProductPhotoUnavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     image: true,
-    label: 'Product photo unavailable for ${product.title}, ${product.pack}',
+    label:
+        'Product photo unavailable for ${product.customerTitle}, ${product.pack}',
     excludeSemantics: true,
     child: ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
@@ -2190,48 +2300,13 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
           builder: (context, constraints) {
             final shortest = constraints.biggest.shortestSide;
             final iconSize = (shortest * .38).clamp(0.0, 46.0);
-            const labelStyle = TextStyle(
-              color: BuyV2Colors.muted,
-              fontSize: 7,
-              fontWeight: FontWeight.w900,
-              letterSpacing: .4,
-            );
-            final labelMeasure = TextPainter(
-              text: TextSpan(
-                text: product.visualLabel,
-                style: DefaultTextStyle.of(context).style.merge(labelStyle),
-              ),
-              textDirection: Directionality.of(context),
-              textScaler: MediaQuery.textScalerOf(context),
-              maxLines: 1,
-            )..layout(maxWidth: constraints.maxWidth);
-            final labelFits = constraints.maxHeight >=
-                iconSize + 3 + labelMeasure.height;
-            labelMeasure.dispose();
-            if (!labelFits) {
-              return Center(child: Icon(
+            // The outer media disclosure and product semantics identify this
+            // illustration. Do not repeat internal atlas labels while decoding.
+            return Center(
+              child: Icon(
                 _fallbackIcon(product.categoryId),
                 size: iconSize,
                 color: BuyV2Colors.navy,
-              ));
-            }
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _fallbackIcon(product.categoryId),
-                    size: iconSize,
-                    color: BuyV2Colors.navy,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    product.visualLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: labelStyle,
-                  ),
-                ],
               ),
             );
           },

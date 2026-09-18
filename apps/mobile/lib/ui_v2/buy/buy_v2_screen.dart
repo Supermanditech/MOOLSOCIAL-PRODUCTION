@@ -339,6 +339,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   final _quickTrackerPointers = <int>{};
   int _quickTrackerNavigationSequence = 0;
   bool _searchOpen = false;
+  bool _searchAutofocus = true;
+  // The pager retains its data and offsets; this retains the return surface.
+  ({
+    BuyV2Destination destination,
+    String query,
+    String saleType,
+    String productId,
+    Object account,
+  })?
+  _searchProductReturn;
   bool _offersActive = false;
   bool _quickTrackerMinimized = true;
   bool _quickTrackerHidden = false;
@@ -360,12 +370,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   bool _miniCartParked = false;
   final _parkedCartNavigationScrollController = ScrollController();
   final _rootProductScrollController = ScrollController();
+  final _relatedProductScrollOrigins = <(String, double)>[];
+  String? _observedRootProductId;
   final _landscapeCatalogueKey = GlobalKey<NestedScrollViewState>();
   final _landscapeCatalogueOffsets = <String, (double, double)>{};
   String? _landscapeCatalogueIdentity;
   String? _presentedQuickOrderId;
   final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
   int _storeProductRouteDepth = 0;
+  int _partnerCatalogueDepth = 0;
+  ({BuyV2Session session, String productId, Object account, int generation})?
+  _storeQuestionReturn;
+  int _storeQuestionGeneration = 0;
+  bool _storeQuestionWasCovered = false;
+  BuyV2View? _observedStoreSessionView;
+  int? _retainedStoreEmptyCartSequence;
   int _storeNavigationGeneration = 0;
   BuyV2Product? get _storeBrowseAnchor =>
       _storeBrowseAnchors.isEmpty ? null : _storeBrowseAnchors.values.last;
@@ -380,6 +399,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Render the requested Offers surface on the first frame. Deferred session
+    // restoration may not notify when its catalogue state is already current.
+    _offersActive = widget.initialOffersActive;
     WidgetsBinding.instance.addObserver(this);
     _foreground =
         WidgetsBinding.instance.lifecycleState == null ||
@@ -411,7 +433,30 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       widget.session.orders.map((order) => MapEntry(order.id, order.status)),
     );
     _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
+    _observedRootProductId = widget.session.view == BuyV2View.product
+        ? widget.session.selectedProductId
+        : null;
     widget.session.addListener(_sessionChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    final pending = _storeQuestionReturn;
+    if (pending == null) return;
+    if (!isCurrent) {
+      _storeQuestionWasCovered = true;
+      return;
+    }
+    if (!_storeQuestionWasCovered) return;
+    _storeQuestionWasCovered = false;
+    // Buy can become visible before the Chat push Future completes.
+    // Restore only this request, on the same account and Buy session.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      _restoreStoreQuestion(pending.generation);
+    });
   }
 
   @override
@@ -435,6 +480,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _quickTrackerMinimized = true;
     }
     if (oldWidget.session != widget.session) {
+      _searchProductReturn = null;
+      _storeQuestionReturn = null;
+      _storeQuestionWasCovered = false;
+      _relatedProductScrollOrigins.clear();
+      _observedRootProductId = widget.session.view == BuyV2View.product
+          ? widget.session.selectedProductId
+          : null;
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
       restoreState = true;
@@ -501,6 +553,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   void _applyInitialState({bool afterRestore = false}) {
+    _searchProductReturn = null;
     if (widget.session.isStoreProcurement &&
         _hasExplicitBuyRoute &&
         !afterRestore) {
@@ -527,7 +580,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         if (anchor != null) _openPartnerCatalogue(anchor);
       });
     } else if (recoveryKind != null) {
-      widget.session.destination = widget.initialDestination;
+      // Recovery must snapshot the current journey before any route defaults
+      // can replace its destination (a generic recovery link defaults to Shop).
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
       unawaited(widget.session.openLinkedProduct(productId));
@@ -551,7 +605,26 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   void _sessionChanged() {
     if (!mounted) return;
+    final previousStoreView = _observedStoreSessionView;
+    final previousRootProduct = _observedRootProductId;
+    final session = widget.session;
+    _observedStoreSessionView = session.view;
+    if (_partnerCatalogueDepth > 0 &&
+        (previousStoreView == BuyV2View.cart ||
+            previousStoreView == BuyV2View.checkout) &&
+        session.view == BuyV2View.catalogue &&
+        session.cartLines.isEmpty &&
+        session.navigationMotionDirection ==
+            BuyV2NavigationMotionDirection.back) {
+      // Emptying the basket updates the covered Cart, not the customer's
+      // active Store catalogue. Retain only this navigation sequence;
+      // subsequent navigation and scope changes keep their existing handling.
+      _retainedStoreEmptyCartSequence = session.navigationMotionSequence;
+    }
     if (!widget.session.procurementScopeCurrent) {
+      _searchProductReturn = null;
+      _relatedProductScrollOrigins.clear();
+      _observedRootProductId = null;
       _resetArrivalSound();
       _noticeTimer?.cancel();
       _cartAcknowledgementTimer?.cancel();
@@ -575,6 +648,28 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       setState(() {});
       return;
     }
+    final searchReturn = _searchProductReturn;
+    if (searchReturn != null &&
+        (searchReturn.account != _arrivalIdentity ||
+            searchReturn.destination != session.destination ||
+            searchReturn.query != session.query ||
+            searchReturn.saleType != session.saleTypeSignature)) {
+      _searchProductReturn = null;
+    }
+    if (_searchOpen &&
+        previousStoreView == BuyV2View.catalogue &&
+        session.view == BuyV2View.product &&
+        session.selectedProductId != null &&
+        _lastSearchDestination == session.destination &&
+        _storeProductRouteDepth == 0) {
+      _searchProductReturn = (
+        destination: session.destination,
+        query: session.query,
+        saleType: session.saleTypeSignature,
+        productId: session.selectedProductId!,
+        account: _arrivalIdentity,
+      );
+    }
     if (_arrivalAccount != _arrivalIdentity) {
       _resetArrivalSound();
       _arrivalAccount = _arrivalIdentity;
@@ -583,13 +678,36 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (_quickTrackerNavigationSequence !=
         widget.session.navigationMotionSequence) {
       final session = widget.session;
+      final previousProductId = _observedRootProductId;
+      final nextProductId = session.view == BuyV2View.product
+          ? session.selectedProductId
+          : null;
+      double? relatedReturnOffset;
+      if (_storeProductRouteDepth == 0 && nextProductId != null) {
+        if (session.navigationMotionDirection == BuyV2NavigationMotionDirection.forward) {
+          if (previousProductId != null && previousProductId != nextProductId &&
+              session.canReturnToComparedProduct &&
+              _rootProductScrollController.positions.length == 1) {
+            _relatedProductScrollOrigins.add((previousProductId,
+              _rootProductScrollController.position.pixels));
+          } else if (!session.canReturnToComparedProduct) {
+            _relatedProductScrollOrigins.clear();
+          }
+        } else if (previousProductId != null && previousProductId != nextProductId &&
+            _relatedProductScrollOrigins.isNotEmpty &&
+            _relatedProductScrollOrigins.last.$1 == nextProductId) {
+          relatedReturnOffset = _relatedProductScrollOrigins.removeLast().$2;
+        }
+      }
+      _observedRootProductId = nextProductId;
       if (_storeProductRouteDepth == 0 &&
           session.view == BuyV2View.product &&
-          session.navigationMotionDirection ==
-              BuyV2NavigationMotionDirection.forward) {
+          (session.navigationMotionDirection ==
+              BuyV2NavigationMotionDirection.forward || relatedReturnOffset != null)) {
         final sequence = session.navigationMotionSequence;
-        // Fresh product entry starts with the buying decision. Back from Cart
-        // or a nested Store visit retains its own existing scroll restoration.
+        // New details start at the buying decision; related-product Back
+        // restores the specific previous visit, including repeated products.
+        // Cart and nested Store keep their separate restoration paths.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted &&
               identical(widget.session, session) &&
@@ -597,7 +715,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
               session.view == BuyV2View.product &&
               _storeProductRouteDepth == 0 &&
               _rootProductScrollController.positions.length == 1) {
-            _rootProductScrollController.jumpTo(0);
+            final position = _rootProductScrollController.position;
+            position.jumpTo((relatedReturnOffset ?? 0).clamp(
+              position.minScrollExtent, position.maxScrollExtent));
           }
         });
       }
@@ -607,9 +727,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       if (!_quickTrackerKept) _quickTrackerMinimized = true;
     }
     if (_storeProductRouteDepth > 0 &&
-        widget.session.view == BuyV2View.catalogue) {
+        widget.session.view == BuyV2View.catalogue &&
+        _retainedStoreEmptyCartSequence != session.navigationMotionSequence) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.session.view == BuyV2View.catalogue) {
+        if (mounted &&
+            identical(widget.session, session) &&
+            session.view == BuyV2View.catalogue &&
+            _retainedStoreEmptyCartSequence !=
+                session.navigationMotionSequence) {
           _dismissStoreProductRoutes();
         }
       });
@@ -656,6 +781,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     if (destinationChanged || widget.session.view != BuyV2View.catalogue) {
       _searchOpen = false;
+    }
+    if (session.view == BuyV2View.catalogue && _searchProductReturn != null) {
+      final origin = _searchProductReturn!;
+      _searchProductReturn = null;
+      if (previousStoreView == BuyV2View.product &&
+          previousRootProduct == origin.productId &&
+          session.navigationMotionDirection ==
+              BuyV2NavigationMotionDirection.back) {
+        _searchOpen = true;
+        _searchAutofocus = false;
+      }
     }
     if (_searchController.text != widget.session.query) {
       _searchController.value = TextEditingValue(
@@ -1072,8 +1208,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                 offersActive: _offersActive,
                                 controller: _searchController,
                                 open: _searchOpen,
-                                onOpenChanged: (value) =>
-                                    setState(() => _searchOpen = value),
+                                autofocus: _searchAutofocus,
+                                onOpenChanged: (value) => setState(() {
+                                  _searchOpen = value;
+                                  _searchAutofocus = value;
+                                }),
                                 onLocation: () => session.pagedCatalogueEnabled
                                     ? showBuyV2CatalogueArea(context, session)
                                     : showBuyV2AddressSheet(context, session),
@@ -1833,6 +1972,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     } else {
       widget.session.openDestination(destination);
     }
+    final router = GoRouter.maybeOf(context);
+    if (widget.orderId != null &&
+        destination != BuyV2Destination.medicine &&
+        router?.routeInformationProvider.value.uri.path.startsWith(
+              '/app/buy/order/',
+            ) ==
+            true) {
+      // Leaving an order must also leave its URL. Otherwise another native
+      // delivery of that same order URL is treated as the current route while
+      // the customer is browsing a product or Store over it.
+      router!.replace('/app/buy?sub=${destination.name}');
+    }
   }
 
   void _openOffers() {
@@ -1987,7 +2138,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     try {
       context.push(
         order.collection == null
-            ? const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order)
+            ? const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+                order: order,
+                deliverySummary: buyV2OrderArrivalSummary(
+                  widget.session,
+                  order,
+                ),
+              )
             : const BuyV2ChatRouteAdapter().orderHelpLocationFor(
                 orderId: order.id,
               ),
@@ -2053,23 +2210,51 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Future<void> _openStoreQuestionRoute(BuyV2Product product) async {
+    final session = widget.session;
+    final generation = ++_storeQuestionGeneration;
+    _storeQuestionReturn = (
+      session: session,
+      productId: product.id,
+      account: _arrivalIdentity,
+      generation: generation,
+    );
+    _storeQuestionWasCovered = false;
     try {
       await context.push(
         const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product),
       );
     } on ArgumentError {
-      widget.session.clearStoreReturnAnchor();
-      widget.session.showNotice(
+      if (!mounted ||
+          _storeQuestionReturn?.generation != generation ||
+          widget.session != session ||
+          _storeQuestionReturn?.account != _arrivalIdentity) {
+        return;
+      }
+      _storeQuestionReturn = null;
+      _storeQuestionWasCovered = false;
+      session.clearStoreReturnAnchor();
+      session.showNotice(
         'Store Chat is unavailable right now. Your products are unchanged.',
       );
       return;
     }
-    if (!mounted) return;
-    final anchorId = widget.session.takeStoreReturnAnchor(
-      routeProductId: product.id,
+    _restoreStoreQuestion(generation);
+  }
+
+  void _restoreStoreQuestion(int generation) {
+    final pending = _storeQuestionReturn;
+    if (!mounted || pending == null || pending.generation != generation) return;
+    _storeQuestionReturn = null;
+    _storeQuestionWasCovered = false;
+    final session = pending.session;
+    final anchorId = session.takeStoreReturnAnchor(
+      routeProductId: pending.productId,
     );
-    if (anchorId == null) return;
-    final anchor = widget.session.findProduct(anchorId);
+    if (anchorId == null || widget.session != session ||
+        pending.account != _arrivalIdentity || !session.procurementScopeCurrent) {
+      return;
+    }
+    final anchor = session.findProduct(anchorId);
     if (anchor != null) _openPartnerCatalogue(anchor);
   }
 
@@ -2098,6 +2283,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (!brandOnly) {
       _rememberStoreBrowse(product);
     }
+    _partnerCatalogueDepth++;
+    _observedStoreSessionView = session.view;
     unawaited(
       showBuyV2PartnerCatalogue(
         context,
@@ -2119,6 +2306,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           },
         ),
       ).whenComplete(() {
+        _partnerCatalogueDepth--;
+        if (_partnerCatalogueDepth == 0) _retainedStoreEmptyCartSequence = null;
         if (originOffset == null) return;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted ||
@@ -2138,6 +2327,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             ),
           );
         });
+        // Route completion can occur after the final animation frame. Ensure
+        // the retained origin restoration receives a frame of its own.
+        WidgetsBinding.instance.scheduleFrame();
       }),
     );
   }
@@ -2169,6 +2361,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     final generation = _storeNavigationGeneration;
     final navigation = MoolGlobalNavigationController();
     final routeDepth = ++_storeProductRouteDepth;
+    // A platform link can replace the Buy route while its old State is still
+    // mounted. Invalidate this temporary return at the router boundary too.
+    final routeInformation = GoRouter.maybeOf(context)?.routeInformationProvider;
+    var routeChanged = false;
+    void onRouteChanged() => routeChanged = true;
+    routeInformation?.addListener(onRouteChanged);
     final openCart = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
         settings: const RouteSettings(name: 'buy-store-product'),
@@ -2375,11 +2573,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           );
         },
       ),
-    );
+    ).whenComplete(() => routeInformation?.removeListener(onRouteChanged));
     _storeProductRouteDepth--;
     if (!mounted) return openCart ?? false;
     setState(() {});
-    if (generation != _storeNavigationGeneration || widget.session != session) {
+    if (routeChanged ||
+        generation != _storeNavigationGeneration ||
+        widget.session != session) {
       return false;
     }
     restoreOrigin();
@@ -3014,6 +3214,7 @@ class _BuySearchBand extends StatelessWidget {
     required this.offersActive,
     required this.controller,
     required this.open,
+    this.autofocus = true,
     required this.onOpenChanged,
     required this.onLocation,
     required this.onAccount,
@@ -3024,6 +3225,7 @@ class _BuySearchBand extends StatelessWidget {
   final bool offersActive;
   final TextEditingController controller;
   final bool open;
+  final bool autofocus;
   final ValueChanged<bool> onOpenChanged;
   final VoidCallback onLocation;
   final VoidCallback onAccount;
@@ -3153,7 +3355,7 @@ class _BuySearchBand extends StatelessWidget {
                                 ? TextField(
                                     key: const ValueKey('buy-search-field'),
                                     controller: controller,
-                                    autofocus: true,
+                                    autofocus: autofocus,
                                     onChanged: session.updateQuery,
                                     textInputAction: TextInputAction.search,
                                     minLines: 1,

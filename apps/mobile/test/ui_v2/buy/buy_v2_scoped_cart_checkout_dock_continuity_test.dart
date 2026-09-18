@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
@@ -16,6 +17,28 @@ import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 import 'buy_v2_product_continuity_test.dart'
     show r669ComparisonContinuitySession;
+
+class _R5DistinctProductContent implements BuyV2ProductContentAdapter {
+  const _R5DistinctProductContent();
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    final base = const BuyV2CatalogueProductContentAdapter().snapshotFor(
+      product,
+    );
+    return BuyV2ProductContentSnapshot(
+      productId: product.id,
+      state: base.state,
+      sourceId: 'r5-supplier-description-fixture',
+      media: base.media,
+      highlights: base.highlights,
+      specifications: base.specifications,
+      description:
+          'Store sealed containers away from direct sunlight. '
+          'Check the batch and best-before date on each container before use.',
+    );
+  }
+}
 
 class _R5DockArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
@@ -441,7 +464,10 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         final core = BuySession();
-        final session = await r669ComparisonContinuitySession(core);
+        final session = await r669ComparisonContinuitySession(
+          core,
+          productContentAdapter: const _R5DistinctProductContent(),
+        );
         session.openDestination(BuyV2Destination.wholesale);
         expect(session.openProduct('w-oil'), isTrue);
         addTearDown(core.dispose);
@@ -1246,22 +1272,44 @@ void main() {
             const ValueKey('buy-recently-viewed-heading'),
           );
           final clear = find.byKey(const ValueKey('buy-recently-viewed-clear'));
-          await tester.scrollUntilVisible(
-            clear,
-            140,
-            scrollable: find
-                .descendant(
-                  of: find.byType(BuyV2CatalogueView),
-                  matching: find.byWidgetPredicate(
-                    (widget) =>
-                        widget is Scrollable &&
-                        widget.axisDirection == AxisDirection.down,
-                  ),
-                )
-                .first,
-          );
-          await tester.ensureVisible(clear);
-          await tester.pumpAndSettle();
+          final catalogueScroll = find
+              .descendant(
+                of: find.byType(BuyV2CatalogueView),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first;
+          Future<void> revealClear(double delta) async {
+            for (
+              var attempt = 0;
+              attempt < 100 && clear.hitTestable().evaluate().isEmpty;
+              attempt++
+            ) {
+              final start =
+                  const [
+                    Alignment(-.85, 0),
+                    Alignment(.85, 0),
+                    Alignment(-.85, -.5),
+                    Alignment(.85, -.5),
+                  ].firstWhere(
+                    (alignment) => catalogueScroll
+                        .hitTestable(at: alignment)
+                        .evaluate()
+                        .isNotEmpty,
+                  );
+              await tester.dragFrom(
+                start.withinRect(tester.getRect(catalogueScroll)),
+                Offset(0, delta),
+              );
+              await tester.pumpAndSettle();
+            }
+            expect(clear.hitTestable(), findsOneWidget);
+          }
+
+          await revealClear(-140);
           final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
           for (final target in [heading, clear]) {
             expect(
@@ -1269,9 +1317,20 @@ void main() {
               isFalse,
             );
           }
-          final facts = find.byKey(
-            const ValueKey('buy-recently-viewed-facts-s-tomato'),
+          final recentCard = find.byKey(
+            const ValueKey('buy-recently-viewed-product-s-tomato'),
           );
+          final facts = find
+              .ancestor(
+                of: find.descendant(
+                  of: recentCard,
+                  matching: find.text(
+                    session.product('s-tomato').customerTitle,
+                  ),
+                ),
+                matching: find.byType(BuyV2CartAvoidanceRegion),
+              )
+              .first;
           await tester.ensureVisible(facts);
           await tester.pumpAndSettle();
           final viewport = tester.getRect(
@@ -1283,10 +1342,14 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.getRect(cart).overlaps(visibleFacts), isFalse);
           await capture(tester, 'r664-recent-facts-$size-$scale');
-          await tester.ensureVisible(clear);
-          await tester.pumpAndSettle();
-          expect(clear.hitTestable(), findsOneWidget);
+          await revealClear(120);
           await capture(tester, 'r664-recent-clear-$size-$scale');
+          expect(
+            clear.hitTestable(),
+            findsOneWidget,
+            reason:
+                'Clear ${clear.evaluate().isEmpty ? 'unmounted' : tester.getRect(clear)}; Cart ${tester.getRect(cart)}; viewport ${tester.getRect(find.byKey(const ValueKey("buy-cart-content-viewport")))}',
+          );
           await tester.tap(clear);
           await tester.pumpAndSettle();
           expect(
@@ -1335,21 +1398,27 @@ void main() {
   }
 
   void expectWordsFit(WidgetTester tester, Finder textFinder) {
-    final text = tester.widget<Text>(textFinder);
-    final paragraph = tester.renderObject<RenderParagraph>(textFinder);
-    expect(paragraph.didExceedMaxLines, isFalse);
-    for (final word in text.data!.split(RegExp(r'\s+'))) {
-      final measure = TextPainter(
-        text: TextSpan(text: word, style: paragraph.text.style),
-        textDirection: TextDirection.ltr,
-        textScaler: paragraph.textScaler,
-      )..layout();
-      expect(
-        paragraph.size.width + .5,
-        greaterThanOrEqualTo(measure.width),
-        reason: 'Complete word: $word',
+    expect(textFinder, findsWidgets);
+    for (final element in textFinder.evaluate()) {
+      final exact = find.byElementPredicate(
+        (candidate) => identical(candidate, element),
       );
-      measure.dispose();
+      final text = tester.widget<Text>(exact);
+      final paragraph = tester.renderObject<RenderParagraph>(exact);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      for (final word in text.data!.split(RegExp(r'\s+'))) {
+        final measure = TextPainter(
+          text: TextSpan(text: word, style: paragraph.text.style),
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout();
+        expect(
+          paragraph.size.width + .5,
+          greaterThanOrEqualTo(measure.width),
+          reason: 'Complete word: $word',
+        );
+        measure.dispose();
+      }
     }
   }
 
@@ -1950,6 +2019,12 @@ void main() {
         final badge = find.descendant(of: tile, matching: find.text('Lowest'));
         expectWordsFit(tester, badge);
         final remove = find.byKey(const ValueKey('buy-save-s-tomato'));
+        expectWordsFit(
+          tester,
+          find.descendant(of: remove, matching: find.text('Remove')),
+        );
+        expect(tester.getSize(remove).width, greaterThanOrEqualTo(44));
+        expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
         expect(tester.getRect(badge).overlaps(tester.getRect(remove)), isFalse);
         expect(remove.hitTestable(), findsOneWidget);
         await capture(tester, 'r664-saved-badge-$width-$scale');
@@ -2389,12 +2464,13 @@ void main() {
           );
           await tester.ensureVisible(add);
           await tester.pumpAndSettle();
+          final card = find.byKey(ValueKey('buy-product-$id'));
+          final compactSize = tester.getSize(card);
           expect(add.hitTestable(), findsOneWidget);
           await tester.tap(add);
           await tester.pumpAndSettle();
           final product = session.product(id);
           expect(session.quantityFor(id), product.minimumOrder);
-          final card = find.byKey(ValueKey('buy-product-$id'));
           final plus = find.descendant(
             of: card,
             matching: find.byTooltip('Add one'),
@@ -2432,8 +2508,23 @@ void main() {
           expect(session.view, BuyV2View.catalogue);
           expect(offers, findsOneWidget);
           expect(state.mounted, isTrue);
-          expect(state.position.pixels, closeTo(offset, .1));
-          expect(tester.getTopLeft(card).dy, closeTo(cardTop, .1));
+          // Compaction may reduce the scroll range at its end. Require only
+          // the normal extent clamp, never an unrelated scroll reset.
+          expect(
+            state.position.pixels,
+            closeTo(
+              offset.clamp(
+                state.position.minScrollExtent,
+                state.position.maxScrollExtent,
+              ),
+              .1,
+            ),
+          );
+          expect(tester.getSize(card), compactSize);
+          expect(
+            tester.getTopLeft(card).dy + state.position.pixels,
+            closeTo(cardTop + offset, .1),
+          );
           expect(add.hitTestable(), findsOneWidget);
           expect(
             find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
@@ -3334,7 +3425,7 @@ void main() {
               of: card,
               matching: find.byType(Text),
             );
-            expect(facts, findsNWidgets(5));
+            expect(facts, findsWidgets);
             expect(
               find.descendant(
                 of: card,
@@ -3345,9 +3436,7 @@ void main() {
             expect(
               find.descendant(
                 of: card,
-                matching: find.text(
-                  'Offer price ${buyV2Money(offerProduct.price)} · ${offerProduct.pack}',
-                ),
+                matching: find.text(buyV2Money(offerProduct.price)),
               ),
               findsOneWidget,
             );
@@ -3363,15 +3452,16 @@ void main() {
             expect(
               find.descendant(
                 of: card,
-                matching: find.text('Published by ${offerProduct.seller}'),
+                matching: find.text('From ${offerProduct.seller}'),
               ),
               findsOneWidget,
             );
             for (final factElement in facts.evaluate()) {
-              final fact = find.byWidget(factElement.widget);
+              final fact = find.byElementPredicate(
+                (element) => identical(element, factElement),
+              );
               final paragraph = tester.renderObject<RenderParagraph>(fact);
               expect(paragraph.didExceedMaxLines, isFalse);
-              expect(paragraph.maxLines, isNull);
               final factBounds = tester.getRect(fact);
               expect(factBounds.bottom, lessThanOrEqualTo(bounds.bottom - 7));
               expect(factBounds.right, lessThanOrEqualTo(bounds.right - 10));

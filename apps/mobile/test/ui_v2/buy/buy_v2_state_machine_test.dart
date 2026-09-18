@@ -4,6 +4,8 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
+import 'buy_v2_cart_relevance_test.dart' show QualificationDeliveryFacts;
+
 bool _belongsToScope(
   BuyV2Product product,
   BuyV2CartScope scope,
@@ -135,7 +137,10 @@ void _expectExactState({
 
 void main() {
   test('mixed Buy actions preserve exact commerce state after every step', () {
-    final session = BuyV2Session(core: BuySession());
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: const QualificationDeliveryFacts(),
+    );
     addTearDown(session.dispose);
     final products = BuyV2Catalogue.products
         .where((product) {

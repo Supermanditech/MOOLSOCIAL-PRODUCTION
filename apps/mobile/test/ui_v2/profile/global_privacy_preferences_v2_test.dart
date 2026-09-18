@@ -715,6 +715,81 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('D005 language availability persists text $scale', (
+      tester,
+    ) async {
+      final fixture = await pumpAccessibility(
+        tester,
+        size: const Size(320, 568),
+        textScale: scale,
+      );
+      final tile = find.byKey(const Key('global-preferences-language'));
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      final disclosure = find.byKey(
+        const Key('global-preferences-language-availability'),
+      );
+      await tester.ensureVisible(disclosure);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Hindi is not yet available'), findsOneWidget);
+      expect(
+        tester.renderObject<RenderParagraph>(disclosure).didExceedMaxLines,
+        isFalse,
+      );
+      await captureR66Visual(tester, 'rv6-d005-disclosure-text-$scale');
+      final hindi = find.byKey(const Key('global-preferences-language-hi'));
+      await tester.ensureVisible(hindi);
+      await tester.pumpAndSettle();
+      await tester.tap(hindi);
+      await tester.pumpAndSettle();
+      expect(fixture.journey.languageCode, 'hi');
+      expect(fixture.store.snapshot?.languageCode, 'hi');
+      expect(
+        find.text('Hindi preferred · App screens: English'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('global-preferences-language-sheet')),
+        findsNothing,
+      );
+      await captureR66Visual(tester, 'rv6-d005-selected-text-$scale');
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      expect(disclosure, findsOneWidget);
+      await tester.ensureVisible(hindi);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: hindi,
+          matching: find.byIcon(Icons.check_circle_rounded),
+        ),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(fixture.store.snapshot?.languageCode, 'hi');
+      final restored = JourneySession(store: fixture.store);
+      addTearDown(restored.dispose);
+      final restoration = restored.start();
+      await tester.pumpAndSettle();
+      await restoration;
+      expect(restored.languageCode, 'hi');
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      final english = find.byKey(const Key('global-preferences-language-en'));
+      await tester.ensureVisible(english);
+      await tester.pumpAndSettle();
+      await tester.tap(english);
+      await tester.pumpAndSettle();
+      expect(fixture.journey.languageCode, 'en');
+      expect(fixture.store.snapshot?.languageCode, 'en');
+      expect(find.text('English'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'Language choices remain fully visible above compact phone insets',
     (tester) async {

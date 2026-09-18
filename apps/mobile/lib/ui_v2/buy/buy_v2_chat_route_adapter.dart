@@ -48,7 +48,11 @@ class BuyV2ChatRouteAdapter {
     ).toString();
   }
 
-  String orderHelpLocationFor({String? orderId, BuyV2Order? order}) {
+  String orderHelpLocationFor({
+    String? orderId,
+    BuyV2Order? order,
+    String? deliverySummary,
+  }) {
     final normalizedOrderId = (order?.id ?? orderId ?? '').trim();
     if (normalizedOrderId.isEmpty) {
       throw ArgumentError.value(orderId, 'orderId', 'Order ID is required.');
@@ -63,7 +67,7 @@ class BuyV2ChatRouteAdapter {
       queryParameters: {
         'draft': order == null
             ? 'Help with order $normalizedOrderId'
-            : _orderHelpDraft(order),
+            : _orderHelpDraft(order, deliverySummary: deliverySummary),
         'return': Uri(
           path: '/app/buy',
           queryParameters: {
@@ -105,7 +109,7 @@ class BuyV2ChatRouteAdapter {
                   )
                   .toList(growable: false),
             ),
-          'delivery': order.promise,
+          'delivery': deliverySummary ?? buyV2OrderEstimateSummary(order),
           'deliveryDestination': order.destinationLabel,
           'paymentMethod': ?_clean(order.paymentMethod),
           'paymentTerms': ?_clean(order.paymentTermLabel),
@@ -322,7 +326,7 @@ class BuyV2ChatRouteAdapter {
   String _productLink(BuyV2Product product) =>
       buyV2SharedProductUri(product).toString();
 
-  String _orderHelpDraft(BuyV2Order order) {
+  String _orderHelpDraft(BuyV2Order order, {String? deliverySummary}) {
     return [
       'Hello ${order.partner},',
       'Help with order ${order.id}.',
@@ -336,7 +340,7 @@ class BuyV2ChatRouteAdapter {
       if (order.lines.isEmpty && order.productIds.isNotEmpty)
         'Product references: ${order.productIds.join(', ')}',
       'Order total: ${buyV2Money(order.total)}',
-      'Delivery: ${order.promise}',
+      'Delivery: ${deliverySummary ?? buyV2OrderEstimateSummary(order)}',
       if (_clean(order.paymentMethod) case final paymentMethod?)
         'Payment: $paymentMethod',
       if (_clean(order.paymentTermLabel) case final paymentTerms?)

@@ -98,9 +98,9 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
                       _PreferenceTile(
                         keyName: 'global-preferences-language',
                         icon: Icons.language_rounded,
-                        title: 'Language',
+                        title: 'Language preference',
                         value: session.languageCode == 'hi'
-                            ? 'हिन्दी'
+                            ? 'Hindi preferred · App screens: English'
                             : 'English',
                         palette: palette,
                         onTap: () => _showLanguage(context, palette),
@@ -192,71 +192,83 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 420),
             child: Padding(
               padding: const EdgeInsets.all(MoolSpacing.md),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Choose language',
-                    style: TextStyle(
-                      color: palette.ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  for (final choice in const [
-                    (code: 'en', label: 'English'),
-                    (code: 'hi', label: 'हिन्दी'),
-                  ])
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: choice.code == 'en' ? MoolSpacing.xs : 0,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Language preference',
+                      style: TextStyle(
+                        color: palette.ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                       ),
-                      child: Semantics(
-                        selected: session.languageCode == choice.code,
-                        button: true,
-                        child: ListTile(
-                          key: Key(
-                            'global-preferences-language-${choice.code}',
-                          ),
-                          tileColor: palette.control,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              MoolRadii.control,
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                    Text(
+                      'Buy and settings currently use English. Hindi is not yet '
+                      'available for these screens. Selecting Hindi saves your '
+                      'preference only.',
+                      key: const Key(
+                        'global-preferences-language-availability',
+                      ),
+                      style: TextStyle(color: palette.muted, fontSize: 13),
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                    for (final choice in const [
+                      (code: 'en', label: 'English'),
+                      (code: 'hi', label: 'हिन्दी'),
+                    ])
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: choice.code == 'en' ? MoolSpacing.xs : 0,
+                        ),
+                        child: Semantics(
+                          selected: session.languageCode == choice.code,
+                          button: true,
+                          child: ListTile(
+                            key: Key(
+                              'global-preferences-language-${choice.code}',
                             ),
-                            side: BorderSide(color: palette.border),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: MoolSpacing.sm,
-                          ),
-                          minTileHeight: 56,
-                          leading: Icon(
-                            session.languageCode == choice.code
-                                ? Icons.check_circle_rounded
-                                : Icons.circle_outlined,
-                            color: palette.accent,
-                          ),
-                          title: Text(
-                            choice.label,
-                            style: TextStyle(
-                              color: palette.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                            tileColor: palette.control,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.control,
+                              ),
+                              side: BorderSide(color: palette.border),
                             ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: MoolSpacing.sm,
+                            ),
+                            minTileHeight: 56,
+                            leading: Icon(
+                              session.languageCode == choice.code
+                                  ? Icons.check_circle_rounded
+                                  : Icons.circle_outlined,
+                              color: palette.accent,
+                            ),
+                            title: Text(
+                              choice.label,
+                              style: TextStyle(
+                                color: palette.ink,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            onTap: () async {
+                              final saved = await session.updateLanguage(
+                                choice.code,
+                              );
+                              if (saved && dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                            },
                           ),
-                          onTap: () async {
-                            final saved = await session.updateLanguage(
-                              choice.code,
-                            );
-                            if (saved && dialogContext.mounted) {
-                              Navigator.pop(dialogContext);
-                            }
-                          },
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

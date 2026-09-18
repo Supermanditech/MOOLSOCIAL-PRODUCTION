@@ -543,7 +543,10 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     label: 'Address',
                     value: order.addressLine ?? order.destinationLabel,
                   ),
-                  _InvoiceFact(label: 'Expected', value: order.promise),
+                  _InvoiceFact(
+                    label: 'Recorded delivery estimate',
+                    value: buyV2HistoricalOrderEstimate(order),
+                  ),
                   if (order.dispatchPromise case final dispatchPromise?)
                     _InvoiceFact(
                       label: 'Dispatch promise',

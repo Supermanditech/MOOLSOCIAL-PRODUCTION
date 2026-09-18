@@ -1,7 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show immutable, listEquals;
+import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart'
+    show CustomSemanticsAction, OrdinalSortKey;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -218,6 +220,11 @@ class BuyV2OffersView extends StatefulWidget {
 class _BuyV2OffersViewState extends State<BuyV2OffersView> {
   BuyV2PublishedOffersSnapshot? _snapshot;
   var _requestSequence = 0;
+  BuyV2OfferPublisherType? get _publisher =>
+      widget.session.finiteOffersPublisher;
+  set _publisher(BuyV2OfferPublisherType? value) =>
+      widget.session.finiteOffersPublisher = value;
+  bool get _mool => widget.session.featuredOffersMoolSocial;
 
   BuyV2Session get session => widget.session;
 
@@ -287,6 +294,7 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
       if (query.isNotEmpty &&
           !_matchesPublishedOffer(query, [
             product.title,
+            product.customerTitle,
             product.brand,
             product.pack,
             product.badge,
@@ -301,8 +309,9 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
     final resolved = allResolved
         .where(
           (entry) =>
-              session.finiteOffersCategoryId == 'all' ||
-              entry.product.categoryId == session.finiteOffersCategoryId,
+              (_publisher == null || entry.offer.publisherType == _publisher) &&
+              (session.finiteOffersCategoryId == 'all' ||
+                  entry.product.categoryId == session.finiteOffersCategoryId),
         )
         .toList(growable: false);
     final products = resolved
@@ -317,6 +326,24 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
             child: _OffersCategoryControl(
               session: session,
               categoryId: session.finiteOffersCategoryId,
+              publisher: _publisher,
+              moolSocial: _mool,
+              onSourceChanged: (value) => setState(() {
+                widget.session.featuredOffersMoolSocial = value;
+                _publisher = value ? BuyV2OfferPublisherType.moolSocial : null;
+              }),
+              onFilter: () async {
+                final choice = await _chooseOfferPublisher(context, _publisher);
+                if (mounted && choice != null) {
+                  setState(() {
+                    _publisher = choice.publisher;
+                    if (_publisher != null) {
+                      widget.session.featuredOffersMoolSocial =
+                          _publisher == BuyV2OfferPublisherType.moolSocial;
+                    }
+                  });
+                }
+              },
               onTap: () async {
                 final selected = await _chooseOffersCategory(
                   context,
@@ -333,6 +360,7 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
               child: _PublishedOfferPromotion(
                 session: session,
                 entries: resolved,
+                moolSocial: _mool,
               ),
             ),
           if (products.isEmpty)
@@ -372,6 +400,13 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
                 products: products,
                 storageKey: 'buy-offers-products',
                 semanticLabel: 'Offer products',
+                alignMediaAtTop: true,
+                productCardBuilder: (product) => BuyV2ProductCard(
+                  session: session,
+                  product: product,
+                  compact: true,
+                  alignMediaAtTop: true,
+                ),
               ),
             ),
         ],
@@ -392,6 +427,8 @@ class _PagedPublishedOffersView extends StatefulWidget {
 class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
   static const _scope = 'published-offers';
   String _category = 'all';
+  BuyV2OfferPublisherType? _publisher;
+  bool get _mool => widget.session.featuredOffersMoolSocial;
 
   @override
   void initState() {
@@ -402,6 +439,7 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
   void _restoreSelection() {
     final query = widget.session.retainedCatalogueOffersQuery(_scope);
     _category = query?.categoryId ?? 'all';
+    _publisher = query?.offerPublisher;
   }
 
   @override
@@ -426,7 +464,10 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
     return BuyV2PagedProductCatalogue(
       session: session,
       scopeKey: _scope,
-      query: session.catalogueOffersQuery(categoryId: _category),
+      query: session.catalogueOffersQuery(
+        categoryId: _category,
+        publisher: _publisher,
+      ),
       publishedOffers: true,
       showAreaControl: true,
       controlsAfterProducts: true,
@@ -434,9 +475,28 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
         session: session,
         categoryId: _category,
         onTap: _chooseCategory,
+        publisher: _publisher,
+        moolSocial: _mool,
+        onSourceChanged: (value) => setState(() {
+          widget.session.featuredOffersMoolSocial = value;
+          _publisher = value ? BuyV2OfferPublisherType.moolSocial : null;
+        }),
+        onFilter: () async {
+          final choice = await _chooseOfferPublisher(context, _publisher);
+          if (mounted && choice != null) {
+            setState(() {
+              _publisher = choice.publisher;
+              if (_publisher != null) {
+                widget.session.featuredOffersMoolSocial =
+                    _publisher == BuyV2OfferPublisherType.moolSocial;
+              }
+            });
+          }
+        },
       ),
       publicationFacts: (offers) => _PublishedOfferPromotion(
         session: session,
+        moolSocial: _mool,
         entries: [
           for (final value in offers)
             (
@@ -516,35 +576,83 @@ Future<String?> _chooseOffersCategory(
   );
 }
 
+String _offerPublisherLabel(BuyV2OfferPublisherType? publisher) =>
+    switch (publisher) {
+      BuyV2OfferPublisherType.manufacturer => 'Manufacturers',
+      BuyV2OfferPublisherType.wholesaler => 'Wholesalers',
+      BuyV2OfferPublisherType.retailer => 'Stores',
+      BuyV2OfferPublisherType.moolSocial => 'MoolSocial',
+      null => 'All publishers',
+    };
+
+Future<({BuyV2OfferPublisherType? publisher})?> _chooseOfferPublisher(
+  BuildContext context,
+  BuyV2OfferPublisherType? selected,
+) => showModalBottomSheet<({BuyV2OfferPublisherType? publisher})>(
+  context: context,
+  showDragHandle: true,
+  useSafeArea: true,
+  builder: (context) => SingleChildScrollView(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text('Filter offers', style: context.buyTitle),
+        ),
+        for (final publisher in [null, ...BuyV2OfferPublisherType.values])
+          ListTile(
+            key: ValueKey('buy-offer-filter-${publisher?.name ?? 'all'}'),
+            title: Text(_offerPublisherLabel(publisher)),
+            selected: selected == publisher,
+            trailing: selected == publisher
+                ? const Icon(Icons.check_rounded)
+                : null,
+            onTap: () => Navigator.pop(context, (publisher: publisher)),
+          ),
+      ],
+    ),
+  ),
+);
+
 class _OffersCategoryControl extends StatelessWidget {
   const _OffersCategoryControl({
     required this.session,
     required this.categoryId,
     required this.onTap,
+    required this.onFilter,
+    this.publisher,
+    required this.moolSocial,
+    required this.onSourceChanged,
   });
   final BuyV2Session session;
   final String categoryId;
   final VoidCallback onTap;
+  final VoidCallback onFilter;
+  final BuyV2OfferPublisherType? publisher;
+  final bool moolSocial;
+  final ValueChanged<bool> onSourceChanged;
 
   @override
   Widget build(BuildContext context) {
     final label =
         _offerCategories(
           session,
-        ).where((category) => category.id == categoryId).firstOrNull?.label ??
+        ).where((c) => c.id == categoryId).firstOrNull?.label ??
         'All categories';
     return BuyV2CartAvoidanceRegion(
-      child: Padding(
+      child: Container(
         key: const ValueKey('buy-offers-publisher-summary'),
-        padding: const EdgeInsets.fromLTRB(12, 2, 8, 2),
+        constraints: const BoxConstraints(minHeight: 60),
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 5),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFF9F2), Color(0xFFF8F8FF), Color(0xFFF5F8FF)],
+          ),
+          border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+        ),
         child: Row(
           children: [
-            Expanded(
-              child: Text(
-                'Offers',
-                style: context.buyTitle.copyWith(fontSize: 17),
-              ),
-            ),
             _CatalogueChromeAction(
               key: const ValueKey('buy-offers-category-control'),
               label: 'Choose offer category. Current category $label',
@@ -552,6 +660,77 @@ class _OffersCategoryControl extends StatelessWidget {
               icon: Icons.menu_rounded,
               emphasized: true,
               onTap: onTap,
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: BuyV2Colors.softBlue,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Flex(
+                  direction: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                      ? Axis.vertical
+                      : Axis.horizontal,
+                  children: [
+                    for (final mool in [false, true])
+                      Flexible(
+                        fit: FlexFit.tight,
+                        flex: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                            ? 0
+                            : 1,
+                        child: TextButton(
+                          key: ValueKey(
+                            'buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}',
+                          ),
+                          onPressed: () => onSourceChanged(mool),
+                          style: TextButton.styleFrom(
+                            backgroundColor: moolSocial == mool
+                                ? BuyV2Colors.navy
+                                : Colors.transparent,
+                            foregroundColor: moolSocial == mool
+                                ? Colors.white
+                                : BuyV2Colors.navy,
+                            minimumSize: const Size(0, 44),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 6,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            mool ? 'MoolSocial' : 'Suppliers',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            _CompactCatalogueAction(
+              key: const ValueKey('buy-offers-saved'),
+              icon: Icons.bookmark_border_rounded,
+              label: 'Show Saved products',
+              badge: '${session.savedCountFor(session.destination)}',
+              active: false,
+              onTap: () => showBuyV2SavedProducts(context, session),
+            ),
+            const SizedBox(width: 5),
+            _CatalogueChromeAction(
+              key: const ValueKey('buy-offers-filter'),
+              label: 'Filter offers. ${_offerPublisherLabel(publisher)}',
+              tooltip: 'Filter offers',
+              icon: Icons.tune_rounded,
+              emphasized: publisher != null,
+              onTap: onFilter,
             ),
           ],
         ),
@@ -566,7 +745,9 @@ class _PublishedOfferPromotion extends StatefulWidget {
   const _PublishedOfferPromotion({
     required this.session,
     required this.entries,
+    required this.moolSocial,
   });
+  final bool moolSocial;
   final BuyV2Session session;
   final List<({BuyV2PublishedOffer offer, BuyV2Product product})> entries;
 
@@ -576,140 +757,346 @@ class _PublishedOfferPromotion extends StatefulWidget {
 }
 
 class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
-  int get _index {
-    final retained = widget.entries.indexWhere(
-      (entry) =>
-          entry.offer.identity == widget.session.featuredOfferPublicationId,
-    );
-    return retained < 0 ? 0 : retained;
-  }
+  bool get _mool => widget.moolSocial;
+  PageController? _controller;
+  String _pageKey = '';
+  List<({BuyV2PublishedOffer offer, BuyV2Product product})> get _entries =>
+      widget.entries
+          .where(
+            (e) =>
+                (e.offer.publisherType == BuyV2OfferPublisherType.moolSocial) ==
+                _mool,
+          )
+          .toList();
 
-  void _select(int index) {
-    setState(() {
-      widget.session.featuredOfferPublicationId =
-          widget.entries[index].offer.identity;
-    });
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.entries.isEmpty) return const SizedBox.shrink();
-    final index = _index;
-    final entry = widget.entries[index];
-    final product = entry.product;
-    final publisher =
-        entry.offer.publisherName ??
-        (entry.offer.publisherType == BuyV2OfferPublisherType.moolSocial
-            ? 'MoolSocial'
-            : product.seller);
-    void open() {
-      widget.session.featuredOfferPublicationId = entry.offer.identity;
-      widget.session.openProduct(product.id);
+    final entries = _entries;
+    final key = '$_mool:${entries.map((e) => e.offer.identity).join('|')}';
+    if (_pageKey != key) {
+      _controller?.dispose();
+      final retained = entries.indexWhere(
+        (e) => e.offer.identity == widget.session.featuredOfferPublicationId,
+      );
+      _controller = PageController(
+        viewportFraction: .80,
+        initialPage: retained < 0 ? 0 : retained,
+      );
+      _pageKey = key;
     }
-
+    final selected = entries.indexWhere(
+      (e) => e.offer.identity == widget.session.featuredOfferPublicationId,
+    );
     return BuyV2CartAvoidanceRegion(
-      child: Padding(
+      child: Column(
         key: const ValueKey('buy-published-offer-facts'),
-        padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [BuyV2Colors.softOrange, BuyV2Colors.softBlue],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0x33000080)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                BuyV2FiniteIncomingTransition(
-                  key: const ValueKey('buy-offer-promotion-motion'),
-                  stateKey: '${entry.offer.identity}:${product.price}',
-                  duration: const Duration(milliseconds: 450),
-                  child: InkWell(
-                    key: ValueKey('buy-published-offer-${product.id}'),
-                    onTap: open,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.offer.headline,
-                          style: context.buyTitle.copyWith(fontSize: 16),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          product.title,
-                          style: context.buyBody.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Offer price ${buyV2Money(product.price)} · ${product.pack}',
-                          style: context.buyBody.copyWith(
-                            color: BuyV2Colors.green,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        if (product.minimumOrder > 1)
-                          Text(
-                            'Minimum ${product.minimumOrder} packs',
-                            style: context.buyMeta,
-                          ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Published by $publisher',
-                          key: const ValueKey('buy-offer-promotion-publisher'),
-                          style: context.buyMeta,
-                        ),
-                      ],
+        children: [
+          if (entries.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('No current offers from this publisher.'),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = constraints.maxWidth * .80 - 12;
+                final largeText =
+                    MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                final imageWidth = largeText ? cardWidth : cardWidth * .43;
+                final textWidth = largeText
+                    ? cardWidth - 16
+                    : cardWidth - imageWidth - 16;
+                double measure(
+                  String text,
+                  double size,
+                  FontWeight weight,
+                  double width,
+                ) {
+                  final painter = TextPainter(
+                    text: TextSpan(
+                      text: text,
+                      style: DefaultTextStyle.of(context).style.copyWith(
+                        fontSize: size,
+                        height: 1.15,
+                        fontWeight: weight,
+                      ),
                     ),
+                    textDirection: Directionality.of(context),
+                    textScaler: MediaQuery.textScalerOf(context),
+                  )..layout(maxWidth: width);
+                  final result = painter.height;
+                  painter.dispose();
+                  return result;
+                }
+
+                double height = 0;
+                for (final entry in entries) {
+                  final product = entry.product;
+                  final body =
+                      measure(
+                        product.customerTitle,
+                        15,
+                        FontWeight.w800,
+                        textWidth,
+                      ) +
+                      measure(
+                        buyV2Money(product.price),
+                        22,
+                        FontWeight.w900,
+                        textWidth,
+                      ) +
+                      measure(product.pack, 11, FontWeight.w500, textWidth) +
+                      4 +
+                      (product.minimumOrder > 1
+                          ? measure(
+                              'Minimum ${product.minimumOrder} packs',
+                              11,
+                              FontWeight.w500,
+                              textWidth,
+                            )
+                          : 0);
+                  final publisher =
+                      entry.offer.publisherName ??
+                      (_mool ? 'MoolSocial' : product.seller);
+                  final contentHeight =
+                      body +
+                      8 +
+                      measure(
+                        entry.offer.headline,
+                        11,
+                        FontWeight.w700,
+                        textWidth,
+                      ) +
+                      measure(
+                        'From ${product.customerSeller(publisher)}',
+                        11,
+                        FontWeight.w500,
+                        textWidth,
+                      );
+                  final candidate =
+                      16 +
+                      (contentHeight > 112 ? contentHeight : 112.0) +
+                      (largeText ? 112 : 0);
+                  if (candidate > height) height = candidate;
+                }
+                return SizedBox(
+                  height: height,
+                  child: PageView.builder(
+                    key: ValueKey('buy-offer-cinema-$_pageKey'),
+                    controller: _controller,
+                    itemCount: entries.length,
+                    padEnds: false,
+                    onPageChanged: (index) => setState(
+                      () => widget.session.featuredOfferPublicationId =
+                          entries[index].offer.identity,
+                    ),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      final product = entry.product;
+                      final publisher =
+                          entry.offer.publisherName ??
+                          (_mool ? 'MoolSocial' : product.seller);
+                      void open() {
+                        widget.session.featuredOfferPublicationId =
+                            entry.offer.identity;
+                        widget.session.openProduct(product.id);
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 4, 0),
+                        child: Container(
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: _mool
+                                  ? [
+                                      const Color(0xFF21182C),
+                                      const Color(0xFF513447),
+                                    ]
+                                  : [
+                                      const Color(0xFF201C24),
+                                      const Color(0xFF49303A),
+                                    ],
+                            ),
+                          ),
+                          child: InkWell(
+                            key: ValueKey('buy-published-offer-${product.id}'),
+                            onTap: open,
+                            child: Flex(
+                              direction: largeText
+                                  ? Axis.vertical
+                                  : Axis.horizontal,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          entry.offer.headline,
+                                          style: const TextStyle(
+                                            color: Color(0xFFFFD381),
+                                            fontSize: 11,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          product.customerTitle,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          buyV2Money(product.price),
+                                          style: const TextStyle(
+                                            color: Color(0xFFFFD381),
+                                            fontSize: 22,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          product.pack,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        if (product.minimumOrder > 1)
+                                          Text(
+                                            'Minimum ${product.minimumOrder} packs',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              height: 1.15,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'From ${product.customerSeller(publisher)}',
+                                          key: ValueKey(
+                                            'buy-offer-publisher-${entry.offer.identity}',
+                                          ),
+                                          style: const TextStyle(
+                                            color: Color(0xFFE4E9E3),
+                                            fontSize: 11,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: imageWidth,
+                                  height: largeText ? 112 : null,
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFFF7EAE3),
+                                          Color(0xFFECDDE7),
+                                        ],
+                                      ),
+                                      border: Border(
+                                        left: BorderSide(
+                                          color: Color(0x337C5264),
+                                        ),
+                                      ),
+                                    ),
+                                    foregroundDecoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0x05A36B76),
+                                          Color(0x16A36B76),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Flex(
+                                      direction: largeText
+                                          ? Axis.horizontal
+                                          : Axis.vertical,
+                                      children: [
+                                        Expanded(
+                                          child: BuyV2ProductPackshot(
+                                            product: product,
+                                            borderRadius: 0,
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: largeText ? 112 : null,
+                                          child: TextButton(
+                                            key: ValueKey(
+                                              'buy-offer-promotion-cta-${product.id}',
+                                            ),
+                                            onPressed: open,
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: const Color(
+                                                0xFF30232D,
+                                              ),
+                                              padding: EdgeInsets.zero,
+                                              minimumSize: const Size(44, 48),
+                                            ),
+                                            child: const Text(
+                                              'View offer →',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                height: 1.15,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (widget.entries.length > 1) ...[
-                      IconButton(
-                        key: const ValueKey('buy-offer-promotion-previous'),
-                        tooltip: 'Previous offer',
-                        onPressed: index > 0 ? () => _select(index - 1) : null,
-                        icon: const Icon(Icons.chevron_left_rounded),
-                      ),
-                      IconButton(
-                        key: const ValueKey('buy-offer-promotion-next'),
-                        tooltip: 'Next offer',
-                        onPressed: index + 1 < widget.entries.length
-                            ? () => _select(index + 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_right_rounded),
-                      ),
-                    ],
-                    const Spacer(),
-                    Flexible(
-                      flex: 3,
-                      child: OutlinedButton(
-                        key: ValueKey('buy-offer-promotion-cta-${product.id}'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        onPressed: open,
-                        child: const Text('View offer'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                );
+              },
             ),
-          ),
-        ),
+          if (entries.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Text(
+                '${selected < 0 ? 1 : selected + 1} / ${entries.length}',
+                style: context.buyMeta.copyWith(fontSize: 10),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -866,6 +1253,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.publicationFacts,
     this.controlsAfterProducts = false,
     this.toolbarBuilder,
+    this.includeStoreSearch = false,
   });
 
   final BuyV2Session session;
@@ -880,6 +1268,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final Widget Function(List<BuyV2PublishedCatalogueOffer>)? publicationFacts;
   final bool controlsAfterProducts;
   final Widget Function(int? total, bool loading)? toolbarBuilder;
+  final bool includeStoreSearch;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
@@ -889,6 +1278,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
 class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     with WidgetsBindingObserver {
   late BuyV2CataloguePager<Object> _pager;
+  BuyV2CataloguePager<BuyV2StoreListing>? _storeSearchPager;
   late ScrollController _vertical;
   bool _ownsVertical = true;
   late List<ScrollController> _lanes;
@@ -926,6 +1316,11 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       lane.addListener(_saveOffsets);
     }
     _pager.addListener(_pageChanged);
+    if (widget.includeStoreSearch) {
+      _storeSearchPager = widget.session.acquireCatalogueStores(
+        'store-search-${widget.query.destination.name}',
+      )..addListener(_storeSearchChanged);
+    }
     _scheduleQuery();
     _schedulePublicationExpiry();
   }
@@ -934,6 +1329,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _bindPrimaryController();
+  }
+
+  void _storeSearchChanged() {
+    if (mounted) setState(() {});
   }
 
   void _bindPrimaryController() {
@@ -984,6 +1383,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
           (_pager.page == null && !_pager.loading && _pager.message == null)) {
         await _pager.open(widget.query);
       }
+      if (mounted && sequence == _openSequence) {
+        unawaited(_pager.prefetchAdjacent());
+      }
     });
   }
 
@@ -992,11 +1394,14 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session ||
         oldWidget.scopeKey != widget.scopeKey ||
-        oldWidget.publishedOffers != widget.publishedOffers) {
+        oldWidget.publishedOffers != widget.publishedOffers ||
+        oldWidget.includeStoreSearch != widget.includeStoreSearch ||
+        oldWidget.query.destination != widget.query.destination) {
       _detach(
         oldWidget.session,
         oldWidget.scopeKey,
         publishedOffers: oldWidget.publishedOffers,
+        storeSearchDestination: oldWidget.query.destination,
       );
       _attach();
       _bindPrimaryController();
@@ -1009,6 +1414,18 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     if (!mounted) return;
     if (_shownPage != _pager.page) {
       _shownPage = _pager.page;
+      unawaited(_pager.prefetchAdjacent());
+      // The pager admits current product records before notifying this view.
+      // Refresh their validated facts as well, so provider identity and
+      // fulfilment text cannot remain cached from a previous publication.
+      if (!_pager.loading && _pager.message == null) {
+        for (final item in _shownPage?.items ?? const <Object>[]) {
+          final product = item is BuyV2PublishedCatalogueOffer
+              ? item.product
+              : item as BuyV2Product;
+          widget.session.refreshProductFacts(product.id);
+        }
+      }
       _restoring = true;
       final page = _shownPage;
       final offset = _pager.scrollOffset;
@@ -1039,7 +1456,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     if (!widget.publishedOffers) return;
     final now = widget.session.catalogueNow();
     Duration? earliest;
-    for (final item in _pager.page?.items ?? const <Object>[]) {
+    for (final item in _pager.cachedItems) {
       final offer = item as BuyV2PublishedCatalogueOffer;
       if (!offer.validUntil.isAfter(now)) continue;
       final remaining = offer.validUntil.difference(now);
@@ -1069,11 +1486,19 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     BuyV2Session session,
     String scopeKey, {
     required bool publishedOffers,
+    required BuyV2Destination storeSearchDestination,
   }) {
     _openSequence++;
     _publicationExpiry?.cancel();
     _saveOffsets();
     _pager.removeListener(_pageChanged);
+    if (_storeSearchPager != null) {
+      _storeSearchPager!.removeListener(_storeSearchChanged);
+      session.releaseCatalogueStores(
+        'store-search-${storeSearchDestination.name}',
+      );
+      _storeSearchPager = null;
+    }
     _vertical.removeListener(_saveOffsets);
     if (_ownsVertical) _vertical.dispose();
     for (final lane in _lanes) {
@@ -1093,6 +1518,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       widget.session,
       widget.scopeKey,
       publishedOffers: widget.publishedOffers,
+      storeSearchDestination: widget.query.destination,
     );
     super.dispose();
   }
@@ -1101,6 +1527,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   Widget build(BuildContext context) {
     final page = _pager.query == widget.query ? _pager.page : null;
     final loading = _pager.query != widget.query || _pager.loading;
+    final storeLoading =
+        _storeSearchPager != null &&
+        (_storeSearchPager!.query != widget.query ||
+            _storeSearchPager!.loading);
     final message = _pager.query == widget.query ? _pager.message : null;
     final offers = widget.publishedOffers
         ? page?.items.cast<BuyV2PublishedCatalogueOffer>().toList(
@@ -1152,141 +1582,200 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
           : null,
       onRefresh: loading ? null : _pager.refresh,
     );
-    final content = BuyV2VerticalScrollIndicator(
-      child: ListView(
-        key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
-        controller: _vertical,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.only(bottom: 12),
-        children: [
-          if (widget.header != null) widget.header!,
-          if (!widget.controlsAfterProducts &&
-              !widget.session.isStoreProcurement)
-            pageControls,
-          if (loading && !widget.controlsAfterProducts)
-            const LinearProgressIndicator(minHeight: 2),
-          if (publicationCurrent &&
-              offers.isNotEmpty &&
-              widget.publicationFacts != null)
-            widget.publicationFacts!(offers),
-          if (needsArea)
-            _CataloguePageNotice(
-              title: 'Where are you shopping?',
-              detail: 'Choose an area, or browse stores in any area.',
-              action: 'Choose area',
-              onAction: () => showBuyV2CatalogueArea(context, widget.session),
-            )
-          else if (!publicationCurrent)
-            _CataloguePageNotice(
-              title: 'Offers need refreshing',
-              detail: 'The published details have changed or expired.',
-              action: 'Refresh offers',
-              onAction: loading ? null : _pager.refresh,
-            )
-          else if (message != null && !widget.controlsAfterProducts)
-            _CataloguePageNotice(
-              title: 'Results could not refresh',
-              detail: message,
-              action: 'Try again',
-              onAction: _pager.retry,
-            )
-          else if (!loading && products.isEmpty && message == null)
-            _CataloguePageNotice(
-              title: widget.publishedOffers
-                  ? 'No matching offers'
-                  : 'No matching products',
-              detail: 'Try another search, category or area.',
-            ),
-          if (products.isNotEmpty)
-            _QuantityAwareGridLayout(
-              session: widget.session,
-              products: products,
-              builder: (context, constraints, quantityWidth) {
-                final scale = MediaQuery.textScalerOf(context).scale(1);
-                final layout = _resolveCompactProductGridLayout(
-                  constraints: constraints,
-                  accessibleText: scale > 1.25,
-                  textScale: scale,
-                  cartQuantityWidth: quantityWidth,
-                  denseStore: widget.storeContext,
-                  storeProcurement: widget.session.isStoreProcurement,
-                  scrollIndicatorInset: true,
-                );
-                final laneCount = products.length == 1 ? 1 : 2;
-                return SizedBox(
-                  height:
-                      layout.tileHeight * laneCount + (laneCount - 1) * 7 + 12,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      children: [
-                        for (var lane = 0; lane < laneCount; lane++) ...[
-                          if (lane > 0) const SizedBox(height: 7),
-                          Expanded(
-                            child: ListView.separated(
-                              key: ValueKey(
-                                'buy-paged-lane-${widget.scopeKey}-$lane',
+    final noun = widget.publishedOffers ? 'offers' : 'products';
+    final range = page == null || !publicationCurrent
+        ? (loading ? 'Loading $noun' : 'Results')
+        : products.isEmpty
+        ? '0 $noun'
+        : '${_catalogueCount(page.startIndex + 1)}–${_catalogueCount(page.startIndex + products.length)}'
+              '${page.totalCount == null ? '' : ' of ${_catalogueCount(page.totalCount!)}'}'
+              '${widget.publishedOffers ? ' offers' : ''}';
+    final canPrevious =
+        !loading && publicationCurrent && page?.previousCursor != null;
+    final canNext = !loading && publicationCurrent && page?.nextCursor != null;
+    final content = Semantics(
+      key: ValueKey('buy-page-status-${widget.scopeKey}'),
+      container: true,
+      explicitChildNodes: true,
+      label: range,
+      customSemanticsActions: {
+        if (canPrevious)
+          const CustomSemanticsAction(label: 'Previous products'):
+              _pager.previous,
+        if (canNext)
+          const CustomSemanticsAction(label: 'Next products'): _pager.next,
+        if (!loading)
+          const CustomSemanticsAction(label: 'Refresh products'):
+              _pager.refresh,
+      },
+      child: RefreshIndicator(
+        onRefresh: _pager.refresh,
+        child: BuyV2VerticalScrollIndicator(
+          child: ListView(
+            key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
+            controller: _vertical,
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              if (widget.header != null) widget.header!,
+              if (loading || storeLoading)
+                const LinearProgressIndicator(
+                  key: ValueKey('buy-catalogue-loading'),
+                  minHeight: 2,
+                ),
+              if (publicationCurrent &&
+                  offers.isNotEmpty &&
+                  widget.publicationFacts != null)
+                widget.publicationFacts!(offers),
+              if (needsArea)
+                _CataloguePageNotice(
+                  title: 'Where are you shopping?',
+                  detail: 'Choose an area, or browse stores in any area.',
+                  action: 'Choose area',
+                  onAction: () =>
+                      showBuyV2CatalogueArea(context, widget.session),
+                )
+              else if (!publicationCurrent)
+                _CataloguePageNotice(
+                  title: 'Offers need refreshing',
+                  detail: 'The published details have changed or expired.',
+                  action: 'Refresh offers',
+                  onAction: loading ? null : _pager.refresh,
+                )
+              else if (message != null)
+                _CataloguePageNotice(
+                  title: 'Results could not refresh',
+                  detail: message,
+                  action: 'Try again',
+                  onAction: _pager.retry,
+                )
+              else if (!loading && products.isEmpty && message == null)
+                _CataloguePageNotice(
+                  title: widget.publishedOffers
+                      ? 'No matching offers'
+                      : 'No matching products',
+                  detail: widget.showAreaControl
+                      ? 'Try another search, category or area.'
+                      : 'Try another search or category.',
+                ),
+              if (products.isNotEmpty)
+                _QuantityAwareGridLayout(
+                  session: widget.session,
+                  products: products,
+                  builder: (context, constraints, quantityWidth) {
+                    final scale = MediaQuery.textScalerOf(context).scale(1);
+                    final layout = _resolveCompactProductGridLayout(
+                      context: context,
+                      session: widget.session,
+                      products: products,
+                      constraints: constraints,
+                      accessibleText: scale > 1.25,
+                      textScale: scale,
+                      cartQuantityWidth: quantityWidth,
+                      denseStore: widget.storeContext,
+                      storeProcurement: widget.session.isStoreProcurement,
+                      scrollIndicatorInset: true,
+                    );
+                    Widget grid(
+                      List<BuyV2Product> items, {
+                      bool preview = false,
+                    }) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: _ProductGridFlow(
+                          columns: layout.columns,
+                          masonry: true,
+                          key: preview
+                              ? null
+                              : ValueKey(
+                                  'buy-paged-vertical-grid-${widget.scopeKey}',
+                                ),
+                          spacing: 7,
+                          runSpacing: 10,
+                          children: [
+                            for (final product in items)
+                              SizedBox(
+                                width: layout.cardWidth,
+                                child: BuyV2ProductCard(
+                                  key: ValueKey('buy-paged-card-${product.id}'),
+                                  session: widget.session,
+                                  product: product,
+                                  compact: true,
+                                  alignMediaAtTop: true,
+                                  storeContext: widget.storeContext,
+                                  onOpenProduct: widget.onOpenProduct,
+                                ),
                               ),
-                              controller: _lanes[lane],
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                              ),
-                              itemCount:
-                                  (products.length - lane + laneCount - 1) ~/
-                                  laneCount,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 7),
-                              itemBuilder: (context, index) {
-                                final product =
-                                    products[index * laneCount + lane];
-                                return SizedBox(
-                                  width: layout.cardWidth,
-                                  child: BuyV2ProductCard(
-                                    key: ValueKey(
-                                      'buy-paged-card-${product.id}',
-                                    ),
-                                    session: widget.session,
-                                    product: product,
-                                    compact: true,
-                                    storeContext: widget.storeContext,
-                                    onOpenProduct: widget.onOpenProduct,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    Widget? adjacent(bool forward) {
+                      final adjacent = _pager.adjacentPage(forward: forward);
+                      if (adjacent == null) return null;
+                      final items = <BuyV2Product>[];
+                      for (final item in adjacent.items) {
+                        if (item is BuyV2PublishedCatalogueOffer) {
+                          if (!item.isCurrent(
+                            now: widget.session.catalogueNow(),
+                          )) {
+                            return null;
+                          }
+                          items.add(item.product);
+                        } else {
+                          items.add(item as BuyV2Product);
+                        }
+                      }
+                      return grid(items, preview: true);
+                    }
+
+                    final canPrevious =
+                        !loading &&
+                        publicationCurrent &&
+                        page?.previousCursor != null;
+                    final canNext =
+                        !loading &&
+                        publicationCurrent &&
+                        page?.nextCursor != null;
+                    return Semantics(
+                      onScrollLeft: canNext ? _pager.next : null,
+                      onScrollRight: canPrevious ? _pager.previous : null,
+                      child: _CataloguePageSwipe(
+                        key: ValueKey('buy-page-swipe-${widget.scopeKey}'),
+                        contextIdentity: widget.query,
+                        pageIdentity: page,
+                        onNext: canNext ? _pager.next : null,
+                        onPrevious: canPrevious ? _pager.previous : null,
+                        nextChild: adjacent(true),
+                        previousChild: adjacent(false),
+                        child: grid(products),
+                      ),
+                    );
+                  },
+                ),
+              if (!loading &&
+                  page != null &&
+                  products.isNotEmpty &&
+                  page.nextCursor == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
                   ),
-                );
-              },
-            ),
-          if (widget.controlsAfterProducts ||
-              widget.session.isStoreProcurement) ...[
-            if (loading) const LinearProgressIndicator(minHeight: 2),
-            if (!needsArea && publicationCurrent && message != null)
-              _CataloguePageNotice(
-                title: 'Results could not refresh',
-                detail: message,
-                action: 'Try again',
-                onAction: _pager.retry,
-              ),
-            pageControls,
-          ],
-          if (!loading &&
-              page != null &&
-              products.isNotEmpty &&
-              page.nextCursor == null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Text(
-                'All matching ${widget.publishedOffers ? 'offers' : 'products'} are on this or earlier pages.',
-                style: context.buyMeta,
-              ),
-            ),
-        ],
+                  child: Text(
+                    'All matching ${widget.publishedOffers ? 'offers' : 'products'} are on this or earlier pages.',
+                    style: context.buyMeta,
+                  ),
+                ),
+              if (widget.session.isStoreProcurement) pageControls,
+            ],
+          ),
+        ),
       ),
     );
     if (widget.toolbarBuilder == null) return content;
@@ -1306,6 +1795,238 @@ String _catalogueCount(int value) => value.toString().replaceAllMapped(
   RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
   (match) => '${match[1]},',
 );
+
+/// Moves the complete grid, leaving the existing vertical scroll owner intact.
+/// Only authoritative pager results can become the incoming product page.
+class _CataloguePageSwipe extends StatefulWidget {
+  const _CataloguePageSwipe({
+    super.key,
+    required this.contextIdentity,
+    required this.pageIdentity,
+    required this.child,
+    this.onNext,
+    this.onPrevious,
+    this.nextChild,
+    this.previousChild,
+  });
+
+  final Widget? nextChild;
+  final Widget? previousChild;
+  final Object contextIdentity;
+  final Object? pageIdentity;
+  final Future<void> Function()? onNext;
+  final Future<void> Function()? onPrevious;
+  final Widget child;
+
+  @override
+  State<_CataloguePageSwipe> createState() => _CataloguePageSwipeState();
+}
+
+class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _offset = AnimationController.unbounded(
+    vsync: this,
+  );
+  double _distance = 0;
+  bool _changingPage = false;
+  bool _pointerCancelled = false;
+  Widget? _departingChild;
+  Widget? _incomingChild;
+  Object? _departingPage;
+  bool _forward = true;
+  int _generation = 0;
+
+  @override
+  void didUpdateWidget(covariant _CataloguePageSwipe oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.contextIdentity != widget.contextIdentity ||
+        (!_changingPage && oldWidget.pageIdentity != widget.pageIdentity)) {
+      _generation++;
+      _changingPage = false;
+      _departingChild = null;
+      _incomingChild = null;
+      _distance = 0;
+      _offset.stop();
+      _offset.value = 0;
+    }
+  }
+
+  Future<void> _settle(double target) async {
+    if (!mounted) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _offset.value = target;
+      return;
+    }
+    await _offset
+        .animateTo(
+          target,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+        )
+        .orCancel;
+  }
+
+  Future<void> _finish(DragEndDetails details, double width) async {
+    if (_changingPage) return;
+    final distance = _distance;
+    _distance = 0;
+    final velocity = details.primaryVelocity ?? 0;
+    final committed =
+        !_pointerCancelled &&
+        (distance.abs() >= 48 ||
+            (distance.abs() >= 18 &&
+                velocity.abs() >= 500 &&
+                velocity.sign == distance.sign));
+    final forward = distance < 0;
+    final action = forward ? widget.onNext : widget.onPrevious;
+    if (!committed || action == null) {
+      try {
+        await _settle(0);
+      } on TickerCanceled {
+        // A new gesture or route/query change owns the position now.
+      }
+      return;
+    }
+    final generation = ++_generation;
+    final previousPage = widget.pageIdentity;
+    setState(() {
+      _changingPage = true;
+      _departingChild = widget.child;
+      _departingPage = widget.pageIdentity;
+      _forward = forward;
+      _incomingChild = forward ? widget.nextChild : widget.previousChild;
+    });
+    try {
+      // Promote the validated preview, or await its real request.
+      final request = action();
+      await _settle(forward ? -width : width);
+      await request;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _departingChild = null;
+        _incomingChild = null;
+      });
+      if (widget.pageIdentity != previousPage) {
+        _offset.value = 0;
+      }
+      // Failed requests return the retained page without pretending to advance.
+      await _settle(0);
+    } on TickerCanceled {
+      // Disposal or a query change cancels the finite transition.
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _changingPage = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _offset.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => ClipRect(
+      child: Listener(
+        onPointerCancel: (_) => _pointerCancelled = true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (_) {
+            if (_changingPage) return;
+            _offset.stop();
+            _pointerCancelled = false;
+            _distance = 0;
+          },
+          onHorizontalDragUpdate: (details) {
+            if (_changingPage) return;
+            _distance += details.primaryDelta ?? 0;
+            final available = _distance < 0
+                ? widget.onNext != null
+                : widget.onPrevious != null;
+            _offset.value = available
+                ? _distance.clamp(-constraints.maxWidth, constraints.maxWidth)
+                : (_distance * .18).clamp(-32.0, 32.0);
+          },
+          onHorizontalDragCancel: () {
+            _distance = 0;
+            if (!_changingPage) {
+              unawaited(
+                _settle(0).catchError((Object error) {
+                  if (error is! TickerCanceled) throw error;
+                }),
+              );
+            }
+          },
+          onHorizontalDragEnd: (details) =>
+              unawaited(_finish(details, constraints.maxWidth)),
+          child: IgnorePointer(
+            ignoring: _changingPage,
+            child: AnimatedBuilder(
+              animation: _offset,
+              child: _departingChild ?? widget.child,
+              builder: (context, child) {
+                final forward = _changingPage ? _forward : _offset.value < 0;
+                final available = forward
+                    ? widget.onNext != null
+                    : widget.onPrevious != null;
+                final incoming =
+                    _changingPage && widget.pageIdentity != _departingPage
+                    ? widget.child
+                    : _changingPage
+                    ? (_incomingChild ??
+                          (forward ? widget.nextChild : widget.previousChild))
+                    : (forward ? widget.nextChild : widget.previousChild);
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Transform.translate(
+                      offset: Offset(_offset.value, 0),
+                      child: child,
+                    ),
+                    if (_offset.value != 0 && (available || _changingPage))
+                      Positioned.fill(
+                        key: const ValueKey('buy-incoming-grid'),
+                        child: Transform.translate(
+                          offset: Offset(
+                            _offset.value +
+                                (forward
+                                    ? constraints.maxWidth
+                                    : -constraints.maxWidth),
+                            0,
+                          ),
+                          child: IgnorePointer(
+                            child: ExcludeSemantics(
+                              child: ClipRect(
+                                child: OverflowBox(
+                                  alignment: Alignment.topCenter,
+                                  minHeight: 0,
+                                  maxHeight: double.infinity,
+                                  child:
+                                      incoming ??
+                                      const Padding(
+                                        padding: EdgeInsets.all(24),
+                                        child: Text('Loading products…'),
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 class _CataloguePageControls extends StatelessWidget {
   const _CataloguePageControls({
@@ -1331,11 +2052,11 @@ class _CataloguePageControls extends StatelessWidget {
   final bool loading;
   final String? areaLabel;
   final VoidCallback? onArea;
+  final bool showRange;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onRefresh;
   final String noun;
-  final bool showRange;
 
   @override
   Widget build(BuildContext context) {
@@ -1435,7 +2156,6 @@ class _CataloguePageControls extends StatelessWidget {
             key: ValueKey('buy-page-range-$scopeKey'),
             style: rangeStyle,
           ),
-          if (areaLabel != null) Text(areaLabel!, style: context.buyMeta),
         ],
       ),
     );
@@ -1457,30 +2177,6 @@ class _CataloguePageControls extends StatelessWidget {
       onPressed: onRefresh,
       icon: const Icon(Icons.refresh_rounded, size: 20),
     );
-    final area = onArea == null
-        ? null
-        : IconButton(
-            key: ValueKey('buy-page-area-$scopeKey'),
-            tooltip: 'Choose shopping area',
-            onPressed: onArea,
-            icon: const Icon(Icons.location_on_outlined, size: 20),
-          );
-    if (!showRange) {
-      return BuyV2CartAvoidanceRegion(
-        key: ValueKey('buy-page-controls-protection-$scopeKey'),
-        child: Semantics(
-          key: ValueKey('buy-page-status-$scopeKey'),
-          label: range,
-          liveRegion: true,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
-              children: [previous, next, const Spacer(), refresh, ?area],
-            ),
-          ),
-        ),
-      );
-    }
     return BuyV2CartAvoidanceRegion(
       key: ValueKey('buy-page-controls-protection-$scopeKey'),
       child: Padding(
@@ -1494,8 +2190,7 @@ class _CataloguePageControls extends StatelessWidget {
               maxWidth: double.infinity,
               maxLines: 1,
             ).width;
-            final inlineWidth =
-                constraints.maxWidth - (area == null ? 144 : 192);
+            final inlineWidth = constraints.maxWidth - 144;
             if (labelWidth > inlineWidth) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1504,9 +2199,7 @@ class _CataloguePageControls extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: summary,
                   ),
-                  Row(
-                    children: [previous, next, const Spacer(), refresh, ?area],
-                  ),
+                  Row(children: [previous, next, const Spacer(), refresh]),
                 ],
               );
             }
@@ -1516,7 +2209,6 @@ class _CataloguePageControls extends StatelessWidget {
                 Expanded(child: summary),
                 next,
                 refresh,
-                ?area,
               ],
             );
           },
@@ -1686,6 +2378,12 @@ Future<void> showBuyV2CatalogueArea(
                         ),
                       ],
                     ),
+                    Text(
+                      'Current area: ${session.catalogueAreaLabel}',
+                      key: const ValueKey('buy-area-selection-summary'),
+                      style: context.buyMeta,
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       key: const ValueKey('buy-catalogue-area-search'),
                       controller: searchController,
@@ -1814,6 +2512,17 @@ Future<void> showBuyV2CatalogueArea(
                     ListTile(
                       key: const ValueKey('buy-catalogue-any-area'),
                       title: const Text('Any area'),
+                      selected:
+                          session.catalogueAreaScope ==
+                          BuyV2CatalogueAreaScope.allAreas,
+                      trailing:
+                          session.catalogueAreaScope ==
+                              BuyV2CatalogueAreaScope.allAreas
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: BuyV2Colors.navy,
+                            )
+                          : null,
                       subtitle: const Text('Find stores in other areas.'),
                       onTap: () {
                         session.chooseCatalogueArea(
@@ -1827,6 +2536,19 @@ Future<void> showBuyV2CatalogueArea(
                       ListTile(
                         key: ValueKey('buy-catalogue-area-${area.key}'),
                         title: Text(area.value),
+                        selected:
+                            session.catalogueAreaScope !=
+                                BuyV2CatalogueAreaScope.allAreas &&
+                            session.catalogueRegionId == area.key,
+                        trailing:
+                            session.catalogueAreaScope !=
+                                    BuyV2CatalogueAreaScope.allAreas &&
+                                session.catalogueRegionId == area.key
+                            ? const Icon(
+                                Icons.check_circle,
+                                color: BuyV2Colors.navy,
+                              )
+                            : null,
                         onTap: () {
                           session.chooseCatalogueArea(
                             area.key,
@@ -1935,6 +2657,8 @@ class BuyV2CatalogueView extends StatelessWidget {
                             updating: loading,
                           )
                         : null,
+                    includeStoreSearch:
+                        session.query.trim().isNotEmpty && onOpenStore != null,
                     controlsAfterProducts:
                         session.destination == BuyV2Destination.shop,
                     header: session.query.trim().isEmpty || onOpenStore == null
@@ -2668,7 +3392,7 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
       }
 
       return 34 +
-          measure(store.name, titleStyle) +
+          measure(buyV2CustomerStoreName(store.name, store.id), titleStyle) +
           measure(_location(store), detailStyle) +
           measure(
             store.previewProduct == null
@@ -2703,7 +3427,8 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
           onNext: !loading && page?.nextCursor != null ? _pager.next : null,
           onRefresh: loading ? null : _pager.refresh,
         ),
-        if (loading) const LinearProgressIndicator(minHeight: 2),
+        // The enclosing product search owns the shared progress line. The
+        // store control above keeps its own truthful "Loading stores" state.
         if (message != null)
           _CataloguePageNotice(
             title: 'Stores could not refresh',
@@ -2749,7 +3474,10 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(store.name, style: titleStyle),
+                              Text(
+                                buyV2CustomerStoreName(store.name, store.id),
+                                style: titleStyle,
+                              ),
                               const SizedBox(height: 3),
                               Text(_location(store), style: detailStyle),
                               const SizedBox(height: 5),
@@ -2799,6 +3527,7 @@ class BuyV2SearchResultsView extends StatelessWidget {
         session: session,
         query: session.catalogueQuery(),
         scopeKey: 'search-${session.destination.name}',
+        includeStoreSearch: onOpenStore != null,
         header: onOpenStore == null
             ? null
             : _CatalogueStoreMatches(
@@ -3088,14 +3817,6 @@ class _SearchProductResults extends StatelessWidget {
       session: session,
       products: products,
       builder: (context, constraints, quantityWidth) {
-        final textScale = MediaQuery.textScalerOf(context).scale(1);
-        final accessibleText = textScale > 1.25;
-        final layout = _resolveCompactProductGridLayout(
-          constraints: constraints,
-          accessibleText: accessibleText,
-          textScale: textScale,
-          cartQuantityWidth: quantityWidth,
-        );
         return CustomScrollView(
           key: PageStorageKey('buy-search-${session.destination.name}-$query'),
           slivers: [
@@ -3122,14 +3843,11 @@ class _SearchProductResults extends StatelessWidget {
               ),
             ),
             SliverToBoxAdapter(
-              child: _HorizontalProductGrid(
+              child: BuyV2ProgressiveProductGrid(
                 session: session,
                 products: products,
-                cardWidth: layout.cardWidth,
-                tileHeight: layout.tileHeight,
-                storageKey:
-                    'buy-search-horizontal-${session.destination.name}-$query',
-                laneCount: products.length <= layout.columns ? 1 : null,
+                storageKey: 'buy-search-${session.destination.name}-$query',
+                semanticLabel: 'Search results',
               ),
             ),
           ],
@@ -4365,6 +5083,27 @@ class _CatalogueToolsMenu extends StatelessWidget {
         context,
         session,
         actions: [
+          // Explicit, non-production access to the original RV6 reproductions.
+          // Use the normal visit callback so restrictions, history and Back
+          // remain owned by the application rather than a parallel harness.
+          if (kDebugMode &&
+              const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+              const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+              const String.fromEnvironment('MOOLSOCIAL_CANDIDATE_ID') ==
+                  'UAW-CURSOR-REDMI-RV6-FIXTURE-20260914' &&
+              session.reviewDataEnabled &&
+              session.procurementContext == null &&
+              session.destination == BuyV2Destination.shop &&
+              onVisitProduct != null)
+            for (final id in ['s-dog-food', 's-shampoo'])
+              if (session.findProduct(id) case final product?)
+                BuyV2FilterSheetAction(
+                  keyName: 'buy-rv6-review-fixture-$id',
+                  icon: Icons.science_outlined,
+                  title: 'Review fixture: ${product.customerTitle}',
+                  detail: 'RV6 original test data · not live inventory',
+                  onTap: () => onVisitProduct!(product, 'RV6 review fixture'),
+                ),
           if (order case final activeOrder?)
             BuyV2FilterSheetAction(
               keyName: 'buy-active-orders-button',
@@ -4477,7 +5216,7 @@ List<(String, String)> _filterOptionsFor(BuyV2Destination destination) =>
         ('bulk-freight', 'Bulk freight'),
         ('lowest', 'Lowest landed price'),
         ('freight', 'Freight included'),
-        ('moq', 'Flexible MOQ'),
+        ('moq', 'Flexible minimums'),
         ('manufacturer', 'Manufacturer direct'),
       ],
       BuyV2Destination.medicine => const [
@@ -4845,7 +5584,7 @@ String _shoppingAlertDetail(BuyV2ShoppingAlert alert, BuyV2Session session) {
     return alert.detail;
   }
   return '${alert.detail.substring(0, alert.detail.length - order.promise.length)}'
-      '${buyV2OrderPromiseSummary(order)}';
+      '${buyV2OrderArrivalSummary(session, order)}';
 }
 
 Future<void> _confirmClearBuyV2RecentlyViewed(
@@ -5649,6 +6388,7 @@ Future<void> showBuyV2PartnerCatalogue(
     duration: motion.duration ?? Duration.zero,
     reverseDuration: motion.reverseDuration ?? Duration.zero,
   );
+  ModalRoute<String>? sheetRoute;
   try {
     final selectedProductId = await showModalBottomSheet<String>(
       context: context,
@@ -5662,219 +6402,223 @@ Future<void> showBuyV2PartnerCatalogue(
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       clipBehavior: Clip.antiAlias,
       transitionAnimationController: transitionController,
-      builder: (sheetContext) => AnimatedBuilder(
-        animation: session,
-        builder: (context, _) => FractionallySizedBox(
-          key: ValueKey('$ownerPrefix-route-${current.id}'),
-          heightFactor: 1,
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    key: ValueKey('$ownerPrefix-sheet-${current.id}'),
-                    container: true,
-                    scopesRoute: true,
-                    namesRoute: true,
-                    explicitChildNodes: true,
-                    label: title,
-                    child: BuyV2VerticalScrollIndicator(
-                      child: ListView(
-                        key: ValueKey('$ownerPrefix-sheet-list'),
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                        children: [
-                          Row(
-                            key: ValueKey('$ownerPrefix-sheet-header'),
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: BuyV2Colors.softOrange,
-                                  borderRadius: BorderRadius.circular(12),
+      builder: (sheetContext) {
+        sheetRoute = ModalRoute.of<String>(sheetContext);
+        return AnimatedBuilder(
+          animation: session,
+          builder: (context, _) => FractionallySizedBox(
+            key: ValueKey('$ownerPrefix-route-${current.id}'),
+            heightFactor: 1,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      key: ValueKey('$ownerPrefix-sheet-${current.id}'),
+                      container: true,
+                      scopesRoute: true,
+                      namesRoute: true,
+                      explicitChildNodes: true,
+                      label: title,
+                      child: BuyV2VerticalScrollIndicator(
+                        child: ListView(
+                          key: ValueKey('$ownerPrefix-sheet-list'),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                          children: [
+                            Row(
+                              key: ValueKey('$ownerPrefix-sheet-header'),
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: BuyV2Colors.softOrange,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    brandOnly
+                                        ? Icons.sell_outlined
+                                        : Icons.storefront_outlined,
+                                    color: BuyV2Colors.navy,
+                                    size: 21,
+                                  ),
                                 ),
-                                child: Icon(
-                                  brandOnly
-                                      ? Icons.sell_outlined
-                                      : Icons.storefront_outlined,
-                                  color: BuyV2Colors.navy,
-                                  size: 21,
-                                ),
-                              ),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    key: canViewAll
-                                        ? ValueKey(
-                                            '$ownerPrefix-view-more-${current.id}',
-                                          )
-                                        : null,
-                                    onTap: canViewAll
-                                        ? () => unawaited(
-                                            openFullStoreCatalogue(
-                                              sheetContext,
-                                            ),
-                                          )
-                                        : null,
-                                    borderRadius: BorderRadius.circular(9),
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        minHeight: BuyV2Metrics.minimumTap,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.clip,
-                                            style: sheetContext.buyTitle
-                                                .copyWith(
-                                                  fontSize: 14,
-                                                  height: 1.08,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          if (canViewAll)
-                                            Row(
-                                              key: ValueKey(
-                                                '$ownerPrefix-view-more-visible-${current.id}',
-                                              ),
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.grid_view_rounded,
-                                                  size: 13,
-                                                  color: BuyV2Colors.navy,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Flexible(
-                                                  child: Text(
-                                                    pagedPartner
-                                                        ? 'Browse all products'
-                                                        : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
-                                                    overflow: TextOverflow.clip,
-                                                    style: sheetContext.buyMeta
-                                                        .copyWith(
-                                                          color:
-                                                              BuyV2Colors.navy,
-                                                          height: 1,
-                                                          fontWeight:
-                                                              FontWeight.w900,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ],
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      key: canViewAll
+                                          ? ValueKey(
+                                              '$ownerPrefix-view-more-${current.id}',
                                             )
-                                          else
+                                          : null,
+                                      onTap: canViewAll
+                                          ? () => unawaited(
+                                              openFullStoreCatalogue(
+                                                sheetContext,
+                                              ),
+                                            )
+                                          : null,
+                                      borderRadius: BorderRadius.circular(9),
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minHeight: BuyV2Metrics.minimumTap,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
                                             Text(
-                                              detail,
+                                              title,
                                               maxLines: 2,
                                               overflow: TextOverflow.clip,
-                                              style: sheetContext.buyMeta
-                                                  .copyWith(height: 1.08),
+                                              style: sheetContext.buyTitle
+                                                  .copyWith(
+                                                    fontSize: 14,
+                                                    height: 1.08,
+                                                  ),
                                             ),
-                                        ],
+                                            const SizedBox(height: 2),
+                                            if (canViewAll)
+                                              Row(
+                                                key: ValueKey(
+                                                  '$ownerPrefix-view-more-visible-${current.id}',
+                                                ),
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.grid_view_rounded,
+                                                    size: 13,
+                                                    color: BuyV2Colors.navy,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Flexible(
+                                                    child: Text(
+                                                      pagedPartner
+                                                          ? 'Browse all products'
+                                                          : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                      overflow:
+                                                          TextOverflow.clip,
+                                                      style: sheetContext
+                                                          .buyMeta
+                                                          .copyWith(
+                                                            color: BuyV2Colors
+                                                                .navy,
+                                                            height: 1,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            else
+                                              Text(
+                                                detail,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.clip,
+                                                style: sheetContext.buyMeta
+                                                    .copyWith(height: 1.08),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton.outlined(
-                                key: ValueKey('$ownerPrefix-sheet-close'),
-                                onPressed: () =>
-                                    Navigator.of(sheetContext).pop(),
-                                tooltip: closeTooltip,
-                                style: IconButton.styleFrom(
-                                  minimumSize: const Size.square(
-                                    BuyV2Metrics.minimumTap,
+                                const SizedBox(width: 8),
+                                IconButton.outlined(
+                                  key: ValueKey('$ownerPrefix-sheet-close'),
+                                  onPressed: () =>
+                                      Navigator.of(sheetContext).pop(),
+                                  tooltip: closeTooltip,
+                                  style: IconButton.styleFrom(
+                                    minimumSize: const Size.square(
+                                      BuyV2Metrics.minimumTap,
+                                    ),
+                                    side: const BorderSide(
+                                      color: BuyV2Colors.line,
+                                    ),
                                   ),
-                                  side: const BorderSide(
-                                    color: BuyV2Colors.line,
-                                  ),
+                                  icon: const Icon(Icons.close_rounded),
                                 ),
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (publicPartner) ...[
-                            _PublicStoreTruthPanel(
-                              product: current,
-                              facts: session.productFactsFor(current),
-                              now: session.catalogueNow,
-                              trust: storeTrust,
-                              fulfilmentLabels: storeFulfilment,
-                              onOrderForCollection: () {
-                                if (session.beginStoreCollection(current.id)) {
-                                  unawaited(
-                                    openFullStoreCatalogue(sheetContext),
-                                  );
-                                }
-                              },
-                              onAskStore: onAskStore == null
-                                  ? null
-                                  : () => Navigator.of(
-                                      sheetContext,
-                                    ).pop('ask-store:${current.id}'),
+                              ],
                             ),
                             const SizedBox(height: 8),
-                          ],
-                          if (pagedPartner)
-                            _PagedPublicStorePreview(
-                              session: session,
-                              product: current,
-                              onOpenProduct: (product) => unawaited(
-                                openStoreProduct(sheetContext, product),
+                            if (publicPartner) ...[
+                              _PublicStoreTruthPanel(
+                                product: current,
+                                facts: session.productFactsFor(current),
+                                now: session.catalogueNow,
+                                trust: storeTrust,
+                                fulfilmentLabels: storeFulfilment,
+                                onOrderForCollection: () {
+                                  if (session.beginStoreCollection(
+                                    current.id,
+                                  )) {
+                                    unawaited(
+                                      openFullStoreCatalogue(sheetContext),
+                                    );
+                                  }
+                                },
+                                onAskStore: onAskStore == null
+                                    ? null
+                                    : () => Navigator.of(
+                                        sheetContext,
+                                      ).pop('ask-store:${current.id}'),
                               ),
-                            )
-                          else if (previewProducts.isEmpty)
-                            const _PublicStoreNoProductsState()
-                          else
-                            BuyV2ProgressiveProductGrid(
-                              session: session,
-                              products: previewProducts,
-                              storageKey:
-                                  '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
-                              semanticLabel:
-                                  '${brandOnly ? current.brand : current.seller} product catalogue',
-                              laneCount: 1,
-                              storeContext: !brandOnly,
-                              onOpenProduct: (product) => unawaited(
-                                openStoreProduct(sheetContext, product),
+                              const SizedBox(height: 8),
+                            ],
+                            if (pagedPartner)
+                              _PagedPublicStorePreview(
+                                session: session,
+                                product: current,
+                                onOpenProduct: (product) => unawaited(
+                                  openStoreProduct(sheetContext, product),
+                                ),
+                              )
+                            else if (previewProducts.isEmpty)
+                              const _PublicStoreNoProductsState()
+                            else
+                              BuyV2ProgressiveProductGrid(
+                                session: session,
+                                products: previewProducts,
+                                storageKey:
+                                    '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
+                                semanticLabel:
+                                    '${brandOnly ? current.brand : current.seller} product catalogue',
+                                laneCount: 1,
+                                storeContext: !brandOnly,
+                                onOpenProduct: (product) => unawaited(
+                                  openStoreProduct(sheetContext, product),
+                                ),
                               ),
-                            ),
-                          if (otherStores.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Text(
-                              'Other stores',
-                              style: sheetContext.buyTitle.copyWith(
-                                fontSize: 11.5,
-                                height: 1.08,
+                            if (otherStores.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'Other stores',
+                                style: sheetContext.buyTitle.copyWith(
+                                  fontSize: 11.5,
+                                  height: 1.08,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Swipe for more relevant stores and delivery options',
-                              style: sheetContext.buyMeta.copyWith(
-                                fontSize: 8.5,
-                                height: 1.08,
+                              const SizedBox(height: 2),
+                              Text(
+                                'Compare stores and delivery options below',
+                                style: sheetContext.buyMeta.copyWith(
+                                  fontSize: 8.5,
+                                  height: 1.08,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            SingleChildScrollView(
-                              key: ValueKey('$ownerPrefix-other-stores'),
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(height: 6),
+                              Column(
+                                key: ValueKey('$ownerPrefix-other-stores'),
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   for (
                                     var index = 0;
@@ -5883,7 +6627,7 @@ Future<void> showBuyV2PartnerCatalogue(
                                   )
                                     Padding(
                                       padding: EdgeInsets.only(
-                                        right: index == otherStores.length - 1
+                                        bottom: index == otherStores.length - 1
                                             ? 0
                                             : 8,
                                       ),
@@ -5938,34 +6682,36 @@ Future<void> showBuyV2PartnerCatalogue(
                                     ),
                                 ],
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (session.countForDestination(current.destination) > 0)
-                  BuyV2FiniteIncomingTransition(
-                    key: const ValueKey('buy-store-cart-entrance-motion'),
-                    stateKey: '$ownerPrefix-store-cart-${session.itemCount}',
-                    child: BuyV2StoreCartBar(
-                      session: session,
-                      destination: current.destination,
-                      onOpenCart: onOpenStoreCart == null
-                          ? () => Navigator.of(sheetContext).pop('cart:')
-                          : () => onOpenStoreCart(current),
+                  if (session.countForDestination(current.destination) > 0)
+                    BuyV2FiniteIncomingTransition(
+                      key: const ValueKey('buy-store-cart-entrance-motion'),
+                      stateKey: '$ownerPrefix-store-cart-${session.itemCount}',
+                      child: BuyV2StoreCartBar(
+                        session: session,
+                        destination: current.destination,
+                        onOpenCart: onOpenStoreCart == null
+                            ? () => Navigator.of(sheetContext).pop('cart:')
+                            : () => onOpenStoreCart(current),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
-    if (!transitionController.isDismissed) {
-      await transitionController.reverse();
-    }
+    // The Navigator owns dismissal. A platform link can remove this route
+    // without a pop; reversing its animation again can finalize it twice.
+    // Wait for actual overlay removal before disposing our controller or
+    // opening the selected destination.
+    await sheetRoute?.completed;
     if (selectedProductId != null && context.mounted) {
       if (selectedProductId == 'cart:') {
         final openCart = onOpenCart;
@@ -6200,7 +6946,7 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
       key: ValueKey('buy-public-store-truth-${product.id}'),
       container: true,
       label:
-          '$fulfilmentIdentity. ${product.seller}. $providerType. '
+          '$fulfilmentIdentity. ${product.customerSeller(product.seller)}. $providerType. '
           '${addressConfirmed ? 'Address confirmed. ' : ''}'
           '$locality. $statusLabel. ${fulfilmentLabels.join(', ')}',
       child: Container(
@@ -6330,7 +7076,7 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.seller,
+                    product.customerSeller(product.seller),
                     key: const ValueKey('buy-public-store-name'),
                     style: context.buyBody.copyWith(
                       color: BuyV2Colors.navy,
@@ -6454,11 +7200,13 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                                   size: 15,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  statusLabel,
-                                  style: context.buyMeta.copyWith(
-                                    color: statusColor,
-                                    fontWeight: FontWeight.w900,
+                                Flexible(
+                                  child: Text(
+                                    statusLabel,
+                                    style: context.buyMeta.copyWith(
+                                      color: statusColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -6790,7 +7538,8 @@ class _PagedPublicStorePreviewState extends State<_PagedPublicStorePreview> {
             session: widget.session,
             products: products,
             storageKey: _scope,
-            semanticLabel: '${widget.product.seller} product catalogue preview',
+            semanticLabel:
+                '${widget.product.customerSeller(widget.product.seller)} product catalogue preview',
             laneCount: 1,
             storeContext: true,
             onOpenProduct: widget.onOpenProduct,
@@ -6935,7 +7684,10 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    store?.name ?? product.seller,
+                    buyV2CustomerStoreName(
+                      store?.name ?? product.seller,
+                      product.storeId,
+                    ),
                     key: const ValueKey('buy-paged-store-name'),
                     style: context.buyTitle.copyWith(fontSize: 16),
                   ),
@@ -7102,9 +7854,9 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                                     ),
                                   ),
                                   Text(
-                                    '${_sellerTypeLabel(current.sellerType)} · ${products.length} available products',
+                                    '${_sellerTypeLabel(current.sellerType)} · ${products.length} ${products.length == 1 ? 'product' : 'products'} listed',
                                     style: sheetContext.buyMeta.copyWith(
-                                      color: BuyV2Colors.green,
+                                      color: BuyV2Colors.muted,
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),
@@ -7191,7 +7943,7 @@ class _RelatedStoreCard extends StatelessWidget {
         'Bulk delivery · ${_compactDeliveryPromise(product.deliveryPromise)}',
     };
     final sellerLabel = Text(
-      product.seller,
+      product.customerSeller(product.seller),
       style: context.buyBody.copyWith(
         color: BuyV2Colors.navy,
         fontSize: 11.5,
@@ -7212,7 +7964,7 @@ class _RelatedStoreCard extends StatelessWidget {
     return BuyV2IntentDepth(
       spatial: false,
       child: SizedBox(
-        width: accessibleText ? 208 : 196,
+        width: double.infinity,
         child: Material(
           key: ValueKey('buy-related-store-surface-${product.id}'),
           color: Colors.transparent,
@@ -7224,9 +7976,7 @@ class _RelatedStoreCard extends StatelessWidget {
             highlightColor: BuyV2Colors.navy.withValues(alpha: .05),
             child: Container(
               key: ValueKey('buy-related-store-card-${product.id}'),
-              constraints: BoxConstraints(
-                minHeight: accessibleText ? 190 : 145,
-              ),
+              constraints: BoxConstraints(minHeight: 44),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -7295,7 +8045,7 @@ class _RelatedStoreCard extends StatelessWidget {
                     ),
                   const SizedBox(height: 1),
                   Text(
-                    '${product.title} · ${product.pack}',
+                    '${product.customerTitle} · ${product.pack}',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.ink,
                       fontSize: 9.5,
@@ -7307,11 +8057,22 @@ class _RelatedStoreCard extends StatelessWidget {
                     spacing: 5,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text(
-                        buyV2Money(product.price),
-                        style: context.buyBody.copyWith(
-                          color: BuyV2Colors.navy,
-                          fontWeight: FontWeight.w900,
+                      Container(
+                        key: ValueKey('buy-related-store-price-${product.id}'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE082),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          buyV2Money(product.price),
+                          style: context.buyBody.copyWith(
+                            color: BuyV2Colors.ink,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                       Text(product.unitPrice, style: context.buyMeta),
@@ -7524,6 +8285,38 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
   final ValueChanged<String> onOpenProduct;
   final VoidCallback onClear;
 
+  Future<void> _addProduct(BuildContext context, BuyV2Product product) async {
+    if (session.addProduct(product.id)) return;
+    final message =
+        session.notice ??
+        'Open product details to review the requirements before adding to Cart.';
+    final openProduct = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: ValueKey('buy-recently-viewed-rejection-${product.id}'),
+        title: const Text('Could not add to Cart'),
+        titleTextStyle: Theme.of(dialogContext).textTheme.titleMedium,
+        scrollable: true,
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('View product'),
+          ),
+        ],
+      ),
+    );
+    if (openProduct == true &&
+        context.mounted &&
+        session.procurementScopeCurrent) {
+      onOpenProduct(product.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sheetHeight = (MediaQuery.sizeOf(context).height * .58)
@@ -7611,7 +8404,9 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
                                     product: product,
                                     facts: session.productFactsFor(product),
                                     onOpen: () => onOpenProduct(product.id),
-                                    onAdd: () => session.addProduct(product.id),
+                                    onAdd: () => unawaited(
+                                      _addProduct(context, product),
+                                    ),
                                     quantity: session.quantityFor(product.id),
                                   );
                                 },
@@ -7688,131 +8483,164 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
   final int quantity;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    explicitChildNodes: true,
-    child: Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: BuyV2Colors.line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final details = Semantics(
-              button: true,
-              label: 'Open ${product.title}, ${product.pack}',
-              onTap: onOpen,
-              excludeSemantics: true,
-              child: InkWell(
-                key: ValueKey(
-                  'buy-settings-recently-viewed-product-${product.id}',
-                ),
-                onTap: onOpen,
-                borderRadius: BorderRadius.circular(12),
-                child: Row(
-                  children: [
-                    SizedBox.square(
-                      dimension: 48,
-                      child: BuyV2ProductPackshot(
-                        product: product,
-                        borderRadius: 12,
-                        animateFirstFrame: false,
-                      ),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.title,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${product.pack} · ${buyV2Money(facts.price)}',
-                            style: context.buyMeta,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            buyV2BuyerDeliveryPromise(facts),
-                            style: context.buyMeta.copyWith(
-                              color: BuyV2Colors.green,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-            final add = ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 76,
-                minHeight: BuyV2Metrics.minimumTap,
-              ),
-              child: Semantics(
+  Widget build(BuildContext context) {
+    final decision = buyV2ResolveProductOfferDecision(
+      product: product,
+      facts: facts,
+    );
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: BuyV2Colors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final details = Semantics(
                 button: true,
-                label: quantity > 0
-                    ? '${product.title} is in Cart'
-                    : 'Add ${product.title} to cart',
-                child: FilledButton.tonalIcon(
-                  key: ValueKey('buy-recently-viewed-add-${product.id}'),
-                  onPressed: onAdd,
-                  icon: Icon(
-                    quantity > 0
-                        ? Icons.check_rounded
-                        : Icons.add_shopping_cart_rounded,
-                    size: 17,
+                label: 'Open ${product.customerTitle}, ${product.pack}',
+                onTap: onOpen,
+                excludeSemantics: true,
+                child: InkWell(
+                  key: ValueKey(
+                    'buy-settings-recently-viewed-product-${product.id}',
                   ),
-                  label: Text(quantity > 0 ? 'Added' : 'Add'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(76, BuyV2Metrics.minimumTap),
-                    padding: const EdgeInsets.symmetric(horizontal: 9),
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
+                  onTap: onOpen,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Row(
+                    children: [
+                      SizedBox.square(
+                        dimension: 48,
+                        child: BuyV2ProductPackshot(
+                          product: product,
+                          borderRadius: 12,
+                          animateFirstFrame: false,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.customerTitle,
+                              style: const TextStyle(
+                                color: BuyV2Colors.ink,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${product.pack} · ${buyV2Money(facts.price)}',
+                              style: context.buyMeta.copyWith(fontSize: 11),
+                            ),
+                            Text(
+                              product.unitPrice,
+                              style: context.buyMeta.copyWith(fontSize: 11),
+                            ),
+                            Text(
+                              product.customerSeller(facts.partner),
+                              style: context.buyMeta.copyWith(fontSize: 11),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              decision.canAdd
+                                  ? buyV2BuyerDeliveryPromise(facts)
+                                  : decision.detail,
+                              key: ValueKey(
+                                'buy-recently-viewed-availability-${product.id}',
+                              ),
+                              style: context.buyMeta.copyWith(
+                                color: decision.canAdd
+                                    ? BuyV2Colors.green
+                                    : BuyV2Colors.muted,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+              final add = ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 76,
+                  minHeight: BuyV2Metrics.minimumTap,
+                ),
+                child: Semantics(
+                  button: true,
+                  label: !decision.canAdd
+                      ? 'Review ${product.customerTitle}. ${decision.statusLabel}'
+                      : quantity > 0
+                      ? '${product.customerTitle} is in Cart'
+                      : 'Add ${product.customerTitle} to cart',
+                  child: FilledButton.tonalIcon(
+                    key: ValueKey(
+                      decision.canAdd
+                          ? 'buy-recently-viewed-add-${product.id}'
+                          : 'buy-recently-viewed-review-${product.id}',
+                    ),
+                    onPressed: decision.canAdd ? onAdd : onOpen,
+                    icon: Icon(
+                      !decision.canAdd
+                          ? Icons.info_outline_rounded
+                          : quantity > 0
+                          ? Icons.check_rounded
+                          : Icons.add_shopping_cart_rounded,
+                      size: 17,
+                    ),
+                    label: Text(
+                      !decision.canAdd
+                          ? 'Details'
+                          : quantity > 0
+                          ? 'Added'
+                          : 'Add',
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(76, BuyV2Metrics.minimumTap),
+                      padding: const EdgeInsets.symmetric(horizontal: 9),
+                      textStyle: Theme.of(context).textTheme.labelLarge
+                          ?.copyWith(fontSize: 10, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
-              ),
-            );
-            // Keep purchase facts readable beside the image. Move the action
-            // below them when narrow or enlarged text needs the row width.
-            if (constraints.maxWidth /
-                    MediaQuery.textScalerOf(context).scale(1) <
-                330) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              );
+              // Keep purchase facts readable beside the image. Move the action
+              // below them when narrow or enlarged text needs the row width.
+              if (constraints.maxWidth /
+                      MediaQuery.textScalerOf(context).scale(1) <
+                  330) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    details,
+                    const SizedBox(height: 4),
+                    Align(alignment: Alignment.centerRight, child: add),
+                  ],
+                );
+              }
+              return Row(
                 children: [
-                  details,
-                  const SizedBox(height: 4),
-                  Align(alignment: Alignment.centerRight, child: add),
+                  Expanded(child: details),
+                  const SizedBox(width: 7),
+                  add,
                 ],
               );
-            }
-            return Row(
-              children: [
-                Expanded(child: details),
-                const SizedBox(width: 7),
-                add,
-              ],
-            );
-          },
+            },
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _SavedProductsEmptyState extends StatelessWidget {
@@ -7885,7 +8713,7 @@ class _SavedProductInfoRow extends StatelessWidget {
           Expanded(
             child: Semantics(
               button: true,
-              label: 'Open ${product.title}, ${product.pack}',
+              label: 'Open ${product.customerTitle}, ${product.pack}',
               onTap: onOpen,
               excludeSemantics: true,
               child: InkWell(
@@ -7914,7 +8742,7 @@ class _SavedProductInfoRow extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              product.title,
+                              product.customerTitle,
                               style: const TextStyle(
                                 color: BuyV2Colors.ink,
                                 fontSize: 13,
@@ -7937,7 +8765,7 @@ class _SavedProductInfoRow extends StatelessWidget {
           ),
           IconButton(
             key: ValueKey('buy-unsave-${product.id}'),
-            tooltip: 'Remove ${product.title} from Saved',
+            tooltip: 'Remove ${product.customerTitle} from Saved',
             onPressed: onRemove,
             icon: const Icon(Icons.bookmark_remove_rounded),
           ),
@@ -8308,14 +9136,6 @@ class _ProductGrid extends StatelessWidget {
       builder: (context, constraints, quantityWidth) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
-        const compactCards = true;
-        final layout = _resolveCompactProductGridLayout(
-          constraints: constraints,
-          accessibleText: accessibleText,
-          textScale: textScale,
-          savedOnly: savedOnly,
-          cartQuantityWidth: quantityWidth,
-        );
         final featuredProducts = showPromotions
             ? products.take(6).toList(growable: false)
             : const <BuyV2Product>[];
@@ -8339,14 +9159,6 @@ class _ProductGrid extends StatelessWidget {
               SliverToBoxAdapter(
                 child: _CataloguePromotionRail(session: session),
               ),
-            if (recentlyViewedProducts.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _RecentlyViewedRail(
-                  session: session,
-                  products: recentlyViewedProducts,
-                  accessibleText: accessibleText,
-                ),
-              ),
             if (prescriptionMatches.isNotEmpty)
               SliverToBoxAdapter(
                 child: _PrescriptionMatchLane(
@@ -8359,6 +9171,14 @@ class _ProductGrid extends StatelessWidget {
                 child: _FeaturedProductRail(
                   session: session,
                   products: featuredProducts,
+                  accessibleText: accessibleText,
+                ),
+              ),
+            if (recentlyViewedProducts.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _RecentlyViewedRail(
+                  session: session,
+                  products: recentlyViewedProducts,
                   accessibleText: accessibleText,
                 ),
               ),
@@ -8383,29 +9203,20 @@ class _ProductGrid extends StatelessWidget {
               ),
             if (gridProducts.isNotEmpty)
               SliverToBoxAdapter(
-                child: session.showingMonthlyBasketProducts
-                    ? BuyV2ProgressiveProductGrid(
-                        session: session,
-                        products: gridProducts,
-                        storageKey: 'buy-monthly-${session.saleTypeSignature}',
-                        semanticLabel: 'Monthly basket products',
-                        vertical: true,
-                      )
-                    : _HorizontalProductGrid(
-                        session: session,
-                        products: gridProducts,
-                        cardWidth: layout.cardWidth,
-                        tileHeight: layout.tileHeight,
-                        storageKey:
-                            'buy-products-horizontal-${session.destination.name}-'
+                child: BuyV2ProgressiveProductGrid(
+                  session: session,
+                  products: gridProducts,
+                  storageKey: session.showingMonthlyBasketProducts
+                      ? 'buy-monthly-${session.saleTypeSignature}'
+                      : 'buy-products-${session.destination.name}-'
                             '${session.selectedCategoryId}-${savedOnly ? 'saved' : 'all'}',
-                        compact: compactCards,
-                        laneCount:
-                            savedOnly || gridProducts.length <= layout.columns
-                            ? 1
-                            : null,
-                        savedContext: savedOnly,
-                      ),
+                  semanticLabel: session.showingMonthlyBasketProducts
+                      ? 'Monthly basket products'
+                      : savedOnly
+                      ? 'Saved products'
+                      : 'Products',
+                  savedContext: savedOnly,
+                ),
               ),
           ],
         );
@@ -8872,10 +9683,12 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     this.laneCount,
     this.fitSmallCatalogue = false,
     this.savedContext = false,
+    this.alignMediaAtTop = true,
     this.onOpenProduct,
     this.storeContext = false,
-    this.vertical = false,
+    this.vertical = true,
     this.productSupplement,
+    this.productCardBuilder,
     this.beforeCartChange,
     this.initialAddQuantity,
     this.beforeSave,
@@ -8892,10 +9705,12 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
   /// the bounded progressive browsing behaviour.
   final bool fitSmallCatalogue;
   final bool savedContext;
+  final bool alignMediaAtTop;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
   final bool vertical;
   final Widget Function(BuyV2Product)? productSupplement;
+  final Widget Function(BuyV2Product)? productCardBuilder;
   final Future<bool> Function(BuyV2Product, int)? beforeCartChange;
   final int? initialAddQuantity;
   final bool Function(BuyV2Product)? beforeSave;
@@ -8909,52 +9724,83 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
         final layout = _resolveCompactProductGridLayout(
+          context: context,
+          session: session,
+          products: products,
           constraints: constraints,
           accessibleText: accessibleText,
           textScale: textScale,
           denseStore: storeContext,
+          savedContext: savedContext,
           cartQuantityWidth: quantityWidth,
         );
         if (vertical) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Wrap(
-              key: ValueKey('buy-vertical-product-grid-$storageKey'),
-              spacing: 7,
-              runSpacing: 10,
-              children: [
-                for (final product in products)
-                  SizedBox(
-                    key: ValueKey('buy-product-compare-${product.id}'),
-                    width: layout.cardWidth,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          height: layout.tileHeight,
-                          child: BuyV2ProductCard(
-                            session: session,
-                            product: product,
-                            compact: true,
-                            savedContext: savedContext,
-                            storeContext: storeContext,
-                            onOpenProduct: onOpenProduct,
-                            initialAddQuantity: initialAddQuantity,
-                            beforeSave: beforeSave == null
+          final rowHeights = _productGridRowHeights(
+            context,
+            session,
+            products,
+            columns: layout.columns,
+            cardWidth: layout.cardWidth,
+            storeContext: storeContext,
+            savedContext: savedContext,
+          );
+          return Semantics(
+            key: ValueKey('buy-vertical-product-summary-$storageKey'),
+            container: true,
+            liveRegion: true,
+            label:
+                '$semanticLabel. Showing ${products.length} of '
+                '${products.length} ${products.length == 1 ? 'product' : 'products'}. '
+                'Scroll up or down to browse.',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: _ProductGridFlow(
+                columns: layout.columns,
+                masonry: alignMediaAtTop,
+                key: ValueKey('buy-vertical-product-grid-$storageKey'),
+                spacing: 7,
+                runSpacing: 10,
+                children: [
+                  for (final (index, product) in products.indexed)
+                    SizedBox(
+                      key: ValueKey('buy-product-compare-${product.id}'),
+                      width: layout.cardWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            height: alignMediaAtTop
                                 ? null
-                                : () => beforeSave!(product),
-                            beforeCartChange: beforeCartChange == null
-                                ? null
-                                : (quantity) =>
-                                      beforeCartChange!(product, quantity),
+                                : rowHeights[index ~/ layout.columns],
+                            child:
+                                productCardBuilder?.call(product) ??
+                                BuyV2ProductCard(
+                                  session: session,
+                                  product: product,
+                                  compact: true,
+                                  alignMediaAtTop: alignMediaAtTop,
+                                  savedContext: savedContext,
+                                  storeContext: storeContext,
+                                  onOpenProduct: onOpenProduct,
+                                  initialAddQuantity: initialAddQuantity,
+                                  beforeSave: beforeSave == null
+                                      ? null
+                                      : () => beforeSave!(product),
+                                  beforeCartChange: beforeCartChange == null
+                                      ? null
+                                      : (quantity) => beforeCartChange!(
+                                          product,
+                                          quantity,
+                                        ),
+                                ),
                           ),
-                        ),
-                        if (productSupplement != null)
-                          productSupplement!(product),
-                      ],
+                          if (productSupplement != null)
+                            productSupplement!(product),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         }
@@ -8988,77 +9834,233 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
 
 ({int columns, double cardWidth, double tileHeight})
 _resolveCompactProductGridLayout({
+  required BuildContext context,
+  required BuyV2Session session,
+  required List<BuyV2Product> products,
   required BoxConstraints constraints,
   required bool accessibleText,
   required double textScale,
-  bool savedOnly = false,
   bool denseStore = false,
+  bool savedContext = false,
   bool scrollIndicatorInset = false,
   bool storeProcurement = false,
   double cartQuantityWidth = 0,
 }) {
-  // The founder-approved Shop and Wholesale rhythm keeps three products
-  // visible at normal text scale. Enlarged accessibility text uses two cards
-  // so type and actions can grow without clipping.
-  // The page scroller reserves 8px inside the same viewport. Keep that gutter
-  // out of the breakpoint calculation, while card widths use the real space.
+  // Founder review: three complete cards across normal phone layouts.
+  // Enlarged text retains the measured adaptive layout for readable facts.
   final viewportWidth = constraints.maxWidth + (scrollIndicatorInset ? 8 : 0);
-  final columns = storeProcurement
+  final minimumWidth = textScale > 1.6 ? 260.0 : 134.0;
+  final columns = storeProcurement && textScale <= 1.25
       ? (viewportWidth < 340
             ? 1
             : viewportWidth < 600
             ? 2
             : 3)
-      : savedOnly
-      ? viewportWidth >= 320
-            ? 2
-            : 1
-      : accessibleText && viewportWidth < 460
-      ? 2
-      : viewportWidth >= 320
+      : textScale <= 1.25 && viewportWidth >= 300 && viewportWidth <= 600
       ? 3
-      : 2;
-  const horizontalInsets = 20.0;
-  const cardGap = 7.0;
-  final cardWidth =
-      (constraints.maxWidth - horizontalInsets - ((columns - 1) * cardGap)) /
-      columns;
-  final tileHeight = savedOnly
-      ? accessibleText
-            ? constraints.maxWidth < 360
-                  ? 290.0
-                  : 284.0
-            : 260.0
-      : denseStore
-      ? accessibleText
-            ? constraints.maxWidth < 360
-                  ? 270.0
-                  : 260.0
-            : columns == 3
-            ? 212.0
-            : 216.0
-      : accessibleText
-      ? constraints.maxWidth < 360
-            ? 300.0
-            : 288.0
-      : columns == 3
-      ? 240.0
-      : 238.0;
-  // Keep the normal catalogue rhythm, but let enlarged text and actions
-  // retain their size instead of overflowing the fixed card body.
-  final enlargedTextHeight =
-      (textScale - 1.4).clamp(0.0, double.infinity) * 160;
+      : ((viewportWidth - 20 + 7) / (minimumWidth + 7)).floor().clamp(1, 4);
+  final cardWidth = (constraints.maxWidth - 20 - ((columns - 1) * 7)) / columns;
+  var tileHeight = 0.0;
+  for (final product in products) {
+    final height = _productGlanceCardHeight(
+      context,
+      session,
+      product,
+      cardWidth,
+      denseStore,
+      savedContext: savedContext,
+    );
+    if (height > tileHeight) tileHeight = height;
+  }
   return (
     columns: columns,
     cardWidth: cardWidth,
     tileHeight:
         tileHeight +
-        enlargedTextHeight +
         (cartQuantityWidth > 0 &&
                 _gridQuantityStacks(cardWidth - 12, cartQuantityWidth)
             ? _gridQuantityLabelHeight(textScale)
             : 0),
   );
+}
+
+/// Product discovery stacks each column independently so shorter cards leave no row gap.
+class _ProductGridFlow extends StatelessWidget {
+  const _ProductGridFlow({
+    super.key,
+    required this.columns,
+    required this.masonry,
+    required this.spacing,
+    required this.runSpacing,
+    required this.children,
+  });
+  final int columns;
+  final bool masonry;
+  final double spacing;
+  final double runSpacing;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!masonry) {
+      return Wrap(spacing: spacing, runSpacing: runSpacing, children: children);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var column = 0; column < columns; column++) ...[
+          if (column > 0) SizedBox(width: spacing),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (
+                  var index = column;
+                  index < children.length;
+                  index += columns
+                ) ...[
+                  if (index >= columns) SizedBox(height: runSpacing),
+                  Semantics(
+                    sortKey: OrdinalSortKey(index.toDouble()),
+                    child: children[index],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Size each visible row from its own provider facts, not the longest item
+/// elsewhere on the page. Rebuilds use the current facts and Cart quantities.
+List<double> _productGridRowHeights(
+  BuildContext context,
+  BuyV2Session session,
+  List<BuyV2Product> products, {
+  required int columns,
+  required double cardWidth,
+  required bool storeContext,
+  bool savedContext = false,
+}) {
+  final heights = <double>[];
+  for (var start = 0; start < products.length; start += columns) {
+    final row = products.skip(start).take(columns).toList(growable: false);
+    var height = 0.0;
+    for (final product in row) {
+      final measured = _productGlanceCardHeight(
+        context,
+        session,
+        product,
+        cardWidth,
+        storeContext,
+        savedContext: savedContext,
+      );
+      if (measured > height) height = measured;
+    }
+    final quantityWidth = _gridMaximumQuantityWidth(context, session, row);
+    if (quantityWidth > 0 &&
+        _gridQuantityStacks(cardWidth - 12, quantityWidth)) {
+      height += _gridQuantityLabelHeight(
+        MediaQuery.textScalerOf(context).scale(1),
+      );
+    }
+    heights.add(height);
+  }
+  return heights;
+}
+
+String _glancePriceLabel(num value) {
+  if (value >= 10000000 && value % 10000000 == 0) {
+    return '${buyV2Money(value / 10000000)} crore';
+  }
+  if (value >= 100000 && value % 100000 == 0) {
+    return '${buyV2Money(value / 100000)} lakh';
+  }
+  return buyV2Money(value);
+}
+
+TextStyle _readableGlancePriceStyle(
+  BuildContext context,
+  _ProductGlanceField field,
+  double width,
+) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: field.text,
+      style: DefaultTextStyle.of(context).style.merge(field.style),
+    ),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  final ratio = painter.width > 0
+      ? ((width - 2).clamp(1.0, double.infinity) / painter.width).clamp(
+          0.0,
+          1.0,
+        )
+      : 1.0;
+  painter.dispose();
+  return field.style.copyWith(
+    fontSize: ((field.style.fontSize ?? 20) * ratio).clamp(12.0, 20.0),
+    color: BuyV2Colors.ink,
+  );
+}
+
+double _productGlanceCardHeight(
+  BuildContext context,
+  BuyV2Session session,
+  BuyV2Product product,
+  double cardWidth,
+  bool storeContext, {
+  bool savedContext = false,
+}) {
+  final compactSavedAction =
+      savedContext &&
+      cardWidth < 130 &&
+      MediaQuery.textScalerOf(context).scale(1) <= 1.25;
+  final reservedActionWidth = savedContext && !compactSavedAction ? 68.0 : 42.0;
+  var height =
+      _compactProductVisualLayout(
+        context,
+        product,
+        cardWidth - 2,
+        reservedActionWidth,
+      ).photoInset +
+      70 +
+      12 +
+      BuyV2Metrics.minimumTap +
+      8 +
+      4;
+  for (final (index, field) in _productGlanceFields(
+    session,
+    product,
+    storeContext,
+  ).indexed) {
+    final painter =
+        TextPainter(
+          text: TextSpan(
+            text: field.text,
+            style: DefaultTextStyle.of(context).style.merge(
+              index == 2
+                  ? _readableGlancePriceStyle(context, field, cardWidth - 20)
+                  : field.style,
+            ),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(
+          maxWidth: (cardWidth - (index == 2 ? 20 : 16)).clamp(
+            1,
+            double.infinity,
+          ),
+        );
+    height += painter.height.ceilToDouble() + 4;
+    painter.dispose();
+  }
+  return height;
 }
 
 double _gridQuantityLabelHeight(double scale) =>
@@ -9071,8 +10073,17 @@ const _gridQuantityStyle = TextStyle(
   fontWeight: FontWeight.w900,
 );
 
+// Keep the normal count on one row in a narrow three-column SKU card.
+// Each side retains a separate target at least 28 wide and 44 high; the
+// editable count has at least 24 width. Large values fall back to two rows.
 bool _gridQuantityStacks(double width, double valueWidth) =>
-    width < 88 + (valueWidth + 16).clamp(44.0, double.infinity);
+    width < 56 + (valueWidth + 12).clamp(24.0, double.infinity);
+
+double _gridQuantitySideWidth(double width, double valueWidth) =>
+    ((width - (valueWidth + 12).clamp(24.0, double.infinity)) / 2).clamp(
+      28.0,
+      44.0,
+    );
 
 double _gridMaximumQuantityWidth(
   BuildContext context,
@@ -9145,10 +10156,11 @@ class _QuantityAwareGridLayoutState extends State<_QuantityAwareGridLayout> {
         widget.session,
         widget.products,
       );
-      if (measured > _largestQuantityWidth) _largestQuantityWidth = measured;
-      // Removing a quantity row must not shrink scroll extent under a buyer's
-      // finger. The product image uses the retained card space. A new product
-      // scope or viewport starts with its own compact geometry.
+      if (measured == 0 || measured > _largestQuantityWidth) {
+        _largestQuantityWidth = measured;
+      }
+      // Keep quantity controls stable while this grid has items in the cart.
+      // Once all its quantities are removed, restore the compact Add layout.
       return widget.builder(context, constraints, _largestQuantityWidth);
     },
   );
@@ -9266,7 +10278,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
         final facts = widget.session.productFactsFor(product);
         for (final field in [
           (
-            text: product.title,
+            text: product.customerTitle,
             style: const TextStyle(
               fontSize: 10,
               height: 1.05,
@@ -9281,7 +10293,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
           ),
           (
             text:
-                '${facts.partner} · ${_compactDeliveryPromise(facts.deliveryPromise)}',
+                '${product.customerSeller(facts.partner)} · ${_compactDeliveryPromise(facts.deliveryPromise)}',
             style: const TextStyle(
               fontSize: 8,
               height: 1.1,
@@ -9317,7 +10329,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
         final measure = TextPainter(
           text: TextSpan(
             text:
-                '${facts.partner} · ${_compactDeliveryPromise(facts.deliveryPromise)}',
+                '${product.customerSeller(facts.partner)} · ${_compactDeliveryPromise(facts.deliveryPromise)}',
             style: promiseStyle,
           ),
           textDirection: Directionality.of(context),
@@ -9330,7 +10342,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
             .ceilToDouble();
         final title = TextPainter(
           text: TextSpan(
-            text: product.title,
+            text: product.customerTitle,
             style: DefaultTextStyle.of(context).style.merge(
               const TextStyle(
                 fontSize: 10,
@@ -9351,7 +10363,10 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
         measure.dispose();
       }
     }
-    final tileHeight = widget.tileHeight + medicalPromiseReserve;
+    final tileHeight =
+        widget.tileHeight +
+        medicalPromiseReserve +
+        (widget.compact ? 4 + _skuPhotoExtent(cardWidth) - 70 : 0);
     return Semantics(
       key: const ValueKey('buy-horizontal-product-grid'),
       container: true,
@@ -9403,13 +10418,16 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
                               : (index * resolvedLaneCount) + laneIndex;
                           return SizedBox(
                             width: cardWidth,
-                            child: BuyV2ProductCard(
-                              session: widget.session,
-                              product: products[productIndex],
-                              compact: widget.compact,
-                              savedContext: widget.savedContext,
-                              onOpenProduct: widget.onOpenProduct,
-                              storeContext: widget.storeContext,
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: BuyV2ProductCard(
+                                session: widget.session,
+                                product: products[productIndex],
+                                compact: widget.compact,
+                                savedContext: widget.savedContext,
+                                onOpenProduct: widget.onOpenProduct,
+                                storeContext: widget.storeContext,
+                              ),
                             ),
                           );
                         },
@@ -9603,72 +10621,105 @@ class _PrescriptionMatchLane extends StatelessWidget {
               style: context.buyMeta,
             ),
             const SizedBox(height: 9),
-            SizedBox(
-              height: 58,
-              child: ListView.separated(
-                key: const ValueKey('buy-prescription-match-list'),
-                scrollDirection: Axis.horizontal,
-                itemCount: products.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final product = products[index];
-                  void openProduct() {
-                    HapticFeedback.selectionClick();
-                    session.openProduct(product.id);
-                  }
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final scale = MediaQuery.textScalerOf(context).scale(1);
+                final columns = scale <= 1.25 ? 3 : 1;
+                final cardWidth =
+                    (constraints.maxWidth - (columns - 1) * 8) / columns;
+                return Wrap(
+                  key: const ValueKey('buy-prescription-match-list'),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(products.length, (index) {
+                    final product = products[index];
+                    void openProduct() {
+                      HapticFeedback.selectionClick();
+                      session.openProduct(product.id);
+                    }
 
-                  return Semantics(
-                    key: ValueKey(
-                      'buy-prescription-match-product-${product.id}',
-                    ),
-                    button: true,
-                    label:
-                        'View prescription-matched ${product.title} product '
-                        'details. ${product.pack}. '
-                        'Pharmacist review required. Not medical advice.',
-                    excludeSemantics: true,
-                    onTap: openProduct,
-                    child: BuyV2IntentDepth(
-                      key: ValueKey(
-                        'buy-prescription-match-depth-${product.id}',
-                      ),
-                      spatial: true,
-                      child: OutlinedButton(
+                    return SizedBox(
+                      width: cardWidth,
+                      child: Semantics(
                         key: ValueKey(
-                          'buy-prescription-match-action-${product.id}',
+                          'buy-prescription-match-product-${product.id}',
                         ),
-                        onPressed: openProduct,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(238, 54),
-                          maximumSize: const Size(286, 58),
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
+                        button: true,
+                        label:
+                            'View prescription-matched ${product.customerTitle} product '
+                            'details. ${product.pack}. '
+                            'Pharmacist review required. Not medical advice.',
+                        excludeSemantics: true,
+                        onTap: openProduct,
+                        child: BuyV2IntentDepth(
+                          key: ValueKey(
+                            'buy-prescription-match-depth-${product.id}',
                           ),
-                          foregroundColor: BuyV2Colors.navy,
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: BuyV2Colors.line),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                        ),
-                        child: Text(
-                          '${product.title}\n${product.pack} · '
-                          '${buyV2Money(product.price)}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            height: 1.22,
+                          spatial: true,
+                          child: OutlinedButton(
+                            key: ValueKey(
+                              'buy-prescription-match-action-${product.id}',
+                            ),
+                            onPressed: openProduct,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 54),
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              foregroundColor: BuyV2Colors.navy,
+                              backgroundColor: Colors.white,
+                              side: const BorderSide(color: BuyV2Colors.line),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.customerTitle,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.22,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  product.pack,
+                                  style: context.buyMeta.copyWith(fontSize: 11),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFE082),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    buyV2Money(product.price),
+                                    style: const TextStyle(
+                                      color: BuyV2Colors.ink,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  }),
+                );
+              },
             ),
           ],
         ),
@@ -9696,42 +10747,12 @@ class _FeaturedProductRail extends StatelessWidget {
       BuyV2Destination.medicine => 'Pharmacy picks',
       BuyV2Destination.orders => 'Product picks',
     };
-    final viewport = MediaQuery.sizeOf(context);
-    final shortLandscape =
-        viewport.width > viewport.height && viewport.height <= 480;
-    final cardWidth = accessibleText && shortLandscape
-        ? (178 * MediaQuery.textScalerOf(context).scale(1))
-              .clamp(1.0, (viewport.width - 28).clamp(1.0, double.infinity))
-              .toDouble()
-        : accessibleText
-        ? 178.0
-        : 168.0;
     final titleStyle = context.buyTitle.copyWith(fontSize: 15);
     final hintStyle = context.buyMeta.copyWith(
       color: BuyV2Colors.navy,
       fontSize: 8,
       fontWeight: FontWeight.w800,
     );
-    final titleHeight = buyV2ValueTextSize(context, title, titleStyle).height;
-    final hintHeight =
-        buyV2ValueTextSize(
-          context,
-          'Swipe to explore',
-          hintStyle,
-        ).height.clamp(14.0, double.infinity) +
-        8;
-    final rowHeight = titleHeight > hintHeight ? titleHeight : hintHeight;
-    // A wrapped heading grows the section, not at the expense of product media.
-    final titleReserve = products.fold(0.0, (height, product) {
-      final extra = _FeaturedProductCard.titleExpansion(
-        context,
-        product,
-        cardWidth,
-      );
-      return height > extra ? height : extra;
-    });
-    final cardLaneHeight =
-        (accessibleText ? 365.0 : 285.0) - rowHeight - 12 + titleReserve;
     return Column(
       key: const ValueKey('buy-featured-products'),
       mainAxisSize: MainAxisSize.min,
@@ -9764,7 +10785,7 @@ class _FeaturedProductRail extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Swipe to explore', style: hintStyle),
+                            Text('Browse categories', style: hintStyle),
                             const SizedBox(width: 2),
                             const Icon(
                               Icons.arrow_forward_rounded,
@@ -9781,23 +10802,14 @@ class _FeaturedProductRail extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(
-          key: PageStorageKey('buy-featured-${session.destination.name}'),
-          height: cardLaneHeight,
-          child: ListView.separated(
-            key: const ValueKey('buy-featured-product-list'),
-            padding: const EdgeInsets.fromLTRB(7, 0, 12, 8),
-            scrollDirection: Axis.horizontal,
-            itemCount: products.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) => SizedBox(
-              width: cardWidth,
-              child: _FeaturedProductCard(
-                session: session,
-                product: products[index],
-              ),
-            ),
-          ),
+        BuyV2ProgressiveProductGrid(
+          key: const ValueKey('buy-featured-product-list'),
+          session: session,
+          products: products,
+          storageKey: 'buy-featured-${session.destination.name}',
+          semanticLabel: title,
+          productCardBuilder: (product) =>
+              _FeaturedProductCard(session: session, product: product),
         ),
       ],
     );
@@ -9817,18 +10829,6 @@ class _RecentlyViewedRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardHeight = products.fold(accessibleText ? 122.0 : 102.0, (
-      height,
-      product,
-    ) {
-      final needed = _RecentlyViewedCard.minimumHeight(
-        context,
-        session,
-        product,
-        accessibleText,
-      );
-      return height > needed ? height : needed;
-    });
     return Column(
       key: const ValueKey('buy-recently-viewed'),
       mainAxisSize: MainAxisSize.min,
@@ -9846,19 +10846,15 @@ class _RecentlyViewedRail extends StatelessWidget {
                       Text(
                         'Recently viewed',
                         key: const ValueKey('buy-recently-viewed-heading'),
-                        maxLines: accessibleText ? null : 1,
-                        overflow: accessibleText
-                            ? TextOverflow.clip
-                            : TextOverflow.ellipsis,
+                        maxLines: null,
+                        overflow: TextOverflow.visible,
                         style: context.buyTitle.copyWith(fontSize: 14),
                       ),
                       Text(
                         'Continue with the exact pack you viewed',
                         key: const ValueKey('buy-recently-viewed-subheading'),
-                        maxLines: accessibleText ? null : 1,
-                        overflow: accessibleText
-                            ? TextOverflow.clip
-                            : TextOverflow.ellipsis,
+                        maxLines: null,
+                        overflow: TextOverflow.visible,
                         style: context.buyMeta.copyWith(fontSize: 8),
                       ),
                     ],
@@ -9881,193 +10877,22 @@ class _RecentlyViewedRail extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(
-          height: cardHeight + 8,
-          child: ListView.separated(
-            key: const ValueKey('buy-recently-viewed-list'),
-            padding: const EdgeInsets.fromLTRB(7, 0, 12, 8),
-            scrollDirection: Axis.horizontal,
-            itemCount: products.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) => _RecentlyViewedCard(
+        BuyV2ProgressiveProductGrid(
+          key: const ValueKey('buy-recently-viewed-list'),
+          session: session,
+          products: products,
+          storageKey: 'buy-recently-viewed-${session.destination.name}',
+          semanticLabel: 'Recently viewed products',
+          productCardBuilder: (product) => KeyedSubtree(
+            key: ValueKey('buy-recently-viewed-product-${product.id}'),
+            child: BuyV2ProductCard(
               session: session,
-              product: products[index],
-              accessibleText: accessibleText,
+              product: product,
+              compact: true,
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RecentlyViewedCard extends StatelessWidget {
-  const _RecentlyViewedCard({
-    required this.session,
-    required this.product,
-    required this.accessibleText,
-  });
-
-  final BuyV2Session session;
-  final BuyV2Product product;
-  final bool accessibleText;
-
-  static const titleStyle = TextStyle(
-    color: BuyV2Colors.ink,
-    fontSize: 10,
-    height: 1.05,
-    fontWeight: FontWeight.w900,
-  );
-  static const priceStyle = TextStyle(
-    color: BuyV2Colors.navy,
-    fontSize: 13,
-    fontWeight: FontWeight.w900,
-  );
-  static const promiseStyle = TextStyle(
-    color: BuyV2Colors.green,
-    fontSize: 7,
-    fontWeight: FontWeight.w800,
-  );
-
-  static double minimumHeight(
-    BuildContext context,
-    BuyV2Session session,
-    BuyV2Product product,
-    bool accessibleText,
-  ) {
-    final facts = session.productFactsFor(product);
-    final mode =
-        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
-    final width = (accessibleText ? 224.0 : 206.0) - 78 - 17;
-    double textHeight(String text, TextStyle style, int? maxLines) =>
-        buyV2ValueTextSize(
-          context,
-          text,
-          style,
-          maxWidth: width,
-          maxLines: maxLines,
-        ).height;
-    return 17 +
-        textHeight(product.title, titleStyle, accessibleText ? null : 2) +
-        textHeight(
-          product.pack,
-          context.buyMeta.copyWith(fontSize: 8),
-          accessibleText ? null : 1,
-        ) +
-        textHeight(buyV2Money(facts.price), priceStyle, null) +
-        textHeight(
-          '${buyV2CompactFulfilmentModeLabel(mode)} · '
-          '${_compactDeliveryPromise(buyV2BuyerDeliveryPromise(facts))}',
-          promiseStyle,
-          null,
-        );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final facts = session.productFactsFor(product);
-    final fulfilmentMode =
-        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
-    final deliveryPromise = buyV2BuyerDeliveryPromise(facts);
-    return SizedBox(
-      width: accessibleText ? 224 : 206,
-      child: Semantics(
-        button: true,
-        label:
-            '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
-            '${buyV2FulfilmentModeLabel(fulfilmentMode)}, $deliveryPromise',
-        child: Material(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: BuyV2Colors.line),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            key: ValueKey('buy-recently-viewed-product-${product.id}'),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              session.openProduct(product.id);
-            },
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 78,
-                  height: double.infinity,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _productVisualColors(product),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(7),
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio:
-                              BuyV2ProductPackshot.resolveMedia(
-                                    product,
-                                  )?.assetPath ==
-                                  BuyV2ProductPackshot.productAtlasPath
-                              ? 9 / 8
-                              : 1,
-                          child: BuyV2ProductPackshot(
-                            key: ValueKey(
-                              'buy-recently-viewed-packshot-${product.id}',
-                            ),
-                            product: product,
-                            borderRadius: 11,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(9, 7, 8, 7),
-                    child: BuyV2CartAvoidanceRegion(
-                      child: Column(
-                        key: ValueKey(
-                          'buy-recently-viewed-facts-${product.id}',
-                        ),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.title,
-                            maxLines: accessibleText ? null : 2,
-                            overflow: accessibleText
-                                ? TextOverflow.clip
-                                : TextOverflow.ellipsis,
-                            style: titleStyle,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            product.pack,
-                            maxLines: accessibleText ? null : 1,
-                            overflow: accessibleText
-                                ? TextOverflow.clip
-                                : TextOverflow.ellipsis,
-                            style: context.buyMeta.copyWith(fontSize: 8),
-                          ),
-                          const Spacer(),
-                          Text(buyV2Money(facts.price), style: priceStyle),
-                          const SizedBox(height: 1),
-                          Text(
-                            '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
-                            '${_compactDeliveryPromise(deliveryPromise)}',
-                            style: promiseStyle,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -10111,7 +10936,7 @@ class _CatalogueSectionHeader extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Swipe for more',
+                          'Browse categories',
                           style: context.buyMeta.copyWith(
                             color: BuyV2Colors.navy,
                             fontSize: 8,
@@ -10143,45 +10968,6 @@ class _FeaturedProductCard extends StatefulWidget {
   final BuyV2Session session;
   final BuyV2Product product;
 
-  static const titleStyle = TextStyle(
-    color: BuyV2Colors.ink,
-    fontSize: 11,
-    height: 1.05,
-    fontWeight: FontWeight.w900,
-  );
-
-  static double titleExpansion(
-    BuildContext context,
-    BuyV2Product product,
-    double cardWidth,
-  ) {
-    if (product.destination != BuyV2Destination.medicine) return 0;
-    final title = TextSpan(
-      text: product.title,
-      style: DefaultTextStyle.of(context).style.merge(titleStyle),
-    );
-    // Match the two card borders and the details' horizontal padding.
-    final width = (cardWidth - 18).clamp(1.0, double.infinity);
-    final full = TextPainter(
-      text: title,
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout(maxWidth: width);
-    final capped = TextPainter(
-      text: title,
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 2,
-    )..layout(maxWidth: width);
-    // Grow the lane by the newly visible lines, preserving the media/actions.
-    final extra = (full.height - capped.height)
-        .clamp(0.0, double.infinity)
-        .ceilToDouble();
-    full.dispose();
-    capped.dispose();
-    return extra;
-  }
-
   @override
   State<_FeaturedProductCard> createState() => _FeaturedProductCardState();
 }
@@ -10190,7 +10976,9 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
   bool _pressed = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
+
+  Widget _buildCard(BuildContext context, BoxConstraints constraints) {
     final session = widget.session;
     final product = widget.product;
     final facts = session.productFactsFor(product);
@@ -10217,6 +11005,29 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
+    final visualLayout = _compactProductVisualLayout(
+      context,
+      product,
+      constraints.maxWidth,
+      30,
+      minimumControlExtent: 28,
+    );
+    final stacked =
+        quantity > 0 &&
+        _gridQuantityStacks(
+          constraints.maxWidth - 14,
+          buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
+        );
+    final visualHeight =
+        visualLayout.photoInset +
+        _skuPhotoExtent(constraints.maxWidth) +
+        BuyV2Metrics.minimumTap +
+        14 +
+        (stacked
+            ? _gridQuantityLabelHeight(
+                MediaQuery.textScalerOf(context).scale(1),
+              )
+            : 0);
     return BuyV2IntentDepth(
       key: ValueKey('buy-featured-depth-${product.id}'),
       spatial: true,
@@ -10227,10 +11038,10 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         curve: Curves.easeOutCubic,
         child: Semantics(
           label:
-              '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+              '${product.customerTitle}, ${product.pack}, ${buyV2Money(facts.price)}, '
               '${product.unitPrice}, '
               '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
-              '$cataloguePromise${automaticFulfilment ? ', ${facts.partner}, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
+              '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
           button: true,
           child: Material(
             color: Colors.transparent,
@@ -10250,9 +11061,11 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                 clipBehavior: Clip.antiAlias,
                 decoration: buyV2CardDecoration(radius: 16, shadow: true),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
+                    SizedBox(
+                      height: visualHeight,
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -10262,16 +11075,19 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                             ),
                           ),
                           Positioned(
-                            top: 2,
+                            top: 0,
                             right: 2,
                             child: _ProductSaveButton(
+                              compactEdgeControls: true,
                               session: session,
                               product: product,
                             ),
                           ),
                           Positioned(
-                            left: 7,
-                            right: 7,
+                            // Two 44-pixel quantity targets use the full narrow
+                            // card; the single Add action retains its inset.
+                            left: quantity > 0 ? 0 : 7,
+                            right: quantity > 0 ? 0 : 7,
                             bottom: 7,
                             child: BuyV2CartAvoidanceRegion(
                               child: _FeaturedProductAction(
@@ -10289,91 +11105,10 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
                       child: BuyV2CartAvoidanceRegion(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.title,
-                              maxLines:
-                                  product.destination ==
-                                      BuyV2Destination.medicine
-                                  ? null
-                                  : 2,
-                              overflow: TextOverflow.clip,
-                              style: _FeaturedProductCard.titleStyle,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              product.pack,
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: context.buyMeta.copyWith(fontSize: 8),
-                            ),
-                            const SizedBox(height: 2),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 2,
-                              crossAxisAlignment: WrapCrossAlignment.end,
-                              children: [
-                                Text(
-                                  buyV2Money(facts.price),
-                                  style: const TextStyle(
-                                    color: BuyV2Colors.navy,
-                                    fontSize: 14,
-                                    height: 1,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                Text(
-                                  product.unitPrice,
-                                  style: context.buyMeta.copyWith(
-                                    fontSize: 7.5,
-                                    height: 1,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              facts.partner,
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.navy,
-                                fontSize: 7.5,
-                                height: 1.05,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              _sellerTypeLabel(product.sellerType),
-                              maxLines: 1,
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.muted,
-                                fontSize: 7,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              automaticFulfilment
-                                  ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · ${_compactDeliveryPromise(cataloguePromise)}'
-                                  : _compactDeliveryPromise(
-                                      facts.deliveryPromise,
-                                    ),
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.green,
-                                fontSize: 7.5,
-                                height: 1.05,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
+                        child: _ProductGlance(
+                          session: session,
+                          product: product,
+                          storeContext: false,
                         ),
                       ),
                     ),
@@ -10397,6 +11132,13 @@ class _FeaturedProductVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final mediaLayout = _compactProductVisualLayout(
+        context,
+        product,
+        constraints.maxWidth,
+        30,
+        minimumControlExtent: 28,
+      );
       final stacked = _gridQuantityStacks(
         constraints.maxWidth - 14,
         buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
@@ -10409,7 +11151,7 @@ class _FeaturedProductVisual extends StatelessWidget {
           children: [
             Positioned(
               left: 8,
-              top: 8,
+              top: mediaLayout.photoInset,
               right: 8,
               bottom:
                   BuyV2Metrics.minimumTap +
@@ -10428,17 +11170,19 @@ class _FeaturedProductVisual extends StatelessWidget {
             if (product.badge.trim().isNotEmpty)
               Positioned(
                 key: ValueKey('buy-compact-product-badge-${product.id}'),
-                left: 7,
-                top: 7,
-                right: 50,
+                left: 6,
+                top: mediaLayout.badgeTop,
+                right: mediaLayout.badgeRight,
                 child: Align(
                   alignment: Alignment.topLeft,
                   child: BuyV2CartAvoidanceRegion(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 92),
+                      constraints: BoxConstraints(
+                        maxWidth: mediaLayout.badgeMaxWidth,
+                      ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
+                        horizontal: 2,
+                        vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: product.requiresPrescription
@@ -10450,7 +11194,7 @@ class _FeaturedProductVisual extends StatelessWidget {
                         _compactProductBadge(product.badge),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 7,
+                          fontSize: 8,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -10524,10 +11268,10 @@ class _FeaturedProductAction extends StatelessWidget {
                         alignment: Alignment.centerRight,
                         child: Semantics(
                           label: requiresOfferReview
-                              ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
+                              ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
                               : rxBlocked
-                              ? 'Use prescription for ${product.title}'
-                              : 'Add ${product.title} to cart',
+                              ? 'Use prescription for ${product.customerTitle}'
+                              : 'Add ${product.customerTitle} to cart',
                           button: true,
                           child: Material(
                             key: ValueKey(
@@ -10610,7 +11354,7 @@ class _FeaturedProductAction extends StatelessWidget {
               child: _QuantityStepperTargets(
                 stacked: stacked,
                 productId: product.id,
-                productTitle: product.title,
+                productTitle: product.customerTitle,
                 quantity: quantity,
                 minimumOrder: product.minimumOrder,
                 onEdit: () =>
@@ -10625,12 +11369,131 @@ class _FeaturedProductAction extends StatelessWidget {
   );
 }
 
+typedef _ProductGlanceField = ({String text, TextStyle style});
+
+List<_ProductGlanceField> _productGlanceFields(
+  BuyV2Session session,
+  BuyV2Product product,
+  bool storeContext,
+) {
+  final facts = session.productFactsFor(product);
+  final automatic =
+      product.destination == BuyV2Destination.shop ||
+      product.destination == BuyV2Destination.wholesale;
+  final decision = automatic
+      ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+      : null;
+  final promise = automatic
+      ? buyV2BuyerDeliveryPromise(facts)
+      : facts.deliveryPromise;
+  const detail = TextStyle(
+    color: BuyV2Colors.muted,
+    fontSize: 11,
+    height: 1.2,
+    fontWeight: FontWeight.w600,
+  );
+  return [
+    (
+      text: product.customerTitle,
+      style: const TextStyle(
+        color: BuyV2Colors.ink,
+        fontSize: 13,
+        height: 1.2,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+    (text: product.pack, style: detail),
+    (
+      text: _glancePriceLabel(facts.price),
+      style: const TextStyle(
+        color: BuyV2Colors.navy,
+        fontSize: 20,
+        height: 1.15,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+    (text: product.unitPrice, style: detail),
+    if (product.destination == BuyV2Destination.wholesale)
+      (
+        text:
+            'Minimum ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'} · '
+            '${buyV2Money(facts.price * product.minimumOrder)} total',
+        style: detail.copyWith(color: BuyV2Colors.navy),
+      ),
+    if (!storeContext)
+      (text: product.customerSeller(facts.partner), style: detail),
+    if (!storeContext && product.sellerType.trim().isNotEmpty)
+      (text: _sellerTypeLabel(product.sellerType), style: detail),
+    (
+      text: decision?.canAdd == false ? decision!.statusLabel : promise,
+      style: detail.copyWith(
+        color: decision?.canAdd == false
+            ? BuyV2Colors.orange
+            : BuyV2Colors.green,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  ];
+}
+
+class _ProductGlance extends StatelessWidget {
+  const _ProductGlance({
+    required this.session,
+    required this.product,
+    required this.storeContext,
+  });
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final bool storeContext;
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = _productGlanceFields(session, product, storeContext);
+    Widget line(_ProductGlanceField field) => Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(field.text, style: field.style),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        line(fields[0]),
+        line(fields[1]),
+        LayoutBuilder(
+          builder: (context, constraints) => Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              key: ValueKey('buy-price-highlight-${product.id}'),
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE082),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                fields[2].text,
+                style: _readableGlancePriceStyle(
+                  context,
+                  fields[2],
+                  constraints.maxWidth - 8,
+                ),
+              ),
+            ),
+          ),
+        ),
+        line(fields[3]),
+        for (final field in fields.skip(4)) line(field),
+      ],
+    );
+  }
+}
+
 class BuyV2ProductCard extends StatelessWidget {
   const BuyV2ProductCard({
     super.key,
     required this.session,
     required this.product,
     this.compact = false,
+    this.alignMediaAtTop = true,
     this.savedContext = false,
     this.onOpenProduct,
     this.storeContext = false,
@@ -10642,6 +11505,7 @@ class BuyV2ProductCard extends StatelessWidget {
   final BuyV2Session session;
   final BuyV2Product product;
   final bool compact;
+  final bool alignMediaAtTop;
   final bool savedContext;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
@@ -10653,6 +11517,11 @@ class BuyV2ProductCard extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
 
   Widget _buildCard(BuildContext context, BoxConstraints constraints) {
+    final compactSavedAction =
+        savedContext &&
+        compact &&
+        constraints.maxWidth < 130 &&
+        MediaQuery.textScalerOf(context).scale(1) <= 1.25;
     void openProduct() {
       HapticFeedback.selectionClick();
       final callback = onOpenProduct;
@@ -10697,10 +11566,10 @@ class BuyV2ProductCard extends StatelessWidget {
       spatial: true,
       child: Semantics(
         label:
-            '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+            '${product.customerTitle}, ${product.pack}, ${buyV2Money(facts.price)}, '
             '${product.unitPrice}, '
             '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
-            '$cataloguePromise${automaticFulfilment ? ', ${facts.partner}, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
+            '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
         button: true,
         child: InkWell(
           key: ValueKey('buy-product-${product.id}'),
@@ -10712,21 +11581,37 @@ class BuyV2ProductCard extends StatelessWidget {
             child: Stack(
               children: [
                 Column(
+                  mainAxisSize: compact && alignMediaAtTop
+                      ? MainAxisSize.min
+                      : MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (compact)
+                    if (compact && alignMediaAtTop)
+                      _ProductVisual(
+                        minimumControlExtent: 48,
+                        squarePhoto: true,
+                        product: product,
+                        compact: true,
+                        reservedActionWidth: savedContext && !compactSavedAction
+                            ? 68
+                            : 42,
+                      )
+                    else if (compact)
                       Expanded(
                         child: _ProductVisual(
                           product: product,
                           compact: true,
-                          reservedActionWidth: savedContext ? 68 : 42,
+                          reservedActionWidth:
+                              savedContext && !compactSavedAction ? 68 : 42,
                         ),
                       )
                     else
                       _ProductVisual(
                         product: product,
                         compact: false,
-                        reservedActionWidth: savedContext ? 68 : 42,
+                        reservedActionWidth: savedContext && !compactSavedAction
+                            ? 68
+                            : 42,
                       ),
                     Flexible(
                       flex: compact ? 0 : 1,
@@ -10745,213 +11630,228 @@ class BuyV2ProductCard extends StatelessWidget {
                                 : MainAxisSize.max,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (!compact &&
-                                  product.brand.trim().isNotEmpty) ...[
-                                Text(
-                                  product.brand,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyEyebrow.copyWith(
-                                    fontSize: 7,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                              ],
-                              Text(
-                                product.title,
-                                maxLines:
-                                    compact &&
-                                        product.destination ==
-                                            BuyV2Destination.medicine
-                                    ? null
-                                    : compact
-                                    ? 3
-                                    : 2,
-                                overflow: compact
-                                    ? TextOverflow.clip
-                                    : TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: BuyV2Colors.ink,
-                                  fontSize: compact ? 10 : 12,
-                                  height: compact ? 1.05 : 1.08,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              SizedBox(height: compact ? 1 : 5),
-                              if (!compact) ...[
-                                Text(
-                                  product.variant,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: BuyV2Colors.ink,
-                                    fontSize: 8,
-                                    height: 1.15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                              ],
-                              Text(
-                                product.pack,
-                                maxLines: compact ? 2 : 1,
-                                overflow: compact
-                                    ? TextOverflow.clip
-                                    : TextOverflow.ellipsis,
-                                style: context.buyMeta.copyWith(
-                                  fontSize: compact ? 8.5 : 8,
-                                  height: 1.05,
-                                ),
-                              ),
                               if (compact)
-                                const SizedBox(height: 2)
-                              else
-                                const Spacer(),
-                              Wrap(
-                                spacing: 3,
-                                runSpacing: 2,
-                                crossAxisAlignment: WrapCrossAlignment.end,
-                                children: [
+                                _ProductGlance(
+                                  session: session,
+                                  product: product,
+                                  storeContext: storeContext,
+                                )
+                              else ...[
+                                if (!compact &&
+                                    product.brand.trim().isNotEmpty) ...[
                                   Text(
-                                    buyV2Money(facts.price),
-                                    style: TextStyle(
-                                      color: BuyV2Colors.navy,
-                                      fontSize: compact ? 14 : 18,
-                                      height: 1,
-                                      fontWeight: FontWeight.w900,
+                                    product.brand,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.buyEyebrow.copyWith(
+                                      fontSize: 7,
                                     ),
                                   ),
-                                  if (compact) ...[
-                                    Text(
-                                      product.unitPrice,
-                                      style: context.buyMeta.copyWith(
-                                        fontSize: 7.2,
-                                        height: 1,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
+                                  const SizedBox(height: 3),
                                 ],
-                              ),
-                              if (!compact)
                                 Text(
-                                  product.unitPrice,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyMeta.copyWith(fontSize: 7),
-                                ),
-                              if (compact && !storeContext) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  facts.partner,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.clip,
-                                  style: context.buyMeta.copyWith(
-                                    color: BuyV2Colors.navy,
-                                    fontSize: 7.5,
-                                    height: 1.05,
+                                  product.customerTitle,
+                                  maxLines:
+                                      compact &&
+                                          product.destination ==
+                                              BuyV2Destination.medicine
+                                      ? null
+                                      : compact
+                                      ? 3
+                                      : 2,
+                                  overflow: compact
+                                      ? TextOverflow.clip
+                                      : TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: BuyV2Colors.ink,
+                                    fontSize: compact ? 10 : 12,
+                                    height: compact ? 1.05 : 1.08,
                                     fontWeight: FontWeight.w900,
                                   ),
                                 ),
+                                SizedBox(height: compact ? 1 : 5),
+                                if (!compact) ...[
+                                  Text(
+                                    product.customerVariant,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: BuyV2Colors.ink,
+                                      fontSize: 8,
+                                      height: 1.15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                ],
                                 Text(
-                                  _sellerTypeLabel(product.sellerType),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.clip,
+                                  product.pack,
+                                  maxLines: compact ? 2 : 1,
+                                  overflow: compact
+                                      ? TextOverflow.clip
+                                      : TextOverflow.ellipsis,
                                   style: context.buyMeta.copyWith(
-                                    fontSize: 7,
-                                    height: 1,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: compact ? 8.5 : 8,
+                                    height: 1.05,
                                   ),
                                 ),
-                              ],
-                              SizedBox(height: compact ? 3 : 6),
-                              Container(
-                                width: double.infinity,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: compact ? 4 : 6,
-                                  vertical: compact ? 2 : 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: requiresOfferReview
-                                      ? BuyV2Colors.softOrange
-                                      : BuyV2Colors.softGreen,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                if (compact)
+                                  const SizedBox(height: 2)
+                                else
+                                  const Spacer(),
+                                Wrap(
+                                  spacing: 3,
+                                  runSpacing: 2,
+                                  crossAxisAlignment: WrapCrossAlignment.end,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          requiresOfferReview
-                                              ? Icons.sync_problem_rounded
-                                              : facts.isLive
-                                              ? Icons.bolt_rounded
-                                              : Icons.schedule_rounded,
-                                          size: 11,
-                                          color: requiresOfferReview
-                                              ? BuyV2Colors.orange
-                                              : BuyV2Colors.green,
-                                        ),
-                                        const SizedBox(width: 3),
-                                        Expanded(
-                                          child: Text(
-                                            compact
-                                                ? requiresOfferReview
-                                                      ? offerDecision!
-                                                            .statusLabel
-                                                      : automaticFulfilment
-                                                      ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
-                                                            '${_compactDeliveryPromise(cataloguePromise)}'
-                                                      : '${facts.partner} · '
-                                                            '${_compactDeliveryPromise(facts.deliveryPromise)}'
-                                                : cataloguePromise,
-                                            maxLines: null,
-                                            overflow: compact
-                                                ? TextOverflow.clip
-                                                : TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: BuyV2Colors.green,
-                                              fontSize: compact ? 8 : 8,
-                                              height: compact ? 1.1 : 1.05,
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                    Text(
+                                      buyV2Money(facts.price),
+                                      style: TextStyle(
+                                        color: BuyV2Colors.navy,
+                                        fontSize: compact ? 14 : 18,
+                                        height: 1,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
-                                    if (!compact) ...[
-                                      const SizedBox(height: 2),
-                                      if (!storeContext) ...[
-                                        Text(
-                                          facts.partner,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: BuyV2Colors.ink,
-                                            fontSize: 8,
-                                            height: 1.05,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                    if (compact) ...[
+                                      Text(
+                                        product.unitPrice,
+                                        style: context.buyMeta.copyWith(
+                                          fontSize: 7.2,
+                                          height: 1,
+                                          fontWeight: FontWeight.w700,
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _sellerTypeLabel(product.sellerType),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: BuyV2Colors.muted,
-                                            fontSize: 7,
-                                            height: 1.05,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ],
                                   ],
                                 ),
-                              ),
-                              if (!compact) const SizedBox(height: 6),
+                                if (!compact)
+                                  Text(
+                                    product.unitPrice,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.buyMeta.copyWith(
+                                      fontSize: 7,
+                                    ),
+                                  ),
+                                if (compact && !storeContext) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    product.customerSeller(facts.partner),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.clip,
+                                    style: context.buyMeta.copyWith(
+                                      color: BuyV2Colors.navy,
+                                      fontSize: 7.5,
+                                      height: 1.05,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    _sellerTypeLabel(product.sellerType),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.clip,
+                                    style: context.buyMeta.copyWith(
+                                      fontSize: 7,
+                                      height: 1,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                                SizedBox(height: compact ? 3 : 6),
+                                Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: compact ? 4 : 6,
+                                    vertical: compact ? 2 : 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: requiresOfferReview
+                                        ? BuyV2Colors.softOrange
+                                        : BuyV2Colors.softGreen,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            requiresOfferReview
+                                                ? Icons.sync_problem_rounded
+                                                : facts.isLive
+                                                ? Icons.bolt_rounded
+                                                : Icons.schedule_rounded,
+                                            size: 11,
+                                            color: requiresOfferReview
+                                                ? BuyV2Colors.orange
+                                                : BuyV2Colors.green,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Expanded(
+                                            child: Text(
+                                              compact
+                                                  ? requiresOfferReview
+                                                        ? offerDecision!
+                                                              .statusLabel
+                                                        : automaticFulfilment
+                                                        ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
+                                                              '${_compactDeliveryPromise(cataloguePromise)}'
+                                                        : '${product.customerSeller(facts.partner)} · '
+                                                              '${_compactDeliveryPromise(facts.deliveryPromise)}'
+                                                  : cataloguePromise,
+                                              maxLines: null,
+                                              overflow: compact
+                                                  ? TextOverflow.clip
+                                                  : TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: BuyV2Colors.green,
+                                                fontSize: compact ? 8 : 8,
+                                                height: compact ? 1.1 : 1.05,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (!compact) ...[
+                                        const SizedBox(height: 2),
+                                        if (!storeContext) ...[
+                                          Text(
+                                            product.customerSeller(
+                                              facts.partner,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: BuyV2Colors.ink,
+                                              fontSize: 8,
+                                              height: 1.05,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _sellerTypeLabel(
+                                              product.sellerType,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: BuyV2Colors.muted,
+                                              fontSize: 7,
+                                              height: 1.05,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                if (!compact) const SizedBox(height: 6),
+                              ],
                               IgnorePointer(
                                 ignoring: quantity > 0,
                                 child: ExcludeSemantics(
@@ -10993,11 +11893,11 @@ class BuyV2ProductCard extends StatelessWidget {
                                             height: BuyV2Metrics.minimumTap,
                                             child: Semantics(
                                               label: requiresOfferReview
-                                                  ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
+                                                  ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
                                                   : rxBlocked
                                                   ? 'Use prescription for '
-                                                        '${product.title}'
-                                                  : 'Add ${product.title} to cart',
+                                                        '${product.customerTitle}'
+                                                  : 'Add ${product.customerTitle} to cart',
                                               button: true,
                                               child: Material(
                                                 key: ValueKey(
@@ -11134,12 +12034,14 @@ class BuyV2ProductCard extends StatelessWidget {
                   ],
                 ),
                 Positioned(
-                  top: 2,
+                  top: compact ? 0 : 2,
                   right: 2,
                   child: _ProductSaveButton(
+                    compactEdgeControls: compact && alignMediaAtTop,
                     session: session,
                     product: product,
                     showRemoveLabel: savedContext,
+                    compactLabel: compactSavedAction,
                     beforeToggle: beforeSave,
                   ),
                 ),
@@ -11159,7 +12061,7 @@ class BuyV2ProductCard extends StatelessWidget {
                       stacked: stackedQuantity,
                       visualInset: compact ? 6 : 9,
                       productId: product.id,
-                      productTitle: product.title,
+                      productTitle: product.customerTitle,
                       quantity: quantity,
                       minimumOrder: product.minimumOrder,
                       onEdit: () => showBuyV2QuantityEditor(
@@ -11263,22 +12165,38 @@ class _QuantityStepper extends StatelessWidget {
                   ),
                 ],
               )
-            : Row(
-                children: [
-                  const SizedBox(
-                    width: 44,
-                    child: Icon(
-                      Icons.remove,
-                      size: 17,
-                      color: BuyV2Colors.navy,
-                    ),
-                  ),
-                  Expanded(child: value),
-                  const SizedBox(
-                    width: 44,
-                    child: Icon(Icons.add, size: 17, color: BuyV2Colors.navy),
-                  ),
-                ],
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final side = _gridQuantitySideWidth(
+                    constraints.maxWidth,
+                    buyV2ValueTextSize(
+                      context,
+                      '$quantity',
+                      _gridQuantityStyle,
+                    ).width,
+                  );
+                  return Row(
+                    children: [
+                      SizedBox(
+                        width: side,
+                        child: const Icon(
+                          Icons.remove,
+                          size: 17,
+                          color: BuyV2Colors.navy,
+                        ),
+                      ),
+                      Expanded(child: value),
+                      SizedBox(
+                        width: side,
+                        child: const Icon(
+                          Icons.add,
+                          size: 17,
+                          color: BuyV2Colors.navy,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
       ),
     );
@@ -11312,6 +12230,16 @@ class _QuantityStepperTargets extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       const target = BuyV2Metrics.minimumTap;
+      final sideWidth = stacked
+          ? target
+          : _gridQuantitySideWidth(
+              constraints.maxWidth - visualInset * 2,
+              buyV2ValueTextSize(
+                context,
+                '$quantity',
+                _gridQuantityStyle,
+              ).width,
+            );
       final maximumInset = ((constraints.maxWidth - target * 2) / 2).clamp(
         0.0,
         double.infinity,
@@ -11333,8 +12261,8 @@ class _QuantityStepperTargets extends StatelessWidget {
             child: IconButton(
               tooltip: tooltip,
               onPressed: onTap,
-              constraints: const BoxConstraints.tightFor(
-                width: target,
+              constraints: BoxConstraints.tightFor(
+                width: sideWidth,
                 height: target,
               ),
               padding: EdgeInsets.zero,
@@ -11345,8 +12273,8 @@ class _QuantityStepperTargets extends StatelessWidget {
       return Stack(
         children: [
           Positioned(
-            left: stacked ? 0 : visualInset + target,
-            right: stacked ? 0 : visualInset + target,
+            left: stacked ? 0 : visualInset + sideWidth,
+            right: stacked ? 0 : visualInset + sideWidth,
             top: 0,
             height: stacked
                 ? _gridQuantityLabelHeight(
@@ -11369,7 +12297,7 @@ class _QuantityStepperTargets extends StatelessWidget {
           Positioned(
             left: inset,
             bottom: 0,
-            width: target,
+            width: sideWidth,
             height: target,
             child: action(
               'Decrease',
@@ -11380,11 +12308,79 @@ class _QuantityStepperTargets extends StatelessWidget {
           Positioned(
             right: inset,
             bottom: 0,
-            width: target,
+            width: sideWidth,
             height: target,
             child: action('Increase', 'Add one', onIncrease),
           ),
         ],
+      );
+    },
+  );
+}
+
+/// Shared thin top edge for SKU surfaces outside the catalogue grid.
+class BuyV2ProductEdgeControls extends StatelessWidget {
+  const BuyV2ProductEdgeControls({
+    super.key,
+    required this.session,
+    required this.product,
+  });
+  final BuyV2Session session;
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final layout = _compactProductVisualLayout(
+        context,
+        product,
+        constraints.maxWidth,
+        30,
+        minimumControlExtent: 28,
+      );
+      return SizedBox(
+        height: layout.photoInset,
+        child: Stack(
+          children: [
+            if (product.badge.trim().isNotEmpty)
+              Positioned(
+                key: ValueKey('buy-edge-badge-${product.id}'),
+                left: 6,
+                top: layout.badgeTop,
+                right: layout.badgeRight,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: layout.badgeMaxWidth),
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: product.requiresPrescription
+                          ? BuyV2Colors.navy
+                          : BuyV2Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _compactProductBadge(product.badge),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: 0,
+              right: 2,
+              child: _ProductSaveButton(
+                session: session,
+                product: product,
+                compactEdgeControls: true,
+              ),
+            ),
+          ],
+        ),
       );
     },
   );
@@ -11395,12 +12391,16 @@ class _ProductSaveButton extends StatelessWidget {
     required this.session,
     required this.product,
     this.showRemoveLabel = false,
+    this.compactLabel = false,
+    this.compactEdgeControls = false,
     this.beforeToggle,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final bool showRemoveLabel;
+  final bool compactLabel;
+  final bool compactEdgeControls;
   final bool Function()? beforeToggle;
 
   @override
@@ -11415,24 +12415,53 @@ class _ProductSaveButton extends StatelessWidget {
       session.toggleSaved(product.id);
     }
 
+    if (compactEdgeControls) {
+      return IconButton(
+        key: ValueKey('buy-save-${product.id}'),
+        tooltip: saved
+            ? 'Remove ${product.customerTitle} from Saved'
+            : 'Save ${product.customerTitle}',
+        onPressed: toggleSaved,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+        style: IconButton.styleFrom(
+          minimumSize: const Size(28, 28),
+          maximumSize: const Size(28, 28),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: saved ? BuyV2Colors.orange : BuyV2Colors.navy,
+        ),
+        icon: Container(
+          width: 22,
+          height: 22,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            size: 15,
+          ),
+        ),
+      );
+    }
     if (showRemoveLabel && saved) {
       return Semantics(
         key: ValueKey('buy-save-${product.id}'),
         button: true,
-        label: 'Remove ${product.title} from Saved',
+        label: 'Remove ${product.customerTitle} from Saved',
         child: Tooltip(
-          message: 'Remove ${product.title} from Saved',
+          message: 'Remove ${product.customerTitle} from Saved',
           child: InkWell(
             onTap: toggleSaved,
             borderRadius: BorderRadius.circular(22),
             child: SizedBox(
-              width: 62,
+              width: compactLabel ? 44 : 62,
               height: 44,
               child: Align(
                 alignment: Alignment.center,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compactLabel ? 2 : 6,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
@@ -11442,28 +12471,49 @@ class _ProductSaveButton extends StatelessWidget {
                       color: BuyV2Colors.orange.withValues(alpha: .22),
                     ),
                   ),
-                  child: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.bookmark_remove_outlined,
-                          size: 12,
-                          color: BuyV2Colors.orange,
-                        ),
-                        SizedBox(width: 3),
-                        Text(
-                          'Remove',
-                          style: TextStyle(
-                            color: BuyV2Colors.muted,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w800,
+                  child: compactLabel
+                      ? const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.bookmark_remove_outlined,
+                              size: 14,
+                              color: BuyV2Colors.orange,
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Remove',
+                              style: TextStyle(
+                                color: BuyV2Colors.muted,
+                                fontSize: 8,
+                                height: 1,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.bookmark_remove_outlined,
+                                size: 12,
+                                color: BuyV2Colors.orange,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Remove',
+                                style: TextStyle(
+                                  color: BuyV2Colors.muted,
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -11474,8 +12524,8 @@ class _ProductSaveButton extends StatelessWidget {
     return IconButton(
       key: ValueKey('buy-save-${product.id}'),
       tooltip: saved
-          ? 'Remove ${product.title} from Saved'
-          : 'Save ${product.title}',
+          ? 'Remove ${product.customerTitle} from Saved'
+          : 'Save ${product.customerTitle}',
       onPressed: toggleSaved,
       style: IconButton.styleFrom(
         minimumSize: const Size(44, 44),
@@ -11486,10 +12536,10 @@ class _ProductSaveButton extends StatelessWidget {
       icon: BuyV2FiniteVisualTransition(
         key: ValueKey('buy-save-visual-${product.id}'),
         stateKey: saved,
-        ownerSize: const Size.square(27),
+        ownerSize: const Size.square(22),
         child: Container(
-          width: 27,
-          height: 27,
+          width: 22,
+          height: 22,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: .92),
             shape: BoxShape.circle,
@@ -11505,22 +12555,84 @@ class _ProductSaveButton extends StatelessWidget {
   }
 }
 
+({double photoInset, double badgeTop, double badgeRight, double badgeMaxWidth})
+_compactProductVisualLayout(
+  BuildContext context,
+  BuyV2Product product,
+  double width,
+  double reservedActionWidth, {
+  double minimumControlExtent = 44,
+}) {
+  var controlsBottom =
+      minimumControlExtent; // Reserve the complete Save touch target.
+  var badgeTop = 6.0;
+  var badgeRight = reservedActionWidth + 6;
+  var badgeMaxWidth = 96.0;
+  if (product.badge.trim().isNotEmpty) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: _compactProductBadge(product.badge),
+        style: DefaultTextStyle.of(context).style.merge(
+          const TextStyle(fontSize: 8, fontWeight: FontWeight.w900),
+        ),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: (width - 6 - badgeRight).clamp(5, 96) - 4);
+    // Long provider facts read across the card, below the Save control.
+    if (badgeTop + painter.height.ceilToDouble() + 4 > controlsBottom) {
+      badgeTop = controlsBottom + 2;
+      badgeRight = 6;
+      badgeMaxWidth = (width - 12).clamp(5, double.infinity);
+      painter.layout(maxWidth: badgeMaxWidth - 4);
+    }
+    final badgeBottom = badgeTop + painter.height.ceilToDouble() + 4;
+    if (badgeBottom > controlsBottom) controlsBottom = badgeBottom;
+    painter.dispose();
+  }
+  return (
+    photoInset: controlsBottom + 2,
+    badgeTop: badgeTop,
+    badgeRight: badgeRight,
+    badgeMaxWidth: badgeMaxWidth,
+  );
+}
+
+double _skuPhotoExtent(double cardWidth) => (cardWidth - 12).clamp(70.0, 130.0);
+
 class _ProductVisual extends StatelessWidget {
   const _ProductVisual({
     required this.product,
     required this.compact,
     this.reservedActionWidth = 42,
+    this.minimumControlExtent = 44,
+    this.squarePhoto = false,
   });
 
   final BuyV2Product product;
   final bool compact;
   final double reservedActionWidth;
+  final double minimumControlExtent;
+  final bool squarePhoto;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _buildVisual);
+
+  Widget _buildVisual(BuildContext context, BoxConstraints constraints) {
     final colors = _productVisualColors(product);
+    final visualLayout = _compactProductVisualLayout(
+      context,
+      product,
+      constraints.maxWidth,
+      squarePhoto ? 30 : reservedActionWidth,
+      minimumControlExtent: squarePhoto ? 28 : minimumControlExtent,
+    );
+    final photoInset = compact ? visualLayout.photoInset : 0.0;
+    final photoExtent = squarePhoto
+        ? _skuPhotoExtent(constraints.maxWidth)
+        : 70.0;
     return SizedBox(
-      height: compact ? 78 : 110,
+      height: compact ? photoInset + photoExtent : 110,
       child: Stack(
         children: [
           Positioned.fill(
@@ -11534,15 +12646,27 @@ class _ProductVisual extends StatelessWidget {
               ),
             ),
           ),
-          Align(
-            alignment: const Alignment(0, .35),
-            child: SizedBox(
-              key: ValueKey('buy-grid-packshot-${product.id}'),
-              width: compact ? 78 : 96,
-              height: compact ? 70 : 86,
-              child: BuyV2ProductPackshot(
-                product: product,
-                borderRadius: compact ? 8 : 12,
+          Positioned(
+            left: 0,
+            right: 0,
+            top: photoInset,
+            height: compact ? photoExtent : 86,
+            child: Align(
+              alignment: compact ? Alignment.center : const Alignment(0, .35),
+              child: SizedBox(
+                key: ValueKey('buy-grid-packshot-${product.id}'),
+                width: squarePhoto
+                    ? photoExtent
+                    : compact
+                    ? (MediaQuery.textScalerOf(context).scale(1) > 1.6
+                          ? 130
+                          : 96)
+                    : 96,
+                height: compact ? photoExtent : 86,
+                child: BuyV2ProductPackshot(
+                  product: product,
+                  borderRadius: compact ? 8 : 12,
+                ),
               ),
             ),
           ),
@@ -11550,15 +12674,17 @@ class _ProductVisual extends StatelessWidget {
             Positioned(
               key: ValueKey('buy-product-card-badge-${product.id}'),
               left: 6,
-              top: 6,
-              right: compact ? reservedActionWidth : 6,
+              top: compact ? visualLayout.badgeTop : 6,
+              right: compact ? visualLayout.badgeRight : 6,
               child: Align(
                 alignment: Alignment.topLeft,
                 child: BuyV2CartAvoidanceRegion(
                   child: Container(
-                    constraints: BoxConstraints(maxWidth: compact ? 96 : 120),
+                    constraints: BoxConstraints(
+                      maxWidth: compact ? visualLayout.badgeMaxWidth : 120,
+                    ),
                     padding: EdgeInsets.symmetric(
-                      horizontal: compact ? 4 : 6,
+                      horizontal: compact ? 2 : 6,
                       vertical: compact ? 2 : 4,
                     ),
                     decoration: BoxDecoration(
@@ -11581,18 +12707,6 @@ class _ProductVisual extends StatelessWidget {
                 ),
               ),
             ),
-          const Positioned(
-            right: 8,
-            bottom: 7,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: BuyV2Colors.green,
-                shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: Colors.white, spreadRadius: 2)],
-              ),
-              child: SizedBox(width: 9, height: 9),
-            ),
-          ),
         ],
       ),
     );

@@ -139,6 +139,9 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v31-20260916' {
       'integration/moolsocial/store-buy-final-v31-20260916'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' {
+      'work/cursor-ui/redmi-v6-audit-20260913'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -161,6 +164,63 @@ function Get-CursorAccessibilityNativeProjection {
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
+    $redmiBaseline = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
+    & git -C $root merge-base --is-ancestor $redmiBaseline HEAD
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit requires the preserved V6 ancestor.'
+    }
+    $redmiBoundaries = @(
+      'apps', 'backend', 'contracts', 'packages',
+      'package.json', 'package-lock.json', 'pubspec.yaml', 'pubspec.lock'
+    )
+    # Founder-authorized RV6-D001..D022 successor; all other sources remain rejected.
+    $redmiSource = $redmiBaseline
+    & git -C $root merge-base --is-ancestor '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' }
+    # Exact founder-approved fixture-only source; retain all source/native checks.
+    & git -C $root merge-base --is-ancestor '11b6562e7bf382afeb11e1801a0a390477fcae8f' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '11b6562e7bf382afeb11e1801a0a390477fcae8f' }
+    # Exact founder-authorized D005-C01 review preference correction.
+    & git -C $root merge-base --is-ancestor '3c30ba11521db6bb1a1ec6995b181a81df1a6b34' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '3c30ba11521db6bb1a1ec6995b181a81df1a6b34' }
+    # Exact reproduced D014 nested product-return correction.
+    & git -C $root merge-base --is-ancestor '4221158fead95a89047e3408aaeb11c9a12dd135' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '4221158fead95a89047e3408aaeb11c9a12dd135' }
+    # Exact reproduced D014 repeated order-link correction.
+    & git -C $root merge-base --is-ancestor '41412f56a4af4d75e2976dc04843dd293ae4869d' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '41412f56a4af4d75e2976dc04843dd293ae4869d' }
+    # Exact founder-authorized, locally qualified SKU metadata source.
+    & git -C $root merge-base --is-ancestor '253cbe16da07f069c878bed8f0f5722b8c4aa29c' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '253cbe16da07f069c878bed8f0f5722b8c4aa29c' }
+    # Exact ten-ticket SKU correction source; retain complete source and native boundaries.
+    & git -C $root merge-base --is-ancestor 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc' }
+    # Exact twelve-record SKU page-swipe and seller correction; source/native checks retained.
+    & git -C $root merge-base --is-ancestor '64ca4d757cffc1cc1fa575b84004cd827e6695ab' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '64ca4d757cffc1cc1fa575b84004cd827e6695ab' }
+    # Exact twelve-record product-row and media correction; all boundaries retained.
+    & git -C $root merge-base --is-ancestor 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2' }
+    # Founder-approved C04/C06/C07 and shared SKU/Offers visual successor.
+    & git -C $root merge-base --is-ancestor '6f0632ad9c73b59288df128ef6540ce04f104957' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '6f0632ad9c73b59288df128ef6540ce04f104957' }
+    # Founder-approved shared SKU top edge, compact quantity and Cart rollout.
+    & git -C $root merge-base --is-ancestor '1880614bb499a47993df86ebed6599926414fc50' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '1880614bb499a47993df86ebed6599926414fc50' }
+    & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit committed source differs from its exact admitted source.'
+    }
+    & git -C $root diff --quiet $redmiSource -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit working source differs from its exact admitted source.'
+    }
+    $redmiUntracked = @(& git -C $root ls-files --others --exclude-standard -- @redmiBoundaries)
+    if ($LASTEXITCODE -ne 0 -or $redmiUntracked.Count -ne 0) {
+      throw 'Redmi audit has untracked source.'
+    }
   }
   & git -C $root merge-base --is-ancestor '38fa1201488ae943487b58d4afe5d851f8b9fc37' HEAD
   if ($LASTEXITCODE -ne 0) {

@@ -10,6 +10,9 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 
+import '../buy/buy_v2_screen_test.dart'
+    show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   Future<JourneySession> readyJourney() async {
     final session = JourneySession(
@@ -96,7 +99,10 @@ void main() {
     return router;
   }
 
-  Future<JourneySession> pumpReadyGuestApp(WidgetTester tester) async {
+  Future<JourneySession> pumpReadyGuestApp(
+    WidgetTester tester, {
+    String initialLocation = '/app/work/earn',
+  }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.reset);
@@ -117,11 +123,13 @@ void main() {
     addTearDown(journey.dispose);
     addTearDown(work.dispose);
     await tester.pumpWidget(
-      MoolSocialApp(
-        key: UniqueKey(),
-        session: journey,
-        workSession: work,
-        initialLocation: '/app/work/earn',
+      r66VisualCaptureRoot(
+        MoolSocialApp(
+          key: UniqueKey(),
+          session: journey,
+          workSession: work,
+          initialLocation: initialLocation,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -243,6 +251,50 @@ void main() {
     await tester.tap(find.byKey(const Key('global-security-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+  });
+
+  testWidgets('D006 Buy sign-in cancel then Android Back restores Buy', (
+    tester,
+  ) async {
+    final journey = await pumpReadyGuestApp(
+      tester,
+      initialLocation: '/app/buy?sub=shop',
+    );
+    final account = find.byKey(const Key('buy-open-account'));
+    expect(account, findsOneWidget);
+    await tester.tap(account);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-profile-security')));
+    await tester.pumpAndSettle();
+    final security = find.byKey(const Key('global-security-v2'));
+    final origin = GoRouterState.of(
+      tester.element(security),
+    ).uri.queryParameters['return'];
+    expect(Uri.parse(origin!).path, '/app/buy');
+    // Control: ordinary pushed Security must retain its original Back behavior.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(account, findsOneWidget);
+    await tester.tap(account);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-profile-security')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-security-sign-in')));
+    await tester.pumpAndSettle();
+    expect(journey.canCancelSignIn, isTrue);
+    expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(security, findsOneWidget);
+    await captureR66Visual(tester, 'rv6-d006-cancelled-security');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(security, findsNothing);
+    expect(account, findsOneWidget);
+    expect(GoRouterState.of(tester.element(account)).uri.toString(), origin);
+    expect(journey.isAuthenticated, isFalse);
+    await captureR66Visual(tester, 'rv6-d006-android-back-buy');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('successful Security sign-in returns to Security then Work', (

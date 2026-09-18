@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show GestureBinding;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -1528,7 +1529,7 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
 }
 
 class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final OverlayPortalController _overlayController = OverlayPortalController();
   late final AnimationController _switcherController;
   LocalHistoryEntry? _historyEntry;
@@ -1536,10 +1537,12 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
   bool _reduceMotion = false;
   bool _removingHistoryEntry = false;
   double _launcherDragDy = 0;
+  final Set<int> _launcherPointers = {};
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _switcherController = AnimationController(
       vsync: this,
       duration: MoolLocalNavigationTokens.selectionDuration,
@@ -1558,6 +1561,17 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
   }
 
   @override
+  void didChangeMetrics() {
+    // Rotation changes launcher coordinates. A gesture begun in the old
+    // layout must not become a menu tap/swipe when the new layout arrives.
+    for (final pointer in _launcherPointers.toList()) {
+      GestureBinding.instance.cancelPointer(pointer);
+    }
+    _launcherPointers.clear();
+    _launcherDragDy = 0;
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final media = MediaQuery.maybeOf(context);
@@ -1572,6 +1586,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _removeLocalHistoryEntry();
     widget.controller?._detach();
     _switcherController.dispose();
@@ -1763,27 +1778,34 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
         key: Key('moolsocial-home-has-no-bottom-navigation'),
       );
     }
-    final launcher = GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragStart: (_) => _launcherDragDy = 0,
-      onVerticalDragUpdate: (details) {
-        _launcherDragDy += details.primaryDelta ?? 0;
-      },
-      onVerticalDragEnd: (details) {
-        if (_launcherDragDy < -24 ||
-            (details.primaryVelocity != null &&
-                details.primaryVelocity! < -80)) {
-          _openConnectedNavigator();
-        }
-      },
-      child: OverlayPortal.overlayChildLayoutBuilder(
-        controller: _overlayController,
-        overlayChildBuilder: _buildEmbeddedSwitcher,
-        child: _MoolHomeLauncher(
-          compact: widget.compact,
-          expandedCell: widget.compactExpanded,
-          expanded: _isOpen,
-          onPressed: _toggleConnectedNavigator,
+    final launcher = Listener(
+      onPointerDown: (event) => _launcherPointers.add(event.pointer),
+      onPointerUp: (event) => _launcherPointers.remove(event.pointer),
+      onPointerCancel: (event) => _launcherPointers.remove(event.pointer),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragStart: (_) => _launcherDragDy = 0,
+        onVerticalDragUpdate: (details) {
+          _launcherDragDy += details.primaryDelta ?? 0;
+        },
+        onVerticalDragCancel: () => _launcherDragDy = 0,
+        onVerticalDragEnd: (details) {
+          if (_launcherDragDy < -24 ||
+              (details.primaryVelocity != null &&
+                  details.primaryVelocity! < -80)) {
+            _openConnectedNavigator();
+          }
+          _launcherDragDy = 0;
+        },
+        child: OverlayPortal.overlayChildLayoutBuilder(
+          controller: _overlayController,
+          overlayChildBuilder: _buildEmbeddedSwitcher,
+          child: _MoolHomeLauncher(
+            compact: widget.compact,
+            expandedCell: widget.compactExpanded,
+            expanded: _isOpen,
+            onPressed: _toggleConnectedNavigator,
+          ),
         ),
       ),
     );

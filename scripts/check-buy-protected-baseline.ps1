@@ -344,7 +344,18 @@ function Test-RedmiReviewBuySource {
 
 function Test-IntegratedStoreBuyReviewSource {
   param([string]$SourceCommit)
-  if ($SourceCommit -cne 'a98fe59a5485f7237e6e18bcf4fa09781173f13c') { return $false }
+  $redmiSuccessor = $SourceCommit -cin @(
+    '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d',
+    '11b6562e7bf382afeb11e1801a0a390477fcae8f',
+    '3c30ba11521db6bb1a1ec6995b181a81df1a6b34',
+    '4221158fead95a89047e3408aaeb11c9a12dd135',
+    '41412f56a4af4d75e2976dc04843dd293ae4869d',
+    '253cbe16da07f069c878bed8f0f5722b8c4aa29c',
+    'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc',
+    '64ca4d757cffc1cc1fa575b84004cd827e6695ab',
+    'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957', '1880614bb499a47993df86ebed6599926414fc50'
+  )
+  if ($SourceCommit -cne 'a98fe59a5485f7237e6e18bcf4fa09781173f13c' -and $SourceCommit -cne '10fb79b4469203371edf888e7d4b8aacb3546581' -and -not $redmiSuccessor) { return $false }
   $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
   $expectedBranch = switch ($canonicalRoot) {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
@@ -353,12 +364,28 @@ function Test-IntegratedStoreBuyReviewSource {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v31-20260916' {
       'integration/moolsocial/store-buy-final-v31-20260916'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' {
+      'work/cursor-ui/redmi-v6-audit-20260913'
+    }
     default { $null }
   }
   if ($null -eq $expectedBranch) { return $false }
   $currentBranch = @(& git -C $root branch --show-current)
   if ($LASTEXITCODE -ne 0 -or $currentBranch.Count -ne 1 -or
       [string]$currentBranch[0] -cne $expectedBranch) { return $false }
+  if ($redmiSuccessor -and $expectedBranch -cne 'work/cursor-ui/redmi-v6-audit-20260913') { return $false }
+  if ($expectedBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
+    $redmiV6 = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
+    & git -C $root merge-base --is-ancestor $redmiV6 HEAD
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $redmiAdmittedSource = if ($redmiSuccessor) { $SourceCommit } else { $redmiV6 }
+    $redmiBoundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
+    & git -C $root diff --quiet $redmiAdmittedSource HEAD -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & git -C $root diff --quiet $redmiAdmittedSource -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+  }
+
   foreach ($requiredTip in @(
     $SourceCommit,
     '2a860f9f9fd793d4f366c5952f4f8eb05326f58b',

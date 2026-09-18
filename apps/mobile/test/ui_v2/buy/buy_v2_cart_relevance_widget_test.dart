@@ -548,8 +548,8 @@ void main() {
         await tester.pumpWidget(app(session, textScale: 2));
         await tester.pumpAndSettle();
         if (destination == BuyV2Destination.wholesale) {
-          expect(find.textContaining('MOQ 1 pack ·'), findsOneWidget);
-          expect(find.textContaining('MOQ 1 packs'), findsNothing);
+          expect(find.textContaining('Minimum order 1 pack ·'), findsOneWidget);
+          expect(find.textContaining('Minimum order 1 packs'), findsNothing);
         }
         final owner = find.byKey(
           ValueKey('buy-cart-delivery-instructions-${destination.name}'),
@@ -623,6 +623,36 @@ void main() {
       final packshot = find.byKey(ValueKey('buy-cart-packshot-${product.id}'));
       await showInMainCartList(tester, packshot);
       expect(packshot, findsOneWidget);
+      final save = find.byKey(ValueKey('buy-save-${product.id}'));
+      expect(save, findsOneWidget);
+      expect(
+        tester.getRect(save).bottom,
+        lessThanOrEqualTo(tester.getRect(packshot).top),
+      );
+      expect(tester.getSize(packshot).width, greaterThanOrEqualTo(76));
+      expect(tester.getSize(packshot).width, tester.getSize(packshot).height);
+      expect(
+        find.descendant(
+          of: packshot,
+          matching: find.byKey(
+            ValueKey('buy-product-illustration-${product.id}'),
+          ),
+        ),
+        findsOneWidget,
+      );
+      final quantity = session.quantityFor(product.id);
+      final wasSaved = session.isSaved(product.id);
+      await Scrollable.ensureVisible(tester.element(save), alignment: 0.5);
+      await tester.pumpAndSettle();
+      expect(save.hitTestable(), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(product.id), !wasSaved);
+      expect(session.quantityFor(product.id), quantity);
+      expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(product.id), wasSaved);
     }
     expect(find.text('Shop order'), findsNothing);
     expect(find.text('Wholesale order'), findsNothing);
@@ -863,128 +893,133 @@ void main() {
     expect(find.text('Bill summary'), findsOneWidget);
   });
 
-  testWidgets(
-    'Saved shelf adds productwise and clears only after confirmation',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(320, 700));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final session = BuyV2Session(core: BuySession());
-      final shop = productFor(BuyV2Destination.shop);
-      final secondShop = BuyV2Catalogue.products.firstWhere(
-        (candidate) =>
-            candidate.destination == BuyV2Destination.shop &&
-            candidate.id != shop.id,
-      );
-      session.toggleSaved(shop.id);
-      session.toggleSaved(secondShop.id);
-      await tester.pumpWidget(app(session, textScale: 1.4));
-      await tester.pumpAndSettle();
+  testWidgets('Saved shelf adds productwise and clears only after confirmation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = BuyV2Session(core: BuySession());
+    final shop = productFor(BuyV2Destination.shop);
+    final secondShop = BuyV2Catalogue.products.firstWhere(
+      (candidate) =>
+          candidate.destination == BuyV2Destination.shop &&
+          candidate.id != shop.id,
+    );
+    session.toggleSaved(shop.id);
+    session.toggleSaved(secondShop.id);
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-saved-decision-shelf')),
-        findsOneWidget,
-      );
-      expect(find.text('Saved in Shop'), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-saved-add-all')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-        findsNothing,
-      );
-      expect(find.text('Remove'), findsWidgets);
-      expect(
-        tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).height,
-        greaterThanOrEqualTo(44),
-      );
-      expect(
-        tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).width,
-        lessThan(80),
-      );
-      expect(tester.takeException(), isNull);
-
-      final productAdd = find.byKey(ValueKey('buy-add-${shop.id}'));
-      await tester.ensureVisible(productAdd);
-      await tester.pumpAndSettle();
-      await tester.tap(productAdd);
-      await tester.pump();
-      expect(session.quantityFor(shop.id), shop.minimumOrder);
-      expect(session.isSaved(shop.id), isTrue);
-
-      final secondRemove = find.byKey(ValueKey('buy-save-${secondShop.id}'));
-      final lane = find.byKey(const ValueKey('buy-horizontal-product-lane-0'));
+    await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-saved-decision-shelf')),
+      findsOneWidget,
+    );
+    expect(find.text('Saved in Shop'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-saved-add-all')), findsNothing);
+    final grid = find.byKey(
+      ValueKey(
+        'buy-vertical-product-grid-buy-products-shop-${session.selectedCategoryId}-saved',
+      ),
+    );
+    expect(grid, findsOneWidget);
+    final scroll = find
+        .ancestor(
+          of: grid,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        )
+        .first;
+    Future<void> reveal(Finder target) async {
       for (
         var attempt = 0;
-        attempt < 8 && secondRemove.evaluate().isEmpty;
+        attempt < 100 && target.hitTestable().evaluate().isEmpty;
         attempt++
       ) {
-        final visibleLane = tester
-            .getRect(lane)
-            .intersect(
-              tester.getRect(
-                find.byKey(const ValueKey('buy-cart-content-viewport')),
-              ),
+        final rect = target.evaluate().isEmpty ? null : tester.getRect(target);
+        final delta = rect != null && rect.top < tester.getRect(scroll).top
+            ? 120.0
+            : -120.0;
+        final point =
+            const [
+              Alignment(-.85, 0),
+              Alignment(.85, 0),
+              Alignment(-.85, -.5),
+              Alignment(.85, -.5),
+            ].firstWhere(
+              (point) => scroll.hitTestable(at: point).evaluate().isNotEmpty,
             );
-        final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
-        final cartBounds = cart.evaluate().isEmpty
-            ? Rect.zero
-            : tester.getRect(cart).inflate(8);
-        final start = [
-          Offset(visibleLane.right - 20, visibleLane.top + 20),
-          Offset(visibleLane.right - 20, visibleLane.center.dy),
-          Offset(visibleLane.right - 20, visibleLane.bottom - 20),
-        ].firstWhere((point) => !cartBounds.contains(point));
-        await tester.dragFrom(start, const Offset(-220, 0));
+        await tester.dragFrom(
+          point.withinRect(tester.getRect(scroll)),
+          Offset(0, delta),
+        );
         await tester.pumpAndSettle();
       }
-      expect(secondRemove, findsOneWidget);
-      await tester.ensureVisible(secondRemove);
-      await tester.pumpAndSettle();
-      expect(secondRemove.hitTestable(), findsOneWidget);
-      await tester.tap(secondRemove);
-      await tester.pumpAndSettle();
-      expect(session.isSaved(secondShop.id), isFalse);
-      expect(session.isSaved(shop.id), isTrue);
+      expect(target.hitTestable(), findsOneWidget);
+    }
 
-      final clearSaved = find.byKey(const ValueKey('buy-saved-clear'));
-      await tester.ensureVisible(clearSaved);
-      await tester.pumpAndSettle();
-      await tester.tap(clearSaved);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-saved-clear-sheet')),
-        findsOneWidget,
-      );
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.text('Clear Saved in Shop?'), findsOneWidget);
-      expect(find.text('Keep saved'), findsWidgets);
-      expect(find.text('Clear list'), findsWidgets);
-      expect(
-        tester
-            .getSize(find.byKey(const ValueKey('buy-saved-clear-sheet')))
-            .height,
-        lessThan(300),
-      );
-      expect(session.isSaved(shop.id), isTrue);
-      await tester.tap(find.byKey(const ValueKey('buy-saved-keep')));
-      await tester.pumpAndSettle();
-      expect(session.isSaved(shop.id), isTrue);
+    expect(
+      find.byTooltip('Remove ${shop.customerTitle} from Saved'),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).height,
+      equals(28),
+    );
+    expect(
+      tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).width,
+      lessThan(80),
+    );
+    expect(tester.takeException(), isNull);
 
-      await tester.tap(find.byKey(const ValueKey('buy-saved-clear')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-saved-confirm-clear')));
-      await tester.pumpAndSettle();
+    final productAdd = find.byKey(ValueKey('buy-add-${shop.id}'));
+    await reveal(productAdd);
+    await tester.tap(productAdd);
+    await tester.pump();
+    expect(session.quantityFor(shop.id), shop.minimumOrder);
+    expect(session.isSaved(shop.id), isTrue);
 
-      expect(session.isSaved(shop.id), isFalse);
-      expect(session.quantityFor(shop.id), shop.minimumOrder);
-      expect(find.text('No saved products yet'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    final secondRemove = find.byKey(ValueKey('buy-save-${secondShop.id}'));
+    await reveal(secondRemove);
+    await tester.tap(secondRemove);
+    await tester.pumpAndSettle();
+    expect(session.isSaved(secondShop.id), isFalse);
+    expect(session.isSaved(shop.id), isTrue);
+
+    final clearSaved = find.byKey(const ValueKey('buy-saved-clear'));
+    await reveal(clearSaved);
+    await tester.tap(clearSaved);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-saved-clear-sheet')), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Clear Saved in Shop?'), findsOneWidget);
+    expect(find.text('Keep saved'), findsWidgets);
+    expect(find.text('Clear list'), findsWidgets);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('buy-saved-clear-sheet')))
+          .height,
+      lessThan(300),
+    );
+    expect(session.isSaved(shop.id), isTrue);
+    await tester.tap(find.byKey(const ValueKey('buy-saved-keep')));
+    await tester.pumpAndSettle();
+    expect(session.isSaved(shop.id), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('buy-saved-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-saved-confirm-clear')));
+    await tester.pumpAndSettle();
+
+    expect(session.isSaved(shop.id), isFalse);
+    expect(session.quantityFor(shop.id), shop.minimumOrder);
+    expect(find.text('No saved products yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('R37 Cart sections fit compact Android and iOS-size viewports', (
     tester,

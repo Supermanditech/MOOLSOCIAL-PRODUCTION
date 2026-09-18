@@ -36,6 +36,14 @@ void main() {
       expect(payload['fileName'], 'MoolSocial-invoice-ORD-TEST-1001.pdf');
       final lines = (payload['lines'] as List).cast<String>();
       expect(lines, contains('Order ID: ORD-TEST-1001'));
+      expect(lines.where((line) => line.startsWith('Expected:')), isEmpty);
+      final recordedEstimate = lines.singleWhere(
+        (line) => line.startsWith('Recorded delivery estimate:'),
+      );
+      expect(recordedEstimate, contains('Original estimate'));
+      expect(recordedEstimate, contains('recorded time unavailable'));
+      expect(recordedEstimate, contains('not a live countdown'));
+
       final subtotal = _product().price * 2;
       expect(
         lines,

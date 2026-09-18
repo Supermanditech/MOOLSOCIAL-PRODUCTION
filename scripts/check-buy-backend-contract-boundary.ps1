@@ -164,6 +164,21 @@ function Get-MobileBoundaryViolations {
         ) -or (
           $IntegratedReviewSourceCommit -ceq 'a98fe59a5485f7237e6e18bcf4fa09781173f13c' -and
           $soundSourceHash -ceq 'AF14A9355A47233DD25802F7741E6AFB065BCFF8F03CCDB298F67BF871C23466'
+        ) -or (
+          $IntegratedReviewSourceCommit -ceq '10fb79b4469203371edf888e7d4b8aacb3546581' -and
+          $soundSourceHash -ceq '7BE1D12EE7CA2ACB96B67B14EC02CAD0DCB25D613A07AF4B0473AE323EB9C0B7'
+        ) -or (
+          # Same V6 arrival-sound/import prefix; exact successor source only.
+          $IntegratedReviewSourceCommit -cin @('9b7e5aa7fddc08517432f9b3932da5a36ef7a92d', '11b6562e7bf382afeb11e1801a0a390477fcae8f', '3c30ba11521db6bb1a1ec6995b181a81df1a6b34') -and
+          $soundSourceHash -ceq '94B7A6AE4F5B24CAE5B14795310E1A5DAE5D13147C6FCFC02CB1F034640BCDF6'
+        ) -or (
+          # D014 changes only nested return handling; preserve exact sound source binding.
+          $IntegratedReviewSourceCommit -ceq '4221158fead95a89047e3408aaeb11c9a12dd135' -and
+          $soundSourceHash -ceq 'C00636022B4C0AEC1CB662F4D2FE28C0B20366358BE9E1E19CE7329848BE4CCA'
+        ) -or (
+          # D014 and exact SKU successor retain the same arrival-sound seam.
+          $IntegratedReviewSourceCommit -cin @('41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab', 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957', '1880614bb499a47993df86ebed6599926414fc50') -and
+          $soundSourceHash -ceq '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }

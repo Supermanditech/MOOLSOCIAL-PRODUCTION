@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app/moolsocial_app.dart';
+import 'app/ui_review_language_store.dart';
 import 'core/auth/facebook_native_sdk_adapter.dart';
 import 'core/auth/instagram_oauth_network_adapter.dart';
 import 'core/auth/public_auth_runtime_configuration.dart';
@@ -354,8 +355,8 @@ void _showReleaseBootstrapFailure(String stage) {
 
 void _runUiReviewOnlyApp() {
   final session = JourneySession(
-    store: MemoryJourneyStore(
-      snapshot: const JourneySnapshot(
+    store: UiReviewLanguageStore(
+      seed: const JourneySnapshot(
         languageCode: 'en',
         areaMode: 'current',
         areaLabel: 'Jodhpur, Rajasthan',

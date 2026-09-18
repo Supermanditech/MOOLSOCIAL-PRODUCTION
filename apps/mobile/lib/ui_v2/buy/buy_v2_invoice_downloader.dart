@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'buy_v2_design.dart' show buyV2HistoricalOrderEstimate;
+
 import 'package:flutter/services.dart';
 
 import '../../features/buy/buy_v2_models.dart';
@@ -99,7 +101,7 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
           '${_invoiceText(order.balanceDueLabel ?? 'Due later')}',
     if (order.recipient case final value?) 'Recipient: ${_invoiceText(value)}',
     'Address: ${_invoiceText(order.addressLine ?? order.destinationLabel)}',
-    'Expected: ${_invoiceText(order.promise)}',
+    'Recorded delivery estimate: ${_invoiceText(buyV2HistoricalOrderEstimate(order))}',
     if (order.dispatchPromise case final value?)
       'Dispatch promise: ${_invoiceText(value)}',
     if (order.deliveryPartnerName case final value?)

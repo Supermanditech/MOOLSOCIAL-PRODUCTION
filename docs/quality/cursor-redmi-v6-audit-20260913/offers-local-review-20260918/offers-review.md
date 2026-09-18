@@ -1,0 +1,63 @@
+# Offers visual review — OFFERS-01, OFFERS-02, OFFERS-03
+
+The founder approved this scope on 18 September 2026. Implementation is ready for local visual review; this does not mark the new visuals or the device build accepted.
+
+- OFFERS-01: horizontal image-led offer cards with a visible next-card edge; Suppliers and MoolSocial selection, distinct colour treatments, exact publication/product actions and retained selection on Back. MoolSocial selection requests its publisher-filtered feed. Motion is swipe-only. These are image cards; no promotional video playback or new publishing backend is claimed.
+- OFFERS-02: consistent image frames on Offers, preserving image aspect ratio and supplier-media validation. The decoded-photo tests caught a 2-pixel Save hit-target overlap after removing variable media stretch. The Offers media inset now reserves the full touch target. This is one occurrence within OFFERS-02, linked to the earlier SKU-M01 media work, not a fourth ticket. Shop and Saved keep their existing layout.
+- OFFERS-03: compact Shop-positioned category / publisher selection / Saved / filter toolbar. Category and publisher filters act on existing sources. Saved uses the existing Saved-products sheet.
+
+## Actual local Flutter visuals
+
+These captures use local review fixtures, including an explicit MoolSocial publication fixture. They are not evidence that an administrator has published a real offer.
+
+![Supplier cards](offers-review-final-v2/offers-390.0-1.0-suppliers.png)
+
+![MoolSocial cards](offers-review-final-v2/offers-390.0-1.0-moolsocial.png)
+
+## Validation
+
+- Combined media, variant, Offers visual and C04/C06/C07 run: 124 passed.
+- Paged Offers journeys: 4 passed.
+- Source selection / product / Back / category journeys: 4 passed.
+- Cart feedback / return: 4 passed.
+- Final source-filter and Saved-return rerun: 10 passed (overlaps the above counts).
+- Dart analysis: no issues. Source diff whitespace check passed.
+- Media coverage includes decoded portrait/landscape/square images, bounded full-image fit, supplier binding, rejected/withdrawn media, fallback presentation, normal/enlarged text, and Save/photo clearance.
+
+Earlier C04/C06/C07 visuals at 73b2cf75 remain founder-approved. The connected device is Redmi 23106RN0DA, currently on Cursor Review r66.28. No new APK was installed during this Offers work. Next: founder visual approval, then the combined Redmi verification and integration.
+
+
+## Compact card revision requested by founder
+Top promotional cards now use 12px padding, a 92px image area, tighter text spacing and a single publisher/action footer. Removed the expanding spacer. Height is calculated from content and grows for enlarged text; the next card still peeks into view. Current review captures: offers-review-compact-v1 (supersedes tall offers-review-final-v2 for visual approval).
+
+Validation after this revision: all 20 selected Offers visual/navigation tests passed; six capture cases passed at 320/390/844 widths and 1x/2x text; catalogue analysis has no issues. Prior broader media and paging results are retained above. Local fixtures illustrate supplier and MoolSocial appearances; no Redmi upgrade or device validation has happened. Founder visual approval is pending.
+
+
+## Compact revision 2
+Founder requested further height and width reduction. Carousel width is now 86% of the viewport (previously 91%); padding 8px, image 72px, headline gap 4px, and smaller title/price typography. Normal review cards are about 153px high, down from 189px. Current captures: offers-review-compact-v2. All 20 selected Offers tests passed; source analysis has no issues. Local visual approval remains pending before Redmi upgrade.
+
+
+## Narrower revision 3
+Founder requested further width reduction: viewport fraction reduced from 86% to 78%. Content height remains measured for wrapping and enlarged text. Current captures: offers-review-compact-v3. All 20 selected Offers tests passed. Local visual approval pending before Redmi upgrade.
+
+
+## Cinematic revision 5
+Founder requested further narrowing and premium gradient backgrounds. Width is now 70% of viewport. Supplier cards use deep emerald, MoolSocial cards rich plum, with gold accents and light publisher text. Current captures: offers-review-cinematic-v5. All 20 selected Offers tests passed after width change; six visual cases passed after color update. Local visual approval remains pending before Redmi upgrade.
+
+
+## Shallow horizontal revision 6
+Founder clarified horizontal length around 80% and reduced vertical depth, with no green background. Carousel now uses 80%; image and CTA sit beside the details, removing the separate footer. Supplier gradient is charcoal-burgundy; MoolSocial remains plum. Action column is bounded at enlarged text to preserve space for product details. Current captures: offers-review-cinematic-v6-final. All 20 selected Offers tests passed, including narrow and enlarged-text cases. Local visual approval remains pending before Redmi upgrade.
+
+
+## Photo panel revision 7 — founder approved
+Text occupies the left side; the right 43% is a full-height image/action panel with an expanded contained packshot. Card retains 80% viewport length, compact height and charcoal-burgundy/plum backgrounds. All 20 selected Offers tests passed; source analysis has no issues. Founder approved this local visual in conversation. Next: Redmi build, install and device qualification.
+
+
+## Approval clarification and SKU fit revision 8
+Founder clarified approval applies ONLY to OFFERS-01 promotional card. OFFERS-02 SKU grid and OFFERS-03 toolbar are NOT visually approved. Redmi build/install is on hold; no new APK was built or installed.
+
+OFFERS-02 now replaces the shallow 70px media frame with a square frame sized to card width (70–130px bound), preserving contained full-photo rendering and separate Save/badge space. Both finite and paged Offers row measurements reserve the larger area. Other Shop/Store media remains unchanged. Current visuals: offers-sku-fit-v8-final. All 112 media/Offers interaction tests passed, with square-frame and photo/control separation checks; analysis passed. OFFERS-03 category, publisher selection, Saved and filter interactions remain locally verified, awaiting founder visual approval alongside SKU fit.
+
+
+## SKU sizing audit revision 9
+See OFFERS-SKU-AUDIT-20260918.md for SKU-SIZE-01 and SKU-SIZE-02. Offers cards now take natural content height rather than the tallest row estimate, eliminating filler below Add and quantity controls. 112 tests and six strengthened control/geometry cases passed; analysis passed. Current visuals: offers-sku-audit-v9-final. Only promotional card is approved; SKU grid and toolbar await founder approval. No Redmi build/install.

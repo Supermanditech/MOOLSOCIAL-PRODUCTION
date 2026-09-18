@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_shopping_alerts.dart';
@@ -36,6 +37,14 @@ void main() {
           viewport: viewport,
         );
         addTearDown(router.dispose);
+        final activeOrder = session.orders.firstWhere(
+          (order) => order.status != BuyV2OrderStatus.delivered,
+        );
+        await session.refreshOrder(activeOrder.id);
+        expect(
+          session.orderRefreshState(activeOrder.id),
+          BuyV2CommerceLoadState.unavailable,
+        );
         unawaited(
           showBuyV2ShoppingAlerts(
             tester.element(find.byType(BuyV2Screen)),
@@ -44,6 +53,20 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(session.shoppingAlerts, hasLength(4));
+        expect(find.text('Updated recently'), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byKey(
+              ValueKey('buy-shopping-alert-order-${activeOrder.id}'),
+            ),
+            matching: find.textContaining(
+              'Last recorded estimate (update unavailable)',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Recorded order estimate'), findsOneWidget);
+
         for (final alert in session.shoppingAlerts) {
           final row = find.byKey(ValueKey('buy-shopping-alert-${alert.id}'));
           await tester.ensureVisible(row);
