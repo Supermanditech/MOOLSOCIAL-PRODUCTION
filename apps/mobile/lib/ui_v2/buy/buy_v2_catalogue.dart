@@ -778,7 +778,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
         (e) => e.offer.identity == widget.session.featuredOfferPublicationId,
       );
       _controller = PageController(
-        viewportFraction: .86,
+        viewportFraction: .78,
         initialPage: retained < 0 ? 0 : retained,
       );
       _pageKey = key;
@@ -799,7 +799,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final scale = MediaQuery.textScalerOf(context).scale(1);
-                final cardWidth = constraints.maxWidth * .86 - 12;
+                final cardWidth = constraints.maxWidth * .78 - 12;
                 final contentWidth = cardWidth - 16;
                 final imageWidth = 72.0;
                 final textWidth = (contentWidth - imageWidth - 10).clamp(

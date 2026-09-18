@@ -35,3 +35,7 @@ Validation after this revision: all 20 selected Offers visual/navigation tests p
 
 ## Compact revision 2
 Founder requested further height and width reduction. Carousel width is now 86% of the viewport (previously 91%); padding 8px, image 72px, headline gap 4px, and smaller title/price typography. Normal review cards are about 153px high, down from 189px. Current captures: offers-review-compact-v2. All 20 selected Offers tests passed; source analysis has no issues. Local visual approval remains pending before Redmi upgrade.
+
+
+## Narrower revision 3
+Founder requested further width reduction: viewport fraction reduced from 86% to 78%. Content height remains measured for wrapping and enlarged text. Current captures: offers-review-compact-v3. All 20 selected Offers tests passed. Local visual approval pending before Redmi upgrade.
