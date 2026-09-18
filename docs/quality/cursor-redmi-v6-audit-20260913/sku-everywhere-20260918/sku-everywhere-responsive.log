@@ -1,0 +1,145 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart
+00:00 +0: R669 full catalogue small and progressive boundary 1 scale 1.0
+00:01 +1: R669 full catalogue small and progressive boundary 1 scale 2.0
+00:01 +2: R669 full catalogue small and progressive boundary 4 scale 1.0
+00:01 +3: R669 full catalogue small and progressive boundary 4 scale 2.0
+00:01 +4: R669 full catalogue small and progressive boundary 8 scale 1.0
+00:01 +5: R669 full catalogue small and progressive boundary 8 scale 2.0
+00:01 +6: R669 full catalogue small and progressive boundary 9 scale 1.0
+00:02 +7: R669 full catalogue small and progressive boundary 9 scale 2.0
+00:02 +8: R669 complete grid quantity store false Size(320.0, 711.0) scale 1.0
+00:02 +9: R669 complete grid quantity store false Size(320.0, 711.0) scale 2.0
+00:03 +10: R669 complete grid quantity store false Size(711.0, 320.0) scale 1.0
+00:03 +11: R669 complete grid quantity store false Size(711.0, 320.0) scale 2.0
+00:03 +12: R669 complete grid quantity store true Size(320.0, 711.0) scale 1.0
+00:03 +13: R669 complete grid quantity store true Size(320.0, 711.0) scale 2.0
+00:03 +14: R669 complete grid quantity store true Size(711.0, 320.0) scale 1.0
+00:03 +15: R669 complete grid quantity store true Size(711.0, 320.0) scale 2.0
+00:04 +16: REG4548 featured medicine item0 return at Size(360.0, 800.0)
+00:06 +17: REG4548 featured medicine item2 return at Size(360.0, 800.0)
+00:08 +18: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:10 +19: REG4548 featured medicine item2 return at Size(800.0, 360.0)
+00:11 +20: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:13 +21: REG4548 featured shop item2 return at Size(360.0, 800.0)
+00:15 +22: REG4548 featured shop item0 return at Size(800.0, 360.0)
+00:17 +23: REG4548 featured shop item2 return at Size(800.0, 360.0)
+00:19 +24: REG4548 featured wholesale item0 return at Size(360.0, 800.0)
+00:21 +25: REG4548 featured wholesale item2 return at Size(360.0, 800.0)
+00:24 +26: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+00:27 +27: REG4548 featured wholesale item2 return at Size(800.0, 360.0)
+00:31 +28: R665 O05 full medicine identity at text2 (featured: false, width: 320.0)
+00:31 +29: R665 O05 full medicine identity at text2 (featured: true, width: 320.0)
+00:31 +30: R665 O05 full medicine identity at text2 (featured: false, width: 360.0)
+00:31 +31: R665 O05 full medicine identity at text2 (featured: true, width: 360.0)
+00:31 +32: R66 customer catalogue announcements BuyV2Destination.shop false 1
+00:31 +33: R66 customer catalogue announcements BuyV2Destination.shop false 2
+00:31 +34: R66 customer catalogue announcements BuyV2Destination.shop false 3
+00:31 +35: R66 customer catalogue announcements BuyV2Destination.shop false 18
+00:31 +36: R66 customer catalogue announcements BuyV2Destination.shop true 1
+00:31 +37: R66 customer catalogue announcements BuyV2Destination.shop true 2
+00:31 +38: R66 customer catalogue announcements BuyV2Destination.shop true 3
+00:31 +39: R66 customer catalogue announcements BuyV2Destination.shop true 18
+00:31 +40: R66 customer catalogue announcements BuyV2Destination.wholesale false 1
+00:31 +41: R66 customer catalogue announcements BuyV2Destination.wholesale false 2
+00:31 +42: R66 customer catalogue announcements BuyV2Destination.wholesale false 3
+00:31 +43: R66 customer catalogue announcements BuyV2Destination.wholesale false 18
+00:32 +44: R66 customer catalogue announcements BuyV2Destination.wholesale true 1
+00:32 +45: R66 customer catalogue announcements BuyV2Destination.wholesale true 2
+00:32 +46: R66 customer catalogue announcements BuyV2Destination.wholesale true 3
+00:32 +47: R66 customer catalogue announcements BuyV2Destination.wholesale true 18
+00:32 +48: R66 quantity targets store quick at 320.0 / 1.0
+00:32 +49: R66 quantity targets store quick at 320.0 / 2.0
+00:32 +50: R66 quantity targets store quick at 360.0 / 1.0
+00:32 +51: R66 quantity targets store quick at 360.0 / 2.0
+00:33 +52: R66 quantity targets store quick at 430.0 / 1.0
+00:33 +53: R66 quantity targets store quick at 430.0 / 2.0
+00:33 +54: R66 quantity targets store scheduled at 320.0 / 1.0
+00:33 +55: R66 quantity targets store scheduled at 320.0 / 2.0
+00:33 +56: R66 quantity targets store scheduled at 360.0 / 1.0
+00:33 +57: R66 quantity targets store scheduled at 360.0 / 2.0
+00:34 +58: R66 quantity targets store scheduled at 430.0 / 1.0
+00:34 +59: R66 quantity targets store scheduled at 430.0 / 2.0
+00:34 +60: R66 quantity targets store wholesale at 320.0 / 1.0
+00:34 +61: R66 quantity targets store wholesale at 320.0 / 2.0
+00:34 +62: R66 quantity targets store wholesale at 360.0 / 1.0
+00:34 +63: R66 quantity targets store wholesale at 360.0 / 2.0
+00:34 +64: R66 quantity targets store wholesale at 430.0 / 1.0
+00:35 +65: R66 quantity targets store wholesale at 430.0 / 2.0
+00:35 +66: R66 quantity targets store bulk at 320.0 / 1.0
+00:35 +67: R66 quantity targets store bulk at 320.0 / 2.0
+00:35 +68: R66 quantity targets store bulk at 360.0 / 1.0
+00:35 +69: R66 quantity targets store bulk at 360.0 / 2.0
+00:35 +70: R66 quantity targets store bulk at 430.0 / 1.0
+00:35 +71: R66 quantity targets store bulk at 430.0 / 2.0
+00:35 +72: R66 quantity targets main quick at 320.0 / 1.0
+00:35 +73: R66 quantity targets main quick at 320.0 / 2.0
+00:36 +74: R66 quantity targets main quick at 360.0 / 1.0
+00:36 +75: R66 quantity targets main quick at 360.0 / 2.0
+00:36 +76: R66 quantity targets main quick at 430.0 / 1.0
+00:36 +77: R66 quantity targets main quick at 430.0 / 2.0
+00:36 +78: R66 quantity targets main scheduled at 320.0 / 1.0
+00:36 +79: R66 quantity targets main scheduled at 320.0 / 2.0
+00:37 +80: R66 quantity targets main scheduled at 360.0 / 1.0
+00:37 +81: R66 quantity targets main scheduled at 360.0 / 2.0
+00:37 +82: R66 quantity targets main scheduled at 430.0 / 1.0
+00:37 +83: R66 quantity targets main scheduled at 430.0 / 2.0
+00:37 +84: R66 quantity targets main wholesale at 320.0 / 1.0
+00:37 +85: R66 quantity targets main wholesale at 320.0 / 2.0
+00:37 +86: R66 quantity targets main wholesale at 360.0 / 1.0
+00:38 +87: R66 quantity targets main wholesale at 360.0 / 2.0
+00:38 +88: R66 quantity targets main wholesale at 430.0 / 1.0
+00:38 +89: R66 quantity targets main wholesale at 430.0 / 2.0
+00:38 +90: R66 quantity targets main bulk at 320.0 / 1.0
+00:38 +91: R66 quantity targets main bulk at 320.0 / 2.0
+00:38 +92: R66 quantity targets main bulk at 360.0 / 1.0
+00:38 +93: R66 quantity targets main bulk at 360.0 / 2.0
+00:38 +94: R66 quantity targets main bulk at 430.0 / 1.0
+00:38 +95: R66 quantity targets main bulk at 430.0 / 2.0
+00:39 +96: R66 quantity targets featured quick at 320.0 / 1.0
+00:40 +97: R66 quantity targets featured quick at 320.0 / 2.0
+00:41 +98: R66 quantity targets featured quick at 360.0 / 1.0
+00:42 +99: R66 quantity targets featured quick at 360.0 / 2.0
+00:43 +100: R66 quantity targets featured quick at 430.0 / 1.0
+00:44 +101: R66 quantity targets featured quick at 430.0 / 2.0
+00:45 +102: R66 quantity targets featured scheduled at 320.0 / 1.0
+00:46 +103: R66 quantity targets featured scheduled at 320.0 / 2.0
+00:47 +104: R66 quantity targets featured scheduled at 360.0 / 1.0
+00:48 +105: R66 quantity targets featured scheduled at 360.0 / 2.0
+00:49 +106: R66 quantity targets featured scheduled at 430.0 / 1.0
+00:51 +107: R66 quantity targets featured scheduled at 430.0 / 2.0
+00:52 +108: R66 quantity targets featured wholesale at 320.0 / 1.0
+00:53 +109: R66 quantity targets featured wholesale at 320.0 / 2.0
+00:56 +110: R66 quantity targets featured wholesale at 360.0 / 1.0
+00:58 +111: R66 quantity targets featured wholesale at 360.0 / 2.0
+01:00 +112: R66 quantity targets featured wholesale at 430.0 / 1.0
+01:02 +113: R66 quantity targets featured wholesale at 430.0 / 2.0
+01:04 +114: R66 quantity targets featured bulk at 320.0 / 1.0
+01:04 +115: R66 quantity targets featured bulk at 320.0 / 2.0
+01:04 +116: R66 quantity targets featured bulk at 360.0 / 1.0
+01:04 +117: R66 quantity targets featured bulk at 360.0 / 2.0
+01:05 +118: R66 quantity targets featured bulk at 430.0 / 1.0
+01:05 +119: R66 quantity targets featured bulk at 430.0 / 2.0
+01:05 +120: featured shop cards fit Size(320.0, 700.0) at 1.0 text
+01:06 +121: featured shop cards fit Size(320.0, 700.0) at 1.4 text
+01:06 +122: featured shop cards fit Size(320.0, 700.0) at 2.0 text
+01:07 +123: featured shop cards fit Size(430.0, 932.0) at 1.0 text
+01:08 +124: featured shop cards fit Size(430.0, 932.0) at 1.4 text
+01:09 +125: featured shop cards fit Size(430.0, 932.0) at 2.0 text
+01:09 +126: featured wholesale cards fit Size(320.0, 700.0) at 1.0 text
+01:11 +127: featured wholesale cards fit Size(320.0, 700.0) at 1.4 text
+01:12 +128: featured wholesale cards fit Size(320.0, 700.0) at 2.0 text
+01:13 +129: featured wholesale cards fit Size(430.0, 932.0) at 1.0 text
+01:15 +130: featured wholesale cards fit Size(430.0, 932.0) at 1.4 text
+01:16 +131: featured wholesale cards fit Size(430.0, 932.0) at 2.0 text
+01:17 +132: featured medicine cards fit Size(320.0, 700.0) at 1.0 text
+01:17 +133: featured medicine cards fit Size(320.0, 700.0) at 1.4 text
+01:17 +134: featured medicine cards fit Size(320.0, 700.0) at 2.0 text
+01:18 +135: featured medicine cards fit Size(430.0, 932.0) at 1.0 text
+01:18 +136: featured medicine cards fit Size(430.0, 932.0) at 1.4 text
+01:18 +137: featured medicine cards fit Size(430.0, 932.0) at 2.0 text
+01:18 +138: phone widths keep three readable product cards with all products reachable
+01:19 +139: large text retains vertical rows and complete minimum tap actions
+01:19 +140: wide catalogue admits three cards without compressing content
+01:19 +141: Fresh picks keeps store and delivery on separate complete lines
+01:19 +142: Fresh picks preserves complete seller facts at 140 percent text
+01:20 +143: All tests passed!
