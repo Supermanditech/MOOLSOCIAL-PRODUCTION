@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart' show TickerCanceled;
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -873,6 +872,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.publishedOffers = false,
     this.publicationFacts,
     this.controlsAfterProducts = false,
+    this.includeStoreSearch = false,
   });
 
   final BuyV2Session session;
@@ -886,6 +886,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final bool publishedOffers;
   final Widget Function(List<BuyV2PublishedCatalogueOffer>)? publicationFacts;
   final bool controlsAfterProducts;
+  final bool includeStoreSearch;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
@@ -895,6 +896,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
 class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     with WidgetsBindingObserver {
   late BuyV2CataloguePager<Object> _pager;
+  BuyV2CataloguePager<BuyV2StoreListing>? _storeSearchPager;
   late ScrollController _vertical;
   bool _ownsVertical = true;
   late List<ScrollController> _lanes;
@@ -932,6 +934,11 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       lane.addListener(_saveOffsets);
     }
     _pager.addListener(_pageChanged);
+    if (widget.includeStoreSearch) {
+      _storeSearchPager = widget.session.acquireCatalogueStores(
+        'store-search-${widget.query.destination.name}',
+      )..addListener(_storeSearchChanged);
+    }
     _scheduleQuery();
     _schedulePublicationExpiry();
   }
@@ -940,6 +947,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _bindPrimaryController();
+  }
+
+  void _storeSearchChanged() {
+    if (mounted) setState(() {});
   }
 
   void _bindPrimaryController() {
@@ -998,11 +1009,14 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session ||
         oldWidget.scopeKey != widget.scopeKey ||
-        oldWidget.publishedOffers != widget.publishedOffers) {
+        oldWidget.publishedOffers != widget.publishedOffers ||
+        oldWidget.includeStoreSearch != widget.includeStoreSearch ||
+        oldWidget.query.destination != widget.query.destination) {
       _detach(
         oldWidget.session,
         oldWidget.scopeKey,
         publishedOffers: oldWidget.publishedOffers,
+        storeSearchDestination: oldWidget.query.destination,
       );
       _attach();
       _bindPrimaryController();
@@ -1086,11 +1100,19 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     BuyV2Session session,
     String scopeKey, {
     required bool publishedOffers,
+    required BuyV2Destination storeSearchDestination,
   }) {
     _openSequence++;
     _publicationExpiry?.cancel();
     _saveOffsets();
     _pager.removeListener(_pageChanged);
+    if (_storeSearchPager != null) {
+      _storeSearchPager!.removeListener(_storeSearchChanged);
+      session.releaseCatalogueStores(
+        'store-search-${storeSearchDestination.name}',
+      );
+      _storeSearchPager = null;
+    }
     _vertical.removeListener(_saveOffsets);
     if (_ownsVertical) _vertical.dispose();
     for (final lane in _lanes) {
@@ -1110,6 +1132,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       widget.session,
       widget.scopeKey,
       publishedOffers: widget.publishedOffers,
+      storeSearchDestination: widget.query.destination,
     );
     super.dispose();
   }
@@ -1118,6 +1141,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   Widget build(BuildContext context) {
     final page = _pager.query == widget.query ? _pager.page : null;
     final loading = _pager.query != widget.query || _pager.loading;
+    final storeLoading =
+        _storeSearchPager != null &&
+        (_storeSearchPager!.query != widget.query ||
+            _storeSearchPager!.loading);
     final message = _pager.query == widget.query ? _pager.message : null;
     final offers = widget.publishedOffers
         ? page?.items.cast<BuyV2PublishedCatalogueOffer>().toList(
@@ -1183,7 +1210,11 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
             padding: const EdgeInsets.only(bottom: 12),
             children: [
               if (widget.header != null) widget.header!,
-              if (loading) const LinearProgressIndicator(minHeight: 2),
+              if (loading || storeLoading)
+                const LinearProgressIndicator(
+                  key: ValueKey('buy-catalogue-loading'),
+                  minHeight: 2,
+                ),
               if (publicationCurrent &&
                   offers.isNotEmpty &&
                   widget.publicationFacts != null)
@@ -1374,11 +1405,13 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
       _offset.value = target;
       return;
     }
-    await _offset.animateTo(
-      target,
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOutCubic,
-    ).orCancel;
+    await _offset
+        .animateTo(
+          target,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+        )
+        .orCancel;
   }
 
   Future<void> _finish(DragEndDetails details, double width) async {
@@ -1386,8 +1419,10 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
     final distance = _distance;
     _distance = 0;
     final velocity = details.primaryVelocity ?? 0;
-    final committed = distance.abs() >= 48 ||
-        (distance.abs() >= 18 && velocity.abs() >= 500 &&
+    final committed =
+        distance.abs() >= 48 ||
+        (distance.abs() >= 18 &&
+            velocity.abs() >= 500 &&
             velocity.sign == distance.sign);
     final forward = distance < 0;
     final action = forward ? widget.onNext : widget.onPrevious;
@@ -1457,9 +1492,11 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
         onHorizontalDragCancel: () {
           _distance = 0;
           if (!_changingPage) {
-            unawaited(_settle(0).catchError((Object error) {
-              if (error is! TickerCanceled) throw error;
-            }));
+            unawaited(
+              _settle(0).catchError((Object error) {
+                if (error is! TickerCanceled) throw error;
+              }),
+            );
           }
         },
         onHorizontalDragEnd: (details) =>
@@ -2007,6 +2044,8 @@ class BuyV2CatalogueView extends StatelessWidget {
                     session: session,
                     query: session.catalogueQuery(),
                     scopeKey: 'catalogue-${session.destination.name}',
+                    includeStoreSearch:
+                        session.query.trim().isNotEmpty && onOpenStore != null,
                     controlsAfterProducts:
                         session.destination == BuyV2Destination.shop,
                     header: session.query.trim().isEmpty || onOpenStore == null
@@ -2875,6 +2914,7 @@ class BuyV2SearchResultsView extends StatelessWidget {
         session: session,
         query: session.catalogueQuery(),
         scopeKey: 'search-${session.destination.name}',
+        includeStoreSearch: onOpenStore != null,
         header: onOpenStore == null
             ? null
             : _CatalogueStoreMatches(
