@@ -104569,6 +104569,28 @@
       "evidence": [
         "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
       ]
+    },
+    {
+      "id": "REG-20260918-4630-REGISTRY-CANONICAL-CHECKOUT-DIGEST",
+      "status": "registered_prevention_active",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "build",
+        "device",
+        "evidence"
+      ],
+      "mistake": "Integration candidate 3892c616 rejected the recorded registry checksum in a fresh checkout.",
+      "rootCause": "Windows text generation wrote CRLF and hashed those working bytes, while .gitattributes requires LF and Git committed/checks out LF. Source and checked-out registry contents were semantically identical but checksum bytes differed.",
+      "prevention": "Write registry and its binding using explicit LF newlines, calculate digest from canonical bytes, compare the staged blob against working bytes, and qualify a fresh checkout. Never relax exact checksum validation. Retain rejected candidate and failure log.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
+      ]
     }
   ],
   "integrationIdReconciliation20260918": [

@@ -36,3 +36,7 @@ Scoped coordination implementation/pre-commit and regression-memory gates pass; 
 - baseline-cart-visual-proof.log SHA256 7f30dda1fca058bf417c84d641447a99510b802ee0dbb1b92eee4a376612e887
 - baseline-fixes-memory.log SHA256 9e032c30af9c869560ab66047d4acad042599da90d34b2ee7c9c7f91aa80b2a3
 - baseline-wrong-ticket-negative.log SHA256 4cc5fc0594c68fbeda493dc4a2d38570e7763e43ed0f2dbe3116ea3ba80527c4
+
+BASELINE-GIT-03 / REG4630: fresh integration candidate 3892c616 failed its registry SHA256 preflight although source checkout passed. Acceptance is held. Diagnose and correct reproducible checkout bytes before another qualified baseline; retain failed candidate and log. Application tree remains the tested source tree.
+
+REG4630 diagnosis: source registry had 104,601 CRLF endings and hash 9c6a4b70…, while fresh LF checkout hash was 01a7b58a…. Both .gitattributes entries explicitly require eol=lf. Correct generation uses explicit LF for registry/policy, recalculates the exact byte digest and compares Git's staged blob with working bytes. No checksum gate is loosened. The rejected v1 candidate 3892c616 remains preserved; replacement v2 starts from the same governance tag with no reset/rebase. New source has identical apps tree to fded29e5; prior application tests remain applicable.

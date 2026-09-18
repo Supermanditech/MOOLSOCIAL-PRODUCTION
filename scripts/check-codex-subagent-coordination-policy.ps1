@@ -1353,7 +1353,7 @@ if ($storeBuySeptember12 -or $storeBuySkuSeptember18) {
 }
 $storeBuySkuSeptember18 = ($ProductionLane -ceq 'integration_repair' -and
   $ProductionWorkId -ceq 'store-buy-sku-20260918') -or
-  ($ProductionLane -ceq 'integration' -and $ProductionWorkId -ceq 'store-buy-sku-baseline-20260918')
+  ($ProductionLane -ceq 'integration' -and $ProductionWorkId -ceq 'store-buy-sku-baseline-v2-20260918')
 if ($storeBuySkuSeptember18) {
   Assert-Coordination (
     $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
@@ -1361,8 +1361,8 @@ if ($storeBuySkuSeptember18) {
       $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-SKU-20260918' -and
       (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-sku-20260918') -or
      ($ProductionLane -ceq 'integration' -and
-      $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918' -and
-      (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-20260918'))
+      $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-V2-20260918' -and
+      (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-v2-20260918'))
   ) 'September18 repair identity changed.'
   $literalBinding = @($continuationBindings | Where-Object {
     $_.id -ceq 'integration_repair_store_buy_sku_20260918'
@@ -1396,11 +1396,11 @@ if ($storeBuySkuSeptember18) {
   $integrationRepair.preMergeCoordinationOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md')
   $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md', 'scripts/check-codex-subagent-coordination-policy.ps1')
   $integrationRepair.maximumPostMergeClosureCommits = 1
-  $integrationRepair.freshIntegrationWorkId = 'store-buy-sku-baseline-20260918'
-  $integrationRepair.freshIntegrationTicketId = 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918'
-  $integrationRepair.freshIntegrationBranch = 'integration/moolsocial/store-buy-sku-baseline-20260918'
-  $integrationRepair.freshIntegrationWorktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-20260918'
-  $integrationRepair.freshIntegrationMergeSubject = 'merge(store-buy-sku-baseline-20260918): integrate reconciled Cursor and Codex'
+  $integrationRepair.freshIntegrationWorkId = 'store-buy-sku-baseline-v2-20260918'
+  $integrationRepair.freshIntegrationTicketId = 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-V2-20260918'
+  $integrationRepair.freshIntegrationBranch = 'integration/moolsocial/store-buy-sku-baseline-v2-20260918'
+  $integrationRepair.freshIntegrationWorktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-v2-20260918'
+  $integrationRepair.freshIntegrationMergeSubject = 'merge(store-buy-sku-baseline-v2-20260918): integrate reconciled Cursor and Codex'
 }
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
@@ -5692,21 +5692,21 @@ if ($ProductionLane -ceq 'baseline') {
         (Test-ProductionWorktreeClean) -and
         (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Combined correction lost repair ancestry or clean remote-equal source.'
       Assert-Coordination (
-        $IntegrationTargetWorkId -ceq 'store-buy-sku-baseline-20260918' -and
-        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918' -and
-        (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-20260918'
+        $IntegrationTargetWorkId -ceq 'store-buy-sku-baseline-v2-20260918' -and
+        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-V2-20260918' -and
+        (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-v2-20260918'
       ) 'Combined baseline target identity changed.'
       $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
       $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
       $targetStatus = @(& git -C $IntegrationTargetRoot status --porcelain=v1 --untracked-files=normal)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
-        $targetBranch[0] -ceq 'integration/moolsocial/store-buy-sku-baseline-20260918' -and
+        $targetBranch[0] -ceq 'integration/moolsocial/store-buy-sku-baseline-v2-20260918' -and
         $targetHead.Count -eq 1 -and $targetHead[0] -ceq $workStartCommit -and
         $targetStatus.Count -eq 0) 'Combined target is not clean at the governance tag.'
       Assert-ProductionManagedWorktreesClean
-      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/store-buy-sku-baseline-20260918')
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/store-buy-sku-baseline-v2-20260918')
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Combined baseline target remote already exists.'
-      Write-Output 'merge(store-buy-sku-baseline-20260918): integrate reconciled Cursor and Codex'
+      Write-Output 'merge(store-buy-sku-baseline-v2-20260918): integrate reconciled Cursor and Codex'
     } elseif ($storeBuyFinalAdmission) {
       $qualifiedSource = 'a98fe59a5485f7237e6e18bcf4fa09781173f13c'
       & git -C $root merge-base --is-ancestor $qualifiedSource $head
