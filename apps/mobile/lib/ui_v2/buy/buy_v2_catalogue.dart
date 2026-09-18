@@ -778,7 +778,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
         (e) => e.offer.identity == widget.session.featuredOfferPublicationId,
       );
       _controller = PageController(
-        viewportFraction: .70,
+        viewportFraction: .80,
         initialPage: retained < 0 ? 0 : retained,
       );
       _pageKey = key;
@@ -799,10 +799,11 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final scale = MediaQuery.textScalerOf(context).scale(1);
-                final cardWidth = constraints.maxWidth * .70 - 12;
+                final cardWidth = constraints.maxWidth * .80 - 12;
                 final contentWidth = cardWidth - 16;
-                final imageWidth = 72.0;
-                final textWidth = (contentWidth - imageWidth - 10).clamp(
+                final imageWidth = 64.0;
+                final ctaWidth = (82.0 * scale).clamp(82.0, contentWidth * .45);
+                final textWidth = (contentWidth - ctaWidth - 10).clamp(
                   60.0,
                   double.infinity,
                 );
@@ -829,7 +830,6 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                   return result;
                 }
 
-                final ctaWidth = 82.0 * scale;
                 double height = 0;
                 for (final entry in entries) {
                   final product = entry.product;
@@ -859,24 +859,23 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                   final publisher =
                       entry.offer.publisherName ??
                       (_mool ? 'MoolSocial' : product.seller);
-                  final bottom = measure(
-                    'From ${product.customerSeller(publisher)}',
-                    11,
-                    FontWeight.w500,
-                    (contentWidth - ctaWidth - 8).clamp(1.0, double.infinity),
-                  );
-                  final footerHeight = bottom > 48 ? bottom : 48.0;
-                  final candidate =
-                      16 +
+                  final contentHeight =
+                      body +
+                      8 +
                       measure(
                         entry.offer.headline,
                         11,
                         FontWeight.w700,
-                        contentWidth,
+                        textWidth,
                       ) +
-                      4 +
-                      (body < 72 ? 72 : body) +
-                      footerHeight;
+                      measure(
+                        'From ${product.customerSeller(publisher)}',
+                        11,
+                        FontWeight.w500,
+                        textWidth,
+                      );
+                  final candidate =
+                      16 + (contentHeight > 112 ? contentHeight : 112.0);
                   if (candidate > height) height = candidate;
                 }
                 return SizedBox(
@@ -917,8 +916,8 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                       const Color(0xFF513447),
                                     ]
                                   : [
-                                      const Color(0xFF092D2B),
-                                      const Color(0xFF28564C),
+                                      const Color(0xFF201C24),
+                                      const Color(0xFF49303A),
                                     ],
                             ),
                           ),
@@ -927,84 +926,64 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                             onTap: open,
                             child: Padding(
                               padding: const EdgeInsets.all(8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    entry.offer.headline,
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFD381),
-                                      fontSize: 11,
-                                      height: 1.15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              product.customerTitle,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 15,
-                                                height: 1.15,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              buyV2Money(product.price),
-                                              style: const TextStyle(
-                                                color: Color(0xFFFFD381),
-                                                fontSize: 22,
-                                                height: 1.15,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                            Text(
-                                              product.pack,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                height: 1.15,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            if (product.minimumOrder > 1)
-                                              Text(
-                                                'Minimum ${product.minimumOrder} packs',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 11,
-                                                  height: 1.15,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                          ],
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          entry.offer.headline,
+                                          style: const TextStyle(
+                                            color: Color(0xFFFFD381),
+                                            fontSize: 11,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      SizedBox(
-                                        width: imageWidth,
-                                        height: 72,
-                                        child: BuyV2ProductPackshot(
-                                          product: product,
-                                          borderRadius: 12,
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          product.customerTitle,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          buyV2Money(product.price),
+                                          style: const TextStyle(
+                                            color: Color(0xFFFFD381),
+                                            fontSize: 22,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          product.pack,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        if (product.minimumOrder > 1)
+                                          Text(
+                                            'Minimum ${product.minimumOrder} packs',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              height: 1.15,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        const SizedBox(height: 4),
+                                        Text(
                                           'From ${product.customerSeller(publisher)}',
                                           key: ValueKey(
                                             'buy-offer-publisher-${entry.offer.identity}',
@@ -1016,11 +995,23 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      SizedBox(
-                                        width: ctaWidth,
-                                        child: TextButton(
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  SizedBox(
+                                    width: ctaWidth,
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          width: imageWidth,
+                                          height: 64,
+                                          child: BuyV2ProductPackshot(
+                                            product: product,
+                                            borderRadius: 12,
+                                          ),
+                                        ),
+                                        TextButton(
                                           key: ValueKey(
                                             'buy-offer-promotion-cta-${product.id}',
                                           ),
@@ -1038,8 +1029,8 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),

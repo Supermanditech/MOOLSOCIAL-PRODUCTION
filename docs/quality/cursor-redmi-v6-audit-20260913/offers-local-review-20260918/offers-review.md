@@ -43,3 +43,7 @@ Founder requested further width reduction: viewport fraction reduced from 86% to
 
 ## Cinematic revision 5
 Founder requested further narrowing and premium gradient backgrounds. Width is now 70% of viewport. Supplier cards use deep emerald, MoolSocial cards rich plum, with gold accents and light publisher text. Current captures: offers-review-cinematic-v5. All 20 selected Offers tests passed after width change; six visual cases passed after color update. Local visual approval remains pending before Redmi upgrade.
+
+
+## Shallow horizontal revision 6
+Founder clarified horizontal length around 80% and reduced vertical depth, with no green background. Carousel now uses 80%; image and CTA sit beside the details, removing the separate footer. Supplier gradient is charcoal-burgundy; MoolSocial remains plum. Action column is bounded at enlarged text to preserve space for product details. Current captures: offers-review-cinematic-v6-final. All 20 selected Offers tests passed, including narrow and enlarged-text cases. Local visual approval remains pending before Redmi upgrade.
