@@ -278,8 +278,14 @@ void main() {
                 ),
           ),
         );
-        final firstRects = packshots
-            .evaluate()
+        final orderedPackshots = packshots.evaluate().toList()
+          ..sort((a, b) {
+            final ar = tester.getRect(find.byWidget(a.widget));
+            final br = tester.getRect(find.byWidget(b.widget));
+            final row = ar.top.compareTo(br.top);
+            return row == 0 ? ar.left.compareTo(br.left) : row;
+          });
+        final firstRects = orderedPackshots
             .take(3)
             .map((e) => tester.getRect(find.byWidget(e.widget)))
             .toList();
@@ -290,8 +296,7 @@ void main() {
             expect(rect.top, closeTo(firstRects.first.top, 1));
           }
         }
-        final ids = packshots
-            .evaluate()
+        final ids = orderedPackshots
             .take(3)
             .map(
               (e) => ((e.widget.key as ValueKey<String>).value).substring(
@@ -310,6 +315,38 @@ void main() {
             reason:
                 'SKU card must end at its own action, without row-height filler',
           );
+        }
+        final gridCards = find
+            .descendant(
+              of: grid,
+              matching: find.byWidgetPredicate(
+                (w) =>
+                    w.key is ValueKey<String> &&
+                    (w.key as ValueKey<String>).value.startsWith(
+                      'buy-product-',
+                    ),
+              ),
+            )
+            .evaluate()
+            .where((e) => e.widget is InkWell)
+            .map((e) => tester.getRect(find.byWidget(e.widget)))
+            .toList();
+        for (final upper in gridCards) {
+          final below =
+              gridCards
+                  .where(
+                    (r) => (r.left - upper.left).abs() < 1 && r.top > upper.top,
+                  )
+                  .toList()
+                ..sort((a, b) => a.top.compareTo(b.top));
+          if (below.isNotEmpty) {
+            expect(
+              below.first.top - upper.bottom,
+              closeTo(10, 1),
+              reason:
+                  'Next SKU must follow its own column, not the tallest neighbour',
+            );
+          }
         }
         await _capture(tester, 'offers-${size.width}-$scale-grid');
         final firstCard = find.byKey(ValueKey('buy-product-${ids.first}'));

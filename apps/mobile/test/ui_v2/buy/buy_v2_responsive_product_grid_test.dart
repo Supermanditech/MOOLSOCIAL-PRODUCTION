@@ -825,7 +825,6 @@ void main() {
             if (scale == 1 && size.width >= 300 && size.width <= 600) {
               final rowCards = cards
                   .evaluate()
-                  .take(4)
                   .map(
                     (element) => tester.getRect(
                       find.byElementPredicate(
@@ -834,12 +833,22 @@ void main() {
                     ),
                   )
                   .toList();
-              expect(rowCards.length, 4);
+              rowCards.sort((a, b) {
+                final top = a.top.compareTo(b.top);
+                return top == 0 ? a.left.compareTo(b.left) : top;
+              });
+              expect(rowCards.length, greaterThanOrEqualTo(4));
               expect(rowCards[1].top, closeTo(rowCards[0].top, .1));
               expect(rowCards[2].top, closeTo(rowCards[0].top, .1));
               expect(rowCards[1].left, greaterThanOrEqualTo(rowCards[0].right));
               expect(rowCards[2].left, greaterThanOrEqualTo(rowCards[1].right));
-              expect(rowCards[3].top, greaterThan(rowCards[0].bottom));
+              final firstColumn = rowCards
+                  .where((r) => (r.left - rowCards[0].left).abs() < .1)
+                  .toList();
+              expect(
+                firstColumn[1].top - firstColumn[0].bottom,
+                closeTo(10, .1),
+              );
             }
             for (final element in cards.evaluate().toList()) {
               final key = element.widget.key! as ValueKey<String>;
@@ -892,6 +901,21 @@ void main() {
                   lessThanOrEqualTo(bounds.bottom + .01),
                   reason: '$id: $text stays inside the card',
                 );
+              }
+              final photoBounds = tester.getRect(
+                find.byKey(ValueKey('buy-featured-packshot-$id')),
+              );
+              expect(
+                photoBounds.overlaps(
+                  tester.getRect(find.byKey(ValueKey('buy-save-$id'))),
+                ),
+                isFalse,
+              );
+              final badge = find.byKey(
+                ValueKey('buy-compact-product-badge-$id'),
+              );
+              if (badge.evaluate().isNotEmpty) {
+                expect(photoBounds.overlaps(tester.getRect(badge)), isFalse);
               }
               final action = find.descendant(
                 of: card,

@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter/semantics.dart'
+    show CustomSemanticsAction, OrdinalSortKey;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -1606,20 +1607,14 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                       List<BuyV2Product> items, {
                       bool preview = false,
                     }) {
-                      final rowHeights = _productGridRowHeights(
-                        context,
-                        widget.session,
-                        items,
-                        columns: layout.columns,
-                        cardWidth: layout.cardWidth,
-                        storeContext: widget.storeContext,
-                      );
                       return Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
                         ),
-                        child: Wrap(
+                        child: _ProductGridFlow(
+                          columns: layout.columns,
+                          masonry: true,
                           key: preview
                               ? null
                               : ValueKey(
@@ -1628,18 +1623,15 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                           spacing: 7,
                           runSpacing: 10,
                           children: [
-                            for (final (index, product) in items.indexed)
+                            for (final product in items)
                               SizedBox(
                                 width: layout.cardWidth,
-                                height: widget.publishedOffers
-                                    ? null
-                                    : rowHeights[index ~/ layout.columns],
                                 child: BuyV2ProductCard(
                                   key: ValueKey('buy-paged-card-${product.id}'),
                                   session: widget.session,
                                   product: product,
                                   compact: true,
-                                  alignMediaAtTop: widget.publishedOffers,
+                                  alignMediaAtTop: true,
                                   storeContext: widget.storeContext,
                                   onOpenProduct: widget.onOpenProduct,
                                 ),
@@ -9428,7 +9420,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     this.laneCount,
     this.fitSmallCatalogue = false,
     this.savedContext = false,
-    this.alignMediaAtTop = false,
+    this.alignMediaAtTop = true,
     this.onOpenProduct,
     this.storeContext = false,
     this.vertical = true,
@@ -9499,7 +9491,9 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
                 'Scroll up or down to browse.',
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Wrap(
+              child: _ProductGridFlow(
+                columns: layout.columns,
+                masonry: alignMediaAtTop,
                 key: ValueKey('buy-vertical-product-grid-$storageKey'),
                 spacing: 7,
                 runSpacing: 10,
@@ -9619,6 +9613,57 @@ _resolveCompactProductGridLayout({
             ? _gridQuantityLabelHeight(textScale)
             : 0),
   );
+}
+
+/// Product discovery stacks each column independently so shorter cards leave no row gap.
+class _ProductGridFlow extends StatelessWidget {
+  const _ProductGridFlow({
+    super.key,
+    required this.columns,
+    required this.masonry,
+    required this.spacing,
+    required this.runSpacing,
+    required this.children,
+  });
+  final int columns;
+  final bool masonry;
+  final double spacing;
+  final double runSpacing;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!masonry) {
+      return Wrap(spacing: spacing, runSpacing: runSpacing, children: children);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var column = 0; column < columns; column++) ...[
+          if (column > 0) SizedBox(width: spacing),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (
+                  var index = column;
+                  index < children.length;
+                  index += columns
+                ) ...[
+                  if (index >= columns) SizedBox(height: runSpacing),
+                  Semantics(
+                    sortKey: OrdinalSortKey(index.toDouble()),
+                    child: children[index],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 /// Size each visible row from its own provider facts, not the longest item
@@ -10040,7 +10085,10 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
         measure.dispose();
       }
     }
-    final tileHeight = widget.tileHeight + medicalPromiseReserve;
+    final tileHeight =
+        widget.tileHeight +
+        medicalPromiseReserve +
+        (widget.compact ? 4 + _skuPhotoExtent(cardWidth) - 70 : 0);
     return Semantics(
       key: const ValueKey('buy-horizontal-product-grid'),
       container: true,
@@ -10092,13 +10140,16 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
                               : (index * resolvedLaneCount) + laneIndex;
                           return SizedBox(
                             width: cardWidth,
-                            child: BuyV2ProductCard(
-                              session: widget.session,
-                              product: products[productIndex],
-                              compact: widget.compact,
-                              savedContext: widget.savedContext,
-                              onOpenProduct: widget.onOpenProduct,
-                              storeContext: widget.storeContext,
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: BuyV2ProductCard(
+                                session: widget.session,
+                                product: products[productIndex],
+                                compact: widget.compact,
+                                savedContext: widget.savedContext,
+                                onOpenProduct: widget.onOpenProduct,
+                                storeContext: widget.storeContext,
+                              ),
                             ),
                           );
                         },
@@ -10647,7 +10698,9 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
   bool _pressed = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
+
+  Widget _buildCard(BuildContext context, BoxConstraints constraints) {
     final session = widget.session;
     final product = widget.product;
     final facts = session.productFactsFor(product);
@@ -10674,6 +10727,29 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
+    final visualLayout = _compactProductVisualLayout(
+      context,
+      product,
+      constraints.maxWidth,
+      42,
+      minimumControlExtent: 48,
+    );
+    final stacked =
+        quantity > 0 &&
+        _gridQuantityStacks(
+          constraints.maxWidth - 14,
+          buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
+        );
+    final visualHeight =
+        visualLayout.photoInset +
+        _skuPhotoExtent(constraints.maxWidth) +
+        BuyV2Metrics.minimumTap +
+        14 +
+        (stacked
+            ? _gridQuantityLabelHeight(
+                MediaQuery.textScalerOf(context).scale(1),
+              )
+            : 0);
     return BuyV2IntentDepth(
       key: ValueKey('buy-featured-depth-${product.id}'),
       spatial: true,
@@ -10707,9 +10783,11 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                 clipBehavior: Clip.antiAlias,
                 decoration: buyV2CardDecoration(radius: 16, shadow: true),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
+                    SizedBox(
+                      height: visualHeight,
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -10775,6 +10853,13 @@ class _FeaturedProductVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final mediaLayout = _compactProductVisualLayout(
+        context,
+        product,
+        constraints.maxWidth,
+        42,
+        minimumControlExtent: 48,
+      );
       final stacked = _gridQuantityStacks(
         constraints.maxWidth - 14,
         buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
@@ -10787,7 +10872,7 @@ class _FeaturedProductVisual extends StatelessWidget {
           children: [
             Positioned(
               left: 8,
-              top: 8,
+              top: mediaLayout.photoInset,
               right: 8,
               bottom:
                   BuyV2Metrics.minimumTap +
@@ -10806,17 +10891,19 @@ class _FeaturedProductVisual extends StatelessWidget {
             if (product.badge.trim().isNotEmpty)
               Positioned(
                 key: ValueKey('buy-compact-product-badge-${product.id}'),
-                left: 7,
-                top: 7,
-                right: 50,
+                left: 6,
+                top: mediaLayout.badgeTop,
+                right: mediaLayout.badgeRight,
                 child: Align(
                   alignment: Alignment.topLeft,
                   child: BuyV2CartAvoidanceRegion(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 92),
+                      constraints: BoxConstraints(
+                        maxWidth: mediaLayout.badgeMaxWidth,
+                      ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 3,
+                        horizontal: 2,
+                        vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: product.requiresPrescription
@@ -10828,7 +10915,7 @@ class _FeaturedProductVisual extends StatelessWidget {
                         _compactProductBadge(product.badge),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 7,
+                          fontSize: 8,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -11127,7 +11214,7 @@ class BuyV2ProductCard extends StatelessWidget {
     required this.session,
     required this.product,
     this.compact = false,
-    this.alignMediaAtTop = false,
+    this.alignMediaAtTop = true,
     this.savedContext = false,
     this.onOpenProduct,
     this.storeContext = false,
@@ -12106,8 +12193,7 @@ _compactProductVisualLayout(
   );
 }
 
-double _offersPhotoExtent(double cardWidth) =>
-    (cardWidth - 12).clamp(70.0, 130.0);
+double _skuPhotoExtent(double cardWidth) => (cardWidth - 12).clamp(70.0, 130.0);
 
 class _ProductVisual extends StatelessWidget {
   const _ProductVisual({
@@ -12138,7 +12224,7 @@ class _ProductVisual extends StatelessWidget {
     );
     final photoInset = compact ? visualLayout.photoInset : 0.0;
     final photoExtent = squarePhoto
-        ? _offersPhotoExtent(constraints.maxWidth)
+        ? _skuPhotoExtent(constraints.maxWidth)
         : 70.0;
     return SizedBox(
       height: compact ? photoInset + photoExtent : 110,

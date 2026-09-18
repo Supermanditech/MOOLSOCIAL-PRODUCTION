@@ -503,7 +503,7 @@ void main() {
                             products: products,
                             storageKey: 'sku-media-grid',
                             semanticLabel: 'Products',
-                            alignMediaAtTop: offersContext,
+                            alignMediaAtTop: true,
                             productCardBuilder: offersContext
                                 ? (product) => BuyV2ProductCard(
                                     session: session,
@@ -558,15 +558,12 @@ void main() {
                       greaterThanOrEqualTo(70),
                     );
                     final photoBounds = tester.getRect(frame);
-                    if (offersContext) {
-                      expect(
-                        photoBounds.height,
-                        closeTo(photoBounds.width, 1),
-                        reason:
-                            'Offers needs a square media frame, not a shallow strip',
-                      );
-                      expect(photoBounds.height, greaterThan(70));
-                    }
+                    expect(
+                      photoBounds.height,
+                      closeTo(photoBounds.width, 1),
+                      reason: 'Every SKU grid needs a square media frame',
+                    );
+                    expect(photoBounds.height, greaterThan(70));
                     expect(
                       photoBounds.overlaps(
                         tester.getRect(
