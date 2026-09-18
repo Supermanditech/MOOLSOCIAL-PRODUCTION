@@ -39,3 +39,7 @@ Founder requested further height and width reduction. Carousel width is now 86% 
 
 ## Narrower revision 3
 Founder requested further width reduction: viewport fraction reduced from 86% to 78%. Content height remains measured for wrapping and enlarged text. Current captures: offers-review-compact-v3. All 20 selected Offers tests passed. Local visual approval pending before Redmi upgrade.
+
+
+## Cinematic revision 5
+Founder requested further narrowing and premium gradient backgrounds. Width is now 70% of viewport. Supplier cards use deep emerald, MoolSocial cards rich plum, with gold accents and light publisher text. Current captures: offers-review-cinematic-v5. All 20 selected Offers tests passed after width change; six visual cases passed after color update. Local visual approval remains pending before Redmi upgrade.

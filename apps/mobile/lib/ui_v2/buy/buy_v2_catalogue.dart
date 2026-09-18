@@ -778,7 +778,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
         (e) => e.offer.identity == widget.session.featuredOfferPublicationId,
       );
       _controller = PageController(
-        viewportFraction: .78,
+        viewportFraction: .70,
         initialPage: retained < 0 ? 0 : retained,
       );
       _pageKey = key;
@@ -799,7 +799,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final scale = MediaQuery.textScalerOf(context).scale(1);
-                final cardWidth = constraints.maxWidth * .78 - 12;
+                final cardWidth = constraints.maxWidth * .70 - 12;
                 final contentWidth = cardWidth - 16;
                 final imageWidth = 72.0;
                 final textWidth = (contentWidth - imageWidth - 10).clamp(
@@ -913,12 +913,12 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                               end: Alignment.bottomRight,
                               colors: _mool
                                   ? [
-                                      const Color(0xFF45210B),
-                                      const Color(0xFF9B511B),
+                                      const Color(0xFF21182C),
+                                      const Color(0xFF513447),
                                     ]
                                   : [
-                                      const Color(0xFF090D38),
-                                      const Color(0xFF273D75),
+                                      const Color(0xFF092D2B),
+                                      const Color(0xFF28564C),
                                     ],
                             ),
                           ),
@@ -1010,7 +1010,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             'buy-offer-publisher-${entry.offer.identity}',
                                           ),
                                           style: const TextStyle(
-                                            color: Color(0xFFDBE3FF),
+                                            color: Color(0xFFE4E9E3),
                                             fontSize: 11,
                                             height: 1.15,
                                             fontWeight: FontWeight.w500,
