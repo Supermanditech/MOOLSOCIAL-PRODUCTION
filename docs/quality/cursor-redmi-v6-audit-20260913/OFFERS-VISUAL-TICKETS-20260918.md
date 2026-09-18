@@ -16,3 +16,5 @@ Acceptance: local Flutter interactions, real rendered captures and founder revie
 Local implementation and validation are recorded in offers-local-review-20260918/offers-review.md. Scope approved; new visual approval and Redmi qualification pending. Swipe-only is the current motion choice. No fourth ticket was added.
 
 Founder requested shorter cards; OFFERS-01 refined to content-measured compact height. Current visual revision is offers-review-compact-v1; approval remains pending.
+
+Current founder approval: OFFERS-01 promotional card only. OFFERS-02 revised square SKU media and OFFERS-03 toolbar await local visual approval. Redmi work remains on hold. Current visuals: offers-sku-fit-v8-final.

@@ -285,7 +285,8 @@ void main() {
             .toList();
         if (scale == 1) {
           for (final rect in firstRects) {
-            expect(rect.height, closeTo(70, 1));
+            expect(rect.height, greaterThan(70));
+            expect(rect.height, closeTo(rect.width, 1));
             expect(rect.top, closeTo(firstRects.first.top, 1));
           }
         }

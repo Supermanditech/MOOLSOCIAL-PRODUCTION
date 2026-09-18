@@ -51,3 +51,9 @@ Founder clarified horizontal length around 80% and reduced vertical depth, with 
 
 ## Photo panel revision 7 — founder approved
 Text occupies the left side; the right 43% is a full-height image/action panel with an expanded contained packshot. Card retains 80% viewport length, compact height and charcoal-burgundy/plum backgrounds. All 20 selected Offers tests passed; source analysis has no issues. Founder approved this local visual in conversation. Next: Redmi build, install and device qualification.
+
+
+## Approval clarification and SKU fit revision 8
+Founder clarified approval applies ONLY to OFFERS-01 promotional card. OFFERS-02 SKU grid and OFFERS-03 toolbar are NOT visually approved. Redmi build/install is on hold; no new APK was built or installed.
+
+OFFERS-02 now replaces the shallow 70px media frame with a square frame sized to card width (70–130px bound), preserving contained full-photo rendering and separate Save/badge space. Both finite and paged Offers row measurements reserve the larger area. Other Shop/Store media remains unchanged. Current visuals: offers-sku-fit-v8-final. All 112 media/Offers interaction tests passed, with square-frame and photo/control separation checks; analysis passed. OFFERS-03 category, publisher selection, Saved and filter interactions remain locally verified, awaiting founder visual approval alongside SKU fit.

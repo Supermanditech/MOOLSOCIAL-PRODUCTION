@@ -1633,7 +1633,13 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                                 width: layout.cardWidth,
                                 height:
                                     rowHeights[index ~/ layout.columns] +
-                                    (widget.publishedOffers ? 4 : 0),
+                                    (widget.publishedOffers
+                                        ? 4 +
+                                              _offersPhotoExtent(
+                                                layout.cardWidth,
+                                              ) -
+                                              70
+                                        : 0),
                                 child: BuyV2ProductCard(
                                   key: ValueKey('buy-paged-card-${product.id}'),
                                   session: widget.session,
@@ -9514,7 +9520,11 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
                           SizedBox(
                             height:
                                 rowHeights[index ~/ layout.columns] +
-                                (alignMediaAtTop ? 4 : 0),
+                                (alignMediaAtTop
+                                    ? 4 +
+                                          _offersPhotoExtent(layout.cardWidth) -
+                                          70
+                                    : 0),
                             child:
                                 productCardBuilder?.call(product) ??
                                 BuyV2ProductCard(
@@ -11220,6 +11230,7 @@ class BuyV2ProductCard extends StatelessWidget {
                     if (compact && alignMediaAtTop)
                       _ProductVisual(
                         minimumControlExtent: 48,
+                        squarePhoto: true,
                         product: product,
                         compact: true,
                         reservedActionWidth: savedContext && !compactSavedAction
@@ -12102,18 +12113,23 @@ _compactProductVisualLayout(
   );
 }
 
+double _offersPhotoExtent(double cardWidth) =>
+    (cardWidth - 12).clamp(70.0, 130.0);
+
 class _ProductVisual extends StatelessWidget {
   const _ProductVisual({
     required this.product,
     required this.compact,
     this.reservedActionWidth = 42,
     this.minimumControlExtent = 44,
+    this.squarePhoto = false,
   });
 
   final BuyV2Product product;
   final bool compact;
   final double reservedActionWidth;
   final double minimumControlExtent;
+  final bool squarePhoto;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildVisual);
@@ -12128,8 +12144,11 @@ class _ProductVisual extends StatelessWidget {
       minimumControlExtent: minimumControlExtent,
     );
     final photoInset = compact ? visualLayout.photoInset : 0.0;
+    final photoExtent = squarePhoto
+        ? _offersPhotoExtent(constraints.maxWidth)
+        : 70.0;
     return SizedBox(
-      height: compact ? photoInset + 70 : 110,
+      height: compact ? photoInset + photoExtent : 110,
       child: Stack(
         children: [
           Positioned.fill(
@@ -12149,12 +12168,14 @@ class _ProductVisual extends StatelessWidget {
               alignment: compact ? Alignment.center : const Alignment(0, .35),
               child: SizedBox(
                 key: ValueKey('buy-grid-packshot-${product.id}'),
-                width: compact
+                width: squarePhoto
+                    ? photoExtent
+                    : compact
                     ? (MediaQuery.textScalerOf(context).scale(1) > 1.6
                           ? 130
                           : 96)
                     : 96,
-                height: compact ? 70 : 86,
+                height: compact ? photoExtent : 86,
                 child: BuyV2ProductPackshot(
                   product: product,
                   borderRadius: compact ? 8 : 12,

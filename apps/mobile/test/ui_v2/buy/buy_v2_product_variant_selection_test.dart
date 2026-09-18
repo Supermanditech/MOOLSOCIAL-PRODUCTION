@@ -558,6 +558,15 @@ void main() {
                       greaterThanOrEqualTo(70),
                     );
                     final photoBounds = tester.getRect(frame);
+                    if (offersContext) {
+                      expect(
+                        photoBounds.height,
+                        closeTo(photoBounds.width, 1),
+                        reason:
+                            'Offers needs a square media frame, not a shallow strip',
+                      );
+                      expect(photoBounds.height, greaterThan(70));
+                    }
                     expect(
                       photoBounds.overlaps(
                         tester.getRect(
@@ -582,7 +591,7 @@ void main() {
                         );
                         expect(
                           badgeBounds.width,
-                          greaterThan(photoBounds.width),
+                          greaterThanOrEqualTo(photoBounds.width),
                           reason: 'Long provider facts must use the card width',
                         );
                       }
