@@ -133,6 +133,9 @@ function Get-CursorAccessibilityNativeProjection {
   # REG4608: admit only the exact merged accessibility + PDF composition in
   # this correction lane and its single fresh final-admission destination.
   $combinedBranch = switch ($actualRoot.Replace('\','/')) {
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-oppo-baseline-qualification-20260918' {
+      'work/codex-ui/oppo-baseline-qualification-20260918'
+    }
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
       'work/codex-ui/store-procurement-bridge-20260912'
     }
@@ -164,6 +167,20 @@ function Get-CursorAccessibilityNativeProjection {
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  if ($requiredBranch -ceq 'work/codex-ui/oppo-baseline-qualification-20260918') {
+    $deviceBaseline = '123ff42cf8179b272d33b480e8267dfa83af2de3'
+    & git -C $root merge-base --is-ancestor $deviceBaseline HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'OPPO qualification lost the combined baseline.' }
+    $deviceBoundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
+    & git -C $root diff --quiet $deviceBaseline HEAD -- @deviceBoundaries
+    if ($LASTEXITCODE -ne 0) { throw 'OPPO qualification changed committed baseline application source.' }
+    & git -C $root diff --quiet $deviceBaseline -- @deviceBoundaries
+    if ($LASTEXITCODE -ne 0) { throw 'OPPO qualification changed working baseline application source.' }
+    $deviceUntracked = @(& git -C $root ls-files --others --exclude-standard -- @deviceBoundaries)
+    if ($LASTEXITCODE -ne 0 -or $deviceUntracked.Count -ne 0) {
+      throw 'OPPO qualification has untracked application source.'
+    }
   }
   if ($requiredBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
     $redmiBaseline = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
