@@ -40,6 +40,40 @@ source before enabling build/install. Final device acceptance remains unfulfille
 
 ## Evidence rules
 
+### Clean-source execution seal
+
+The tracked apk-regression-state.json is a preparation template, not the active
+build authorization. After clean remote-exact integration, derive the active
+snapshot at apk-regression-state.json.local in this same candidate directory.
+Its primary-owned path is explicitly admitted by the coordination gate. The
+existing *.local exclusion is for generated execution metadata only; no source
+or test owner is ignored or hidden. Preserve its SHA256 in the external audit.
+
+The final integration target is the exact
+integration/moolsocial/counter-sale-20260919-v2 branch in
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2.
+The earlier integration1af04e06 remains intact. The successor integrates audit
+and build-control ownership only; its apps tree must equal approvedbfb47131 and
+all395 qualified source bytes must match the retained manifest before activation.
+
+The generated snapshot must bind the actual current integration HEAD, branch,
+candidate/version, source-manifest hash and four runtime defines. It may mark
+only evidence-backed prebuild requirements complete. All physical-device and
+founder acceptance gates stay pending. Run the existing guarded wrapper with
+PreflightOnly first; preserve its result and active-state hash in the separately
+owned preflight-result.json.local. Before the sole real build, atomically create
+the owned build-attempt.json.local record. An existing attempt blocks another
+build even if the first failed before creating an APK. Never overwrite any of
+these records, APKs or provenance files. The existing wrapper/machine gates stay
+mandatory; this generated snapshot resolves Git-HEAD self-reference without
+weakening clean-source or authorization checks.
+
+The wrapper output directory is this candidate's build/ child, already covered
+by the existing generated-build exclusion. Its exact APK, provenance and Store
+navigation-log paths are explicitly primary-owned/predeclared. They remain
+immutable local evidence and their hashes must be recorded for device review;
+do not claim raw APK/log bytes were committed to Git. No ignore rule is changed.
+
 Pin the exact committed source/evidence seal, current manifest, unique version,
 toolchain and runtime defines before authorizing one build. Match the produced APK
 hash, signer, package and version to the installed physical OPPO serial2b3e0f71.

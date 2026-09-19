@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4602,
-    "sha256": "EED894A1A5531C2A13B5142BFBC9CE034B51374E18A82407F12B521250C968D7"
+    "sha256": "37E885039B788999F6ADB7F69AC9A79DD875949E73AEE08BCA0BD835317EEF4A"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -344,6 +344,12 @@
         "artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md",
         "artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md",
         "artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json.local",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/preflight-result.json.local",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/build-attempt.json.local",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/build/uaw-counter-sale-r66.34-review-20260919-device-review-debug.apk",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/build/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/build/store-navigation-replay.jsonl",
         "artifacts/quality/counter-sale-r66-34-review-20260919/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt",
         "artifacts/quality/counter-sale-r66-34-review-20260919/post-install.json",
         "artifacts/quality/counter-sale-r66-34-review-20260919/device-review.md",

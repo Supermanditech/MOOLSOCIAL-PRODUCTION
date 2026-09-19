@@ -1,6 +1,7 @@
 # Counter Sale motion disposition
 
-Audit status: pending final qualification and physical OPPO replay.
+Audit status: prebuild disposition documented; physical OPPO motion/accessibility
+acceptance remains pending. All v13 local layouts are founder-approved.
 Authority: config/buy-premium-motion-policy.json and
 docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md.
 
@@ -12,7 +13,7 @@ new animation library, decorative perpetual loop or fabricated live activity.
 Applied intent: event-driven product entry/return and compact detail disclosures.
 Reused owners: Store dashboard, existing native controls and route transitions.
 Dependency-held evidence: actual reduced-motion/device setting replay, TalkBack,
-large-text/keyboard gestures and founder visual acceptance for the new journey.
+large-text/keyboard gestures and checksum-matched founder device acceptance.
 Inapplicable: artificial payment-success celebrations, fake inventory activity,
 perpetual attention animations and changes to locked Screens01-03 or Buy motion.
 

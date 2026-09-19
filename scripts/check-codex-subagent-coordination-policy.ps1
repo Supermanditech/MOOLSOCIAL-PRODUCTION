@@ -68,8 +68,9 @@ function Test-CounterSalePendingEvidence([hashtable]$Facts) {
   }
   if (Test-CounterSaleIntegrationIdentity $Facts) {
     $expected.Lane = 'integration'
-    $expected.Branch = 'integration/moolsocial/counter-sale-20260919'
-    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919'
+    $expected.WorkId = $Facts.WorkId
+    $expected.Branch = $Facts.Branch
+    $expected.Root = $Facts.Root
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -82,6 +83,12 @@ function Test-CounterSalePendingEvidence([hashtable]$Facts) {
     'artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md',
     'artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md',
     'artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json.local',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/preflight-result.json.local',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/build-attempt.json.local',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/build/uaw-counter-sale-r66.34-review-20260919-device-review-debug.apk',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/build/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/build/store-navigation-replay.jsonl',
     'artifacts/quality/counter-sale-r66-34-review-20260919/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt',
     'artifacts/quality/counter-sale-r66-34-review-20260919/post-install.json',
     'artifacts/quality/counter-sale-r66-34-review-20260919/device-review.md',
@@ -95,6 +102,11 @@ function Test-CounterSaleIntegrationIdentity([hashtable]$Facts) {
     WorkId = 'counter-sale-20260919'; TicketId = 'UAW-COUNTER-SALE-20260919'
     Branch = 'integration/moolsocial/counter-sale-20260919'
     Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919'
+  }
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v2') {
+    $expected.WorkId = 'counter-sale-20260919-v2'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v2'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2'
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -2649,12 +2661,23 @@ if ($ProductionLane -ceq 'baseline') {
           'artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md',
           'artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md',
           'artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json.local',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/preflight-result.json.local',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/build-attempt.json.local',
           'artifacts/quality/counter-sale-r66-34-review-20260919/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt',
           'artifacts/quality/counter-sale-r66-34-review-20260919/post-install.json',
           'artifacts/quality/counter-sale-r66-34-review-20260919/device-review.md',
           'artifacts/quality/counter-sale-r66-34-review-20260919/ticket-and-screen-coverage.md'
         )
       )
+      if ($counterSaleIntegration) {
+        $counterSaleCoordinationOwner = Test-CounterSalePendingEvidence @{
+          Role = $AgentRole; Task = $AgentTask; ClaimTask = '/root'
+          Lane = $ProductionLane; WorkId = $ProductionWorkId
+          TicketId = $ProductionTicketId; Branch = $branch
+          Root = $rootForward; Owner = $effectiveOwner
+        }
+      }
       if ($counterSaleCoordinationOwner -and $effectiveOwner -ceq
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart') {
         # REG4631: admit only one inherited non-rendered comment correction.
@@ -5858,22 +5881,22 @@ if ($ProductionLane -ceq 'baseline') {
       Assert-Coordination ((Test-ProductionWorktreeClean) -and
         (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Counter Sale source must be clean and remote-equal.'
       Assert-Coordination (
-        $IntegrationTargetWorkId -ceq 'counter-sale-20260919' -and
+        $IntegrationTargetWorkId -ceq 'counter-sale-20260919-v2' -and
         $IntegrationTargetTicketId -ceq 'UAW-COUNTER-SALE-20260919' -and
         (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq
-          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919' -and
+          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2' -and
         (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
       ) 'Counter Sale integration target identity changed.'
       $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
-        $targetBranch[0] -ceq 'integration/moolsocial/counter-sale-20260919') 'Counter Sale integration branch changed.'
+        $targetBranch[0] -ceq 'integration/moolsocial/counter-sale-20260919-v2') 'Counter Sale integration branch changed.'
       $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
         $targetHead[0] -ceq $workStartCommit) 'Counter Sale integration must start at governance.'
       Assert-ProductionManagedWorktreesClean
-      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/counter-sale-20260919')
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/counter-sale-20260919-v2')
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Counter Sale integration remote already exists.'
-      Write-Output 'merge(counter-sale-20260919): integrate approved Counter Sale journey'
+      Write-Output 'merge(counter-sale-20260919-v2): seal qualified Counter Sale review source'
     } elseif ($ProductionLane -ceq 'codex_ui' -and
         $ProductionWorkId -ceq 'store-buy-baseline-fixes-20260918') {
       Assert-Coordination (
