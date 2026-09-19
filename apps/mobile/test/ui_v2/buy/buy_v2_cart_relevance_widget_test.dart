@@ -1,11 +1,18 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' show ImageByteFormat;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +24,7 @@ void main() {
         final media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
+          child: _r66CartCaptureBoundary(child!),
         );
       },
       home: BuyV2Screen(
@@ -35,15 +42,614 @@ void main() {
             !candidate.requiresPrescription,
       );
 
-  Future<void> showInMainCartList(WidgetTester tester, Finder target) async {
+  Future<void> showInMainCartList(
+    WidgetTester tester,
+    Finder target, {
+    double scrollDelta = 450,
+  }) async {
     await tester.scrollUntilVisible(
       target,
-      450,
-      scrollable: find.byType(Scrollable).first,
+      scrollDelta,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first,
       maxScrolls: 40,
     );
     await tester.pumpAndSettle();
   }
+
+  for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scope in BuyV2CartScope.values) {
+      testWidgets(
+        'R665 D01 Cart confirmation stays reachable text2 $viewport $scope',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport;
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          for (final destination in [
+            BuyV2Destination.shop,
+            BuyV2Destination.wholesale,
+            BuyV2Destination.medicine,
+          ]) {
+            session.addProduct(productFor(destination).id);
+          }
+          session.openCart(scope: scope);
+          final totalBefore = session.itemCount;
+          final removedCount = session.scopedItemCount;
+          expect(removedCount, greaterThan(0));
+          await tester.pumpWidget(app(session, textScale: 2));
+          await tester.pumpAndSettle();
+          session.openCart(scope: scope);
+          await tester.pumpAndSettle();
+          final open = find.byKey(const ValueKey('buy-cart-empty'));
+          await tester.ensureVisible(open);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final keep = find.byKey(const ValueKey('buy-cart-clear-cancel'));
+          final remove = find.byKey(const ValueKey('buy-cart-clear-confirm'));
+          await tester.ensureVisible(keep);
+          await tester.pumpAndSettle();
+          expect(keep.hitTestable(), findsOneWidget);
+          await tester.tap(keep);
+          await tester.pumpAndSettle();
+          expect(session.itemCount, totalBefore);
+          expect(session.cartScope, scope);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          tester.view.viewInsets = const FakeViewPadding(bottom: 100);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(remove).bottom,
+            lessThanOrEqualTo(viewport.height - 100 - 24),
+          );
+          expect(tester.takeException(), isNull);
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          expect(remove.hitTestable(), findsOneWidget);
+          final button = tester.getRect(remove);
+          expect(button.top, greaterThanOrEqualTo(24));
+          expect(button.bottom, lessThanOrEqualTo(viewport.height - 24));
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(session.itemCount, totalBefore - removedCount);
+          expect(
+            find.byKey(const ValueKey('buy-cart-clear-sheet')),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final reduced in [false, true]) {
+      testWidgets(
+        'R66 028 main Cart money transitions fit Redmi360 text$scale reduced$reduced',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.viewPadding = const FakeViewPadding(bottom: 32);
+          addTearDown(tester.view.reset);
+          final session = _R66PayableDisplayFixture(1);
+          addTearDown(session.dispose);
+          addTearDown(session.core.dispose);
+          session.addProduct('w-notebook');
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(scale),
+                  disableAnimations: reduced,
+                ),
+                child: child!,
+              ),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: session.destination,
+                initialView: session.view,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          var quantity = 1;
+          for (final total in [3480, 10000000, 1]) {
+            session.setDisplayTotal(total);
+            session.addProduct('w-notebook');
+            quantity += 1;
+            await tester.pump();
+            for (final elapsed in [0, 50, 80, 200]) {
+              await tester.pump(Duration(milliseconds: elapsed));
+              for (final key in [
+                'buy-cart-payable-total-motion',
+                'buy-cart-scope-value-motion-all',
+                'buy-cart-line-total-motion-w-notebook',
+                'buy-cart-line-quantity-motion-w-notebook',
+              ]) {
+                final owner = find.byKey(ValueKey(key));
+                final value = tester.widget<BuyV2FiniteValueTransition>(owner);
+                final expected = key.contains('line-total')
+                    ? buyV2Money(3480 * quantity)
+                    : key.contains('line-quantity')
+                    ? '$quantity'
+                    : buyV2Money(total);
+                expect(value.text, expected, reason: key);
+                final paragraphs = find.descendant(
+                  of: owner,
+                  matching: find.byType(RichText),
+                );
+                expect(paragraphs, findsOneWidget);
+                final opacity = tester.widget<Opacity>(
+                  find.descendant(of: owner, matching: find.byType(Opacity)),
+                );
+                if (reduced || elapsed == 200) {
+                  expect(opacity.opacity, 1);
+                } else if (elapsed == 0) {
+                  expect(opacity.opacity, lessThan(1));
+                }
+                for (final paragraph
+                    in tester.renderObjectList<RenderParagraph>(paragraphs)) {
+                  expect(paragraph.text.toPlainText(), expected);
+                  final natural = TextPainter(
+                    text: paragraph.text,
+                    textDirection: paragraph.textDirection,
+                    textScaler: paragraph.textScaler,
+                  )..layout(maxWidth: paragraph.size.width);
+                  expect(
+                    paragraph.didExceedMaxLines,
+                    isFalse,
+                    reason:
+                        '$key current=${value.text} painted=${paragraph.text.toPlainText()} '
+                        'width=${paragraph.size.width} elapsed=$elapsed total=$total',
+                  );
+                  expect(
+                    paragraph.size.height,
+                    greaterThanOrEqualTo(natural.height - .1),
+                    reason: key,
+                  );
+                  natural.dispose();
+                }
+              }
+              expect(tester.takeException(), isNull);
+            }
+            await tester.pumpAndSettle();
+          }
+        },
+      );
+    }
+  }
+
+  for (final width in [320.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final total in [3480, 10000000]) {
+        testWidgets(
+          'R66 Cart payable display INR$total fits $width at $scale',
+          (tester) async {
+            await tester.binding.setSurfaceSize(Size(width, 800));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final session = _R66PayableDisplayFixture(total);
+            addTearDown(session.dispose);
+            session.addProduct('w-notebook');
+            session.openCart(scope: BuyV2CartScope.wholesale);
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(scale)),
+                  child: _r66CartCaptureBoundary(child!),
+                ),
+                home: Scaffold(
+                  body: BuyV2CartView(session: session, onBrowseMore: () {}),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final amount = find.byKey(
+              const ValueKey('buy-cart-payable-total-motion'),
+            );
+            final value = tester.widget<BuyV2FiniteValueTransition>(amount);
+            final required = buyV2ValueTextSize(
+              tester.element(amount),
+              value.text,
+              value.style,
+            );
+            expect(value.text, buyV2Money(total));
+            expect(value.ownerSize.width, greaterThanOrEqualTo(required.width));
+            expect(
+              value.ownerSize.height,
+              greaterThanOrEqualTo(required.height),
+            );
+            expect(
+              tester.getSize(amount).width,
+              greaterThanOrEqualTo(required.width),
+            );
+            expect(
+              tester.getSize(amount).height,
+              greaterThanOrEqualTo(required.height),
+            );
+            final bar = tester.getRect(
+              find.byKey(const ValueKey('buy-cart-action-bar')),
+            );
+            expect(tester.getRect(amount).left, greaterThanOrEqualTo(bar.left));
+            expect(tester.getRect(amount).right, lessThanOrEqualTo(bar.right));
+            final review = find.widgetWithText(FilledButton, 'Review order');
+            expect(tester.getSize(review).height, greaterThanOrEqualTo(44));
+            final label = find.descendant(
+              of: review,
+              matching: find.text('Review order'),
+            );
+            expect(
+              tester.getSize(review).height,
+              greaterThanOrEqualTo(tester.getSize(label).height),
+            );
+            expect(tester.getBottomRight(review).dy, lessThanOrEqualTo(800));
+            final allScope = find.byKey(
+              const ValueKey('buy-cart-scope-value-motion-all'),
+            );
+            final allValue = tester.widget<BuyV2FiniteValueTransition>(
+              allScope,
+            );
+            expect(allValue.text, buyV2Money(total));
+            final allSize = buyV2ValueTextSize(
+              tester.element(allScope),
+              allValue.text,
+              allValue.style,
+            );
+            expect(
+              tester.getSize(allScope).width,
+              greaterThanOrEqualTo(allSize.width),
+            );
+            expect(
+              tester.getSize(allScope).height,
+              greaterThanOrEqualTo(allSize.height),
+            );
+            for (final scope in ['all', 'shop', 'wholesale']) {
+              final control = find.byKey(ValueKey('buy-cart-scope-$scope'));
+              expect(tester.getRect(control).left, greaterThanOrEqualTo(0));
+              expect(tester.getRect(control).right, lessThanOrEqualTo(width));
+              expect(tester.getSize(control).height, greaterThanOrEqualTo(44));
+            }
+            await _captureR66MainCart(
+              tester,
+              'total$total-width$width-text$scale',
+            );
+            final bill = find.byKey(const ValueKey('buy-cart-bill-summary'));
+            await showInMainCartList(tester, bill);
+            final billAmount = find.descendant(
+              of: bill,
+              matching: find.text(buyV2Money(total)),
+            );
+            expect(billAmount, findsAtLeastNWidgets(1));
+            for (var index = 0; index < billAmount.evaluate().length; index++) {
+              final item = billAmount.at(index);
+              expect(
+                tester.getRect(item).left,
+                greaterThanOrEqualTo(tester.getRect(bill).left),
+              );
+              expect(
+                tester.getRect(item).right,
+                lessThanOrEqualTo(tester.getRect(bill).right),
+              );
+              expect(
+                tester.renderObject<RenderParagraph>(item).didExceedMaxLines,
+                isFalse,
+              );
+            }
+            if (scale == 2 && total == 10000000) {
+              await _captureR66MainCart(tester, 'bill-width$width-text$scale');
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets('R66 Cart item values fit enlarged ${destination.name}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final id = destination == BuyV2Destination.shop
+          ? 's-tomato'
+          : 'w-notebook';
+      session.addProduct(id);
+      session.openCart(
+        scope: destination == BuyV2Destination.shop
+            ? BuyV2CartScope.shop
+            : BuyV2CartScope.wholesale,
+      );
+      await tester.pumpWidget(app(session, textScale: 2));
+      await tester.pumpAndSettle();
+      for (final kind in ['total', 'quantity']) {
+        final finder = find.byKey(ValueKey('buy-cart-line-$kind-motion-$id'));
+        final value = tester.widget<BuyV2FiniteValueTransition>(finder);
+        final required = buyV2ValueTextSize(
+          tester.element(finder),
+          value.text,
+          value.style,
+        );
+        expect(value.ownerSize.width, greaterThanOrEqualTo(required.width));
+        expect(value.ownerSize.height, greaterThanOrEqualTo(required.height));
+        expect(
+          tester.getSize(finder).width,
+          greaterThanOrEqualTo(required.width),
+        );
+        expect(
+          tester.getSize(finder).height,
+          greaterThanOrEqualTo(required.height),
+        );
+      }
+      await _captureR66MainCart(
+        tester,
+        'item-${destination.name}-text2-values',
+      );
+      for (final key in [
+        'buy-cart-header-value-motion',
+        'buy-cart-scope-value-motion-all',
+        'buy-cart-scope-value-motion-shop',
+        'buy-cart-scope-value-motion-wholesale',
+        'buy-cart-benefit-entry-Coupons-motion',
+        'buy-cart-benefit-entry-Payment offers-motion',
+      ]) {
+        final finder = find.byKey(ValueKey(key));
+        if (finder.evaluate().isEmpty) {
+          await showInMainCartList(tester, finder);
+        }
+        expect(finder, findsOneWidget);
+        final texts = find.descendant(
+          of: finder,
+          matching: find.byType(RichText),
+        );
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          texts,
+        )) {
+          expect(paragraph.didExceedMaxLines, isFalse, reason: key);
+          final text = paragraph.text.toPlainText();
+          final painter = TextPainter(
+            text: paragraph.text,
+            textDirection: TextDirection.ltr,
+            textScaler: const TextScaler.linear(2),
+          )..layout(maxWidth: paragraph.size.width);
+          expect(
+            tester.getSize(finder).height,
+            greaterThanOrEqualTo(painter.height),
+            reason: '$key: $text',
+          );
+          painter.dispose();
+        }
+      }
+      final browse = find.byKey(const ValueKey('buy-cart-browse-more'));
+      await showInMainCartList(tester, browse, scrollDelta: -450);
+      final browseText = find.descendant(
+        of: browse,
+        matching: find.text('Browse more products'),
+      );
+      expect(
+        tester.getRect(browseText).top,
+        greaterThanOrEqualTo(tester.getRect(browse).top),
+      );
+      expect(
+        tester.getRect(browseText).bottom,
+        lessThanOrEqualTo(tester.getRect(browse).bottom),
+      );
+      await _captureR66MainCart(tester, 'item-${destination.name}-text2');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets('R66 empty Cart fits compact enlarged ${destination.name}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 568));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      session.openDestination(destination);
+      session.openCart();
+      var browseCount = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: _r66CartCaptureBoundary(child!),
+          ),
+          home: Scaffold(
+            body: BuyV2CartView(
+              session: session,
+              onBrowseMore: () => browseCount++,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final action = find.byKey(const ValueKey('buy-empty-cart-browse'));
+      expect(action, findsOneWidget);
+      final labels = find.descendant(of: action, matching: find.byType(Text));
+      expect(labels, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(labels);
+      final naturalLabel = TextPainter(
+        text: paragraph.text,
+        textDirection: TextDirection.ltr,
+        textScaler: const TextScaler.linear(2),
+      )..layout(maxWidth: paragraph.size.width);
+      expect(paragraph.size.height, greaterThanOrEqualTo(naturalLabel.height));
+      naturalLabel.dispose();
+      expect(
+        tester.getRect(labels).top,
+        greaterThanOrEqualTo(tester.getRect(action).top),
+      );
+      expect(
+        tester.getRect(labels).bottom,
+        lessThanOrEqualTo(tester.getRect(action).bottom),
+      );
+      expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+      expect(find.text('Your cart is empty'), findsOneWidget);
+      expect(find.text('Browse products'), findsOneWidget);
+      expect(find.textContaining('₹ Total products'), findsNothing);
+      final header = tester.widget<BuyV2FiniteValueTransition>(
+        find.byKey(const ValueKey('buy-cart-header-value-motion')),
+      );
+      expect(header.text, isNot(contains('·  ·')));
+      expect(tester.takeException(), isNull);
+      await _captureR66MainCart(tester, 'empty-${destination.name}-text2');
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(browseCount, 1);
+    });
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets(
+      'R66 delivery instructions stay complete at 200 percent ${destination.name}',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final session = BuyV2Session(core: BuySession());
+        addTearDown(session.dispose);
+        session.addProduct(
+          destination == BuyV2Destination.shop ? 's-tomato' : 'w-notebook',
+        );
+        session.openCart();
+        await tester.pumpWidget(app(session, textScale: 2));
+        await tester.pumpAndSettle();
+        if (destination == BuyV2Destination.wholesale) {
+          expect(find.textContaining('Minimum order 1 pack ·'), findsOneWidget);
+          expect(find.textContaining('Minimum order 1 packs'), findsNothing);
+        }
+        final owner = find.byKey(
+          ValueKey('buy-cart-delivery-instructions-${destination.name}'),
+        );
+        await showInMainCartList(tester, owner);
+        final lane = find.descendant(
+          of: owner,
+          matching: find.byType(Scrollable),
+        );
+        expect(lane, findsOneWidget);
+        await _captureR66MainCart(
+          tester,
+          'instructions-${destination.name}-text2',
+        );
+        for (final option in session.deliveryInstructionsFor(destination)) {
+          final action = find.byKey(
+            ValueKey('buy-cart-instruction-${destination.name}-${option.id}'),
+          );
+          await tester.scrollUntilVisible(
+            action,
+            110,
+            scrollable: lane,
+            maxScrolls: 15,
+          );
+          await tester.pumpAndSettle();
+          final label = find.descendant(
+            of: action,
+            matching: find.text(option.label),
+          );
+          expect(label, findsOneWidget);
+          expect(
+            tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+            isFalse,
+            reason: option.label,
+          );
+          expect(
+            tester.getRect(label).bottom,
+            lessThanOrEqualTo(tester.getRect(action).bottom),
+          );
+          expect(
+            tester.getRect(label).top,
+            greaterThanOrEqualTo(tester.getRect(action).top),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'REG4628 Cart preserves illustration and whole title words at 200 percent',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      const id = 'm-paracetamol-500';
+      session.addProduct(id);
+      session.openCart();
+      final quantity = session.quantityFor(id);
+      final total = session.cartTotal;
+      await tester.pumpWidget(app(session, textScale: 2));
+      await tester.pumpAndSettle();
+      final summary = find.byKey(
+        const ValueKey('buy-cart-product-summary-$id'),
+      );
+      final title = find.descendant(
+        of: summary,
+        matching: find.text(session.product(id).customerTitle),
+      );
+      await showInMainCartList(tester, title);
+      final paragraph = tester.renderObject<RenderParagraph>(title);
+      final boxes = paragraph.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 11),
+      );
+      expect(boxes, isNotEmpty);
+      expect(
+        boxes.map((box) => box.top).toSet(),
+        hasLength(1),
+        reason: 'Paracetamol must not split inside its word',
+      );
+      final photo = find.byKey(const ValueKey('buy-cart-packshot-$id'));
+      expect(
+        find.descendant(
+          of: photo,
+          matching: find.byKey(const ValueKey('buy-product-illustration-$id')),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.product);
+      expect(session.quantityFor(id), quantity);
+      expect(session.cartTotal, total);
+    },
+  );
 
   testWidgets('mixed Cart uses real media and context-specific benefit pages', (
     tester,
@@ -61,10 +667,44 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
+    expect(find.byTooltip('Empty cart'), findsOneWidget);
+    expect(find.text('Clear'), findsNothing);
+
     for (final product in products) {
       final packshot = find.byKey(ValueKey('buy-cart-packshot-${product.id}'));
       await showInMainCartList(tester, packshot);
       expect(packshot, findsOneWidget);
+      final save = find.byKey(ValueKey('buy-save-${product.id}'));
+      expect(save, findsOneWidget);
+      expect(
+        tester.getRect(save).bottom,
+        lessThanOrEqualTo(tester.getRect(packshot).top),
+      );
+      expect(tester.getSize(packshot).width, greaterThanOrEqualTo(76));
+      expect(tester.getSize(packshot).width, tester.getSize(packshot).height);
+      expect(
+        find.descendant(
+          of: packshot,
+          matching: find.byKey(
+            ValueKey('buy-product-illustration-${product.id}'),
+          ),
+        ),
+        findsOneWidget,
+      );
+      final quantity = session.quantityFor(product.id);
+      final wasSaved = session.isSaved(product.id);
+      await Scrollable.ensureVisible(tester.element(save), alignment: 0.5);
+      await tester.pumpAndSettle();
+      expect(save.hitTestable(), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(product.id), !wasSaved);
+      expect(session.quantityFor(product.id), quantity);
+      expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(product.id), wasSaved);
     }
     expect(find.text('Shop order'), findsNothing);
     expect(find.text('Wholesale order'), findsNothing);
@@ -129,6 +769,21 @@ void main() {
   testWidgets(
     'device-review offer UI selects and removes all six seeded states',
     (tester) async {
+      Future<void> revealHeader(Finder target) async {
+        await tester.scrollUntilVisible(
+          target,
+          -180,
+          scrollable: find.descendant(
+            of: find.byKey(const ValueKey('buy-cart-benefits-page')),
+            matching: find.byType(Scrollable),
+          ),
+          maxScrolls: 30,
+        );
+        await tester.ensureVisible(target);
+        await tester.pumpAndSettle();
+        expect(target.hitTestable(), findsOneWidget);
+      }
+
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final session = BuyV2Session(
@@ -141,6 +796,26 @@ void main() {
         BuyV2Destination.medicine,
       ]) {
         session.addProduct(productFor(destination).id);
+      }
+      // Each coupon is scoped to its own destination. Populate qualifying
+      // baskets for this selection/removal test rather than relying on the
+      // combined total of unrelated destinations.
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+        BuyV2Destination.medicine,
+      ]) {
+        final product = productFor(destination);
+        final minimum = destination == BuyV2Destination.wholesale ? 2500 : 499;
+        if (session.totalForDestination(destination) < minimum) {
+          expect(
+            session.setCartQuantity(
+              product.id,
+              ((minimum + product.price - 1) ~/ product.price).toString(),
+            ),
+            isTrue,
+          );
+        }
       }
       final originalTotal = session.cartTotal;
       session.openCart();
@@ -157,21 +832,21 @@ void main() {
         BuyV2Destination.wholesale,
         BuyV2Destination.medicine,
       ]) {
-        await tester.tap(
-          find.byKey(
-            ValueKey('buy-cart-benefit-destination-${destination.name}'),
-          ),
+        final destinationControl = find.byKey(
+          ValueKey('buy-cart-benefit-destination-${destination.name}'),
         );
+        await revealHeader(destinationControl);
+        await tester.tap(destinationControl);
         await tester.pumpAndSettle();
         for (final kind in BuyV2CartBenefitKind.values) {
-          await tester.tap(
-            find.byKey(
-              ValueKey(
-                'buy-cart-benefit-kind-'
-                '${kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment'}',
-              ),
+          final kindControl = find.byKey(
+            ValueKey(
+              'buy-cart-benefit-kind-'
+              '${kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment'}',
             ),
           );
+          await revealHeader(kindControl);
+          await tester.tap(kindControl);
           await tester.pumpAndSettle();
           final benefitId = '${destination.name}-${kind.name}';
           final card = find.byKey(ValueKey('buy-cart-benefit-$benefitId'));
@@ -187,12 +862,37 @@ void main() {
           await tester.ensureVisible(card);
           await tester.pumpAndSettle();
           expect(tester.getTopLeft(card).dy, lessThan(220));
-          expect(tester.getSize(card).height, lessThan(150));
+          final list = find.byKey(
+            ValueKey('buy-cart-benefits-list-${destination.name}-${kind.name}'),
+          );
+          expect(
+            tester.getSize(card).height,
+            lessThan(tester.getSize(list).height),
+          );
+          for (final element
+              in find
+                  .descendant(of: card, matching: find.byType(RichText))
+                  .evaluate()) {
+            final paragraph = element.renderObject! as RenderParagraph;
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final natural = TextPainter(
+              text: paragraph.text,
+              textDirection: paragraph.textDirection,
+              textScaler: paragraph.textScaler,
+            )..layout(maxWidth: paragraph.size.width);
+            expect(
+              paragraph.size.height + .1,
+              greaterThanOrEqualTo(natural.height),
+            );
+            natural.dispose();
+          }
           final select = find.byKey(
             ValueKey('buy-cart-benefit-select-$benefitId'),
           );
           await tester.ensureVisible(select);
           await tester.pumpAndSettle();
+          expect(select.hitTestable(), findsOneWidget);
+          expect(tester.getSize(select).height, greaterThanOrEqualTo(44));
           await tester.tap(select);
           await tester.pumpAndSettle();
           expect(
@@ -204,6 +904,8 @@ void main() {
           );
           await tester.ensureVisible(remove);
           await tester.pumpAndSettle();
+          expect(remove.hitTestable(), findsOneWidget);
+          expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
           await tester.tap(remove);
           await tester.pumpAndSettle();
           expect(
@@ -243,101 +945,133 @@ void main() {
     expect(find.text('Bill summary'), findsOneWidget);
   });
 
-  testWidgets(
-    'Saved shelf adds productwise and clears only after confirmation',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(320, 700));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final session = BuyV2Session(core: BuySession());
-      final shop = productFor(BuyV2Destination.shop);
-      final secondShop = BuyV2Catalogue.products.firstWhere(
-        (candidate) =>
-            candidate.destination == BuyV2Destination.shop &&
-            candidate.id != shop.id,
-      );
-      session.toggleSaved(shop.id);
-      session.toggleSaved(secondShop.id);
-      await tester.pumpWidget(app(session, textScale: 1.4));
-      await tester.pumpAndSettle();
+  testWidgets('Saved shelf adds productwise and clears only after confirmation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = BuyV2Session(core: BuySession());
+    final shop = productFor(BuyV2Destination.shop);
+    final secondShop = BuyV2Catalogue.products.firstWhere(
+      (candidate) =>
+          candidate.destination == BuyV2Destination.shop &&
+          candidate.id != shop.id,
+    );
+    session.toggleSaved(shop.id);
+    session.toggleSaved(secondShop.id);
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-saved-decision-shelf')),
-        findsOneWidget,
-      );
-      expect(find.text('Saved in Shop'), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-saved-add-all')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-        findsNothing,
-      );
-      expect(find.text('Remove'), findsWidgets);
-      expect(
-        tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).height,
-        greaterThanOrEqualTo(44),
-      );
-      expect(
-        tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).width,
-        lessThan(80),
-      );
-      expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-saved-decision-shelf')),
+      findsOneWidget,
+    );
+    expect(find.text('Saved in Shop'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-saved-add-all')), findsNothing);
+    final grid = find.byKey(
+      ValueKey(
+        'buy-vertical-product-grid-buy-products-shop-${session.selectedCategoryId}-saved',
+      ),
+    );
+    expect(grid, findsOneWidget);
+    final scroll = find
+        .ancestor(
+          of: grid,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        )
+        .first;
+    Future<void> reveal(Finder target) async {
+      for (
+        var attempt = 0;
+        attempt < 100 && target.hitTestable().evaluate().isEmpty;
+        attempt++
+      ) {
+        final rect = target.evaluate().isEmpty ? null : tester.getRect(target);
+        final delta = rect != null && rect.top < tester.getRect(scroll).top
+            ? 120.0
+            : -120.0;
+        final point =
+            const [
+              Alignment(-.85, 0),
+              Alignment(.85, 0),
+              Alignment(-.85, -.5),
+              Alignment(.85, -.5),
+            ].firstWhere(
+              (point) => scroll.hitTestable(at: point).evaluate().isNotEmpty,
+            );
+        await tester.dragFrom(
+          point.withinRect(tester.getRect(scroll)),
+          Offset(0, delta),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(target.hitTestable(), findsOneWidget);
+    }
 
-      final productAdd = find.byKey(ValueKey('buy-add-${shop.id}'));
-      await tester.ensureVisible(productAdd);
-      await tester.pumpAndSettle();
-      await tester.tap(productAdd);
-      await tester.pump();
-      expect(session.quantityFor(shop.id), shop.minimumOrder);
-      expect(session.isSaved(shop.id), isTrue);
+    expect(
+      find.byTooltip('Remove ${shop.customerTitle} from Saved'),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).height,
+      equals(28),
+    );
+    expect(
+      tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).width,
+      lessThan(80),
+    );
+    expect(tester.takeException(), isNull);
 
-      final secondRemove = find.byKey(ValueKey('buy-save-${secondShop.id}'));
-      await tester.ensureVisible(secondRemove);
-      await tester.pumpAndSettle();
-      await tester.tap(secondRemove);
-      await tester.pumpAndSettle();
-      expect(session.isSaved(secondShop.id), isFalse);
-      expect(session.isSaved(shop.id), isTrue);
+    final productAdd = find.byKey(ValueKey('buy-add-${shop.id}'));
+    await reveal(productAdd);
+    await tester.tap(productAdd);
+    await tester.pump();
+    expect(session.quantityFor(shop.id), shop.minimumOrder);
+    expect(session.isSaved(shop.id), isTrue);
 
-      final clearSaved = find.byKey(const ValueKey('buy-saved-clear'));
-      await tester.ensureVisible(clearSaved);
-      await tester.pumpAndSettle();
-      await tester.tap(clearSaved);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-saved-clear-sheet')),
-        findsOneWidget,
-      );
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.text('Clear Saved in Shop?'), findsOneWidget);
-      expect(find.text('Keep saved'), findsWidgets);
-      expect(find.text('Clear list'), findsWidgets);
-      expect(
-        tester
-            .getSize(find.byKey(const ValueKey('buy-saved-clear-sheet')))
-            .height,
-        lessThan(300),
-      );
-      expect(session.isSaved(shop.id), isTrue);
-      await tester.tap(find.byKey(const ValueKey('buy-saved-keep')));
-      await tester.pumpAndSettle();
-      expect(session.isSaved(shop.id), isTrue);
+    final secondRemove = find.byKey(ValueKey('buy-save-${secondShop.id}'));
+    await reveal(secondRemove);
+    await tester.tap(secondRemove);
+    await tester.pumpAndSettle();
+    expect(session.isSaved(secondShop.id), isFalse);
+    expect(session.isSaved(shop.id), isTrue);
 
-      await tester.tap(find.byKey(const ValueKey('buy-saved-clear')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-saved-confirm-clear')));
-      await tester.pumpAndSettle();
+    final clearSaved = find.byKey(const ValueKey('buy-saved-clear'));
+    await reveal(clearSaved);
+    await tester.tap(clearSaved);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-saved-clear-sheet')), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Clear Saved in Shop?'), findsOneWidget);
+    expect(find.text('Keep saved'), findsWidgets);
+    expect(find.text('Clear list'), findsWidgets);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('buy-saved-clear-sheet')))
+          .height,
+      lessThan(300),
+    );
+    expect(session.isSaved(shop.id), isTrue);
+    await tester.tap(find.byKey(const ValueKey('buy-saved-keep')));
+    await tester.pumpAndSettle();
+    expect(session.isSaved(shop.id), isTrue);
 
-      expect(session.isSaved(shop.id), isFalse);
-      expect(session.quantityFor(shop.id), shop.minimumOrder);
-      expect(find.text('No Saved products here'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    await tester.tap(find.byKey(const ValueKey('buy-saved-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-saved-confirm-clear')));
+    await tester.pumpAndSettle();
+
+    expect(session.isSaved(shop.id), isFalse);
+    expect(session.quantityFor(shop.id), shop.minimumOrder);
+    expect(find.text('No saved products yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('R37 Cart sections fit compact Android and iOS-size viewports', (
     tester,
@@ -453,7 +1187,7 @@ void main() {
   );
 
   testWidgets(
-    'validated coupon selects, removes and projects into Checkout without changing total',
+    'validated coupon selects, removes and projects its saving into Checkout',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -480,7 +1214,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(select);
       await tester.pumpAndSettle();
-      expect(find.text('Selected for Checkout review'), findsOneWidget);
+      expect(find.text('Applied to Cart total'), findsOneWidget);
       expect(session.cartTotal, originalTotal);
 
       await tester.tap(
@@ -501,26 +1235,178 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.openCheckout(), isTrue);
       await tester.pumpAndSettle();
-
-      final checkoutBenefit = find.byKey(
-        const ValueKey('buy-checkout-benefit-shop-coupon'),
-      );
-      await tester.scrollUntilVisible(
-        checkoutBenefit,
-        300,
-        scrollable: find.byType(Scrollable).first,
-        maxScrolls: 20,
-      );
-      await tester.pumpAndSettle();
-      expect(checkoutBenefit, findsOneWidget);
+      expect(session.checkoutCouponSaving, greaterThan(0));
       expect(
-        find.textContaining('No amount has been deducted'),
-        findsOneWidget,
+        session.checkoutPayableTotal,
+        originalTotal - session.checkoutCouponSaving,
       );
-      expect(session.checkoutPayableTotal, originalTotal);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('live coupon shows eligibility, saving and offline retry', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _WidgetLiveBenefitsAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      cartBenefitsAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    final shop = productFor(BuyV2Destination.shop);
+    expect(session.addProduct(shop.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+
+    await tester.pumpWidget(app(session));
+    await tester.pump();
+    final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
+    await showInMainCartList(tester, coupons);
+    await tester.tap(coupons);
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-loading')),
+      findsOneWidget,
+    );
+
+    final evaluatedAt = DateTime.utc(2026, 8, 29, 12);
+    adapter.complete(
+      BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.ready,
+        evaluatedAt: evaluatedAt,
+        benefits: [
+          BuyV2CartBenefit(
+            id: 'live-retailer-sale',
+            kind: BuyV2CartBenefitKind.coupon,
+            destination: BuyV2Destination.shop,
+            title: 'Fresh basket sale',
+            detail: 'Eligible for the current basket.',
+            sourceId: 'retailer-live-source',
+            strategy: BuyV2CartBenefitStrategy.timedSale,
+            sponsor: BuyV2CartBenefitSponsor.retailer,
+            sponsorName: 'Shree Balaji Fresh',
+            savingAmount: 10,
+            validUntil: evaluatedAt.add(const Duration(hours: 4)),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Time-bound sale · Retailer · Shree Balaji Fresh'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Save ₹10 now'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-cart-benefit-select-live-retailer-sale')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Applied to Cart total'), findsOneWidget);
+    expect(session.scopedCouponSaving, 10);
+
+    adapter.begin();
+    unawaited(session.refreshCartBenefits());
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-loading')),
+      findsOneWidget,
+    );
+    adapter.complete(
+      BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.offline,
+        evaluatedAt: evaluatedAt,
+        customerMessage: 'Reconnect to check current eligibility.',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-offline')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-retry')),
+      findsOneWidget,
+    );
+    expect(session.scopedCouponSaving, 0);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+// Payable display only; connected tests retain real quote/arithmetic coverage.
+Widget _r66CartCaptureBoundary(Widget child) =>
+    const bool.fromEnvironment('BUY_R66_MAIN_CART_CAPTURE')
+    ? RepaintBoundary(
+        key: const ValueKey('r66-main-cart-capture'),
+        child: child,
+      )
+    : child;
+
+Future<void> _captureR66MainCart(WidgetTester tester, String label) async {
+  if (!const bool.fromEnvironment('BUY_R66_MAIN_CART_CAPTURE')) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-main-cart-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory(
+      const String.fromEnvironment(
+        'BUY_R66_MAIN_CART_DIRECTORY',
+        defaultValue: 'build/r66-cart-wording-review-v3-20260905',
+      ),
+    );
+    await directory.create(recursive: true);
+    final output = File('${directory.path}/$label.png');
+    if (await output.exists()) {
+      throw StateError('Main Cart capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('Main Cart capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
+class _R66PayableDisplayFixture extends BuyV2Session {
+  _R66PayableDisplayFixture(this.displayTotal) : super(core: BuySession());
+  int displayTotal;
+
+  void setDisplayTotal(int total) {
+    displayTotal = total;
+    notifyListeners();
+  }
+
+  @override
+  int get scopedPayableTotal => displayTotal;
+
+  @override
+  int get cartTotal => displayTotal;
+}
+
+class _WidgetLiveBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {
+  Completer<BuyV2CartBenefitsSnapshot> _pending = Completer();
+
+  void begin() => _pending = Completer();
+
+  void complete(BuyV2CartBenefitsSnapshot snapshot) {
+    if (!_pending.isCompleted) _pending.complete(snapshot);
+  }
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => const [];
+
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  ) => _pending.future;
 }
 
 class _AvailableBenefitsAdapter implements BuyV2CartBenefitsAdapter {
@@ -542,6 +1428,9 @@ class _AvailableBenefitsAdapter implements BuyV2CartBenefitsAdapter {
           title: 'Provider coupon',
           detail: 'Eligibility returned by the test provider.',
           sourceId: 'test-coupon-source',
+          sponsor: BuyV2CartBenefitSponsor.retailer,
+          sponsorName: 'Retail partner',
+          savingAmount: 10,
         ),
       if (kind == BuyV2CartBenefitKind.paymentOffer)
         const BuyV2CartBenefit(

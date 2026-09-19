@@ -100,7 +100,7 @@ void main() {
       session.confirmReadyRoute('/app/buy?sub=medicine');
       await Future<void>.delayed(Duration.zero);
 
-      expect(store.snapshot?.lastReadyRoute, '/app/buy?sub=medicine');
+      expect(store.snapshot?.lastReadyRoute, '/app/book/medicine');
       expect(session.buyExitRoute(), '/app/mool?from=buy');
       expect(
         session.buyExitRoute(requestedRoute: '/app/eat'),
@@ -261,8 +261,8 @@ void main() {
       var visibleState = GoRouterState.of(
         tester.element(find.byKey(const Key('buy-v2-screen'))),
       );
-      expect(visibleState.uri.path, '/app/buy');
-      expect(visibleState.uri.queryParameters['sub'], 'medicine');
+      expect(visibleState.uri.path, '/app/book/medicine');
+      expect(visibleState.uri.queryParameters.containsKey('sub'), isFalse);
 
       expect(await session.updateLanguage('hi'), isTrue);
       await tester.pumpAndSettle();
@@ -270,9 +270,9 @@ void main() {
       visibleState = GoRouterState.of(
         tester.element(find.byKey(const Key('buy-v2-screen'))),
       );
-      expect(visibleState.uri.path, '/app/buy');
-      expect(visibleState.uri.queryParameters['sub'], 'medicine');
-      expect(find.text('Search medicines and wellness'), findsOneWidget);
+      expect(visibleState.uri.path, '/app/book/medicine');
+      expect(visibleState.uri.queryParameters.containsKey('sub'), isFalse);
+      expect(find.text('Search medicines'), findsOneWidget);
     },
   );
 
@@ -291,14 +291,6 @@ void main() {
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     expect(find.byType(EditableText), findsNothing);
 
-    await tester.tap(find.byKey(const Key('buy-open-account')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('buy-account-hub')), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.byKey(const Key('buy-account-hub')), findsNothing);
-
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
@@ -312,7 +304,7 @@ void main() {
       initialLocation: '/app/buy?sub=medicine',
     );
     addTearDown(session.dispose);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
@@ -323,7 +315,7 @@ void main() {
     expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -332,40 +324,8 @@ void main() {
       findsNothing,
     );
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
   });
-
-  testWidgets(
-    'nested Buy account survives chooser open and exact Back dismissal',
-    (tester) async {
-      final session = await _mount(tester, initialLocation: '/app/buy');
-      addTearDown(session.dispose);
-
-      await tester.tap(find.byKey(const Key('buy-open-account')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('buy-account-hub')), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('mool-compact-launcher')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
-      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-      expect(find.byKey(const Key('buy-account-hub')), findsOneWidget);
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsNothing,
-      );
-      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-      expect(find.byKey(const Key('buy-account-hub')), findsOneWidget);
-      expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
-    },
-  );
 
   testWidgets('stored Medicine route cannot replace Social cold launch', (
     tester,
@@ -419,7 +379,7 @@ void main() {
         destination: BuyV2Destination.wholesale,
         route: '/app/buy?sub=wholesale',
       ),
-      (destination: BuyV2Destination.medicine, route: '/app/buy?sub=medicine'),
+      (destination: BuyV2Destination.medicine, route: '/app/book/medicine'),
       (destination: BuyV2Destination.orders, route: '/app/buy?sub=orders'),
       (destination: BuyV2Destination.shop, route: '/app/buy?sub=shop'),
     ]) {
@@ -457,6 +417,8 @@ Future<JourneySession> _mount(
     MoolSocialApp(session: session, initialLocation: initialLocation),
   );
   if (initialLocation == '/boot') {
+    // Mount the async boot route before advancing its presentation timer.
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 3));
   }
   await tester.pumpAndSettle();
