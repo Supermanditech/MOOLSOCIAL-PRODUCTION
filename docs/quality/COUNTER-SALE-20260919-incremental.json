@@ -20,6 +20,13 @@
   },
   "lanes": [
     {
+      "id": "integration",
+      "branchPrefix": "integration/moolsocial/counter-sale-20260919",
+      "packageId": "com.moolsocial.app.runtime",
+      "deviceSerial": "2b3e0f71",
+      "minimumVersionCodeExclusive": 2026091803
+    },
+    {
       "id": "codex_ui",
       "branchPrefix": "work/codex-ui/",
       "packageId": "com.moolsocial.app.runtime",

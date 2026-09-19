@@ -66,6 +66,11 @@ function Test-CounterSalePendingEvidence([hashtable]$Facts) {
     Branch = 'work/codex-ui/counter-sale-20260919'
     Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
   }
+  if (Test-CounterSaleIntegrationIdentity $Facts) {
+    $expected.Lane = 'integration'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919'
+  }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
         [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
@@ -82,6 +87,20 @@ function Test-CounterSalePendingEvidence([hashtable]$Facts) {
     'artifacts/quality/counter-sale-r66-34-review-20260919/device-review.md',
     'artifacts/quality/counter-sale-r66-34-review-20260919/ticket-and-screen-coverage.md'
   )
+}
+
+function Test-CounterSaleIntegrationIdentity([hashtable]$Facts) {
+  $expected = @{
+    Role = 'primary'; Task = '/root'; Lane = 'integration'
+    WorkId = 'counter-sale-20260919'; TicketId = 'UAW-COUNTER-SALE-20260919'
+    Branch = 'integration/moolsocial/counter-sale-20260919'
+    Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or
+        [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
+  }
+  return $true
 }
 
 function Test-CodexOppoR6615PendingEvidence([hashtable]$Facts) {
@@ -1387,6 +1406,13 @@ $storeBuyBaselineFixAdmission = (
   $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
   (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-baseline-fixes-20260918'
 )
+$counterSaleAdmission = (
+  $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and
+  $AgentTask -ceq '/root' -and $ProductionWorkId -ceq 'counter-sale-20260919' -and
+  $ProductionTicketId -ceq 'UAW-COUNTER-SALE-20260919' -and
+  (ConvertTo-ProductionForwardPath $root) -ceq
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
+)
 $storeBuySkuSeptember18 = $false
 $storeBuySeptember12 = $ProductionLane -ceq 'integration_repair' -and
   $ProductionWorkId -ceq 'store-buy-20260912'
@@ -1930,6 +1956,11 @@ $runtimeBaselineBranch = [string]$gitDiscipline.acceptedRuntimeBaseline.branch
 $runtimeBaselineTag = [string]$gitDiscipline.acceptedRuntimeBaseline.tag
 $governanceTag = [string]$gitDiscipline.workStart.annotatedTag
 $rootForward = ConvertTo-ProductionForwardPath $root
+$counterSaleIntegration = Test-CounterSaleIntegrationIdentity @{
+  Role = $AgentRole; Task = $AgentTask; Lane = $ProductionLane
+  WorkId = $ProductionWorkId; TicketId = $ProductionTicketId
+  Branch = $branch; Root = $rootForward
+}
 $productionCheckoutForward = [string]$gitDiscipline.productionCheckout
 
 $runtimeTagCommitOutput = @(& git -C $root rev-parse `
@@ -2040,7 +2071,7 @@ if ($ProductionLane -ceq 'baseline') {
   } else {
     Assert-Coordination (
       [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $AgentTask.StartsWith(
+      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))
@@ -2689,7 +2720,7 @@ if ($ProductionLane -ceq 'baseline') {
         'coordination_bootstrap','task_start','implementation','pre_commit','handoff',
         'founder_acceptance','ticket_acceptance','ticket_close'
       )
-      if ($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission) { 'integration_admission_authorize' }
+      if ($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission -or $counterSaleAdmission) { 'integration_admission_authorize' }
     }
     'codex_auth' {
       @('coordination_bootstrap','task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
@@ -5669,7 +5700,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (($ProductionPhase -cin @(
       'handoff','founder_acceptance','ticket_acceptance','ticket_close'
-    )) -or (($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission) -and
+    )) -or (($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission -or $counterSaleAdmission) -and
       $ProductionPhase -ceq 'integration_admission_authorize')) {
     Assert-Coordination ($head -cne $baseCommit) `
       'production handoff contains no feature commit.'
@@ -5817,7 +5848,33 @@ if ($ProductionLane -ceq 'baseline') {
   }
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
-    if ($ProductionLane -ceq 'codex_ui' -and
+    if ($counterSaleAdmission) {
+      $qualifiedSource = 'bfb47131adae3458ae92cc67fb8fb932a295e16c'
+      & git -C $root merge-base --is-ancestor $qualifiedSource $head
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Counter Sale qualified implementation ancestry changed.'
+      $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $appTrees.Count -eq 2 -and
+        $appTrees[0] -ceq $appTrees[1]) 'Counter Sale app source changed after qualification.'
+      Assert-Coordination ((Test-ProductionWorktreeClean) -and
+        (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Counter Sale source must be clean and remote-equal.'
+      Assert-Coordination (
+        $IntegrationTargetWorkId -ceq 'counter-sale-20260919' -and
+        $IntegrationTargetTicketId -ceq 'UAW-COUNTER-SALE-20260919' -and
+        (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq
+          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919' -and
+        (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
+      ) 'Counter Sale integration target identity changed.'
+      $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
+        $targetBranch[0] -ceq 'integration/moolsocial/counter-sale-20260919') 'Counter Sale integration branch changed.'
+      $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
+        $targetHead[0] -ceq $workStartCommit) 'Counter Sale integration must start at governance.'
+      Assert-ProductionManagedWorktreesClean
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/counter-sale-20260919')
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Counter Sale integration remote already exists.'
+      Write-Output 'merge(counter-sale-20260919): integrate approved Counter Sale journey'
+    } elseif ($ProductionLane -ceq 'codex_ui' -and
         $ProductionWorkId -ceq 'store-buy-baseline-fixes-20260918') {
       Assert-Coordination (
         $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
@@ -6069,6 +6126,16 @@ if ($ProductionLane -ceq 'baseline') {
       @($approvedBranches | Select-Object -Unique).Count -eq
         $approvedBranches.Count
     ) 'integration requires unique approved feature commits and branches.'
+    if ($counterSaleIntegration) {
+      Assert-Coordination ($approvedCommits.Count -eq 1 -and
+        $approvedBranches[0] -ceq 'work/codex-ui/counter-sale-20260919') 'Counter Sale integration requires exactly its qualified feature branch.'
+      $qualifiedSource = 'bfb47131adae3458ae92cc67fb8fb932a295e16c'
+      & git -C $root merge-base --is-ancestor $qualifiedSource $approvedCommits[0]
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Counter Sale integration lost its approved implementation.'
+      $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $appTrees.Count -eq 2 -and
+        $appTrees[0] -ceq $appTrees[1]) 'Counter Sale integration changed the qualified app tree.'
+    }
     $firstParentDirectCommits = @(& git -C $root rev-list --first-parent `
         --no-merges "$workStartCommit..$head")
     Assert-Coordination ($LASTEXITCODE -eq 0) `

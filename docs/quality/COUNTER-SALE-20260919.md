@@ -8,8 +8,33 @@ founder visual acceptance, production release authority, or payment receipt.
 
 Lane codex_ui, primary /root, work counter-sale-20260919. Feature checkout:
 C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919.
-Branch work/codex-ui/counter-sale-20260919. Preserve canonical integration and
-its earlier unverified customer-form edit. Never commit feature source there.
+Branch work/codex-ui/counter-sale-20260919. Preserve the canonical integration
+baseline. Its older uncommitted customer-form edit was verified fully superseded
+by approved implementation bfb47131adae3458ae92cc67fb8fb932a295e16c and removed
+with the founder's conditional permission. A byte-identical external backup
+remains (SHA256 2E18E303B2EF96D535916E8ACD06F3747B220CEA530F62E63E97C2D2F419DA0F).
+No older form is an implementation or acceptance input.
+
+## Bounded integration admission
+
+Use a fresh integration checkout at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919,
+branch integration/moolsocial/counter-sale-20260919. The existing combined
+baseline checkout stays unchanged. Following the mandatory integration history
+contract, the new branch starts at the governance tag and receives exactly one
+no-ff merge of the remote-exact Counter Sale feature tip, which already includes
+the latest combined baseline. It is not a return to older app source.
+
+The exact admission verifies approved implementation ancestry, identical apps
+tree, all managed checkouts clean, remote equality and an unused target branch.
+Post-merge checks retain no direct first-parent commits, exact merge-tree
+equality, one approved second-parent tip, secret safety and remote verification.
+Only this primary task/root/branch/ticket gains pending evidence/native-lock
+admission; all existing native projection and source hashes remain enforced.
+Focused fixtures cover both identities (20 accepted evidence owners and 360
+rejected identity/owner omissions or mutations; each native context has one
+accepted projection and six rejected cases). This changes no approved UI or
+native app source and does not consume the one-build authority.
 
 ## Reproduced scope and acceptance units
 

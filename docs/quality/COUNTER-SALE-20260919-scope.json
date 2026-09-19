@@ -18,7 +18,7 @@
       "ticketId": "UAW-COUNTER-SALE-20260919",
       "customerOutcome": "Retailer completes fast, accurate Store Counter Sale entry, review and invoice without false payment completion.",
       "manifestPath": "docs/quality/COUNTER-SALE-20260919.md",
-      "manifestSha256": "4869F6EB58F04CE585F9F5C969F11F0A894696601608C87070E14D6D5C99CEC0",
+      "manifestSha256": "530E150F5626C41995DB92758D26389F50DACBE9169253839DAD6B4E84BF57B7",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
