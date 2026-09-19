@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "prebuild_pending",
+  "buildAuthorization": "not_authorized",
+  "preBuildValidation": {
+    "state": "pending",
+    "evidence": "artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md"
+  },
+  "candidate": {
+    "id": "UAW-COUNTER-SALE-R66.34-REVIEW-20260919",
+    "versionName": "1.0.0-r66.34",
+    "versionCode": 2026091901,
+    "buildMode": "debug",
+    "gateProfile": "uaw_runtime_ui_review_debug",
+    "branch": "work/codex-ui/counter-sale-20260919",
+    "head": "b19609bac4e1dbdb0fc71ec8154f9bec179f7af6"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/counter-sale-r66-34-review-20260919/source-manifest.txt",
+    "manifestSha256": "DD7B3E64F4D5E6DE9F296A596DB32C6B38263AED872DE8E432F1BAAA09CB1AC4",
+    "fileCount": 395
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-COUNTER-SALE-R66.34-REVIEW-20260919"
+  },
+  "promotion": { "state": "forbidden_non_promotable" },
+  "preBuildGates": [
+    { "id": "branch-head", "state": "pending" },
+    { "id": "source-manifest", "state": "passed", "evidence": ["artifacts/quality/counter-sale-r66-34-review-20260919/source-manifest.txt"] },
+    { "id": "format-analysis", "state": "passed", "evidence": ["artifacts/quality/counter-sale-r66-34-review-20260919/local-validation.md"] },
+    { "id": "focused-tests", "state": "pending" },
+    { "id": "positive-release-gates", "state": "pending" },
+    { "id": "protected-boundary-disposition", "state": "pending" },
+    { "id": "rejected-candidate-preserved", "state": "pending" },
+    { "id": "startup-config-regression-registered", "state": "pending" },
+    { "id": "buy-regression-1", "state": "pending" },
+    { "id": "buy-regression-2", "state": "pending" },
+    { "id": "clean-state-regression", "state": "pending" },
+    { "id": "wrapper-self-test", "state": "passed", "evidence": ["artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md"] },
+    { "id": "package-isolation", "state": "pending" }
+  ],
+  "premiumMotionPolicy": {
+    "state": "pending",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "artifacts/quality/counter-sale-r66-34-review-20260919/candidate-contract.md",
+    "disposition": "artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md",
+    "applied": ["event_driven_product_entry_return_and_detail_disclosure"],
+    "reused": ["existing_native_navigation_focus_and_scroll"],
+    "dependencyHeld": ["physical_reduced_motion_TalkBack_and_founder_visual_review"],
+    "inapplicable": ["fabricated_payment_success_or_perpetual_activity"]
+  },
+  "postBuildGates": [
+    { "id": "apk-package-version-signer-sha256", "state": "pending" },
+    { "id": "oppo-installed-apk-identity", "state": "pending" },
+    { "id": "oppo-orders-selected-filter", "state": "pending" },
+    { "id": "oppo-profile-authentication-state", "state": "pending" },
+    { "id": "oppo-security-return-with-retained-restock", "state": "pending" },
+    { "id": "oppo-restock-labelled-catalogue-and-return", "state": "pending" },
+    { "id": "oppo-restock-search-bulk-native-back", "state": "pending" },
+    { "id": "oppo-retained-cart-and-relaunch", "state": "pending" },
+    { "id": "oppo-flutter-error-free-replay", "state": "pending" },
+    { "id": "oppo-dashboard-final", "state": "pending" },
+    { "id": "final-clean-and-live-remote", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-201", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-202", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-203", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-204", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-205", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-206", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-207", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-208", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-209", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-210", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-211", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-212", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-213", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-214", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-215", "state": "pending" },
+    { "id": "oppo-counter-sale-CS-216", "state": "pending" },
+    { "id": "founder-review", "state": "pending" }
+  ]
+}

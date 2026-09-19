@@ -1,0 +1,36 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart
+00:00 +0: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.all
+00:02 +1: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:03 +2: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.wholesale
+00:04 +3: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.medicine
+00:04 +4: R665 D01 Cart confirmation stays reachable text2 Size(711.0, 320.0) BuyV2CartScope.all
+00:05 +5: R665 D01 Cart confirmation stays reachable text2 Size(711.0, 320.0) BuyV2CartScope.shop
+00:06 +6: R665 D01 Cart confirmation stays reachable text2 Size(711.0, 320.0) BuyV2CartScope.wholesale
+00:06 +7: R665 D01 Cart confirmation stays reachable text2 Size(711.0, 320.0) BuyV2CartScope.medicine
+00:07 +8: R66 028 main Cart money transitions fit Redmi360 text1.0 reducedfalse
+00:08 +9: R66 028 main Cart money transitions fit Redmi360 text1.0 reducedtrue
+00:09 +10: R66 028 main Cart money transitions fit Redmi360 text2.0 reducedfalse
+00:09 +11: R66 028 main Cart money transitions fit Redmi360 text2.0 reducedtrue
+00:10 +12: R66 Cart payable display INR3480 fits 320.0 at 1.0
+00:10 +13: R66 Cart payable display INR10000000 fits 320.0 at 1.0
+00:11 +14: R66 Cart payable display INR3480 fits 320.0 at 2.0
+00:11 +15: R66 Cart payable display INR10000000 fits 320.0 at 2.0
+00:12 +16: R66 Cart payable display INR3480 fits 430.0 at 1.0
+00:12 +17: R66 Cart payable display INR10000000 fits 430.0 at 1.0
+00:13 +18: R66 Cart payable display INR3480 fits 430.0 at 2.0
+00:13 +19: R66 Cart payable display INR10000000 fits 430.0 at 2.0
+00:14 +20: R66 Cart item values fit enlarged shop
+00:15 +21: R66 Cart item values fit enlarged wholesale
+00:15 +22: R66 empty Cart fits compact enlarged shop
+00:15 +23: R66 empty Cart fits compact enlarged wholesale
+00:16 +24: R66 delivery instructions stay complete at 200 percent shop
+00:16 +25: R66 delivery instructions stay complete at 200 percent wholesale
+00:17 +26: mixed Cart uses real media and context-specific benefit pages
+00:20 +27: device-review offer UI selects and removes all six seeded states
+00:23 +28: Wholesale Cart keeps trade vocabulary and truthful summary
+00:24 +29: Saved shelf adds productwise and clears only after confirmation
+00:25 +30: R37 Cart sections fit compact Android and iOS-size viewports
+00:27 +31: benefit destination fits compact viewport and enlarged customer text
+00:27 +32: validated coupon selects, removes and projects its saving into Checkout
+00:28 +33: live coupon shows eligibility, saving and offline retry
+00:29 +34: All tests passed!

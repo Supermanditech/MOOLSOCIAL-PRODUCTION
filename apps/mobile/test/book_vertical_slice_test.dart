@@ -73,6 +73,39 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Care profile resumes the active doctor appointment', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final book = BookSession(gateway: ReviewBookGateway(latency: Duration.zero))
+      ..setMedicalConsent(true);
+    expect(await book.confirmDoctorDetails(), isTrue);
+    addTearDown(journey.dispose);
+    addTearDown(book.dispose);
+    await mount(
+      tester,
+      route: '/app/book/doctor',
+      journey: journey,
+      book: book,
+    );
+
+    await tapVisible(tester, const Key('care-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-care-doctor-appointment')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-care-salon-discovery')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-care-doctor-appointment'),
+    );
+    expect(find.byKey(const Key('medical-consent')), findsOneWidget);
+  });
+
   testWidgets(
     'doctor completes care, patient, consent, invite and follow-up controls',
     (tester) async {
@@ -105,6 +138,7 @@ void main() {
       );
       await tapVisible(tester, const Key('doctor-care-video'));
       await tapVisible(tester, const Key('doctor-need-skin'));
+      await tapVisible(tester, const Key('doctor-top-provider'));
       await tapVisible(tester, const Key('book-doctor'));
       await tapVisible(tester, const Key('patient-mother'));
       await tapVisible(tester, const Key('symptom-cough'));
@@ -163,7 +197,7 @@ void main() {
       await tapVisible(tester, const Key('followup-book-slot'));
       expect(find.byKey(const Key('followup-slot-sheet')), findsOneWidget);
       await tapVisible(tester, const Key('followup-slot-video-today'));
-      expect(book.followUpSlot, 'Video · Today 6:20 PM');
+      expect(book.followUpSlot, 'Video · Next available');
       await tapVisible(tester, const Key('followup-sharing'));
       expect(book.clinicSharing, isFalse);
     },
