@@ -55,6 +55,35 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-CounterSalePendingEvidence([hashtable]$Facts) {
+  $expected = @{
+    Role = 'primary'
+    Task = '/root'
+    ClaimTask = '/root'
+    Lane = 'codex_ui'
+    WorkId = 'counter-sale-20260919'
+    TicketId = 'UAW-COUNTER-SALE-20260919'
+    Branch = 'work/codex-ui/counter-sale-20260919'
+    Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or
+        [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Owner') -and [string]$Facts.Owner -cin @(
+    'artifacts/quality/counter-sale-r66-34-review-20260919/candidate-contract.md',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/source-manifest.txt',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/local-validation.md',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/post-install.json',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/device-review.md',
+    'artifacts/quality/counter-sale-r66-34-review-20260919/ticket-and-screen-coverage.md'
+  )
+}
+
 function Test-CodexOppoR6615PendingEvidence([hashtable]$Facts) {
   $expected = @{
     Role = 'primary'
@@ -1720,6 +1749,12 @@ foreach ($claim in $claims) {
   foreach ($ownerValue in @($claim.owners)) {
     $owner = Get-CanonicalOwner ([string]$ownerValue)
     $resolvedOwner = [IO.Path]::GetFullPath((Join-Path $root $owner))
+    $predeclaredCounterSaleEvidenceOwner = Test-CounterSalePendingEvidence @{
+      Role = $AgentRole; Task = $AgentTask; ClaimTask = [string]$claim.task
+      Lane = $ProductionLane; WorkId = $ProductionWorkId
+      TicketId = $ProductionTicketId; Branch = $pendingEvidenceBranch
+      Root = $root.Replace('\','/').TrimEnd('/'); Owner = $owner
+    }
     $predeclaredR6615EvidenceOwner = Test-CodexOppoR6615PendingEvidence @{
       Role = $AgentRole; Task = $AgentTask; ClaimTask = [string]$claim.task
       Lane = $ProductionLane; WorkId = $ProductionWorkId
@@ -1840,6 +1875,7 @@ foreach ($claim in $claims) {
         $predeclaredR65TenEvidenceOwner -or
         $predeclaredR65ElevenEvidenceOwner -or
         $predeclaredR6615EvidenceOwner -or
+        $predeclaredCounterSaleEvidenceOwner -or
         $predeclaredR669PortableOwner -or $predeclaredFounderReferenceOwner -or $predeclaredRedmiV6EvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
@@ -2555,6 +2591,61 @@ if ($ProductionLane -ceq 'baseline') {
           'docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md'
         )
       )
+      # Founder standing approval admits only primary coordination maintenance
+      # for this exact continuation; it grants no other UI lane policy access.
+      $counterSaleCoordinationOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_counter_sale_20260919' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq '123ff42cf8179b272d33b480e8267dfa83af2de3' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'counter-sale-20260919' -and
+        $ProductionTicketId -ceq 'UAW-COUNTER-SALE-20260919' -and
+        [string]$branch -ceq 'work/codex-ui/counter-sale-20260919' -and
+        (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919' -and
+        $effectiveOwner -cin @(
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'docs/quality/COUNTER-SALE-20260919.md',
+          'docs/quality/COUNTER-SALE-20260919-scope.json',
+          'docs/quality/COUNTER-SALE-20260919-incremental.json',
+          'scripts/check-approved-ui-locks.ps1',
+          'apps/mobile/test/work_invoice_pdf_test.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/candidate-contract.md',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/source-manifest.txt',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/local-validation.md',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/uaw-counter-sale-r66.34-review-20260919-build-provenance.txt',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/post-install.json',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/device-review.md',
+          'artifacts/quality/counter-sale-r66-34-review-20260919/ticket-and-screen-coverage.md'
+        )
+      )
+      if ($counterSaleCoordinationOwner -and $effectiveOwner -ceq
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart') {
+        # REG4631: admit only one inherited non-rendered comment correction.
+        # Counter Sale receives no authority to change Buy behavior or copy.
+        $counterCommentBase = @(& git -C $root show (
+          '123ff42cf8179b272d33b480e8267dfa83af2de3:' + $effectiveOwner
+        ))
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Counter Sale Buy comment baseline is missing.'
+        $counterCommentOriginal = ($counterCommentBase -join "`n").TrimEnd("`n")
+        $counterCommentCorrected = $counterCommentOriginal.Replace(
+          '// before an earlier fade has finished (for example, search then Bulk).',
+          '// before an earlier fade has finished (such as search then Bulk).'
+        )
+        $counterCommentLive = [IO.File]::ReadAllText(
+          (Join-Path $root $effectiveOwner)
+        ).Replace("`r`n", "`n").TrimEnd("`n")
+        Assert-Coordination (
+          $counterCommentOriginal -cne $counterCommentCorrected -and
+          ($counterCommentLive -ceq $counterCommentOriginal -or
+           $counterCommentLive -ceq $counterCommentCorrected)
+        ) 'Counter Sale may change only the exact inherited Buy comment.'
+      }
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -2567,7 +2658,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or $counterSaleCoordinationOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2579,7 +2670,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or $counterSaleCoordinationOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }

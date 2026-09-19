@@ -1129,6 +1129,96 @@ class SecureWorkReceiptDraftStore implements WorkReceiptDraftStore {
   });
 }
 
+abstract interface class WorkUpiDestinationStore {
+  Future<WorkspaceUpiDestination?> read(String account, String store);
+  Future<void> save(WorkspaceUpiDestination destination);
+}
+
+/// Device-local retailer settings. Never supplies bank verification or a
+/// payment result. Account/Store checks bracket every asynchronous storage call.
+class SecureWorkUpiDestinationStore implements WorkUpiDestinationStore {
+  SecureWorkUpiDestinationStore({
+    required this.accountScope,
+    required this.storeScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  final String? Function() accountScope, storeScope;
+  final FlutterSecureStorage _storage;
+  static final Map<String, Future<void>> _pending = {};
+
+  String _key(String account, String store) =>
+      'moolsocial.workspace.upi-destination.v1.'
+      '${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+
+  void _checkScope(String account, String store) {
+    if (account.trim().isEmpty ||
+        store.trim().isEmpty ||
+        accountScope() != account ||
+        storeScope() != store) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+  }
+
+  Future<T> _exclusive<T>(String key, Future<T> Function() action) {
+    final result = (_pending[key] ?? Future<void>.value()).then(
+      (_) => action(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pending[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_pending[key], tail)) _pending.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  Future<WorkspaceUpiDestination?> _read(String account, String store) async {
+    _checkScope(account, store);
+    final raw = await _storage.read(key: _key(account, store));
+    _checkScope(account, store);
+    if (raw == null) return null;
+    WorkspaceUpiDestination? destination;
+    try {
+      destination = WorkspaceUpiDestination.fromJson(jsonDecode(raw));
+    } on FormatException {
+      // Preserve corrupt saved data instead of silently replacing the payee.
+    }
+    if (destination == null ||
+        destination.account != account ||
+        destination.store != store) {
+      throw const WorkGatewayException(
+        'Your Store UPI details could not be opened.',
+      );
+    }
+    return destination;
+  }
+
+  @override
+  Future<WorkspaceUpiDestination?> read(String account, String store) =>
+      _exclusive(_key(account, store), () => _read(account, store));
+
+  @override
+  Future<void> save(WorkspaceUpiDestination destination) =>
+      _exclusive(_key(destination.account, destination.store), () async {
+        _checkScope(destination.account, destination.store);
+        if (!destination.valid) {
+          throw const WorkGatewayException('Check your Store UPI details.');
+        }
+        await _read(destination.account, destination.store);
+        _checkScope(destination.account, destination.store);
+        await _storage.write(
+          key: _key(destination.account, destination.store),
+          value: jsonEncode(destination.toJson()),
+        );
+        _checkScope(destination.account, destination.store);
+      });
+}
+
 abstract interface class WorkCounterDraftStore {
   Future<WorkspaceCounterDraft?> read(String account, String store);
   Future<void> save(

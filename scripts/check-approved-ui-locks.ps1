@@ -142,6 +142,9 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' {
       'work/cursor-ui/redmi-v6-audit-20260913'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919' {
+      'work/codex-ui/counter-sale-20260919'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -164,6 +167,20 @@ function Get-CursorAccessibilityNativeProjection {
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  if ($requiredBranch -ceq 'work/codex-ui/counter-sale-20260919') {
+    # REG4631: this ticket inherits the accepted combined native implementation.
+    # Admission does not permit native edits or change any projection hash.
+    $counterSaleBaseline = '123ff42cf8179b272d33b480e8267dfa83af2de3'
+    & git -C $root merge-base --is-ancestor $counterSaleBaseline HEAD
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Counter Sale native projection requires the latest combined baseline.'
+    }
+    & git -C $root diff --quiet $counterSaleBaseline -- `
+      'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Counter Sale native implementation differs from the combined baseline.'
+    }
   }
   if ($requiredBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
     $redmiBaseline = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'

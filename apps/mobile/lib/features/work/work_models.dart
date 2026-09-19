@@ -3166,6 +3166,94 @@ class WorkspaceBillingDetails {
   }
 }
 
+/// Retailer-entered destination, not bank verification or payment authority.
+/// Persist and resolve only within its exact signed-in account and Store.
+class WorkspaceUpiDestination {
+  const WorkspaceUpiDestination({
+    required this.account,
+    required this.store,
+    required this.address,
+    required this.payeeName,
+    this.merchantCode = '',
+  });
+
+  final String account, store, address, payeeName, merchantCode;
+
+  bool get valid =>
+      account.trim().isNotEmpty &&
+      store.trim().isNotEmpty &&
+      address.length <= 256 &&
+      RegExp(r'^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$').hasMatch(address) &&
+      payeeName.trim().isNotEmpty &&
+      payeeName == payeeName.trim() &&
+      payeeName.length <= 100 &&
+      !RegExp(r'[\x00-\x1f\x7f]').hasMatch(payeeName) &&
+      (merchantCode.isEmpty || RegExp(r'^\d{4}$').hasMatch(merchantCode));
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': account,
+    'store': store,
+    'address': address,
+    'payeeName': payeeName,
+    'merchantCode': merchantCode,
+  };
+
+  static WorkspaceUpiDestination? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        ![
+          'account',
+          'store',
+          'address',
+          'payeeName',
+          'merchantCode',
+        ].every((key) => value[key] is String)) {
+      return null;
+    }
+    final destination = WorkspaceUpiDestination(
+      account: value['account'] as String,
+      store: value['store'] as String,
+      address: value['address'] as String,
+      payeeName: value['payeeName'] as String,
+      merchantCode: value['merchantCode'] as String,
+    );
+    return destination.valid ? destination : null;
+  }
+
+  /// Generic UPI request. No callback, scan, or app return records a receipt.
+  /// Use integer paise throughout; floating-point formatting can alter money.
+  Uri paymentUri({
+    required String expectedAccount,
+    required String expectedStore,
+    required int amountPaise,
+    required String reference,
+  }) {
+    if (!valid ||
+        expectedAccount != account ||
+        expectedStore != store ||
+        amountPaise <= 0 ||
+        amountPaise > 9007199254740991 ||
+        !RegExp(r'^[a-zA-Z0-9-]{1,64}$').hasMatch(reference)) {
+      throw const FormatException('Invalid Store payment request');
+    }
+    return Uri(
+      scheme: 'upi',
+      host: 'pay',
+      queryParameters: {
+        'pa': address,
+        'pn': payeeName,
+        if (merchantCode.isNotEmpty) 'mc': merchantCode,
+        'tr': reference,
+        'tn': 'Counter Sale',
+        'am':
+            '${amountPaise ~/ 100}.${(amountPaise % 100).toString().padLeft(2, '0')}',
+        'cu': 'INR',
+      },
+    );
+  }
+}
+
 class WorkspaceCounterDraft {
   WorkspaceCounterDraft({
     required this.account,
@@ -3211,6 +3299,7 @@ class WorkspaceCounterDraft {
       const {
         'Cash',
         'UPI',
+        'Bank Transfer',
         'Pay request',
         'On delivery',
         'Customer due',
@@ -4360,6 +4449,11 @@ class WorkspaceCatalogueItem {
 
   bool get published =>
       publicListing &&
+      available &&
+      (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
+
+  // Public discovery and the retailer's own counter inventory are independent.
+  bool get canSellAtCounter =>
       available &&
       (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
 

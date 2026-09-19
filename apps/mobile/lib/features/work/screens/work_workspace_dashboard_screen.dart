@@ -4,7 +4,9 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pdf/widgets.dart' as store_qr;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/design/mool_design_system.dart';
@@ -161,6 +163,7 @@ class _StoreValueMotionState extends State<_StoreValueMotion>
 class _StoreMoneyText extends StatefulWidget {
   const _StoreMoneyText(
     this.value, {
+    super.key,
     this.style,
     this.textAlign = TextAlign.start,
     this.summary = false,
@@ -251,6 +254,7 @@ class _StoreMoneyTextState extends State<_StoreMoneyText> {
 
 class _StoreMoneyLine extends StatelessWidget {
   const _StoreMoneyLine({
+    super.key,
     required this.leading,
     required this.value,
     this.style,
@@ -1105,10 +1109,6 @@ class _WorkWorkspaceDashboardScreenState
                 style: TextStyle(fontSize: 18),
               ),
               actions: [
-                MoolGlobalProfileShortcutV2(
-                  keyName: 'work-dashboard-profile',
-                  onPressed: () => _openProfile(context, workspace),
-                ),
                 IconButton(
                   key: const Key('work-counter-close'),
                   tooltip: 'Close sale',
@@ -7116,7 +7116,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
         top: false,
         bottom: !widget.embedded,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -7161,26 +7161,18 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   if (payment != null) _recordedPayments(payment),
                   const SizedBox(height: 12),
                   Text(
-                    '${invoice.id} · ${invoice.customer}',
-                    style: const TextStyle(color: MoolColors.muted),
+                    invoice.billingDetails.name.trim().isNotEmpty
+                        ? invoice.billingDetails.name
+                        : invoice.customer,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 17,
+                    ),
                   ),
-                  Text(
-                    'Sold by: $invoiceStoreName',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    'Invoice date: ${issued.day}/${issued.month}/${issued.year}',
-                  ),
-                  if (!invoice.billingDetails.isEmpty)
+                  if (invoice.billingDetails.name.trim().isNotEmpty)
                     Text(
-                      [
-                        invoice.billingDetails.name,
-                        if (invoice.billingDetails.business)
-                          invoice.billingDetails.businessName,
-                        if (invoice.billingDetails.business)
-                          invoice.billingDetails.gst,
-                        invoice.billingDetails.address,
-                      ].where((value) => value.trim().isNotEmpty).join(' · '),
+                      invoice.customer,
+                      style: const TextStyle(color: MoolColors.muted),
                     ),
                   const SizedBox(height: 12),
                   Container(
@@ -7212,6 +7204,28 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       ],
                     ),
                   ),
+                  ExpansionTile(
+                    key: const Key('work-invoice-details'),
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: const EdgeInsets.only(bottom: 12),
+                    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                    title: const Text('Invoice details'),
+                    children: [
+                      Text(invoice.id),
+                      Text('Sold by: $invoiceStoreName'),
+                      Text(
+                        'Invoice date: ${issued.day}/${issued.month}/${issued.year}',
+                      ),
+                      if (invoice.billingDetails.business &&
+                          invoice.billingDetails.businessName.trim().isNotEmpty)
+                        Text(invoice.billingDetails.businessName),
+                      if (invoice.billingDetails.business &&
+                          invoice.billingDetails.gst.trim().isNotEmpty)
+                        Text('GST: ${invoice.billingDetails.gst}'),
+                      if (invoice.billingDetails.address.trim().isNotEmpty)
+                        Text(invoice.billingDetails.address),
+                    ],
+                  ),
                 ],
                 if (session.workspaceOrders.any(
                   (order) =>
@@ -7223,20 +7237,13 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   Text(
                     paid
                         ? 'Hand over goods at the counter'
-                        : 'At the counter: confirm payment, hand over the goods and share this invoice.',
+                        : 'Confirm payment before handing over goods.',
                     key: Key('work-counter-handover-hint'),
                     style: const TextStyle(
                       color: MoolColors.muted,
                       fontSize: 12,
                       height: 1.35,
                     ),
-                  ),
-                ],
-                if (!paid) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Choose the customer’s preferred channel, then send the invoice there.',
-                    style: TextStyle(color: MoolColors.muted, height: 1.35),
                   ),
                 ],
                 if (shareError != null) ...[
@@ -7255,9 +7262,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   key: const Key('work-invoice-share-chat'),
                   onPressed: () => _openChat(sheetContext),
                   icon: const Icon(Icons.chat_bubble_outline_rounded),
-                  label: Text(
-                    paid ? 'Share in Chat' : 'Send in MoolSocial Chat',
-                  ),
+                  label: const Text('Share in MoolSocial Chat'),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -7316,7 +7321,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                           }
                         },
                   icon: const Icon(Icons.send_outlined),
-                  label: Text(paid ? 'WhatsApp' : 'Send on WhatsApp'),
+                  label: const Text('Share on WhatsApp'),
                 ),
               ],
             ),
@@ -24254,7 +24259,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
           Text(
             'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
           ),
-          if (payment.dueMinor > 0)
+          if (payment.dueMinor > 0 && invoice.payment == 'Cash')
             OutlinedButton.icon(
               key: const Key('work-invoice-record-payment'),
               onPressed: !canRecord
@@ -24281,7 +24286,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                       );
                     },
               icon: const Icon(Icons.payments_outlined),
-              label: const Text('Record payment received'),
+              label: const Text('Record Payment Receipt'),
             ),
         ],
       );
@@ -24343,9 +24348,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   late final TextEditingController _productSearch = TextEditingController(
     text: widget.query,
   );
-  String? _saleCategory;
+  final _productSearchFocus = FocusNode(debugLabel: 'counter-product-search');
   bool _usbScanMode = false;
-  final _barcodeInput = TextEditingController();
+  String _barcodeBuffer = '';
+  bool _barcodeOverflow = false;
+  DateTime? _lastScannerKeyAt;
   final _barcodeFocus = FocusNode();
   late final TextEditingController _address = TextEditingController(
     text: widget.session.workspaceOrderAddress,
@@ -24387,9 +24394,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _openingDraft = true;
       _stage = 'customer';
       _productSearch.clear();
-      _saleCategory = null;
       _usbScanMode = false;
-      _barcodeInput.clear();
+      _clearScannerBuffer();
       _invoice = null;
       _collection = null;
       _saving = false;
@@ -24450,7 +24456,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     _address.removeListener(_rememberDetails);
     _customer.dispose();
     _productSearch.dispose();
-    _barcodeInput.dispose();
+    _productSearchFocus.dispose();
     _barcodeFocus.dispose();
     _address.dispose();
     super.dispose();
@@ -24475,17 +24481,6 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
 
   int get _selectedUnits => widget.session.workspaceOrderQuantities.values
       .fold<int>(0, (total, quantity) => total + quantity);
-
-  String get _draftItems => widget.session.workspaceCatalogueItems
-      .where(
-        (product) =>
-            (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
-      )
-      .map(
-        (product) =>
-            '${product.title} × ${widget.session.workspaceOrderQuantities[product.id]}',
-      )
-      .join(' · ');
 
   Future<void> _save({String? expectedReview}) async {
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
@@ -24565,9 +24560,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _customerReturnToItems = false;
       _customer.clear();
       _productSearch.clear();
-      _saleCategory = null;
       _usbScanMode = false;
-      _barcodeInput.clear();
+      _clearScannerBuffer();
       _barcodeFocus.unfocus();
       _customerInput = null;
       _address.clear();
@@ -24602,22 +24596,73 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextButton.icon(
-            onPressed: _saving ? null : () => setState(() => _stage = 'items'),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Back to items'),
-          ),
-          const Text(
-            'Review bill',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          _OrderReviewSummary(
-            customer: _customer.text.trim(),
-            source: _source,
-            items: _draftItems,
-            units: _selectedUnits,
-            amount: widget.session.workspaceOrderTotal,
+          Container(
+            key: const Key('work-order-review-summary'),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F7FB),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE5E8F1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.session.workspaceOrderBillingDetails.name
+                    .trim()
+                    .isNotEmpty)
+                  Text(
+                    widget.session.workspaceOrderBillingDetails.name.trim(),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                Text(
+                  _customer.text.trim(),
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+                const Divider(height: 24),
+                for (final product in widget.session.workspaceCatalogueItems)
+                  if ((widget.session.workspaceOrderQuantities[product.id] ??
+                          0) >
+                      0)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            product.title,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          _StoreMoneyLine(
+                            leading: Text(
+                              '${product.pack} · ${widget.session.workspaceOrderQuantities[product.id]} × ₹${_formatStoreAmount(product.sellingPrice)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MoolColors.muted,
+                              ),
+                            ),
+                            value:
+                                '₹${_formatStoreAmount(product.sellingPrice * widget.session.workspaceOrderQuantities[product.id]!)}',
+                          ),
+                        ],
+                      ),
+                    ),
+                const Divider(height: 16),
+                _StoreMoneyLine(
+                  key: const Key('work-counter-review-total'),
+                  leading: Text(
+                    'Total · $_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
+                  ),
+                  value:
+                      '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: MoolColors.navy,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           _OrderCompletionChoices(
@@ -24634,6 +24679,13 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               _rememberDetails();
             },
           ),
+          if (_payment == 'UPI')
+            _CounterUpiPanel(
+              key: ValueKey(widget.session.storeUpiScope),
+              session: widget.session,
+              amountPaise: widget.session.workspaceOrderTotal * 100,
+              reference: widget.session.retainedCounterDraft?.id,
+            ),
           if (_error != null)
             Semantics(
               key: const Key('work-bill-review-update'),
@@ -24694,27 +24746,101 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     );
   }
 
+  Future<void> _openProduct(WorkspaceCatalogueItem product) async {
+    if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
+      return;
+    }
+    final identity = _currentDraftIdentity;
+    final saleGeneration = widget.session.counterSaleGeneration;
+    _productSearchFocus.unfocus();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => _CounterStoreProductPage(
+          session: widget.session,
+          productId: product.id,
+          isCurrent: () =>
+              mounted &&
+              identity == _currentDraftIdentity &&
+              saleGeneration == widget.session.counterSaleGeneration &&
+              !widget.session.counterDraftEditingBlocked,
+        ),
+      ),
+    );
+  }
+
   Future<void> _scanProduct() async {
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
       return;
     }
     final identity = _currentDraftIdentity;
+    final saleGeneration = widget.session.counterSaleGeneration;
     final code = await showBuyV2ProductScanner(context);
     if (!mounted || code == null || code.trim().isEmpty) return;
-    if (identity != _currentDraftIdentity) return;
+    if (identity != _currentDraftIdentity ||
+        saleGeneration != widget.session.counterSaleGeneration) {
+      return;
+    }
     _addScannedProduct(code);
   }
 
   void _toggleUsbScanner() {
-    setState(() => _usbScanMode = !_usbScanMode);
+    _clearScannerBuffer();
+    final enable = !_usbScanMode || !_barcodeFocus.hasPrimaryFocus;
+    setState(() => _usbScanMode = enable);
     if (_usbScanMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _usbScanMode) _barcodeFocus.requestFocus();
       });
     } else {
       _barcodeFocus.unfocus();
-      _barcodeInput.clear();
+      _clearScannerBuffer();
     }
+  }
+
+  void _clearScannerBuffer() {
+    _barcodeBuffer = '';
+    _barcodeOverflow = false;
+    _lastScannerKeyAt = null;
+  }
+
+  KeyEventResult _handleScannerKey(FocusNode node, KeyEvent event) {
+    if (!_usbScanMode || !node.hasPrimaryFocus || _stage != 'items') {
+      return KeyEventResult.ignored;
+    }
+    if (event is KeyRepeatEvent) return KeyEventResult.handled;
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _toggleUsbScanner();
+      return KeyEventResult.handled;
+    }
+    final now = DateTime.now();
+    if (_lastScannerKeyAt != null &&
+        now.difference(_lastScannerKeyAt!) > const Duration(seconds: 2)) {
+      _clearScannerBuffer();
+    }
+    _lastScannerKeyAt = now;
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      final code = _barcodeBuffer;
+      final overflow = _barcodeOverflow;
+      _clearScannerBuffer();
+      if (overflow) {
+        widget.session.showError('Scan the product again.');
+      } else {
+        _addScannedProduct(code);
+      }
+      return KeyEventResult.handled;
+    }
+    final character = event.character;
+    if (character == null || character.runes.any((rune) => rune < 32)) {
+      return KeyEventResult.ignored;
+    }
+    if (_barcodeBuffer.length + character.length > 128) {
+      _barcodeOverflow = true;
+    } else {
+      _barcodeBuffer += character;
+    }
+    return KeyEventResult.handled;
   }
 
   void _addScannedProduct(String code) {
@@ -24742,9 +24868,9 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       return;
     }
     final product = matches.firstOrNull;
-    if (product == null || !product.published) {
+    if (product == null || !product.canSellAtCounter) {
       widget.session.showError(
-        'This product is not available in your published Store catalogue.',
+        'This product is not available in your store inventory.',
       );
       return;
     }
@@ -24922,157 +25048,136 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     }
     if (_stage == 'review') return _reviewPanel();
     final query = _productSearch.text.trim().toLowerCase();
-    final categories =
-        widget.session.workspaceCatalogueItems
-            .where((product) => product.published)
-            .map((product) => product.categoryId)
-            .where((category) => category.trim().isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-    final selectedCategory = categories.contains(_saleCategory)
-        ? _saleCategory
-        : null;
     final searchTerms = query
         .split(RegExp(r'\s+'))
         .where((term) => term.isNotEmpty);
     final products = widget.session.workspaceCatalogueItems
         .where(
-          (product) =>
-              product.published &&
-              (selectedCategory == null ||
-                  product.categoryId == selectedCategory) &&
-              searchTerms.every(
-                (term) =>
-                    '${product.title} ${product.brand} ${product.variant} ${product.pack} ${product.sku} ${product.barcode}'
-                        .toLowerCase()
-                        .contains(term),
-              ),
+          (product) => searchTerms.every(
+            (term) =>
+                '${product.title} ${product.brand} ${product.variant} ${product.pack} ${product.sku} ${product.barcode}'
+                    .toLowerCase()
+                    .contains(term),
+          ),
         )
         .toList(growable: false);
-    final selectedCustomer = _RecentCounterCustomer(
-      _customer.text.trim(),
-      widget.session.workspaceOrderBillingDetails,
-    ).label;
+    final enteredName = widget.session.workspaceOrderBillingDetails.name.trim();
+    final selectedCustomer = enteredName.isNotEmpty
+        ? enteredName
+        : _RecentCounterCustomer(
+            _customer.text.trim(),
+            widget.session.workspaceOrderBillingDetails,
+          ).label;
+    final mobile = _storedCounterCustomerMobile(_customer.text.trim());
+    final customerName =
+        selectedCustomer.replaceAll(RegExp(r'\D'), '') == mobile
+        ? 'Customer'
+        : selectedCustomer.split('·').first.trim();
     final customerControls = Container(
       key: const Key('work-sale-compact-controls'),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE9EDF5))),
       ),
-      child: _StoreScaledPair(
-        gap: 0,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        first: TextButton.icon(
+      child: SizedBox(
+        width: double.infinity,
+        child: TextButton(
           key: const Key('work-sale-customer'),
           onPressed: _editCustomer,
           style: TextButton.styleFrom(
             minimumSize: const Size(48, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             alignment: Alignment.centerLeft,
           ),
-          icon: const Icon(Icons.person_outline_rounded, size: 20),
-          label: Text(
-            selectedCustomer.isEmpty
-                ? 'Add customer'
-                : selectedCustomer.split('·').first.trim(),
-            key: const Key('work-sale-customer-label'),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                customerName.isEmpty ? 'Customer' : customerName,
+                key: const Key('work-sale-customer-label'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                semanticsLabel: selectedCustomer,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (mobile != null)
+                Text(
+                  '+91 $mobile',
+                  key: const Key('work-sale-customer-mobile'),
+                  style: const TextStyle(fontSize: 12, color: MoolColors.muted),
+                ),
+            ],
           ),
-        ),
-        second: Wrap(
-          children: [
-            IconButton(
-              key: const Key('work-counter-camera-scan'),
-              tooltip: 'Scan product',
-              onPressed: _scanProduct,
-              icon: const Icon(Icons.qr_code_scanner),
-            ),
-            IconButton(
-              key: const Key('work-counter-usb-scan'),
-              tooltip: _usbScanMode
-                  ? 'Close barcode input'
-                  : 'Use attached scanner',
-              onPressed: _toggleUsbScanner,
-              icon: const Icon(Icons.barcode_reader),
-            ),
-          ],
         ),
       ),
     );
     final controls = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        customerControls,
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: TextField(
-            key: const Key('work-counter-product-search'),
-            controller: _productSearch,
-            onChanged: (_) => setState(() {}),
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              labelText: 'Search',
-              hintText: 'Name or code',
-              prefixIcon: const Icon(Icons.search),
-              border: const OutlineInputBorder(),
-              suffixIcon: query.isEmpty
-                  ? null
-                  : IconButton(
-                      key: const Key('work-counter-search-clear'),
-                      tooltip: 'Clear search',
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => setState(_productSearch.clear),
-                    ),
-            ),
-          ),
-        ),
-        if (_usbScanMode)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Semantics(
+            textField: true,
+            label: 'Search store products',
+            onTap: _productSearchFocus.requestFocus,
             child: TextField(
-              key: const Key('work-counter-barcode-input'),
-              controller: _barcodeInput,
-              focusNode: _barcodeFocus,
-              keyboardType: TextInputType.none,
-              autocorrect: false,
-              enableSuggestions: false,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Scan product barcode',
-                border: OutlineInputBorder(),
+              key: const Key('work-counter-product-search'),
+              controller: _productSearch,
+              focusNode: _productSearchFocus,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _productSearchFocus.unfocus(),
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: 'Search products',
+                isDense: true,
+                filled: false,
+                prefixIcon: const Icon(Icons.search_rounded, size: 21),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (query.isNotEmpty)
+                      IconButton(
+                        key: const Key('work-counter-search-clear'),
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(_productSearch.clear);
+                          _productSearchFocus.requestFocus();
+                        },
+                      ),
+                    IconButton(
+                      key: const Key('work-counter-camera-scan'),
+                      tooltip: 'Scan product',
+                      onPressed: () {
+                        _productSearchFocus.unfocus();
+                        _scanProduct();
+                      },
+                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    ),
+                    IconButton(
+                      key: const Key('work-counter-usb-scan'),
+                      tooltip: _usbScanMode
+                          ? 'Stop attached scanner'
+                          : 'Use attached scanner',
+                      onPressed: _toggleUsbScanner,
+                      isSelected: _usbScanMode,
+                      icon: const Icon(Icons.barcode_reader, size: 20),
+                    ),
+                  ],
+                ),
               ),
-              onSubmitted: (code) {
-                _addScannedProduct(code);
-                _barcodeInput.clear();
-                _barcodeFocus.requestFocus();
-              },
             ),
           ),
-        SingleChildScrollView(
-          key: const Key('work-counter-categories'),
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              for (final category in <String?>[null, ...categories])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    key: ValueKey('work-counter-category-${category ?? 'all'}'),
-                    label: Text(
-                      category == null
-                          ? 'All'
-                          : category.replaceAll(RegExp(r'[-_]'), ' '),
-                    ),
-                    selected: selectedCategory == category,
-                    onSelected: (_) => setState(() => _saleCategory = category),
-                    materialTapTargetSize: MaterialTapTargetSize.padded,
-                  ),
-                ),
-            ],
-          ),
         ),
+        customerControls,
       ],
     );
     final emptyProducts = Center(
@@ -25107,8 +25212,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       itemCount: products.length,
       separatorBuilder: (_, _) =>
           const Divider(height: 1, color: Color(0xFFE9EDF5)),
-      itemBuilder: (context, index) =>
-          _SaleProductTile(product: products[index], session: widget.session),
+      itemBuilder: (context, index) => _SaleProductTile(
+        product: products[index],
+        session: widget.session,
+        onOpen: () => _openProduct(products[index]),
+      ),
     );
     final errorText =
         widget.session.counterDraftError ??
@@ -25196,59 +25304,72 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     return Material(
       key: const Key('work-dashboard-counter-order-screen'),
       color: Colors.white,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // When fixed controls would crowd out products, keep one native scroll
-          // surface instead of clipping content or reducing the chosen text size.
-          final scaledLine = MediaQuery.textScalerOf(context).scale(14);
-          // Reserve room for customer/scanner controls, search, categories,
-          // the bill action and at least one usable product row.
-          final minimumWorkingHeight = scaledLine * 12 + 240;
-          if (error != null || constraints.maxHeight < minimumWorkingHeight) {
-            final pinBillAction = constraints.maxHeight >= scaledLine * 5 + 100;
-            final scroll = CustomScrollView(
-              key: const Key('work-sale-short-scroll'),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: [
-                SliverToBoxAdapter(child: controls),
-                if (products.isEmpty)
-                  SliverToBoxAdapter(child: emptyProducts)
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      key: const Key('work-sale-products'),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => _SaleProductTile(
-                          product: products[index],
-                          session: widget.session,
+      child: Focus(
+        key: const Key('work-counter-scanner-listener'),
+        focusNode: _barcodeFocus,
+        skipTraversal: true,
+        canRequestFocus: _usbScanMode,
+        onFocusChange: (focused) {
+          if (!focused) _clearScannerBuffer();
+        },
+        onKeyEvent: _handleScannerKey,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // When fixed controls would crowd out products, keep one native scroll
+            // surface instead of clipping content or reducing the chosen text size.
+            final scaledLine = MediaQuery.textScalerOf(context).scale(14);
+            // Reserve room for customer controls and inline search,
+            // the bill action and at least one usable product row.
+            final minimumWorkingHeight = scaledLine * 12 + 240;
+            if (error != null || constraints.maxHeight < minimumWorkingHeight) {
+              final pinBillAction =
+                  constraints.maxHeight >= scaledLine * 5 + 100;
+              final scroll = CustomScrollView(
+                key: const Key('work-sale-short-scroll'),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                slivers: [
+                  SliverToBoxAdapter(child: controls),
+                  if (products.isEmpty)
+                    SliverToBoxAdapter(child: emptyProducts)
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverList(
+                        key: const Key('work-sale-products'),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _SaleProductTile(
+                            product: products[index],
+                            session: widget.session,
+                            onOpen: () => _openProduct(products[index]),
+                          ),
+                          childCount: products.length,
                         ),
-                        childCount: products.length,
                       ),
                     ),
-                  ),
-                if (error != null) SliverToBoxAdapter(child: error),
-                if (!pinBillAction) SliverToBoxAdapter(child: total),
+                  if (error != null) SliverToBoxAdapter(child: error),
+                  if (!pinBillAction) SliverToBoxAdapter(child: total),
+                ],
+              );
+              return pinBillAction
+                  ? Column(
+                      children: [
+                        Expanded(child: scroll),
+                        total,
+                      ],
+                    )
+                  : scroll;
+            }
+            return Column(
+              children: [
+                controls,
+                Expanded(child: products.isEmpty ? emptyProducts : productList),
+                ?error,
+                total,
               ],
             );
-            return pinBillAction
-                ? Column(
-                    children: [
-                      Expanded(child: scroll),
-                      total,
-                    ],
-                  )
-                : scroll;
-          }
-          return Column(
-            children: [
-              controls,
-              Expanded(child: products.isEmpty ? emptyProducts : productList),
-              ?error,
-              total,
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -25345,7 +25466,6 @@ class _StoreSaleCustomerSheet extends StatefulWidget {
 class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
   late final _controller = TextEditingController(text: widget.initialValue);
   String? _error;
-  late bool _expanded = !widget.billingDetails.isEmpty;
   late bool _business = widget.billingDetails.business;
   late bool _businessExpanded = widget.billingDetails.business;
   late final _name = TextEditingController(text: widget.billingDetails.name);
@@ -25382,7 +25502,6 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
     _billingAddress.text = details.address;
     _business = details.business;
     _businessExpanded = details.business;
-    _expanded = !details.isEmpty;
     _lastDraft = mobile;
     _applyingRecent = false;
     widget.onDraftChanged?.call(mobile);
@@ -25408,6 +25527,10 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
     }
     _controller.addListener(() {
       if (_applyingRecent) return;
+      if (_error != null &&
+          normalizeWorkspaceMobile(_controller.text) != null) {
+        setState(() => _error = null);
+      }
       if (_lastDraft != _controller.text) {
         final original = _storedCounterCustomerMobile(_lastDraft);
         if (original != null &&
@@ -25491,7 +25614,7 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                   children: [
                     const Expanded(
                       child: Text(
-                        'Customer',
+                        'Customer details',
                         key: Key('work-sale-customer-title'),
                         style: TextStyle(
                           color: MoolColors.navy,
@@ -25510,14 +25633,25 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                       ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                _AccessibleWorkTextField(
+                  keyName: 'work-sale-customer-name',
+                  controller: _name,
+                  label: 'Type Customer Name',
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 12),
                 _AccessibleWorkTextField(
                   keyName: 'work-order-customer',
                   controller: _controller,
-                  label: 'Customer mobile number',
+                  label: 'Mobile Number',
                   stackedLabel: media.textScaler.scale(14) > 21,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
-                  prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Center(widthFactor: 1, child: Text('+91')),
+                  ),
                 ),
                 if (_error != null)
                   Semantics(
@@ -25528,26 +25662,13 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                       style: const TextStyle(color: Color(0xFFB42318)),
                     ),
                   ),
-                TextButton.icon(
-                  key: const Key('work-sale-customer-details'),
-                  onPressed: () => setState(() => _expanded = !_expanded),
-                  icon: Icon(_expanded ? Icons.remove : Icons.add),
-                  label: Text(
-                    _expanded
-                        ? 'Hide optional details'
-                        : 'Add customer details',
-                  ),
-                ),
-                if (_expanded) ...[
-                  _AccessibleWorkTextField(
-                    keyName: 'work-sale-customer-name',
-                    controller: _name,
-                    label: _business
-                        ? 'Contact name (optional)'
-                        : 'Name (optional)',
-                  ),
-                  TextButton.icon(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
                     key: const Key('work-sale-business-details'),
+                    tooltip: _businessExpanded
+                        ? 'Collapse business details'
+                        : 'Expand business details',
                     onPressed: () {
                       setState(() {
                         _businessExpanded = !_businessExpanded;
@@ -25555,37 +25676,28 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                       });
                       _rememberBilling();
                     },
-                    icon: Icon(
-                      _businessExpanded
-                          ? Icons.visibility_off_outlined
-                          : Icons.add,
-                    ),
-                    label: Text(
-                      _businessExpanded
-                          ? 'Hide business details'
-                          : 'Add business details',
-                    ),
+                    icon: Icon(_businessExpanded ? Icons.remove : Icons.add),
                   ),
-                  if (_businessExpanded) ...[
-                    _AccessibleWorkTextField(
-                      keyName: 'work-sale-business-name',
-                      controller: _businessName,
-                      label: 'Business name (optional)',
-                    ),
-                    _AccessibleWorkTextField(
-                      keyName: 'work-sale-business-gst',
-                      controller: _gst,
-                      label: 'GST number (optional)',
-                    ),
-                    _AccessibleWorkTextField(
-                      keyName: 'work-sale-billing-address',
-                      controller: _billingAddress,
-                      label: 'Billing address (optional)',
-                    ),
-                  ],
+                ),
+                if (_businessExpanded) ...[
+                  _AccessibleWorkTextField(
+                    keyName: 'work-sale-business-name',
+                    controller: _businessName,
+                    label: 'Business Name',
+                  ),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-sale-business-gst',
+                    controller: _gst,
+                    label: 'GST',
+                  ),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-sale-billing-address',
+                    controller: _billingAddress,
+                    label: 'Billing Address',
+                  ),
                 ],
                 const Text(
-                  'Delivery needed? Share your store link so the customer can order for delivery.',
+                  'For home delivery, share your store link with the customer at the mobile number entered above using WhatsApp or MoolSocial Chat.',
                   style: TextStyle(color: MoolColors.muted, fontSize: 12),
                 ),
                 if (widget.recentCustomers.isNotEmpty) ...[
@@ -25602,7 +25714,11 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                         customer.label,
                         style: const TextStyle(fontSize: 14),
                       ),
-                      subtitle: customer.label == customer.mobile
+                      subtitle:
+                          customer.mobile == null ||
+                              customer.label
+                                  .replaceAll(RegExp(r'\D'), '')
+                                  .endsWith(customer.mobile!)
                           ? null
                           : Text(customer.mobile!),
                       onTap: () => _selectRecent(customer),
@@ -25618,27 +25734,39 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
 }
 
 class _SaleProductTile extends StatelessWidget {
-  const _SaleProductTile({required this.product, required this.session});
+  const _SaleProductTile({
+    required this.product,
+    required this.session,
+    required this.onOpen,
+  });
   final WorkspaceCatalogueItem product;
   final WorkSession session;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
     return Padding(
       key: Key('work-sale-product-${product.id}'),
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _StoreMoneyLine(
-            leading: Text(
-              product.title,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 14,
-                height: 1.25,
-                fontWeight: FontWeight.w700,
+            leading: InkWell(
+              key: Key('work-sale-product-open-${product.id}'),
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  product.title,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 14,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
             value: '₹${_formatStoreAmount(product.sellingPrice)}',
@@ -25653,7 +25781,11 @@ class _SaleProductTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${product.pack} · ${product.stock} in stock',
+                  '${product.pack} · ${!product.available
+                      ? 'Unavailable'
+                      : product.stockMode == WorkspaceStockMode.availabilityOnly
+                      ? 'Available'
+                      : '${product.stock} in stock'}',
                   style: const TextStyle(
                     color: MoolColors.muted,
                     fontSize: 12,
@@ -25693,12 +25825,12 @@ class _SaleProductTile extends StatelessWidget {
                 tooltip: 'Add ${product.title} to bill',
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 onPressed:
-                    product.published &&
+                    product.canSellAtCounter &&
                         (product.stockMode ==
                                 WorkspaceStockMode.availabilityOnly
                             ? quantity < 99
                             : product.stock > quantity)
-                    ? () => session.adjustWorkspaceOrderQuantity(product.id, 1)
+                    ? onOpen
                     : null,
                 style: IconButton.styleFrom(
                   foregroundColor: MoolColors.navy,
@@ -25712,6 +25844,158 @@ class _SaleProductTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CounterStoreProductPage extends StatefulWidget {
+  const _CounterStoreProductPage({
+    required this.session,
+    required this.productId,
+    required this.isCurrent,
+  });
+  final WorkSession session;
+  final String productId;
+  final bool Function() isCurrent;
+  @override
+  State<_CounterStoreProductPage> createState() =>
+      _CounterStoreProductPageState();
+}
+
+class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
+  String? error;
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final product = widget.session.workspaceCatalogueItems
+          .where((p) => p.id == widget.productId)
+          .firstOrNull;
+      final current = widget.isCurrent();
+      final quantity =
+          widget.session.workspaceOrderQuantities[widget.productId] ?? 0;
+      final canAdd =
+          current &&
+          product != null &&
+          product.canSellAtCounter &&
+          (product.stockMode == WorkspaceStockMode.availabilityOnly
+              ? quantity < 99
+              : quantity < product.stock);
+      return Scaffold(
+        key: const Key('work-counter-store-product-page'),
+        backgroundColor: Colors.white,
+        appBar: AppBar(title: const Text('Store Product')),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              if (!current)
+                const Text(
+                  'This sale has changed. Return to Counter Sale to continue.',
+                )
+              else if (product == null)
+                const Text('This product is no longer in your store catalogue.')
+              else ...[
+                Text(
+                  product.brand,
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  product.title,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: MoolColors.navy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text('${product.variant} · ${product.pack}'),
+                const SizedBox(height: 24),
+                Text(
+                  '₹${_formatStoreAmount(product.sellingPrice)}',
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(product.unitPrice),
+                if (product.mrp != null)
+                  Text('MRP ₹${_formatStoreAmount(product.mrp!)}'),
+                const Divider(height: 32),
+                _ProductPreviewLine(label: 'In this bill', value: '$quantity'),
+                _ProductPreviewLine(
+                  label: 'Availability',
+                  value: !product.canSellAtCounter
+                      ? 'Unavailable'
+                      : product.stockMode == WorkspaceStockMode.availabilityOnly
+                      ? 'Available'
+                      : '${product.stock} in stock',
+                ),
+                _ProductPreviewLine(label: 'Product code', value: product.sku),
+                const SizedBox(height: 8),
+                const Text(
+                  'Barcode',
+                  style: TextStyle(color: MoolColors.muted, fontSize: 14),
+                ),
+                Text(
+                  product.barcode,
+                  key: const Key('work-counter-product-barcode'),
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _ProductPreviewLine(
+                  label: 'Country of origin',
+                  value: product.origin,
+                ),
+                if (product.composition?.isNotEmpty == true) ...[
+                  const SizedBox(height: 16),
+                  Text(product.composition!),
+                ],
+                if (product.returnPolicy?.isNotEmpty == true) ...[
+                  const SizedBox(height: 16),
+                  Text(product.returnPolicy!),
+                ],
+              ],
+              if (error != null)
+                Text(error!, style: const TextStyle(color: Color(0xFFB42318))),
+            ],
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.all(16),
+          child: FilledButton.icon(
+            key: const Key('work-counter-product-add-confirm'),
+            icon: const Icon(Icons.add_shopping_cart),
+            label: const Text('Add to bill'),
+            onPressed: !canAdd
+                ? null
+                : () {
+                    if (!widget.isCurrent()) return;
+                    widget.session.adjustWorkspaceOrderQuantity(
+                      widget.productId,
+                      1,
+                    );
+                    if ((widget.session.workspaceOrderQuantities[widget
+                                .productId] ??
+                            0) ==
+                        quantity + 1) {
+                      Navigator.of(context).pop();
+                    } else {
+                      setState(
+                        () => error =
+                            widget.session.errorMessage ??
+                            'Could not add this product. Check availability and try again.',
+                      );
+                    }
+                  },
+          ),
+        ),
+      );
+    },
+  );
 }
 
 // ignore: unused_element
@@ -25748,70 +26032,281 @@ class _OrderTotalBar extends StatelessWidget {
   }
 }
 
-class _OrderReviewSummary extends StatelessWidget {
-  const _OrderReviewSummary({
-    required this.customer,
-    required this.source,
-    required this.items,
-    required this.units,
-    required this.amount,
+class _CounterUpiPanel extends StatefulWidget {
+  const _CounterUpiPanel({
+    super.key,
+    required this.session,
+    required this.amountPaise,
+    required this.reference,
   });
+  final WorkSession session;
+  final int amountPaise;
+  final String? reference;
 
-  final String customer;
-  final String source;
-  final String items;
-  final int units;
-  final int amount;
+  @override
+  State<_CounterUpiPanel> createState() => _CounterUpiPanelState();
+}
+
+class _CounterUpiPanelState extends State<_CounterUpiPanel> {
+  late final _scope = widget.session.storeUpiScope;
+  final _address = TextEditingController();
+  final _payee = TextEditingController();
+  WorkspaceUpiDestination? _destination;
+  bool _loading = true, _saving = false, _editing = false;
+  String? _error;
+
+  bool get _current =>
+      mounted && _scope != null && _scope == widget.session.storeUpiScope;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _address.dispose();
+    _payee.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (!_current) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final destination = await widget.session.loadStoreUpiDestination(_scope!);
+      if (!_current) return;
+      setState(() {
+        _destination = destination;
+        _address.text = destination?.address ?? '';
+        _payee.text =
+            destination?.payeeName ??
+            widget.session.activeWorkspace?.name ??
+            '';
+      });
+    } on Object {
+      if (_current) {
+        setState(() => _error = 'Could not load Store UPI details. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_current || _saving) return;
+    final destination = WorkspaceUpiDestination(
+      account: _scope!.account,
+      store: _scope!.store,
+      address: _address.text.trim(),
+      payeeName: _payee.text.trim(),
+      merchantCode: _destination?.merchantCode ?? '',
+    );
+    if (!destination.valid) {
+      setState(() => _error = 'Enter a valid UPI ID and account holder name.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.session.saveStoreUpiDestination(destination);
+      if (!_current) return;
+      final stored = await widget.session.loadStoreUpiDestination(_scope!);
+      if (!_current) return;
+      if (stored == null ||
+          stored.address != destination.address ||
+          stored.payeeName != destination.payeeName) {
+        throw StateError('UPI destination changed during save');
+      }
+      setState(() {
+        _destination = stored;
+        _editing = false;
+      });
+    } on Object {
+      if (_current) {
+        setState(
+          () => _error =
+              'UPI details could not be confirmed. Reload before trying again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const Key('work-order-review-summary'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F6FF),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    if (!_current) {
+      return const Text(
+        'Return to your Store to set up UPI.',
+        key: Key('work-sale-payment-request-unavailable'),
+      );
+    }
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text('Loading Store UPI details…'),
+      );
+    }
+    Uri? uri;
+    if (_destination != null && !_editing && widget.reference != null) {
+      try {
+        uri = _destination!.paymentUri(
+          expectedAccount: _scope!.account,
+          expectedStore: _scope!.store,
+          amountPaise: widget.amountPaise,
+          reference: widget.reference!,
+        );
+      } on FormatException {
+        // No fallback payee, amount, or invented transaction reference.
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _StoreMoneyLine(
-            leading: Text(
-              customer,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontWeight: FontWeight.w900,
+          if (_error != null) ...[
+            Semantics(
+              liveRegion: true,
+              child: Text(_error!, key: const Key('work-sale-upi-error')),
+            ),
+            TextButton(
+              onPressed: _saving ? null : _load,
+              child: const Text('Reload UPI details'),
+            ),
+          ],
+          if (_destination == null || _editing) ...[
+            const Text(
+              'Set up Store UPI',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const Text(
+              'Enter your Store’s UPI ID. Check the account holder name in your banking app before saving.',
+              key: Key('work-sale-payment-request-unavailable'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('work-sale-upi-address'),
+              controller: _address,
+              enabled: !_saving,
+              autocorrect: false,
+              enableSuggestions: false,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Store UPI ID'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('work-sale-upi-payee'),
+              controller: _payee,
+              enabled: !_saving,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+              decoration: const InputDecoration(
+                labelText: 'Account holder name',
               ),
             ),
-            value: '₹${_formatStoreAmount(amount)}',
-            style: const TextStyle(
-              color: MoolColors.navy,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              key: const Key('work-sale-upi-save'),
+              child: Text(_saving ? 'Saving…' : 'Use this UPI ID'),
             ),
-          ),
-          Text(
-            '$source order · $units ${units == 1 ? 'unit' : 'units'}',
-            style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            items,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: MoolColors.ink,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+          ] else ...[
+            Text(
+              _destination!.payeeName,
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-          ),
+            SelectableText(_destination!.address),
+            if (uri != null) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: _StoreMoneyText(
+                  '₹${_formatStoreAmount(widget.amountPaise ~/ 100)}.${(widget.amountPaise % 100).toString().padLeft(2, '0')}',
+                  key: const Key('work-sale-upi-amount'),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Semantics(
+                  label: 'Scan to pay this Store by UPI',
+                  image: true,
+                  child: CustomPaint(
+                    key: const Key('work-sale-upi-qr'),
+                    size: const Size(224, 224),
+                    painter: _StoreUpiQrPainter(uri.toString()),
+                  ),
+                ),
+              ),
+              const Text(
+                'Ask the customer to scan. Confirm receipt in your banking app; this bill stays unpaid.',
+              ),
+            ] else
+              const Text(
+                'Save the bill details before showing its payment QR.',
+                key: Key('work-sale-payment-request-unavailable'),
+              ),
+            TextButton(
+              onPressed: () => setState(() => _editing = true),
+              child: const Text('Change Store UPI'),
+            ),
+          ],
         ],
       ),
     );
   }
+}
+
+class _StoreUpiQrPainter extends CustomPainter {
+  _StoreUpiQrPainter(this.data);
+  final String data;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    // Generous white quiet zone; never stretch or decorate the encoded modules.
+    final side = (size.shortestSide - 40).clamp(1.0, double.infinity);
+    final offset = Offset((size.width - side) / 2, (size.height - side) / 2);
+    final ink = Paint()
+      ..color = Colors.black
+      ..isAntiAlias = false;
+    for (final element in store_qr.Barcode.qrCode().make(
+      data,
+      width: side,
+      height: side,
+    )) {
+      if (element is store_qr.BarcodeBar && element.black) {
+        canvas.drawRect(
+          Rect.fromLTWH(
+            offset.dx + element.left,
+            offset.dy + element.top,
+            element.width,
+            element.height,
+          ),
+          ink,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StoreUpiQrPainter oldDelegate) =>
+      oldDelegate.data != data;
 }
 
 class _OrderCompletionChoices extends StatelessWidget {
@@ -25877,32 +26372,64 @@ class _OrderCompletionChoices extends StatelessWidget {
       if (counterOnly) ...[
         const Text('Payment method'),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final method in const ['Cash', 'UPI'])
-              ChoiceChip(
-                key: ValueKey('work-sale-payment-${method.toLowerCase()}'),
-                avatar: Icon(
-                  method == 'Cash'
-                      ? Icons.payments_outlined
-                      : Icons.qr_code_rounded,
-                  size: 20,
+        IntrinsicHeight(
+          child: Row(
+            key: const Key('work-sale-payment-row'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final method in const ['Cash', 'UPI', 'Bank Transfer'])
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: method == 'Bank Transfer' ? 0 : 6,
+                    ),
+                    child: Semantics(
+                      key: ValueKey(
+                        'work-sale-payment-state-${method.toLowerCase()}',
+                      ),
+                      selected: payment == method,
+                      child: OutlinedButton(
+                        key: ValueKey(
+                          'work-sale-payment-${method.toLowerCase()}',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 8,
+                          ),
+                          backgroundColor: payment == method
+                              ? MoolColors.navy
+                              : Colors.white,
+                          foregroundColor: payment == method
+                              ? Colors.white
+                              : MoolColors.navy,
+                          side: BorderSide(
+                            color: payment == method
+                                ? MoolColors.navy
+                                : const Color(0xFFE5E8F1),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => onPaymentChanged(method),
+                        child: Text(
+                          method,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                label: Text(method),
-                selected: payment == method,
-                showCheckmark: true,
-                materialTapTargetSize: MaterialTapTargetSize.padded,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                onSelected: (_) => onPaymentChanged(method),
-              ),
-          ],
+            ],
+          ),
         ),
-        if (payment != 'Cash' && payment != 'UPI')
+        if (!const ['Cash', 'UPI', 'Bank Transfer'].contains(payment))
           Text('Saved payment method: $payment'),
       ] else
         DropdownButtonFormField<String>(
@@ -25928,11 +26455,12 @@ class _OrderCompletionChoices extends StatelessWidget {
           },
         ),
       const SizedBox(height: 10),
-      const Text(
-        'Confirm payment separately. Recording this bill does not collect payment.',
-        style: TextStyle(color: MoolColors.muted, fontSize: 12, height: 1.4),
-      ),
-      if (payment == 'UPI' || payment == 'Pay request') ...[
+      if (!counterOnly || payment != 'UPI')
+        const Text(
+          'Confirm payment separately. Recording this bill does not collect payment.',
+          style: TextStyle(color: MoolColors.muted, fontSize: 12, height: 1.4),
+        ),
+      if (!counterOnly && (payment == 'UPI' || payment == 'Pay request')) ...[
         const SizedBox(height: 8),
         const Text(
           'UPI QR and payment links are not available for this Store yet. '

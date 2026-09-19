@@ -235,7 +235,7 @@ class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
           ),
           pw.SizedBox(height: 20),
           pw.Text(
-            'Local review copy. Not a backend-issued invoice or proof of payment.',
+            'Preview only. Not an issued invoice or proof of payment.',
             style: pw.TextStyle(fontSize: 9, color: muted),
           ),
         ],

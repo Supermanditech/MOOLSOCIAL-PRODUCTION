@@ -13,6 +13,29 @@ its earlier unverified customer-form edit. Never commit feature source there.
 
 ## Reproduced scope and acceptance units
 
+Founder authorization update, 19 September 2026: all seventeen displayed v13
+local journey/branch screens are approved, including public/private inventory.
+Founder replied "yes authorised" to ticket-scoped Git commit/push and required
+integration, followed by one non-production review APK build/install after all
+gates pass. This is bounded candidate-preparation authority, not permission to
+skip qualification/integration, clear data, release to production, send messages
+or make real transactions. OPPO acceptance remains pending. Installed r66.33
+cannot qualify the revised implementation. Preserve approved layouts and test
+the exact checksum-matched successor with synthetic review data only.
+
+Latest founder inventory amendment: Counter Sale automatically lists the active
+Store's own catalogue, including public and private inventory. Inline Search
+continues to filter by typed product information; explicit manual add uses the
+approved full Product page and matched scans add directly to the cart. Publication
+is not sale eligibility: unavailable/out-of-stock rows may be inspected but not
+added. Preserve stock limits, Store/account scoping, draft and invoice contracts;
+never turn a private listing public. This is a CS-206/207/209 continuation, not a
+new public-discovery or backend owner. Founder stated that the remaining shown
+v10 screens remain approved; do not redesign them. Local approval is not physical
+OPPO acceptance or Git/build authorization. Focused UI/atomic tests cover blank
+Search auto-listing, private search/manual/scanner add, clear-to-inventory,
+unavailable/zero-stock rejection, retained publication flags and invoice stock.
+
 Authoritative pre-change OPPO screenshots/XML and full reproduction steps:
 C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/counter-sale-reproduction-20260919.md.
 
@@ -51,8 +74,9 @@ pending. No fresh invoice, payment or message was submitted during pass 79–94.
 Prior six-ticket register overstated implementation and reproduction. Captures
 69–78 have misleading filenames and are retained, not accepted as proof of
 their named destinations. The earlier customer-form edit has no passing tests
-and is not in the installed runtime. Regression registration is pending before
-any new implementation/build/device attempt.
+and is not in the installed runtime. REG-20260919-4631 now records these
+incidents and later test/gate corrections. The isolated feature changes have
+local tests; neither the old integration edit nor new source is OPPO-accepted.
 
 ## Gate and test plan
 
@@ -66,3 +90,50 @@ tests plus affected regressions, and qualify a uniquely versioned review build.
 Show the complete OPPO visual journey to the founder. Acceptance, local/OPPO
 tests and Git closure must each be evidenced separately. Do not mark tickets
 closed or manufacture approval while any boundary is pending.
+
+## Scoped machine-state reconciliation and reuse assessment
+
+The founder explicitly selected all fifteen Counter Sale corrections and the
+evidence/ticket/implementation/local-test/OPPO/founder/Git sequence, then gave
+narrow standing approval for ticket-specific policy/gate blockers. The initial
+disclosure and admission above precede feature implementation. Machine MVP and
+incremental reconciliation is being recorded later; do not claim those exact
+scoped gates ran retroactively before the earlier implementation.
+
+Actor: signed-in retailer operating the active Store's Counter Sale capability.
+Outcome: quick customer/product entry and accurate review/invoice/payment-choice
+handling without inventing a sale, payment, delivery or message completion.
+Classification remains mvp_supporting, bounded to the existing Store journey.
+
+Reuse inventory: dashboard owns customer entry, catalogue, cart, review and
+invoice presentation; work_models/work_session/work_services own retained draft,
+catalogue, invoice, collection, stock and encrypted settings. Existing Buy search
+and scanner were inspected; its private UI is not copied as a second Buy route.
+The Store product editor/preview cannot safely serve an Add-to-bill action, so
+the requested read-only full Store Product page uses one internal Navigator route
+and the existing cart owner. Existing PDF dependency exports the QR encoder;
+there is no new package or separate payment platform. No Store UPI destination
+owner existed, so device-local encrypted settings and scope-checked request
+construction are necessary. They confer no bank verification/payment authority.
+
+CS-201 through CS-216 reuse those owners; the product page and UPI destination
+are necessary new work within them. No per-actor duplicate screen, new backend,
+SQL Connect, authentication, Buy rewrite or production payment execution.
+Review-build preparation reuses existing gate/wrapper controls. The incremental
+state binds the exact combined 20260918-v2 baseline; a later implementation check
+does not substitute for the preserved original clean checkout evidence.
+
+Required robustness: long names/enlarged text, IME focus/typing/Back, product
+Back without mutation, live stock loss, same-Store new-sale rejection, customer
+and business retention, immutable invoice money, account/Store isolation,
+corrupt storage/read/write recovery, unpaid noncash truth, QR payload and optical
+decoding, full connected local regressions, physical OPPO interruptions and
+checksum-matched screenshots. Host images are explicitly not OPPO evidence.
+
+Delivery impact estimate: two additional working days for bounded correction,
+qualification and review, within the existing October window; this is an estimate,
+not a delivery or acceptance claim. Dependencies: exact review candidate gates,
+retailer UPI setup permission review, connected OPPO, founder visual decision.
+Build/install authority remains false in this scope state until an exact gated
+candidate is registered. No release, Play, deployment, message sending, real
+transfer, destructive Git or founder-acceptance authority is inferred.

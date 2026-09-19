@@ -513,6 +513,204 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('COUNTER1919 UPI destination', () {
+    const destination = WorkspaceUpiDestination(
+      account: 'account-A',
+      store: 'store-A',
+      address: 'synthetic-store@examplebank',
+      payeeName: 'Store & Sons',
+    );
+
+    test('round trips destination without asserting bank verification', () {
+      expect(destination.valid, isTrue);
+      expect(
+        WorkspaceUpiDestination.fromJson(destination.toJson())!.toJson(),
+        destination.toJson(),
+      );
+      expect(destination.toJson().containsKey('verified'), isFalse);
+    });
+
+    test('encodes exact retailer destination and integer paise', () {
+      for (final (paise, encoded) in [
+        (1, '0.01'),
+        (26400, '264.00'),
+        (26409, '264.09'),
+      ]) {
+        final uri = destination.paymentUri(
+          expectedAccount: 'account-A',
+          expectedStore: 'store-A',
+          amountPaise: paise,
+          reference: 'counter-1919',
+        );
+        expect(uri.scheme, 'upi');
+        expect(uri.host, 'pay');
+        expect(uri.queryParameters, {
+          'pa': 'synthetic-store@examplebank',
+          'pn': 'Store & Sons',
+          'tr': 'counter-1919',
+          'tn': 'Counter Sale',
+          'am': encoded,
+          'cu': 'INR',
+        });
+      }
+    });
+
+    test('rejects cross-account Store and malformed requests', () {
+      for (final (account, store, amount, reference) in [
+        ('account-B', 'store-A', 100, 'counter-1'),
+        ('account-A', 'store-B', 100, 'counter-1'),
+        ('account-A', 'store-A', 0, 'counter-1'),
+        ('account-A', 'store-A', -1, 'counter-1'),
+        ('account-A', 'store-A', 100, ''),
+        ('account-A', 'store-A', 100, 'counter&pa=other@bank'),
+      ]) {
+        expect(
+          () => destination.paymentUri(
+            expectedAccount: account,
+            expectedStore: store,
+            amountPaise: amount,
+            reference: reference,
+          ),
+          throwsFormatException,
+        );
+      }
+    });
+
+    test('rejects corrupt saved destination and URI injection', () {
+      for (final overrides in <Map<String, Object?>>[
+        {'version': 2},
+        {'account': ''},
+        {'store': ''},
+        {'address': ''},
+        {'address': 'store@bank&am=1'},
+        {'address': 'store@bank\n'},
+        {'payeeName': 'Store\nOther'},
+        {'payeeName': ' '},
+        {'merchantCode': 'abc'},
+      ]) {
+        expect(
+          WorkspaceUpiDestination.fromJson({
+            ...destination.toJson(),
+            ...overrides,
+          }),
+          isNull,
+        );
+      }
+    });
+
+    test(
+      'encrypted storage restores only the active account and Store',
+      () async {
+        final storage = _OrderJournalStorage();
+        var account = 'account-A';
+        var store = 'store-A';
+        SecureWorkUpiDestinationStore reopen() => SecureWorkUpiDestinationStore(
+          accountScope: () => account,
+          storeScope: () => store,
+          storage: storage,
+        );
+        await reopen().save(destination);
+        expect(
+          (await reopen().read(account, store))!.toJson(),
+          destination.toJson(),
+        );
+        account = 'account-B';
+        expect(await reopen().read(account, store), isNull);
+        await expectLater(
+          reopen().read('account-A', store),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await expectLater(
+          reopen().save(destination),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        account = 'account-A';
+        store = 'store-B';
+        expect(await reopen().read(account, store), isNull);
+        await expectLater(
+          reopen().save(destination),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(storage.writes, hasLength(1));
+      },
+    );
+
+    test(
+      'corrupt storage is preserved and read failure never changes payee',
+      () async {
+        final storage = _OrderJournalStorage();
+        final settings = SecureWorkUpiDestinationStore(
+          accountScope: () => 'account-A',
+          storeScope: () => 'store-A',
+          storage: storage,
+        );
+        await settings.save(destination);
+        final key = storage.values.keys.single;
+        storage.values[key] = '{invalid';
+        await expectLater(
+          settings.read('account-A', 'store-A'),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await expectLater(
+          settings.save(destination),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(storage.values[key], '{invalid');
+        expect(storage.writes, hasLength(1));
+        storage.failRead = true;
+        await expectLater(settings.save(destination), throwsStateError);
+        expect(storage.writes, hasLength(1));
+      },
+    );
+
+    test(
+      'lost write reply is recovered by reading the persisted destination',
+      () async {
+        final storage = _OrderJournalStorage()..loseWriteResponseOnce = true;
+        final settings = SecureWorkUpiDestinationStore(
+          accountScope: () => 'account-A',
+          storeScope: () => 'store-A',
+          storage: storage,
+        );
+        await expectLater(settings.save(destination), throwsStateError);
+        expect(
+          (await settings.read('account-A', 'store-A'))!.address,
+          destination.address,
+        );
+        expect(storage.writes, hasLength(1));
+      },
+    );
+
+    test(
+      'Store change during write cannot report successful active setup',
+      () async {
+        final storage = _OrderJournalStorage()..holdWrite = Completer<void>();
+        var store = 'store-A';
+        final settings = SecureWorkUpiDestinationStore(
+          accountScope: () => 'account-A',
+          storeScope: () => store,
+          storage: storage,
+        );
+        final saving = settings.save(destination);
+        final rejected = expectLater(
+          saving,
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await _drainOrderJournal();
+        expect(storage.writes, hasLength(1));
+        store = 'store-B';
+        storage.holdWrite!.complete();
+        await rejected;
+        expect(await settings.read('account-A', 'store-B'), isNull);
+        store = 'store-A';
+        expect(
+          (await settings.read('account-A', store))!.address,
+          destination.address,
+        );
+      },
+    );
+  });
+
   test(
     'LEDGER02 supplier save failure and lost reply recover without another payment',
     () async {
@@ -5555,6 +5753,32 @@ void main() {
       },
     );
 
+    for (final method in ['Cash', 'UPI', 'Bank Transfer']) {
+      test('COUNTER1919 restores $method without payment authority', () async {
+        final storage = _OrderJournalStorage();
+        final selected = WorkspaceCounterDraft.fromJson({
+          ...draft().toJson(),
+          'payment': method,
+        });
+        expect(selected, isNotNull);
+        expect(selected!.valid, isTrue);
+        final first = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        await first.save(selected, expectedRevision: null);
+        final restarted = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        final restored = (await restarted.read('account-A', 'store-A'))!;
+        expect(restored.payment, method);
+        expect(restored.toJson(), selected.toJson());
+        expect(restored.stage, WorkspaceCounterDraftStage.editing);
+        expect(restored.submissionOrderId, isNull);
+      });
+    }
+
     test('retains exact snapshot through a new storage instance', () async {
       final storage = _OrderJournalStorage();
       final first = SecureWorkCounterDraftStore(
@@ -10551,6 +10775,92 @@ void main() {
     expect(session.workspaceCatalogueItems.single.stock, 10);
     expect(gateway.lastOperationalSnapshot, same(snapshot));
   });
+
+  for (final publicListing in [false, true]) {
+    test('counter inventory sale preserves public listing $publicListing', () {
+      final session = liveSession();
+      final product = _product(
+        stock: 10,
+      ).copyWith(publicListing: publicListing);
+      session.addOrUpdateWorkspaceProduct(product);
+      session.prepareWorkspaceOrder(
+        source: 'Counter',
+        fulfilment: 'At the shop',
+      );
+      expect(product.canSellAtCounter, isTrue);
+      expect(product.published, publicListing);
+      session.adjustWorkspaceOrderQuantity(product.id, 2);
+      expect(session.workspaceOrderQuantities[product.id], 2);
+      session.saveWorkspaceOrderDraft(
+        customer: '9829012321',
+        source: 'Counter',
+        fulfilment: 'At the shop',
+        payment: 'Cash',
+        address: '',
+      );
+      final invoice = session.completeWorkspaceCounterSale();
+      expect(invoice, isNotNull);
+      expect(invoice!.amount, 550);
+      final remaining = session.workspaceCatalogueItems.single;
+      expect(remaining.stock, 8);
+      expect(remaining.publicListing, publicListing);
+      expect(remaining.published, publicListing);
+      expect(
+        remaining.toBuyPublicProduct(storeName: 'Store').catalogueListing,
+        publicListing,
+      );
+      expect(session.workspaceSettlementBalance, 0);
+    });
+  }
+
+  for (final stockMode in WorkspaceStockMode.values) {
+    test(
+      'counter inventory rejects unavailable private product $stockMode',
+      () {
+        final session = liveSession();
+        final product = _product(stock: 10).copyWith(
+          publicListing: false,
+          available: false,
+          stockMode: stockMode,
+        );
+        session.addOrUpdateWorkspaceProduct(product);
+        session.prepareWorkspaceOrder(
+          source: 'Counter',
+          fulfilment: 'At the shop',
+        );
+        expect(product.canSellAtCounter, isFalse);
+        session.adjustWorkspaceOrderQuantity(product.id, 1);
+        expect(session.workspaceOrderQuantities[product.id] ?? 0, 0);
+        expect(
+          session.errorMessage,
+          'This product is not available in your store inventory.',
+        );
+        expect(session.workspaceInvoices, isEmpty);
+      },
+    );
+  }
+
+  test(
+    'counter private availability-only inventory retains its quantity limit',
+    () {
+      final session = liveSession();
+      final product = _product(stock: 0).copyWith(
+        publicListing: false,
+        stockMode: WorkspaceStockMode.availabilityOnly,
+      );
+      session.addOrUpdateWorkspaceProduct(product);
+      session.prepareWorkspaceOrder(
+        source: 'Counter',
+        fulfilment: 'At the shop',
+      );
+      expect(product.canSellAtCounter, isTrue);
+      session.adjustWorkspaceOrderQuantity(product.id, 100);
+      expect(session.workspaceOrderQuantities[product.id], 99);
+      session.adjustWorkspaceOrderQuantity(product.id, -1);
+      expect(session.workspaceOrderQuantities[product.id], 98);
+      expect(session.workspaceCatalogueItems.single.publicListing, isFalse);
+    },
+  );
 
   test('counter sale posts stock money and customer invoice together', () {
     final session = liveSession();

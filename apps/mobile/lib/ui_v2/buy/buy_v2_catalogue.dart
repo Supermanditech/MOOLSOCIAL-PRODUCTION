@@ -3860,7 +3860,7 @@ class _SearchProductResults extends StatelessWidget {
 class _CatalogueToolbar extends StatelessWidget {
   // Let AnimatedSwitcher assign its per-transition child counter. Keying the
   // FadeTransition by the count can collide when a loading state repeats
-  // before an earlier fade has finished (for example, search then Bulk).
+  // before an earlier fade has finished (such as search then Bulk).
   static Widget _countTransition(Widget child, Animation<double> animation) =>
       FadeTransition(opacity: animation, child: child);
 

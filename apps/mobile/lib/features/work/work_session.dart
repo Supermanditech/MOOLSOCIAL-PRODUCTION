@@ -521,6 +521,7 @@ class WorkSession extends ChangeNotifier {
     this.stockHistoryGateway,
     this.counterDraftStore,
     this.ledgerFormDraftStore,
+    this.upiDestinationStore,
   }) : gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -556,6 +557,7 @@ class WorkSession extends ChangeNotifier {
     this.stockHistoryGateway,
     this.counterDraftStore,
     this.ledgerFormDraftStore,
+    this.upiDestinationStore,
   }) : gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -580,6 +582,50 @@ class WorkSession extends ChangeNotifier {
   final WorkStockHistoryGateway? stockHistoryGateway;
   final WorkCounterDraftStore? counterDraftStore;
   final WorkLedgerFormDraftStore? ledgerFormDraftStore;
+  final WorkUpiDestinationStore? upiDestinationStore;
+  late final WorkUpiDestinationStore _upiDestinationStorage =
+      upiDestinationStore ??
+      SecureWorkUpiDestinationStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+        storeScope: () => _disposed ? null : activeWorkspace?.id,
+      );
+
+  ({String account, String store})? get storeUpiScope =>
+      _disposed ? null : _counterDraftScope;
+
+  Future<WorkspaceUpiDestination?> loadStoreUpiDestination(
+    ({String account, String store}) scope,
+  ) async {
+    if (scope != storeUpiScope) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+    final destination = await _upiDestinationStorage.read(
+      scope.account,
+      scope.store,
+    );
+    if (scope != storeUpiScope ||
+        (destination != null &&
+            (!destination.valid ||
+                destination.account != scope.account ||
+                destination.store != scope.store))) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+    return destination;
+  }
+
+  Future<void> saveStoreUpiDestination(
+    WorkspaceUpiDestination destination,
+  ) async {
+    final scope = (account: destination.account, store: destination.store);
+    if (!destination.valid || scope != storeUpiScope) {
+      throw const WorkGatewayException('Check your Store UPI details.');
+    }
+    await _upiDestinationStorage.save(destination);
+    if (scope != storeUpiScope) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+  }
+
   late final WorkLedgerFormDraftStore _ledgerFormStorage =
       ledgerFormDraftStore ??
       SecureWorkLedgerFormDraftStore(accountScope: () => _contactAccountScope);
@@ -709,6 +755,8 @@ class WorkSession extends ChangeNotifier {
   _CounterDraftRecovery? get _counterRecovery =>
       _counterDraftRecovery[_counterDraftScope];
   Object? get counterDraftIdentity => _counterDraftScope;
+  int _counterSaleGeneration = 0;
+  int get counterSaleGeneration => _counterSaleGeneration;
   bool get counterDraftLoading => _counterRecovery?.loading == true;
   bool get counterDraftSubmitting => _counterRecovery?.submitting == true;
   bool get counterDraftNeedsReconciliation =>
@@ -7564,6 +7612,7 @@ class WorkSession extends ChangeNotifier {
       );
       return false;
     }
+    _counterSaleGeneration++;
     _rememberActiveOrder();
     _clearCollection();
     if (_counterRecovery?.record?.stage == WorkspaceCounterDraftStage.retired) {
@@ -7755,6 +7804,10 @@ class WorkSession extends ChangeNotifier {
         .where((item) => item.id == productId)
         .firstOrNull;
     if (product == null) return;
+    if (change > 0 && !product.canSellAtCounter) {
+      showError('This product is not available in your store inventory.');
+      return;
+    }
     final current = workspaceOrderQuantities[productId] ?? 0;
     final maximum = product.stockMode == WorkspaceStockMode.availabilityOnly
         ? 99
