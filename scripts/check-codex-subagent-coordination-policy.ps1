@@ -63,11 +63,11 @@ function Test-CounterSaleR6636Evidence([hashtable]$Facts) {
     Branch = 'work/codex-ui/counter-sale-20260919'
     Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
   }
-  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v4') {
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -cin @('counter-sale-20260919-v4','counter-sale-20260919-v5')) {
     $expected.Lane = 'integration'
-    $expected.WorkId = 'counter-sale-20260919-v4'
-    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v4'
-    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v4'
+    $expected.WorkId = $Facts.WorkId
+    $expected.Branch = 'integration/moolsocial/' + $Facts.WorkId
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-' + $Facts.WorkId
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -102,11 +102,13 @@ function Test-CounterSaleSuccessorEvidence([hashtable]$Facts) {
     Branch = 'work/codex-ui/counter-sale-20260919'
     Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
   }
-  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v3') {
+  # REG4632: exact successor checkouts retain optional historical evidence claims.
+  # This owner admission never authorizes replaying an old build or execution state.
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -cin @('counter-sale-20260919-v3','counter-sale-20260919-v4','counter-sale-20260919-v5')) {
     $expected.Lane = 'integration'
-    $expected.WorkId = 'counter-sale-20260919-v3'
-    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v3'
-    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v3'
+    $expected.WorkId = $Facts.WorkId
+    $expected.Branch = 'integration/moolsocial/' + $Facts.WorkId
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-' + $Facts.WorkId
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -130,6 +132,17 @@ function Test-CounterSaleSuccessorEvidence([hashtable]$Facts) {
     'artifacts/quality/counter-sale-r66-35-review-20260920/device-review.md',
     'artifacts/quality/counter-sale-r66-35-review-20260920/ticket-and-screen-coverage.md'
   )
+}
+
+function Assert-CounterSaleInheritedEvidenceAdmission([hashtable]$Facts, [string[]]$Owners) {
+  # Fail before merge if a successor forgot an inherited optional evidence owner.
+  # Selection may span generations; admission still uses exact owner/identity pins.
+  Assert-Coordination ($Owners.Count -gt 0) 'Counter Sale inherited evidence inventory is empty.'
+  foreach ($owner in $Owners) {
+    $probe = $Facts.Clone()
+    $probe.Owner = $owner
+    Assert-Coordination (Test-CounterSalePendingEvidence $probe) "Counter Sale successor omitted inherited evidence admission: $owner"
+  }
 }
 
 function Test-CounterSalePendingEvidence([hashtable]$Facts) {
@@ -195,6 +208,11 @@ function Test-CounterSaleIntegrationIdentity([hashtable]$Facts) {
     $expected.WorkId = 'counter-sale-20260919-v4'
     $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v4'
     $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v4'
+  }
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v5') {
+    $expected.WorkId = 'counter-sale-20260919-v5'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v5'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v5'
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -5974,9 +5992,9 @@ if ($ProductionLane -ceq 'baseline') {
         $qualifiedSource = '8bfda8f862837bdc43910476a841befb750b6114'
         $counterTargetId = 'counter-sale-20260919-v3'
       }
-      if ($IntegrationTargetWorkId -ceq 'counter-sale-20260919-v4') {
+      if ($IntegrationTargetWorkId -cin @('counter-sale-20260919-v4','counter-sale-20260919-v5')) {
         $qualifiedSource = '6e32df591dc8178aa1776c0f18c2eac0bb4efc37'
-        $counterTargetId = 'counter-sale-20260919-v4'
+        $counterTargetId = $IntegrationTargetWorkId
       }
       $counterTargetBranch = "integration/moolsocial/$counterTargetId"
       $counterTargetRoot = "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-$counterTargetId"
@@ -6000,6 +6018,16 @@ if ($ProductionLane -ceq 'baseline') {
       $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
         $targetHead[0] -ceq $workStartCommit) 'Counter Sale integration must start at governance.'
+      $inheritedEvidenceOwners = @($policy.activeClaims |
+        Where-Object { [string]$_.task -ceq '/root' } |
+        ForEach-Object { $_.owners } |
+        Where-Object { ([string]$_).StartsWith('artifacts/quality/counter-sale-', [StringComparison]::Ordinal) })
+      $targetEvidenceFacts = @{
+        Role = $AgentRole; Task = $AgentTask; ClaimTask = '/root'; Lane = 'integration'
+        WorkId = $counterTargetId; TicketId = $IntegrationTargetTicketId
+        Branch = $counterTargetBranch; Root = $counterTargetRoot
+      }
+      Assert-CounterSaleInheritedEvidenceAdmission -Facts $targetEvidenceFacts -Owners $inheritedEvidenceOwners
       Assert-ProductionManagedWorktreesClean
       $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin "refs/heads/$counterTargetBranch")
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Counter Sale integration remote already exists.'
@@ -6263,7 +6291,7 @@ if ($ProductionLane -ceq 'baseline') {
       if ($ProductionWorkId -ceq 'counter-sale-20260919-v3') {
         $qualifiedSource = '8bfda8f862837bdc43910476a841befb750b6114'
       }
-      if ($ProductionWorkId -ceq 'counter-sale-20260919-v4') {
+      if ($ProductionWorkId -cin @('counter-sale-20260919-v4','counter-sale-20260919-v5')) {
         $qualifiedSource = '6e32df591dc8178aa1776c0f18c2eac0bb4efc37'
       }
       & git -C $root merge-base --is-ancestor $qualifiedSource $approvedCommits[0]

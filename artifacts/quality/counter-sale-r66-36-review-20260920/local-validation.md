@@ -37,3 +37,33 @@ All 396 candidate source entries were rehashed and remained unchanged. Process
 Narrow successor admission: 64 exact identities and 608 invalid/missing facts
 checked; previous r66.35 test set also passes with 64/608. Log:
 counter-sale-r66-36-admission-fixtures-04.log. No gate bypass or broadened wildcard.
+
+## REG4632 inherited-owner regression and bounded repair
+
+Founder authorized registration and correction after v4 integration rejected
+the missing historical r66.35 apk-regression-state.json.local. Failed merge
+dec622f66acf9287d5f82679bf1ae65a74669043 is preserved unchanged. No APK attempt,
+install or new physical acceptance occurred. Failure is in admission metadata,
+not application source; old execution records must not be copied or fabricated.
+
+Task fixture work/counter-sale-reg4632-inherited-owners.ps1 reproduced all 16
+r66.35 historical-owner rejections among the full 48-owner inventory before
+correction (counter-sale-reg4632-before-13.log). After correction, v4/v5 admitted
+96 exact owner cases and rejected all 42 wrong/missing identity, unknown path,
+ordinary source-owner and empty-inventory cases (counter-sale-reg4632-after-14.log).
+The admission gate now calls this full inherited-owner check before merge; an
+unknown future candidate owner fails closed until its exact admission exists.
+
+Existing r66.35/r66.36 suites each retain 64 positive and 608 negative passes
+(counter-sale-r66-36-admission-regression-14.log). Exact v5 native admission
+passes 1 positive / 6 negative cases with all native hashes unchanged
+(counter-sale-r66-36-v5-native-admission-14.log). Registry entry
+REG-20260920-4632-SUCCESSOR-INHERITED-EVIDENCE-ADMISSION is permanent; generation
+4603 is bound to canonical LF SHA256
+D77C0CBAC571EC1509A5B239A568414DB93AA5FD337A384000F1076416FADD95.
+
+The already completed app regressions remain source-matched: a new verification
+rehashes all 396 source entries unchanged. This correction does not change Dart,
+Android source, dependencies, source/version pins, one-build controls or device
+acceptance. Replacement integration is v5; current-generation build checks and
+fresh-checkout verification are still required before build activation.

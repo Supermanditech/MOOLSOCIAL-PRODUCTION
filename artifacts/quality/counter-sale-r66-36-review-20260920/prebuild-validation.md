@@ -6,7 +6,7 @@ formatting, focused journey/receipt/settings/PDF checks, exact runtime isolation
 UI locks, copy, resource/coverage checks and unchanged build-foundation tests
 passed. All 396 candidate source hashes remain equal to the recorded manifest.
 
-Preserve all 13 prebuild gate IDs and checks from r66.35. Fresh v4 integration
+Preserve all 13 prebuild gate IDs and checks from r66.35. Replacement v5 integration
 must contain the exact clean remote-equal feature tip through one no-ff merge
 from the recorded governance baseline. Compare its apps tree with implementation
 6e32df591dc8178aa1776c0f18c2eac0bb4efc37 and verify every source-manifest entry.
@@ -47,3 +47,31 @@ after binding the already-approved document; no outcome/check was removed.
 The tracked machine-state template intentionally remains pending. Only the
 separately sealed execution state may authorize one build after clean,
 remote-exact integration and current candidate/incremental gates succeed.
+
+## REG4632 successor repair
+
+The first fresh v4 integration merged exact feature 7601b84e but its verification
+rejected an absent historical r66.35 execution record. Original v4 merge
+dec622f66acf9287d5f82679bf1ae65a74669043 and task logs remain preserved. No build
+or install occurred. Registry entry REG-20260920-4632-SUCCESSOR-INHERITED-EVIDENCE-ADMISSION
+records cause, detection and prevention. See local-validation.md for the
+failing-before / passing-after full inherited-owner inventory fixture.
+
+The corrected gate checks every explicitly recorded Counter Sale evidence owner
+against the exact target integration identity BEFORE permitting its merge.
+Ordinary missing files and unknown paths still fail; historical build states
+are never copied, replayed or marked accepted. V5 is the replacement integration;
+older checkouts remain unchanged. Source fingerprint and APK version are unchanged
+because the rejected v4 attempt never reached build authorization or execution.
+The new registry generation is 4603 / D77C0CBAC571EC1509A5B239A568414DB93AA5FD337A384000F1076416FADD95.
+Replay generation-bound admission/build checks before creating .local controls.
+
+Current-generation build-foundation checks passed with locked dependencies
+(counter-sale-r66-36-build-controls-reg4632-15.log). No dependency update or
+application-source change. Repair proof hashes:
+
+- counter-sale-reg4632-before-13.log: 36E2F42970D79D7F34D7649B0C6C2B69F951C1BEB06458E1AA5FCA46CCD5E026
+- counter-sale-reg4632-after-14.log: CB0E96C372DBF9EB10DA5F51264BD9541352C8CA1D3C0DA6BFFEFBE6C882B74B
+- counter-sale-r66-36-admission-regression-14.log: 58D57EFE629AEEEBCEAEFD5187E3B0CCDF80B54F2CC31893447EA761C1426D3A
+- counter-sale-r66-36-v5-native-admission-14.log: 69F18C38D310A838F9D0871F7F66080F642F359DF561E54952F0D04D5A3ED429
+- counter-sale-r66-36-build-controls-reg4632-15.log: 42A940CA643B07DF47D60A6132D8A1016C90CFD74D2D5CB718AB883FB2D2E4DE

@@ -9,8 +9,12 @@ unchanged gates, then build/install and OPPO testing. No premature acceptance.
 - Implementation 6e32df591dc8178aa1776c0f18c2eac0bb4efc37.
 - Qualified apps tree 818257cadc2064a1f05735414e5a677707533f05.
 - Manifest 396 inputs; SHA256 8B0A4E487BFAC9053E59F3CE20A2907F01D29385175A61A5D5A2CDF2C629F9DF.
-- New integration/moolsocial/counter-sale-20260919-v4 at
-  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v4.
+- Replacement integration/moolsocial/counter-sale-20260919-v5 at
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v5.
+- Failed v4 merge dec622f66acf9287d5f82679bf1ae65a74669043 remains untouched.
+  REG-20260920-4632-SUCCESSOR-INHERITED-EVIDENCE-ADMISSION records its missing
+  historical optional-owner admission. Founder authorized this bounded repair
+  and fresh integration; no v4 APK attempt occurred and no version is reused.
 
 Exactly four APK defines: MOOLSOCIAL_UI_REVIEW_ONLY=true,
 MOOLSOCIAL_DEVICE_REVIEW=true, MOOLSOCIAL_USE_EMULATORS=true,

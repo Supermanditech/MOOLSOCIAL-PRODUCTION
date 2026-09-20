@@ -104601,6 +104601,16 @@
       "prevention": "Capture settled UI after each state-changing action, inspect PNG and XML before classifying reproduction, separate source-only from device evidence, preserve the old edit, and require exact feature-worktree admission before further source changes.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["docs/quality/COUNTER-SALE-20260919.md"]
+    },
+    {
+      "id": "REG-20260920-4632-SUCCESSOR-INHERITED-EVIDENCE-ADMISSION",
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "implementation", "testing", "build", "device", "evidence"],
+      "mistake": "Counter Sale r66.36 fresh integration v4 passed source admission and merged, then integration_verify rejected the missing historical r66.35 apk-regression-state.json.local. No APK was built or installed.",
+      "rootCause": "The new exact r66.36 owner predicate admitted v4, but the inherited r66.35 optional-evidence predicate admitted only feature/v3. Fixtures covered new candidate identities without exercising the union of inherited recorded claims in a fresh integration checkout.",
+      "prevention": "Before successor integration/build, exercise every recorded historical and current candidate evidence owner against the exact successor identity with absent optional records; require ordinary missing owners, changed identities and unknown candidate paths to fail. Admit only explicitly enumerated inherited paths. Preserve historical source/version pins and one-build controls; never copy old execution authorization, create placeholder evidence, broaden wildcard admission, rewrite failed integration history or mark device gates passed. Qualify a fresh replacement checkout and preserve the failed v4 merge.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+      "evidence": ["artifacts/quality/counter-sale-r66-36-review-20260920/prebuild-validation.md", "artifacts/quality/counter-sale-r66-36-review-20260920/local-validation.md"]
     }
   ],
   "counterSaleTestIncident20260919": {
