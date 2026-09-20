@@ -1,0 +1,399 @@
+# Cursor and Codex SKU baseline reconciliation
+Founder authorizes complete reconciliation through current work, no omitted contributions, qualified integration and Git discipline. Cart thumbnail follow-up is explicitly local-test-only before integration.
+
+Locked Codex tip: cbaa68ad00f2285329d2d5c584689b9c6be1123a, Store product catalogue branch.
+Locked Cursor tip: ee42be0e21f1707e1cbf2ba3ad966579f118b209, Redmi audit branch.
+Common ancestor: 11cdabb727e820fcf888089a58b6699d9addfda7. Codex includes V31 integration 21977bff and counter-sale/ledger corrections; Cursor includes every prior audit/UI/evidence commit and latest thumbnail fix.
+All20 registered worktrees clean before creating this isolated repair. Four current source/baseline remote tips matched origin. Source branches remain immutable during repair. No reset, squash, cherry-pick, force-push, main/remediation mutation or production deployment.
+
+Exact conflict owners: apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart; config/codex-development-regression-registry.json; config/codex-subagent-coordination-policy.json; scripts/check-buy-backend-contract-boundary.ps1; scripts/check-buy-protected-baseline.ps1; scripts/check-codex-subagent-coordination-policy.ps1. All non-conflict blobs must match Git automatic merge. Preserve toolbarBuilder/procurement semantics AND Cursor store search, paging/loading/rotation/column/media/quantity corrections. Union historical registry evidence and retain both admission histories; never select an entire side merely to silence conflicts.
+
+One exact bootstrap, one evidence checkpoint, one two-parent repair merge, bounded evidence closure; then fresh governance-tag integration by no-ff merge, no direct integration source commits. Qualification pending: exact coverage ledger and ancestry, automatic-blob audit, secret/dependency/source checks, analysis, focused Store/catalogue and connected Buy/Work regressions. Host, founder visual and Redmi evidence remain separate. New source baseline is not accepted until these checks pass; live publication dependencies are not implicitly completed.
+
+## Pre-merge inventory and exact coverage ledger
+
+Scoped bootstrap and regression-memory gates pass. Wrong-ticket negative rejects. All prior records remain; initial binding-inventory rejection was corrected for exactly one new binding. Ledger includes source, tests, fixes, WIP and evidence, not only visually approved commits. Unqualified WIP stays marked as such and must not gain live publication authority through integration.
+
+### cursor: 290 commits through ee42be0e21f1707e1cbf2ba3ad966579f118b209
+
+- da4d266f97b4081f55bd98f1e9522f25bc8ee05f — merge(store-buy-final-v6-20260912): integrate qualified Store and Buy
+- 7a9e0a291c969fc12aa961a0426aaaea6b9a08ce — coordination(redmi-v6-audit-20260913): admit exact V6 Redmi audit lane
+- ae084c5ea03b569c4746c651b7f6f6d7b545beca — ui(redmi-v6-audit-20260913): bind unchanged V6 build evidence
+- 446ba27a4ffbc74b1905ff9030cc5834da867a2f — ui(redmi-v6-audit-20260913): record verified APK and first device audit slice
+- a7af3a5579f3db40ecc649c3d87d07e515d7cdd1 — ui(redmi-v6-audit-20260913): record Store and product audit findings
+- 27b276ee639b67df0896541bb10a3fe3f34625e2 — ui(redmi-v6-audit-20260913): record filters offers and bulk device evidence
+- 01edf441599dc876eb5f35295db478f3942577ec — ui(redmi-v6-audit-20260913): preserve bulk checkout and benefit audit
+- 5a41c63c1dc7d94e5905ecb3f98f7c94f7e32b67 — ui(redmi-v6-audit-20260913): record invoice validation and tracker recovery
+- 564caefce556028e367d767e9d95f7b6613ddfe8 — ui(redmi-v6-audit-20260913): record tracking and nested address audit
+- 48e09e5bdf32a16f6cb27e06ec66c855eb34f5cf — ui(redmi-v6-audit-20260913): record invoice navigation and remaining coverage
+- 89c88f587a4daf21d6973cc6dd3dd9ab693f8ac6 — ui(redmi-v6-audit-20260913): record export evidence and stale order chat ETA
+- 398074b4d7f95064413a973a1120b442d059c1ac — ui(redmi-v6-audit-20260913): record delivered order and resolution audit
+- 957f61ea5af154e77b3e65b263acecb6bd4205f4 — ui(redmi-v6-audit-20260913): record cart instructions and shipment review
+- 7e659c695b4b6704ddbb58e39b02eda556db9f63 — ui(redmi-v6-audit-20260913): record cart and profile device findings
+- 9668142901347d1a5db3963c58b18c9196e89749 — ui(redmi-v6-audit-20260913): record settings return paths and offline boundary
+- 9bf929512e039427671bd0bd144cfe33dc19c1ae — ui(redmi-v6-audit-20260913): qualify security returns and assist reachability
+- 4ece28df692053dcecf38c43391eb24bb491a031 — ui(redmi-v6-audit-20260913): record lost Buy return after sign-in cancellation
+- 0075825f2bccb4e93facc1da97f8c4a3522daf8c — ui(redmi-v6-audit-20260913): record saved lifecycle and Scheduled checkout audit
+- 8c63ceb1a4a3244c606fe5f2284dfb30160f75c6 — ui(redmi-v6-audit-20260913): verify Saved clearing and destination isolation
+- 09120204915aa3e6d779f8d2a417ca1b734cfa5e — ui(redmi-v6-audit-20260913): audit Store collection entry and identity boundary
+- ca1ada74aa8eb2d3a2cf3953b23a02a23828e80c — ui(redmi-v6-audit-20260913): identify supplier media coverage gap
+- 82119e0e766c7ffd811f1f0ed465ead8c7c87dad — ui(redmi-v6-audit-20260913): record physical enlarged-text and media mapping checks
+- 96c2af9d83cbe8ccb16807d61e8d706eb31f3df8 — ui(redmi-v6-audit-20260913): register related-product Back context defect
+- 087bcbb7511a405608b260e33aeee3c820d599c8 — ui(redmi-v6-audit-20260913): verify milk variant selection and cart identity
+- 2d9516a60a6e1051775899c2ea02849812e89f43 — ui(redmi-v6-audit-20260913): record Wholesale order device audit
+- 51350c7c58080a558892e27d8ab583c987b615d8 — ui(redmi-v6-audit-20260913): record Wholesale invoice recovery gap
+- cbd092412755e241035677cd09301a8e64e2ad25 — ui(redmi-v6-audit-20260913): audit Wholesale Items and address return
+- 7c2256108d915ba7d8f2d09377f2ffec7d3b0716 — ui(redmi-v6-audit-20260913): verify trade receiving and reorder basket
+- 880edc437e235ab5338ff7f8ca0295c50f926234 — ui(redmi-v6-audit-20260913): verify quantity validation and keyboard Back
+- dc3be762a3d9d401d914b099164db5ee00427377 — ui(redmi-v6-audit-20260913): record false confirmation and recovery inventory
+- 82db8c5aab9b252433f9ad72661c827647d3775f — ui(redmi-v6-audit-20260913): qualify generic recovery route returns
+- dbdca6034a4151651e461afc3772846db6ec1115 — ui(redmi-v6-audit-20260913): record order recovery and help qualification
+- ab386dc01f78dec06b43abc27d0d8c2432a4947c — ui(redmi-v6-audit-20260913): qualify checkout address recovery returns
+- 6b303569ae443c9e2d79976e775c47e8a19b88cf — ui(redmi-v6-audit-20260913): record quantity limits and conditional prerequisites
+- c6dc54d77acbbb221d715336cbf16cde40f493e0 — ui(redmi-v6-audit-20260913): qualify wholesale quantity and scope retention
+- 16049ce13c02506dd2e96ddcd21523332895e9f1 — ui(redmi-v6-audit-20260913): record wholesale content duplication and data claims
+- c3be466a96589f8e76ad160ec901126133f85ca4 — ui(redmi-v6-audit-20260913): qualify closed and unavailable product entry
+- a6433221c0364cfa7149705b47f8055da4b250d0 — ui(redmi-v6-audit-20260913): record medicine destination boundary
+- f81213199618c01098657c8b75e7fa9003f22e44 — ui(redmi-v6-audit-20260913): record closed store listing and header qualification
+- 86b326118e03986264128d6edd910d1fad7f216f — ui(redmi-v6-audit-20260913): record Store conversation context audit
+- 19aa482a26e0a4d33c79557b6b9ced89101f893b — ui(redmi-v6-audit-20260913): verify other Store navigation and return
+- d0538ee306ea58f8731ab7cff3a0b57e93e470b7 — ui(redmi-v6-audit-20260913): record modal link failure and address lifecycle
+- eafd94505a7f3963dc65d81973166ad1f3e843f8 — ui(redmi-v6-audit-20260913): reconcile conditional recovery coverage
+- 8faaa8a480ddd646028fda08c1d45a493745040f — ui(redmi-v6-audit-20260913): verify saved-list cancellation paths
+- 1257a52e8de322a6186e8f8129648936c6987ae2 — ui(redmi-v6-audit-20260913): verify Wholesale saved clear isolation
+- 5eca240ab3839699072acf3f8a9789330c7dff28 — ui(redmi-v6-audit-20260913): verify saved invoice on Redmi viewer
+- a1a4426aef84b0c2de113112e279bd7b15288d4b — ui(redmi-v6-audit-20260913): record recently viewed availability audit
+- 833d4c3d95159890c18f5044bed1cd88f53fb598 — ui(redmi-v6-audit-20260913): map history and monthly basket device coverage
+- 159ae522a6fec0eaa18c6f37d3d62e692be3d483 — ui(redmi-v6-audit-20260913): verify basket cart and settings returns
+- b76325d5064f46a12f8c1588c2da92461ea7f80c — ui(redmi-v6-audit-20260913): record shopping alert navigation and freshness
+- a31de8a5201486179b2f1e2760f7cc1f78e986ee — ui(redmi-v6-audit-20260913): verify settings notification and nested returns
+- 040f15b694ab047401a91568fd33dec8c9effbdd — ui(redmi-v6-audit-20260913): verify shared settings routes and help guidance
+- 7aa72a1aaf9b8eaa3b46fef61c45e9c035f5a4e1 — ui(redmi-v6-audit-20260913): verify help search and order return context
+- 2df780bee14401a935eb95d3b551741ad731e64c — ui(redmi-v6-audit-20260913): verify help matching and dismissal coverage
+- b0c23c1f0a3f589f68f1fa25b015767d3c8814d1 — ui(redmi-v6-audit-20260913): verify recently viewed cart addition
+- 1e8e48943be7a014a621a583561e3e48bfd8e7dc — ui(redmi-v6-audit-20260913): verify monthly basket repeat quantities
+- 91e81cde8970378de607837622ed05ddc4ff7a8c — ui(redmi-v6-audit-20260913): qualify price filters and cancellation
+- b71f9257f069261207e147b2b0ee8acc326aec47 — ui(redmi-v6-audit-20260913): reconcile pending coverage evidence
+- 128f038b3c66c1131dbfd96db0e9676d177a419f — ui(redmi-v6-audit-20260913): verify isolated address edit and resume
+- 41a8dbbf28cf5511aacf10b1fa93526991c2b007 — ui(redmi-v6-audit-20260913): verify variant cart identity retention
+- de455405e749c47f5acd8754dff504bf8f9daa6b — ui(redmi-v6-audit-20260913): verify wholesale search recovery
+- b54ce6a7bc6a9419f12b610baab9f8fa34f53a7c — ui(redmi-v6-audit-20260913): reconcile filter data qualification
+- 483fab6d1ae9e2276e13e769a4d01574ef239b93 — ui(redmi-v6-audit-20260913): record wholesale price band device checks
+- cde2768fba48da58c4f53cd353c930bf5859eff1 — ui(redmi-v6-audit-20260913): qualify help Back to wholesale
+- eddb0be095927f4221349833dcbbbf39fddb0ada — ui(redmi-v6-audit-20260913): reconcile early coverage residuals
+- 26436f18f15d471f09edcba2709811dbf5c133b4 — ui(redmi-v6-audit-20260913): qualify mixed cart isolation on device
+- a66bedea00f3a0c45a710cb2e6f17665ea4b2ece — ui(redmi-v6-audit-20260913): qualify saved search recovery
+- f33c067316edfad301f1a6d03f0f8d19e55867bf — ui(redmi-v6-audit-20260913): map delivery controls and reconcile coverage
+- d2ce7ecb695bb589a7bfc5dcf9dd1029975e698b — ui(redmi-v6-audit-20260913): inventory conditional delivery and balance actions
+- ad1c65e90313560f6d6980fe7cf09698257a71e0 — ui(redmi-v6-audit-20260913): qualify Offers cart and return checks
+- 328c8168811bce093a96abcc1ff8a560df6f6db5 — ui(redmi-v6-audit-20260913): enumerate collection order audit boundaries
+- 518baec0a2d83620b157e96b4ce211a074b9c444 — ui(redmi-v6-audit-20260913): verify Offers category product return on Redmi
+- c5900b4fc8228a58cb46fe20cbe1634fabfe8b62 — ui(redmi-v6-audit-20260913): record Offers reset and pagination checks
+- 3514b0b31648a7acfdd27bb547360293ba1c04f2 — ui(redmi-v6-audit-20260913): map collection status and receipt authority
+- d0a152d0888dcbf5ce70eafcd761418b49cf00fb — ui(redmi-v6-audit-20260913): record Redmi Offers at double text size
+- d1bec77cbc9f3bf6843cef3290c8ce9ac87a343e — ui(redmi-v6-audit-20260913): explain large-text illustration fallback
+- ece284c3eaf1a1480474f4704ac0577586b30f81 — ui(redmi-v6-audit-20260913): record public scanner reachability boundary
+- 68732355e6f267a5126d31422b12431583afbfa5 — ui(redmi-v6-audit-20260913): enumerate supplier media control blockers
+- 24466b44f805be7e489bcec86243a4b487bce8fe — ui(redmi-v6-audit-20260913): verify expiry recovery and large-text tracking
+- aa17997855d1b795f56819a6ceab6cdd464306fd — ui(redmi-v6-audit-20260913): clarify supplier media publication requirements
+- 748bc2de58dcc00091f5f13f3a9cc8fe8deb2fef — ui(redmi-v6-audit-20260913): reconcile checkout validation coverage
+- 3f66a2c692b01a86378ddbae6921338db2be74c9 — ui(redmi-v6-audit-20260913): record GST profile visibility defect and cleanup
+- cc9e4b07899b7e3b9ac0003dc3cb5a3276cfe382 — ui(redmi-v6-audit-20260913): correlate GST chip contrast and qualification
+- 6cf0fd4c064ffafa1de028628e1f26165ce3c53a — ui(redmi-v6-audit-20260913): record enlarged tracking and management checks
+- 8607adb51e716c978dcbb77109d91e4654d88219 — ui(redmi-v6-audit-20260913): qualify reason fit and inventory resolution gaps
+- 088f83677c961d5a23f772ca49869e62d332746a — ui(redmi-v6-audit-20260913): reconcile cancellation menu coverage
+- 5a0b8976be05c54370f01ff561cb877c04820c46 — ui(redmi-v6-audit-20260913): reconcile superseded audit gaps
+- 63da2defcdef5ece70810e5a710aa8ed78945949 — ui(redmi-v6-audit-20260913): qualify Store category pagination and return
+- 31ada4bd1f21e42f2787ded92b4a3b78c591e47c — ui(redmi-v6-audit-20260913): map catalogue paging data requirements
+- 248066040551d4b21d2ec26770253cb0b89d7da8 — ui(redmi-v6-audit-20260913): verify Store previous and refresh recovery
+- 74607764a5454ca1960eeb29df2201f7c8e2ae04 — ui(redmi-v6-audit-20260913): index source interactions for coverage reconciliation
+- 45a5680f0adf043bf6b812cb519d86fea5a61ac9 — ui(redmi-v6-audit-20260913): reconcile public Buy shared chat routing
+- 1c574bdf44c73823ce83a8c1cd7560d898c39bf2 — ui(redmi-v6-audit-20260913): record report dismissal device checks
+- 5af501e3515db132e50b003577ae45272b051761 — ui(redmi-v6-audit-20260913): reconcile review conditional coverage
+- adb2888d1574870ce43cfcf4d4eeaeda4f6c21f3 — ui(redmi-v6-audit-20260913): reconcile public filter coverage gaps
+- 4b2779d23a89adc103b939cdeea9d6bada25e869 — ui(redmi-v6-audit-20260913): verify individual filter reset controls on Redmi
+- 2ce723c444d08dcfe329cac8dcded37ccc4240db — ui(redmi-v6-audit-20260913): reconcile cart and GST action coverage
+- 5349b9a71833d8712962785174c9bea6529672f1 — ui(redmi-v6-audit-20260913): verify GST keyboard and reuse controls
+- d02b795caaed9ba4b0a4766433b1572565c0127a — ui(redmi-v6-audit-20260913): inventory supplemental action callbacks
+- f3fa8c80af705c5543cedbf343ef915514a1aeed — ui(redmi-v6-audit-20260913): reconcile blocked gallery controls
+- c27666fa916ce19e828d315fba1755a8b16d5699 — ui(redmi-v6-audit-20260913): verify cart browse return on Redmi
+- 3a29f3ab443c07d6c35ef8940379cc92899ab982 — ui(redmi-v6-audit-20260913): reconcile and verify Offers entry controls
+- bb6bc1a64586e2d81946c14a03826c16cac99502 — ui(redmi-v6-audit-20260913): verify area controls and reconcile paging
+- b2fa829264c71ceade16aa7d6ab9e84adf89de06 — ui(redmi-v6-audit-20260913): distinguish sale and search audit actions
+- 87050689b5592e286112689ee9de1539511c71af — ui(redmi-v6-audit-20260913): reconcile category and settings coverage
+- 71c1c56b22a0acf1d18c7937c25d3b84bb3fe765 — ui(redmi-v6-audit-20260913): reconcile Help and Store action evidence
+- 2f2c97031c175b8b2502a546ac555e8812af5ea3 — ui(redmi-v6-audit-20260913): finish catalogue callback reconciliation
+- eafd1ae6bd1b8ffee08964cb72828bfeb4d0c0d6 — ui(redmi-v6-audit-20260913): reconcile shell navigation and tracker controls
+- f4dea4ba21ce490631faaec57a6f93a51d84d0f3 — ui(redmi-v6-audit-20260913): verify category and expired offer recovery
+- 889a8df95031898591ca1aba557d9176a5b9e1ef — ui(redmi-v6-audit-20260913): reconcile product actions and recovery gaps
+- b4a1266052890d41554db38ac6fd77ef6d72f89d — ui(redmi-v6-audit-20260913): reconcile checkout and recovery controls
+- e7ffa91c3f4b6d6bc56d7805a879059cba56a61a — ui(redmi-v6-audit-20260913): reconcile order and collection actions
+- 8578ba6af82d9125b0bb0a1b85d072c9b41ee081 — ui(redmi-v6-audit-20260913): reconcile tracking and resolution evidence
+- 8961605937322004a4ac69241ac5b4d60042b325 — ui(redmi-v6-audit-20260913): record shared profile order return on Redmi
+- 3ff18a12a62c0efdb546c111302137f553301daf — ui(redmi-v6-audit-20260913): reconcile address payment and quantity coverage
+- c92d1cf736a2de57e2bff46f75b3e6722f3885df — ui(redmi-v6-audit-20260913): verify cart quantity controls and complete callback triage
+- 0d3335828fb7a8b238c096cd78f6621f4335ec62 — ui(redmi-v6-audit-20260913): group shared inbox action coverage
+- f467111bf39bf2dfa7948fc96c7900889cc66b19 — ui(redmi-v6-audit-20260913): verify shared Chat filters and Buy return
+- 6eb6ae83978b31ba181a088ac2b67e24c8e66ce5 — ui(redmi-v6-audit-20260913): verify Chat search recovery and keyboard controls
+- 1a1d5a1b4d48ae9b53b2541876347f658e40f471 — ui(redmi-v6-audit-20260913): verify Chat archive settings navigation and data boundaries
+- 6a3527a5d8bbb7c16d8736cc85463477e56cf7b4 — ui(redmi-v6-audit-20260913): reconcile framework and shared settings actions
+- 5acc20a74b8829a3dae73a9ae8362cfa8f1f86ab — ui(redmi-v6-audit-20260913): record preview masking and restoration audit
+- 18e7c66bdde6ad7e5f295ff363e0d5b9d9b2235e — ui(redmi-v6-audit-20260913): reconcile catalogue callback coverage
+- dcd30f49ba84f2f0262fc7baacd5e8833aec8c51 — ui(redmi-v6-audit-20260913): verify catalogue page return on Redmi
+- a9d1a9186fe8b50709a6a805770da44bb8d4fcbd — ui(redmi-v6-audit-20260913): record search return defect on Redmi
+- af0aaea151c5d866116041460452af58086a1833 — ui(redmi-v6-audit-20260913): reconcile tools and Store action coverage
+- 423f84c1435a329800324e8383f5e1d927040bc5 — ui(redmi-v6-audit-20260913): classify catalogue and scanner action aliases
+- c92fb605a2df29d6b978eb85a040c04a36e27b6e — ui(redmi-v6-audit-20260913): reconcile Buy navigation and recovery actions
+- 49e98efe6c5d2ac162b8350034c2c547ad991fd4 — ui(redmi-v6-audit-20260913): complete supplemental callback triage
+- ac9d5ecae9c50b51d51c76263d0e5998d6336d19 — ui(redmi-v6-audit-20260913): record minimized delivery indicator defect
+- b9b7b7f1743b3f4b8297451c4d834d810af903ad — ui(redmi-v6-audit-20260913): record notification and privacy return checks
+- d69bb663279d0728ad0b114cb3b7aaf7915b8663 — ui(redmi-v6-audit-20260913): record clipped privacy explanation on Redmi
+- 8014f31e0b452ca369b224a8bcb31134fd963d9a — ui(redmi-v6-audit-20260913): map shared privacy data and conditional actions
+- cd9780fbdb7da7bb77eb65c5e692b6e953be7d46 — ui(redmi-v6-audit-20260913): verify checkout dismissal and cart preservation
+- ef54b45fff034b8753bc640cde18051716f5927f — ui(redmi-v6-audit-20260913): reconcile exact settings sheet closure coverage
+- 12f3e2e2691d1ed70dc8df4fb8362b8ec00c0263 — ui(redmi-v6-audit-20260913): qualify request sharing cancellation and exact payment route
+- 0856d088f06057a7af8cea885c49a92842140c1e — ui(redmi-v6-audit-20260913): verify recipient prefill and nested cancellation
+- d07f176fc59e700f82c5fb5fad5feefbb84d3d0f — ui(redmi-v6-audit-20260913): verify address types retain unsaved recipient
+- f52f7a3530ab2160a120db8c739e1e4a88c415b0 — ui(redmi-v6-audit-20260913): reconcile existing recovery and tracker evidence
+- a8d0fe8b9f3a6e5cdc826e353442a4c1a046a2d8 — ui(redmi-v6-audit-20260913): verify settings address selection and restoration
+- aa5c9c5de7f84aae48cf862ed0a379d11b594057 — ui(redmi-v6-audit-20260913): qualify short area query submission
+- 667668f7518e8c75721f53be8bcbf7dd2bd285dd — ui(redmi-v6-audit-20260913): reconcile catalogue follow-up coverage
+- 9a836d9f39337ea13fb02ca5af0cfe5b04d5309b — ui(redmi-v6-audit-20260913): qualify Store close and submit controls
+- 2e83116b87791a8838328749c173e6f492b1f946 — ui(redmi-v6-audit-20260913): verify Store search page and category return
+- c40ae524f44b71db405e93407c2b88979363ebba — ui(redmi-v6-audit-20260913): verify Shop sale selector gestures
+- 5136121ba91eeb01965692153e11be86ecc79aee — ui(redmi-v6-audit-20260913): qualify Wholesale Bulk gestures
+- ebbcf98223444b65e22bbed0e8d929e950cad960 — ui(redmi-v6-audit-20260913): qualify Offers footer location return
+- 5f2a920f8fb41bcd76f7af8adeb80abca74d05b0 — ui(redmi-v6-audit-20260913): verify final Offers promotion boundary
+- fe26e92fa20374c45b3ff82c79a6939561366064 — ui(redmi-v6-audit-20260913): qualify catalogue quantity editor
+- b2c44b8822a8dd7d9102fd3bb48f070bbe77794e — ui(redmi-v6-audit-20260913): record empty-cart catalogue height defect
+- d64ae9ab58da70316e3334286a9d68b03dc785e8 — ui(redmi-v6-audit-20260913): qualify search suggestion navigation
+- 7bf65262c813d3de09f36376b4feb0db5536f2ee — ui(redmi-v6-audit-20260913): map search data and alternate scope control
+- f8d1c5b8403c9445eb6b6fcf1df877f563bd6ce9 — ui(redmi-v6-audit-20260913): verify saved settings removal on Redmi
+- 18a04667380c0682196d16ee74827ff212ca7214 — ui(redmi-v6-audit-20260913): verify active-order tool route
+- 8af8a0beb75c8eb71736af9201ab5ace385acd13 — ui(redmi-v6-audit-20260913): verify monthly basket recovery controls
+- 48d011d6da3be74647b695147d21295a9c974e60 — ui(redmi-v6-audit-20260913): verify Store search page returns
+- f349e61cde152af5f9abd937370110d59ea2fda3 — ui(redmi-v6-audit-20260913): reconcile remaining catalogue audit paths
+- f7cdf8cd1070cd9e7541dd05bba8620d05a97c30 — ui(redmi-v6-audit-20260913): record area selection visibility defect
+- 663536744bb2e9ec72e833b5c870140f48e52945 — ui(redmi-v6-audit-20260913): record Wholesale category and mode device checks
+- 717c81875e1df7ba7eaea22ae12f5e6091bda78b — ui(redmi-v6-audit-20260913): record Shop and Wholesale pager boundary checks
+- 4b4fd986d152a23ec2c1a176706de77180e983dc — ui(redmi-v6-audit-20260913): qualify product save and reconcile product action gaps
+- 44e3ad553f8af3dbddbea8db946f0be3da0bb3fa — ui(redmi-v6-audit-20260913): record supplier return and verification coverage boundary
+- b54b9af7936e55c903d6e95e501587438dd82e18 — ui(redmi-v6-audit-20260913): reconcile cart and checkout action coverage
+- d704706d9ffcc7cc9f4be8899b772ea6634658b5 — ui(redmi-v6-audit-20260913): qualify cart browse and checkout visible return
+- c7efabf33051aa9c808e386ec5be234dabf7cb3b — ui(redmi-v6-audit-20260913): qualify coupon returns and checkout address controls
+- 56953a7a5be8b78763bcfc54ca4c6f89a426e84f — ui(redmi-v6-audit-20260913): reconcile order tracking and collection coverage
+- 44a3e4a2b4d4776160ce68cb56de2e44e1af9d16 — ui(redmi-v6-audit-20260913): record exact order context return checks
+- f771d27b78e223e23b6f88025b8c67930097b542 — ui(redmi-v6-audit-20260913): qualify tracking restore and alert controls
+- a846c558fe4bd606a69cfc613112979ba6d6a022 — ui(redmi-v6-audit-20260913): freeze passed evidence and pause for founder handoff
+- 48366d66307e425f4cee3b9094a9cea4ce4b9084 — ui(redmi-v6-audit-20260913): admit D001 source and test ownership
+- d532b9dea97a52473a5a95e090a9831fd9635696 — ui(redmi-v6-audit-20260913): fix D001 contextual empty-search guidance
+- cea1699a42bf182c9648719b8780b5ec9afd05ba — ui(redmi-v6-audit-20260913): admit D002 source and test ownership
+- 55877c20437bdc34c1a90de19904381e94014cde — ui(redmi-v6-audit-20260913): retain Store after final cart item removal
+- 3b0fd2fcdbcc444ead93590f7992e6ccb8d9b384 — ui(redmi-v6-audit-20260913): admit D003 freshness source and test ownership
+- e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa — ui(redmi-v6-audit-20260913): preserve D003 order estimate freshness across Buy surfaces
+- 41c5e36cfd2950521c918271afb56dcff2e02354 — ui(redmi-v6-audit-20260913): admit D004 profile source and test ownership
+- 2967bf188ffe6587a9f3e6409584ce3686504f60 — ui(redmi-v6-audit-20260913): show complete D004 profile validation guidance
+- 0ee85fd2d98595b0134b6190d3e9af58532990f3 — ui(redmi-v6-audit-20260913): admit D005 language source and test ownership
+- dce65c05ab54b39751211a608c923c00226e4a26 — ui(redmi-v6-audit-20260913): disclose D005 language preference availability
+- 9af7e19f79d61cabc5a96ba3be252ec242f2dcbc — ui(redmi-v6-audit-20260913): admit D006 Security source and test ownership
+- ed0233761e825e22a4d6e14c7d0f0e0073f9ea25 — ui(redmi-v6-audit-20260913): restore D006 Buy return after sign-in cancellation
+- 877656e54eab174f3c4dc698da23799553d8023a — ui(redmi-v6-audit-20260913): admit D007 product continuity test ownership
+- e604579b1f102573766bcaee8bcbf772f9cf96bd — ui(redmi-v6-audit-20260913): preserve D007 related product return context
+- 6104c9cc83d3407a142490e3fd4ac23c2b7cfec3 — ui(redmi-v6-audit-20260913): admit D008 order details test ownership
+- 0fe77e604fc4787a3b1584a3c0e3e92bff1e53e5 — ui(redmi-v6-audit-20260913): separate D008 wholesale buyer identity labels
+- e29194eb14d0d90ebf37eff329705e8ee4ec2381 — ui(redmi-v6-audit-20260913): reject D009 unverified order confirmation
+- 6fcb36cbd8e9ae1b42ee7f97c31230633b50f0f1 — ui(redmi-v6-audit-20260913): preserve D010 recovery destination context
+- b46c582bc747c15576f8349b0c2fd144d452f02b — ui(redmi-v6-audit-20260913): remove D011 duplicate wholesale product content
+- 4194ea5985bc95ddd228f25011ccf198dda38926 — ui(redmi-v6-audit-20260913): distinguish D012 Store listings from availability
+- da9555f36919292a19f74ee1bff162a5730dec27 — ui(redmi-v6-audit-20260913): admit D013 Chat presentation ownership
+- 4fccb654d602319e4b7352c5160e93c2bbf4e485 — ui(redmi-v6-audit-20260913): remove empty Store context expansion and preserve return
+- da26e9ff88616262c6677b0cb7903fd952b42656 — ui(redmi-v6-audit-20260913): finish Store sheet disposal before linked order entry
+- 0c10682b9c5e6955e5cf845de8897090b95f60d4 — ui(redmi-v6-audit-20260913): align Recently Viewed availability and visible recovery
+- ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb — ui(redmi-v6-audit-20260913): render Offers on initial alert entry
+- 99f74b80e37850003f7fdd37db81e71387fbc9ca — ui(redmi-v6-audit-20260913): make selected GST profile identity readable
+- 04afab670c14e5cc425269f6753a3410e0b82548 — ui(redmi-v6-audit-20260913): restore paged search after product Back
+- 70b117b966a58ca4a551edb31742e175c2723dde — ui(redmi-v6-audit-20260913): reconcile delivery minimize evidence and regression
+- 213d2e6c41fa4c123b9648fb4913e015bb973040 — ui(redmi-v6-audit-20260913): admit D020 Chat settings presentation ownership
+- 9a81541e866975c15c4044f8a5d68906e45dd638 — ui(redmi-v6-audit-20260913): keep audience explanation above Android navigation
+- 7e811a753a9896947f514a209f50138d21ea9544 — ui(redmi-v6-audit-20260913): restore compact grid after final quantity removal
+- 4eb257d146fa656b63d7e0fe003cc8898ee8cd09 — ui(redmi-v6-audit-20260913): identify selected shopping area
+- 9d73a543e0aa01dfd01c488eb04897eca1300def — ui(redmi-v6-audit-20260913): restore product position after store completion
+- e65f341b690d4345fda29fa3609d02e6293b6d25 — ui(redmi-v6-audit-20260913): record remaining qualification conflicts
+- 4881429fdfe3ade5cbfb35c1f7c736f22f323a95 — ui(redmi-v6-audit-20260913): admit exact qualification test ownership
+- d67d269d25cfc3376cc95447f7849b7735e1428f — ui(redmi-v6-audit-20260913): retain distinct supplier description regression
+- cd92728c56cbfadfbd9fa4cb10703c888311c4d4 — ui(redmi-v6-audit-20260913): assert historical order estimate context
+- 8627359d0eb954b3f0909f787eb054362a103c1a — ui(redmi-v6-audit-20260913): qualify optional supplier brand contract
+- 260e5d4da422da433c8b4181c9069a06ae4b72f5 — ui(redmi-v6-audit-20260913): qualify seeded benefit spend thresholds
+- 28a25ab53251eb70642821bb30b6a8384e1eb790 — ui(redmi-v6-audit-20260913): qualify delivery-dependent checkout fixtures
+- 0356a82179a805f63a33f73f62ac3fadbcd6e691 — ui(redmi-v6-audit-20260913): qualify canonical Medicine route continuity
+- 84101a16083b065bd822ec09c35a6ef22d5dc732 — ui(redmi-v6-audit-20260913): qualify Wholesale display contracts
+- 9b7e5aa7fddc08517432f9b3932da5a36ef7a92d — ui(redmi-v6-audit-20260913): qualify compact Offers scroll continuity
+- 9018535597239296871f9cf026e1e2a7328aca50 — ui(redmi-v6-audit-20260913): record final connected local qualification
+- 242a1b87c21389d3bc65e694d4a3cc8f28a26d05 — ui(redmi-v6-audit-20260913): admit exact qualified successor review source
+- ed39d76a7d98583ef6894c6dd4a5927ce954d85f — ui(redmi-v6-audit-20260913): preserve successor build prerequisites and source manifest
+- 32ebd7361fedf2224dae9cd89bb02337ca53286a — ui(redmi-v6-audit-20260913): seal both successor prebuild regression cycles
+- 92f410e4a0efb968028ce24211c400a22ec6aa19 — ui(redmi-v6-audit-20260913): preserve verified r66.20 APK and consumed build record
+- acb50158692686326193fdd9a17cc011c93ab3b6 — ui(redmi-v6-audit-20260913): record r66.20 Redmi install and D001 acceptance
+- 8686895bbc10dedd25da73726da7eab9caba2d39 — ui(redmi-v6-audit-20260913): record D002 Redmi acceptance
+- 2d8adbeba9071b4d628de090590606b1994ad44b — ui(redmi-v6-audit-20260913): qualify D003 Redmi freshness occurrences
+- 2ca408bd9bac0b87ad4492e4fc2fce9e3e78c17d — ui(redmi-v6-audit-20260913): record D004 Redmi validation acceptance
+- 1666ae109d95e7165d3ddbde05f2e6ed71ffe126 — ui(redmi-v6-audit-20260913): record D005 Redmi persistence child
+- 4a13f2f53824df91183003fdf332f80f8a32d42f — ui(redmi-v6-audit-20260913): record D006 Redmi cancellation return
+- d4225c31a5f3ff947fae35dc449423f501ca3605 — ui(redmi-v6-audit-20260913): record D007 Redmi product return
+- 01cea97bd0431a18490d4da722c151ebbdd963a1 — ui(redmi-v6-audit-20260913): record D008 Redmi buyer spacing
+- 8ee766845c473160f101f2de209776860fb45181 — ui(redmi-v6-audit-20260913): record D011 Redmi content acceptance
+- 8bd95d77150e9c2ff69761648e1dbbd8f0879f3e — ui(redmi-v6-audit-20260913): record D016 Redmi offer navigation acceptance
+- fb185f98c82a5ddf0d6c392bf7bd9ce7ad4081cc — ui(redmi-v6-audit-20260913): record D017 Redmi GST profile acceptance
+- 47912cf353e5eaa93377398a869bd104da7453b7 — ui(redmi-v6-audit-20260913): preserve scoped D018 return evidence and limits
+- 84a7ab62311c049e10339edf715db05e8ee3bd49 — ui(redmi-v6-audit-20260913): confirm D019 delivery rail reconciliation on Redmi
+- cde06820f2e55366839e721f0609d7bb76402207 — ui(redmi-v6-audit-20260913): record D020 Redmi privacy sheet acceptance
+- aaeb75fc9187a72f8c16f29c29b4f70732bf242b — ui(redmi-v6-audit-20260913): record D021 Redmi grid restoration acceptance
+- 2949b9071f016c4bce6826ff8ab2720b28b3a7d3 — ui(redmi-v6-audit-20260913): record D022 Redmi area selection acceptance
+- 859056fcae9b88d7199aae4d330871ea64865f91 — ui(redmi-v6-audit-20260913): qualify D018 exact Redmi search return
+- e4b33ab1f092aa390805ca50b190288e6b3a2685 — ui(redmi-v6-audit-20260913): record six remaining device prerequisites
+- b437a216b3c61db9a7ef67968828b71ef7243474 — ui(redmi-v6-audit-20260913): consolidate scoped ticket and preservation evidence
+- 11b6562e7bf382afeb11e1801a0a390477fcae8f — ui(redmi-v6-audit-20260913): qualify isolated original fixture access
+- d7efb8f9daec35835a9c2e476f34d43e5fbc1039 — ui(redmi-v6-audit-20260913): admit exact fixture prerequisite source pins
+- e8cbc3ef46a1d1360e2445163ebf515f3cbcf029 — ui(redmi-v6-audit-20260913): seal fixture prerequisite prebuild evidence
+- 2be0968529f43e41cf6a95f07b8b7e46f4d0035e — ui(redmi-v6-audit-20260913): record three scoped Redmi closures
+- fe3ee1d3bd1f01f3f6bc254bc6e06646bff40b78 — ui(redmi-v6-audit-20260913): diagnose language persistence dependency
+- 3c30ba11521db6bb1a1ec6995b181a81df1a6b34 — ui(redmi-v6-audit-20260913): persist isolated review language preference
+- 43548137e445457b84587547edbab4195e50cba9 — ui(redmi-v6-audit-20260913): qualify language source admission and reconcile device status
+- f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b — ui(redmi-v6-audit-20260913): seal qualified r66.22 language source baseline
+- d0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c — ui(redmi-v6-audit-20260913): record r66.22 Redmi delivery and open qualification
+- 448d4a2c7c10ee195e711e49aa4cc69a593ff37b — docs(redmi): close D005 persistence with r66.22 device evidence
+- f0f73c427e27f30117e4b98b116100f7d306c76a — ui(redmi-v6-audit-20260913): prepare original D014 Store fixture on r66.22
+- b7012e92f583fcf48ae428bc89f208b665537337 — ui(redmi-v6-audit-20260913): verify approved native links and retain D014 failure
+- 4221158fead95a89047e3408aaeb11c9a12dd135 — ui(redmi-v6-audit-20260913): preserve incoming order over temporary Store returns
+- 3d8827ccfbb0b0d1e95d31190c9a17f4f832efd3 — ui(redmi-v6-audit-20260913): admit exact D014 correction for source checks
+- 1d5c4be97dc13874af1f4348156782339ecacf60 — ui(redmi-v6-audit-20260913): seal D014 combined qualification for r66.23
+- 7fabefa9ed78e7f694440f8eae6d083ac92dffde — ui(redmi-v6-audit-20260913): record r66.23 install and native approval blocker
+- 41412f56a4af4d75e2976dc04843dd293ae4869d — ui(redmi-v6-audit-20260913): restore repeated order link navigation
+- e52f60301c8d5bdd28895681d2888c9612ba6dd6 — ui(redmi-v6-audit-20260913): admit exact repeated-link correction source
+- 32630c34df17d52bb0ac74156fb1580177977d9d — ui(redmi-v6-audit-20260913): qualify r66.24 corrective source baseline
+- 9d775c481b749833127039b2ac6cf0fd71d57a51 — ui(redmi-v6-audit-20260913): close D014 with r66.24 Redmi evidence
+- 3f4d1cf92100a3008223c43a89d65e3d820a0867 — ui(redmi-v6-audit-20260913): bind historical evidence label exception
+- 17730e9c5a92ca51cad0c590deca368927f2bae6 — ui(redmi-v6-audit-20260913): reconcile completed Redmi handoff
+- 253cbe16da07f069c878bed8f0f5722b8c4aa29c — ui(redmi-v6-audit-20260913): improve customer SKU metadata across Buy presentations
+- 4467b078a9e10e0549567b3a3c68b97e791186ed — ui(redmi-v6-audit-20260913): seal SKU source admission and r66.25 prebuild evidence
+- d6d9890fa7754a38a05b183bc8ca6e89eccf22cc — ui(redmi-v6-audit-20260913): qualify adaptive SKU metadata and vertical product discovery
+- dad26da0365006d16891203e45839db40b9ed8d6 — ui(redmi-v6-audit-20260913): seal qualified r66.26 SKU review source
+- 64ca4d757cffc1cc1fa575b84004cd827e6695ab — ui(redmi-v6-audit-20260913): qualify product page swipes and seller wording
+- f3403f9ad14a709e0bee9b37d2c5aa03a72c5a5a — ui(redmi-v6-audit-20260913): seal twelve-ticket navigation prebuild evidence
+- f0fc06a92bb43627ec4ca952e8996a888ec96ac2 — ui(redmi-v6-audit-20260913): remove product paging rows and preserve full media
+- e450af636f61e86abbcbb9fd3acb1fe34d2696dc — ui(redmi-v6-audit-20260913): seal r66.28 source qualification and build gates
+- 067b26d1c66ac9511d026539470103baaea194fc — ui(redmi-v6-audit-20260913): qualify twelve SKU records on r66.28 Redmi
+- e5d39769e260c1a6691ea7808642308472261a97 — ui(redmi-v6-audit-20260913): reopen whole-grid horizontal motion with Redmi evidence
+- 8ecf24a9a7c14a492f603c019c0d40ef805b8aab — ui(redmi-v6-audit-20260913): preserve unqualified catalogue WIP and pending review defects
+- c4365373f2c34af0f240377c6a91726ffb8097dc — ui(redmi-v6-audit-20260913): reconcile Cursor evidence and owner catalogue handoff
+- 56397db971e0402f5ff6c407f72635b520e94d46 — ui(redmi-v6-audit-20260913): prepare C04 C06 C07 local founder review
+- 73b2cf75c4648978d0da3cc366463a13030173c7 — ui(redmi-v6-audit-20260913): reveal adjacent SKU grid during C04 swipe
+- 808db0321bc1291b82227a2fe7a64db2b52d6a72 — ui(redmi-v6-audit-20260913): compact Offers carousel media and toolbar
+- 2db20c6fa91e29a6fb6999f81141a699016556a8 — ui(offers): tighten promotional card height and width
+- 82c751b613080cb1c2b445f7480b55090455bf17 — ui(offers): narrow promotional cards for a larger next-card preview
+- 698e0e412ed8fe766b8d2918e42ee812b5991535 — ui(offers): narrow cards and apply emerald and plum gradients
+- b1a3d339ec32a2619df9420ea09ae284b8399363 — ui(offers): shorten horizontal cards and replace green with charcoal burgundy
+- 17ef37aa9494c2fee141852eafd88223dd6779e9 — ui(offers): expand product photo panel with founder visual approval
+- 4e7927cfe1758affbc56e1035a69792e38cb9b73 — ui(offers): fit SKU media to square frames pending visual approval
+- 0adb2a271ed334f98c2fd5c961e6f2ce12c04cb3 — ui(offers): size SKU cards to content and verify quantity reflow
+- 6f0632ad9c73b59288df128ef6540ce04f104957 — ui(buy): pack shared SKU columns and align product media across surfaces
+- eb0bb45c0dc7c62c3b7f82ff97b7a5d2312a0e05 — build(redmi): register founder-approved SKU and Offers review source
+- 86efc84baa8237bc4e3f2abdb9e4ef3f61d9b432 — docs: register Redmi shared SKU defects and review build evidence
+- abe7410ab31752345ce8449ac5776d7322dbd3be — docs: record bounded Redmi journeys and three open visual defects
+- 364ac3d798a5242f5c31459dc45727f0b66e6bd7 — fix: compact shared SKU controls and separate Offers media panel
+- 5b0dd2cd1af1bfedd73ced627580ce38f62af66d — fix: place compact SKU badge and circular Save on top edge
+- 1880614bb499a47993df86ebed6599926414fc50 — fix: apply approved SKU top edge to featured and Cart cards
+- da4bd11dfb2b7cba809f9187d94cbcbf99944de9 — chore: register approved SKU rollout for isolated Redmi review
+- d6a83b3466edcdb29932b86a0f03f763bcb78141 — test: record r66.30 Redmi SKU rollout and media limitation
+- ee42be0e21f1707e1cbf2ba3ad966579f118b209 — ui(redmi-v6-audit-20260913): fit Cart thumbnail disclosure before integration
+
+### codex: 57 commits through cbaa68ad00f2285329d2d5c584689b9c6be1123a
+
+- cf8b5e0f37c3c461387ea406b62b72837c85f99f — ui(store-procurement-bridge-20260912): correct Store first-view navigation
+- d5a4a7ca6e15729190675580e6a2a35b2865f4dd — ui(store-procurement-bridge-20260912): pin corrected Store source for V7 review
+- f68da17fe18ad89c33ada2b2e8df783871974f7c — ui(store-procurement-bridge-20260912): align exact V8 native review admission
+- fd1c84f4b0328c5b758670cb2e8013f60b76ecf9 — ui(store-procurement-bridge-20260912): preserve explicit Store return over saved Restock
+- ec9f9a41bd822f078281b9992f5d26386525fba2 — ui(store-procurement-bridge-20260912): pin saved-purchase return correction for V9
+- 794bbd36e16578d7c178e010a5a4cb99444b99da — ui(store-procurement-bridge-20260912): connect isolated existing Store review catalogue
+- a2bfab5097d2a2d02e8d386eca77b62cd5d27e91 — ui(store-procurement-bridge-20260912): pin exact Restock correction for V10 review
+- 906fd10d28211ae61acd83059185a958f5d7d003 — ui(store-procurement-bridge-20260912): preserve approved Restock and Orders review checkpoint
+- f50f9ecda16002f8db1ca847ff69f37633cc65d6 — ui(store-procurement-bridge-20260912): restore compact Orders list space
+- 5fd62ba3d960b4a60f24163616b25a2a58beec28 — ui(store-procurement-bridge-20260912): retain accessible Restock header and compact cart
+- 72e7f5cd909781e57d7a8ef6aadafd1506fde1fe — ui(store-procurement-bridge-20260912): align Restock route test with approved header
+- a13a96ecb02737a3d307a00c7a78531871d16fab — ui(store-procurement-bridge-20260912): align payment isolation fixtures with supplier terms
+- c1a42ecd54fd19c313b2c03c233e7208b635ae17 — ui(store-procurement-bridge-20260912): verify live updates through current Orders and Stock routes
+- f0ab60f164d6f0f7176cf0b8643babe53c3e3a05 — ui(store-procurement-bridge-20260912): pin tested source for V11 review admission
+- 2dbabb356dee467170774763941a2203a7ec0cb7 — ui(store-procurement-bridge-20260912): synchronize Restock search header with its current query
+- e9bd7e78b7f5f391d3aaedf845863fe791abf3a0 — ui(store-procurement-bridge-20260912): pin search correction for V12 admission
+- 38f70547d0f41b8feda7a0040d3e119465ca2c69 — ui(store-procurement-bridge-20260912): release Restock focus and require APK replay
+- b0fd2f0e5b7183574d7a6ca7547db72bb5bca776 — ui(store-procurement-bridge-20260912): pin navigation correction for V13 admission
+- 2fa491645cf469aee7848f37ae637718488efa6a — ui(store-procurement-bridge-20260912): isolate independent Cursor audit from Store admission
+- 659a080f74a7cb4dd15e58ca10ed45f28be55512 — ui(store-procurement-bridge-20260912): align exact native projection admission for successor
+- 7e0a4e8be0be13555552b14d8853584d11a9a8e3 — ui(store-procurement-bridge-20260912): bind native exit checks for mandatory navigation replay
+- 081e98ac35da4ec2a211923a802f35f9e4ad8b30 — ui(store-procurement-bridge-20260912): preserve overlapping SKU transition identity
+- 04208634a04aa9e28fc367e70cecefa3a36a05f5 — ui(store-procurement-bridge-20260912): correct Store return and transition regressions
+- 51efc32440050816225500f46415f8b2b360fe15 — ui(store-procurement-bridge-20260912): pin tested V17 successor admission
+- 803ac6ea275c1cdbc67c3ee666349d25b1065cd9 — ui(store-procurement-bridge-20260912): bind canonical registry for V18 admission
+- a99b857885e0b9a36bc9a895b186d2ba3b049594 — ui(store-procurement-bridge-20260912): align exact V19 native admission identity
+- c39c70416969e2057c14ad74baee008d90e723fb — ui(store-procurement-bridge-20260912): require complete Store regression replay
+- 2dcaa48f118dd6c6312c397033bf6ca5800c9745 — ui(store-procurement-bridge-20260912): connect Store sales ledger and recovery
+- 6d9b61ee3fb640125c6810d7c9bd541fd2ba3863 — ui(store-procurement-bridge-20260912): pin tested Ledger review successor
+- 7273cb4a650b9b6cb0c865f2adfe9d07559961c4 — ui(store-procurement-bridge-20260912): connect supplier and money ledgers
+- 4712e446a1c727f8feac594d3e0e7859eae3c166 — ui(store-procurement-bridge-20260912): pin combined Ledger review successor
+- 2a3b5fccbc14b41e09071fd8b00199e5ef13d149 — ui(store-procurement-bridge-20260912): align approved sound review source pin
+- 73255de3185505decdc39cc006b0e79e2272e2ac — ui(store-procurement-bridge-20260912): pin approved Ledger build successor
+- 9f90dfff4e5f01ea397dba3e3f4262cf25da61ec — ui(store-procurement-bridge-20260912): keep Ledger actions above system navigation
+- cea104050ff80cae29b957a0f8c8aa2136cb95d1 — ui(store-procurement-bridge-20260912): pin tested Ledger child correction admission
+- 29c4d3744e7fedc9f9d6a3737beda4020fe91760 — ui(store-procurement-bridge-20260912): isolate supplier ledger expansion state
+- 57c20f570f6699a55ecbacf08b2ac795318c7b64 — ui(store-procurement-bridge-20260912): pin supplier-state correction for V24
+- f6a6117de520d5e38efb2c10cb8ee35b3ace22f8 — ui(store-procurement-bridge-20260912): retain confirmed receipt history across restart
+- d77fdf0faff9d687955dece66a33b71c78c9aadb — ui(store-procurement-bridge-20260912): pin V25 receipt recovery admission
+- a9623872839085c7147c979692957c6289fe335b — ui(store-procurement-bridge-20260912): organise approved dashboard quick actions
+- efe71e722d8944cb053cfbc4a705efbcaa74a492 — ui(store-procurement-bridge-20260912): connect counter invoice to existing collection
+- 66de537fdfb1223d0ae3fc34cb00d4b6a9318447 — ui(store-procurement-bridge-20260912): preserve approved counter-sale and PDF review baseline
+- 35ea39150884412e3766b35dafb25ca474c34f29 — ui(store-procurement-bridge-20260912): enable invoice previews in isolated review APKs
+- 0e3e1051647adf104125d4e5fb2e082708d2f1a9 — ui(store-procurement-bridge-20260912): bind preserved frontend to V26 review candidate
+- 0340a6419b7b2a75ff9ed2891ced04cbf0bb0604 — ui(store-procurement-bridge-20260912): reconcile approved sale journeys and accessible layouts
+- 47dce7e015673a7ca503ab0fd552cc5a3ba5d273 — chore(store-procurement-bridge-20260912): bind exact V27 review admission
+- ba7e5369928d397bb2f912a49526448c308f8102 — ui(store-procurement-bridge-20260912): preserve exact historical admission label
+- 8cec1dd68225810b22d42be3844508043662510b — ui(store-procurement-bridge-20260912): verify enlarged action and recovery navigation
+- 9312de0a15364e37cc64588e2c5ca62a2dd3b81b — ui(store-procurement-bridge-20260912): bind exact V28 review admission
+- 92d90843316490cbfd5511ad0d176187943ea70c — ui(store-procurement-bridge-20260912): align saved invoice dates with local PDF date
+- 008be4370712b60e5324f24fa514180bf33cbb9f — ui(store-procurement-bridge-20260912): bind exact V29 date-corrected review admission
+- 04d09a0db90df67cb3e6c66c31d10601990d8802 — ui(store-procurement-bridge-20260912): repair counter sale flow and responsive forms
+- f226a0b0db654cbc9621774badaa106ec55d946c — ui(store-procurement-bridge-20260912): bind counter repair review candidate
+- a98fe59a5485f7237e6e18bcf4fa09781173f13c — ui(store-procurement-bridge-20260912): verify Ledger return after focused sale
+- 54eae4970959d39cb978cd01082be828625721f9 — ui(store-procurement-bridge-20260912): bind V31 counter review candidate
+- 21977bff27cf22bfadb50f592a635355bb80574e — merge(store-buy-final-v31-20260916): integrate qualified Store and Buy
+- cbaa68ad00f2285329d2d5c584689b9c6be1123a — ui(store-product-catalogue-20260916): add scoped product setup from Store rail
+
+Expected resolution: preserve both catalogue features, all 4598 unique full registry records; numeric collision mapping must retain original IDs as aliases/evidence. Automatically merged source/test files must remain byte-identical to Git merge result. No source merge has yet been accepted.
+
+## Reconciled source checkpoint
+
+Repair merge: `990ce3c02a142c5b24f25b107013893aa85e5f75`, exact two parents: pre-merge checkpoint `8d0a06a3` and Cursor `ee42be0e`. All 347 divergent source commits remain ancestors; no squash or selected-commit replay. The full prior Codex/V31 history is preserved.
+
+Local verification: 213 SKU/Cart/responsive/founder-pending tests passed; 871 Store Add Product/workspace tests passed (79 explicitly skipped); 459 session/router/route-continuity/Offers tests passed. Total: 1,543 passed, 79 skipped. Four combined Buy Dart owners analyze cleanly. Boundary-checker self-test passes. Combined regression-memory and scoped pre-commit gates pass. Source/config/script whitespace check passes; inherited raw evidence logs retain their original whitespace unchanged.
+
+Git automatic merge tree `4a05446a24a51f8e7492fcc497b40e682baa6c2f` differs only in the six authorized conflict files. Both policy helper/admission histories remain. All 4,598 regression records preserve source content; five distinct Cursor IDs colliding numerically with Codex incidents are mapped to 4623–4627 with originalId and explicit reconciliation table. Existing historical originalId fields remain untouched.
+
+Cart follow-up is fixed at `ee42be0e` and locally tested (37 tests before integration). Founder explicitly waived another Redmi test for this follow-up. The existing Redmi r66.30 evidence remains evidence for its original source, not for this new combined source. No new device qualification is claimed here.
+
+Strict production boundary result: FAIL, 18 findings, retained in the log below. Backend files are byte-identical to the Codex parent. Existing review-only source/admission and backend-contract limitations remain; this merge does not grant production transport/publication authority. Full Store metadata/media editing, publication and provider wiring remain the dependencies documented in STORE-CATALOGUE-ENTRY-20260916.md. This is a reconciled source checkpoint; production acceptance/release is unresolved. No production deployment is implied.
+
+Earlier analyzer/interface mismatch was corrected before the passing runs. Initial ownership gate rejection was corrected by restoring the exact primary conflict claim. An attempted overlapping analyzer invocation was rejected by the guard and later run successfully after the test lock released. Failed/diagnostic logs are retained, not counted as passes.
+
+Local evidence root: `C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/`.
+
+- `integration-combined-widgets.log` SHA256 `b7ed834ee2a6819d163034c2ff478e1df1d1d929f69f986fc4c1ed0b0ae70850`
+- `integration-store-tests.log` SHA256 `862f1110a2cd8c92c400f1f3e062d40a38db2ea845ff46c1e12c2b6c838f84e6`
+- `integration-connected-tests.log` SHA256 `593531b734acf33419320b36c74b2119ce433a1d2d58c6bb768efbe4c4425279`
+- `integration-combined-analysis-v2.log` SHA256 `daa47515af88860b60502862f9191c4ece5eff18632b30ab1360353e794b843a`
+- `integration-merged-memory.log` SHA256 `c93b48b9992ada1cec3bce3c3c3397e23540cf7c6d5e5dab23ef176f2e4c6c70`
+- `integration-repair-precommit-final.log` SHA256 `51b35c37faaef332d160087e4906d5e4aea3c2a6939e6190dcf57c4b9f9a3aa2`
+- `integration-boundary-selftest.log` SHA256 `e104e61312586e550dffdbe3110f89936b037d8c436bf7749486f8e61da4b5b9`
+- `integration-backend-boundary.log` SHA256 `5b99b05d0dbce3c8ace883a6ee1f28a7570db35a3f25dc2c5a6036ef54e72758`
+
+### Bounded closure gate correction
+
+The pre-closure gate counted all ancestry merges and rejected the preserved Cursor V6 merge `da4d266f` as a second repair merge. Exact evidence: `git rev-list --merges abf25ccb..990ce3c0` returns 990ce3c0 and da4d266f; `--first-parent` returns only 990ce3c0. Correct the inventory to first-parent, matching the existing handoff and qualified-repair logic. This one closure therefore owns the exact coordination checker plus this evidence document. No application or conflict resolution changes are admitted after the merge. One post-merge closure maximum remains. The earlier doc-only closure plan is superseded only for this demonstrated gate correction; no source history is rewritten or omitted.

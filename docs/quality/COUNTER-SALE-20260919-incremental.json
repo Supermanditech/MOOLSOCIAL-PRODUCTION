@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001",
+  "baselineTag": "moolsocial-source-baseline-20260918-v2",
+  "uiFounderReview": {
+    "state": "pending",
+    "acceptedScopes": [],
+    "reachableBuyDestinations": [
+      "shop",
+      "wholesale",
+      "orders",
+      "offers"
+    ],
+    "blockedBackendScopes": [
+      "buy.product_seller",
+      "buy.search",
+      "buy.medicine"
+    ],
+    "medicineOwner": "care"
+  },
+  "lanes": [
+    {
+      "id": "integration",
+      "branchPrefix": "integration/moolsocial/counter-sale-20260919",
+      "packageId": "com.moolsocial.app.runtime",
+      "deviceSerial": "2b3e0f71",
+      "minimumVersionCodeExclusive": 2026091803
+    },
+    {
+      "id": "codex_ui",
+      "branchPrefix": "work/codex-ui/",
+      "packageId": "com.moolsocial.app.runtime",
+      "deviceSerial": "2b3e0f71",
+      "minimumVersionCodeExclusive": 2026091803
+    }
+  ],
+  "rules": {
+    "oneOpenTicketPerLane": true,
+    "oneOpenTicketPerPackage": true,
+    "ticketStartMustEqualBaseline": true,
+    "laterPhasesMustDescendFromBaseline": true,
+    "baselineTagMustBeAnnotatedAndRemoteExact": true,
+    "candidateVersionMustIncrease": true,
+    "backendRequiresFounderAcceptedUiScope": true,
+    "handoffRequiresCleanWorktree": true,
+    "acceptedTicketBecomesNextBaseline": true
+  }
+}

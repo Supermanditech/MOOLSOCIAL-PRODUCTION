@@ -78,6 +78,23 @@ void main() {
     );
   }
 
+  testWidgets('OPPO header keeps the complete Ride instruction visible', (
+    tester,
+  ) async {
+    final sessions = await _mount(tester, size: const Size(360, 800));
+    addTearDown(sessions.dispose);
+
+    final subtitle = find.byKey(const Key('ride-page-subtitle'));
+    expect(find.text('Destination, vehicle and fare'), findsOneWidget);
+    final subtitleRect = tester.getRect(subtitle);
+    final appBarRect = tester.getRect(find.byType(AppBar));
+    expect(subtitleRect.left, greaterThanOrEqualTo(appBarRect.left));
+    expect(subtitleRect.right, lessThanOrEqualTo(appBarRect.right));
+    expect(subtitleRect.bottom, lessThanOrEqualTo(appBarRect.bottom));
+    expect(subtitleRect.height, lessThan(20));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('C24D recent and saved places set the destination in one tap', (
     tester,
   ) async {
