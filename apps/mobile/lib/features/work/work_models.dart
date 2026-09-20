@@ -292,12 +292,14 @@ enum WorkspacePaymentChannel {
   cash,
   directUpi,
   credit,
-  unknown;
+  unknown,
+  bankTransfer;
 
   String get label => switch (this) {
     platform => 'Through MoolSocial',
     cash => 'Cash at store',
     directUpi => 'UPI to store',
+    bankTransfer => 'Bank transfer to store',
     credit => 'On account',
     unknown => 'Payment method unavailable',
   };
@@ -388,6 +390,7 @@ class WorkspacePaymentRecord {
           WorkspacePaymentChannel.platform => 'Paid through MoolSocial',
           WorkspacePaymentChannel.cash => 'Paid in cash',
           WorkspacePaymentChannel.directUpi => 'Paid to store',
+          WorkspacePaymentChannel.bankTransfer => 'Paid by bank transfer',
           _ => state.label,
         }
       : state.label;
@@ -636,7 +639,8 @@ class WorkspaceCustomerCollection {
       amountMinor > 0 &&
       _financeAmountValid(amountMinor) &&
       (channel == WorkspacePaymentChannel.cash ||
-          (channel == WorkspacePaymentChannel.directUpi &&
+          ((channel == WorkspacePaymentChannel.directUpi ||
+                  channel == WorkspacePaymentChannel.bankTransfer) &&
               reference?.trim().isNotEmpty == true));
   Object get identityData => (
     accountScope,
@@ -3171,6 +3175,55 @@ class WorkspaceBillingDetails {
       gst: value['gst'] as String,
       address: value['address'] as String,
     );
+  }
+}
+
+enum WorkspaceInvoiceDeliveryMode {
+  off('Off'),
+  automatic('Auto'),
+  whatsapp('WhatsApp'),
+  moolSocialChat('MoolSocial Chat');
+
+  const WorkspaceInvoiceDeliveryMode(this.label);
+  final String label;
+}
+
+/// A Store preference, never recipient consent or evidence of message delivery.
+class WorkspaceInvoiceDeliveryPreference {
+  const WorkspaceInvoiceDeliveryPreference({
+    required this.account,
+    required this.store,
+    this.mode = WorkspaceInvoiceDeliveryMode.off,
+  });
+
+  final String account, store;
+  final WorkspaceInvoiceDeliveryMode mode;
+  bool get valid => account.trim().isNotEmpty && store.trim().isNotEmpty;
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': account,
+    'store': store,
+    'mode': mode.name,
+  };
+
+  static WorkspaceInvoiceDeliveryPreference? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['account'] is! String ||
+        value['store'] is! String) {
+      return null;
+    }
+    final mode = WorkspaceInvoiceDeliveryMode.values
+        .where((item) => item.name == value['mode'])
+        .firstOrNull;
+    if (mode == null) return null;
+    final preference = WorkspaceInvoiceDeliveryPreference(
+      account: value['account'] as String,
+      store: value['store'] as String,
+      mode: mode,
+    );
+    return preference.valid ? preference : null;
   }
 }
 

@@ -1129,6 +1129,108 @@ class SecureWorkReceiptDraftStore implements WorkReceiptDraftStore {
   });
 }
 
+abstract interface class WorkInvoiceDeliveryPreferenceStore {
+  Future<WorkspaceInvoiceDeliveryPreference?> read(
+    String account,
+    String store,
+  );
+  Future<void> save(WorkspaceInvoiceDeliveryPreference preference);
+}
+
+/// Device-local encrypted preference only. No outbox, recipient or delivery claim.
+class SecureWorkInvoiceDeliveryPreferenceStore
+    implements WorkInvoiceDeliveryPreferenceStore {
+  SecureWorkInvoiceDeliveryPreferenceStore({
+    required this.accountScope,
+    required this.storeScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  final String? Function() accountScope, storeScope;
+  final FlutterSecureStorage _storage;
+  static final Map<String, Future<void>> _pending = {};
+
+  String _key(String account, String store) =>
+      'moolsocial.workspace.invoice-delivery.v1.'
+      '${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+
+  void _check(String account, String store) {
+    if (account.trim().isEmpty ||
+        store.trim().isEmpty ||
+        accountScope() != account ||
+        storeScope() != store) {
+      throw const WorkGatewayException(
+        'Return to your Store to change invoice delivery.',
+      );
+    }
+  }
+
+  Future<T> _exclusive<T>(String key, Future<T> Function() action) {
+    final result = (_pending[key] ?? Future<void>.value()).then(
+      (_) => action(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pending[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_pending[key], tail)) _pending.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  Future<WorkspaceInvoiceDeliveryPreference?> _read(
+    String account,
+    String store,
+  ) async {
+    _check(account, store);
+    final raw = await _storage.read(key: _key(account, store));
+    _check(account, store);
+    if (raw == null) return null;
+    WorkspaceInvoiceDeliveryPreference? preference;
+    try {
+      preference = WorkspaceInvoiceDeliveryPreference.fromJson(jsonDecode(raw));
+    } on FormatException {
+      // Keep unreadable data; never silently enable or replace a saved choice.
+    }
+    if (preference == null ||
+        preference.account != account ||
+        preference.store != store) {
+      throw const WorkGatewayException(
+        'Your invoice delivery preference could not be opened.',
+      );
+    }
+    return preference;
+  }
+
+  @override
+  Future<WorkspaceInvoiceDeliveryPreference?> read(
+    String account,
+    String store,
+  ) => _exclusive(_key(account, store), () => _read(account, store));
+
+  @override
+  Future<void> save(WorkspaceInvoiceDeliveryPreference preference) =>
+      _exclusive(_key(preference.account, preference.store), () async {
+        _check(preference.account, preference.store);
+        if (!preference.valid) {
+          throw const WorkGatewayException(
+            'Check your invoice delivery preference.',
+          );
+        }
+        await _read(preference.account, preference.store);
+        _check(preference.account, preference.store);
+        await _storage.write(
+          key: _key(preference.account, preference.store),
+          value: jsonEncode(preference.toJson()),
+        );
+        _check(preference.account, preference.store);
+      });
+}
+
 abstract interface class WorkUpiDestinationStore {
   Future<WorkspaceUpiDestination?> read(String account, String store);
   Future<void> save(WorkspaceUpiDestination destination);

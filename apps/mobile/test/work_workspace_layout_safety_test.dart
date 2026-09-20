@@ -28,10 +28,33 @@ import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'package:moolsocial/features/work/screens/work_invoice_pdf_screen.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 // Host-only authoritative-response fixtures. These never qualify live grants.
+class _InvoiceDeliveryFixtureStore
+    implements WorkInvoiceDeliveryPreferenceStore {
+  final values = <String, WorkspaceInvoiceDeliveryPreference>{};
+  bool failRead = false, failSave = false;
+  Completer<void>? holdSave;
+  @override
+  Future<WorkspaceInvoiceDeliveryPreference?> read(
+    String account,
+    String store,
+  ) async {
+    if (failRead) throw StateError('read unavailable');
+    return values['$account/$store'];
+  }
+
+  @override
+  Future<void> save(WorkspaceInvoiceDeliveryPreference preference) async {
+    await holdSave?.future;
+    if (failSave) throw StateError('write unavailable');
+    values['${preference.account}/${preference.store}'] = preference;
+  }
+}
+
 class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
   bool failWrite = false;
   final drafts = <WorkspaceLedgerFormKey, WorkspaceLedgerFormDraft>{};
@@ -910,6 +933,7 @@ void main() {
     WorkStockHistoryGateway? stockHistoryGateway,
     WorkReceiptDraftStore? receiptDraftStore,
     WorkPendingProofStore? pendingProofStore,
+    WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryStore,
   ]) {
     final work =
         WorkSession(
@@ -919,6 +943,8 @@ void main() {
             counterDraftStore: _CounterDraftFixtureStore(),
             ledgerFormDraftStore: _LedgerFormFixtureStore(),
             upiDestinationStore: _UpiDestinationFixtureStore(),
+            invoiceDeliveryPreferenceStore:
+                invoiceDeliveryStore ?? _InvoiceDeliveryFixtureStore(),
             issueDraftStore: issueDraftStore ?? _IssueDraftFixtureStore(),
             issueCommandGateway: issueCommandGateway,
             issueCommandStore: issueCommandStore ?? _IssueCommandFixtureStore(),
@@ -8774,9 +8800,10 @@ void main() {
         expect(invoice.payment, paymentMethod);
         expect(find.byType(DataTable), findsNothing);
         expect(find.byTooltip('Close invoice'), findsNothing);
+        expect(find.byKey(const Key('work-invoice-share-chat')), findsNothing);
         expect(
-          tester.widget(find.byKey(const Key('work-invoice-share-chat'))),
-          isA<TextButton>(),
+          find.byKey(const Key('work-invoice-share-whatsapp')),
+          findsNothing,
         );
         expect(
           tester
@@ -8972,8 +8999,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(paid.channel, WorkspacePaymentChannel.cash);
         expect(find.textContaining('Reference: QA-UPI'), findsNothing);
-        await reveal(tester, find.text('Next sale'));
-        await tester.tap(find.text('Next sale'));
+        await reveal(tester, find.byKey(const Key('work-sale-next')));
+        await tester.tap(find.byKey(const Key('work-sale-next')));
         await tester.pumpAndSettle();
         await reveal(tester, find.text('Counter recall customer'));
         await tester.tap(find.text('Counter recall customer'));
@@ -10303,7 +10330,7 @@ void main() {
         );
         await reveal(tester, handoverHint);
         await captureStoreView(tester, 'pos-counter-handover-$entry-$scale');
-        final nextSale = find.text('Next sale');
+        final nextSale = find.byKey(const Key('work-sale-next'));
         await reveal(tester, nextSale);
         await tester.tap(nextSale);
         await tester.pumpAndSettle();
@@ -22640,6 +22667,572 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 1.4]) {
+    testWidgets(
+      'CSENH015 Store settings saves channel and invoice stays truthful $scale',
+      (tester) async {
+        final preferences = _InvoiceDeliveryFixtureStore();
+        final work = storeViewFixture(
+          null,
+          _ContactDraftFixtureStore(),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          preferences,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          textScale: scale,
+        );
+        Future<void> press(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        Future<void> openSettings() async {
+          await openStoreSettings(tester);
+          await press('work-invoice-delivery-settings');
+          await reveal(
+            tester,
+            find.byKey(const Key('work-invoice-delivery-mode')),
+          );
+        }
+
+        await openSettings();
+        final dropdown = find.byKey(const Key('work-invoice-delivery-mode'));
+        expect(
+          tester
+              .widget<DropdownButton<WorkspaceInvoiceDeliveryMode>>(dropdown)
+              .value,
+          WorkspaceInvoiceDeliveryMode.off,
+        );
+        for (final mode in [
+          WorkspaceInvoiceDeliveryMode.automatic,
+          WorkspaceInvoiceDeliveryMode.moolSocialChat,
+          WorkspaceInvoiceDeliveryMode.whatsapp,
+        ]) {
+          await press('work-invoice-delivery-mode');
+          await tester.tap(find.text(mode.label).last);
+          await tester.pumpAndSettle();
+          expect(preferences.values.values.single.mode, mode);
+        }
+        expect(find.textContaining('consent'), findsNothing);
+        expect(find.textContaining('opt-in'), findsNothing);
+        await captureStoreView(tester, 'invoice-delivery-settings-$scale');
+        await press('work-store-home');
+        expect(
+          find.byKey(const Key('work-settings-discard-dialog')),
+          findsNothing,
+        );
+        await openSettings();
+        expect(
+          tester
+              .widget<DropdownButton<WorkspaceInvoiceDeliveryMode>>(dropdown)
+              .value,
+          WorkspaceInvoiceDeliveryMode.whatsapp,
+        );
+        await press('work-store-home');
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9000092035');
+        await addCounterProduct(
+          tester,
+          find.byKey(const Key('work-order-add-oil-fortune-1l')),
+        );
+        await press('work-order-review');
+        expect(
+          find.byKey(const Key('work-invoice-delivery-mode')),
+          findsNothing,
+        );
+        await press('work-order-save');
+        await reveal(
+          tester,
+          find.byKey(const Key('work-invoice-auto-delivery-unavailable')),
+        );
+        expect(find.textContaining('Auto-send: WhatsApp'), findsOneWidget);
+        expect(
+          find.textContaining('Automatic delivery unavailable'),
+          findsOneWidget,
+        );
+        expect(find.text('Sent'), findsNothing);
+        expect(find.text('Delivered'), findsNothing);
+        // Founder removed both actions; no fake replacement send is introduced.
+        expect(find.byKey(const Key('work-invoice-share-chat')), findsNothing);
+        expect(
+          find.byKey(const Key('work-invoice-share-whatsapp')),
+          findsNothing,
+        );
+        expect(find.textContaining('Use Share below'), findsNothing);
+        await captureStoreView(tester, 'invoice-delivery-unavailable-$scale');
+        await press('work-counter-close');
+        await press('work-store-home');
+        await press('work-invoice-open');
+        expect(find.byKey(const Key('work-invoice-share-chat')), findsNothing);
+        expect(
+          find.byKey(const Key('work-invoice-share-whatsapp')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-invoice-auto-delivery-unavailable')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'CSENH015 settings read and save failures require reload without false success',
+    (tester) async {
+      final preferences = _InvoiceDeliveryFixtureStore()..failRead = true;
+      final work = storeViewFixture(
+        null,
+        _ContactDraftFixtureStore(),
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        preferences,
+      );
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      Future<void> press(String key) async {
+        final target = find.byKey(Key(key));
+        await reveal(tester, target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      await openStoreSettings(tester);
+      await press('work-invoice-delivery-settings');
+      expect(
+        find.byKey(const Key('work-invoice-delivery-error')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-invoice-delivery-mode')), findsNothing);
+      preferences.failRead = false;
+      await press('work-invoice-delivery-reload');
+      preferences.failSave = true;
+      await press('work-invoice-delivery-mode');
+      await tester.tap(find.text('Auto').last);
+      await tester.pumpAndSettle();
+      expect(preferences.values, isEmpty);
+      expect(find.textContaining('Could not confirm the save'), findsOneWidget);
+      expect(find.byKey(const Key('work-invoice-delivery-mode')), findsNothing);
+      preferences.failSave = false;
+      await press('work-invoice-delivery-reload');
+      expect(
+        tester
+            .widget<DropdownButton<WorkspaceInvoiceDeliveryMode>>(
+              find.byKey(const Key('work-invoice-delivery-mode')),
+            )
+            .value,
+        WorkspaceInvoiceDeliveryMode.off,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final method in ['Cash', 'Bank Transfer', 'UPI']) {
+    for (final scale in [1.0, 1.4]) {
+      testWidgets('CSINVOICE completion and payment facts $method $scale', (
+        tester,
+      ) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        work.workspaceCatalogueItems.addAll(
+          workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
+        );
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 806),
+          textScale: scale,
+        );
+        Future<void> press(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await press('work-quick-counter-sale');
+        await tester.enterText(
+          find.byKey(const Key('work-order-customer')),
+          '9000092035',
+        );
+        await tester.enterText(
+          find.byKey(const Key('work-sale-customer-name')),
+          'Counter Sale QA',
+        );
+        await press('work-sale-customer-confirm');
+        await press('work-order-add-${work.workspaceCatalogueItems.first.id}');
+        await press('work-order-review');
+        await press('work-sale-payment-${method.toLowerCase()}');
+        await press('work-order-save');
+        final invoice = work.workspaceInvoices.single;
+        final stock = work.workspaceCatalogueItems.first.stock;
+        WorkspacePaymentRecord payment() => work.workspaceFinance!.payments
+            .singleWhere((p) => p.invoiceId == invoice.id);
+        Future<void> checkPdfPayment(String expected) async {
+          await press('work-invoice-open-pdf');
+          final request = tester
+              .widget<WorkInvoicePdfScreen>(find.byType(WorkInvoicePdfScreen))
+              .request;
+          expect(request.invoice, same(invoice));
+          expect(request.paymentStatus, expected);
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+        }
+
+        expect(find.text('Invoice created'), findsOneWidget);
+        expect(find.text('Start next sale').hitTestable(), findsOneWidget);
+        expect(payment().state, WorkspacePaymentState.unpaid);
+        expect(payment().paidMinor, 0);
+        expect(payment().dueMinor, invoice.payableMinor);
+        expect(
+          find.byKey(const Key('work-invoice-share-whatsapp')),
+          findsNothing,
+        );
+        await captureStoreView(tester, 'invoice-$method-unpaid-$scale');
+        await checkPdfPayment('Payment due · Received ₹0 · Due ₹264');
+        if (method == 'UPI') {
+          expect(
+            find.byKey(const Key('work-invoice-record-payment')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('work-invoice-record-bank-transfer')),
+            findsNothing,
+          );
+        } else {
+          final action = method == 'Cash'
+              ? 'work-invoice-record-payment'
+              : 'work-invoice-record-bank-transfer';
+          await press(action);
+          final amount = find.byKey(const Key('collection-amount'));
+          expect(
+            tester.widget<TextField>(amount).controller!.text,
+            '${invoice.payableMinor ~/ 100}',
+          );
+          if (method == 'Bank Transfer') {
+            await press('collection-confirm');
+            expect(
+              find.text('Enter the bank transaction reference.'),
+              findsOneWidget,
+            );
+            expect(payment().paidMinor, 0);
+            await tester.enterText(
+              find.byKey(const Key('collection-reference')),
+              'TEST-BANK-001',
+            );
+          }
+          await tester.enterText(amount, '100');
+          await tester.testTextInput.receiveAction(TextInputAction.done);
+          await tester.pumpAndSettle();
+          await captureStoreView(tester, 'invoice-$method-receipt-$scale');
+          await press('collection-confirm');
+          expect(payment().state, WorkspacePaymentState.partPaid);
+          expect(payment().paidMinor, 10000);
+          expect(payment().dueMinor, invoice.payableMinor - 10000);
+          await captureStoreView(tester, 'invoice-$method-part-paid-$scale');
+          await checkPdfPayment('Part paid · Received ₹100 · Due ₹164');
+          await press(action);
+          if (method == 'Bank Transfer') {
+            await tester.enterText(
+              find.byKey(const Key('collection-reference')),
+              'TEST-BANK-002',
+            );
+            await tester.testTextInput.receiveAction(TextInputAction.done);
+            await tester.pumpAndSettle();
+          }
+          await press('collection-confirm');
+          expect(payment().state, WorkspacePaymentState.paid);
+          expect(payment().dueMinor, 0);
+          expect(payment().paidMinor, invoice.payableMinor);
+          expect(
+            payment().channel,
+            method == 'Cash'
+                ? WorkspacePaymentChannel.cash
+                : WorkspacePaymentChannel.bankTransfer,
+          );
+          expect(find.byKey(Key(action)), findsNothing);
+          await captureStoreView(tester, 'invoice-$method-paid-$scale');
+          await checkPdfPayment(
+            '${method == 'Cash' ? 'Paid in cash' : 'Paid by bank transfer'} · Received ₹264 · Due ₹0',
+          );
+        }
+        await press('work-sale-next');
+        expect(work.workspaceInvoices.single, same(invoice));
+        expect(work.workspaceCatalogueItems.first.stock, stock);
+        expect(work.workspaceOrderQuantities, isEmpty);
+        expect(find.byKey(const Key('work-order-customer')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final exit in ['header', 'system', 'close']) {
+    testWidgets('CSOPPOFIX014 saved invoice exits safely via $exit', (
+      tester,
+    ) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openCounterSaleFromSales(tester);
+      await enterSaleCustomer(tester, '9000092035');
+      await addCounterProduct(
+        tester,
+        find.byKey(const Key('work-order-add-oil-fortune-1l')),
+      );
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+      final invoice = work.workspaceInvoices.single;
+      final stock = work.workspaceCatalogueItems.first.stock;
+      if (exit == 'header') {
+        await captureStoreView(tester, 'oppo-fix-created-invoice');
+      }
+      if (exit == 'system') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(
+          find.byKey(
+            Key(
+              exit == 'header'
+                  ? 'work-counter-fullscreen-back'
+                  : 'work-counter-close',
+            ),
+          ),
+        );
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+      expect(find.byKey(const Key('work-invoice-title')), findsNothing);
+      expect(work.workspaceInvoices.single, same(invoice));
+      expect(work.workspaceCatalogueItems.first.stock, stock);
+      expect(work.workspaceOrderQuantities, isEmpty);
+      expect(work.workspaceOrderCustomer, isEmpty);
+      if (exit == 'header') {
+        await captureStoreView(tester, 'oppo-fix-saved-invoice-exit');
+      }
+      // A real new, unfinished bill must still get the existing leave warning.
+      await openCounterSaleFromSales(tester);
+      await enterSaleCustomer(tester, '9000092035');
+      await tester.tap(find.byKey(const Key('work-counter-close')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-order-discard-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('work-order-keep-editing')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceInvoices.single, same(invoice));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'CSOPPOFIX013 country prefix stays singular without cursor rewrite',
+    (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openCounterSaleFromSales(tester);
+      final phone = find.byKey(const Key('work-order-customer'));
+      expect(tester.widget<TextField>(phone).decoration!.prefixIcon, isNotNull);
+      for (final number in [
+        '+919000092035',
+        '+91 90000 92035',
+        '919000092035',
+      ]) {
+        await tester.enterText(phone, number);
+        await tester.pumpAndSettle();
+        final field = tester.widget<TextField>(phone);
+        expect(field.decoration!.prefixIcon, isNull);
+        expect(field.controller!.text, number);
+        expect(field.controller!.selection.baseOffset, number.length);
+        expect(tester.testTextInput.isVisible, isTrue);
+      }
+      await tester.enterText(phone, '9000092035');
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(phone).decoration!.prefixIcon, isNotNull);
+      await tester.enterText(phone, '');
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(phone).decoration!.prefixIcon, isNotNull);
+      await tester.enterText(phone, '+919000092035');
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'oppo-fix-single-country-prefix');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(const Key('work-sale-customer-confirm'));
+      await reveal(tester, confirm);
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderCustomer, '9000092035');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final display in [
+    (method: 'UPI', scale: 1.0),
+    (method: 'Cash', scale: 1.0),
+    (method: 'UPI', scale: 1.4),
+    (method: 'Cash', scale: 1.4),
+  ]) {
+    final method = display.method;
+    testWidgets(
+      'CSOPPOFIX reveal $method details without manual scrolling ${display.scale}',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        work.workspaceCatalogueItems.addAll(
+          workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
+        );
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        final scope = work.storeUpiScope!;
+        await work.saveStoreUpiDestination(
+          WorkspaceUpiDestination(
+            account: scope.account,
+            store: scope.store,
+            address: 'counter-sale-qa@examplebank',
+            payeeName: 'TEST Store · 12 orders',
+          ),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 806),
+          textScale: display.scale,
+        );
+        Future<void> press(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await press('work-quick-counter-sale');
+        await tester.enterText(
+          find.byKey(const Key('work-order-customer')),
+          '9000092035',
+        );
+        await tester.enterText(
+          find.byKey(const Key('work-sale-customer-name')),
+          'Counter Sale QA Very Long Customer Name For Screen Fitment Verification R35',
+        );
+        await press('work-sale-customer-confirm');
+        for (final product in work.workspaceCatalogueItems.take(3)) {
+          await press('work-order-add-${product.id}');
+        }
+        await press('work-order-review');
+        await press('work-sale-payment-${method.toLowerCase()}');
+        if (method == 'UPI') {
+          final viewport = tester.getRect(
+            find.byKey(const Key('work-sale-central-review')),
+          );
+          for (final key in [
+            'work-sale-upi-registered-address',
+            'work-sale-upi-qr',
+            'work-sale-upi-amount',
+            'work-sale-upi-verification-unavailable',
+          ]) {
+            final target = find.byKey(Key(key));
+            final rect = tester.getRect(target);
+            expect(rect.top, greaterThanOrEqualTo(viewport.top - 1));
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(viewport.bottom + 1),
+              reason: '$key must fit within $viewport; actual $rect',
+            );
+            expect(target.hitTestable(), findsOneWidget);
+          }
+          expect(
+            find.byKey(const Key('work-order-save')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(work.workspaceInvoices, isEmpty);
+          final dynamic painter = tester
+              .widget<CustomPaint>(find.byKey(const Key('work-sale-upi-qr')))
+              .painter;
+          expect(
+            Uri.parse(painter.data as String).queryParameters['am'],
+            '428.00',
+          );
+          await captureStoreView(
+            tester,
+            'oppo-fix-upi-revealed-${display.scale}',
+          );
+        } else {
+          await press('work-order-save');
+          final receipt = find.byKey(const Key('work-invoice-record-payment'));
+          await Scrollable.ensureVisible(tester.element(receipt), alignment: 1);
+          await tester.pumpAndSettle();
+          await tester.tap(receipt);
+          await tester.pumpAndSettle();
+          // No test-side reveal after opening: production must reveal the editor.
+          expect(
+            find.byKey(const Key('collection-amount')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('collection-confirm')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .widget<TextField>(find.byKey(const Key('collection-amount')))
+                .controller!
+                .text,
+            '428',
+          );
+          await captureStoreView(
+            tester,
+            'oppo-fix-receipt-revealed-${display.scale}',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('DASH03 exact finance alerts among 1000 payments $scale', (
       tester,
@@ -27642,37 +28235,39 @@ void main() {
   }
 
   for (final outcome in ['opened', 'unavailable', 'error', 'invalid-number']) {
-    testWidgets('invoice WhatsApp $outcome never claims message completion', (
-      tester,
-    ) async {
-      final work = liveStore();
-      const channel = MethodChannel('plugins.flutter.io/url_launcher');
-      final launches = <Uri>[];
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
-        call,
-      ) async {
-        if (call.method != 'launch') return false;
-        launches.add(Uri.parse((call.arguments as Map)['url'] as String));
-        if (outcome == 'error') throw PlatformException(code: 'launch_failed');
-        return outcome == 'opened';
-      });
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    testWidgets(
+      'App-order invoice WhatsApp $outcome never claims message completion',
+      (tester) async {
+        final work = liveStore();
+        const channel = MethodChannel('plugins.flutter.io/url_launcher');
+        final launches = <Uri>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           channel,
-          null,
-        ),
-      );
-      await mount(
-        tester,
-        route: '/app/work/workspace/dashboard',
-        work: work,
-        viewport: const Size(320, 568),
-        textScale: 1.4,
-      );
-      await openCounterSaleFromSales(tester);
-      await enterSaleCustomer(tester, '9829012345');
-      if (outcome == 'opened' || outcome == 'unavailable') {
-        work.updateWorkspaceCounterDetails(
+          (call) async {
+            if (call.method != 'launch') return false;
+            launches.add(Uri.parse((call.arguments as Map)['url'] as String));
+            if (outcome == 'error') {
+              throw PlatformException(code: 'launch_failed');
+            }
+            return outcome == 'opened';
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+        // Counter Sale no longer exposes either share action. Preserve the
+        // existing launcher contract only for unrelated App-order invoices.
+        final invoice = WorkspaceCustomerInvoice(
+          id: 'INV-APP-QA',
+          orderId: 'APP-QA',
+          customer: outcome == 'invalid-number' ? 'Rakesh' : '9829012345',
+          items: 'Test product × 1',
+          amount: 264,
+          payment: 'Cash',
+          issuedAt: DateTime(2026, 9, 20),
           billingDetails: WorkspaceBillingDetails(
             business: outcome == 'opened',
             name: 'Test customer',
@@ -27681,109 +28276,96 @@ void main() {
             address: 'Test billing address',
           ),
         );
-      }
-      await reveal(
-        tester,
-        find.byKey(const Key('work-order-add-oil-fortune-1l')),
-      );
-      await addCounterProduct(
-        tester,
-        find.byKey(const Key('work-order-add-oil-fortune-1l')),
-      );
-      await tester.pumpAndSettle();
-      await reveal(tester, find.byKey(const Key('work-order-review')));
-      await tester.tap(find.byKey(const Key('work-order-review')));
-      await tester.pumpAndSettle();
-      await reveal(tester, find.byKey(const Key('work-order-save')));
-      await tester.tap(find.byKey(const Key('work-order-save')));
-      await tester.pumpAndSettle();
-      var invoice = work.latestWorkspaceInvoice!;
-      if (outcome == 'invalid-number') {
-        await reveal(tester, find.byKey(const Key('work-sale-next')));
-        await tester.tap(find.byKey(const Key('work-sale-next')));
-        await tester.pumpAndSettle();
-        invoice = WorkspaceCustomerInvoice(
-          id: invoice.id,
-          orderId: invoice.orderId,
-          customer: 'Rakesh',
-          items: invoice.items,
-          amount: invoice.amount,
-          payment: invoice.payment,
-          issuedAt: invoice.issuedAt,
+        work.workspaceInvoices.add(invoice);
+        work.workspaceOrders.add(
+          WorkspaceOrderRecord(
+            id: invoice.orderId,
+            customer: invoice.customer,
+            createdAt: invoice.issuedAt,
+            amount: invoice.amount,
+            payment: invoice.payment,
+            source: 'App',
+            items: invoice.items,
+            quantities: const {},
+            fulfilment: 'Pickup',
+            address: '',
+            stage: 'Completed',
+            needsDelivery: false,
+          ),
         );
-        work.workspaceInvoices[0] = invoice;
-        await tester.tap(find.byKey(const Key('work-counter-close')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('work-store-home')));
-        await tester.pumpAndSettle();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(320, 568),
+          textScale: 1.4,
+        );
         await reveal(tester, find.byKey(const Key('work-invoice-open')));
         await tester.tap(find.byKey(const Key('work-invoice-open')));
         await tester.pumpAndSettle();
-      }
-      final whatsapp = find.byKey(const Key('work-invoice-share-whatsapp'));
-      await reveal(tester, whatsapp);
-      await tester.tap(whatsapp);
-      await tester.pumpAndSettle();
-      expect(work.latestWorkspaceInvoice!.sharedChannels, isEmpty);
-      expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
-      expect(work.workspaceInvoices, hasLength(1));
-      if (outcome == 'invalid-number') {
-        expect(launches, isEmpty);
-      } else {
-        expect(launches, hasLength(1));
-        expect(launches.single.host, 'wa.me');
-        expect(launches.single.path, '/919829012345');
-        expect(launches.single.queryParameters['text'], contains(invoice.id));
-        final message = launches.single.queryParameters['text']!;
-        if (outcome == 'opened' || outcome == 'unavailable') {
-          expect(message, contains('Customer: Test customer'));
-          expect(message, contains('Billing address: Test billing address'));
-        }
-        if (outcome == 'opened') {
-          expect(message, contains('Business: Test business'));
-          expect(message, contains('GST: TEST-GST'));
+        final whatsapp = find.byKey(const Key('work-invoice-share-whatsapp'));
+        await reveal(tester, whatsapp);
+        await tester.tap(whatsapp);
+        await tester.pumpAndSettle();
+        expect(work.latestWorkspaceInvoice!.sharedChannels, isEmpty);
+        expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
+        expect(work.workspaceInvoices, hasLength(1));
+        if (outcome == 'invalid-number') {
+          expect(launches, isEmpty);
         } else {
-          expect(message, isNot(contains('Business:')));
-          expect(message, isNot(contains('GST:')));
+          expect(launches, hasLength(1));
+          expect(launches.single.host, 'wa.me');
+          expect(launches.single.path, '/919829012345');
+          expect(launches.single.queryParameters['text'], contains(invoice.id));
+          final message = launches.single.queryParameters['text']!;
+          if (outcome == 'opened' || outcome == 'unavailable') {
+            expect(message, contains('Customer: Test customer'));
+            expect(message, contains('Billing address: Test billing address'));
+          }
+          if (outcome == 'opened') {
+            expect(message, contains('Business: Test business'));
+            expect(message, contains('GST: TEST-GST'));
+          } else {
+            expect(message, isNot(contains('Business:')));
+            expect(message, isNot(contains('GST:')));
+          }
+          expect(
+            launches.single.queryParameters['text'],
+            contains(invoice.items),
+          );
+          expect(
+            launches.single.queryParameters['text'],
+            contains('₹${invoice.amount}'),
+          );
+        }
+        if (outcome != 'opened') {
+          expect(
+            find.byKey(const Key('work-invoice-share-error')),
+            findsOneWidget,
+          );
+          await reveal(
+            tester,
+            find.byKey(const Key('work-invoice-share-chat')),
+          );
+          expect(
+            find.byKey(const Key('work-invoice-share-chat')).hitTestable(),
+            findsOneWidget,
+          );
+          await captureStoreView(tester, '38-invoice-$outcome-320');
+          final close = find.byTooltip('Close invoice');
+          await reveal(tester, close);
+          await tester.tap(close);
+          await tester.pumpAndSettle();
+          expect(find.byTooltip('Close invoice'), findsNothing);
         }
         expect(
-          launches.single.queryParameters['text'],
-          contains(invoice.items),
-        );
-        expect(
-          launches.single.queryParameters['text'],
-          contains('₹${invoice.amount}'),
-        );
-      }
-      if (outcome != 'opened') {
-        expect(
-          find.byKey(const Key('work-invoice-share-error')),
+          find.byKey(const Key('work-store-activity-deck')),
           findsOneWidget,
         );
-        await reveal(tester, find.byKey(const Key('work-invoice-share-chat')));
-        expect(
-          find.byKey(const Key('work-invoice-share-chat')).hitTestable(),
-          findsOneWidget,
-        );
-        await captureStoreView(tester, '38-invoice-$outcome-320');
-        final close = outcome == 'invalid-number'
-            ? find.byTooltip('Close invoice')
-            : find.byKey(const Key('work-sale-next'));
-        await reveal(tester, close);
-        await tester.tap(close);
-        await tester.pumpAndSettle();
-        expect(find.byTooltip('Close invoice'), findsNothing);
-      }
-      if (outcome != 'invalid-number') {
-        await tester.tap(find.byKey(const Key('work-counter-close')));
-        await tester.pumpAndSettle();
-      }
-      await tester.tap(find.byKey(const Key('work-store-home')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
-      expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
-      expect(tester.takeException(), isNull);
-    });
+        expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('drafted sale has explicit keep or discard recovery', (

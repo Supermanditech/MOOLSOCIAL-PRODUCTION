@@ -1419,6 +1419,7 @@ class _WorkWorkspaceDashboardScreenState
                 _openSearchRecord(record, workspace.id, openScopedRoute),
           ),
           _WorkspaceControlView.status => _WorkspaceStatusSurface(
+            session: session,
             acceptingOrders: _draftAcceptingOrders,
             visibleToCustomers: _draftVisibleToCustomers,
             fulfilmentMode: _draftFulfilmentMode,
@@ -2247,6 +2248,12 @@ class _WorkWorkspaceDashboardScreenState
     if (!mounted) return false;
     if (session.counterDraftSubmitting) return false;
     if (session.counterDraftNeedsReconciliation) return true;
+    if (_operation == _WorkspaceOperation.counterOrder &&
+        (_counterKey.currentState?.hasCompletedInvoice ?? false)) {
+      // The invoice/ledger already owns this sale. Reset only the next-sale
+      // editor, retaining the existing busy/reconciliation guards.
+      return session.startNewWorkspaceOrder();
+    }
     if (!_hasCounterOrderDraft) return true;
     final discard = await showDialog<bool>(
       context: context,
@@ -6629,6 +6636,9 @@ class _InvoiceReadyActivityCard extends StatelessWidget {
   });
   final WorkSession session;
   final WorkspaceCustomerInvoice invoice;
+  bool get _counterInvoice => session.workspaceOrders.any(
+    (order) => order.id == invoice.orderId && order.source == 'Counter',
+  );
 
   @override
   Widget build(BuildContext context) => Column(
@@ -6702,8 +6712,13 @@ class _InvoiceReadyActivityCard extends StatelessWidget {
             key: const Key('work-invoice-open'),
             onPressed: () =>
                 _showWorkspaceInvoiceSheet(context, session, invoice),
-            icon: const Icon(Icons.send_outlined, size: 18),
-            label: const Text('Send invoice'),
+            icon: Icon(
+              _counterInvoice
+                  ? Icons.receipt_long_outlined
+                  : Icons.send_outlined,
+              size: 18,
+            ),
+            label: Text(_counterInvoice ? 'View invoice' : 'Send invoice'),
           ),
         ),
       ),
@@ -6851,8 +6866,14 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
 
   WorkSession get session => widget.session;
   WorkspaceCustomerInvoice get invoice => widget.invoice;
+  bool get _counterInvoice =>
+      widget.counterAppearance ||
+      session.workspaceOrders.any(
+        (order) => order.id == invoice.orderId && order.source == 'Counter',
+      );
   late final invoiceAccount = session.workspaceFinance?.accountScope;
   late final invoiceStore = session.activeWorkspace?.id;
+  late final invoiceDeliveryScope = session.storeInvoiceDeliveryScope;
   late final invoiceStoreName = invoice.sellerName.trim().isNotEmpty
       ? invoice.sellerName
       : session.activeWorkspace?.name ?? session.workName;
@@ -6879,7 +6900,9 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       storeId: invoiceStore ?? '',
       invoice: invoice,
       items: order?.itemSnapshots ?? const [],
-      paymentStatus: payment?.label ?? 'Payment status unavailable',
+      paymentStatus: payment == null
+          ? 'Payment status unavailable'
+          : '${payment.label} · Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -6901,6 +6924,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
     // Freeze identity before any account/Store change can rebuild this view.
     invoiceAccount;
     invoiceStore;
+    invoiceDeliveryScope;
     invoiceStoreName;
   }
 
@@ -7223,7 +7247,9 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Invoice',
+                        widget.counterAppearance
+                            ? 'Invoice created'
+                            : 'Invoice',
                         key: const Key('work-invoice-title'),
                         style: const TextStyle(
                           color: MoolColors.navy,
@@ -7383,77 +7409,85 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    key: const Key('work-invoice-share-chat'),
-                    onPressed: () => _openChat(sheetContext),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded),
-                    label: const Text('Share in MoolSocial Chat'),
+                if (_counterInvoice)
+                  _StoreInvoiceDeliveryPreferenceView(
+                    key: ValueKey((invoiceDeliveryScope, invoice.id)),
+                    session: session,
+                    scope: invoiceDeliveryScope,
                   ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    key: const Key('work-invoice-share-whatsapp'),
-                    onPressed: openingWhatsApp
-                        ? null
-                        : () async {
-                            final digits = invoice.customer.replaceAll(
-                              RegExp(r'\D'),
-                              '',
-                            );
-                            final mobile = digits.length == 10
-                                ? '91$digits'
-                                : digits;
-                            if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
-                              updateSheet(() {
-                                shareError =
-                                    'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
-                              });
-                              return;
-                            }
-                            updateSheet(() {
-                              shareError = null;
-                              openingWhatsApp = true;
-                            });
-                            try {
-                              final opened = await launchUrl(
-                                Uri.https('wa.me', '/$mobile', {
-                                  'text': invoiceMessage(),
-                                }),
-                                mode: LaunchMode.externalApplication,
+                if (!_counterInvoice) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const Key('work-invoice-share-chat'),
+                      onPressed: () => _openChat(sheetContext),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded),
+                      label: const Text('Share in MoolSocial Chat'),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const Key('work-invoice-share-whatsapp'),
+                      onPressed: openingWhatsApp
+                          ? null
+                          : () async {
+                              final digits = invoice.customer.replaceAll(
+                                RegExp(r'\D'),
+                                '',
                               );
-                              if (!sheetContext.mounted) return;
-                              if (opened) {
-                                widget.onClose();
-                                session.showNotice(
-                                  'Invoice opened in WhatsApp. Complete sending it there.',
+                              final mobile = digits.length == 10
+                                  ? '91$digits'
+                                  : digits;
+                              if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
+                                updateSheet(() {
+                                  shareError =
+                                      'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
+                                });
+                                return;
+                              }
+                              updateSheet(() {
+                                shareError = null;
+                                openingWhatsApp = true;
+                              });
+                              try {
+                                final opened = await launchUrl(
+                                  Uri.https('wa.me', '/$mobile', {
+                                    'text': invoiceMessage(),
+                                  }),
+                                  mode: LaunchMode.externalApplication,
                                 );
-                              } else {
-                                updateSheet(() {
-                                  shareError =
-                                      'WhatsApp could not open. Try again or use MoolSocial Chat.';
-                                });
+                                if (!sheetContext.mounted) return;
+                                if (opened) {
+                                  widget.onClose();
+                                  session.showNotice(
+                                    'Invoice opened in WhatsApp. Complete sending it there.',
+                                  );
+                                } else {
+                                  updateSheet(() {
+                                    shareError =
+                                        'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                                  });
+                                }
+                              } on Object {
+                                if (sheetContext.mounted) {
+                                  updateSheet(() {
+                                    shareError =
+                                        'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                                  });
+                                }
+                              } finally {
+                                if (sheetContext.mounted) {
+                                  updateSheet(() => openingWhatsApp = false);
+                                }
                               }
-                            } on Object {
-                              if (sheetContext.mounted) {
-                                updateSheet(() {
-                                  shareError =
-                                      'WhatsApp could not open. Try again or use MoolSocial Chat.';
-                                });
-                              }
-                            } finally {
-                              if (sheetContext.mounted) {
-                                updateSheet(() => openingWhatsApp = false);
-                              }
-                            }
-                          },
-                    icon: const Icon(Icons.send_outlined),
-                    label: const Text('Share on WhatsApp'),
+                            },
+                      icon: const Icon(Icons.send_outlined),
+                      label: const Text('Share on WhatsApp'),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -21443,6 +21477,12 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
   final amountFocus = FocusNode();
   final referenceFocus = FocusNode();
   late WorkspacePaymentChannel channel;
+  bool get _bankTransfer => channel == WorkspacePaymentChannel.bankTransfer;
+  bool get _needsReference =>
+      _bankTransfer || channel == WorkspacePaymentChannel.directUpi;
+  String get _referenceLabel => _bankTransfer
+      ? 'Bank transaction reference'
+      : 'UPI transaction reference';
   bool saving = false;
   bool confirming = false;
   String? error;
@@ -21471,9 +21511,11 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
         ? WorkspacePaymentChannel.directUpi
         : WorkspacePaymentChannel.cash;
     if (widget.counterSaleReceipt) {
-      channel = invoice?.payment == 'UPI'
-          ? WorkspacePaymentChannel.directUpi
-          : WorkspacePaymentChannel.cash;
+      channel = switch (invoice?.payment) {
+        'UPI' => WorkspacePaymentChannel.directUpi,
+        'Bank Transfer' => WorkspacePaymentChannel.bankTransfer,
+        _ => WorkspacePaymentChannel.cash,
+      };
       amount.text = _formatStoreMinorAmount(
         widget.payment.dueMinor,
       ).replaceAll(',', '');
@@ -21584,9 +21626,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
       amountFocus.requestFocus();
       return;
     }
-    if (channel == WorkspacePaymentChannel.directUpi &&
-        reference.text.trim().isEmpty) {
-      setState(() => referenceError = 'Enter the UPI transaction reference.');
+    if (_needsReference && reference.text.trim().isEmpty) {
+      setState(
+        () => referenceError = 'Enter the ${_referenceLabel.toLowerCase()}.',
+      );
       referenceFocus.requestFocus();
       return;
     }
@@ -21642,10 +21685,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Cash receipt',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                _bankTransfer ? 'Bank transfer receipt' : 'Cash receipt',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             IconButton(
@@ -21665,8 +21708,12 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
           focusNode: amountFocus,
           enabled: !saving && !confirming && draft.ready,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => amountFocus.unfocus(),
+          textInputAction: _needsReference
+              ? TextInputAction.next
+              : TextInputAction.done,
+          onSubmitted: (_) => _needsReference
+              ? referenceFocus.requestFocus()
+              : amountFocus.unfocus(),
           onChanged: (_) {
             if (amountError != null) setState(() => amountError = null);
           },
@@ -21677,6 +21724,25 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
             errorMaxLines: 3,
           ),
         ),
+        if (_needsReference) ...[
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('collection-reference'),
+            controller: reference,
+            focusNode: referenceFocus,
+            enabled: !saving && !confirming && draft.ready,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => referenceFocus.unfocus(),
+            onChanged: (_) {
+              if (referenceError != null) setState(() => referenceError = null);
+            },
+            decoration: InputDecoration(
+              labelText: _referenceLabel,
+              errorText: referenceError,
+              errorMaxLines: 3,
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         FilledButton(
           key: const Key('collection-confirm'),
@@ -21690,9 +21756,11 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
               : submit,
           child: Text(saving ? 'Checking…' : 'Record receipt'),
         ),
-        const Text(
-          'Confirm only after receiving the cash.',
-          style: TextStyle(fontSize: 12, color: MoolColors.muted),
+        Text(
+          _bankTransfer
+              ? 'Confirm only after checking the credit in your bank account.'
+              : 'Confirm only after receiving the cash.',
+          style: const TextStyle(fontSize: 12, color: MoolColors.muted),
         ),
         if (draft.error != null) ...[
           Text(draft.error!),
@@ -21794,12 +21862,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
                           setState(() => amountError = null);
                         }
                       },
-                      textInputAction:
-                          channel == WorkspacePaymentChannel.directUpi
+                      textInputAction: _needsReference
                           ? TextInputAction.next
                           : TextInputAction.done,
-                      onSubmitted: (_) =>
-                          channel == WorkspacePaymentChannel.directUpi
+                      onSubmitted: (_) => _needsReference
                           ? referenceFocus.requestFocus()
                           : amountFocus.unfocus(),
                       enabled: !saving && !confirming && draft.ready,
@@ -21821,7 +21887,11 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text(
-                          'Payment method: ${channel == WorkspacePaymentChannel.cash ? 'Cash' : 'UPI'}',
+                          'Payment method: ${_bankTransfer
+                              ? 'Bank Transfer'
+                              : channel == WorkspacePaymentChannel.cash
+                              ? 'Cash'
+                              : 'UPI'}',
                           key: const Key('work-counter-receipt-method'),
                         ),
                       )
@@ -21849,7 +21919,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
                             ),
                         ],
                       ),
-                    if (channel == WorkspacePaymentChannel.directUpi)
+                    if (_needsReference)
                       TextField(
                         key: Key(
                           widget.refund
@@ -21867,7 +21937,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
                           }
                         },
                         decoration: InputDecoration(
-                          labelText: 'UPI transaction reference',
+                          labelText: _referenceLabel,
                           errorText: referenceError,
                           errorMaxLines: 3,
                         ),
@@ -24516,11 +24586,16 @@ class _InvoiceCollectionSummary extends StatelessWidget {
           ),
           if (receiptEditor != null)
             receiptEditor!
-          else if (payment.dueMinor > 0 && invoice.payment == 'Cash')
+          else if (payment.dueMinor > 0 &&
+              (invoice.payment == 'Cash' || invoice.payment == 'Bank Transfer'))
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                key: const Key('work-invoice-record-payment'),
+                key: Key(
+                  invoice.payment == 'Cash'
+                      ? 'work-invoice-record-payment'
+                      : 'work-invoice-record-bank-transfer',
+                ),
                 onPressed: !canRecord
                     ? null
                     : () async {
@@ -24546,7 +24621,11 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                         );
                       },
                 icon: const Icon(Icons.payments_outlined),
-                label: const Text('Record Payment Receipt'),
+                label: Text(
+                  invoice.payment == 'Cash'
+                      ? 'Record Payment Receipt'
+                      : 'Confirm bank transfer',
+                ),
               ),
             ),
         ],
@@ -24663,6 +24742,8 @@ String? _storedCounterCustomerMobile(String customer) {
 
 class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   final _collectionKey = GlobalKey<_CustomerCollectionSheetState>();
+  bool get hasCompletedInvoice =>
+      _invoice != null && (_stage == 'invoice' || _stage == 'payment');
   Future<bool> flushForNavigation() async {
     if (_saving) return false;
     return await (_collectionKey.currentState?.flushForNavigation() ??
@@ -25070,7 +25151,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ],
       ),
     );
-    final checkout = Container(
+    Widget checkout(double paymentViewportHeight) => Container(
       key: const Key('work-counter-review-totals-card'),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: const BoxDecoration(
@@ -25142,6 +25223,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               session: widget.session,
               amountPaise: widget.session.workspaceCounterPayableMinor,
               reference: widget.session.retainedCounterDraft?.id,
+              viewportHeight: paymentViewportHeight,
             ),
           if (_error != null)
             Semantics(
@@ -25201,7 +25283,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             child: SingleChildScrollView(
               key: const Key('work-sale-central-review'),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: checkout,
+              child: checkout(constraints.maxHeight * .40),
             ),
           ),
           ConstrainedBox(
@@ -25501,18 +25583,36 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                       }),
                     )
                   : null,
-              onRecord: (payment) => setState(() {
-                _collection = payment;
-                _stage = 'payment';
-              }),
+              onRecord: (payment) {
+                setState(() {
+                  _collection = payment;
+                  _stage = 'payment';
+                });
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final target = _collectionKey.currentContext;
+                  if (!mounted ||
+                      _stage != 'payment' ||
+                      _collection != payment ||
+                      target == null) {
+                    return;
+                  }
+                  unawaited(
+                    Scrollable.ensureVisible(
+                      target,
+                      alignment: 1,
+                      duration: const Duration(milliseconds: 180),
+                    ),
+                  );
+                });
+              },
             ),
           ),
           if (_stage == 'invoice')
-            TextButton.icon(
+            FilledButton.icon(
               key: const Key('work-sale-next'),
               onPressed: _nextSale,
               icon: const Icon(Icons.add),
-              label: const Text('Next sale'),
+              label: const Text('Start next sale'),
             ),
         ],
       );
@@ -25924,6 +26024,14 @@ class _StoreSaleCustomerSheet extends StatefulWidget {
 
 class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
   late final _controller = TextEditingController(text: widget.initialValue);
+  bool get _enteredCountryPrefix {
+    final value = _controller.text.trimLeft();
+    return value.startsWith('+') ||
+        (normalizeWorkspaceMobile(value) != null &&
+            value.replaceAll(RegExp(r'[ +\-]'), '').length == 12);
+  }
+
+  late bool _showMobilePrefix = !_enteredCountryPrefix;
   String? _error;
   late bool _business = widget.billingDetails.business;
   late bool _businessExpanded = widget.billingDetails.business;
@@ -25985,6 +26093,11 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
       controller.addListener(_rememberBilling);
     }
     _controller.addListener(() {
+      final showPrefix = !_enteredCountryPrefix;
+      if (_showMobilePrefix != showPrefix) {
+        // Keep the actual editing value, selection and IME connection intact.
+        setState(() => _showMobilePrefix = showPrefix);
+      }
       if (_applyingRecent) return;
       if (_error != null &&
           normalizeWorkspaceMobile(_controller.text) != null) {
@@ -26107,10 +26220,12 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                   stackedLabel: media.textScaler.scale(14) > 21,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Center(widthFactor: 1, child: Text('+91')),
-                  ),
+                  prefixIcon: _showMobilePrefix
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Center(widthFactor: 1, child: Text('+91')),
+                        )
+                      : null,
                 ),
                 if (_error != null)
                   Semantics(
@@ -26683,16 +26798,25 @@ class _CounterUpiPanel extends StatefulWidget {
     required this.session,
     required this.amountPaise,
     required this.reference,
+    required this.viewportHeight,
   });
   final WorkSession session;
   final int amountPaise;
   final String? reference;
+  final double viewportHeight;
 
   @override
   State<_CounterUpiPanel> createState() => _CounterUpiPanelState();
 }
 
 class _CounterUpiPanelState extends State<_CounterUpiPanel> {
+  final _paymentDetailsKey = GlobalKey();
+  static const _verificationMessage =
+      'Payment unverified. Automatic check unavailable.';
+  static const _amountStyle = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w800,
+  );
   late final _scope = widget.session.storeUpiScope;
   WorkspaceUpiDestination? _destination;
   bool _loading = true;
@@ -26705,6 +26829,58 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
   void initState() {
     super.initState();
     unawaited(_load());
+  }
+
+  @override
+  void didUpdateWidget(covariant _CounterUpiPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.amountPaise != widget.amountPaise ||
+        oldWidget.viewportHeight != widget.viewportHeight) {
+      _revealPayment();
+    }
+  }
+
+  void _revealPayment() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _paymentDetailsKey.currentContext;
+      if (!_current || _loading || target == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          target,
+          alignment: 0,
+          duration: const Duration(milliseconds: 180),
+        ),
+      );
+    });
+  }
+
+  String get _amountLabel =>
+      '₹${_formatStoreAmount(widget.amountPaise ~/ 100)}.${(widget.amountPaise % 100).toString().padLeft(2, '0')}';
+
+  double _qrSize(BuildContext context, double width) {
+    final baseStyle = DefaultTextStyle.of(context).style;
+    double height(String text, [TextStyle? style]) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: baseStyle.merge(style)),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: width);
+      final value = painter.height;
+      painter.dispose();
+      return value;
+    }
+
+    final textHeight =
+        height(
+          _destination!.payeeName,
+          const TextStyle(fontWeight: FontWeight.w700),
+        ) +
+        height(_destination!.address) +
+        height(_amountLabel, _amountStyle) +
+        height(_verificationMessage);
+    // Keep the cart-first allocation. Never shrink text or clip truthful status;
+    // exceptionally small/enlarged-text viewports retain scrolling as fallback.
+    return (widget.viewportHeight - textHeight - 10).clamp(112.0, 224.0);
   }
 
   Future<void> _load() async {
@@ -26729,6 +26905,7 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+      _revealPayment();
     }
   }
 
@@ -26775,49 +26952,56 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
               'No registered Store UPI ID is available. Choose Cash or Bank Transfer.',
               key: Key('work-sale-payment-request-unavailable'),
             ),
-          ] else ...[
-            Text(
-              _destination!.payeeName,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+          ] else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final qrSize = _qrSize(context, constraints.maxWidth);
+                return Column(
+                  key: _paymentDetailsKey,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _destination!.payeeName,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    SelectableText(
+                      _destination!.address,
+                      key: const Key('work-sale-upi-registered-address'),
+                    ),
+                    if (uri != null) ...[
+                      const SizedBox(height: 4),
+                      Center(
+                        child: _StoreMoneyText(
+                          _amountLabel,
+                          key: const Key('work-sale-upi-amount'),
+                          style: _amountStyle,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Center(
+                        child: Semantics(
+                          label: 'Scan to pay this Store by UPI',
+                          image: true,
+                          child: CustomPaint(
+                            key: const Key('work-sale-upi-qr'),
+                            size: Size(qrSize, qrSize),
+                            painter: _StoreUpiQrPainter(uri.toString()),
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        _verificationMessage,
+                        key: Key('work-sale-upi-verification-unavailable'),
+                      ),
+                    ] else
+                      const Text(
+                        'Save the bill details before showing its payment QR.',
+                        key: Key('work-sale-payment-request-unavailable'),
+                      ),
+                  ],
+                );
+              },
             ),
-            SelectableText(
-              _destination!.address,
-              key: const Key('work-sale-upi-registered-address'),
-            ),
-            if (uri != null) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: _StoreMoneyText(
-                  '₹${_formatStoreAmount(widget.amountPaise ~/ 100)}.${(widget.amountPaise % 100).toString().padLeft(2, '0')}',
-                  key: const Key('work-sale-upi-amount'),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Semantics(
-                  label: 'Scan to pay this Store by UPI',
-                  image: true,
-                  child: CustomPaint(
-                    key: const Key('work-sale-upi-qr'),
-                    size: const Size(224, 224),
-                    painter: _StoreUpiQrPainter(uri.toString()),
-                  ),
-                ),
-              ),
-              const Text(
-                'Automatic payment verification is unavailable. This bill remains unpaid until receipt is verified.',
-                key: Key('work-sale-upi-verification-unavailable'),
-              ),
-            ] else
-              const Text(
-                'Save the bill details before showing its payment QR.',
-                key: Key('work-sale-payment-request-unavailable'),
-              ),
-          ],
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -27168,6 +27352,7 @@ class _OrderCatalogueRow extends StatelessWidget {
 
 class _WorkspaceStatusSurface extends StatelessWidget {
   const _WorkspaceStatusSurface({
+    required this.session,
     required this.acceptingOrders,
     required this.visibleToCustomers,
     required this.fulfilmentMode,
@@ -27195,6 +27380,7 @@ class _WorkspaceStatusSurface extends StatelessWidget {
     required this.onBusinessDetails,
   });
 
+  final WorkSession session;
   final bool acceptingOrders;
   final bool visibleToCustomers;
   final String fulfilmentMode;
@@ -27494,6 +27680,13 @@ class _WorkspaceStatusSurface extends StatelessWidget {
                 onTap: onPaymentControls,
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
+              _StoreInvoiceDeliveryPreferenceView(
+                key: ValueKey(session.storeInvoiceDeliveryScope),
+                session: session,
+                scope: session.storeInvoiceDeliveryScope,
+                settings: true,
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
               ListTile(
                 leading: const Icon(Icons.fact_check_outlined),
                 title: const Text('Business details and documents'),
@@ -27502,6 +27695,188 @@ class _WorkspaceStatusSurface extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One Store-owned preference, reused by Settings and read-only invoice status.
+/// Backend delivery is not connected; no message or queue is created here.
+class _StoreInvoiceDeliveryPreferenceView extends StatefulWidget {
+  const _StoreInvoiceDeliveryPreferenceView({
+    required this.session,
+    required this.scope,
+    this.settings = false,
+    super.key,
+  });
+  final WorkSession session;
+  final ({String account, String store})? scope;
+  final bool settings;
+
+  @override
+  State<_StoreInvoiceDeliveryPreferenceView> createState() =>
+      _StoreInvoiceDeliveryPreferenceViewState();
+}
+
+class _StoreInvoiceDeliveryPreferenceViewState
+    extends State<_StoreInvoiceDeliveryPreferenceView> {
+  WorkspaceInvoiceDeliveryPreference? _preference;
+  bool _busy = true;
+  String? _error;
+  bool get _current =>
+      mounted &&
+      widget.scope != null &&
+      widget.scope == widget.session.storeInvoiceDeliveryScope;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    if (!_current) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final value = await widget.session.loadInvoiceDeliveryPreference(
+        widget.scope!,
+      );
+      if (_current) setState(() => _preference = value);
+    } on Object {
+      if (_current) {
+        setState(() {
+          _preference = null;
+          _error = 'Could not load your invoice delivery preference.';
+        });
+      }
+    } finally {
+      if (_current) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _save(WorkspaceInvoiceDeliveryMode? mode) async {
+    if (!_current || _busy || _preference == null || mode == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final scope = widget.scope!;
+      await widget.session.saveInvoiceDeliveryPreference(
+        WorkspaceInvoiceDeliveryPreference(
+          account: scope.account,
+          store: scope.store,
+          mode: mode,
+        ),
+      );
+      // Read back the actual persisted choice, including after leaving/reopening.
+      if (_current) await _load();
+    } on Object {
+      if (_current) {
+        setState(() {
+          _preference = null;
+          _error =
+              'Could not confirm the save. Reload to check your saved preference.';
+        });
+      }
+    } finally {
+      if (_current) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_current) {
+      return widget.settings
+          ? const ListTile(
+              title: Text('Invoice delivery'),
+              subtitle: Text('Open your Store to change invoice delivery.'),
+            )
+          : const SizedBox.shrink();
+    }
+    final mode = _preference?.mode;
+    final feedback = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_busy) const Text('Loading invoice delivery…'),
+        if (_error != null) ...[
+          Semantics(
+            liveRegion: true,
+            child: Text(_error!, key: const Key('work-invoice-delivery-error')),
+          ),
+          TextButton(
+            key: const Key('work-invoice-delivery-reload'),
+            onPressed: _busy ? null : _load,
+            child: const Text('Reload'),
+          ),
+        ],
+      ],
+    );
+    if (!widget.settings) {
+      if (mode == WorkspaceInvoiceDeliveryMode.off && _error == null) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            feedback,
+            if (!_busy && _error == null && mode != null)
+              Text(
+                'Auto-send: ${mode.label} · Automatic delivery unavailable.',
+                key: const Key('work-invoice-auto-delivery-unavailable'),
+                style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+              ),
+          ],
+        ),
+      );
+    }
+    return ExpansionTile(
+      key: const Key('work-invoice-delivery-settings'),
+      leading: const Icon(Icons.receipt_long_outlined),
+      title: const Text('Invoice delivery'),
+      subtitle: Text(
+        mode == null
+            ? 'Choose how to send invoices'
+            : 'Auto-send: ${mode.label}',
+      ),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        feedback,
+        // Leave room for InputDecorator's floating label below the tile header.
+        const SizedBox(height: 12),
+        if (mode != null)
+          InputDecorator(
+            decoration: const InputDecoration(labelText: 'Auto-send invoice'),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<WorkspaceInvoiceDeliveryMode>(
+                key: const Key('work-invoice-delivery-mode'),
+                isExpanded: true,
+                value: mode,
+                onChanged: _busy || _error != null ? null : _save,
+                items: [
+                  for (final choice in WorkspaceInvoiceDeliveryMode.values)
+                    DropdownMenuItem(value: choice, child: Text(choice.label)),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        const Text(
+          'Changes save automatically for this Store on this device.',
+          style: TextStyle(color: MoolColors.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        const Text('WhatsApp sender: MoolSocial'),
+        const Text(
+          'Automatic sending is not available yet. Choose your preferred channel for future invoices.',
+          style: TextStyle(color: MoolColors.muted, fontSize: 12),
         ),
       ],
     );

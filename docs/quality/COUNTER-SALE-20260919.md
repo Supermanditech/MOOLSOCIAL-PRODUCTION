@@ -162,3 +162,77 @@ retailer UPI setup permission review, connected OPPO, founder visual decision.
 Build/install authority remains false in this scope state until an exact gated
 candidate is registered. No release, Play, deployment, message sending, real
 transfer, destructive Git or founder-acceptance authority is inferred.
+
+## 20 September — invoice completion and recorded payment amendment
+
+Founder approved invoices carrying current unpaid/part-paid/paid and received/due
+facts, retailer-confirmed Cash/manual Bank Transfer, and provider-confirmed online
+payments. Actor: active Store retailer completing Counter Sale. Classification:
+mvp_supporting; accurate completion and receipt presentation in the existing flow.
+Reuse dashboard invoice/inline collection UI, WorkspacePaymentRecord and existing
+collection journal/adapter; no new screen or accounting owner. Exact runtime owners:
+work_models.dart and screens/work_workspace_dashboard_screen.dart under
+apps/mobile/lib/features/work; tests reuse the layout and atomic test owners.
+
+Smallest app-side scope: clear Invoice created / Start next sale; show authoritative
+received/due facts in existing invoice export text; allow reference-backed manual
+Bank Transfer recording against the saved invoice, preserving Cash-only wording
+for Record Payment Receipt and keeping provider verification separate. Invoice
+creation alone remains unpaid unless the ledger already confirms receipt. Later
+receipts update that same invoice; no second sale or automatic retry send.
+
+The existing auto-send preference remains in Store Settings. Future backend enqueue
+must happen after durable invoice creation and bind its payment revision; later
+receipts require an idempotent payment update, not a duplicate invoice. No outbox,
+Queued/Sent/Delivered state or actual message is fabricated in this app-only phase.
+PhonePe/Pine Labs availability is founder-confirmed, not verified app integration.
+No backend/provider configuration, governance, APK, production or real-money work.
+
+Acceptance: connected unpaid/partial/paid journeys, bank reference validation,
+same-invoice balance/discount preservation, receipt failure/recovery and Store scope,
+next-sale preservation, settings/errors and prior OPPO fixes. Local screenshots
+are not physical device acceptance; fresh OPPO qualification remains pending.
+
+## Founder boundary: separate dependencies and close tested Counter Sale only
+
+20 September 2026: founder directs separate frontend/backend tickets for the
+remaining settings, payment verification and automatic delivery work. Register
+these as inactive backlog, not implementation authority. Finish the CURRENT
+Counter Sale frontend/recorded-receipt journey on OPPO first. No broader policy,
+governance, profile or backend coding under this closeout instruction.
+
+All children below are mvp_supporting for the exact signed-in Retailer/Grocery
+Store actor; they reuse the existing Store settings/invoice/finance owners. Their
+scope and execution gates must be qualified when individually selected. These are
+repository-local ticket IDs, not claims of external tracker registration.
+
+| Ticket | Layer and exact outcome | Reuse, dependencies and acceptance |
+|---|---|---|
+| CS-FE-017 | Store Settings payment profile: one place to view/edit the permitted Store UPI and bank details; Counter Sale remains read-only. | Reuse dashboard Store Settings and work_models/work_session/work_services. Depends on CS-BE-018's field/permission contract. Loading, masked details, validation, save/reload errors and Store/account isolation; no payment verification claim or sensitive data in screenshots. Supersedes pending frontend portion of CS-OPPO-002. |
+| CS-BE-018 | Authoritative Store payment profile with permission-checked read/update. | Reuse existing Store identity/auth/storage and existing provider configuration; do not provision replacement providers. Exact backend source owners must be discovered at selection. Define allowed actors, fields, audit/version conflicts and safe update/recovery before coding. Must reject cross-Store access and preserve last confirmed destination on failed update. Backend portion of CS-OPPO-002. |
+| CS-FE-019 | Counter Sale shows real provider payment progress and resulting paid/part-paid/due facts. | Reuse existing UPI panel, scoped invoice and WorkspacePaymentRecord; depend on CS-BE-020. No QR/client-return-only paid state. Test pending, failed, cancelled, unknown, verified receipt, late return, offline/relaunch and Store/amount mismatch without another checkout screen. Frontend portion of CS-OPPO-003. |
+| CS-BE-020 | Verify existing PhonePe/Pine Labs payment results and reconcile the correct invoice/ledger once. | Reuse existing payment/provider adapters after exact owner discovery; founder reports provider availability. Bind Store, bill, currency, net amount, operation and provider reference; handle duplicate callbacks, delayed results, partial receipts, retries and reconciliation. Never double-credit. Provider-specific contract and sandbox verification precede execution. Backend portion of CS-OPPO-003. |
+| CS-BE-021 | Automatic invoice delivery and later payment-update receipt through existing messaging integrations. | Reuse invoice authority and existing WhatsApp API; MoolSocial sender approved. Durable invoice-save trigger, current payment revision, Store preference, verified customer routing, recipient permission enforcement, idempotent outbox/retry and authoritative delivery acknowledgments. A later payment updates the same invoice, not another invoice/send-on-navigation. Backend portion of CS-ENH-015; no broad Social module activation. |
+| CS-FE-022 | Display actual automatic-delivery status and bounded retry on the saved invoice. | Reuse current Store Settings preference and invoice status owner; depend on CS-BE-021. No new share step, duplicate settings or consent popup. Queued/Sent/Delivered/Failed require backend facts; missing contact/offline/failure cannot undo the sale. Retry/reopen/Start next sale must not duplicate delivery. Remaining frontend integration portion of CS-ENH-015. |
+
+Dependency order: profile backend contract -> settings UI; verified payment
+backend contract -> payment status UI; invoice-delivery backend contract -> delivery
+status UI. Backend execution remains deferred until its own approved phase.
+Shared inventory CS-DEFERRED-010 stays separate and inactive.
+
+Current closeout gate: qualify a NEW source-bound review APK, verify its installed
+checksum/version, and exercise customer/business entry, Search/typing/IME/scanner,
+direct Plus versus Product page, cart/discount, Cash/UPI/Bank selection, saved invoice,
+manual partial/full receipts, settings persistence, navigation and recovery. Recheck
+CS-OPPO-011–014 and normal/enlarged text and 20/30/50 distinct-item behavior where
+the fixture supports it. Retain screenshots and exact tested/not-tested matrix.
+An unavailable device, unsupported fixture case or untested required interaction
+is NOT a zero-defect pass. No real money/messages, uninstall or data clearing.
+
+Any fresh defect gets a separate evidence-backed local ticket with severity,
+steps, expected/actual behavior and screenshot; do not redesign or silently expand
+the closeout. Do not close while current-scope defects or required checks remain.
+When the current scope passes, make the ticket-scoped Git checkpoint/closure with
+exact source and evidence, remote readback and clean worktree as required by the
+unchanged Git gates. Never tag/claim the whole platform or deferred integrations
+production-ready. Prebuild source checkpoint and post-test acceptance are distinct.

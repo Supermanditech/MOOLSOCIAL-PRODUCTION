@@ -824,6 +824,241 @@ void main() {
     });
   });
 
+  test(
+    'CSINVOICE bank receipt requires reference and recovers without duplicate',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 20),
+      );
+      final work = WorkSession(
+        gateway: ReviewWorkGateway(),
+        pendingProofStore: _CommandAccountStore(),
+      )..activeWorkspace = seed.workspace;
+      addTearDown(work.dispose);
+      expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+      final adapter = _LostCollectionGateway(seed.finance);
+      final journal = SecureWorkLedgerCheckpointStore(
+        accountScope: () => 'account-A',
+        storage: _OrderJournalStorage(),
+      );
+      expect(
+        work.bindCustomerCollectionGateway(
+          accountScope: 'account-A',
+          storeId: seed.storeId,
+          adapter: adapter,
+          checkpointStore: journal,
+        ),
+        isTrue,
+      );
+      final original = seed.finance.payments.first;
+      Future<bool> record(String reference) => work.recordCustomerCollection(
+        customerId: original.customerId,
+        invoiceId: original.invoiceId!,
+        amountMinor: original.dueMinor,
+        channel: WorkspacePaymentChannel.bankTransfer,
+        reference: reference,
+      );
+      expect(await record('  '), isFalse);
+      expect(adapter.submissions, 0);
+      expect(await record('TEST-BANK-001'), isFalse);
+      expect(adapter.submissions, 1);
+      expect(work.pendingCustomerCollection, isNotNull);
+      expect(await work.reconcileCustomerCollection(), isTrue);
+      expect(await work.reconcileCustomerCollection(), isFalse);
+      expect(adapter.submissions, 1);
+      final payment = work.workspaceFinance!.payments.singleWhere(
+        (p) => p.invoiceId == original.invoiceId,
+      );
+      expect(payment.channel, WorkspacePaymentChannel.bankTransfer);
+      expect(payment.state, WorkspacePaymentState.paid);
+      expect(payment.dueMinor, 0);
+      expect(payment.label, 'Paid by bank transfer');
+      expect(await record('TEST-BANK-001'), isFalse);
+      final restored = await journal.read('account-A', seed.storeId);
+      expect(
+        restored!.finance.payments
+            .singleWhere((p) => p.invoiceId == original.invoiceId)
+            .channel,
+        WorkspacePaymentChannel.bankTransfer,
+      );
+      expect(work.workspaceStockMovements, isEmpty);
+    },
+  );
+
+  group('CSENH015 invoice delivery preference', () {
+    const preference = WorkspaceInvoiceDeliveryPreference(
+      account: 'account-A',
+      store: 'store-A',
+      mode: WorkspaceInvoiceDeliveryMode.automatic,
+    );
+
+    test(
+      'strict round trip is a preference, never consent or delivery proof',
+      () {
+        for (final mode in WorkspaceInvoiceDeliveryMode.values) {
+          final value = WorkspaceInvoiceDeliveryPreference(
+            account: 'a',
+            store: 's',
+            mode: mode,
+          );
+          expect(
+            WorkspaceInvoiceDeliveryPreference.fromJson(value.toJson())!.mode,
+            mode,
+          );
+          expect(
+            value.toJson().keys,
+            unorderedEquals(['version', 'account', 'store', 'mode']),
+          );
+        }
+        for (final invalid in [
+          null,
+          '',
+          {},
+          {...preference.toJson(), 'version': 2},
+          {...preference.toJson(), 'mode': 'sent'},
+          {...preference.toJson(), 'account': ''},
+          {...preference.toJson(), 'store': 3},
+        ]) {
+          expect(WorkspaceInvoiceDeliveryPreference.fromJson(invalid), isNull);
+        }
+      },
+    );
+
+    test('reopens saved choice and isolates account and Store', () async {
+      final bytes = _OrderJournalStorage();
+      var account = 'account-A', store = 'store-A';
+      SecureWorkInvoiceDeliveryPreferenceStore reopen() =>
+          SecureWorkInvoiceDeliveryPreferenceStore(
+            accountScope: () => account,
+            storeScope: () => store,
+            storage: bytes,
+          );
+      expect(await reopen().read(account, store), isNull);
+      await reopen().save(preference);
+      expect(
+        (await reopen().read(account, store))!.mode,
+        WorkspaceInvoiceDeliveryMode.automatic,
+      );
+      store = 'store-B';
+      expect(await reopen().read(account, store), isNull);
+      await expectLater(
+        reopen().save(preference),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      store = 'store-A';
+      account = 'account-B';
+      expect(await reopen().read(account, store), isNull);
+      await expectLater(
+        reopen().read('account-A', store),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(bytes.writes, hasLength(1));
+    });
+
+    test('corrupt preference is not overwritten or silently reset', () async {
+      final bytes = _OrderJournalStorage();
+      final prefs = SecureWorkInvoiceDeliveryPreferenceStore(
+        accountScope: () => 'account-A',
+        storeScope: () => 'store-A',
+        storage: bytes,
+      );
+      await prefs.save(preference);
+      final key = bytes.values.keys.single;
+      bytes.values[key] = '{invalid';
+      await expectLater(
+        prefs.read('account-A', 'store-A'),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      await expectLater(
+        prefs.save(preference),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(bytes.values[key], '{invalid');
+      expect(bytes.writes, hasLength(1));
+    });
+
+    test(
+      'write failure retains last saved choice and lost reply can be read back',
+      () async {
+        final bytes = _OrderJournalStorage();
+        final prefs = SecureWorkInvoiceDeliveryPreferenceStore(
+          accountScope: () => 'account-A',
+          storeScope: () => 'store-A',
+          storage: bytes,
+        );
+        await prefs.save(preference);
+        const off = WorkspaceInvoiceDeliveryPreference(
+          account: 'account-A',
+          store: 'store-A',
+        );
+        bytes.failWrite = true;
+        await expectLater(prefs.save(off), throwsStateError);
+        expect(
+          (await prefs.read('account-A', 'store-A'))!.mode,
+          WorkspaceInvoiceDeliveryMode.automatic,
+        );
+        bytes.failWrite = false;
+        bytes.loseWriteResponseOnce = true;
+        await expectLater(prefs.save(off), throwsStateError);
+        expect(
+          (await prefs.read('account-A', 'store-A'))!.mode,
+          WorkspaceInvoiceDeliveryMode.off,
+        );
+      },
+    );
+
+    test(
+      'scope changes during pending save cannot claim success in another Store',
+      () async {
+        final bytes = _OrderJournalStorage()..holdWrite = Completer<void>();
+        var store = 'store-A';
+        final prefs = SecureWorkInvoiceDeliveryPreferenceStore(
+          accountScope: () => 'account-A',
+          storeScope: () => store,
+          storage: bytes,
+        );
+        final saving = prefs.save(preference);
+        final failure = expectLater(
+          saving,
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await _drainOrderJournal();
+        store = 'store-B';
+        bytes.holdWrite!.complete();
+        await failure;
+        expect(await prefs.read('account-A', 'store-B'), isNull);
+      },
+    );
+
+    test(
+      'serial writes retain latest explicitly selected preference',
+      () async {
+        final bytes = _OrderJournalStorage();
+        final prefs = SecureWorkInvoiceDeliveryPreferenceStore(
+          accountScope: () => 'account-A',
+          storeScope: () => 'store-A',
+          storage: bytes,
+        );
+        await Future.wait([
+          prefs.save(preference),
+          prefs.save(
+            const WorkspaceInvoiceDeliveryPreference(
+              account: 'account-A',
+              store: 'store-A',
+              mode: WorkspaceInvoiceDeliveryMode.whatsapp,
+            ),
+          ),
+        ]);
+        expect(
+          (await prefs.read('account-A', 'store-A'))!.mode,
+          WorkspaceInvoiceDeliveryMode.whatsapp,
+        );
+      },
+    );
+  });
+
   group('COUNTER1919 UPI destination', () {
     const destination = WorkspaceUpiDestination(
       account: 'account-A',
@@ -9616,8 +9851,15 @@ void main() {
           : 27500 - paid,
       refundedMinor: status == WorkspacePaymentState.refunded ? paid : 0,
       state: status,
-      channel: WorkspacePaymentChannel
-          .values[i % WorkspacePaymentChannel.values.length],
+      // Keep this established 25-record scenario stable as new tenders are
+      // added. Bank Transfer has its own reference/recovery test above.
+      channel: const [
+        WorkspacePaymentChannel.platform,
+        WorkspacePaymentChannel.cash,
+        WorkspacePaymentChannel.directUpi,
+        WorkspacePaymentChannel.credit,
+        WorkspacePaymentChannel.unknown,
+      ][i % 5],
       invoiceId: 'INV-$i',
       transactionId: 'TX-$i',
     );

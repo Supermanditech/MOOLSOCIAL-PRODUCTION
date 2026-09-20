@@ -524,6 +524,7 @@ class WorkSession extends ChangeNotifier {
     this.counterDraftStore,
     this.ledgerFormDraftStore,
     this.upiDestinationStore,
+    this.invoiceDeliveryPreferenceStore,
     this.reviewStoreSelectionStore,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
@@ -562,6 +563,7 @@ class WorkSession extends ChangeNotifier {
     this.counterDraftStore,
     this.ledgerFormDraftStore,
     this.upiDestinationStore,
+    this.invoiceDeliveryPreferenceStore,
     this.reviewStoreSelectionStore,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
@@ -589,6 +591,7 @@ class WorkSession extends ChangeNotifier {
   final WorkCounterDraftStore? counterDraftStore;
   final WorkLedgerFormDraftStore? ledgerFormDraftStore;
   final WorkUpiDestinationStore? upiDestinationStore;
+  final WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryPreferenceStore;
   final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
   final bool _productionSession;
   StoreReviewSeed? _selectedReviewSeed;
@@ -607,6 +610,63 @@ class WorkSession extends ChangeNotifier {
 
   ({String account, String store})? get storeUpiScope =>
       _disposed ? null : _counterDraftScope;
+
+  ({String account, String store})? get storeInvoiceDeliveryScope =>
+      _disposed ? null : _counterDraftScope;
+
+  late final WorkInvoiceDeliveryPreferenceStore _invoiceDeliveryStorage =
+      invoiceDeliveryPreferenceStore ??
+      SecureWorkInvoiceDeliveryPreferenceStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+        storeScope: () => _disposed ? null : activeWorkspace?.id,
+      );
+
+  Future<WorkspaceInvoiceDeliveryPreference> loadInvoiceDeliveryPreference(
+    ({String account, String store}) scope,
+  ) async {
+    if (scope != storeInvoiceDeliveryScope) {
+      throw const WorkGatewayException(
+        'Return to your Store to view invoice delivery.',
+      );
+    }
+    final saved = await _invoiceDeliveryStorage.read(
+      scope.account,
+      scope.store,
+    );
+    if (scope != storeInvoiceDeliveryScope ||
+        (saved != null &&
+            (!saved.valid ||
+                saved.account != scope.account ||
+                saved.store != scope.store))) {
+      throw const WorkGatewayException(
+        'Return to your Store to view invoice delivery.',
+      );
+    }
+    return saved ??
+        WorkspaceInvoiceDeliveryPreference(
+          account: scope.account,
+          store: scope.store,
+        );
+  }
+
+  Future<void> saveInvoiceDeliveryPreference(
+    WorkspaceInvoiceDeliveryPreference preference,
+  ) async {
+    final scope = (account: preference.account, store: preference.store);
+    if (!preference.valid || scope != storeInvoiceDeliveryScope) {
+      throw const WorkGatewayException(
+        'Return to your Store to change invoice delivery.',
+      );
+    }
+    await _invoiceDeliveryStorage.save(preference);
+    if (scope != storeInvoiceDeliveryScope) {
+      throw const WorkGatewayException(
+        'Return to your Store to change invoice delivery.',
+      );
+    }
+    // This stores a preference only. Backend dispatch is deliberately absent.
+    notifyListeners();
+  }
 
   Future<WorkspaceUpiDestination?> loadStoreUpiDestination(
     ({String account, String store}) scope,
