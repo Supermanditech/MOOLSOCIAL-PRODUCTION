@@ -21469,13 +21469,18 @@ class _CustomerCollectionSheet extends StatefulWidget {
       _CustomerCollectionSheetState();
 }
 
-class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
+class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
+    with WidgetsBindingObserver {
   Future<bool> flushForNavigation() async =>
       !saving && !confirming && await draft.flush();
   final amount = TextEditingController();
   final reference = TextEditingController();
   final amountFocus = FocusNode();
   final referenceFocus = FocusNode();
+  final _receiptContentKey = GlobalKey();
+  bool _receiptRevealScheduled = false;
+  bool get _inlineCounterReceipt =>
+      widget.counterSaleReceipt && widget.onClose != null;
   late WorkspacePaymentChannel channel;
   bool get _bankTransfer => channel == WorkspacePaymentChannel.bankTransfer;
   bool get _needsReference =>
@@ -21496,6 +21501,9 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    amountFocus.addListener(_scheduleReceiptReveal);
+    referenceFocus.addListener(_scheduleReceiptReveal);
     final invoice = widget.session.workspaceInvoices
         .where(
           (invoice) =>
@@ -21531,6 +21539,49 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
     unawaited(loadDraft());
   }
 
+  @override
+  void didChangeMetrics() => _scheduleReceiptReveal();
+
+  void _scheduleReceiptReveal() {
+    if (!_inlineCounterReceipt ||
+        _receiptRevealScheduled ||
+        (!amountFocus.hasFocus && !referenceFocus.hasFocus)) {
+      return;
+    }
+    _receiptRevealScheduled = true;
+    // Run after EditableText's post-frame caret scrolling, which otherwise
+    // overrides the form reveal during successive keyboard-inset changes.
+    unawaited(
+      WidgetsBinding.instance.endOfFrame.then((_) {
+        _receiptRevealScheduled = false;
+        if (!mounted ||
+            !_inlineCounterReceipt ||
+            (!amountFocus.hasFocus && !referenceFocus.hasFocus)) {
+          return;
+        }
+        final target = _receiptContentKey.currentContext;
+        if (target == null || !target.mounted) return;
+        final box = target.findRenderObject();
+        final scroll = Scrollable.maybeOf(target);
+        if (box is! RenderBox || !box.hasSize || scroll == null) return;
+        // Reveal the complete editor/action after IME and validation layout, not
+        // only the text caret. On very short screens prioritise the active field
+        // and retain ordinary scrolling rather than hide it to expose the button.
+        final fits = box.size.height <= scroll.position.viewportDimension;
+        final focused = referenceFocus.hasFocus ? referenceFocus : amountFocus;
+        final reveal = fits ? target : focused.context;
+        if (reveal == null || !reveal.mounted) return;
+        unawaited(
+          Scrollable.ensureVisible(
+            reveal,
+            alignment: fits ? 1 : .5,
+            duration: const Duration(milliseconds: 180),
+          ),
+        );
+      }),
+    );
+  }
+
   void refreshDraft() {
     if (mounted) {
       setState(() {});
@@ -21562,6 +21613,9 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    amountFocus.removeListener(_scheduleReceiptReveal);
+    referenceFocus.removeListener(_scheduleReceiptReveal);
     draft.removeListener(refreshDraft);
     draft.dispose();
     amount.dispose();
@@ -21588,7 +21642,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
     try {
       await _submitCollection();
     } finally {
-      if (mounted) setState(() => confirming = false);
+      if (mounted) {
+        setState(() => confirming = false);
+        _scheduleReceiptReveal();
+      }
     }
   }
 
@@ -21680,6 +21737,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
       gradient: _counterSalePaperGradient,
     ),
     child: Column(
+      key: _receiptContentKey,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -21715,7 +21773,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
               ? referenceFocus.requestFocus()
               : amountFocus.unfocus(),
           onChanged: (_) {
-            if (amountError != null) setState(() => amountError = null);
+            if (amountError != null) {
+              setState(() => amountError = null);
+              _scheduleReceiptReveal();
+            }
           },
           decoration: InputDecoration(
             labelText: 'Amount received',
@@ -21734,7 +21795,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => referenceFocus.unfocus(),
             onChanged: (_) {
-              if (referenceError != null) setState(() => referenceError = null);
+              if (referenceError != null) {
+                setState(() => referenceError = null);
+                _scheduleReceiptReveal();
+              }
             },
             decoration: InputDecoration(
               labelText: _referenceLabel,

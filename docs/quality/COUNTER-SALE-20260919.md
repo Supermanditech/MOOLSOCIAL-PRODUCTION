@@ -1,5 +1,34 @@
 # UAW-COUNTER-SALE-20260919
 
+## CS-OPPO-015 — local keyboard-fit correction; physical retest pending
+
+20 September 2026: founder requested the next bounded action after physical
+r66.36 registration. Cash amount editing and Bank Transfer reference editing
+clipped Record receipt on OPPO CPH2375. Initial form reveal ran before keyboard
+resize; later caret-only scrolling did not expose the complete action.
+
+The inline Counter Sale receipt now observes focus/IME changes and re-reveals
+after the frame's caret scrolling, including validation layout changes. Very
+short viewports prioritise the active field with ordinary scrolling. Generic
+collection sheets, payment semantics, ledger mutations, backend and approved
+layout/theme are unchanged. This is not broader governance or redesign work.
+
+Four connected CSOPPOFIX015 regressions failed before and passed after the fix:
+Cash/Bank Transfer, 360x806, text scales 1.0/1.4, progressive keyboard insets,
+invalid amount, missing reference, direct visible submit, partial receipt and
+remaining-due prefill on reopen. The 21-test focused invoice/settings/prior-fix
+run passed; four local renders were inspected. Final source rerun passed all 21;
+static analysis reports no issues. Keyboard insets are simulated, not
+physical-device acceptance. First fix iteration passed only 3/4; final fix
+waits until endOfFrame so caret scrolling cannot override receipt reveal.
+
+Task-local proof: C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/counter-sale-cs015-local-verification.md.
+Original device proof: outputs/oppo-counter-sale-r66-36-20260920 frames
+033–035 and 059–062, with matching XML, documented in that task's defect register.
+Status: locally corrected, OPEN for checksum-bound successor OPPO retest. No
+new APK/install, physical acceptance, closure tag or production release.
+UPI QR and 20/30/50-distinct-line device gaps remain; deferred tickets stay inactive.
+
 Founder-selected Store retailer Counter Sale continuation from combined source
 123ff42cf8179b272d33b480e8267dfa83af2de3. On 19 September the founder authorized
 the exact coordination-policy/gate admission and isolated Codex checkout, with

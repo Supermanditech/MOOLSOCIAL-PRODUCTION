@@ -22995,6 +22995,144 @@ void main() {
     }
   }
 
+  for (final method in ['Cash', 'Bank Transfer']) {
+    for (final scale in [1.0, 1.4]) {
+      testWidgets('CSOPPOFIX015 receipt action above IME $method $scale', (
+        tester,
+      ) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        work.workspaceCatalogueItems.addAll(
+          workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
+        );
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 806),
+          textScale: scale,
+        );
+        Future<void> press(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await press('work-quick-counter-sale');
+        await tester.enterText(
+          find.byKey(const Key('work-order-customer')),
+          '9000091936',
+        );
+        await tester.enterText(
+          find.byKey(const Key('work-sale-customer-name')),
+          'QA r36 Long Customer Name Layout Verification',
+        );
+        await press('work-sale-customer-confirm');
+        for (final product in work.workspaceCatalogueItems.take(2)) {
+          await press('work-order-add-${product.id}');
+        }
+        await press('work-order-review');
+        await press('work-sale-payment-${method.toLowerCase()}');
+        await press('work-order-save');
+        final invoice = work.workspaceInvoices.single;
+        WorkspacePaymentRecord payment() => work.workspaceFinance!.payments
+            .singleWhere((p) => p.invoiceId == invoice.id);
+        final action = method == 'Cash'
+            ? 'work-invoice-record-payment'
+            : 'work-invoice-record-bank-transfer';
+        await press(action);
+        final amount = find.byKey(const Key('collection-amount'));
+        final reference = find.byKey(const Key('collection-reference'));
+        final confirm = find.byKey(const Key('collection-confirm'));
+        void expectVisible(Finder field) {
+          final viewport = tester.getRect(
+            find
+                .ancestor(
+                  of: field,
+                  matching: find.byType(SingleChildScrollView),
+                )
+                .first,
+          );
+          for (final target in [field, confirm]) {
+            final rect = tester.getRect(target);
+            expect(
+              rect.top,
+              greaterThanOrEqualTo(viewport.top),
+              reason: '$target top',
+            );
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(viewport.bottom),
+              reason: '$target bottom',
+            );
+            expect(target.hitTestable(), findsOneWidget);
+          }
+        }
+
+        // No reveal/ensureVisible after opening: production owns IME fitment.
+        await tester.tap(amount);
+        for (final inset in [180.0, 255.0, 300.0]) {
+          tester.view.viewInsets = FakeViewPadding(bottom: inset);
+          await tester.pumpAndSettle();
+          expectVisible(amount);
+        }
+        await tester.enterText(amount, '0');
+        await tester.pumpAndSettle();
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(find.text('Enter an amount greater than zero.'), findsOneWidget);
+        expectVisible(amount);
+        expect(payment().paidMinor, 0);
+        await tester.enterText(amount, '100');
+        await tester.pumpAndSettle();
+        if (method == 'Bank Transfer') {
+          await tester.tap(confirm);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Enter the bank transaction reference.'),
+            findsOneWidget,
+          );
+          expectVisible(reference);
+          expect(payment().paidMinor, 0);
+          await tester.enterText(reference, 'QA-IME-015');
+          await tester.pumpAndSettle();
+          expectVisible(reference);
+        }
+        await captureStoreView(tester, 'receipt-ime-$method-$scale');
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(payment().paidMinor, 10000);
+        expect(payment().dueMinor, invoice.payableMinor - 10000);
+        tester.view.viewInsets = FakeViewPadding.zero;
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await press(action);
+        expect(
+          tester.widget<TextField>(amount).controller!.text,
+          '${payment().dueMinor ~/ 100}',
+        );
+        expect(work.workspaceInvoices.single, same(invoice));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final exit in ['header', 'system', 'close']) {
     testWidgets('CSOPPOFIX014 saved invoice exits safely via $exit', (
       tester,
