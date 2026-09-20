@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
@@ -505,6 +506,502 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for additive evidence.
     skip: true,
   );
+
+  testWidgets(
+    'OPPO installed baseline header removal review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+        BuyV2Destination.orders,
+      ]) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        final reviewRootKey = ValueKey(
+          'buy-header-removal-review-root-${destination.name}',
+        );
+
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: reviewRootKey,
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                  disableAnimations: true,
+                ),
+                child: child!,
+              ),
+              home: BuyV2Screen(session: session),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        if (destination == BuyV2Destination.orders) {
+          session.openOrders();
+          await tester.pumpAndSettle();
+        } else if (destination != BuyV2Destination.shop) {
+          session.openDestination(destination);
+          await tester.pumpAndSettle();
+        }
+
+        await _captureHeaderRemovalReview(
+          tester,
+          destination.name,
+          reviewRootKey,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-header-visual-creative-reel')),
+          findsNothing,
+          reason: destination.name,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-open-account')),
+          findsOneWidget,
+          reason: destination.name,
+        );
+
+        if (destination == BuyV2Destination.shop) {
+          await tester.tap(find.byKey(const ValueKey('buy-open-account')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-account-hub')), findsOneWidget);
+          expect(find.byKey(const ValueKey('buy-search-band')), findsNothing);
+          await _captureHeaderRemovalReview(tester, 'account', reviewRootKey);
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
+        core.dispose();
+      }
+
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'post-order confirmation and invoice review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-post-order-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final shop = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.shop,
+      );
+      final wholesale = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.wholesale,
+      );
+      session.addProduct(shop.id);
+      session.increase(shop.id);
+      session.addProduct(wholesale.id);
+      session.openCart();
+      session.openCheckout();
+      session.confirmOrder();
+      await tester.pumpAndSettle();
+
+      await _capturePostOrderReview(
+        tester,
+        'confirmation-shop-wholesale',
+        reviewRootKey,
+      );
+      final shopOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.shop,
+      );
+      final invoiceAction = find.byKey(
+        ValueKey('buy-confirmation-invoice-${shopOrder.id}'),
+      );
+      await tester.ensureVisible(invoiceAction);
+      await tester.tap(invoiceAction);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey('buy-invoice-page-${shopOrder.id}')),
+        findsOneWidget,
+      );
+
+      await _capturePostOrderReview(tester, 'invoice-shop', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'Offers progressive browsing laptop review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-offers-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers', reviewRootKey);
+
+      await tester.fling(
+        find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
+        const Offset(-1200, 0),
+        2200,
+      );
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers-paged', reviewRootKey);
+
+      session.openProduct('w-oil');
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offer-product', reviewRootKey);
+
+      session.addProduct('w-oil');
+      session.openCart();
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'cart-browse-more', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-cart-browse-more')));
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers-cart-active', reviewRootKey);
+
+      session.openOrders();
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const PageStorageKey('buy-orders')),
+        const Offset(0, -520),
+      );
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'orders-browse', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'B01 T02 automatic fulfilment founder capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const _CaptureAutomaticFulfilmentFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.openDestination(BuyV2Destination.shop);
+      session.openProduct('s-tomato');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 47, bottom: 34),
+              viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.shop,
+            initialView: BuyV2View.product,
+            productId: 's-tomato',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final automatic = find.byKey(
+        const ValueKey('buy-automatic-fulfilment-s-tomato'),
+      );
+      await tester.scrollUntilVisible(
+        automatic,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 230));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivered in 5 min'), findsWidgets);
+      expect(find.text('Mool delivery partner'), findsOneWidget);
+      expect(find.text('Shree Balaji Fresh'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-shop-seller-action-s-tomato')),
+        findsNothing,
+      );
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-v2-b01-t02-auto-fulfilment-founder-390x844.png',
+        ),
+      );
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'B01 T01C delivery plan and split founder captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const _CaptureT01CDeliveryFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 47, bottom: 34),
+              viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.addProduct('w-oil'), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivery plan'), findsOneWidget);
+      expect(
+        find.textContaining('Delivered in 5 min · by 6:35 PM'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Delivered in 1 day · by tomorrow 4:00 PM'),
+        findsOneWidget,
+      );
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-v2-b01-t01c-checkout-delivery-plan-founder-390x844.png',
+        ),
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your deliveries'), findsOneWidget);
+      expect(find.text('Delivery 1 of 2'), findsOneWidget);
+      expect(find.text('Delivery 2 of 2'), findsOneWidget);
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-v2-b01-t01c-confirmation-split-founder-390x844.png',
+        ),
+      );
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+  testWidgets(
+    'B01 T01A remove Medicine tab founder capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final product = BuyV2Catalogue.products.firstWhere(
+          (item) =>
+              item.destination == destination && !item.requiresPrescription,
+        );
+        session.addProduct(product.id);
+      }
+      session.openDestination(BuyV2Destination.wholesale);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              viewPadding: const EdgeInsets.symmetric(vertical: 24),
+              disableAnimations: true,
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.wholesale,
+            initialView: BuyV2View.cart,
+            initialCartScope: BuyV2CartScope.wholesale,
+            scannerLauncher: (_) async => null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Shop'), findsWidgets);
+      expect(find.text('Wholesale'), findsWidgets);
+      expect(find.textContaining('Medicine'), findsNothing);
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-b01-t01a-remove-medicine-only-360x800.png',
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    // Founder-review evidence only; run explicitly with --run-skipped.
+    skip: true,
+  );
+
+  testWidgets(
+    'B01 T01B optional GST invoice founder capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.wholesale &&
+            !item.requiresPrescription,
+      );
+      session.addProduct(product.id);
+      session.openDestination(BuyV2Destination.wholesale);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.wholesale,
+            initialView: BuyV2View.checkout,
+            initialCartScope: BuyV2CartScope.wholesale,
+            scannerLauncher: (_) async => null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-gst-request-wholesale')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-gst-add-wholesale')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Shree Balaji Retail',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-gstin')),
+        '08ABCDE1234F1Z5',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '12 Market Road, Jodhpur 342003',
+      );
+      await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
+      await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Personal'), findsNothing);
+      expect(find.textContaining('Business purchase'), findsNothing);
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-b01-t01b-optional-gst-invoice-390x844.png',
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    // Founder-review evidence only; run explicitly with --run-skipped.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -513,6 +1010,52 @@ Future<void> _capture(WidgetTester tester, String state) async {
     find.byKey(const ValueKey('buy-v2-screen')),
     matchesGoldenFile(
       'candidate_captures/buy-v2-r33-search-media-chat-local-$state-360x800.png',
+    ),
+  );
+}
+
+Future<void> _captureHeaderRemovalReview(
+  WidgetTester tester,
+  String destination,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/'
+      'buy-v2-oppo-baseline-header-removed-$destination-360x800.png',
+    ),
+  );
+}
+
+Future<void> _capturePostOrderReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-post-order-$state-360x800.png',
+    ),
+  );
+}
+
+Future<void> _captureOffersReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-offers-progressive-$state-390x844.png',
     ),
   );
 }
@@ -553,6 +1096,42 @@ Future<void> _captureResponsiveOverlay(
       'candidate_captures/buy-v2-r33-search-media-chat-local-$state-$viewport.png',
     ),
   );
+}
+
+final class _CaptureAutomaticFulfilmentFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  const _CaptureAutomaticFulfilmentFactsAdapter();
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: 'within 5 min',
+          sourceId: 'b01-t02-founder-capture',
+        );
+  }
+}
+
+final class _CaptureT01CDeliveryFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  const _CaptureT01CDeliveryFactsAdapter();
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final quote = switch (product.destination) {
+      BuyV2Destination.shop => ('within 5 min', 'by 6:35 PM'),
+      BuyV2Destination.wholesale => ('within 1 day', 'by tomorrow 4:00 PM'),
+      _ => (product.deliveryPromise, null),
+    };
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: quote.$1,
+          promisedByLabel: quote.$2,
+          sourceId: 'b01-t01c-founder-capture',
+        );
+  }
 }
 
 Future<void> _captureR34SearchSuggestions(

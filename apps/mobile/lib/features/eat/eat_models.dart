@@ -98,6 +98,70 @@ class EatCartLine {
   }
 }
 
+class EatTaxInvoiceLine {
+  const EatTaxInvoiceLine({
+    required this.description,
+    required this.sac,
+    required this.taxableValue,
+    required this.gstRate,
+    required this.cgst,
+    required this.sgst,
+    required this.igst,
+  });
+
+  final String description;
+  final String sac;
+  final int taxableValue;
+  final double gstRate;
+  final int cgst;
+  final int sgst;
+  final int igst;
+}
+
+class EatTaxInvoiceDetails {
+  const EatTaxInvoiceDetails({
+    required this.invoiceNumber,
+    required this.issuedAt,
+    required this.issuerLegalName,
+    required this.issuerAddress,
+    required this.issuerGstin,
+    required this.placeOfSupply,
+    required this.lines,
+    this.issuerPan,
+    this.issuerCin,
+    this.issuerFssaiNumber,
+    this.restaurantLegalName,
+    this.restaurantAddress,
+    this.restaurantGstin,
+    this.restaurantFssaiNumber,
+    this.recipientName,
+    this.recipientAddress,
+    this.reverseCharge = false,
+    this.section9FiveSupply = false,
+    this.authorizedSignatory,
+  });
+
+  final String invoiceNumber;
+  final DateTime issuedAt;
+  final String issuerLegalName;
+  final String issuerAddress;
+  final String issuerGstin;
+  final String placeOfSupply;
+  final List<EatTaxInvoiceLine> lines;
+  final String? issuerPan;
+  final String? issuerCin;
+  final String? issuerFssaiNumber;
+  final String? restaurantLegalName;
+  final String? restaurantAddress;
+  final String? restaurantGstin;
+  final String? restaurantFssaiNumber;
+  final String? recipientName;
+  final String? recipientAddress;
+  final bool reverseCharge;
+  final bool section9FiveSupply;
+  final String? authorizedSignatory;
+}
+
 class EatOrderReceipt {
   const EatOrderReceipt({
     required this.id,
@@ -109,6 +173,11 @@ class EatOrderReceipt {
     required this.deliveryAddress,
     required this.promise,
     required this.paymentMethod,
+    this.subtotal,
+    this.deliveryFee = 0,
+    this.taxes = 0,
+    this.taxInvoiceDetails,
+    this.platformTaxInvoiceDetails,
   });
 
   final String id;
@@ -120,6 +189,11 @@ class EatOrderReceipt {
   final String deliveryAddress;
   final String promise;
   final EatPaymentMethod paymentMethod;
+  final int? subtotal;
+  final int deliveryFee;
+  final int taxes;
+  final EatTaxInvoiceDetails? taxInvoiceDetails;
+  final EatTaxInvoiceDetails? platformTaxInvoiceDetails;
 }
 
 class TableBookingReceipt {

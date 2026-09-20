@@ -1,0 +1,182 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: Offers cinema toolbar media 390.0 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.ensureVisible (package:flutter_test/src/controller.dart:2389:32)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:264:22)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  Offers cinema toolbar media 390.0 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +0 -1: Offers cinema toolbar media 390.0 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: Offers cinema toolbar media 390.0 1.0
+  
+00:04 +0 -1: Offers cinema toolbar media 390.0 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: null
+  Actual: FlutterError:<A RenderFlex overflowed by 17 pixels on the right.>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:204:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart line 204
+The test description was:
+  Offers cinema toolbar media 390.0 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +0 -2: Offers cinema toolbar media 390.0 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: Offers cinema toolbar media 390.0 2.0
+  
+00:06 +0 -2: Offers cinema toolbar media 320.0 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.ensureVisible (package:flutter_test/src/controller.dart:2389:32)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:264:22)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  Offers cinema toolbar media 320.0 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:08 +0 -3: Offers cinema toolbar media 320.0 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: Offers cinema toolbar media 320.0 1.0
+  
+00:08 +0 -3: Offers cinema toolbar media 320.0 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: null
+  Actual: FlutterError:<A RenderFlex overflowed by 87 pixels on the right.>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:204:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart line 204
+The test description was:
+  Offers cinema toolbar media 320.0 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:09 +0 -4: Offers cinema toolbar media 320.0 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: Offers cinema toolbar media 320.0 2.0
+  
+00:09 +0 -4: Offers cinema toolbar media 844.0 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.ensureVisible (package:flutter_test/src/controller.dart:2389:32)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:240:22)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  Offers cinema toolbar media 844.0 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +0 -5: Offers cinema toolbar media 844.0 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: Offers cinema toolbar media 844.0 1.0
+  
+00:11 +0 -5: Offers cinema toolbar media 844.0 2.0
+
+Warning: A call to drag() with finder "Found 1 widget with type "PageView": [
+  PageView-[<'buy-offer-cinema-false:visual-offer-0|visual-offer-1|visual-offer-2|visual-offer-3|visual-offer-4|visual-offer-5|visual-offer-6|visual-offer-7'>](dependencies: [Directionality, ScrollConfiguration, _ScrollableScope], state: _PageViewState#80835(scrollDirection: horizontal, PageController#a72a8(one client, offset 0.0), null)),
+]" derived an Offset (Offset(418.0, 340.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#f0084 relayoutBoundary=up9
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#880cb(TextSpan(inherit: false, color: Color(alpha: 1.0000, red: 0.3569, green: 0.3725, blue: 0.4706, colorSpace: ColorSpace.sRGB), family: MaterialIcons, size: 20.0, height: 1.0x, leadingDistribution: even, "")), RenderParagraph#73f05@Offset(6.0, 2.0), RenderPositionedBox#3b197@Offset(6.0, 2.0), RenderConstrainedBox#82649@Offset(6.0, 2.0), RenderExcludeSemantics#5c505@Offset(6.0, 2.0), RenderSemanticsAnnotations#751f6@Offset(6.0, 2.0), RenderPositionedBox#a3f34@Offset(6.0, 2.0), RenderConstrainedBox#d37c0@Offset(6.0, 2.0), RenderFlex#b9c88@Offset(54.3, 9.0), RenderPadding#33288@Offset(56.3, 10.0), RenderExcludeSemantics#5cc90@Offset(56.3, 10.0), RenderStack#3a08a@Offset(56.3, 10.0), RenderPointerListener#2d56a@Offset(56.3, 10.0), RenderSemanticsAnnotations#e8c87@Offset(56.3, 10.0), RenderMouseRegion#b0753@Offset(56.3, 10.0), RenderSemanticsAnnotations#a563d@Offset(56.3, 10.0), RenderPadding#6c54d@Offset(56.3, 10.0), RenderDecoratedBox#f639e@Offset(56.3, 10.0), RenderDecoratedBox#36b62@Offset(56.3, 10.0), RenderMouseRegion#10a1d@Offset(56.3, 10.0), RenderSemanticsAnnotations#e8799@Offset(56.3, 10.0), RenderPointerListener#e13ae@Offset(56.3, 10.0), _RenderExclusiveMouseRegion#50b22@Offset(56.3, 10.0), RenderSemanticsAnnotations#c03f5@Offset(56.3, 10.0), _RenderLayoutSurrogateProxyBox#dfd16@Offset(56.3, 10.0), _RenderInkFeatures#069de@Offset(56.3, 10.0), RenderPhysicalModel#3916d@Offset(56.3, 10.0), RenderSemanticsAnnotations#c9dbf@Offset(56.3, 10.0), RenderConstrainedBox#dadc9@Offset(56.3, 10.0), RenderFlex#fb7b2@Offset(176.9, 10.0), RenderConstrainedBox#a752c@Offset(176.9, 10.0), RenderPositionedBox#dfd23@Offset(176.9, 10.0), _RenderLayoutBuilder#0d13b@Offset(176.9, 10.0), RenderConstrainedBox#7f934@Offset(176.9, 10.0), RenderSemanticsAnnotations#496a8@Offset(176.9, 10.0), RenderFlex#7f580@Offset(176.9, 10.0), RenderFlex#d308b@Offset(418.0, 10.0), RenderConstrainedBox#2db47@Offset(418.0, 10.0), RenderPadding#36c88@Offset(418.0, 10.0), RenderPadding#3032c@Offset(418.0, 10.0), _RenderInkFeatures#23f36@Offset(418.0, 10.0), RenderPhysicalModel#419e4@Offset(418.0, 10.0), RenderDecoratedBox#a828d@Offset(418.0, 10.0), RenderRepaintBoundary#17eb2@Offset(418.0, 10.0), RenderCustomMultiChildLayoutBox#757e5@Offset(418.0, 340.0), _RenderInkFeatures#fcd6c@Offset(418.0, 340.0), RenderPhysicalModel#df2e4@Offset(418.0, 340.0), RenderStack#43406@Offset(418.0, 340.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#a17ca@Offset(418.0, 340.0), RenderSemanticsAnnotations#cc824@Offset(418.0, 340.0), RenderRepaintBoundary#db770@Offset(418.0, 340.0), RenderIgnorePointer#558eb@Offset(418.0, 340.0), RenderStack#924a6@Offset(418.0, 340.0), RenderDecoratedBox#3da2a@Offset(418.0, 340.0), RenderRepaintBoundary#30920@Offset(418.0, 340.0), RenderSemanticsAnnotations#64ee4@Offset(418.0, 340.0), RenderOffstage#28948@Offset(418.0, 340.0), RenderSemanticsAnnotations#84bdd@Offset(418.0, 340.0), _RenderTheater#0ee00@Offset(418.0, 340.0), RenderAbsorbPointer#4633f@Offset(418.0, 340.0), RenderPointerListener#76623@Offset(418.0, 340.0), RenderSemanticsAnnotations#7fa30@Offset(418.0, 340.0), RenderRepaintBoundary#1ee31@Offset(418.0, 340.0), RenderSemanticsAnnotations#ab44f@Offset(418.0, 340.0), RenderSemanticsAnnotations#29025@Offset(418.0, 340.0), RenderSemanticsAnnotations#9915c@Offset(418.0, 340.0), RenderTapRegionSurface#62573@Offset(418.0, 340.0), RenderSemanticsAnnotations#4a377@Offset(418.0, 340.0), RenderSemanticsAnnotations#c7e9f@Offset(418.0, 340.0), HitTestEntry<HitTestTarget>#50ae7(_ReusableRenderView#6005f), HitTestEntry<HitTestTarget>#33937(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:227:22)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: not <null>
+  Actual: <null>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart:229:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart line 229
+The test description was:
+  Offers cinema toolbar media 844.0 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:12 +0 -6: Offers cinema toolbar media 844.0 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: Offers cinema toolbar media 844.0 2.0
+  
+00:12 +0 -6: (tearDownAll)
+00:12 +0 -6: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 2.0
+  ... and 2 more

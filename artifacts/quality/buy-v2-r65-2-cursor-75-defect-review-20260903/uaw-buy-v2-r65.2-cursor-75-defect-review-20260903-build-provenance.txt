@@ -1,0 +1,15 @@
+CandidateId=UAW-BUY-V2-R65.2-CURSOR-75-DEFECT-REVIEW-20260903
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-BUY-V2-R65.2-CURSOR-75-DEFECT-REVIEW-20260903;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r65.2
+VersionCode=2026090302
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-2-cursor-75-defect-review-20260903\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-2-cursor-75-defect-review-20260903\apk-regression-state.json
+Branch=work/cursor-ui/buy-mvp-ticket14-v1-20260902
+HEAD=fbc39fb4d6bc5ce3fb3ffd33063c273084634dc5
+SourceFingerprint=FEEFDEDF67F75A7EE60A6B5A9E5B9ADE9D195299EFC79E059F3E5F34CE0A70FA
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-2-cursor-75-defect-review-20260903\uaw-buy-v2-r65.2-cursor-75-defect-review-20260903-device-review-debug.apk
+Bytes=208696573
+SHA256=442B36541677422F5F96C1657B6512B3807E0EDE07D677AF15749ABCD050CCAF
+BuiltAt=2026-09-03T23:55:22.1619223+05:30

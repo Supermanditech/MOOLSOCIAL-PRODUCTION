@@ -83,6 +83,63 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Food profile context resumes the basket without losing state', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final eat = EatSession()..addMenuItem('veg-thali');
+    addTearDown(journey.dispose);
+    addTearDown(eat.dispose);
+    await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
+
+    await tapVisible(tester, const Key('eat-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-food-basket')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-food-table-discovery')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-food-basket'),
+    );
+    expect(find.byKey(const Key('eat-basket-screen')), findsOneWidget);
+    expect(eat.itemCount, 1);
+  });
+
+  testWidgets('active Food order takes priority over the retained basket', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final eat = EatSession(
+      gateway: ReviewEatOrderGateway(latency: Duration.zero),
+    )..addMenuItem('veg-thali');
+    expect(await eat.placeFoodOrder(), isTrue);
+    addTearDown(journey.dispose);
+    addTearDown(eat.dispose);
+    await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
+
+    await tapVisible(tester, const Key('eat-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-food-order')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-food-basket')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-food-order'),
+    );
+    expect(find.byKey(const Key('eat-tracking-screen')), findsOneWidget);
+    expect(eat.orderReceipt, isNotNull);
+  });
+
   testWidgets(
     'food order completes add, duplicate merge, payment, tracking and rating',
     (tester) async {
@@ -258,10 +315,12 @@ void main() {
     addTearDown(eat.dispose);
     await mount(tester, route: '/app/eat/table', journey: journey, eat: eat);
 
-    await tapVisible(tester, const Key('eat-table-people-6'));
-    await tapVisible(tester, const Key('eat-table-time-800PM'));
-    await tapVisible(tester, const Key('eat-table-choice-family-dining'));
     await tapVisible(tester, const Key('eat-book-table'));
+    expect(find.byKey(const Key('eat-table-review-sheet')), findsOneWidget);
+    await tapVisible(tester, const Key('eat-table-people-6'));
+    await tapVisible(tester, const Key('eat-table-time-In30min'));
+    await tapVisible(tester, const Key('eat-table-choice-family-dining'));
+    await tapVisible(tester, const Key('eat-table-confirm-booking'));
 
     expect(
       find.byKey(const Key('eat-table-confirmation-screen')),
@@ -269,6 +328,17 @@ void main() {
     );
     expect(find.byKey(const Key('eat-table-qr')), findsOneWidget);
     await tapVisible(tester, const Key('eat-table-directions'));
+    await tapVisible(tester, const Key('eat-table-confirm-chat'));
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.text('Spice Darbar'), findsWidgets);
+    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('eat-table-confirmation-screen')),
+      findsOneWidget,
+    );
     await tapVisible(tester, const Key('eat-table-cancel-booking'));
     await tapVisible(tester, const Key('eat-table-keep-booking'));
     expect(eat.tableBookingCancelled, isFalse);
@@ -298,10 +368,14 @@ void main() {
     expect(find.textContaining('no tables today'), findsOneWidget);
     await tapVisible(tester, const Key('dismiss-eat-message'));
 
+    eat.chooseTablePeople('4');
+    eat.chooseTableTime('Next available');
+    eat.chooseTableType('Standard table', 0);
     await tapVisible(tester, const Key('eat-book-table'));
+    await tapVisible(tester, const Key('eat-table-confirm-booking'));
     expect(eat.tableReceipt, isNull);
     expect(find.textContaining('just taken'), findsOneWidget);
-    await tapVisible(tester, const Key('eat-book-table'));
+    await tapVisible(tester, const Key('eat-table-confirm-booking'));
     expect(eat.tableReceipt, isNotNull);
     expect(
       find.byKey(const Key('eat-table-confirmation-screen')),

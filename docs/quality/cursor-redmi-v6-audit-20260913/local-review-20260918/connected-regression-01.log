@@ -1,0 +1,224 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: RV6 D001 empty guidance area false text 1.0
+00:01 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: RV6 D001 empty guidance area false text 1.0
+00:02 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:02 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:02 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:02 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:03 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B all six families use one fixed visual token system
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <22>
+  Actual: <20.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart:30:5)
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart line 30
+The test description was:
+  C27B all six families use one fixed visual token system
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:03 +5 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:03 +5 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B all six families use one fixed visual token system [E]
+  Test failed. See exception logs above.
+  The test description was: C27B all six families use one fixed visual token system
+  
+00:03 +5 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: Home is the fixed six-family entry owner without a dock
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:03 +6 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:04 +6 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 320.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152>
+  Actual: <128.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart:138:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart line 138
+The test description was:
+  C27B sparse actions stay compact and leading at 320.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +6 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:04 +6 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 320.0 [E]
+  Test failed. See exception logs above.
+  The test description was: C27B sparse actions stay compact and leading at 320.0
+  
+00:04 +6 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 390.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152>
+  Actual: <156.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart:138:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart line 138
+The test description was:
+  C27B sparse actions stay compact and leading at 390.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +6 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:04 +6 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 390.0 [E]
+  Test failed. See exception logs above.
+  The test description was: C27B sparse actions stay compact and leading at 390.0
+  
+00:04 +6 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 430.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152>
+  Actual: <172.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart:138:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart line 138
+The test description was:
+  C27B sparse actions stay compact and leading at 430.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +6 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:04 +6 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 430.0 [E]
+  Test failed. See exception logs above.
+  The test description was: C27B sparse actions stay compact and leading at 430.0
+  
+00:05 +6 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: eat connected chooser Back restores exact owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:05 +7 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:05 +7 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B keeps semantic controls above persistent bottom inset
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: Size:<Size(54.0, 58.0)>
+  Actual: _DebugSize:<Size(60.0, 58.0)>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart:168:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart line 168
+The test description was:
+  C27B keeps semantic controls above persistent bottom inset
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:05 +7 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:05 +7 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B keeps semantic controls above persistent bottom inset [E]
+  Test failed. See exception logs above.
+  The test description was: C27B keeps semantic controls above persistent bottom inset
+  
+00:05 +7 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: ride connected chooser Back restores exact owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:05 +8 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:06 +8 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: book connected chooser Back restores exact owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:06 +9 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:06 +9 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: work connected chooser Back restores exact owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:06 +10 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+00:07 +10 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: eat deep owner keeps its connected action
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:07 +11 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:07 +12 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+00:07 +12 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: book deep owner keeps its connected action
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:07 +13 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+00:07 +14 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: historical Buy deep links resolve to V2 destinations
+00:08 +14 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: work deep owner keeps its connected action
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:08 +15 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: historical Buy deep links resolve to V2 destinations
+00:08 +15 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: Ride Auto survives connected chooser dismissal
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:08 +16 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: historical Buy deep links resolve to V2 destinations
+00:08 +16 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: direct Home origin Back uses the safe Ride default fallback
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:08 +17 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: historical Buy deep links resolve to V2 destinations
+00:09 +17 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart: Home main action keeps route history back to fixed Home
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:09 +18 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: historical Buy deep links resolve to V2 destinations
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:09 +19 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 280.0
+00:09 +20 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+00:11 +21 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+00:12 +22 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:13 +23 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 1.0 keyboard 0.0
+00:14 +24 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Offers deep link restores the exact Offers catalogue
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:14 +25 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 1.0 keyboard 280.0
+00:15 +26 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Screen 04 Mool Buy action opens only the native Buy V2
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:16 +27 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 2.0 keyboard 0.0
+00:16 +28 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: every historical Buy order route stays inside V2
+00:18 +29 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: every historical Buy order route stays inside V2
+00:19 +30 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: every historical Buy order route stays inside V2
+00:20 +31 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: every historical Buy order route stays inside V2
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:20 +32 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 no-results clears refinements for scheduled at 1.0
+00:21 +33 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: all approved recovery routes mount their native state
+00:21 +34 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: all approved recovery routes mount their native state
+00:23 +35 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: all approved recovery routes mount their native state
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:24 +36 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 no-results clears refinements for wholesale at 2.0
+00:24 +37 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:24 +38 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:24 +39 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:24 +40 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:24 +41 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:25 +42 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:25 +43 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:25 +44 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+00:26 +45 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:26 +46 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: scope recovery is static at 320px and 140% reduced motion
+00:26 +47 -5: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B all six families use one fixed visual token system
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B keeps semantic controls above persistent bottom inset
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 320.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 390.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart: C27B sparse actions stay compact and leading at 430.0
