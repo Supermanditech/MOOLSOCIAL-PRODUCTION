@@ -55,7 +55,46 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-CounterSaleR6636Evidence([hashtable]$Facts) {
+  # Exact founder-approved successor only; all earlier pins stay immutable.
+  $expected = @{
+    Role = 'primary'; Task = '/root'; ClaimTask = '/root'; Lane = 'codex_ui'
+    WorkId = 'counter-sale-20260919'; TicketId = 'UAW-COUNTER-SALE-20260919'
+    Branch = 'work/codex-ui/counter-sale-20260919'
+    Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
+  }
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v4') {
+    $expected.Lane = 'integration'
+    $expected.WorkId = 'counter-sale-20260919-v4'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v4'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v4'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or
+        [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Owner') -and [string]$Facts.Owner -cin @(
+    'artifacts/quality/counter-sale-r66-36-review-20260920/candidate-contract.md',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/source-manifest.txt',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/local-validation.md',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/prebuild-validation.md',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/motion-disposition.md',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/apk-regression-state.json',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/apk-regression-state.json.local',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/preflight-result.json.local',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/build-attempt.json.local',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/build/uaw-counter-sale-r66.36-review-20260920-device-review-debug.apk',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/build/uaw-counter-sale-r66.36-review-20260920-build-provenance.txt',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/build/store-navigation-replay.jsonl',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/uaw-counter-sale-r66.36-review-20260920-build-provenance.txt',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/post-install.json',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/device-review.md',
+    'artifacts/quality/counter-sale-r66-36-review-20260920/ticket-and-screen-coverage.md'
+  )
+}
+
 function Test-CounterSaleSuccessorEvidence([hashtable]$Facts) {
+  if (Test-CounterSaleR6636Evidence $Facts) { return $true }
   # Founder-approved r66.35 entry only. Older candidate/source pins stay intact.
   $expected = @{
     Role = 'primary'; Task = '/root'; ClaimTask = '/root'; Lane = 'codex_ui'
@@ -151,6 +190,11 @@ function Test-CounterSaleIntegrationIdentity([hashtable]$Facts) {
     $expected.WorkId = 'counter-sale-20260919-v3'
     $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v3'
     $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v3'
+  }
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v4') {
+    $expected.WorkId = 'counter-sale-20260919-v4'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v4'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v4'
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -5930,6 +5974,10 @@ if ($ProductionLane -ceq 'baseline') {
         $qualifiedSource = '8bfda8f862837bdc43910476a841befb750b6114'
         $counterTargetId = 'counter-sale-20260919-v3'
       }
+      if ($IntegrationTargetWorkId -ceq 'counter-sale-20260919-v4') {
+        $qualifiedSource = '6e32df591dc8178aa1776c0f18c2eac0bb4efc37'
+        $counterTargetId = 'counter-sale-20260919-v4'
+      }
       $counterTargetBranch = "integration/moolsocial/$counterTargetId"
       $counterTargetRoot = "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-$counterTargetId"
       & git -C $root merge-base --is-ancestor $qualifiedSource $head
@@ -6214,6 +6262,9 @@ if ($ProductionLane -ceq 'baseline') {
       $qualifiedSource = 'bfb47131adae3458ae92cc67fb8fb932a295e16c'
       if ($ProductionWorkId -ceq 'counter-sale-20260919-v3') {
         $qualifiedSource = '8bfda8f862837bdc43910476a841befb750b6114'
+      }
+      if ($ProductionWorkId -ceq 'counter-sale-20260919-v4') {
+        $qualifiedSource = '6e32df591dc8178aa1776c0f18c2eac0bb4efc37'
       }
       & git -C $root merge-base --is-ancestor $qualifiedSource $approvedCommits[0]
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Counter Sale integration lost its approved implementation.'

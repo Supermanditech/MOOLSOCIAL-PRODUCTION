@@ -18,7 +18,7 @@
       "ticketId": "UAW-COUNTER-SALE-20260919",
       "customerOutcome": "Retailer completes fast, accurate Store Counter Sale entry, review and invoice without false payment completion.",
       "manifestPath": "docs/quality/COUNTER-SALE-20260919.md",
-      "manifestSha256": "530E150F5626C41995DB92758D26389F50DACBE9169253839DAD6B4E84BF57B7",
+      "manifestSha256": "543CBC3FE98925948F379BA59C479EEF3E9880BE0D9DE18FAAC2763946ACF3CA",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
@@ -44,9 +44,9 @@
   "state": "ticket_disclosed_and_authorized",
   "checkpoint": {
     "branch": "work/codex-ui/counter-sale-20260919",
-    "head": "b19609bac4e1dbdb0fc71ec8154f9bec179f7af6",
+    "head": "6e32df591dc8178aa1776c0f18c2eac0bb4efc37",
     "successorRegistered": true,
-    "approvalState": "all v13 local screens approved; ticket Git commit/push, required integration and one gated nonproduction APK build/install authorized; OPPO acceptance pending"
+    "approvalState": "founder explicitly approved bounded r66.36 successor source/version/integration admission and gated review build/install/test; implementation 6e32df59; physical OPPO acceptance and final Git closure pending"
   },
   "ticket": {
     "id": "UAW-COUNTER-SALE-20260919",
