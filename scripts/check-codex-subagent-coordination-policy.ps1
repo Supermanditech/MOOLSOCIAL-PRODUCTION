@@ -55,7 +55,46 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-CounterSaleSuccessorEvidence([hashtable]$Facts) {
+  # Founder-approved r66.35 entry only. Older candidate/source pins stay intact.
+  $expected = @{
+    Role = 'primary'; Task = '/root'; ClaimTask = '/root'; Lane = 'codex_ui'
+    WorkId = 'counter-sale-20260919'; TicketId = 'UAW-COUNTER-SALE-20260919'
+    Branch = 'work/codex-ui/counter-sale-20260919'
+    Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919'
+  }
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v3') {
+    $expected.Lane = 'integration'
+    $expected.WorkId = 'counter-sale-20260919-v3'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v3'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v3'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or
+        [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Owner') -and [string]$Facts.Owner -cin @(
+    'artifacts/quality/counter-sale-r66-35-review-20260920/candidate-contract.md',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/source-manifest.txt',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/local-validation.md',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/prebuild-validation.md',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/motion-disposition.md',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/apk-regression-state.json',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/apk-regression-state.json.local',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/preflight-result.json.local',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/build-attempt.json.local',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/build/uaw-counter-sale-r66.35-review-20260920-device-review-debug.apk',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/build/uaw-counter-sale-r66.35-review-20260920-build-provenance.txt',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/build/store-navigation-replay.jsonl',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/uaw-counter-sale-r66.35-review-20260920-build-provenance.txt',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/post-install.json',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/device-review.md',
+    'artifacts/quality/counter-sale-r66-35-review-20260920/ticket-and-screen-coverage.md'
+  )
+}
+
 function Test-CounterSalePendingEvidence([hashtable]$Facts) {
+  if (Test-CounterSaleSuccessorEvidence $Facts) { return $true }
   $expected = @{
     Role = 'primary'
     Task = '/root'
@@ -107,6 +146,11 @@ function Test-CounterSaleIntegrationIdentity([hashtable]$Facts) {
     $expected.WorkId = 'counter-sale-20260919-v2'
     $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v2'
     $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2'
+  }
+  if ($Facts.ContainsKey('WorkId') -and $Facts.WorkId -ceq 'counter-sale-20260919-v3') {
+    $expected.WorkId = 'counter-sale-20260919-v3'
+    $expected.Branch = 'integration/moolsocial/counter-sale-20260919-v3'
+    $expected.Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v3'
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or
@@ -2670,6 +2714,14 @@ if ($ProductionLane -ceq 'baseline') {
           'artifacts/quality/counter-sale-r66-34-review-20260919/ticket-and-screen-coverage.md'
         )
       )
+      if (-not $counterSaleCoordinationOwner) {
+        $counterSaleCoordinationOwner = Test-CounterSaleSuccessorEvidence @{
+          Role = $AgentRole; Task = $AgentTask; ClaimTask = '/root'
+          Lane = $ProductionLane; WorkId = $ProductionWorkId
+          TicketId = $ProductionTicketId; Branch = $branch
+          Root = $rootForward; Owner = $effectiveOwner
+        }
+      }
       if ($counterSaleIntegration) {
         $counterSaleCoordinationOwner = Test-CounterSalePendingEvidence @{
           Role = $AgentRole; Task = $AgentTask; ClaimTask = '/root'
@@ -5873,6 +5925,13 @@ if ($ProductionLane -ceq 'baseline') {
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
     if ($counterSaleAdmission) {
       $qualifiedSource = 'bfb47131adae3458ae92cc67fb8fb932a295e16c'
+      $counterTargetId = 'counter-sale-20260919-v2'
+      if ($IntegrationTargetWorkId -ceq 'counter-sale-20260919-v3') {
+        $qualifiedSource = '8bfda8f862837bdc43910476a841befb750b6114'
+        $counterTargetId = 'counter-sale-20260919-v3'
+      }
+      $counterTargetBranch = "integration/moolsocial/$counterTargetId"
+      $counterTargetRoot = "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-$counterTargetId"
       & git -C $root merge-base --is-ancestor $qualifiedSource $head
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Counter Sale qualified implementation ancestry changed.'
       $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")
@@ -5881,22 +5940,22 @@ if ($ProductionLane -ceq 'baseline') {
       Assert-Coordination ((Test-ProductionWorktreeClean) -and
         (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Counter Sale source must be clean and remote-equal.'
       Assert-Coordination (
-        $IntegrationTargetWorkId -ceq 'counter-sale-20260919-v2' -and
+        $IntegrationTargetWorkId -ceq $counterTargetId -and
         $IntegrationTargetTicketId -ceq 'UAW-COUNTER-SALE-20260919' -and
         (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq
-          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2' -and
+          $counterTargetRoot -and
         (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
       ) 'Counter Sale integration target identity changed.'
       $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
-        $targetBranch[0] -ceq 'integration/moolsocial/counter-sale-20260919-v2') 'Counter Sale integration branch changed.'
+        $targetBranch[0] -ceq $counterTargetBranch) 'Counter Sale integration branch changed.'
       $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
         $targetHead[0] -ceq $workStartCommit) 'Counter Sale integration must start at governance.'
       Assert-ProductionManagedWorktreesClean
-      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/counter-sale-20260919-v2')
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin "refs/heads/$counterTargetBranch")
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Counter Sale integration remote already exists.'
-      Write-Output 'merge(counter-sale-20260919-v2): seal qualified Counter Sale review source'
+      Write-Output "merge(${counterTargetId}): seal qualified Counter Sale review source"
     } elseif ($ProductionLane -ceq 'codex_ui' -and
         $ProductionWorkId -ceq 'store-buy-baseline-fixes-20260918') {
       Assert-Coordination (
@@ -6153,6 +6212,9 @@ if ($ProductionLane -ceq 'baseline') {
       Assert-Coordination ($approvedCommits.Count -eq 1 -and
         $approvedBranches[0] -ceq 'work/codex-ui/counter-sale-20260919') 'Counter Sale integration requires exactly its qualified feature branch.'
       $qualifiedSource = 'bfb47131adae3458ae92cc67fb8fb932a295e16c'
+      if ($ProductionWorkId -ceq 'counter-sale-20260919-v3') {
+        $qualifiedSource = '8bfda8f862837bdc43910476a841befb750b6114'
+      }
       & git -C $root merge-base --is-ancestor $qualifiedSource $approvedCommits[0]
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Counter Sale integration lost its approved implementation.'
       $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")

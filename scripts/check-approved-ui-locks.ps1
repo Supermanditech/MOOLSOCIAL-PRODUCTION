@@ -151,6 +151,9 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2' {
       'integration/moolsocial/counter-sale-20260919-v2'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v3' {
+      'integration/moolsocial/counter-sale-20260919-v3'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -174,7 +177,7 @@ function Get-CursorAccessibilityNativeProjection {
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
   }
-  if ($requiredBranch -cin @('work/codex-ui/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919-v2')) {
+  if ($requiredBranch -cin @('work/codex-ui/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919-v2', 'integration/moolsocial/counter-sale-20260919-v3')) {
     # REG4631: this ticket inherits the accepted combined native implementation.
     # Admission does not permit native edits or change any projection hash.
     $counterSaleBaseline = '123ff42cf8179b272d33b480e8267dfa83af2de3'
