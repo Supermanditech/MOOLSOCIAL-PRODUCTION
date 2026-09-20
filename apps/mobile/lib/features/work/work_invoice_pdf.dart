@@ -90,7 +90,19 @@ class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
               line.unitPricePaise < 0 ||
               line.lineTotalPaise < 0,
         ) ||
-        invoice.amount < 0) {
+        !invoice.validBillAmounts ||
+        (!invoice.discount.isEmpty &&
+            (request.items.isEmpty ||
+                request.items.fold<int>(
+                      0,
+                      (sum, line) => sum + line.lineTotalPaise,
+                    ) !=
+                    invoice.payableMinor ||
+                request.items.fold<int>(
+                      0,
+                      (sum, line) => sum + line.unitPricePaise * line.quantity,
+                    ) !=
+                    invoice.subtotalMinor))) {
       throw const WorkInvoicePdfException('This invoice cannot be prepared.');
     }
     final font = pw.Font.ttf(
@@ -103,7 +115,8 @@ class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
     );
     final navy = PdfColor.fromHex('#080078');
     final muted = PdfColor.fromHex('#596078');
-    String money(int paise) => '₹${(paise / 100).toStringAsFixed(2)}';
+    String money(int paise) =>
+        '₹${paise ~/ 100}.${(paise % 100).toString().padLeft(2, '0')}';
     final billing = invoice.billingDetails;
     final date = invoice.issuedAt.toLocal();
     final buyer = {
@@ -194,7 +207,11 @@ class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
                       '${line.name}\n${line.pack}',
                       '${line.quantity}',
                       money(line.unitPricePaise),
-                      money(line.lineTotalPaise),
+                      money(
+                        invoice.discountMinor == 0
+                            ? line.lineTotalPaise
+                            : line.unitPricePaise * line.quantity,
+                      ),
                     ],
                   )
                   .toList(),
@@ -221,10 +238,15 @@ class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
           else
             pw.Text(invoice.items),
           pw.SizedBox(height: 20),
+          if (invoice.discountMinor > 0) ...[
+            pw.Text('Subtotal   ${money(invoice.subtotalMinor)}'),
+            pw.Text('Discount   −${money(invoice.discountMinor)}'),
+            pw.SizedBox(height: 8),
+          ],
           pw.Align(
             alignment: pw.Alignment.centerRight,
             child: pw.Text(
-              'Invoice total   ${money(invoice.amount * 100)}',
+              'Invoice total   ${money(invoice.payableMinor)}',
               style: pw.TextStyle(fontSize: 18, color: navy),
             ),
           ),

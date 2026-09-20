@@ -41,6 +41,13 @@ String _formatStoreAmount(int value) {
   return '${negative ? '-' : ''}${groups.join(',')},$tail';
 }
 
+String _formatStoreMinorAmount(int value) {
+  final absolute = value.abs();
+  final decimals = absolute % 100;
+  return '${value < 0 ? '-' : ''}${_formatStoreAmount(absolute ~/ 100)}'
+      '${decimals == 0 ? '' : '.${decimals.toString().padLeft(2, '0')}'}';
+}
+
 String _storeSummaryAmount(String exact) {
   final parts = RegExp(r'^(-?)(\d+)(?:\.(\d{1,2}))?$').firstMatch(
     exact.replaceAll('₹', '').replaceAll(',', '').replaceAll('−', '-'),
@@ -259,11 +266,13 @@ class _StoreMoneyLine extends StatelessWidget {
     required this.value,
     this.style,
     this.orderReference,
+    this.alignAmountToEnd = false,
   });
   final Widget leading;
   final String value;
   final TextStyle? style;
   final String? orderReference;
+  final bool alignAmountToEnd;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -294,6 +303,9 @@ class _StoreMoneyLine extends StatelessWidget {
               children: [leading, const SizedBox(height: 6), amount],
             )
           : Row(
+              mainAxisAlignment: alignAmountToEnd
+                  ? MainAxisAlignment.spaceBetween
+                  : MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(child: leading),
@@ -1075,51 +1087,66 @@ class _WorkWorkspaceDashboardScreenState
     );
     if (saleOpen) {
       void goBack() => unawaited(_leaveOperation());
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {
-          if (!didPop) goBack();
-        },
-        child: Listener(
-          onPointerDown: (event) =>
-              _saleSwipeStart = event.position.dx < 24 ? event.position : null,
-          onPointerUp: (event) {
-            final start = _saleSwipeStart;
-            _saleSwipeStart = null;
-            if (start != null &&
-                event.position.dx - start.dx > 80 &&
-                (event.position.dy - start.dy).abs() < 60) {
-              goBack();
-            }
+      return Theme(
+        data: _counterSaleTheme(Theme.of(context)),
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) goBack();
           },
-          child: Scaffold(
-            appBar: AppBar(
-              leading: IconButton(
-                key: const Key('work-counter-fullscreen-back'),
-                tooltip: 'Back',
-                onPressed: goBack,
-                icon: const Icon(Icons.arrow_back),
-              ),
-              toolbarHeight: (MediaQuery.textScalerOf(context).scale(18) * 2.4)
-                  .clamp(kToolbarHeight, double.infinity),
-              title: const Text(
-                'Counter sale',
-                softWrap: true,
-                maxLines: 2,
-                style: TextStyle(fontSize: 18),
-              ),
-              actions: [
-                IconButton(
-                  key: const Key('work-counter-close'),
-                  tooltip: 'Close sale',
-                  onPressed: () => unawaited(_leaveOperation(exitSale: true)),
-                  icon: const Icon(Icons.close),
+          child: Listener(
+            onPointerDown: (event) => _saleSwipeStart = event.position.dx < 24
+                ? event.position
+                : null,
+            onPointerUp: (event) {
+              final start = _saleSwipeStart;
+              _saleSwipeStart = null;
+              if (start != null &&
+                  event.position.dx - start.dx > 80 &&
+                  (event.position.dy - start.dy).abs() < 60) {
+                goBack();
+              }
+            },
+            child: Scaffold(
+              appBar: AppBar(
+                flexibleSpace: const SizedBox.expand(
+                  child: DecoratedBox(
+                    key: Key('work-counter-header-gradient'),
+                    decoration: BoxDecoration(
+                      gradient: _counterSaleHeaderGradient,
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            body: SafeArea(
-              maintainBottomViewPadding: true,
-              child: counterSurface(true),
+                leading: IconButton(
+                  key: const Key('work-counter-fullscreen-back'),
+                  tooltip: 'Back',
+                  onPressed: goBack,
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                toolbarHeight:
+                    (MediaQuery.textScalerOf(context).scale(18) * 2.4).clamp(
+                      kToolbarHeight,
+                      double.infinity,
+                    ),
+                title: const Text(
+                  'Counter sale',
+                  softWrap: true,
+                  maxLines: 2,
+                  style: TextStyle(fontSize: 18),
+                ),
+                actions: [
+                  IconButton(
+                    key: const Key('work-counter-close'),
+                    tooltip: 'Close sale',
+                    onPressed: () => unawaited(_leaveOperation(exitSale: true)),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              body: SafeArea(
+                maintainBottomViewPadding: true,
+                child: counterSurface(true),
+              ),
             ),
           ),
         ),
@@ -4197,12 +4224,12 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
     final salesValue = finance != null
         ? _purchaseAmount(finance.salesTodayMinor)
         : review
-        ? '₹${_formatStoreAmount(session.workspaceSalesToday)}'
+        ? '₹${_formatStoreMinorAmount(session.workspaceSalesTodayMinor)}'
         : '—';
     final duesValue = finance != null
         ? _purchaseAmount(finance.duesMinor)
         : review
-        ? '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}'
+        ? '₹${_formatStoreMinorAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDueMinor))}'
         : '—';
     final settlementValue = finance != null
         ? _purchaseAmount(finance.availableMinor)
@@ -4699,7 +4726,7 @@ class _StoreRecentSale extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: _StoreMoneyLine(
-                  value: '₹${_formatStoreAmount(order.amount)}',
+                  value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -6048,7 +6075,7 @@ class _StoreOrderDetails extends StatelessWidget {
       ),
     );
     final amount = _StoreOrderAmount(
-      '₹${_formatStoreAmount(order.amount)}',
+      '₹${_formatStoreMinorAmount(order.payableMinor)}',
       orderReference: order.id,
       style: const TextStyle(
         fontSize: 22,
@@ -6649,7 +6676,7 @@ class _InvoiceReadyActivityCard extends StatelessWidget {
               ),
               const Divider(height: 20),
               _StoreMoneyText(
-                '₹${_formatStoreAmount(invoice.amount)}',
+                '₹${_formatStoreMinorAmount(invoice.payableMinor)}',
                 summary: true,
                 style: const TextStyle(
                   color: MoolColors.navy,
@@ -6720,7 +6747,9 @@ String _workspaceInvoiceMessage(
   ].join('\n');
   return '${invoice.id} from $invoiceStoreName\n'
       '${customerDetails.isEmpty ? '' : '$customerDetails\n'}'
-      '${invoice.items}\nTotal ₹${invoice.amount} · Payment method: ${invoice.payment}\n$status';
+      '${invoice.items}\n'
+      '${invoice.discountMinor == 0 ? '' : 'Subtotal ₹${_formatStoreMinorAmount(invoice.subtotalMinor)}\nDiscount −₹${_formatStoreMinorAmount(invoice.discountMinor)}\n'}'
+      'Total ₹${_formatStoreMinorAmount(invoice.payableMinor)} · Payment method: ${invoice.payment}\n$status';
 }
 
 Future<void> _showWorkspaceInvoiceSheet(
@@ -6784,7 +6813,9 @@ class _StoreInvoiceSurface extends StatefulWidget {
     required this.onClose,
     this.onOpenChat,
     this.onRecord,
+    this.receiptEditor,
     this.embedded = false,
+    this.counterAppearance = false,
     super.key,
   });
   final WorkSession session;
@@ -6792,12 +6823,32 @@ class _StoreInvoiceSurface extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onOpenChat;
   final ValueChanged<WorkspacePaymentRecord>? onRecord;
+  final Widget? receiptEditor;
   final bool embedded;
+  final bool counterAppearance;
   @override
   State<_StoreInvoiceSurface> createState() => _StoreInvoiceSurfaceState();
 }
 
 class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
+  final _invoiceScroll = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant _StoreInvoiceSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.receiptEditor != null && widget.receiptEditor == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _invoiceScroll.hasClients) _invoiceScroll.jumpTo(0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _invoiceScroll.dispose();
+    super.dispose();
+  }
+
   WorkSession get session => widget.session;
   WorkspaceCustomerInvoice get invoice => widget.invoice;
   late final invoiceAccount = session.workspaceFinance?.accountScope;
@@ -6874,36 +6925,40 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       children: [
         for (final line in order.itemSnapshots)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  line.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: MoolColors.ink,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${line.pack} · ${line.quantity} × ${_purchaseAmount(line.unitPricePaise)}',
-                  style: const TextStyle(fontSize: 12, color: MoolColors.muted),
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _StoreMoneyText(
-                    _purchaseAmount(line.lineTotalPaise),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: _StoreMoneyLine(
+              alignAmountToEnd: true,
+              leading: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    line.name,
                     style: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: MoolColors.navy,
+                      fontWeight: FontWeight.w600,
+                      color: MoolColors.ink,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${line.pack} · ${line.quantity} × ${_purchaseAmount(line.unitPricePaise)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: MoolColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+              value: _purchaseAmount(
+                invoice.discountMinor == 0
+                    ? line.lineTotalPaise
+                    : line.unitPricePaise * line.quantity,
+              ),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: MoolColors.navy,
+              ),
             ),
           ),
       ],
@@ -6973,7 +7028,11 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border.all(color: const Color(0xFFE5E8F1)),
+            border: Border.all(
+              color: widget.counterAppearance
+                  ? MoolColors.success
+                  : const Color(0xFFE5E8F1),
+            ),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -6981,9 +7040,11 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.check_circle_rounded,
-                    color: Color(0xFF16704A),
+                    color: widget.counterAppearance
+                        ? MoolColors.success
+                        : const Color(0xFF16704A),
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -6991,23 +7052,16 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     child: Text(
                       payment.label,
                       key: const Key('work-invoice-payment-summary'),
-                      style: const TextStyle(
-                        color: Color(0xFF16704A),
+                      style: TextStyle(
+                        color: widget.counterAppearance
+                            ? MoolColors.success
+                            : const Color(0xFF16704A),
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              _StoreMoneyText(
-                '₹${_formatStoreAmount(invoice.amount)}',
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -7021,10 +7075,15 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _recordedPayments(payment),
+        const SizedBox(height: 8),
         _invoiceItemRows(),
         const Divider(height: 1),
+        _invoiceTotal(),
+        Text(
+          'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
+          style: const TextStyle(color: MoolColors.muted),
+        ),
+        _recordedPayments(payment),
         ExpansionTile(
           key: const Key('work-invoice-details'),
           tilePadding: EdgeInsets.zero,
@@ -7084,6 +7143,43 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
     );
   }
 
+  Widget _invoiceTotal() => Padding(
+    key: const Key('work-invoice-total'),
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (invoice.discountMinor > 0) ...[
+          _StoreMoneyLine(
+            alignAmountToEnd: true,
+            leading: const Text('Subtotal'),
+            value: _purchaseAmount(invoice.subtotalMinor),
+          ),
+          const SizedBox(height: 6),
+          _StoreMoneyLine(
+            alignAmountToEnd: true,
+            leading: const Text('Discount'),
+            value: '−${_purchaseAmount(invoice.discountMinor)}',
+          ),
+          const SizedBox(height: 10),
+        ],
+        _StoreMoneyLine(
+          alignAmountToEnd: true,
+          leading: const Text(
+            'Total',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          value: '₹${_formatStoreMinorAmount(invoice.payableMinor)}',
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     if (session.activeWorkspace?.id != invoiceStore ||
@@ -7118,6 +7214,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
           child: SingleChildScrollView(
+            controller: _invoiceScroll,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -7141,25 +7238,45 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       onPressed: _openPdf,
                       icon: const Icon(Icons.picture_as_pdf_outlined),
                     ),
-                    IconButton(
-                      tooltip: 'Close invoice',
-                      onPressed: widget.onClose,
-                      icon: const Icon(Icons.close_rounded),
-                    ),
+                    if (!widget.embedded)
+                      IconButton(
+                        tooltip: 'Close invoice',
+                        onPressed: widget.onClose,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
                   ],
                 ),
                 if (paid)
                   _paidReceipt(payment)
                 else ...[
-                  _InvoiceCollectionSummary(
-                    session: session,
-                    invoice: invoice,
-                    accountScope: invoiceAccount,
-                    storeId: invoiceStore,
-                    onRecord: widget.onRecord,
-                  ),
-                  if (payment != null) _recordedPayments(payment),
-                  const SizedBox(height: 12),
+                  if (payment != null)
+                    Container(
+                      key: const Key('work-invoice-pending-accent'),
+                      padding: widget.counterAppearance
+                          ? const EdgeInsets.only(left: 8)
+                          : EdgeInsets.zero,
+                      decoration: widget.counterAppearance
+                          ? const BoxDecoration(
+                              border: Border(
+                                left: BorderSide(
+                                  color: MoolColors.orange,
+                                  width: 3,
+                                ),
+                              ),
+                            )
+                          : null,
+                      child: Text(
+                        payment.label,
+                        key: const Key('work-invoice-payment-summary'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: widget.counterAppearance
+                              ? MoolColors.navy
+                              : null,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
                   Text(
                     invoice.billingDetails.name.trim().isNotEmpty
                         ? invoice.billingDetails.name
@@ -7182,21 +7299,20 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                           : 14,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF4F6FF),
+                      color: widget.counterAppearance
+                          ? Colors.white
+                          : const Color(0xFFF4F6FF),
+                      border: widget.counterAppearance
+                          ? Border.all(color: _counterSaleLine)
+                          : null,
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _StoreMoneyText(
-                          '₹${_formatStoreAmount(invoice.amount)}',
-                          style: const TextStyle(
-                            color: MoolColors.navy,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
                         _invoiceItemRows(),
+                        const Divider(height: 1),
+                        _invoiceTotal(),
                         Text(
                           'Payment method: ${invoice.payment}',
                           style: const TextStyle(color: MoolColors.muted),
@@ -7204,6 +7320,16 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _InvoiceCollectionSummary(
+                    session: session,
+                    invoice: invoice,
+                    accountScope: invoiceAccount,
+                    storeId: invoiceStore,
+                    onRecord: widget.onRecord,
+                    receiptEditor: widget.receiptEditor,
+                  ),
+                  if (payment != null) _recordedPayments(payment),
                   ExpansionTile(
                     key: const Key('work-invoice-details'),
                     tilePadding: EdgeInsets.zero,
@@ -7258,70 +7384,75 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                FilledButton.icon(
-                  key: const Key('work-invoice-share-chat'),
-                  onPressed: () => _openChat(sheetContext),
-                  icon: const Icon(Icons.chat_bubble_outline_rounded),
-                  label: const Text('Share in MoolSocial Chat'),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('work-invoice-share-chat'),
+                    onPressed: () => _openChat(sheetContext),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    label: const Text('Share in MoolSocial Chat'),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  key: const Key('work-invoice-share-whatsapp'),
-                  onPressed: openingWhatsApp
-                      ? null
-                      : () async {
-                          final digits = invoice.customer.replaceAll(
-                            RegExp(r'\D'),
-                            '',
-                          );
-                          final mobile = digits.length == 10
-                              ? '91$digits'
-                              : digits;
-                          if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
-                            updateSheet(() {
-                              shareError =
-                                  'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
-                            });
-                            return;
-                          }
-                          updateSheet(() {
-                            shareError = null;
-                            openingWhatsApp = true;
-                          });
-                          try {
-                            final opened = await launchUrl(
-                              Uri.https('wa.me', '/$mobile', {
-                                'text': invoiceMessage(),
-                              }),
-                              mode: LaunchMode.externalApplication,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('work-invoice-share-whatsapp'),
+                    onPressed: openingWhatsApp
+                        ? null
+                        : () async {
+                            final digits = invoice.customer.replaceAll(
+                              RegExp(r'\D'),
+                              '',
                             );
-                            if (!sheetContext.mounted) return;
-                            if (opened) {
-                              widget.onClose();
-                              session.showNotice(
-                                'Invoice opened in WhatsApp. Complete sending it there.',
+                            final mobile = digits.length == 10
+                                ? '91$digits'
+                                : digits;
+                            if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
+                              updateSheet(() {
+                                shareError =
+                                    'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
+                              });
+                              return;
+                            }
+                            updateSheet(() {
+                              shareError = null;
+                              openingWhatsApp = true;
+                            });
+                            try {
+                              final opened = await launchUrl(
+                                Uri.https('wa.me', '/$mobile', {
+                                  'text': invoiceMessage(),
+                                }),
+                                mode: LaunchMode.externalApplication,
                               );
-                            } else {
-                              updateSheet(() {
-                                shareError =
-                                    'WhatsApp could not open. Try again or use MoolSocial Chat.';
-                              });
+                              if (!sheetContext.mounted) return;
+                              if (opened) {
+                                widget.onClose();
+                                session.showNotice(
+                                  'Invoice opened in WhatsApp. Complete sending it there.',
+                                );
+                              } else {
+                                updateSheet(() {
+                                  shareError =
+                                      'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                                });
+                              }
+                            } on Object {
+                              if (sheetContext.mounted) {
+                                updateSheet(() {
+                                  shareError =
+                                      'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                                });
+                              }
+                            } finally {
+                              if (sheetContext.mounted) {
+                                updateSheet(() => openingWhatsApp = false);
+                              }
                             }
-                          } on Object {
-                            if (sheetContext.mounted) {
-                              updateSheet(() {
-                                shareError =
-                                    'WhatsApp could not open. Try again or use MoolSocial Chat.';
-                              });
-                            }
-                          } finally {
-                            if (sheetContext.mounted) {
-                              updateSheet(() => openingWhatsApp = false);
-                            }
-                          }
-                        },
-                  icon: const Icon(Icons.send_outlined),
-                  label: const Text('Share on WhatsApp'),
+                          },
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Share on WhatsApp'),
+                  ),
                 ),
               ],
             ),
@@ -7537,7 +7668,7 @@ class _DeliveryActivityCard extends StatelessWidget {
                 const Divider(height: 22),
                 if (session.currentWorkspaceOrder case final order?) ...[
                   _StoreOrderAmount(
-                    '₹${_formatStoreAmount(order.amount)}',
+                    '₹${_formatStoreMinorAmount(order.payableMinor)}',
                     orderReference: order.id,
                     style: const TextStyle(
                       color: MoolColors.navy,
@@ -8064,7 +8195,7 @@ class _MoneyActivityCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Today’s sales · ₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                'Today’s sales · ₹${_formatStoreMinorAmount(session.workspaceSalesTodayMinor)}',
                 style: const TextStyle(color: MoolColors.muted, fontSize: 12),
               ),
               const Divider(height: 22),
@@ -8838,7 +8969,7 @@ Future<void> _showRejectOrderSheet(
       (order != null && (order.id != orderId || order.stage != stage)) ||
       (reviewedOrder != null &&
           (order == null ||
-              order.amount != reviewedOrder.amount ||
+              order.payableMinor != reviewedOrder.payableMinor ||
               order.items != reviewedOrder.items ||
               order.payment != reviewedOrder.payment ||
               !mapEquals(order.quantities, reviewedOrder.quantities))) ||
@@ -9198,7 +9329,8 @@ class _StoreMetricBand extends StatelessWidget {
         ),
         _StoreMetricTile(
           label: 'Sales today',
-          value: '₹${session.workspaceSalesToday}',
+          value:
+              '₹${_formatStoreMinorAmount(session.workspaceSalesTodayMinor)}',
           onTap: onMoney,
         ),
         _StoreMetricTile(
@@ -11051,7 +11183,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                             style: const TextStyle(fontSize: 12),
                           ),
                           Text(
-                            '${issued.day}/${issued.month}/${issued.year} · ₹${_formatStoreAmount(invoice.amount)}',
+                            '${issued.day}/${issued.month}/${issued.year} · ₹${_formatStoreMinorAmount(invoice.payableMinor)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 12),
@@ -11260,7 +11392,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             child: _StoreMoneyLine(
-                              value: '₹${_formatStoreAmount(order.amount)}',
+                              value:
+                                  '₹${_formatStoreMinorAmount(order.payableMinor)}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: MoolColors.navy,
@@ -11446,7 +11579,7 @@ class _StoreDuesSurface extends StatelessWidget {
       return _StoreFinanceSurface(session: session, section: 'dues');
     }
     final customers = session.workspaceCustomerBook
-        .where((customer) => customer.amountDue > 0)
+        .where((customer) => customer.hasDues)
         .toList();
     return ListView(
       key: const Key('work-store-dues'),
@@ -11487,7 +11620,7 @@ class _StoreDuesSurface extends StatelessWidget {
                 ),
               ],
             ),
-            value: '₹${_formatStoreAmount(customer.amountDue)}',
+            value: '₹${_formatStoreMinorAmount(customer.amountDueMinor)}',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -11502,7 +11635,7 @@ class _StoreDuesSurface extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: _ProductPreviewLine(
                 label: '${order.id} · ${order.payment}',
-                value: '₹${_formatStoreAmount(order.amount)}',
+                value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
               ),
             ),
           Align(
@@ -11515,7 +11648,7 @@ class _StoreDuesSurface extends StatelessWidget {
                     'type': 'business',
                     'recipient': customer.mobile,
                     'draft':
-                        'Hello ${customer.name}, your recorded balance with ${session.activeWorkspace?.name ?? session.workName} is ₹${customer.amountDue}. Please contact us if anything needs correcting.',
+                        'Hello ${customer.name}, your recorded balance with ${session.activeWorkspace?.name ?? session.workName} is ₹${_formatStoreMinorAmount(customer.amountDueMinor)}. Please contact us if anything needs correcting.',
                   },
                 ).toString(),
               ),
@@ -17457,7 +17590,8 @@ class _OperationMetricBoard extends StatelessWidget {
         children: [
           _PaymentMetric(
             label: 'Completed sales today',
-            value: '₹${session.workspaceSalesToday}',
+            value:
+                '₹${_formatStoreMinorAmount(session.workspaceSalesTodayMinor)}',
           ),
           const Divider(height: MoolSpacing.md),
           _PaymentMetric(
@@ -18097,7 +18231,7 @@ class _LiveOrderTicket extends StatelessWidget {
                         ),
                     ],
                   ),
-                  value: '₹${_formatStoreAmount(order.amount)}',
+                  value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
                   style: const TextStyle(
                     color: MoolColors.navy,
                     fontSize: 19,
@@ -18803,7 +18937,7 @@ class _CustomersDestinationSurfaceState
                               _MoneyDestinationLine(
                                 label: 'Total purchases',
                                 value:
-                                    '₹${_formatStoreAmount(customer.totalSpend)}',
+                                    '₹${_formatStoreMinorAmount(customer.totalSpendMinor)}',
                               ),
                               _MoneyDestinationLine(
                                 label: 'Average purchase',
@@ -18821,7 +18955,7 @@ class _CustomersDestinationSurfaceState
                               _CustomerMiniFact(
                                 label: 'Spent',
                                 value:
-                                    '₹${_formatStoreAmount(customer.totalSpend)}',
+                                    '₹${_formatStoreMinorAmount(customer.totalSpendMinor)}',
                               ),
                               _CustomerMiniFact(
                                 label: 'Average',
@@ -18873,7 +19007,7 @@ class _CustomersDestinationSurfaceState
                           ),
                         ],
                       ),
-                      value: '₹${_formatStoreAmount(order.amount)}',
+                      value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
                       style: const TextStyle(
                         color: MoolColors.navy,
                         fontWeight: FontWeight.w900,
@@ -19179,7 +19313,7 @@ class _CustomerBookRow extends StatelessWidget {
                         ),
                         if (!expandedAmounts)
                           Text(
-                            '${customer.mobile} · ${customer.orderCount} orders · ₹${_formatStoreAmount(customer.totalSpend)}',
+                            '${customer.mobile} · ${customer.orderCount} orders · ₹${_formatStoreMinorAmount(customer.totalSpendMinor)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -19241,7 +19375,7 @@ class _CustomerBookRow extends StatelessWidget {
                     style: TextStyle(fontSize: 12),
                   ),
                   second: _StoreMoneyText(
-                    '₹${_formatStoreAmount(customer.totalSpend)}',
+                    '₹${_formatStoreMinorAmount(customer.totalSpendMinor)}',
                     summary: true,
                     textAlign: TextAlign.end,
                     style: const TextStyle(
@@ -19682,7 +19816,7 @@ class _LegacyCustomersDestinationSurface extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '₹${order.amount}',
+                      '₹${_formatStoreMinorAmount(order.payableMinor)}',
                       style: const TextStyle(
                         color: MoolColors.navy,
                         fontWeight: FontWeight.w900,
@@ -21287,9 +21421,11 @@ class _CustomerCollectionSheet extends StatefulWidget {
     required this.accountScope,
     required this.storeId,
     this.refund = false,
+    this.counterSaleReceipt = false,
     this.onClose,
   });
   final bool refund;
+  final bool counterSaleReceipt;
   final VoidCallback? onClose;
   final WorkSession session;
   final WorkspacePaymentRecord payment;
@@ -21334,6 +21470,14 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
             widget.payment.channel == WorkspacePaymentChannel.directUpi
         ? WorkspacePaymentChannel.directUpi
         : WorkspacePaymentChannel.cash;
+    if (widget.counterSaleReceipt) {
+      channel = invoice?.payment == 'UPI'
+          ? WorkspacePaymentChannel.directUpi
+          : WorkspacePaymentChannel.cash;
+      amount.text = _formatStoreMinorAmount(
+        widget.payment.dueMinor,
+      ).replaceAll(',', '');
+    }
     draft = _LedgerFormAutosave(
       widget.session,
       widget.session.ledgerFormKey(
@@ -21356,13 +21500,15 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
     if (!mounted || fields == null) {
       return;
     }
-    amount.text = fields['amount'] ?? '';
+    amount.text = fields['amount'] ?? amount.text;
     reference.text = fields['reference'] ?? '';
-    channel = switch (fields['channel']) {
-      'directUpi' => WorkspacePaymentChannel.directUpi,
-      'cash' => WorkspacePaymentChannel.cash,
-      _ => channel,
-    };
+    if (!widget.counterSaleReceipt) {
+      channel = switch (fields['channel']) {
+        'directUpi' => WorkspacePaymentChannel.directUpi,
+        'cash' => WorkspacePaymentChannel.cash,
+        _ => channel,
+      };
+    }
     amount.addListener(saveDraft);
     reference.addListener(saveDraft);
     setState(() {});
@@ -21480,175 +21626,279 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) => PopScope(
-    canPop:
-        !saving &&
-        !confirming &&
-        !draft.busy &&
-        (!draft.ready || draft.error == null),
-    onPopInvokedWithResult: (didPop, result) async {
-      if (!didPop &&
-          !saving &&
-          !confirming &&
-          await draft.flush() &&
-          context.mounted) {
-        if (widget.onClose != null) {
-          widget.onClose!();
-        } else {
-          Navigator.pop(context);
-        }
-      }
-    },
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: widget.onClose == null
-              ? MediaQuery.viewInsetsOf(context).bottom
-              : 0,
-        ),
-        child: _StoreFormLayout(
-          action: FilledButton(
-            key: Key(widget.refund ? 'refund-confirm' : 'collection-confirm'),
-            onPressed:
-                !draft.ready ||
-                    draft.busy ||
-                    draft.error != null ||
-                    saving ||
-                    confirming ||
-                    (widget.refund &&
-                        widget.session.pendingCustomerRefund != null)
-                ? null
-                : submit,
-            child: Text(
-              saving
-                  ? 'Checking…'
-                  : widget.refund
-                  ? 'Confirm refund'
-                  : 'Confirm collection',
+  Widget _inlineReceipt() => Container(
+    key: const Key('work-counter-inline-receipt'),
+    margin: const EdgeInsets.only(top: 10, bottom: 8),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: _counterSaleLine),
+      gradient: _counterSalePaperGradient,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Cash receipt',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
+            IconButton(
+              tooltip: 'Close receipt entry',
+              onPressed: saving || confirming
+                  ? null
+                  : () async {
+                      if (await draft.flush() && mounted) widget.onClose!();
+                    },
+              icon: const Icon(Icons.close, size: 18),
+            ),
+          ],
+        ),
+        TextField(
+          key: const Key('collection-amount'),
+          controller: amount,
+          focusNode: amountFocus,
+          enabled: !saving && !confirming && draft.ready,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => amountFocus.unfocus(),
+          onChanged: (_) {
+            if (amountError != null) setState(() => amountError = null);
+          },
+          decoration: InputDecoration(
+            labelText: 'Amount received',
+            prefixText: '₹ ',
+            errorText: amountError,
+            errorMaxLines: 3,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.onClose != null)
-                TextButton.icon(
-                  onPressed: saving || confirming
-                      ? null
-                      : () async {
-                          if (await draft.flush() && mounted) widget.onClose!();
-                        },
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Back to invoice'),
-                ),
-              Text(
-                widget.refund ? 'Record refund' : 'Record collection',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              Text(
-                '${widget.payment.customerName} · ${widget.payment.invoiceId}',
-              ),
-              Text(
-                '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
-              ),
-              TextField(
-                key: Key(widget.refund ? 'refund-amount' : 'collection-amount'),
-                controller: amount,
-                focusNode: amountFocus,
-                onChanged: (_) {
-                  if (amountError != null) {
-                    setState(() => amountError = null);
-                  }
-                },
-                textInputAction: channel == WorkspacePaymentChannel.directUpi
-                    ? TextInputAction.next
-                    : TextInputAction.done,
-                onSubmitted: (_) => channel == WorkspacePaymentChannel.directUpi
-                    ? referenceFocus.requestFocus()
-                    : amountFocus.unfocus(),
-                enabled: !saving && !confirming && draft.ready,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  errorText: amountError,
-                  errorMaxLines: 3,
-                  labelText: widget.refund
-                      ? 'Amount refunded (₹)'
-                      : 'Amount received (₹)',
-                ),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final mode in [
-                    WorkspacePaymentChannel.cash,
-                    WorkspacePaymentChannel.directUpi,
-                  ])
-                    ChoiceChip(
-                      label: Text(
-                        mode == WorkspacePaymentChannel.cash ? 'Cash' : 'UPI',
-                      ),
-                      selected: channel == mode,
-                      onSelected: saving || confirming || !draft.ready
-                          ? null
-                          : (_) {
-                              setState(() => channel = mode);
-                              saveDraft();
-                            },
-                    ),
-                ],
-              ),
-              if (channel == WorkspacePaymentChannel.directUpi)
-                TextField(
-                  key: Key(
-                    widget.refund ? 'refund-reference' : 'collection-reference',
-                  ),
-                  controller: reference,
-                  focusNode: referenceFocus,
-                  enabled: !saving && !confirming && draft.ready,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => referenceFocus.unfocus(),
-                  onChanged: (_) {
-                    if (referenceError != null) {
-                      setState(() => referenceError = null);
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          key: const Key('collection-confirm'),
+          onPressed:
+              !draft.ready ||
+                  draft.busy ||
+                  draft.error != null ||
+                  saving ||
+                  confirming
+              ? null
+              : submit,
+          child: Text(saving ? 'Checking…' : 'Record receipt'),
+        ),
+        const Text(
+          'Confirm only after receiving the cash.',
+          style: TextStyle(fontSize: 12, color: MoolColors.muted),
+        ),
+        if (draft.error != null) ...[
+          Text(draft.error!),
+          TextButton(
+            onPressed: draft.busy
+                ? null
+                : () {
+                    if (draft.ready) {
+                      saveDraft();
+                    } else {
+                      unawaited(loadDraft());
                     }
                   },
-                  decoration: InputDecoration(
-                    labelText: 'UPI transaction reference',
-                    errorText: referenceError,
-                    errorMaxLines: 3,
-                  ),
-                ),
-              Text(
-                widget.refund
-                    ? 'Record money already returned to this customer. This does not transfer money.'
-                    : 'Record a payment already received. This does not request or transfer money.',
-              ),
-              if (draft.error != null) ...[
-                Text(draft.error!),
-                TextButton(
-                  onPressed: draft.busy
-                      ? null
-                      : () {
-                          if (draft.ready) {
-                            saveDraft();
-                          } else {
-                            unawaited(loadDraft());
-                          }
-                        },
-                  child: const Text('Retry saving input'),
-                ),
-              ],
-              if (error != null) Text(error!),
-            ],
+            child: const Text('Retry saving input'),
           ),
-        ),
-      ),
+        ],
+        if (error != null) Text(error!),
+      ],
     ),
   );
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.counterSaleReceipt && widget.onClose != null
+      ? _inlineReceipt()
+      : PopScope(
+          canPop:
+              !saving &&
+              !confirming &&
+              !draft.busy &&
+              (!draft.ready || draft.error == null),
+          onPopInvokedWithResult: (didPop, result) async {
+            if (!didPop &&
+                !saving &&
+                !confirming &&
+                await draft.flush() &&
+                context.mounted) {
+              if (widget.onClose != null) {
+                widget.onClose!();
+              } else {
+                Navigator.pop(context);
+              }
+            }
+          },
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: widget.onClose == null
+                    ? MediaQuery.viewInsetsOf(context).bottom
+                    : 0,
+              ),
+              child: _StoreFormLayout(
+                action: FilledButton(
+                  key: Key(
+                    widget.refund ? 'refund-confirm' : 'collection-confirm',
+                  ),
+                  onPressed:
+                      !draft.ready ||
+                          draft.busy ||
+                          draft.error != null ||
+                          saving ||
+                          confirming ||
+                          (widget.refund &&
+                              widget.session.pendingCustomerRefund != null)
+                      ? null
+                      : submit,
+                  child: Text(
+                    saving
+                        ? 'Checking…'
+                        : widget.refund
+                        ? 'Confirm refund'
+                        : 'Confirm collection',
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      widget.refund ? 'Record refund' : 'Record collection',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      '${widget.payment.customerName} · ${widget.payment.invoiceId}',
+                    ),
+                    if (!widget.counterSaleReceipt)
+                      Text(
+                        '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
+                      ),
+                    TextField(
+                      key: Key(
+                        widget.refund ? 'refund-amount' : 'collection-amount',
+                      ),
+                      controller: amount,
+                      focusNode: amountFocus,
+                      onChanged: (_) {
+                        if (amountError != null) {
+                          setState(() => amountError = null);
+                        }
+                      },
+                      textInputAction:
+                          channel == WorkspacePaymentChannel.directUpi
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                      onSubmitted: (_) =>
+                          channel == WorkspacePaymentChannel.directUpi
+                          ? referenceFocus.requestFocus()
+                          : amountFocus.unfocus(),
+                      enabled: !saving && !confirming && draft.ready,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        errorText: amountError,
+                        errorMaxLines: 3,
+                        labelText: widget.refund
+                            ? 'Amount refunded (₹)'
+                            : widget.counterSaleReceipt
+                            ? 'Amount received'
+                            : 'Amount received (₹)',
+                        prefixText: widget.counterSaleReceipt ? '₹ ' : null,
+                      ),
+                    ),
+                    if (widget.counterSaleReceipt)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Payment method: ${channel == WorkspacePaymentChannel.cash ? 'Cash' : 'UPI'}',
+                          key: const Key('work-counter-receipt-method'),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final mode in [
+                            WorkspacePaymentChannel.cash,
+                            WorkspacePaymentChannel.directUpi,
+                          ])
+                            ChoiceChip(
+                              label: Text(
+                                mode == WorkspacePaymentChannel.cash
+                                    ? 'Cash'
+                                    : 'UPI',
+                              ),
+                              selected: channel == mode,
+                              onSelected: saving || confirming || !draft.ready
+                                  ? null
+                                  : (_) {
+                                      setState(() => channel = mode);
+                                      saveDraft();
+                                    },
+                            ),
+                        ],
+                      ),
+                    if (channel == WorkspacePaymentChannel.directUpi)
+                      TextField(
+                        key: Key(
+                          widget.refund
+                              ? 'refund-reference'
+                              : 'collection-reference',
+                        ),
+                        controller: reference,
+                        focusNode: referenceFocus,
+                        enabled: !saving && !confirming && draft.ready,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => referenceFocus.unfocus(),
+                        onChanged: (_) {
+                          if (referenceError != null) {
+                            setState(() => referenceError = null);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'UPI transaction reference',
+                          errorText: referenceError,
+                          errorMaxLines: 3,
+                        ),
+                      ),
+                    Text(
+                      widget.refund
+                          ? 'Record money already returned to this customer. This does not transfer money.'
+                          : 'Record a payment already received. This does not request or transfer money.',
+                    ),
+                    if (draft.error != null) ...[
+                      Text(draft.error!),
+                      TextButton(
+                        onPressed: draft.busy
+                            ? null
+                            : () {
+                                if (draft.ready) {
+                                  saveDraft();
+                                } else {
+                                  unawaited(loadDraft());
+                                }
+                              },
+                        child: const Text('Retry saving input'),
+                      ),
+                    ],
+                    if (error != null) Text(error!),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
 }
 
 class _MoneyDestinationSurface extends StatelessWidget {
@@ -21666,12 +21916,12 @@ class _MoneyDestinationSurface extends StatelessWidget {
         .where(
           (order) => order.stage != 'Completed' && order.stage != 'Cancelled',
         )
-        .fold<int>(0, (total, order) => total + order.amount);
+        .fold<int>(0, (total, order) => total + order.payableMinor);
     final largeFigures =
         MediaQuery.textScalerOf(context).scale(11) > 16 ||
         [
           session.workspaceSalesToday,
-          pendingFulfilment,
+          pendingFulfilment ~/ 100,
           session.workspaceSettlementRequested,
         ].any((amount) => amount.abs() >= 10000000);
     final settlementActivity = session.workspaceActivity
@@ -21732,24 +21982,28 @@ class _MoneyDestinationSurface extends StatelessWidget {
           const SizedBox(height: 14),
           if (largeFigures)
             for (final fact in [
-              ('Sales today', session.workspaceSalesToday),
+              ('Sales today', session.workspaceSalesTodayMinor),
               ('Sales awaiting completion', pendingFulfilment),
-              ('Settlement requested', session.workspaceSettlementRequested),
+              (
+                'Settlement requested',
+                session.workspaceSettlementRequested * 100,
+              ),
             ])
               _MoneyDestinationLine(
                 label: fact.$1,
-                value: '₹${_formatStoreAmount(fact.$2)}',
+                value: '₹${_formatStoreMinorAmount(fact.$2)}',
               )
           else
             Row(
               children: [
                 _MoneyDestinationFact(
                   label: 'Sales today',
-                  value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                  value:
+                      '₹${_formatStoreMinorAmount(session.workspaceSalesTodayMinor)}',
                 ),
                 _MoneyDestinationFact(
                   label: 'Sales awaiting completion',
-                  value: '₹${_formatStoreAmount(pendingFulfilment)}',
+                  value: '₹${_formatStoreMinorAmount(pendingFulfilment)}',
                 ),
                 _MoneyDestinationFact(
                   label: 'Settlement requested',
@@ -21899,7 +22153,7 @@ class _MoneyDestinationSurface extends StatelessWidget {
                       Expanded(child: Text(order.id)),
                     ],
                   ),
-                  value: '₹${_formatStoreAmount(order.amount)}',
+                  value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
                   style: const TextStyle(
                     color: MoolColors.navy,
                     fontWeight: FontWeight.w900,
@@ -24208,10 +24462,12 @@ class _InvoiceCollectionSummary extends StatelessWidget {
     required this.accountScope,
     required this.storeId,
     this.onRecord,
+    this.receiptEditor,
   });
 
   final WorkSession session;
   final ValueChanged<WorkspacePaymentRecord>? onRecord;
+  final Widget? receiptEditor;
   final WorkspaceCustomerInvoice invoice;
   final String? accountScope, storeId;
 
@@ -24252,47 +24508,130 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                 ledger.historyComplete,
           );
       return Column(
-        key: const Key('work-invoice-payment-summary'),
+        key: const Key('work-invoice-payment-totals'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(payment.label),
           Text(
             'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
           ),
-          if (payment.dueMinor > 0 && invoice.payment == 'Cash')
-            OutlinedButton.icon(
-              key: const Key('work-invoice-record-payment'),
-              onPressed: !canRecord
-                  ? null
-                  : () async {
-                      if (onRecord != null) {
-                        onRecord!(payment);
-                        return;
-                      }
-                      // The existing collection sheet rechecks Store, account and
-                      // invoice revision; reopening it never creates another sale.
-                      await showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        isDismissible: false,
-                        enableDrag: false,
-                        builder: (_) => _CustomerCollectionSheet(
-                          session: session,
-                          payment: payment,
-                          accountScope: accountScope!,
-                          storeId: storeId!,
-                        ),
-                      );
-                    },
-              icon: const Icon(Icons.payments_outlined),
-              label: const Text('Record Payment Receipt'),
+          if (receiptEditor != null)
+            receiptEditor!
+          else if (payment.dueMinor > 0 && invoice.payment == 'Cash')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('work-invoice-record-payment'),
+                onPressed: !canRecord
+                    ? null
+                    : () async {
+                        if (onRecord != null) {
+                          onRecord!(payment);
+                          return;
+                        }
+                        // The existing collection sheet rechecks Store, account and
+                        // invoice revision; reopening it never creates another sale.
+                        await showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          isDismissible: false,
+                          enableDrag: false,
+                          builder: (_) => _CustomerCollectionSheet(
+                            session: session,
+                            payment: payment,
+                            accountScope: accountScope!,
+                            storeId: storeId!,
+                            counterSaleReceipt: true,
+                          ),
+                        );
+                      },
+                icon: const Icon(Icons.payments_outlined),
+                label: const Text('Record Payment Receipt'),
+              ),
             ),
         ],
       );
     },
   );
 }
+
+// Counter Sale styling stays local: Store/Buy and payment semantics are unchanged.
+const _counterSalePrimary = MoolColors.navy;
+const _counterSaleLine = MoolColors.line;
+const _counterSaleTint = Color(0xFFF5F5FC);
+const _counterSaleHeaderGradient = LinearGradient(
+  // One blue family only: never blend saffron, white and green into a flag strip.
+  colors: [MoolColors.navy, MoolColors.royal],
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+);
+const _counterSalePaperGradient = LinearGradient(
+  colors: [_counterSaleTint, Colors.white],
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+);
+
+ThemeData _counterSaleTheme(ThemeData base) => base.copyWith(
+  colorScheme: base.colorScheme.copyWith(
+    primary: _counterSalePrimary,
+    onPrimary: Colors.white,
+    primaryContainer: _counterSaleTint,
+    onPrimaryContainer: _counterSalePrimary,
+  ),
+  scaffoldBackgroundColor: Colors.white,
+  appBarTheme: base.appBarTheme.copyWith(
+    backgroundColor: MoolColors.navy,
+    foregroundColor: Colors.white,
+    iconTheme: const IconThemeData(color: Colors.white),
+    actionsIconTheme: const IconThemeData(color: Colors.white),
+    titleTextStyle: const TextStyle(
+      fontFamily: 'Inter',
+      color: Colors.white,
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+    ),
+    surfaceTintColor: Colors.transparent,
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: base.filledButtonTheme.style?.copyWith(
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? const Color(0xFFE6EAF1)
+            : _counterSalePrimary,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? const Color(0xFF68758A)
+            : Colors.white,
+      ),
+    ),
+  ),
+  textButtonTheme: TextButtonThemeData(
+    style: base.textButtonTheme.style?.copyWith(
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? const Color(0xFF68758A)
+            : _counterSalePrimary,
+      ),
+    ),
+  ),
+  inputDecorationTheme: base.inputDecorationTheme.copyWith(
+    fillColor: Colors.white,
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _counterSaleLine),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _counterSalePrimary, width: 1.5),
+    ),
+  ),
+  textSelectionTheme: const TextSelectionThemeData(
+    cursorColor: _counterSalePrimary,
+    selectionColor: Color(0x33000080),
+    selectionHandleColor: _counterSalePrimary,
+  ),
+);
 
 class _CounterOrderSurface extends StatefulWidget {
   const _CounterOrderSurface({
@@ -24369,6 +24708,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   String? _reviewedBill;
   String? _reviewedOrderId;
   bool _saving = false, _restoring = false, _openingDraft = false;
+  bool _editingDiscount = false;
   String? _customerInput;
   Object? _draftIdentity;
   Object get _currentDraftIdentity =>
@@ -24399,6 +24739,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _invoice = null;
       _collection = null;
       _saving = false;
+      _editingDiscount = false;
       _error = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_openDraft());
@@ -24587,88 +24928,202 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _reviewedBill = widget.session.counterBillReviewSignature;
       _reviewedOrderId = widget.session.currentWorkspaceOrderId;
       _stage = 'review';
+      _editingDiscount = false;
     });
   }
 
+  void _applyDiscount(WorkspaceBillDiscount discount) {
+    if (_saving ||
+        _stage != 'review' ||
+        widget.session.counterDraftEditingBlocked ||
+        _reviewedOrderId != widget.session.currentWorkspaceOrderId) {
+      return;
+    }
+    if (widget.session.updateWorkspaceCounterDiscount(discount)) {
+      setState(() {
+        _reviewedBill = widget.session.counterBillReviewSignature;
+        _error = null;
+        _editingDiscount = false;
+      });
+    }
+  }
+
   Widget _reviewPanel() {
-    final content = Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            key: const Key('work-order-review-summary'),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F7FB),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E8F1)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (widget.session.workspaceOrderBillingDetails.name
-                    .trim()
-                    .isNotEmpty)
-                  Text(
-                    widget.session.workspaceOrderBillingDetails.name.trim(),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                Text(
-                  _customer.text.trim(),
-                  style: const TextStyle(color: MoolColors.muted),
-                ),
-                const Divider(height: 24),
-                for (final product in widget.session.workspaceCatalogueItems)
-                  if ((widget.session.workspaceOrderQuantities[product.id] ??
-                          0) >
-                      0)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            product.title,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          _StoreMoneyLine(
-                            leading: Text(
-                              '${product.pack} · ${widget.session.workspaceOrderQuantities[product.id]} × ₹${_formatStoreAmount(product.sellingPrice)}',
+    void editItems() {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() => _stage = 'items');
+    }
+
+    final compactHeader =
+        MediaQuery.sizeOf(context).width < 360 &&
+        MediaQuery.textScalerOf(context).scale(14) > 20;
+    final products = widget.session.workspaceCatalogueItems
+        .where(
+          (product) =>
+              (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
+        )
+        .toList(growable: false);
+    final cart = Material(
+      key: const Key('work-order-review-summary'),
+      color: Colors.white,
+      child: CustomScrollView(
+        key: const Key('work-review-items-list'),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.session.workspaceOrderBillingDetails.name
+                                .trim()
+                                .isNotEmpty)
+                              Text(
+                                widget.session.workspaceOrderBillingDetails.name
+                                    .trim(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            Text(
+                              _customer.text.trim(),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: MoolColors.muted,
                               ),
                             ),
-                            value:
-                                '₹${_formatStoreAmount(product.sellingPrice * widget.session.workspaceOrderQuantities[product.id]!)}',
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      if (compactHeader)
+                        IconButton(
+                          key: const Key('work-review-edit-items'),
+                          tooltip: 'Edit items',
+                          onPressed: _saving ? null : editItems,
+                          icon: const Icon(Icons.edit_outlined),
+                        )
+                      else
+                        TextButton(
+                          key: const Key('work-review-edit-items'),
+                          onPressed: _saving ? null : editItems,
+                          child: const Text('Edit items'),
+                        ),
+                    ],
+                  ),
+                  Text(
+                    '${products.length} ${products.length == 1 ? 'item' : 'items'}',
+                    key: const Key('work-review-item-count'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: MoolColors.muted,
                     ),
-                const Divider(height: 16),
-                _StoreMoneyLine(
-                  key: const Key('work-counter-review-total'),
-                  leading: Text(
-                    'Total · $_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
                   ),
-                  value:
-                      '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: MoolColors.navy,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final product = products[index];
+                final quantity =
+                    widget.session.workspaceOrderQuantities[product.id]!;
+                return Container(
+                  key: ValueKey('work-review-item-${product.id}'),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _StoreMoneyLine(
+                        leading: Text(
+                          product.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        value:
+                            '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${product.pack} · $quantity × ₹${_formatStoreAmount(product.sellingPrice)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }, childCount: products.length),
+            ),
+          ),
+        ],
+      ),
+    );
+    final checkout = Container(
+      key: const Key('work-counter-review-totals-card'),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      decoration: const BoxDecoration(
+        gradient: _counterSalePaperGradient,
+        border: Border(top: BorderSide(color: _counterSaleLine)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!widget.session.workspaceCounterDiscount.isEmpty)
+            _StoreMoneyLine(
+              leading: const Text('Subtotal', style: TextStyle(fontSize: 12)),
+              value: _purchaseAmount(
+                widget.session.workspaceCounterSubtotalMinor,
+              ),
+            ),
+          _StoreMoneyLine(
+            key: const Key('work-counter-review-total'),
+            leading: Text(
+              'Total · $_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
+            ),
+            value:
+                !_editingDiscount &&
+                    widget.session.workspaceCounterDiscountError == null
+                ? '₹${_formatStoreMinorAmount(widget.session.workspaceCounterPayableMinor)}'
+                : 'Review discount',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: MoolColors.navy,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _CounterBillDiscountEditor(
+            key: const Key('work-counter-discount-editor'),
+            subtotalMinor: widget.session.workspaceCounterSubtotalMinor,
+            initial: widget.session.workspaceCounterDiscount,
+            onApply: _applyDiscount,
+            onInvalid: () => setState(() => _editingDiscount = true),
+            enabled: !_saving && !widget.session.counterDraftEditingBlocked,
+          ),
+          if (widget.session.workspaceCounterDiscountError case final error?)
+            Text(
+              error,
+              key: const Key('work-counter-discount-error'),
+              style: const TextStyle(color: Color(0xFFB42318)),
+            ),
+          const SizedBox(height: 4),
           _OrderCompletionChoices(
             fulfilment: _fulfilment,
             payment: _payment,
             counterOnly: true,
+            compact: true,
             addressController: _address,
             onFulfilmentChanged: (value) {
               setState(() => _fulfilment = value);
@@ -24679,11 +25134,13 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               _rememberDetails();
             },
           ),
-          if (_payment == 'UPI')
+          if (_payment == 'UPI' &&
+              !_editingDiscount &&
+              widget.session.workspaceCounterDiscountError == null)
             _CounterUpiPanel(
               key: ValueKey(widget.session.storeUpiScope),
               session: widget.session,
-              amountPaise: widget.session.workspaceOrderTotal * 100,
+              amountPaise: widget.session.workspaceCounterPayableMinor,
               reference: widget.session.retainedCounterDraft?.id,
             ),
           if (_error != null)
@@ -24698,51 +25155,61 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ],
       ),
     );
-    final action = Padding(
-      padding: const EdgeInsets.all(12),
-      child: SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          key: const Key('work-order-save'),
-          onPressed: _saving
-              ? null
-              : () {
-                  final current = widget.session.counterBillReviewSignature;
-                  if (_reviewedOrderId !=
-                          widget.session.currentWorkspaceOrderId ||
-                      current != _reviewedBill) {
-                    setState(() {
-                      _reviewedOrderId = widget.session.currentWorkspaceOrderId;
-                      _reviewedBill = current;
-                      _error = 'Bill updated. Review the items and total.';
-                    });
-                    return;
-                  }
-                  _save(expectedReview: _reviewedBill);
-                },
-          icon: const Icon(Icons.check_circle_outline),
-          label: Text(_saving ? 'Saving…' : 'Create invoice'),
+    final action = ColoredBox(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const Key('work-order-save'),
+            onPressed:
+                _saving ||
+                    _editingDiscount ||
+                    widget.session.workspaceCounterDiscountError != null
+                ? null
+                : () {
+                    final current = widget.session.counterBillReviewSignature;
+                    if (_reviewedOrderId !=
+                            widget.session.currentWorkspaceOrderId ||
+                        current != _reviewedBill) {
+                      setState(() {
+                        _reviewedOrderId =
+                            widget.session.currentWorkspaceOrderId;
+                        _reviewedBill = current;
+                        _error = 'Bill updated. Review the items and total.';
+                      });
+                      return;
+                    }
+                    _save(expectedReview: _reviewedBill);
+                  },
+            icon: const Icon(Icons.check_circle_outline),
+            label: Text(_saving ? 'Saving…' : 'Create invoice'),
+          ),
         ),
       ),
     );
     return LayoutBuilder(
-      key: const Key('work-sale-central-review'),
-      builder: (context, constraints) {
-        if (constraints.maxHeight < 320) {
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [content, action],
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: cart),
+          // Checkout grows only as needed; products own all remaining height.
+          // Stable scroll subtrees retain the discount IME during resizing.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: constraints.maxHeight * .40),
+            child: SingleChildScrollView(
+              key: const Key('work-sale-central-review'),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: checkout,
             ),
-          );
-        }
-        return Column(
-          children: [
-            Expanded(child: SingleChildScrollView(child: content)),
-            action,
-          ],
-        );
-      },
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: constraints.maxHeight * .25),
+            child: SingleChildScrollView(child: action),
+          ),
+        ],
+      ),
     );
   }
 
@@ -24755,14 +25222,17 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     _productSearchFocus.unfocus();
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => _CounterStoreProductPage(
-          session: widget.session,
-          productId: product.id,
-          isCurrent: () =>
-              mounted &&
-              identity == _currentDraftIdentity &&
-              saleGeneration == widget.session.counterSaleGeneration &&
-              !widget.session.counterDraftEditingBlocked,
+        builder: (_) => Theme(
+          data: _counterSaleTheme(Theme.of(context)),
+          child: _CounterStoreProductPage(
+            session: widget.session,
+            productId: product.id,
+            isCurrent: () =>
+                mounted &&
+                identity == _currentDraftIdentity &&
+                saleGeneration == widget.session.counterSaleGeneration &&
+                !widget.session.counterDraftEditingBlocked,
+          ),
         ),
       ),
     );
@@ -25001,46 +25471,50 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ],
       );
     }
-    if (_invoice != null && _stage == 'invoice') {
+    if (_invoice != null && (_stage == 'invoice' || _stage == 'payment')) {
       return Column(
         children: [
           Expanded(
             child: _StoreInvoiceSurface(
               key: ValueKey(_invoice!.id),
               embedded: true,
+              counterAppearance: true,
               session: widget.session,
               invoice: _invoice!,
               onClose: _nextSale,
+              receiptEditor:
+                  _stage == 'payment' &&
+                      _collection != null &&
+                      _invoiceAccount != null &&
+                      _invoiceStore != null
+                  ? _CustomerCollectionSheet(
+                      key: _collectionKey,
+                      session: widget.session,
+                      payment: _collection!,
+                      accountScope: _invoiceAccount!,
+                      storeId: _invoiceStore!,
+                      counterSaleReceipt: true,
+                      onClose: () => setState(() {
+                        widget.session.clearMessages();
+                        _collection = null;
+                        _stage = 'invoice';
+                      }),
+                    )
+                  : null,
               onRecord: (payment) => setState(() {
                 _collection = payment;
                 _stage = 'payment';
               }),
             ),
           ),
-          TextButton.icon(
-            key: const Key('work-sale-next'),
-            onPressed: _nextSale,
-            icon: const Icon(Icons.add),
-            label: const Text('Next sale'),
-          ),
+          if (_stage == 'invoice')
+            TextButton.icon(
+              key: const Key('work-sale-next'),
+              onPressed: _nextSale,
+              icon: const Icon(Icons.add),
+              label: const Text('Next sale'),
+            ),
         ],
-      );
-    }
-    if (_stage == 'payment' &&
-        _collection != null &&
-        _invoiceAccount != null &&
-        _invoiceStore != null) {
-      return _CustomerCollectionSheet(
-        key: _collectionKey,
-        session: widget.session,
-        payment: _collection!,
-        accountScope: _invoiceAccount!,
-        storeId: _invoiceStore!,
-        onClose: () => setState(() {
-          widget.session.clearMessages();
-          _collection = null;
-          _stage = 'invoice';
-        }),
       );
     }
     if (_stage == 'customer') {
@@ -25134,11 +25608,21 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               decoration: InputDecoration(
                 hintText: 'Search products',
                 isDense: true,
-                filled: false,
+                filled: true,
+                fillColor: _counterSaleTint,
                 prefixIcon: const Icon(Icons.search_rounded, size: 21),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _counterSalePrimary),
+                ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -25205,19 +25689,6 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ),
       ),
     );
-    final productList = ListView.separated(
-      key: const Key('work-sale-products'),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      itemCount: products.length,
-      separatorBuilder: (_, _) =>
-          const Divider(height: 1, color: Color(0xFFE9EDF5)),
-      itemBuilder: (context, index) => _SaleProductTile(
-        product: products[index],
-        session: widget.session,
-        onOpen: () => _openProduct(products[index]),
-      ),
-    );
     final errorText =
         widget.session.counterDraftError ??
         _error ??
@@ -25250,8 +25721,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       key: const Key('work-sale-total-bar'),
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
+        gradient: _counterSalePaperGradient,
+        border: Border(top: BorderSide(color: _counterSaleLine)),
       ),
       child: _StoreScaledPair(
         forceStack: widget.session.workspaceOrderTotal >= 10000000,
@@ -25264,7 +25735,9 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               style: const TextStyle(color: MoolColors.muted, fontSize: 12),
             ),
             _StoreMoneyText(
-              '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
+              widget.session.workspaceCounterDiscountError == null
+                  ? '₹${_formatStoreMinorAmount(widget.session.workspaceCounterPayableMinor)}'
+                  : 'Review discount',
               style: const TextStyle(
                 color: MoolColors.navy,
                 fontSize: 23,
@@ -25315,57 +25788,43 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         onKeyEvent: _handleScannerKey,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // When fixed controls would crowd out products, keep one native scroll
-            // surface instead of clipping content or reducing the chosen text size.
+            // Keep the same editable/scroll subtree when the keyboard resizes
+            // this surface. Replacing it detaches Search's native IME connection.
             final scaledLine = MediaQuery.textScalerOf(context).scale(14);
-            // Reserve room for customer controls and inline search,
-            // the bill action and at least one usable product row.
-            final minimumWorkingHeight = scaledLine * 12 + 240;
-            if (error != null || constraints.maxHeight < minimumWorkingHeight) {
-              final pinBillAction =
-                  constraints.maxHeight >= scaledLine * 5 + 100;
-              final scroll = CustomScrollView(
-                key: const Key('work-sale-short-scroll'),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                slivers: [
-                  SliverToBoxAdapter(child: controls),
-                  if (products.isEmpty)
-                    SliverToBoxAdapter(child: emptyProducts)
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverList(
-                        key: const Key('work-sale-products'),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => _SaleProductTile(
-                            product: products[index],
-                            session: widget.session,
-                            onOpen: () => _openProduct(products[index]),
-                          ),
-                          childCount: products.length,
-                        ),
+            final pinBillAction = constraints.maxHeight >= scaledLine * 5 + 100;
+            final scroll = CustomScrollView(
+              key: const Key('work-sale-short-scroll'),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                SliverToBoxAdapter(child: controls),
+                if (products.isEmpty)
+                  SliverToBoxAdapter(child: emptyProducts)
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    sliver: SliverList(
+                      key: const Key('work-sale-products'),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => index.isOdd
+                            ? const Divider(height: 1, color: Color(0xFFE9EDF5))
+                            : _SaleProductTile(
+                                product: products[index ~/ 2],
+                                session: widget.session,
+                                onOpen: () =>
+                                    _openProduct(products[index ~/ 2]),
+                              ),
+                        childCount: products.length * 2 - 1,
                       ),
                     ),
-                  if (error != null) SliverToBoxAdapter(child: error),
-                  if (!pinBillAction) SliverToBoxAdapter(child: total),
-                ],
-              );
-              return pinBillAction
-                  ? Column(
-                      children: [
-                        Expanded(child: scroll),
-                        total,
-                      ],
-                    )
-                  : scroll;
-            }
+                  ),
+                if (error != null) SliverToBoxAdapter(child: error),
+                if (!pinBillAction) SliverToBoxAdapter(child: total),
+              ],
+            );
             return Column(
               children: [
-                controls,
-                Expanded(child: products.isEmpty ? emptyProducts : productList),
-                ?error,
-                total,
+                Expanded(child: scroll),
+                if (pinBillAction) total,
               ],
             );
           },
@@ -25666,6 +26125,10 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                   alignment: Alignment.centerRight,
                   child: IconButton(
                     key: const Key('work-sale-business-details'),
+                    style: IconButton.styleFrom(
+                      backgroundColor: MoolColors.orange,
+                      foregroundColor: MoolColors.navy,
+                    ),
                     tooltip: _businessExpanded
                         ? 'Collapse business details'
                         : 'Expand business details',
@@ -25746,9 +26209,13 @@ class _SaleProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
-    return Padding(
+    return Container(
       key: Key('work-sale-product-${product.id}'),
       padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: quantity > 0 ? _counterSaleTint : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -25830,11 +26297,17 @@ class _SaleProductTile extends StatelessWidget {
                                 WorkspaceStockMode.availabilityOnly
                             ? quantity < 99
                             : product.stock > quantity)
-                    ? onOpen
+                    ? () => session.adjustWorkspaceOrderQuantity(product.id, 1)
                     : null,
                 style: IconButton.styleFrom(
-                  foregroundColor: MoolColors.navy,
-                  backgroundColor: const Color(0xFFF1F4FF),
+                  disabledForegroundColor: const Color(0xFF68758A),
+                  disabledBackgroundColor: const Color(0xFFE6EAF1),
+                  foregroundColor: quantity > 0
+                      ? Colors.white
+                      : _counterSalePrimary,
+                  backgroundColor: quantity > 0
+                      ? _counterSalePrimary
+                      : _counterSaleTint,
                 ),
                 icon: const Icon(Icons.add_rounded, size: 20),
               ),
@@ -25882,7 +26355,14 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
       return Scaffold(
         key: const Key('work-counter-store-product-page'),
         backgroundColor: Colors.white,
-        appBar: AppBar(title: const Text('Store Product')),
+        appBar: AppBar(
+          title: const Text('Store Product'),
+          flexibleSpace: const SizedBox.expand(
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: _counterSaleHeaderGradient),
+            ),
+          ),
+        ),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(20),
@@ -25913,6 +26393,7 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
                 Text(
                   '₹${_formatStoreAmount(product.sellingPrice)}',
                   style: const TextStyle(
+                    color: MoolColors.navy,
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
                   ),
@@ -26019,7 +26500,7 @@ class _OrderTotalBar extends StatelessWidget {
             ),
           ),
           Text(
-            '₹${session.workspaceOrderTotal}',
+            '₹${_formatStoreMinorAmount(session.workspaceCounterPayableMinor)}',
             style: const TextStyle(
               color: MoolColors.navy,
               fontSize: 19,
@@ -26030,6 +26511,170 @@ class _OrderTotalBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CounterBillDiscountEditor extends StatefulWidget {
+  const _CounterBillDiscountEditor({
+    super.key,
+    required this.subtotalMinor,
+    required this.initial,
+    required this.onApply,
+    required this.onInvalid,
+    required this.enabled,
+  });
+  final int subtotalMinor;
+  final WorkspaceBillDiscount initial;
+  final ValueChanged<WorkspaceBillDiscount> onApply;
+  final VoidCallback onInvalid;
+  final bool enabled;
+  @override
+  State<_CounterBillDiscountEditor> createState() =>
+      _CounterBillDiscountEditorState();
+}
+
+class _CounterBillDiscountEditorState
+    extends State<_CounterBillDiscountEditor> {
+  late String kind = widget.initial.isEmpty
+      ? 'percentage'
+      : widget.initial.kind;
+  late final input = TextEditingController(
+    text: widget.initial.isEmpty
+        ? ''
+        : '${widget.initial.value ~/ 100}.${(widget.initial.value % 100).toString().padLeft(2, '0')}',
+  );
+  String? error;
+  @override
+  void dispose() {
+    input.dispose();
+    super.dispose();
+  }
+
+  void applyInput() {
+    if (!widget.enabled) return;
+    WorkspaceBillDiscount? discount;
+    try {
+      final text = input.text.trim();
+      discount = text.isEmpty || RegExp(r'^0+(\.0{1,2})?$').hasMatch(text)
+          ? const WorkspaceBillDiscount.none()
+          : WorkspaceBillDiscount.parse(kind, text);
+      if (!discount.isEmpty && !discount.validFor(widget.subtotalMinor)) {
+        discount = null;
+      }
+    } on FormatException {
+      discount = null;
+    }
+    setState(
+      () => error = discount == null
+          ? 'Enter a discount below the subtotal.'
+          : null,
+    );
+    if (discount == null) {
+      widget.onInvalid();
+    } else {
+      widget.onApply(discount);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const Key('work-counter-discount-inline'),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final field = TextField(
+            key: const Key('work-counter-discount-value'),
+            controller: input,
+            enabled: widget.enabled,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              applyInput();
+              if (error == null) FocusScope.of(context).unfocus();
+            },
+            onChanged: (_) => applyInput(),
+            decoration: InputDecoration(
+              labelText: 'Offer discount',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              hintText: kind == 'percentage'
+                  ? 'Enter percentage'
+                  : 'Enter amount',
+              suffixIcon: input.text.trim().isEmpty
+                  ? null
+                  : TextButton(
+                      key: const Key('work-counter-discount-apply'),
+                      onPressed: !widget.enabled || error != null
+                          ? null
+                          : () {
+                              applyInput();
+                              if (error == null) {
+                                FocusScope.of(context).unfocus();
+                              }
+                            },
+                      child: const Text('Apply'),
+                    ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 10,
+              ),
+            ),
+          );
+          final modes = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in ['percentage', 'fixed'])
+                Padding(
+                  padding: const EdgeInsets.only(left: 2),
+                  child: ChoiceChip(
+                    key: Key('work-counter-discount-$mode'),
+                    label: Text(mode == 'percentage' ? '%' : 'AMT'),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: EdgeInsets.zero,
+                    showCheckmark: false,
+                    tooltip: mode == 'percentage'
+                        ? 'Percentage discount'
+                        : 'Amount discount',
+                    selected: kind == mode,
+                    onSelected: !widget.enabled
+                        ? null
+                        : (_) {
+                            setState(() => kind = mode);
+                            applyInput();
+                          },
+                  ),
+                ),
+            ],
+          );
+          if (MediaQuery.textScalerOf(context).scale(14) > 20 &&
+              constraints.maxWidth < 320) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(alignment: Alignment.centerRight, child: modes),
+                field,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: field),
+              const SizedBox(width: 8),
+              modes,
+            ],
+          );
+        },
+      ),
+      if (error != null)
+        Text(
+          error!,
+          key: const Key('work-counter-discount-input-error'),
+          style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
+        ),
+      const SizedBox(height: 6),
+    ],
+  );
 }
 
 class _CounterUpiPanel extends StatefulWidget {
@@ -26049,10 +26694,8 @@ class _CounterUpiPanel extends StatefulWidget {
 
 class _CounterUpiPanelState extends State<_CounterUpiPanel> {
   late final _scope = widget.session.storeUpiScope;
-  final _address = TextEditingController();
-  final _payee = TextEditingController();
   WorkspaceUpiDestination? _destination;
-  bool _loading = true, _saving = false, _editing = false;
+  bool _loading = true;
   String? _error;
 
   bool get _current =>
@@ -26064,13 +26707,6 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
     unawaited(_load());
   }
 
-  @override
-  void dispose() {
-    _address.dispose();
-    _payee.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     if (!_current) {
       if (mounted) setState(() => _loading = false);
@@ -26079,17 +26715,13 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
     setState(() {
       _loading = true;
       _error = null;
+      _destination = null;
     });
     try {
       final destination = await widget.session.loadStoreUpiDestination(_scope!);
       if (!_current) return;
       setState(() {
         _destination = destination;
-        _address.text = destination?.address ?? '';
-        _payee.text =
-            destination?.payeeName ??
-            widget.session.activeWorkspace?.name ??
-            '';
       });
     } on Object {
       if (_current) {
@@ -26100,55 +26732,11 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
     }
   }
 
-  Future<void> _save() async {
-    if (!_current || _saving) return;
-    final destination = WorkspaceUpiDestination(
-      account: _scope!.account,
-      store: _scope!.store,
-      address: _address.text.trim(),
-      payeeName: _payee.text.trim(),
-      merchantCode: _destination?.merchantCode ?? '',
-    );
-    if (!destination.valid) {
-      setState(() => _error = 'Enter a valid UPI ID and account holder name.');
-      return;
-    }
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    try {
-      await widget.session.saveStoreUpiDestination(destination);
-      if (!_current) return;
-      final stored = await widget.session.loadStoreUpiDestination(_scope!);
-      if (!_current) return;
-      if (stored == null ||
-          stored.address != destination.address ||
-          stored.payeeName != destination.payeeName) {
-        throw StateError('UPI destination changed during save');
-      }
-      setState(() {
-        _destination = stored;
-        _editing = false;
-      });
-    } on Object {
-      if (_current) {
-        setState(
-          () => _error =
-              'UPI details could not be confirmed. Reload before trying again.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_current) {
       return const Text(
-        'Return to your Store to set up UPI.',
+        'Return to your Store to view its registered UPI ID.',
         key: Key('work-sale-payment-request-unavailable'),
       );
     }
@@ -26159,7 +26747,7 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
       );
     }
     Uri? uri;
-    if (_destination != null && !_editing && widget.reference != null) {
+    if (_destination != null && widget.reference != null) {
       try {
         uri = _destination!.paymentUri(
           expectedAccount: _scope!.account,
@@ -26181,54 +26769,21 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
               liveRegion: true,
               child: Text(_error!, key: const Key('work-sale-upi-error')),
             ),
-            TextButton(
-              onPressed: _saving ? null : _load,
-              child: const Text('Reload UPI details'),
-            ),
           ],
-          if (_destination == null || _editing) ...[
+          if (_destination == null) ...[
             const Text(
-              'Set up Store UPI',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const Text(
-              'Enter your Store’s UPI ID. Check the account holder name in your banking app before saving.',
+              'No registered Store UPI ID is available. Choose Cash or Bank Transfer.',
               key: Key('work-sale-payment-request-unavailable'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              key: const Key('work-sale-upi-address'),
-              controller: _address,
-              enabled: !_saving,
-              autocorrect: false,
-              enableSuggestions: false,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Store UPI ID'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              key: const Key('work-sale-upi-payee'),
-              controller: _payee,
-              enabled: !_saving,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => FocusScope.of(context).unfocus(),
-              decoration: const InputDecoration(
-                labelText: 'Account holder name',
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              key: const Key('work-sale-upi-save'),
-              child: Text(_saving ? 'Saving…' : 'Use this UPI ID'),
             ),
           ] else ...[
             Text(
               _destination!.payeeName,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            SelectableText(_destination!.address),
+            SelectableText(
+              _destination!.address,
+              key: const Key('work-sale-upi-registered-address'),
+            ),
             if (uri != null) ...[
               const SizedBox(height: 8),
               Center(
@@ -26254,18 +26809,24 @@ class _CounterUpiPanelState extends State<_CounterUpiPanel> {
                 ),
               ),
               const Text(
-                'Ask the customer to scan. Confirm receipt in your banking app; this bill stays unpaid.',
+                'Automatic payment verification is unavailable. This bill remains unpaid until receipt is verified.',
+                key: Key('work-sale-upi-verification-unavailable'),
               ),
             ] else
               const Text(
                 'Save the bill details before showing its payment QR.',
                 key: Key('work-sale-payment-request-unavailable'),
               ),
-            TextButton(
-              onPressed: () => setState(() => _editing = true),
-              child: const Text('Change Store UPI'),
-            ),
           ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('work-sale-upi-refresh'),
+              onPressed: _load,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Refresh Store UPI'),
+            ),
+          ),
         ],
       ),
     );
@@ -26312,6 +26873,7 @@ class _StoreUpiQrPainter extends CustomPainter {
 class _OrderCompletionChoices extends StatelessWidget {
   const _OrderCompletionChoices({
     this.counterOnly = false,
+    this.compact = false,
     required this.fulfilment,
     required this.payment,
     required this.addressController,
@@ -26321,6 +26883,7 @@ class _OrderCompletionChoices extends StatelessWidget {
 
   final String fulfilment;
   final bool counterOnly;
+  final bool compact;
   final String payment;
   final TextEditingController addressController;
   final ValueChanged<String> onFulfilmentChanged;
@@ -26330,7 +26893,7 @@ class _OrderCompletionChoices extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      if (counterOnly && fulfilment == 'At the shop')
+      if (!compact && counterOnly && fulfilment == 'At the shop')
         const Text('Customer takes items at the counter'),
       if (!counterOnly || fulfilment != 'At the shop')
         DropdownButtonFormField<String>(
@@ -26368,10 +26931,10 @@ class _OrderCompletionChoices extends StatelessWidget {
           textInputAction: TextInputAction.done,
         ),
       ],
-      const SizedBox(height: 12),
+      if (!compact) const SizedBox(height: 12),
       if (counterOnly) ...[
-        const Text('Payment method'),
-        const SizedBox(height: 8),
+        if (!compact) const Text('Payment method'),
+        if (!compact) const SizedBox(height: 8),
         IntrinsicHeight(
           child: Row(
             key: const Key('work-sale-payment-row'),
@@ -26379,6 +26942,11 @@ class _OrderCompletionChoices extends StatelessWidget {
             children: [
               for (final method in const ['Cash', 'UPI', 'Bank Transfer'])
                 Expanded(
+                  flex:
+                      method == 'Bank Transfer' &&
+                          MediaQuery.textScalerOf(context).scale(12) > 18
+                      ? 16
+                      : 10,
                   child: Padding(
                     padding: EdgeInsets.only(
                       right: method == 'Bank Transfer' ? 0 : 6,
@@ -26399,15 +26967,15 @@ class _OrderCompletionChoices extends StatelessWidget {
                             vertical: 8,
                           ),
                           backgroundColor: payment == method
-                              ? MoolColors.navy
+                              ? _counterSalePrimary
                               : Colors.white,
                           foregroundColor: payment == method
                               ? Colors.white
-                              : MoolColors.navy,
+                              : _counterSalePrimary,
                           side: BorderSide(
                             color: payment == method
-                                ? MoolColors.navy
-                                : const Color(0xFFE5E8F1),
+                                ? _counterSalePrimary
+                                : _counterSaleLine,
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -26454,8 +27022,15 @@ class _OrderCompletionChoices extends StatelessWidget {
             if (value != null) onPaymentChanged(value);
           },
         ),
-      const SizedBox(height: 10),
-      if (!counterOnly || payment != 'UPI')
+      if (compact) ...[
+        const SizedBox(height: 4),
+        const Text(
+          'Invoice does not confirm payment.',
+          style: TextStyle(color: MoolColors.muted, fontSize: 11),
+        ),
+      ],
+      if (!compact) const SizedBox(height: 10),
+      if (!compact && (!counterOnly || payment != 'UPI'))
         const Text(
           'Confirm payment separately. Recording this bill does not collect payment.',
           style: TextStyle(color: MoolColors.muted, fontSize: 12, height: 1.4),
@@ -27241,7 +27816,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   for (final order in session.visibleWorkspaceOrders) {
     final stage = session.workspaceOrderStageLabel(order);
     if (!matches(
-      '${order.id} ${order.customer} ${order.source} ${order.items} ${order.amount} ${_formatStoreAmount(order.amount)} $stage',
+      '${order.id} ${order.customer} ${order.source} ${order.items} ${_formatStoreMinorAmount(order.payableMinor)} ${_formatStoreMinorAmount(order.payableMinor)} $stage',
     )) {
       continue;
     }
@@ -27252,7 +27827,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       purchase: null,
       title: '${order.id} · ${order.customer}',
       detail: '$stage · ${order.items}',
-      amount: '₹${_formatStoreAmount(order.amount)}',
+      amount: '₹${_formatStoreMinorAmount(order.payableMinor)}',
       route: Uri(
         path: '/app/retailer/orders',
         queryParameters: {'order': order.id},
@@ -27281,7 +27856,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   }
   for (final invoice in session.workspaceInvoices) {
     if (!matches(
-      '${invoice.id} ${invoice.orderId} ${invoice.customer} ${invoice.items} ${invoice.amount} ${_formatStoreAmount(invoice.amount)} ${invoice.payment}',
+      '${invoice.id} ${invoice.orderId} ${invoice.customer} ${invoice.items} ${_formatStoreMinorAmount(invoice.payableMinor)} ${_formatStoreMinorAmount(invoice.payableMinor)} ${invoice.payment}',
     )) {
       continue;
     }
@@ -27292,7 +27867,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       purchase: null,
       title: invoice.id,
       detail: '${invoice.customer} · ${invoice.orderId} · ${invoice.payment}',
-      amount: '₹${_formatStoreAmount(invoice.amount)}',
+      amount: '₹${_formatStoreMinorAmount(invoice.payableMinor)}',
       route: '/app/retailer/books',
       icon: Icons.description_outlined,
     ));
@@ -27466,7 +28041,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       purchase: null,
       title: '${order.id} · ${order.customer.split('·').first.trim()}',
       detail:
-          '${order.items} · ₹${_formatStoreAmount(order.amount)}\n'
+          '${order.items} · ₹${_formatStoreMinorAmount(order.payableMinor)}\n'
           '${session.workspaceOrderPaymentLabel(order)} · $status\n$when',
       actionLabel: switch (group) {
         'New' => 'Review',

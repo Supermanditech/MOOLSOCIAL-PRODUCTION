@@ -517,7 +517,11 @@ Future<void> confirmCounterProduct(WidgetTester tester) async {
 
 Future<void> addCounterProduct(WidgetTester tester, Finder entry) async {
   await tester.tap(entry);
-  await confirmCounterProduct(tester);
+  await tester.pumpAndSettle();
+  expect(
+    find.byKey(const Key('work-counter-store-product-page')),
+    findsNothing,
+  );
 }
 
 void main() {
@@ -1066,18 +1070,81 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> captureStoreView(WidgetTester tester, String name) async {
+  Future<void> captureStoreView(
+    WidgetTester tester,
+    String name, {
+    Rect? requiredInkRect,
+    void Function(List<bool>)? onCapturedInk,
+  }) async {
     if (!captureStoreViewV2) return;
     const folder = String.fromEnvironment(
       'MOOL_STORE_VIEW_CAPTURE_DIR',
       defaultValue: 'store-dashboard-first-tap-local-review-20260905',
     );
-    await expectLater(
-      find.byKey(const Key('store-review-root')),
-      matchesGoldenFile(
-        '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/$name.png',
-      ),
+    final root = find.byKey(const Key('store-review-root'));
+    final matcher = matchesGoldenFile(
+      '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/$name.png',
     );
+    if (requiredInkRect == null) {
+      await expectLater(root, matcher);
+      return;
+    }
+    // Inspect the same unmodified raster that is saved as evidence, not merely
+    // the title's widget geometry. Do not force app repaint to hide a failure.
+    final boundary = tester.renderObject<RenderRepaintBoundary>(root);
+    final image = (await tester.runAsync(() => boundary.toImage()))!;
+    try {
+      await expectLater(image, matcher);
+      final pixels = (await tester.runAsync(
+        () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+      ))!;
+      expect(requiredInkRect.left, greaterThanOrEqualTo(0));
+      expect(requiredInkRect.top, greaterThanOrEqualTo(0));
+      expect(requiredInkRect.right, lessThanOrEqualTo(image.width));
+      expect(requiredInkRect.bottom, lessThanOrEqualTo(image.height));
+      var inkPixels = 0;
+      var trailingInkPixels = 0;
+      final inkMask = <bool>[];
+      for (
+        var y = requiredInkRect.top.ceil();
+        y < requiredInkRect.bottom.floor();
+        y++
+      ) {
+        for (
+          var x = requiredInkRect.left.ceil();
+          x < requiredInkRect.right.floor();
+          x++
+        ) {
+          final offset = (y * image.width + x) * 4;
+          // Counter Sale uses white title glyphs on its dark gradient.
+          final isInk =
+              pixels.getUint8(offset) > 200 &&
+              pixels.getUint8(offset + 1) > 200 &&
+              pixels.getUint8(offset + 2) > 200 &&
+              pixels.getUint8(offset + 3) > 200;
+          inkMask.add(isInk);
+          if (isInk) {
+            inkPixels++;
+            if (x > requiredInkRect.left + requiredInkRect.width * 2 / 3) {
+              trailingInkPixels++;
+            }
+          }
+        }
+      }
+      expect(
+        inkPixels,
+        greaterThan(100),
+        reason: 'The saved $name raster must visibly paint its header title.',
+      );
+      expect(
+        trailingInkPixels,
+        greaterThan(30),
+        reason: 'The final word of the header must appear in $name.',
+      );
+      onCapturedInk?.call(inkMask);
+    } finally {
+      image.dispose();
+    }
   }
 
   WorkSession collectionStore(
@@ -8026,6 +8093,524 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('COUNTERPOLISH readable scoped theme preserves Store styling', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+    );
+    final entry = find.byKey(const Key('work-quick-counter-sale'));
+    final storeTheme = Theme.of(tester.element(entry));
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+    final gradientWidget = tester.widget<DecoratedBox>(
+      find.byKey(const Key('work-counter-header-gradient')),
+    );
+    final gradientSize = tester.getSize(
+      find.byKey(const Key('work-counter-header-gradient')),
+    );
+    expect(gradientSize.width, 412);
+    expect(gradientSize.height, greaterThanOrEqualTo(kToolbarHeight));
+    final gradient =
+        (gradientWidget.decoration as BoxDecoration).gradient!
+            as LinearGradient;
+    expect(gradient.colors, [MoolColors.navy, MoolColors.royal]);
+    for (final background in gradient.colors) {
+      expect(
+        1.05 / (background.computeLuminance() + .05),
+        greaterThanOrEqualTo(4.5),
+        reason: 'White header text stays readable across the gradient.',
+      );
+    }
+    final counterTheme = Theme.of(
+      tester.element(find.byKey(const Key('work-counter-close'))),
+    );
+    expect(counterTheme.colorScheme.primary, MoolColors.navy);
+    expect(counterTheme.scaffoldBackgroundColor, Colors.white);
+    expect(counterTheme.appBarTheme.foregroundColor, Colors.white);
+    final business = tester.widget<IconButton>(
+      find.byKey(const Key('work-sale-business-details')),
+    );
+    expect(business.style!.backgroundColor!.resolve({}), MoolColors.orange);
+    expect(business.style!.foregroundColor!.resolve({}), MoolColors.navy);
+    expect(
+      (MoolColors.orange.computeLuminance() + .05) /
+          (MoolColors.navy.computeLuminance() + .05),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      1.05 / (MoolColors.success.computeLuminance() + .05),
+      greaterThanOrEqualTo(4.5),
+      reason: 'The separate green paid-status label remains readable on white.',
+    );
+    await tester.tap(find.byKey(const Key('work-counter-close')));
+    await tester.pumpAndSettle();
+    expect(Theme.of(tester.element(entry)), equals(storeTheme));
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final display in [(360.0, 1.0), (320.0, 1.0), (320.0, 2.0)]) {
+    testWidgets(
+      'COUNTERLARGE crore bill and five lakh discount ${display.$1}-${display.$2}',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now(),
+        );
+        work.activeWorkspace = seed.workspace;
+        final product = workspaceMasterCatalogue.first.copyWith(
+          title: 'Wholesale inventory lot',
+          pack: '1 lot',
+          sellingPrice: 10000000,
+          mrp: 10000000,
+          stock: 24,
+        );
+        work.workspaceCatalogueItems.add(product);
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, 806),
+          textScale: display.$2,
+        );
+        Future<void> press(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await press('work-quick-counter-sale');
+        await enterSaleCustomer(
+          tester,
+          '9000091620',
+          name: 'Large bill customer',
+        );
+        await press('work-order-add-${product.id}');
+        await press('work-order-review');
+        await press('work-counter-discount-fixed');
+        expect(find.widgetWithText(ChoiceChip, 'AMT'), findsOneWidget);
+        final input = find.byKey(const Key('work-counter-discount-value'));
+        await reveal(tester, input);
+        await tester.enterText(input, '500000.00');
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterSubtotalMinor, 1000000000);
+        expect(work.workspaceCounterDiscountMinor, 50000000);
+        expect(work.workspaceCounterPayableMinor, 950000000);
+        final editable = find.descendant(
+          of: input,
+          matching: find.byType(EditableText),
+        );
+        final painter = TextPainter(
+          text: TextSpan(
+            text: '500000.00',
+            style: tester.widget<EditableText>(editable).style,
+          ),
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(tester.element(input)),
+        )..layout();
+        expect(
+          painter.width,
+          lessThanOrEqualTo(
+            tester.state<EditableTextState>(editable).renderEditable.size.width,
+          ),
+          reason:
+              'The complete five-lakh value including paise fits without horizontal scrolling.',
+        );
+        painter.dispose();
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'large-bill-review-${display.$1}-${display.$2}',
+        );
+        await tester.enterText(input, '0.00');
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterDiscount.isEmpty, isTrue);
+        expect(work.workspaceCounterPayableMinor, 1000000000);
+        await tester.enterText(input, '500000.00');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await press('work-order-save');
+        final invoice = work.workspaceInvoices.single;
+        expect(invoice.discountMinor, 50000000);
+        expect(invoice.payableMinor, 950000000);
+        expect(find.text('₹95,00,000'), findsWidgets);
+        await captureStoreView(
+          tester,
+          'large-bill-invoice-${display.$1}-${display.$2}',
+        );
+        await press('work-invoice-record-payment');
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('collection-amount')))
+              .controller!
+              .text,
+          '9500000',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final method in ['Cash', 'UPI', 'Bank Transfer']) {
+    for (final display in [
+      (size: const Size(360, 806), scale: 1.0, label: 'portrait'),
+      (size: const Size(360, 806), scale: 1.4, label: 'large-text'),
+      (size: const Size(806, 360), scale: 1.0, label: 'landscape'),
+    ]) {
+      testWidgets('COUNTERDISCOUNT journey $method ${display.label}', (
+        tester,
+      ) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        work.workspaceCatalogueItems.addAll(
+          workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
+        );
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: display.size,
+          textScale: display.scale,
+        );
+        Future<void> press(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        List<bool>? initialHeaderInk;
+        Future<void> capture(String state) async {
+          Rect? headerInkRect;
+          if (display.label == 'portrait' && !state.contains('discount-')) {
+            final title = find.text('Counter sale');
+            final back = find.byKey(const Key('work-counter-fullscreen-back'));
+            expect(
+              (tester.getCenter(title).dy - tester.getCenter(back).dy).abs(),
+              lessThan(2),
+              reason:
+                  'The Counter Sale header must remain aligned after scrolling.',
+            );
+            headerInkRect = tester
+                .getRect(title)
+                .shift(
+                  -tester.getTopLeft(
+                    find.byKey(const Key('store-review-root')),
+                  ),
+                );
+          }
+          await captureStoreView(
+            tester,
+            'discount-$method-${display.label}-$state',
+            requiredInkRect: headerInkRect,
+            onCapturedInk: (ink) {
+              final initial = initialHeaderInk;
+              if (initial == null) {
+                initialHeaderInk = ink;
+                return;
+              }
+              expect(ink.length, initial.length);
+              final differences = List.generate(
+                ink.length,
+                (i) => i,
+              ).where((i) => ink[i] != initial[i]).length;
+              expect(
+                differences,
+                lessThan(ink.length * 0.01),
+                reason:
+                    'The unchanged Counter sale title must stay painted '
+                    'in the saved $state raster.',
+              );
+            },
+          );
+        }
+
+        await press('work-quick-counter-sale');
+        if (method == 'Cash') await capture('01-customer-empty');
+        await tester.enterText(
+          find.byKey(const Key('work-order-customer')),
+          '9000091620',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-sale-customer-name')));
+        await tester.enterText(
+          find.byKey(const Key('work-sale-customer-name')),
+          'Rakesh',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await press('work-sale-customer-confirm');
+        if (method == 'Cash') await capture('02-items-empty-cart');
+        await press('work-order-add-oil-fortune-1l');
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        expect(work.workspaceOrderTotal, 264);
+        if (method == 'Cash') await capture('03-items-added');
+        await press('work-order-review');
+        await press('work-sale-payment-${method.toLowerCase()}');
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(Dialog), findsNothing);
+        expect(
+          find.byKey(const Key('work-counter-discount-inline')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('work-counter-discount-apply')),
+          findsNothing,
+        );
+        final input = find.byKey(const Key('work-counter-discount-value'));
+        expect(
+          tester.widget<TextField>(input).decoration!.labelText,
+          'Offer discount',
+        );
+        expect(
+          tester.widget<TextField>(input).decoration!.hintText,
+          'Enter percentage',
+        );
+        expect(tester.widget<TextField>(input).controller!.text, isEmpty);
+        tester.view.viewInsets = FakeViewPadding(
+          bottom: display.label == 'landscape' ? 120 : 280,
+        );
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+        await reveal(tester, input);
+        await tester.enterText(input, '100');
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterDiscount.isEmpty, isTrue);
+        expect(
+          find.text('Enter a discount below the subtotal.'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('work-sale-upi-qr')), findsNothing);
+        expect(
+          tester
+              .widget<FilledButton>(find.byKey(const Key('work-order-save')))
+              .onPressed,
+          isNull,
+        );
+        await tester.enterText(input, '10');
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterPayableMinor, 23760);
+        expect(tester.widget<TextField>(input).controller!.text, '10');
+        await press('work-counter-discount-apply');
+        expect(work.workspaceCounterPayableMinor, 23760);
+        expect(tester.testTextInput.isVisible, isFalse);
+        await tester.tap(input);
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.isVisible, isTrue);
+        expect(
+          tester.widget<TextField>(input).keyboardType,
+          const TextInputType.numberWithOptions(decimal: true),
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Payable '), findsNothing);
+        await capture('04-discount-percentage');
+        await press('work-counter-discount-fixed');
+        expect(work.workspaceCounterDiscount.kind, 'fixed');
+        expect(
+          tester.widget<TextField>(input).decoration!.hintText,
+          'Enter amount',
+        );
+        expect(work.workspaceCounterPayableMinor, 25400);
+        await reveal(tester, input);
+        await tester.enterText(input, '26.40');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterPayableMinor, 23760);
+        await capture('05-discount-fixed');
+        await reveal(tester, input);
+        await tester.enterText(input, '');
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterPayableMinor, 26400);
+        expect(work.workspaceCounterDiscount.isEmpty, isTrue);
+        await press('work-counter-discount-percentage');
+        await reveal(tester, input);
+        await tester.enterText(input, '10');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterPayableMinor, 23760);
+        expect(work.workspaceOrderPayment, method);
+        if (method == 'UPI') {
+          final scope = work.storeUpiScope!;
+          await work.saveStoreUpiDestination(
+            WorkspaceUpiDestination(
+              account: scope.account,
+              store: scope.store,
+              address: 'synthetic-store@examplebank',
+              payeeName: 'Store & Sons',
+            ),
+          );
+          await press('work-sale-upi-refresh');
+          final qr = find.byKey(const Key('work-sale-upi-qr'));
+          await reveal(tester, qr);
+          final dynamic painter = tester.widget<CustomPaint>(qr).painter;
+          expect(
+            Uri.parse(painter.data as String).queryParameters['am'],
+            '237.60',
+          );
+          expect(
+            find.byKey(const Key('work-sale-upi-verification-unavailable')),
+            findsOneWidget,
+          );
+          await capture('06-upi-qr');
+        }
+        await reveal(
+          tester,
+          find.byKey(const Key('work-counter-review-total')),
+        );
+        await capture('07-review');
+        if (method == 'Cash' && display.label == 'portrait') {
+          expect(
+            tester.getTopLeft(find.byKey(const Key('work-order-save'))).dy -
+                tester
+                    .getBottomLeft(
+                      find.byKey(const Key('work-sale-payment-cash')),
+                    )
+                    .dy,
+            lessThan(110),
+            reason:
+                'The action stays with payment choices, not at the screen bottom.',
+          );
+        }
+        expect(work.workspaceInvoices, isEmpty);
+        await press('work-order-save');
+        expect(work.workspaceInvoices, hasLength(1));
+        final invoice = work.workspaceInvoices.single;
+        expect(invoice.payableMinor, 23760);
+        expect(invoice.discountMinor, 2640);
+        expect(invoice.payment, method);
+        expect(find.text('Discount'), findsOneWidget);
+        expect(find.text('₹237.60'), findsWidgets);
+        final pendingDecoration =
+            tester
+                    .widget<Container>(
+                      find.byKey(const Key('work-invoice-pending-accent')),
+                    )
+                    .decoration!
+                as BoxDecoration;
+        expect(pendingDecoration.gradient, isNull);
+        expect(
+          (pendingDecoration.border! as Border).left.color,
+          MoolColors.orange,
+        );
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(const Key('work-invoice-payment-summary')),
+              )
+              .style!
+              .color,
+          MoolColors.navy,
+        );
+        await capture('08-invoice');
+        final payment = work.workspaceFinance!.payments.singleWhere(
+          (p) => p.invoiceId == invoice.id,
+        );
+        expect(payment.paidMinor, 0);
+        expect(payment.dueMinor, 23760);
+        if (method == 'Cash') {
+          await press('work-invoice-record-payment');
+          expect(find.text('Back to invoice'), findsNothing);
+          expect(
+            find.byKey(const Key('work-counter-inline-receipt')),
+            findsOneWidget,
+          );
+          expect(find.byKey(const Key('work-invoice-title')), findsOneWidget);
+          expect(find.text('Record collection'), findsNothing);
+          expect(find.text('Payment method: Cash'), findsOneWidget);
+          expect(find.widgetWithText(ChoiceChip, 'UPI'), findsNothing);
+          expect(find.text('Due ₹237.60'), findsNothing);
+          expect(
+            tester
+                .widget<TextField>(find.byKey(const Key('collection-amount')))
+                .decoration!
+                .prefixText,
+            '₹ ',
+          );
+          expect(
+            tester
+                .widget<TextField>(find.byKey(const Key('collection-amount')))
+                .decoration!
+                .labelText,
+            'Amount received',
+          );
+          expect(
+            tester
+                .widget<TextField>(find.byKey(const Key('collection-amount')))
+                .controller!
+                .text,
+            '237.60',
+          );
+          await capture('09-receipt');
+          // Confirm the prefilled bill amount without retyping it.
+          await press('collection-confirm');
+          expect(
+            work.workspaceFinance!.payments
+                .singleWhere((p) => p.invoiceId == invoice.id)
+                .dueMinor,
+            0,
+          );
+          expect(
+            find.byKey(const Key('work-invoice-pending-accent')),
+            findsNothing,
+          );
+          expect(
+            tester
+                .widget<Text>(
+                  find.byKey(const Key('work-invoice-payment-summary')),
+                )
+                .style!
+                .color,
+            MoolColors.success,
+          );
+          await capture('10-paid-invoice');
+        } else {
+          expect(
+            find.byKey(const Key('work-invoice-record-payment')),
+            findsNothing,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final (landscape, paymentMethod, paymentTextScale) in [
     for (final landscape in [false, true])
       for (final method in ['Cash', 'UPI', 'Bank Transfer'])
@@ -8114,28 +8699,43 @@ void main() {
         await tester.tap(paymentChoice);
         await tester.pumpAndSettle();
         if (paymentMethod == 'UPI') {
-          final upiAddress = find.byKey(const Key('work-sale-upi-address'));
-          await reveal(tester, upiAddress);
-          await tester.enterText(upiAddress, 'invalid');
-          await tester.testTextInput.receiveAction(TextInputAction.done);
-          final saveUpi = find.byKey(const Key('work-sale-upi-save'));
-          await reveal(tester, saveUpi);
-          await tester.tap(saveUpi);
-          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-sale-upi-address')), findsNothing);
+          expect(find.byKey(const Key('work-sale-upi-payee')), findsNothing);
+          expect(find.byKey(const Key('work-sale-upi-save')), findsNothing);
+          expect(find.text('Change Store UPI'), findsNothing);
           expect(find.byKey(const Key('work-sale-upi-qr')), findsNothing);
           expect(
-            find.text('Enter a valid UPI ID and account holder name.'),
+            find.text(
+              'No registered Store UPI ID is available. Choose Cash or Bank Transfer.',
+            ),
             findsOneWidget,
           );
-          await reveal(tester, upiAddress);
-          await tester.enterText(upiAddress, 'synthetic-store@examplebank');
-          final payee = find.byKey(const Key('work-sale-upi-payee'));
-          await reveal(tester, payee);
-          await tester.enterText(payee, 'Store & Sons');
-          await tester.testTextInput.receiveAction(TextInputAction.done);
-          await reveal(tester, saveUpi);
-          await tester.tap(saveUpi);
+          // Simulate an already registered destination, not Counter Sale entry.
+          final scope = work.storeUpiScope!;
+          await work.saveStoreUpiDestination(
+            WorkspaceUpiDestination(
+              account: scope.account,
+              store: scope.store,
+              address: 'synthetic-store@examplebank',
+              payeeName: 'Store & Sons',
+            ),
+          );
+          final refreshUpi = find.byKey(const Key('work-sale-upi-refresh'));
+          await reveal(tester, refreshUpi);
+          await tester.tap(refreshUpi);
           await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<SelectableText>(
+                  find.byKey(const Key('work-sale-upi-registered-address')),
+                )
+                .data,
+            'synthetic-store@examplebank',
+          );
+          expect(
+            find.byKey(const Key('work-sale-upi-verification-unavailable')),
+            findsOneWidget,
+          );
           final qr = find.byKey(const Key('work-sale-upi-qr'));
           await reveal(tester, qr);
           expect(qr, findsOneWidget);
@@ -8173,6 +8773,19 @@ void main() {
         expect(invoice.billingDetails.name, 'Counter recall customer');
         expect(invoice.payment, paymentMethod);
         expect(find.byType(DataTable), findsNothing);
+        expect(find.byTooltip('Close invoice'), findsNothing);
+        expect(
+          tester.widget(find.byKey(const Key('work-invoice-share-chat'))),
+          isA<TextButton>(),
+        );
+        expect(
+          tester
+              .getBottomLeft(find.byKey(const Key('work-invoice-item-table')))
+              .dy,
+          lessThanOrEqualTo(
+            tester.getTopLeft(find.byKey(const Key('work-invoice-total'))).dy,
+          ),
+        );
         await captureStoreView(
           tester,
           'counter-local-invoice-$paymentMethod-landscape-$landscape-scale-$paymentTextScale',
@@ -8202,23 +8815,25 @@ void main() {
           return;
         }
 
+        var capturedReceipt = false;
         Future<void> openCollection() async {
           final collect = find.byKey(const Key('work-invoice-record-payment'));
           await reveal(tester, collect);
+          expect(tester.widget(collect), isA<TextButton>());
           await tester.tap(collect);
           await tester.pumpAndSettle();
-          // A cash bill can be settled by a different actual collection method.
-          // Keep UPI reference/amount validation covered through this entry.
-          await reveal(tester, find.widgetWithText(ChoiceChip, 'UPI'));
-          await tester.tap(find.widgetWithText(ChoiceChip, 'UPI'));
-          await tester.pumpAndSettle();
-          expect(
-            tester
-                .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'UPI'))
-                .selected,
-            isTrue,
-          );
-          expect(find.byKey(const Key('collection-reference')), findsOneWidget);
+          expect(find.text('Back to invoice'), findsNothing);
+          if (!capturedReceipt) {
+            await captureStoreView(
+              tester,
+              'counter-local-receipt-$landscape-$paymentTextScale',
+            );
+            capturedReceipt = true;
+          }
+          // Counter Sale carries the saved bill method; no second selection.
+          expect(find.text('Payment method: Cash'), findsOneWidget);
+          expect(find.widgetWithText(ChoiceChip, 'UPI'), findsNothing);
+          expect(find.byKey(const Key('collection-reference')), findsNothing);
         }
 
         Future<void> confirm() async {
@@ -8230,6 +8845,40 @@ void main() {
         }
 
         await openCollection();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('collection-amount')))
+              .controller!
+              .text,
+          '${total ~/ 100}',
+        );
+        if (!landscape && paymentTextScale == 1.0) {
+          for (final useHeader in [true, false]) {
+            final amountField = find.byKey(const Key('collection-amount'));
+            await reveal(tester, amountField);
+            await tester.enterText(amountField, '1');
+            await tester.testTextInput.receiveAction(TextInputAction.done);
+            await tester.pumpAndSettle();
+            if (useHeader) {
+              await tester.tap(
+                find.byKey(const Key('work-counter-fullscreen-back')),
+              );
+            } else {
+              await tester.binding.handlePopRoute();
+            }
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('work-invoice-title')), findsOneWidget);
+            expect(work.workspaceInvoices.single.id, invoice.id);
+            expect(
+              work.workspaceFinance!.payments
+                  .singleWhere((p) => p.invoiceId == invoice.id)
+                  .paidMinor,
+              0,
+            );
+            await openCollection();
+            expect(tester.widget<TextField>(amountField).controller!.text, '1');
+          }
+        }
         tester.view.viewInsets = FakeViewPadding(bottom: landscape ? 120 : 280);
         addTearDown(tester.view.resetViewInsets);
         await tester.pumpAndSettle();
@@ -8261,23 +8910,6 @@ void main() {
         await reveal(tester, find.byKey(const Key('collection-amount')));
         await tester.enterText(find.byKey(const Key('collection-amount')), '1');
         await tester.pumpAndSettle();
-        await confirm();
-        expect(
-          find.text('Enter the UPI transaction reference.'),
-          findsOneWidget,
-        );
-        expect(
-          tester
-              .widget<TextField>(find.byKey(const Key('collection-reference')))
-              .focusNode!
-              .hasFocus,
-          isTrue,
-        );
-        await reveal(tester, find.byKey(const Key('collection-reference')));
-        await tester.enterText(
-          find.byKey(const Key('collection-reference')),
-          'QA-UPI-PARTIAL',
-        );
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
         expect(
@@ -8294,20 +8926,22 @@ void main() {
         );
         expect(partial.paidMinor, 100);
         expect(partial.dueMinor, total - 100);
+        await captureStoreView(
+          tester,
+          'counter-local-partial-cash-$landscape-$paymentTextScale',
+        );
         expect(
           find.byKey(const Key('work-invoice-payment-summary')).hitTestable(),
           findsOneWidget,
         );
         await openCollection();
         await reveal(tester, find.byKey(const Key('collection-amount')));
-        await tester.enterText(
-          find.byKey(const Key('collection-amount')),
-          ((total - 100) / 100).toStringAsFixed(2),
-        );
-        await reveal(tester, find.byKey(const Key('collection-reference')));
-        await tester.enterText(
-          find.byKey(const Key('collection-reference')),
-          'QA-UPI-FINAL',
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('collection-amount')))
+              .controller!
+              .text,
+          '${(total - 100) ~/ 100}',
         );
         await tester.pumpAndSettle();
         await confirm();
@@ -8316,6 +8950,14 @@ void main() {
         );
         expect(paid.paidMinor, total);
         expect(paid.dueMinor, 0);
+        expect(
+          find.byKey(const Key('work-invoice-record-payment')),
+          findsNothing,
+        );
+        await captureStoreView(
+          tester,
+          'counter-local-paid-cash-$landscape-$paymentTextScale',
+        );
         expect(work.workspaceInvoices, hasLength(1));
         final recorded = find.byKey(
           const Key('work-invoice-recorded-payments'),
@@ -8328,8 +8970,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Reference: QA-UPI-PARTIAL'), findsOneWidget);
-        expect(find.text('Reference: QA-UPI-FINAL'), findsOneWidget);
+        expect(paid.channel, WorkspacePaymentChannel.cash);
+        expect(find.textContaining('Reference: QA-UPI'), findsNothing);
         await reveal(tester, find.text('Next sale'));
         await tester.tap(find.text('Next sale'));
         await tester.pumpAndSettle();
@@ -8362,6 +9004,104 @@ void main() {
       },
     );
   }
+
+  testWidgets('OPPOCS01 Search keeps native focus across keyboard resize', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+    );
+    await openCounterSaleFromSales(tester);
+    await enterSaleCustomer(tester, '9000091934', name: 'Counter QA');
+    await tester.tap(
+      find.byKey(const Key('work-sale-product-open-oil-fortune-1l')),
+    );
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final search = find.byKey(const Key('work-counter-product-search'));
+    await reveal(tester, search);
+    final rect = tester.getRect(search);
+    await tester.tapAt(Offset(rect.left + 80, rect.center.dy));
+    await tester.pumpAndSettle();
+    final field = tester.widget<TextField>(search);
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    // updateEditingValue does not force focus as tester.enterText would.
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'Fortune',
+        selection: TextSelection.collapsed(offset: 7),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(field.controller!.text, 'Fortune');
+    expect(
+      find.byKey(const Key('work-sale-product-oil-fortune-1l')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('work-sale-product-atta-aashirvaad-1kg')),
+      findsNothing,
+    );
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(field.controller!.text, 'Fortune');
+    expect(work.workspaceOrderCustomer, '9000091934');
+    tester.testTextInput.enterText('no matching product');
+    await tester.pumpAndSettle();
+    expect(find.text('No products match your search'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-counter-search-clear')));
+    await tester.pumpAndSettle();
+    expect(field.controller!.text, isEmpty);
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('OPPOCS07 Plus adds directly while product title opens details', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openCounterSaleFromSales(tester);
+    await enterSaleCustomer(tester, '9000091934');
+    const product = 'oil-fortune-1l';
+    final add = find.byKey(const Key('work-order-add-$product'));
+    await reveal(tester, add);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-counter-store-product-page')),
+      findsNothing,
+    );
+    expect(work.workspaceOrderQuantities[product], 1);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderQuantities[product], 2);
+    await tester.tap(find.byKey(const Key('work-sale-product-open-$product')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-counter-store-product-page')),
+      findsOneWidget,
+    );
+    expect(work.workspaceOrderQuantities[product], 2);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderQuantities[product], 2);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final interruption in ['back', 'stock', 'new-sale']) {
     testWidgets('COUNTER1919 Product page interruption $interruption', (
@@ -8444,16 +9184,18 @@ void main() {
   }
 
   for (final fitment in [
-    (scale: 1.0, width: 412.0, longNames: false),
-    (scale: 2.0, width: 320.0, longNames: false),
-    (scale: 1.0, width: 412.0, longNames: true),
-    (scale: 1.0, width: 320.0, longNames: true),
-    (scale: 2.0, width: 320.0, longNames: true),
+    (scale: 1.0, width: 412.0, longNames: false, itemCount: 20),
+    (scale: 1.0, width: 412.0, longNames: false, itemCount: 30),
+    (scale: 1.0, width: 412.0, longNames: false, itemCount: 50),
+    (scale: 2.0, width: 320.0, longNames: false, itemCount: 50),
+    (scale: 1.0, width: 412.0, longNames: true, itemCount: 50),
+    (scale: 1.0, width: 320.0, longNames: true, itemCount: 50),
+    (scale: 2.0, width: 320.0, longNames: true, itemCount: 50),
   ]) {
     final scale = fitment.scale;
-    final caseId = fitment.longNames
-        ? 'long-${fitment.width}-$scale'
-        : '$scale';
+    final itemCount = fitment.itemCount;
+    final caseId =
+        '$itemCount-${fitment.longNames ? 'long-' : ''}${fitment.width}-$scale';
     testWidgets('COUNTER1919 compact fifty-line cart and empty entry $caseId', (
       tester,
     ) async {
@@ -8511,11 +9253,11 @@ void main() {
         'Peanuts',
         'Roasted Chana',
       ];
-      final products = List.generate(titles.length, (index) {
+      final products = List.generate(itemCount, (index) {
         final base = workspaceMasterCatalogue.first;
         final title = fitment.longNames && index == 0
             ? 'Premium Traditional Whole Grain Basmati Rice Naturally Aged Extra Long Grain Family Value Pack'
-            : fitment.longNames && index == 49
+            : fitment.longNames && index == itemCount - 1
             ? 'RoastedChanaWithNaturalSpicesFamilyValuePackExtraCrunchyNoAddedPreservativesReadyToServe'
             : titles[index];
         return WorkspaceCatalogueItem(
@@ -8538,7 +9280,11 @@ void main() {
           visualKind: base.visualKind,
         );
       });
-      expect(products, hasLength(50));
+      expect(products, hasLength(itemCount));
+      final expectedTotal = products.fold<int>(
+        0,
+        (sum, product) => sum + product.sellingPrice,
+      );
       work.workspaceCatalogueItems
         ..clear()
         ..addAll(products);
@@ -8622,9 +9368,9 @@ void main() {
       }
       expect(
         work.workspaceOrderQuantities.values.where((q) => q > 0),
-        hasLength(50),
+        hasLength(itemCount),
       );
-      expect(work.workspaceOrderTotal, 2225);
+      expect(work.workspaceOrderTotal, expectedTotal);
       expect(tester.widget<FilledButton>(review).onPressed, isNotNull);
       expect(tester.getRect(totalBar), totalBounds);
       expectFullTitleFits(firstProduct, products.first.title);
@@ -8638,7 +9384,9 @@ void main() {
         ),
       );
       expect(scroll, findsOneWidget);
-      final last = find.byKey(const Key('work-sale-product-counter-load-49'));
+      final last = find.byKey(
+        Key('work-sale-product-counter-load-${itemCount - 1}'),
+      );
       await tester.scrollUntilVisible(
         last,
         300,
@@ -8650,7 +9398,9 @@ void main() {
       expectFullTitleFits(last, products.last.title);
       expect(tester.getRect(totalBar), totalBounds);
       expect(review.hitTestable(), findsOneWidget);
-      final reduce = find.byKey(const Key('work-order-reduce-counter-load-49'));
+      final reduce = find.byKey(
+        Key('work-order-reduce-counter-load-${itemCount - 1}'),
+      );
       await tester.ensureVisible(reduce);
       await tester.pumpAndSettle();
       expect(tester.getSize(reduce).height, greaterThanOrEqualTo(44));
@@ -8663,9 +9413,18 @@ void main() {
       await tester.tap(reduce);
       await tester.pumpAndSettle();
       expect(work.workspaceOrderQuantities[products.last.id] ?? 0, 0);
-      expect(work.workspaceOrderTotal, 2156);
+      expect(
+        work.workspaceOrderTotal,
+        expectedTotal - products.last.sellingPrice,
+      );
       // Explicit product taps keep the full product-page route.
-      await tester.tap(find.byKey(const Key('work-order-add-counter-load-49')));
+      final productTitle = find.byKey(
+        Key('work-sale-product-open-counter-load-${itemCount - 1}'),
+      );
+      await tester.ensureVisible(productTitle);
+      await tester.pumpAndSettle();
+      expect(productTitle.hitTestable(), findsOneWidget);
+      await tester.tap(productTitle);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-counter-store-product-page')),
@@ -8675,30 +9434,123 @@ void main() {
         find.byKey(const Key('work-counter-store-product-page')),
         products.last.title,
       );
+      await captureStoreView(tester, 'counter-full-product-page-$caseId');
       await tester.tap(
         find.byKey(const Key('work-counter-product-add-confirm')),
       );
       await tester.pumpAndSettle();
-      expect(work.workspaceOrderTotal, 2225);
+      expect(work.workspaceOrderTotal, expectedTotal);
       expect(work.workspaceOrderQuantities[products.last.id], 1);
       await tester.tap(review);
       await tester.pumpAndSettle();
       final reviewSummary = find.byKey(const Key('work-order-review-summary'));
+      final save = find.byKey(const Key('work-order-save'));
+      final reviewTotal = find.byKey(const Key('work-counter-review-total'));
+      expect(find.text('$itemCount items'), findsOneWidget);
+      expect(find.byKey(const Key('work-review-items-toggle')), findsNothing);
+      expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
+      await captureStoreView(tester, 'counter-cart-review-initial-$caseId');
       expectFullTitleFits(reviewSummary, products.first.title);
-      expectFullTitleFits(reviewSummary, products.last.title);
+      expect(save.hitTestable(), findsOneWidget);
+      final saveBounds = tester.getRect(save);
+      if (fitment.width == 412 && scale == 1) {
+        expect(tester.getSize(reviewSummary).height, greaterThan(450));
+        expect(find.text(products[5].title).hitTestable(), findsOneWidget);
+        // Non-interactive money rows can have an unpainted centre.
+        final totalRect = tester.getRect(reviewTotal);
+        expect(totalRect.top, greaterThanOrEqualTo(0));
+        expect(totalRect.bottom, lessThanOrEqualTo(saveBounds.top));
+        expect(
+          find.byKey(const Key('work-sale-payment-cash')).hitTestable(),
+          findsOneWidget,
+        );
+      }
       await captureStoreView(
         tester,
         'counter-compact-fifty-review-top-$caseId',
       );
-      await tester.ensureVisible(
-        find.byKey(const Key('work-counter-review-total')),
+      final itemScroll = find.descendant(
+        of: find.byKey(const Key('work-review-items-list')),
+        matching: find.byType(Scrollable),
       );
+      final lastReviewItem = find.byKey(
+        ValueKey('work-review-item-${products.last.id}'),
+      );
+      await tester.scrollUntilVisible(
+        lastReviewItem,
+        140,
+        scrollable: itemScroll,
+        maxScrolls: 100,
+      );
+      await tester.pumpAndSettle();
+      expectFullTitleFits(reviewSummary, products.last.title);
+      expect(tester.getRect(save), saveBounds);
+      expect(save.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'counter-expanded-review-$caseId');
+      final editItems = find.byKey(const Key('work-review-edit-items'));
+      await tester.scrollUntilVisible(
+        editItems,
+        -300,
+        scrollable: itemScroll,
+        maxScrolls: 100,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(editItems);
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderTotal, expectedTotal);
+      await reveal(tester, review);
+      await tester.tap(review);
+      await tester.pumpAndSettle();
+      expect(find.text('$itemCount items'), findsOneWidget);
+      expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
+      expectFullTitleFits(reviewSummary, products.first.title);
+      expect(work.workspaceOrderTotal, expectedTotal);
+      await tester.ensureVisible(reviewTotal);
       await tester.pumpAndSettle();
       await captureStoreView(
         tester,
         'counter-compact-fifty-review-total-$caseId',
       );
-      expect(find.text('Total · 50 units'), findsOneWidget);
+      expect(find.text('Total · $itemCount units'), findsOneWidget);
+      final bankLabel = find.descendant(
+        of: find.byKey(const Key('work-sale-payment-bank transfer')),
+        matching: find.text('Bank Transfer'),
+      );
+      final bankParagraph = tester.renderObject<RenderParagraph>(bankLabel);
+      for (final word in [
+        const TextSelection(baseOffset: 0, extentOffset: 4),
+        const TextSelection(baseOffset: 5, extentOffset: 13),
+      ]) {
+        expect(
+          bankParagraph.getBoxesForSelection(word),
+          hasLength(1),
+          reason:
+              'A payment-method word must not break inside the word at enlarged text.',
+        );
+      }
+      final discount = find.byKey(const Key('work-counter-discount-value'));
+      await reveal(tester, discount);
+      await tester.enterText(discount, '10');
+      final editable = find.descendant(
+        of: discount,
+        matching: find.byType(EditableText),
+      );
+      final inputState = tester.state<EditableTextState>(editable);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      await tester.pumpAndSettle();
+      expect(tester.state<EditableTextState>(editable), same(inputState));
+      expect(tester.widget<TextField>(discount).controller!.text, '10');
+      expect(work.workspaceCounterPayableMinor, expectedTotal * 90);
+      await tester.enterText(discount, '100');
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+      await tester.enterText(discount, '10');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      expect(tester.state<EditableTextState>(editable), same(inputState));
+      expect(work.workspaceCounterPayableMinor, expectedTotal * 90);
+      await captureStoreView(tester, 'counter-large-cart-discount-$caseId');
       expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
     });
@@ -8792,7 +9644,7 @@ void main() {
           find.byKey(Key('work-order-add-${privateProduct.id}')),
         );
         await tester.tap(
-          find.byKey(Key('work-order-add-${privateProduct.id}')),
+          find.byKey(Key('work-sale-product-open-${privateProduct.id}')),
         );
         await tester.pumpAndSettle();
         expect(
@@ -9415,9 +10267,12 @@ void main() {
         );
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
-        await reveal(tester, find.text('Confirm collection'));
-        expect(find.text('Confirm collection').hitTestable(), findsOneWidget);
-        await tester.tap(find.text('Confirm collection'));
+        await reveal(tester, find.byKey(const Key('collection-confirm')));
+        expect(
+          find.byKey(const Key('collection-confirm')).hitTestable(),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('collection-confirm')));
         await tester.pumpAndSettle();
         final paid = work.workspaceFinance!.payments
             .where((p) => p.invoiceId == invoice.id)
@@ -21686,13 +22541,18 @@ void main() {
               .liveRegion,
           isTrue,
         );
-        expect(find.text('Payment method'), findsOneWidget);
+        // Compact checkout keeps the choices, not the redundant heading.
+        expect(find.text('Payment method'), findsNothing);
         expect(
           find.byKey(const ValueKey('work-sale-payment-cash')),
           findsOneWidget,
         );
         expect(
           find.byKey(const ValueKey('work-sale-payment-upi')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('work-sale-payment-bank transfer')),
           findsOneWidget,
         );
         await reveal(tester, update);
@@ -21754,7 +22614,8 @@ void main() {
             .stock,
         stockBefore - 1,
       );
-      await tester.tap(find.byTooltip('Close invoice'));
+      expect(find.byTooltip('Close invoice'), findsNothing);
+      await tester.tap(find.byKey(const Key('work-sale-next')));
       await tester.pumpAndSettle();
       expect(work.workspaceOrderCustomer, isEmpty);
       expect(work.workspaceOrderQuantities, isEmpty);
@@ -26838,8 +27699,8 @@ void main() {
       await tester.pumpAndSettle();
       var invoice = work.latestWorkspaceInvoice!;
       if (outcome == 'invalid-number') {
-        await reveal(tester, find.byTooltip('Close invoice'));
-        await tester.tap(find.byTooltip('Close invoice'));
+        await reveal(tester, find.byKey(const Key('work-sale-next')));
+        await tester.tap(find.byKey(const Key('work-sale-next')));
         await tester.pumpAndSettle();
         invoice = WorkspaceCustomerInvoice(
           id: invoice.id,
@@ -26905,8 +27766,11 @@ void main() {
           findsOneWidget,
         );
         await captureStoreView(tester, '38-invoice-$outcome-320');
-        await reveal(tester, find.byTooltip('Close invoice'));
-        await tester.tap(find.byTooltip('Close invoice'));
+        final close = outcome == 'invalid-number'
+            ? find.byTooltip('Close invoice')
+            : find.byKey(const Key('work-sale-next'));
+        await reveal(tester, close);
+        await tester.tap(close);
         await tester.pumpAndSettle();
         expect(find.byTooltip('Close invoice'), findsNothing);
       }

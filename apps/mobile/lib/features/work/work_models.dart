@@ -536,6 +536,7 @@ class WorkspaceCustomerReturn {
     if (!valid ||
         order.id != orderId ||
         !order.isCompleted ||
+        !order.validBillAmounts ||
         !order.hasCompleteItemSnapshot ||
         order.itemSnapshots.any(
           (line) =>
@@ -546,7 +547,7 @@ class WorkspaceCustomerReturn {
               0,
               (sum, line) => sum + line.lineTotalPaise,
             ) !=
-            order.amount * 100) {
+            order.payableMinor) {
       return null;
     }
     final returned = <String, int>{};
@@ -1719,8 +1720,15 @@ class WorkspaceLedgerCheckpoint {
       billedInvoices.entries.every(
         (entry) =>
             entry.key == entry.value.id &&
+            entry.value.validBillAmounts &&
             billedOrders[entry.key]?.id == entry.value.orderId &&
-            billedOrders[entry.key]?.amount == entry.value.amount,
+            billedOrders[entry.key]?.payableMinor == entry.value.payableMinor &&
+            billedOrders[entry.key]?.discountMinor ==
+                entry.value.discountMinor &&
+            billedOrders[entry.key]?.discount.kind ==
+                entry.value.discount.kind &&
+            billedOrders[entry.key]?.discount.value ==
+                entry.value.discount.value,
       ) &&
       billedOrders.entries.every(
         (entry) =>
@@ -1731,7 +1739,7 @@ class WorkspaceLedgerCheckpoint {
               (payment) =>
                   payment.invoiceId == entry.key &&
                   payment.orderId == entry.value.id &&
-                  payment.amountMinor == entry.value.amount * 100,
+                  payment.amountMinor == entry.value.payableMinor,
             ) &&
             finance.customerLedgers.any(
               (ledger) => ledger.entries.any(
@@ -1740,7 +1748,7 @@ class WorkspaceLedgerCheckpoint {
                     line.orderId == entry.value.id &&
                     line.kind == WorkspaceLedgerEntryKind.invoice &&
                     line.state == WorkspaceLedgerPostingState.posted &&
-                    line.amountMinor == entry.value.amount * 100,
+                    line.amountMinor == entry.value.payableMinor,
               ),
             ),
       ) &&
@@ -3254,6 +3262,76 @@ class WorkspaceUpiDestination {
   }
 }
 
+/// Bill-level discount. Fixed values are paise; percentage values are basis
+/// points (100 = 1%). Money calculations never use floating point.
+class WorkspaceBillDiscount {
+  const WorkspaceBillDiscount.none() : kind = 'none', value = 0;
+  const WorkspaceBillDiscount.fixed(this.value) : kind = 'fixed';
+  const WorkspaceBillDiscount.percentage(this.value) : kind = 'percentage';
+
+  final String kind;
+  final int value;
+  bool get isEmpty => kind == 'none';
+  bool get valid => switch (kind) {
+    'none' => value == 0,
+    'fixed' => value > 0 && value <= 9007199254740991,
+    'percentage' => value > 0 && value <= 10000,
+    _ => false,
+  };
+
+  static WorkspaceBillDiscount parse(String kind, String input) {
+    if (!const {'fixed', 'percentage'}.contains(kind) ||
+        !RegExp(r'^\d{1,12}(?:\.\d{1,2})?$').hasMatch(input.trim())) {
+      throw const FormatException(
+        'Enter a positive value with up to 2 decimals.',
+      );
+    }
+    final parts = input.trim().split('.');
+    final value =
+        int.parse(parts[0]) * 100 +
+        (parts.length == 1 ? 0 : int.parse(parts[1].padRight(2, '0')));
+    final result = kind == 'fixed'
+        ? WorkspaceBillDiscount.fixed(value)
+        : WorkspaceBillDiscount.percentage(value);
+    if (!result.valid) throw const FormatException('Check the discount value.');
+    return result;
+  }
+
+  int amountFor(int subtotalMinor) {
+    if (!valid || subtotalMinor < 0) {
+      throw const FormatException('Invalid discount.');
+    }
+    if (isEmpty) return 0;
+    if (kind == 'fixed') return value;
+    // Round once, half-up, to the nearest paise.
+    return ((BigInt.from(subtotalMinor) * BigInt.from(value) +
+                BigInt.from(5000)) ~/
+            BigInt.from(10000))
+        .toInt();
+  }
+
+  bool validFor(int subtotalMinor) =>
+      valid &&
+      subtotalMinor >= 0 &&
+      (isEmpty || amountFor(subtotalMinor) < subtotalMinor);
+
+  Map<String, Object?> toJson() => {'kind': kind, 'value': value};
+  static WorkspaceBillDiscount fromJson(Object? raw) {
+    if (raw == null) return const WorkspaceBillDiscount.none();
+    if (raw is! Map || raw['value'] is! int) {
+      throw const FormatException('Invalid discount.');
+    }
+    final result = switch (raw['kind']) {
+      'none' when raw['value'] == 0 => const WorkspaceBillDiscount.none(),
+      'fixed' => WorkspaceBillDiscount.fixed(raw['value'] as int),
+      'percentage' => WorkspaceBillDiscount.percentage(raw['value'] as int),
+      _ => throw const FormatException('Invalid discount.'),
+    };
+    if (!result.valid) throw const FormatException('Invalid discount.');
+    return result;
+  }
+}
+
 class WorkspaceCounterDraft {
   WorkspaceCounterDraft({
     required this.account,
@@ -3269,9 +3347,11 @@ class WorkspaceCounterDraft {
     required this.address,
     required List<WorkspaceOrderItemSnapshot> lines,
     this.submissionOrderId,
+    this.discount = const WorkspaceBillDiscount.none(),
   }) : lines = List.unmodifiable(lines);
 
   final WorkspaceBillingDetails billingDetails;
+  final WorkspaceBillDiscount discount;
   final String account,
       store,
       id,
@@ -3290,6 +3370,7 @@ class WorkspaceCounterDraft {
       store.trim().isNotEmpty &&
       id.trim().isNotEmpty &&
       revision > 0 &&
+      discount.valid &&
       const {'Counter', 'Phone', 'Chat'}.contains(source) &&
       const {
         'At the shop',
@@ -3334,6 +3415,7 @@ class WorkspaceCounterDraft {
     'stage': stage.name,
     'customer': customer,
     'billingDetails': billingDetails.toJson(),
+    'discount': discount.toJson(),
     'source': source,
     'fulfilment': fulfilment,
     'payment': payment,
@@ -3403,8 +3485,10 @@ class WorkspaceCounterDraft {
       );
     }
     WorkspaceBillingDetails billing;
+    WorkspaceBillDiscount discount;
     try {
       billing = WorkspaceBillingDetails.fromJson(value['billingDetails']);
+      discount = WorkspaceBillDiscount.fromJson(value['discount']);
     } on FormatException {
       return null;
     }
@@ -3416,6 +3500,7 @@ class WorkspaceCounterDraft {
       stage: stage,
       customer: value['customer'] as String,
       billingDetails: billing,
+      discount: discount,
       source: value['source'] as String,
       fulfilment: value['fulfilment'] as String,
       payment: value['payment'] as String,
@@ -3435,6 +3520,9 @@ class WorkspaceOrderRecord {
     required this.items,
     required this.quantities,
     required this.amount,
+    this.remainderPaise = 0,
+    this.discount = const WorkspaceBillDiscount.none(),
+    this.discountMinor = 0,
     required this.source,
     required this.fulfilment,
     required this.payment,
@@ -3457,6 +3545,18 @@ class WorkspaceOrderRecord {
   final String items;
   final Map<String, int> quantities;
   final int amount;
+  final int remainderPaise, discountMinor;
+  final WorkspaceBillDiscount discount;
+  int get payableMinor => amount * 100 + remainderPaise;
+  int get subtotalMinor => payableMinor + discountMinor;
+  bool get validBillAmounts =>
+      amount >= 0 &&
+      remainderPaise >= 0 &&
+      remainderPaise < 100 &&
+      discountMinor >= 0 &&
+      discount.valid &&
+      discount.validFor(subtotalMinor) &&
+      discount.amountFor(subtotalMinor) == discountMinor;
   final String source;
   final String fulfilment;
   final String payment;
@@ -3483,6 +3583,9 @@ class WorkspaceOrderRecord {
     'items': items,
     'quantities': quantities,
     'amount': amount,
+    'remainderPaise': remainderPaise,
+    'discount': discount.toJson(),
+    'discountMinor': discountMinor,
     'source': source,
     'fulfilment': fulfilment,
     'payment': payment,
@@ -3523,6 +3626,9 @@ class WorkspaceOrderRecord {
           (map['quantities'] as Map).cast<String, int>(),
         ),
         amount: map['amount'] as int,
+        remainderPaise: map['remainderPaise'] as int? ?? 0,
+        discount: WorkspaceBillDiscount.fromJson(map['discount']),
+        discountMinor: map['discountMinor'] as int? ?? 0,
         source: map['source'] as String,
         fulfilment: map['fulfilment'] as String,
         payment: map['payment'] as String,
@@ -3554,12 +3660,18 @@ class WorkspaceOrderRecord {
           !order.hasCompleteItemSnapshot ||
           order.id.trim().isEmpty ||
           order.customer.trim().isEmpty ||
-          order.amount < 0 ||
+          !order.validBillAmounts ||
           order.itemSnapshots.fold<int>(
                 0,
                 (sum, item) => sum + item.lineTotalPaise,
               ) !=
-              order.amount * 100) {
+              order.payableMinor ||
+          (!order.discount.isEmpty &&
+              order.itemSnapshots.fold<int>(
+                    0,
+                    (sum, item) => sum + item.unitPricePaise * item.quantity,
+                  ) !=
+                  order.subtotalMinor)) {
         return null;
       }
       return order;
@@ -3629,6 +3741,9 @@ class WorkspaceOrderRecord {
     items: items ?? this.items,
     quantities: Map<String, int>.unmodifiable(quantities ?? this.quantities),
     amount: amount ?? this.amount,
+    remainderPaise: amount == null ? remainderPaise : 0,
+    discount: amount == null ? discount : const WorkspaceBillDiscount.none(),
+    discountMinor: amount == null ? discountMinor : 0,
     source: source ?? this.source,
     fulfilment: fulfilment ?? this.fulfilment,
     payment: payment ?? this.payment,
@@ -3658,6 +3773,8 @@ class WorkspaceCustomerRecord {
     required this.orders,
     required this.totalSpend,
     required this.amountDue,
+    this.totalSpendRemainderPaise = 0,
+    this.amountDueRemainderPaise = 0,
     required this.lastPurchaseAt,
     required this.followingStore,
     required this.messagesAllowed,
@@ -3672,9 +3789,12 @@ class WorkspaceCustomerRecord {
   final List<WorkspaceOrderRecord> orders;
   final int totalSpend;
   final int amountDue;
+  final int totalSpendRemainderPaise, amountDueRemainderPaise;
+  int get totalSpendMinor => totalSpend * 100 + totalSpendRemainderPaise;
   final int? confirmedBalanceMinor;
   final bool balanceAvailable;
-  int get amountDueMinor => confirmedBalanceMinor ?? amountDue * 100;
+  int get amountDueMinor =>
+      confirmedBalanceMinor ?? amountDue * 100 + amountDueRemainderPaise;
   bool get hasDues => balanceAvailable && amountDueMinor > 0;
   final DateTime lastPurchaseAt;
   final bool followingStore;
@@ -3774,6 +3894,9 @@ class WorkspaceCustomerInvoice {
     this.billingDetails = const WorkspaceBillingDetails(),
     required this.items,
     required this.amount,
+    this.remainderPaise = 0,
+    this.discount = const WorkspaceBillDiscount.none(),
+    this.discountMinor = 0,
     required this.payment,
     required this.issuedAt,
     this.sharedChannels = const <String>{},
@@ -3788,6 +3911,18 @@ class WorkspaceCustomerInvoice {
   final String sellerName;
   final String items;
   final int amount;
+  final int remainderPaise, discountMinor;
+  final WorkspaceBillDiscount discount;
+  int get payableMinor => amount * 100 + remainderPaise;
+  int get subtotalMinor => payableMinor + discountMinor;
+  bool get validBillAmounts =>
+      amount >= 0 &&
+      remainderPaise >= 0 &&
+      remainderPaise < 100 &&
+      discountMinor >= 0 &&
+      discount.valid &&
+      discount.validFor(subtotalMinor) &&
+      discount.amountFor(subtotalMinor) == discountMinor;
   final String payment;
   final DateTime issuedAt;
   final Set<String> sharedChannels;
@@ -3830,13 +3965,16 @@ class WorkspaceCustomerInvoice {
     'billingDetails': billingDetails.toJson(),
     'items': items,
     'amount': amount,
+    'remainderPaise': remainderPaise,
+    'discount': discount.toJson(),
+    'discountMinor': discountMinor,
     'payment': payment,
     'issuedAt': issuedAt.toUtc().toIso8601String(),
     'sharedChannels': sharedChannels.toList()..sort(),
   };
   factory WorkspaceCustomerInvoice.fromLedgerJson(Object? value) {
     final map = value as Map;
-    return WorkspaceCustomerInvoice(
+    final invoice = WorkspaceCustomerInvoice(
       id: map['id'] as String,
       orderId: map['orderId'] as String,
       customer: map['customer'] as String,
@@ -3844,12 +3982,19 @@ class WorkspaceCustomerInvoice {
       billingDetails: WorkspaceBillingDetails.fromJson(map['billingDetails']),
       items: map['items'] as String,
       amount: map['amount'] as int,
+      remainderPaise: map['remainderPaise'] as int? ?? 0,
+      discount: WorkspaceBillDiscount.fromJson(map['discount']),
+      discountMinor: map['discountMinor'] as int? ?? 0,
       payment: map['payment'] as String,
       issuedAt: DateTime.parse(map['issuedAt'] as String).toUtc(),
       sharedChannels: Set.unmodifiable(
         (map['sharedChannels'] as List).cast<String>(),
       ),
     );
+    if (!invoice.validBillAmounts) {
+      throw const FormatException('Invalid invoice amounts.');
+    }
+    return invoice;
   }
 
   bool get needsCustomerHandoff => sharedChannels.isEmpty;
@@ -3863,6 +4008,9 @@ class WorkspaceCustomerInvoice {
         billingDetails: billingDetails,
         items: items,
         amount: amount,
+        remainderPaise: remainderPaise,
+        discount: discount,
+        discountMinor: discountMinor,
         payment: payment,
         issuedAt: issuedAt,
         sharedChannels: Set<String>.unmodifiable(

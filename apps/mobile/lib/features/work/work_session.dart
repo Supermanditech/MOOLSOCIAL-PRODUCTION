@@ -387,6 +387,7 @@ class _StoreOperationalData {
   String workspaceOrderAddress = '';
   WorkspaceBillingDetails workspaceOrderBillingDetails =
       const WorkspaceBillingDetails();
+  WorkspaceBillDiscount counterDiscount = const WorkspaceBillDiscount.none();
   String workspaceOrderStage = 'No order';
   int workspaceOrderExtraMinutes = 0;
   DateTime? workspaceOrderActionDeadline;
@@ -398,6 +399,7 @@ class _StoreOperationalData {
   DateTime? workspaceCustomerCustomStart;
   DateTime? workspaceCustomerCustomEnd;
   int workspaceSalesToday = 0;
+  int salesTodayRemainderPaise = 0;
   int workspaceCompletedSalesCount = 0;
   int workspacePlatformAdjustments = 0;
   int workspaceDeliveryAdjustments = 0;
@@ -522,7 +524,9 @@ class WorkSession extends ChangeNotifier {
     this.counterDraftStore,
     this.ledgerFormDraftStore,
     this.upiDestinationStore,
-  }) : gateway = gateway ?? ReviewWorkGateway(),
+    this.reviewStoreSelectionStore,
+  }) : _productionSession = false,
+       gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
            (kDebugMode &&
@@ -558,7 +562,9 @@ class WorkSession extends ChangeNotifier {
     this.counterDraftStore,
     this.ledgerFormDraftStore,
     this.upiDestinationStore,
-  }) : gateway = gateway ?? buildWorkGateway(),
+    this.reviewStoreSelectionStore,
+  }) : _productionSession = true,
+       gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
            (proofPicker == null || proofPicker is NativeWorkProofPicker
@@ -583,6 +589,15 @@ class WorkSession extends ChangeNotifier {
   final WorkCounterDraftStore? counterDraftStore;
   final WorkLedgerFormDraftStore? ledgerFormDraftStore;
   final WorkUpiDestinationStore? upiDestinationStore;
+  final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
+  final bool _productionSession;
+  StoreReviewSeed? _selectedReviewSeed;
+  Future<bool>? _reviewSelectionSave;
+  late final WorkReviewStoreSelectionStore _reviewSelectionStorage =
+      reviewStoreSelectionStore ??
+      SecureWorkReviewStoreSelectionStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+      );
   late final WorkUpiDestinationStore _upiDestinationStorage =
       upiDestinationStore ??
       SecureWorkUpiDestinationStore(
@@ -797,6 +812,7 @@ class WorkSession extends ChangeNotifier {
       currentWorkspaceOrderId,
       workspaceOrderCustomer,
       workspaceOrderBillingDetails.toJson(),
+      workspaceCounterDiscount.toJson(),
       for (final id in ids)
         [
           id,
@@ -922,6 +938,7 @@ class WorkSession extends ChangeNotifier {
           workspaceOrderPayment = record.payment;
           workspaceOrderAddress = record.address;
           workspaceOrderBillingDetails = record.billingDetails;
+          _storeData.counterDiscount = record.discount;
           workspaceOrderNeedsDelivery = record.fulfilment != 'At the shop';
           workspaceOrderQuantities
             ..clear()
@@ -989,6 +1006,7 @@ class WorkSession extends ChangeNotifier {
       stage: stage,
       customer: counterCustomerInput ?? workspaceOrderCustomer,
       billingDetails: workspaceOrderBillingDetails,
+      discount: workspaceCounterDiscount,
       source: workspaceOrderSource,
       fulfilment: workspaceOrderFulfilment,
       payment: workspaceOrderPayment,
@@ -1011,6 +1029,7 @@ class WorkSession extends ChangeNotifier {
     stage: stage ?? draft.stage,
     customer: draft.customer,
     billingDetails: draft.billingDetails,
+    discount: draft.discount,
     source: draft.source,
     fulfilment: draft.fulfilment,
     payment: draft.payment,
@@ -1099,6 +1118,33 @@ class WorkSession extends ChangeNotifier {
     unawaited(saveWorkspaceCounterDraft());
   }
 
+  WorkspaceBillDiscount get workspaceCounterDiscount =>
+      _storeData.counterDiscount;
+  int get workspaceCounterSubtotalMinor => workspaceOrderTotal * 100;
+  int get workspaceCounterDiscountMinor =>
+      workspaceCounterDiscount.amountFor(workspaceCounterSubtotalMinor);
+  int get workspaceCounterPayableMinor =>
+      workspaceCounterSubtotalMinor - workspaceCounterDiscountMinor;
+  String? get workspaceCounterDiscountError =>
+      workspaceCounterDiscount.validFor(workspaceCounterSubtotalMinor)
+      ? null
+      : 'Reduce or remove the discount. The bill must have an amount to pay.';
+
+  bool updateWorkspaceCounterDiscount(WorkspaceBillDiscount discount) {
+    if (counterDraftEditingBlocked ||
+        !_canEditCounterOrder(allowCompletedInvoice: false)) {
+      return false;
+    }
+    if (!discount.validFor(workspaceCounterSubtotalMinor)) {
+      showError('Discount must be less than the bill subtotal.');
+      return false;
+    }
+    _storeData.counterDiscount = discount;
+    unawaited(saveWorkspaceCounterDraft());
+    notifyListeners();
+    return true;
+  }
+
   Future<bool> discardWorkspaceCounterDraft() async {
     final scope = _counterDraftScope;
     if (scope == null) return true;
@@ -1169,7 +1215,8 @@ class WorkSession extends ChangeNotifier {
             counterCustomerInput != workspaceOrderCustomer) ||
         workspaceCustomerMobile(workspaceOrderCustomer) == null ||
         workspaceOrderQuantities.isEmpty ||
-        workspaceOrderTotal <= 0 ||
+        workspaceCounterPayableMinor <= 0 ||
+        workspaceCounterDiscountError != null ||
         (workspaceOrderFulfilment != 'At the shop' &&
             workspaceOrderAddress.trim().isEmpty)) {
       showError('Check the customer, products and delivery details.');
@@ -1674,6 +1721,8 @@ class WorkSession extends ChangeNotifier {
   final List<WorkWorkspace> otherWorkspaces = <WorkWorkspace>[];
 
   bool initialWorkspaceStateLoaded = false;
+  bool _loadingWorkspaceEntry = false;
+  bool _lastWorkspaceFeedEmpty = false;
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
 
@@ -2437,7 +2486,7 @@ class WorkSession extends ChangeNotifier {
           reply.accountScope != finance.accountScope ||
           reply.workspaceId != finance.workspaceId ||
           payment == null ||
-          payment.amountMinor != invoice.amount * 100 ||
+          payment.amountMinor != invoice.payableMinor ||
           !reply.customerLedgers.any(
             (l) =>
                 l.customerId == payment.customerId &&
@@ -2447,7 +2496,7 @@ class WorkSession extends ChangeNotifier {
                       e.orderId == invoice.orderId &&
                       e.kind == WorkspaceLedgerEntryKind.invoice &&
                       e.state == WorkspaceLedgerPostingState.posted &&
-                      e.amountMinor == invoice.amount * 100,
+                      e.amountMinor == invoice.payableMinor,
                 ),
           )) {
         throw StateError('Invoice reply could not be verified.');
@@ -4808,12 +4857,15 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderQuantities
       ..clear()
       ..addAll(order.quantities);
-    workspaceOrderAmount = order.amount.toString();
+    workspaceOrderAmount = order.remainderPaise == 0
+        ? order.amount.toString()
+        : '${order.amount}.${order.remainderPaise.toString().padLeft(2, '0')}';
     workspaceOrderSource = order.source;
     workspaceOrderFulfilment = order.fulfilment;
     workspaceOrderPayment = order.payment;
     workspaceOrderAddress = order.address;
     workspaceOrderBillingDetails = order.billingDetails;
+    _storeData.counterDiscount = order.discount;
     workspaceOrderStage = order.stage;
     workspaceOrderNeedsDelivery = order.needsDelivery;
     workspaceOrderActionDeadline = order.actionDeadline;
@@ -5240,7 +5292,19 @@ class WorkSession extends ChangeNotifier {
   set workspaceCustomerCustomEnd(DateTime? value) =>
       _storeData.workspaceCustomerCustomEnd = value;
   int get workspaceSalesToday => _storeData.workspaceSalesToday;
-  set workspaceSalesToday(int value) => _storeData.workspaceSalesToday = value;
+  set workspaceSalesToday(int value) {
+    _storeData.workspaceSalesToday = value;
+    _storeData.salesTodayRemainderPaise = 0;
+  }
+
+  int get workspaceSalesTodayMinor =>
+      workspaceSalesToday * 100 + _storeData.salesTodayRemainderPaise;
+  void _addCompletedSaleMinor(int amountMinor) {
+    final total = workspaceSalesTodayMinor + amountMinor;
+    _storeData.workspaceSalesToday = total ~/ 100;
+    _storeData.salesTodayRemainderPaise = total % 100;
+  }
+
   int get workspaceCompletedSalesCount =>
       _storeData.workspaceCompletedSalesCount;
   set workspaceCompletedSalesCount(int value) =>
@@ -5819,12 +5883,15 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderQuantities
       ..clear()
       ..addAll(order.quantities);
-    workspaceOrderAmount = order.amount.toString();
+    workspaceOrderAmount = order.remainderPaise == 0
+        ? order.amount.toString()
+        : '${order.amount}.${order.remainderPaise.toString().padLeft(2, '0')}';
     workspaceOrderSource = order.source;
     workspaceOrderFulfilment = order.fulfilment;
     workspaceOrderPayment = order.payment;
     workspaceOrderAddress = order.address;
     workspaceOrderBillingDetails = order.billingDetails;
+    _storeData.counterDiscount = order.discount;
     workspaceOrderStage = order.stage;
     workspaceOrderNeedsDelivery = order.needsDelivery;
     workspaceOrderExtraMinutes = order.extraMinutes;
@@ -5927,10 +5994,10 @@ class WorkSession extends ChangeNotifier {
           : firstPart;
       final totalSpend = orders
           .where((order) => order.stage == 'Completed')
-          .fold<int>(0, (total, order) => total + order.amount);
+          .fold<int>(0, (total, order) => total + order.payableMinor);
       final amountDue = orders
           .where((order) => order.payment.toLowerCase().contains('due'))
-          .fold<int>(0, (total, order) => total + order.amount);
+          .fold<int>(0, (total, order) => total + order.payableMinor);
       final finance = workspaceFinance;
       final ledger = finance?.customerLedgers
           .where((l) => l.customerId == entry.key)
@@ -5948,8 +6015,10 @@ class WorkSession extends ChangeNotifier {
           name: name,
           mobile: mobile,
           orders: List<WorkspaceOrderRecord>.unmodifiable(orders),
-          totalSpend: totalSpend,
-          amountDue: amountDue,
+          totalSpend: totalSpend ~/ 100,
+          totalSpendRemainderPaise: totalSpend % 100,
+          amountDue: amountDue ~/ 100,
+          amountDueRemainderPaise: amountDue % 100,
           confirmedBalanceMinor: confirmedBalance,
           balanceAvailable: finance == null || confirmedBalance != null,
           lastPurchaseAt: orders.first.createdAt,
@@ -6556,6 +6625,10 @@ class WorkSession extends ChangeNotifier {
                 },
             ],
           'amount': order.amount,
+          'remainderPaise': order.remainderPaise,
+          'discount': order.discount.toJson(),
+          'discountMinor': order.discountMinor,
+          'billingDetails': order.billingDetails.toJson(),
           'source': order.source,
           'fulfilment': order.fulfilment,
           'payment': order.payment,
@@ -6584,6 +6657,11 @@ class WorkSession extends ChangeNotifier {
           'customer': invoice.customer,
           'items': invoice.items,
           'amount': invoice.amount,
+          'remainderPaise': invoice.remainderPaise,
+          'discount': invoice.discount.toJson(),
+          'discountMinor': invoice.discountMinor,
+          'billingDetails': invoice.billingDetails.toJson(),
+          'sellerName': invoice.sellerName,
           'payment': invoice.payment,
           'issuedAt': invoice.issuedAt.toUtc().toIso8601String(),
           'sharedChannels': invoice.sharedChannels.toList(growable: false),
@@ -6599,6 +6677,7 @@ class WorkSession extends ChangeNotifier {
     'staffAccessEnabled': workspaceStaffAccessEnabled,
     'counterCount': workspaceCounterCount,
     'salesToday': workspaceSalesToday,
+    'salesTodayRemainderPaise': _storeData.salesTodayRemainderPaise,
     'completedSalesCount': workspaceCompletedSalesCount,
     'settlementBalance': workspaceSettlementBalance,
     'settlementRequested': workspaceSettlementRequested,
@@ -6818,6 +6897,9 @@ class WorkSession extends ChangeNotifier {
       billingDetails: order.billingDetails,
       items: order.items,
       amount: order.amount,
+      remainderPaise: order.remainderPaise,
+      discount: order.discount,
+      discountMinor: order.discountMinor,
       payment: order.payment,
       issuedAt: DateTime.now(),
     );
@@ -6838,7 +6920,8 @@ class WorkSession extends ChangeNotifier {
     if (completedInvoice != null) return completedInvoice;
     if (workspaceOrderQuantities.isEmpty ||
         workspaceOrderCustomer.trim().isEmpty ||
-        workspaceOrderTotal <= 0) {
+        workspaceCounterPayableMinor <= 0 ||
+        workspaceCounterDiscountError != null) {
       showError('Add a customer and products before creating the invoice.');
       return null;
     }
@@ -6852,7 +6935,7 @@ class WorkSession extends ChangeNotifier {
     final index = workspaceOrders.indexWhere((item) => item.id == order.id);
     final completed = order.copyWith(stage: 'Completed', stockReserved: true);
     if (index >= 0) workspaceOrders[index] = completed;
-    workspaceSalesToday += order.amount;
+    _addCompletedSaleMinor(order.payableMinor);
     // A counter invoice records a sale, not money collected by MoolSocial.
     // Settlement remains the authoritative balance supplied for the Store.
     workspaceCompletedSalesCount++;
@@ -6916,22 +6999,48 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
-  List<WorkspaceOrderItemSnapshot> _counterPurchasedItems() =>
-      List.unmodifiable([
-        for (final product in workspaceCatalogueItems)
-          if ((workspaceOrderQuantities[product.id] ?? 0) > 0)
-            WorkspaceOrderItemSnapshot(
-              productId: product.id,
-              name: product.title,
-              pack: product.pack,
-              quantity: workspaceOrderQuantities[product.id]!,
-              unitPricePaise: product.sellingPrice * 100,
-              lineTotalPaise:
-                  product.sellingPrice *
-                  100 *
-                  workspaceOrderQuantities[product.id]!,
-            ),
-      ]);
+  List<WorkspaceOrderItemSnapshot> _counterPurchasedItems() {
+    final lines = <WorkspaceOrderItemSnapshot>[
+      for (final product in workspaceCatalogueItems)
+        if ((workspaceOrderQuantities[product.id] ?? 0) > 0)
+          WorkspaceOrderItemSnapshot(
+            productId: product.id,
+            name: product.title,
+            pack: product.pack,
+            quantity: workspaceOrderQuantities[product.id]!,
+            unitPricePaise: product.sellingPrice * 100,
+            lineTotalPaise:
+                product.sellingPrice *
+                100 *
+                workspaceOrderQuantities[product.id]!,
+          ),
+    ];
+    if (workspaceCounterDiscount.isEmpty ||
+        workspaceCounterDiscountError != null) {
+      return List.unmodifiable(lines);
+    }
+    final subtotal = BigInt.from(workspaceCounterSubtotalMinor);
+    final discount = BigInt.from(workspaceCounterDiscountMinor);
+    var cumulative = BigInt.zero;
+    var allocated = 0;
+    return List.unmodifiable([
+      for (final line in lines)
+        (() {
+          cumulative += BigInt.from(line.lineTotalPaise);
+          final next = (discount * cumulative ~/ subtotal).toInt();
+          final share = next - allocated;
+          allocated = next;
+          return WorkspaceOrderItemSnapshot(
+            productId: line.productId,
+            name: line.name,
+            pack: line.pack,
+            quantity: line.quantity,
+            unitPricePaise: line.unitPricePaise,
+            lineTotalPaise: line.lineTotalPaise - share,
+          );
+        })(),
+    ]);
+  }
 
   bool saveWorkspaceOrderDraft({
     required String customer,
@@ -6941,6 +7050,10 @@ class WorkSession extends ChangeNotifier {
     required String address,
   }) {
     if (!_canEditCounterOrder()) return false;
+    if (workspaceCounterDiscountError != null) {
+      showError(workspaceCounterDiscountError!);
+      return false;
+    }
     if (workspaceInvoices.any(
       (invoice) => invoice.orderId == currentWorkspaceOrderId,
     )) {
@@ -6963,7 +7076,9 @@ class WorkSession extends ChangeNotifier {
               '${product.title} × ${workspaceOrderQuantities[product.id]}',
         )
         .join(', ');
-    workspaceOrderAmount = '$workspaceOrderTotal';
+    workspaceOrderAmount = workspaceCounterPayableMinor % 100 == 0
+        ? '${workspaceCounterPayableMinor ~/ 100}'
+        : '${workspaceCounterPayableMinor ~/ 100}.${(workspaceCounterPayableMinor % 100).toString().padLeft(2, '0')}';
     workspaceOrderStage = 'Confirmed';
     workspaceOrderExtraMinutes = 0;
     workspacePackedProductIds.clear();
@@ -6981,7 +7096,10 @@ class WorkSession extends ChangeNotifier {
       items: workspaceOrderItems,
       quantities: Map<String, int>.from(workspaceOrderQuantities),
       itemSnapshots: _counterPurchasedItems(),
-      amount: workspaceOrderTotal,
+      amount: workspaceCounterPayableMinor ~/ 100,
+      remainderPaise: workspaceCounterPayableMinor % 100,
+      discount: workspaceCounterDiscount,
+      discountMinor: workspaceCounterDiscountMinor,
       source: workspaceOrderSource,
       fulfilment: workspaceOrderFulfilment,
       payment: workspaceOrderPayment,
@@ -7000,7 +7118,7 @@ class WorkSession extends ChangeNotifier {
       workspaceOrders[existingIndex] = record;
     }
     _recordWorkspaceActivity(
-      '$source order saved · $workspaceOrderItemCount products · ₹$workspaceOrderTotal.',
+      '$source order saved · $workspaceOrderItemCount products · ₹$workspaceOrderAmount.',
     );
     showNotice(
       workspaceOrderNeedsDelivery
@@ -7065,7 +7183,14 @@ class WorkSession extends ChangeNotifier {
       items: workspaceOrderItems,
       quantities: Map<String, int>.from(workspaceOrderQuantities),
       itemSnapshots: _counterPurchasedItems(),
-      amount: int.tryParse(workspaceOrderAmount) ?? 0,
+      amount: workspaceCounterDiscount.isEmpty
+          ? int.tryParse(workspaceOrderAmount) ?? 0
+          : workspaceCounterPayableMinor ~/ 100,
+      remainderPaise: workspaceCounterDiscount.isEmpty
+          ? 0
+          : workspaceCounterPayableMinor % 100,
+      discount: workspaceCounterDiscount,
+      discountMinor: workspaceCounterDiscountMinor,
       source: workspaceOrderSource,
       fulfilment: workspaceOrderFulfilment,
       payment: workspaceOrderPayment,
@@ -7266,7 +7391,7 @@ class WorkSession extends ChangeNotifier {
     final index = workspaceOrders.indexWhere((item) => item.id == order.id);
     final completed = order.copyWith(stage: 'Completed');
     if (index >= 0) workspaceOrders[index] = completed;
-    workspaceSalesToday += order.amount;
+    _addCompletedSaleMinor(order.payableMinor);
     // Fulfilment creates no platform funds. Settlement remains a separately
     // supplied balance, regardless of the order's payment label.
     workspaceCompletedSalesCount++;
@@ -7627,6 +7752,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderPayment = 'Cash';
     workspaceOrderAddress = '';
     workspaceOrderBillingDetails = const WorkspaceBillingDetails();
+    _storeData.counterDiscount = const WorkspaceBillDiscount.none();
     workspaceOrderStage = 'No order';
     workspaceOrderExtraMinutes = 0;
     workspaceOrderActionDeadline = null;
@@ -7890,6 +8016,7 @@ class WorkSession extends ChangeNotifier {
     try {
       final records = await gateway.loadFeed();
       if (!current()) return;
+      _lastWorkspaceFeedEmpty = records.isEmpty;
       _restoreWorkspaceState(records);
       initialWorkspaceStateLoaded = true;
       noticeMessage = 'Work opportunities refreshed.';
@@ -7902,11 +8029,32 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> loadInitialWorkspaceState() async {
-    if (initialWorkspaceStateLoaded || busy) return;
-    await refreshFeed();
-    if (noticeMessage == 'Work opportunities refreshed.') {
-      clearMessages();
-      notifyListeners();
+    if (initialWorkspaceStateLoaded || busy || _loadingWorkspaceEntry) return;
+    final account = _contactAccountScope;
+    _loadingWorkspaceEntry = true;
+    try {
+      await refreshFeed();
+      if (_disposed || account != _contactAccountScope) return;
+      if (initialWorkspaceStateLoaded &&
+          _lastWorkspaceFeedEmpty &&
+          activeWorkspace == null &&
+          _reviewStoreRecoveryEnabled) {
+        // The feed read is finished. Bind the saved review Store using the
+        // normal controller gates, without bypassing the busy-operation guard.
+        initialWorkspaceStateLoaded = false;
+        _lastWorkspaceFeedEmpty = false;
+        await _restoreSelectedReviewStore();
+        if (_disposed || account != _contactAccountScope) return;
+        initialWorkspaceStateLoaded = true;
+      }
+      if (noticeMessage == 'Work opportunities refreshed.') clearMessages();
+    } on WorkGatewayException catch (error) {
+      if (!_disposed && account == _contactAccountScope) {
+        errorMessage = error.message;
+      }
+    } finally {
+      _loadingWorkspaceEntry = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -8530,6 +8678,8 @@ class WorkSession extends ChangeNotifier {
         activeWorkspace = null;
         _storeDataById.clear();
         _storeData = _StoreOperationalData();
+        _selectedReviewSeed = null;
+        _reviewSelectionSave = null;
         _busyStoreOperation = null;
         busy = false;
         otherWorkspaces.clear();
@@ -10079,9 +10229,70 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
+  bool get _reviewStoreRecoveryEnabled =>
+      !_productionSession &&
+      SecureWorkReviewStoreSelectionStore.enabled &&
+      gateway is ReviewWorkGateway &&
+      _contactAccountScope?.trim().isNotEmpty == true;
+
+  /// Awaitable save result for the explicit review-Store selection.
+  Future<bool> get storeReviewSelectionSaved =>
+      _reviewSelectionSave ?? Future<bool>.value(false);
+
+  Future<bool> _saveSelectedReviewStore(StoreReviewSeed seed) async {
+    bool current() =>
+        !_disposed &&
+        _reviewStoreRecoveryEnabled &&
+        _contactAccountScope == seed.accountScope &&
+        activeWorkspace?.id == seed.storeId;
+    if (!current()) return false;
+    try {
+      await _reviewSelectionStorage.save(seed);
+      return current();
+    } on Object {
+      if (current()) {
+        showError(
+          'The test Store selection was not saved. Keep this session open; its bills have not been removed.',
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _restoreSelectedReviewStore() async {
+    if (!_reviewStoreRecoveryEnabled || activeWorkspace != null) return;
+    final account = _contactAccountScope!;
+    StoreReviewSeed? seed;
+    try {
+      seed = await _reviewSelectionStorage.read(account);
+    } on Object {
+      if (_disposed || account != _contactAccountScope) return;
+      throw const WorkGatewayException(
+        'The saved test Store could not be reopened. Retry without clearing its saved bills.',
+      );
+    }
+    if (_disposed ||
+        !_reviewStoreRecoveryEnabled ||
+        account != _contactAccountScope ||
+        activeWorkspace != null ||
+        seed == null) {
+      return;
+    }
+    if (seed.accountScope != account) {
+      throw const WorkGatewayException(
+        'Return to the same review account to reopen this test Store.',
+      );
+    }
+    // Only regenerates the explicitly selected labelled synthetic Store.
+    // Production sessions and gateways never enter this branch.
+    _activateStoreReviewSeed(seed, restoring: true);
+    await _recoverReviewSupplierLedgers(seed);
+  }
+
   /// Explicit review-APK action. Never seed the currently approved Store or
   /// use a production gateway; fixtures occupy their own stable Store IDs.
   bool get canLoadStoreReviewSeed =>
+      !_productionSession &&
       kDebugMode &&
       const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
       const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
@@ -10105,15 +10316,39 @@ class WorkSession extends ChangeNotifier {
       orderCount: orderCount,
       now: now ?? DateTime.now(),
     );
+    return _activateStoreReviewSeed(seed);
+  }
+
+  bool _activateStoreReviewSeed(
+    StoreReviewSeed seed, {
+    bool restoring = false,
+  }) {
     // No reset of a fixture in this session: retain edits and selected order.
-    if (activeWorkspace?.id == seed.storeId) return true;
-    final previous = activeWorkspace!;
+    if (activeWorkspace?.id == seed.storeId) {
+      final previousSeed = _selectedReviewSeed;
+      if (previousSeed != null) {
+        _reviewSelectionSave = _saveSelectedReviewStore(previousSeed);
+      }
+      return true;
+    }
+    final previous = activeWorkspace;
     final exists = _storeDataById.containsKey(seed.storeId);
-    if (!otherWorkspaces.any((store) => store.id == previous.id)) {
+    if (previous != null &&
+        !otherWorkspaces.any((store) => store.id == previous.id)) {
       otherWorkspaces.add(previous);
     }
     otherWorkspaces.removeWhere((store) => store.id == seed.storeId);
     activeWorkspace = seed.workspace;
+    _selectedReviewSeed = seed;
+    if (restoring) {
+      selectedProfile = workProfiles.firstWhere(
+        (profile) => profile.id == seed.workspace.profileId,
+      );
+      workName = seed.label;
+      workArea = seed.workspace.area;
+      workspaceId = seed.storeId;
+      reviewStage = WorkReviewStage.live;
+    }
     if (!exists) {
       workspaceCatalogueItems.addAll(seed.products);
       workspaceOrders.addAll(seed.orders);
@@ -10146,7 +10381,7 @@ class WorkSession extends ChangeNotifier {
         storeId: seed.storeId,
         adapter: StoreReviewCustomerCollectionGateway(seed.finance),
       );
-      unawaited(_recoverReviewSupplierLedgers(seed));
+      if (!restoring) unawaited(_recoverReviewSupplierLedgers(seed));
       final operations = WorkOrderOperations(
         accountScope: seed.accountScope,
         workspaceId: seed.storeId,
@@ -10161,6 +10396,7 @@ class WorkSession extends ChangeNotifier {
       }
       selectWorkspaceOrder(seed.orders.first.id);
     }
+    if (!restoring) _reviewSelectionSave = _saveSelectedReviewStore(seed);
     notifyListeners();
     return true;
   }

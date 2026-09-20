@@ -142,6 +142,26 @@ class _CommandAccountStore implements WorkPendingProofStore {
   Future<void> clear(String scope) async {}
 }
 
+class _ReviewSelectionFixtureStore implements WorkReviewStoreSelectionStore {
+  _ReviewSelectionFixtureStore(this.seed);
+  StoreReviewSeed? seed;
+  int reads = 0;
+  Completer<void>? holdRead;
+  bool failRead = false;
+  @override
+  Future<StoreReviewSeed?> read(String account) async {
+    reads++;
+    await holdRead?.future;
+    if (failRead) throw StateError('selection storage unavailable');
+    return seed;
+  }
+
+  @override
+  Future<void> save(StoreReviewSeed value) async {
+    seed = value;
+  }
+}
+
 class _CounterDraftBoundaryStore implements WorkCounterDraftStore {
   _CounterDraftBoundaryStore(this.delegate);
   final WorkCounterDraftStore delegate;
@@ -513,6 +533,297 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('COUNTERRELAUNCH review Store recovery', () {
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      FlutterSecureStorage.setMockInitialValues({});
+    });
+
+    test(
+      'production constructor never reads or promotes a review selection',
+      () async {
+        final store = _ReviewSelectionFixtureStore(
+          StoreReviewSeed(
+            accountScope: 'account-A',
+            orderCount: 12,
+            now: DateTime.utc(2026, 9, 19),
+          ),
+        );
+        final work = WorkSession.production(
+          gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
+          proofPicker: ReviewWorkProofPicker(),
+          reviewStoreSelectionStore: store,
+        );
+        addTearDown(work.dispose);
+        await work.loadInitialWorkspaceState();
+        expect(store.reads, 0);
+        expect(work.activeWorkspace, isNull);
+        expect(work.hasVerifiedWorkspace, isFalse);
+        expect(work.canLoadStoreReviewSeed, isFalse);
+      },
+    );
+
+    test(
+      'disabled review mode cannot read or seed a Store',
+      () async {
+        final native = _OrderJournalStorage();
+        final store = SecureWorkReviewStoreSelectionStore(
+          accountScope: () => 'account-A',
+          storage: native,
+        );
+        await expectLater(
+          store.read('account-A'),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(native.values, isEmpty);
+        final work = WorkSession(
+          gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
+          reviewStoreSelectionStore: store,
+        );
+        addTearDown(work.dispose);
+        await work.loadInitialWorkspaceState();
+        expect(work.activeWorkspace, isNull);
+      },
+      skip: SecureWorkReviewStoreSelectionStore.enabled,
+    );
+
+    group('enabled fixture mode', () {
+      test(
+        'encrypted selection retains original seed and rejects corrupt/cross-account data',
+        () async {
+          final account = _CommandAccountStore();
+          final native = _OrderJournalStorage();
+          SecureWorkReviewStoreSelectionStore open() =>
+              SecureWorkReviewStoreSelectionStore(
+                accountScope: () => account.accountScope,
+                storage: native,
+              );
+          final seed = StoreReviewSeed(
+            accountScope: 'account-A',
+            orderCount: 12,
+            now: DateTime.utc(2026, 9, 19, 2, 40),
+          );
+          await open().save(seed);
+          final restored = (await open().read('account-A'))!;
+          expect(restored.storeId, seed.storeId);
+          expect(restored.now, seed.now);
+          expect(restored.orders.first.createdAt, seed.orders.first.createdAt);
+          expect(native.values.values.single, isNot(contains('verified')));
+          account.accountScope = 'account-B';
+          expect(await open().read('account-B'), isNull);
+          await expectLater(
+            open().read('account-A'),
+            throwsA(isA<WorkGatewayException>()),
+          );
+          account.accountScope = 'account-A';
+          final key = native.values.keys.single;
+          native.values[key] = '{"version":99}';
+          await expectLater(
+            open().read('account-A'),
+            throwsA(isA<WorkGatewayException>()),
+          );
+          await expectLater(
+            open().save(seed),
+            throwsA(isA<WorkGatewayException>()),
+          );
+          expect(native.values[key], '{"version":99}');
+        },
+      );
+
+      test(
+        'fresh session reopens selected Store, discounted draft and completed invoice',
+        () async {
+          final account = _CommandAccountStore();
+          final native = _OrderJournalStorage();
+          WorkSession open() => WorkSession(
+            gateway: ReviewWorkGateway(),
+            contactDraftStore: account,
+            reviewStoreSelectionStore: SecureWorkReviewStoreSelectionStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+            counterDraftStore: SecureWorkCounterDraftStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+          );
+          final first = open()..activeWorkspace = _commandStore;
+          expect(
+            first.loadStoreReviewSeed(12, now: DateTime.utc(2026, 9, 19)),
+            isTrue,
+          );
+          expect(await first.storeReviewSelectionSaved, isTrue);
+          expect(await first.recoverCustomerLedger(), isTrue);
+          final storeId = first.activeWorkspace!.id;
+          final productId = first.workspaceCatalogueItems.first.id;
+          expect(first.startNewWorkspaceOrder(), isTrue);
+          await first.loadWorkspaceCounterDraft();
+          first.adjustWorkspaceOrderQuantity(productId, 2);
+          first.updateWorkspaceCounterDetails(
+            customer: '9000091934',
+            payment: 'Bank Transfer',
+            billingDetails: const WorkspaceBillingDetails(
+              name: 'Relaunch customer',
+            ),
+          );
+          expect(
+            first.updateWorkspaceCounterDiscount(
+              const WorkspaceBillDiscount.fixed(525),
+            ),
+            isTrue,
+          );
+          expect(await first.saveWorkspaceCounterDraft(), isTrue);
+          final total = first.workspaceCounterPayableMinor;
+          first.dispose();
+
+          final second = open();
+          expect(second.activeWorkspace, isNull);
+          await second.loadInitialWorkspaceState();
+          expect(second.initialWorkspaceStateLoaded, isTrue);
+          expect(second.activeWorkspace?.id, storeId);
+          expect(second.activeWorkspace?.name, startsWith('TEST Store'));
+          expect(second.customerLedgerRecoveryError, isNull);
+          expect(second.startNewWorkspaceOrder(), isTrue);
+          await second.loadWorkspaceCounterDraft();
+          expect(second.workspaceOrderCustomer, '9000091934');
+          expect(second.workspaceOrderBillingDetails.name, 'Relaunch customer');
+          expect(second.workspaceOrderPayment, 'Bank Transfer');
+          expect(second.workspaceOrderQuantities[productId], 2);
+          expect(second.workspaceCounterPayableMinor, total);
+          final submitted = await second.submitWorkspaceCounterBill();
+          expect(submitted?.invoice, isNotNull);
+          final invoice = submitted!.invoice!;
+          final stock = second.workspaceCatalogueItems.first.stock;
+          second.dispose();
+
+          final third = open();
+          addTearDown(third.dispose);
+          await third.loadInitialWorkspaceState();
+          expect(third.activeWorkspace?.id, storeId);
+          expect(
+            third.workspaceInvoices.single.toLedgerJson(),
+            invoice.toLedgerJson(),
+          );
+          expect(third.workspaceCatalogueItems.first.stock, stock);
+          expect(
+            third.workspaceFinance!.payments
+                .singleWhere((p) => p.invoiceId == invoice.id)
+                .dueMinor,
+            total,
+          );
+        },
+      );
+
+      test(
+        'selection read failure is retryable without creating a Store',
+        () async {
+          final selection = _ReviewSelectionFixtureStore(
+            StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 12,
+              now: DateTime.utc(2026, 9, 19),
+            ),
+          )..failRead = true;
+          final work = WorkSession(
+            gateway: ReviewWorkGateway(),
+            contactDraftStore: _CommandAccountStore(),
+            reviewStoreSelectionStore: selection,
+          );
+          addTearDown(work.dispose);
+          await work.loadInitialWorkspaceState();
+          expect(work.activeWorkspace, isNull);
+          expect(work.initialWorkspaceStateLoaded, isFalse);
+          expect(work.errorMessage, isNotNull);
+          selection.failRead = false;
+          await work.loadInitialWorkspaceState();
+          expect(work.activeWorkspace?.id, selection.seed!.storeId);
+          expect(work.initialWorkspaceStateLoaded, isTrue);
+        },
+      );
+
+      test(
+        'account change during read cannot activate the previous Store',
+        () async {
+          final account = _CommandAccountStore();
+          final selection = _ReviewSelectionFixtureStore(
+            StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 12,
+              now: DateTime.utc(2026, 9, 19),
+            ),
+          )..holdRead = Completer<void>();
+          final work = WorkSession(
+            gateway: ReviewWorkGateway(),
+            contactDraftStore: account,
+            reviewStoreSelectionStore: selection,
+          );
+          addTearDown(work.dispose);
+          final opening = work.loadInitialWorkspaceState();
+          while (selection.reads == 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+          }
+          account.accountScope = 'account-B';
+          selection.holdRead!.complete();
+          await opening;
+          expect(work.activeWorkspace, isNull);
+          expect(work.initialWorkspaceStateLoaded, isFalse);
+        },
+      );
+    }, skip: !SecureWorkReviewStoreSelectionStore.enabled);
+  });
+
+  group('COUNTERDISCOUNT currency rules', () {
+    test('percentage and fixed values round once to paise', () {
+      expect(
+        WorkspaceBillDiscount.parse('percentage', '10').amountFor(10500),
+        1050,
+      );
+      expect(
+        WorkspaceBillDiscount.parse('fixed', '10.50').amountFor(10500),
+        1050,
+      );
+      expect(WorkspaceBillDiscount.parse('percentage', '50').amountFor(1), 1);
+      expect(
+        WorkspaceBillDiscount.parse('percentage', '16.67').amountFor(300),
+        50,
+      );
+      for (final kind in ['percentage', 'fixed']) {
+        for (final value in [
+          '',
+          '-1',
+          '0',
+          '1.001',
+          '1e2',
+          'NaN',
+          '₹10',
+          '1,000',
+        ]) {
+          expect(
+            () => WorkspaceBillDiscount.parse(kind, value),
+            throwsFormatException,
+          );
+        }
+      }
+      expect(
+        () => WorkspaceBillDiscount.parse('percentage', '100.01'),
+        throwsFormatException,
+      );
+      expect(
+        const WorkspaceBillDiscount.percentage(10000).validFor(10000),
+        isFalse,
+      );
+      expect(const WorkspaceBillDiscount.fixed(10000).validFor(10000), isFalse);
+      expect(const WorkspaceBillDiscount.none().validFor(0), isTrue);
+      expect(WorkspaceBillDiscount.fromJson(null).isEmpty, isTrue);
+      expect(
+        () => WorkspaceBillDiscount.fromJson({'kind': 'fixed', 'value': 1.5}),
+        throwsFormatException,
+      );
+    });
+  });
+
   group('COUNTER1919 UPI destination', () {
     const destination = WorkspaceUpiDestination(
       account: 'account-A',
@@ -4789,6 +5100,272 @@ void main() {
       );
       expect(await work.saveWorkspaceCounterDraft(), isTrue);
     }
+
+    for (final kind in ['percentage', 'fixed']) {
+      for (final method in ['Cash', 'UPI', 'Bank Transfer']) {
+        for (final publicListing in [true, false]) {
+          test(
+            'COUNTERDISCOUNT $kind $method public=$publicListing exact ledger and recovery',
+            () async {
+              final work = session();
+              work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0]
+                  .copyWith(publicListing: publicListing);
+              await fill(work);
+              final discount = WorkspaceBillDiscount.parse(
+                kind,
+                kind == 'percentage' ? '10.01' : '55.05',
+              );
+              expect(work.updateWorkspaceCounterDiscount(discount), isTrue);
+              work.updateWorkspaceCounterDetails(payment: method);
+              expect(await work.saveWorkspaceCounterDraft(), isTrue);
+              expect(work.workspaceCounterSubtotalMinor, 55000);
+              expect(
+                work.workspaceCounterDiscountMinor,
+                kind == 'percentage' ? 5506 : 5505,
+              );
+              final payable = 55000 - discount.amountFor(55000);
+              final restored = session();
+              restored.workspaceCatalogueItems[0] = restored
+                  .workspaceCatalogueItems[0]
+                  .copyWith(publicListing: publicListing);
+              await restored.loadWorkspaceCounterDraft();
+              expect(
+                restored.workspaceCounterDiscount.toJson(),
+                discount.toJson(),
+              );
+              expect(restored.workspaceCounterPayableMinor, payable);
+              expect(restored.workspaceOrderPayment, method);
+              final finance = WorkspaceFinanceSnapshot(
+                accountScope: 'account-A',
+                workspaceId: 'store-A',
+                revision: 1,
+                asOf: DateTime.utc(2026, 9, 19),
+                salesTodayMinor: 0,
+                duesMinor: 0,
+                availableMinor: 0,
+                heldMinor: 0,
+                requestedMinor: 0,
+                paidOutMinor: 0,
+                feesMinor: 0,
+                deliveryAdjustmentsMinor: 0,
+                refundsMinor: 0,
+                taxWithheldMinor: 0,
+                payments: const [],
+                payouts: const [],
+                historyComplete: true,
+              );
+              expect(restored.applyWorkspaceFinance(finance), isTrue);
+              expect(
+                restored.bindCustomerCollectionGateway(
+                  accountScope: 'account-A',
+                  storeId: 'store-A',
+                  adapter: StoreReviewCustomerCollectionGateway(finance),
+                  checkpointStore: SecureWorkLedgerCheckpointStore(
+                    accountScope: () => account.accountScope,
+                    storage: storage,
+                  ),
+                ),
+                isTrue,
+              );
+              final result = await restored.submitWorkspaceCounterBill();
+              expect(result?.invoice, isNotNull);
+              final invoice = result!.invoice!;
+              final order = restored.workspaceOrders.single;
+              expect(invoice.payableMinor, payable);
+              expect(invoice.subtotalMinor, 55000);
+              expect(invoice.discount.toJson(), discount.toJson());
+              expect(
+                WorkspaceCustomerInvoice.fromLedgerJson(
+                  invoice.toLedgerJson(),
+                ).payableMinor,
+                payable,
+              );
+              expect(
+                WorkspaceOrderRecord.fromLedgerJson(
+                  order.toLedgerJson(),
+                )?.payableMinor,
+                payable,
+              );
+              expect(order.itemSnapshots.single.unitPricePaise, 27500);
+              expect(order.itemSnapshots.single.lineTotalPaise, payable);
+              expect(restored.workspaceCatalogueItems.single.sellingPrice, 275);
+              expect(
+                restored.workspaceCatalogueItems.single.publicListing,
+                publicListing,
+              );
+              expect(
+                restored.workspaceFinance!.payments.single.amountMinor,
+                payable,
+              );
+              expect(restored.workspaceFinance!.payments.single.paidMinor, 0);
+              expect(
+                restored.workspaceFinance!.payments.single.dueMinor,
+                payable,
+              );
+              expect(restored.workspaceFinance!.salesTodayMinor, payable);
+              expect(
+                restored.workspaceCustomerBook.single.totalSpendMinor,
+                payable,
+              );
+              expect(
+                restored.updateWorkspaceCounterDiscount(
+                  const WorkspaceBillDiscount.none(),
+                ),
+                isFalse,
+              );
+              if (method == 'Cash') {
+                expect(
+                  await restored.recordCustomerCollection(
+                    customerId: '9000000013',
+                    invoiceId: invoice.id,
+                    amountMinor: payable,
+                    channel: WorkspacePaymentChannel.cash,
+                  ),
+                  isTrue,
+                );
+                expect(restored.workspaceFinance!.payments.single.dueMinor, 0);
+              }
+              final reopened = session();
+              expect(reopened.applyWorkspaceFinance(finance), isTrue);
+              expect(
+                reopened.bindCustomerCollectionGateway(
+                  accountScope: 'account-A',
+                  storeId: 'store-A',
+                  adapter: StoreReviewCustomerCollectionGateway(finance),
+                  checkpointStore: SecureWorkLedgerCheckpointStore(
+                    accountScope: () => account.accountScope,
+                    storage: storage,
+                  ),
+                ),
+                isTrue,
+              );
+              expect(await reopened.recoverCustomerLedger(), isTrue);
+              expect(
+                reopened.workspaceInvoices.single.toLedgerJson(),
+                invoice.toLedgerJson(),
+              );
+              expect(reopened.workspaceOrders.single.payableMinor, payable);
+              expect(restored.startNewWorkspaceOrder(), isTrue);
+              expect(restored.workspaceCounterDiscount.isEmpty, isTrue);
+            },
+          );
+        }
+      }
+    }
+
+    test(
+      'COUNTERDISCOUNT mixed-line refund allocation preserves every paise',
+      () async {
+        final work = session();
+        await fill(work);
+        work.workspaceCatalogueItems.add(
+          _product(id: 'second-sku', sellingPrice: 105),
+        );
+        work.adjustWorkspaceOrderQuantity('second-sku', 1);
+        expect(
+          work.updateWorkspaceCounterDiscount(
+            const WorkspaceBillDiscount.fixed(5505),
+          ),
+          isTrue,
+        );
+        final result = await work.submitWorkspaceCounterBill();
+        final order = work.workspaceOrders.single;
+        expect(result?.invoice?.payableMinor, 59995);
+        expect(
+          order.itemSnapshots.fold<int>(
+            0,
+            (sum, line) => sum + line.lineTotalPaise,
+          ),
+          59995,
+        );
+        expect(order.itemSnapshots.map((line) => line.unitPricePaise), [
+          27500,
+          10500,
+        ]);
+        WorkspaceCustomerReturn returned(
+          String operation,
+          List<WorkspaceCustomerReturnLine> lines,
+        ) => WorkspaceCustomerReturn(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          customerId: '9000000013',
+          invoiceId: result!.invoice!.id,
+          orderId: order.id,
+          operationId: operation,
+          expectedRevision: 1,
+          reason: 'Unopened goods',
+          lines: lines,
+        );
+        final first = returned('return-1', const [
+          WorkspaceCustomerReturnLine(
+            productId: 'atta-5kg',
+            quantity: 1,
+            restockQuantity: 1,
+          ),
+        ]);
+        final second = returned('return-2', const [
+          WorkspaceCustomerReturnLine(
+            productId: 'atta-5kg',
+            quantity: 1,
+            restockQuantity: 1,
+          ),
+          WorkspaceCustomerReturnLine(
+            productId: 'second-sku',
+            quantity: 1,
+            restockQuantity: 1,
+          ),
+        ]);
+        final firstCredit = first.creditMinorFor(order, priorReturns: const []);
+        final secondCredit = second.creditMinorFor(
+          order,
+          priorReturns: [first],
+        );
+        expect(firstCredit, isNotNull);
+        expect(secondCredit, isNotNull);
+        expect(firstCredit! + secondCredit!, 59995);
+        expect(
+          second.creditMinorFor(order, priorReturns: [first, second]),
+          isNull,
+        );
+        final tampered = order.toLedgerJson();
+        tampered['discountMinor'] = 5504;
+        expect(WorkspaceOrderRecord.fromLedgerJson(tampered), isNull);
+      },
+    );
+
+    test(
+      'COUNTERDISCOUNT cart changes cannot submit an excessive fixed discount',
+      () async {
+        final work = session();
+        await fill(work);
+        expect(
+          work.updateWorkspaceCounterDiscount(
+            const WorkspaceBillDiscount.fixed(30000),
+          ),
+          isTrue,
+        );
+        work.adjustWorkspaceOrderQuantity('atta-5kg', -1);
+        expect(work.workspaceCounterDiscountError, isNotNull);
+        expect(await work.submitWorkspaceCounterBill(), isNull);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(
+          work.updateWorkspaceCounterDiscount(
+            const WorkspaceBillDiscount.percentage(1000),
+          ),
+          isTrue,
+        );
+        expect(work.workspaceCounterPayableMinor, 24750);
+        work.adjustWorkspaceOrderQuantity('atta-5kg', 1);
+        expect(work.workspaceCounterPayableMinor, 49500);
+        expect(
+          work.updateWorkspaceCounterDiscount(
+            const WorkspaceBillDiscount.none(),
+          ),
+          isTrue,
+        );
+        expect(work.workspaceCounterPayableMinor, 55000);
+      },
+    );
 
     test(
       'POSCENTRAL billing details survive recovery and stay on original invoice',

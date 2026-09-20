@@ -3514,7 +3514,8 @@ class StoreReviewCustomerCollectionGateway
         storeId != _finance.workspaceId ||
         payment == null ||
         payment.customerId != workspaceCustomerMobile(invoice.customer) ||
-        payment.amountMinor != invoice.amount * 100) {
+        !invoice.validBillAmounts ||
+        payment.amountMinor != invoice.payableMinor) {
       throw StateError('Invoice status is not confirmed.');
     }
     return _finance;
@@ -3532,7 +3533,8 @@ class StoreReviewCustomerCollectionGateway
         customerId == null ||
         invoice.id.trim().isEmpty ||
         invoice.orderId.trim().isEmpty ||
-        invoice.amount <= 0) {
+        !invoice.validBillAmounts ||
+        invoice.payableMinor <= 0) {
       throw StateError('Invoice does not identify this Store and customer.');
     }
     final previousPayment = _finance.payments
@@ -3542,7 +3544,7 @@ class StoreReviewCustomerCollectionGateway
       if (previousPayment.invoiceId != invoice.id ||
           previousPayment.orderId != invoice.orderId ||
           previousPayment.customerId != customerId ||
-          previousPayment.amountMinor != invoice.amount * 100) {
+          previousPayment.amountMinor != invoice.payableMinor) {
         throw StateError('Invoice identity cannot be changed.');
       }
       return _finance;
@@ -3554,7 +3556,7 @@ class StoreReviewCustomerCollectionGateway
       throw StateError('Customer history needs recovery.');
     }
     final now = DateTime.now().toUtc();
-    final amount = invoice.amount * 100;
+    final amount = invoice.payableMinor;
     final ledger = WorkspaceCustomerLedger(
       accountScope: accountScope,
       workspaceId: storeId,
@@ -3850,7 +3852,7 @@ class StoreReviewCustomerCollectionGateway
         ledger.revision != request.expectedRevision ||
         balance == null ||
         payment == null ||
-        payment.amountMinor != originalOrder.amount * 100 ||
+        payment.amountMinor != originalOrder.payableMinor ||
         workspaceCustomerMobile(originalOrder.customer) != request.customerId ||
         payment.dueMinor != balance.dueMinor) {
       throw StateError(
@@ -4127,6 +4129,103 @@ class StoreReviewCustomerCollectionGateway
 }
 
 enum WorkReviewTestCase { pending, clarification, rejected, approved }
+
+/// A review-fixture selection, never Store approval or payment authority.
+abstract interface class WorkReviewStoreSelectionStore {
+  Future<StoreReviewSeed?> read(String account);
+  Future<void> save(StoreReviewSeed seed);
+}
+
+class SecureWorkReviewStoreSelectionStore
+    implements WorkReviewStoreSelectionStore {
+  SecureWorkReviewStoreSelectionStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static const enabled =
+      kDebugMode &&
+      bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+  static final Map<String, Future<void>> _pending = {};
+  String _key(String account) =>
+      'moolsocial.workspace.review-store-selection.v1.${Uri.encodeComponent(account)}';
+  void _check(String account) {
+    if (!enabled || account.trim().isEmpty || accountScope() != account) {
+      throw const WorkGatewayException(
+        'Return to the same review account to reopen this test Store.',
+      );
+    }
+  }
+
+  Future<T> _exclusive<T>(String account, Future<T> Function() action) {
+    final key = _key(account);
+    final result = (_pending[key] ?? Future<void>.value()).then(
+      (_) => action(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pending[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_pending[key], tail)) _pending.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  Future<StoreReviewSeed?> _read(String account) async {
+    _check(account);
+    final raw = await _storage.read(key: _key(account));
+    _check(account);
+    if (raw == null) return null;
+    try {
+      final data = jsonDecode(raw);
+      if (data is! Map ||
+          data.length != 4 ||
+          data['version'] != StoreReviewSeed.version ||
+          data['account'] != account ||
+          data['orderCount'] is! int ||
+          data['seedAt'] is! String) {
+        throw const FormatException();
+      }
+      return StoreReviewSeed(
+        accountScope: account,
+        orderCount: data['orderCount'] as int,
+        now: DateTime.parse(data['seedAt'] as String),
+      );
+    } on Object {
+      throw const WorkGatewayException(
+        'The saved test Store could not be reopened. Its saved bills have not been removed.',
+      );
+    }
+  }
+
+  @override
+  Future<StoreReviewSeed?> read(String account) =>
+      _exclusive(account, () => _read(account));
+  @override
+  Future<void> save(StoreReviewSeed seed) =>
+      _exclusive(seed.accountScope, () async {
+        await _read(
+          seed.accountScope,
+        ); // Preserve corrupt/unknown data instead of replacing it.
+        _check(seed.accountScope);
+        await _storage.write(
+          key: _key(seed.accountScope),
+          value: jsonEncode({
+            'version': StoreReviewSeed.version,
+            'account': seed.accountScope,
+            'orderCount': seed.orderCount,
+            'seedAt': seed.now.toIso8601String(),
+          }),
+        );
+        _check(seed.accountScope);
+      });
+}
 
 /// Versioned, synthetic projections for frontend UAT and future adapter tests.
 /// Pure data only: no network, approval, payment or collection authority.

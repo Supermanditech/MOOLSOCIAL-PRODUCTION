@@ -129,6 +129,50 @@ Future<void> tap(WidgetTester tester, String key) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'COUNTERDISCOUNT PDF accepts precise bill and rejects mismatched lines',
+    () async {
+      final invoice = WorkspaceCustomerInvoice(
+        id: 'INV-DISCOUNT',
+        orderId: 'order-discount',
+        customer: 'Rakesh',
+        sellerName: 'Store',
+        items: 'Rice',
+        amount: 94,
+        remainderPaise: 50,
+        discount: const WorkspaceBillDiscount.percentage(1000),
+        discountMinor: 1050,
+        payment: 'Cash',
+        issuedAt: DateTime.utc(2026, 9, 19),
+      );
+      WorkInvoicePdfRequest discounted(int net) => WorkInvoicePdfRequest(
+        accountId: 'review-account',
+        storeId: 'review-store',
+        invoice: invoice,
+        items: [
+          WorkspaceOrderItemSnapshot(
+            productId: 'rice',
+            name: 'Rice',
+            pack: '1 kg',
+            quantity: 1,
+            unitPricePaise: 10500,
+            lineTotalPaise: net,
+          ),
+        ],
+        paymentStatus: 'Payment due: ₹94.50',
+      );
+      const source = LocalReviewWorkInvoicePdfSource();
+      final document = await source.load(discounted(9450));
+      expect(document.reviewOnly, isTrue);
+      expect(String.fromCharCodes(document.bytes.take(5)), '%PDF-');
+      expect(document.bytes.length, greaterThan(1000));
+      await expectLater(
+        source.load(discounted(10500)),
+        throwsA(isA<WorkInvoicePdfException>()),
+      );
+    },
+  );
+
   testWidgets('APK source selection exposes only the requested review mode', (
     tester,
   ) async {
