@@ -1038,8 +1038,33 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 79) `
+Assert-Coordination ($continuationBindings.Count -eq 80) `
   'founder-authorized continuation binding inventory changed.'
+
+# Founder-authorized Screen 1 exception: a work checkpoint, never acceptance.
+$addProductBindings = @($continuationBindings | Where-Object { $_.id -ceq 'codex_add_product_screen1_20260920' })
+$addProductBootstrapOwners = @(
+  'config/codex-subagent-coordination-policy.json',
+  'scripts/check-codex-subagent-coordination-policy.ps1',
+  'docs/quality/ADD-PRODUCT-SCREEN1-20260920.md',
+  'docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json',
+  'docs/quality/ADD-PRODUCT-SCREEN1-20260920-incremental.json'
+)
+Assert-Coordination ($addProductBindings.Count -eq 1) 'Add Product Screen 1 binding missing or duplicated.'
+$addProductBinding = $addProductBindings[0]
+Assert-Coordination (
+  $addProductBinding.state -ceq 'founder_authorized_2026_09_20' -and
+  $addProductBinding.lane -ceq 'codex_ui' -and $addProductBinding.role -ceq 'primary' -and
+  $addProductBinding.task -ceq '/root' -and
+  $addProductBinding.workId -ceq 'add-product-screen1-20260920' -and
+  $addProductBinding.ticketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+  $addProductBinding.worktreePath -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920' -and
+  $addProductBinding.branch -ceq 'work/codex-ui/add-product-screen1-20260920' -and
+  $addProductBinding.baselineHead -ceq 'a425fd89445a4650533b14903d99215cfed74034' -and
+  $addProductBinding.bootstrapCommitSubject -ceq 'coordination(add-product-screen1-20260920): register bounded Add product entry' -and
+  (@($addProductBinding.bootstrapOwners | Sort-Object) -join '|') -ceq (@($addProductBootstrapOwners | Sort-Object) -join '|') -and
+  $addProductBinding.cursorIndependent -eq $true -and $addProductBinding.integrationRequiredBeforeSuccessorApk -eq $true
+) 'Add Product Screen 1 exact checkpoint/owner contract changed.'
 
 # Founder standing approval is limited to this exact Counter Sale continuation.
 # Validate every field, including bootstrap owners, rather than admitting a date
@@ -1139,6 +1164,8 @@ foreach ($continuationBinding in $continuationBindings) {
   Assert-Coordination (
     [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
     (
+      ([string]$continuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_20') -or
       ([string]$continuationBinding.id -ceq 'codex_counter_sale_20260919' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_19') -or
       ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
@@ -2814,6 +2841,15 @@ if ($ProductionLane -ceq 'baseline') {
            $counterCommentLive -ceq $counterCommentCorrected)
         ) 'Counter Sale may change only the exact inherited Buy comment.'
       }
+      $addProductScreen1Owner = (
+        $hasContinuationBinding -and
+        $selectedContinuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+        $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+        $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
+        $effectiveOwner -cin $addProductBootstrapOwners
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -2821,7 +2857,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($shopCursorReviewAndroidOwner -or
+      if ($addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
