@@ -1,5 +1,569 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Current checkpoint — v24 CSV review and independent Cursor baseline
+
+Founder visually approved the v23 guide. Technical correctness of CSV mapping
+to Buy/Wholesale remains Codex responsibility; visual approval is not technical
+acceptance. Founder requested later design/UIUX/theme/colour/gradient/brand polish.
+The v24 field-error review screen is implemented but NOT founder-approved yet.
+The complete Add Product journey, Wholesale wiring, backend and OPPO remain open.
+
+Founder explicitly authorised: finish pending checks, create a ticket-scoped work
+checkpoint containing current work, advance the clean unused Cursor Buy worktree
+to that exact commit, then provide a Cursor readiness message. This is checkpoint
+authority, not acceptance, release, broad policy changes or remote push authority.
+
+v24 reuses one field-aware validator and preserves the manual editor's text API.
+Review now shows source row, SKU/variant/pack, exact column, entered value and
+correction. Existing validation still stops at the first issue per row; the UI
+states that limitation. Saveable rows remain Store-only, separate from publication
+readiness, with changed catalogue facts visibly held for review. Inherited MRP
+errors identify the entered selling price, not an allegedly empty supplied MRP.
+Initial test patch missed a formatter-split anchor; reapplied at the verified
+location without weakening assertions. All source edits remain scoped.
+
+Evidence: task outputs/store-csv-review-v24/tests-r1.log (23 affected tests passed),
+analysis-final.log (six source/test owners clean), checkpoint-tests.log (36 final
+focused tests passed), checkpoint-analysis.log (clean after MRP correction).
+Actual normal/200% local renders inspected at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-csv-review-v24-r1.
+No fresh physical download, scanner, keyboard or OPPO qualification is claimed.
+Earlier v21 native template payload checks passed; actual MediaStore I/O remains
+device-pending. Screenshots/logs remain retained locally outside Git; source,
+tests, requirements and the 400-row mapping appendix are checkpointed here.
+
+Cursor preparation: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921,
+branch work/cursor-ui/buy-ready-20260921. Started at pushed dff6c124 and includes
+previous Cursor Buy baseline ee42be0. Advance fast-forward only after this checkpoint;
+do not copy dirty files or alter old Cursor worktrees. This new worktree is setup-
+only, with no implementation ticket/claim until founder assigns its first ticket.
+Existing Redmi claims cannot be borrowed. Cursor must coordinate shared Buy model,
+session/content and route changes with Codex's Store/CSV public-field mapping.
+No APK, backend, deployment or production/main changes are authorised here.
+
+Inherited qualification limitation: check-approved-ui-locks.ps1 rejects both this
+Add Product path and the clean Cursor setup at unchanged dff6c124 with "Approved
+UI Accessibility projection requires its exact isolated native owner." Its
+hardcoded path list omits both new checkouts. The protected MainActivity owner,
+approved-reference manifest and UI-lock script are unchanged by this checkpoint.
+Do not call that check passed or weaken/patch it here. Ticket pre_commit,
+scope/incremental checks and local tests passed separately. This is a preservation
+checkpoint only; production/build/acceptance qualification stays blocked pending
+separate exact path admission and the other recorded runtime requirements.
+
+## Preserved v22 mapping — complete 400-ID disposition
+
+This is the retained source/CSV-responsibility inventory, not a claim of 400
+implemented fields or fresh public-device tests. v23 adds only the eight C-series
+pack fields; their prior CSV-MISSING labels below are historical and superseded
+by the v23 implementation notes. All other gaps remain explicitly pending.
+Original detailed inventory and source aliases are retained locally at:
+C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/store-public-exact-field-map-20260920.md.
+v22 reconciliation: outputs/store-csv-public-reconciliation-v22.md in that task.
+Do not use the inventory to expand scope or grant unsupported CSV inputs.
+
+| ID | Field | Original source anchor | v22 treatment | Required disposition / gap |
+|---|---|---|---|---|
+| S01 | Store/branch identity | WS.id; STORE.id; P.storeId missing in W→P | SYSTEM | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S02 | Store / seller display name | WS.name or WorkSession.workName → W→P.seller; FACT.partner | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S03 | Seller type / business role | WS.profileLabel/profileId; P.sellerType hardcoded `Store` by W→P | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S04 | Business verification | WS.verified; P.manufacturerVerified not mapped | SYSTEM | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S05 | Store locality | WS.area / workArea; STORE.area | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S06 | Store full address | STORE.address; no address in W→P | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S07 | Store region identity | STORE.regionId | SYSTEM | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S08 | Ask seller contact destination | Seller/Store identity used by product action; not a contact field in W→P | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S09 | Seller legal name | TAX.sellerLegalName | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S10 | Seller registered/billing address | TAX.sellerAddress | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S11 | Seller GSTIN | TAX.sellerGstin | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S12 | Seller PAN | TAX.sellerPan (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S13 | Seller CIN | TAX.sellerCin (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S14 | Seller FSSAI licence/registration | TAX.sellerFssaiNumber (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S15 | Authorised signatory | TAX.authorizedSignatory (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S16 | Opening time | STATE.workspaceOpeningTime; SAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S17 | Closing time | STATE.workspaceClosingTime; SAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S18 | Fulfilment capability | STATE.workspaceFulfilmentMode | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S19 | Pickup available | workspacePickupEnabled; DSAVE; COLLECT.supportsCollection | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S20 | Delivery city | workspaceDeliveryCity; DSAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S21 | Delivery area | workspaceDeliveryArea; DSAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S22 | Delivery PIN | workspaceDeliveryPincode; DSAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S23 | Delivery radius | workspaceDeliveryRadiusKm; DSAVE (int km) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S24 | Delivery fee default | workspaceDeliveryFee; DSAVE (int rupees) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S25 | Free-delivery threshold | workspaceFreeDeliveryAbove; DSAVE (int rupees) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S26 | Preparation-time default | SETTINGS.busyMinutes / STATE.workspaceBusyMinutes | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S27 | Active-order preference | workspaceMaximumActiveOrders; SAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S28 | Order alert sound | workspaceOrderAlertSound; SAVE | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S29 | Order alert vibration | workspaceOrderAlertVibration; SAVE | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S30 | Public storefront visibility | workspaceVisibleToCustomers | STORE-LIVE | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S31 | Taking orders / Open-Paused-Off | workspaceAcceptingOrders / workspaceStoreState | STORE-LIVE | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S32 | Reopening time | workspaceReopensAt | STORE-LIVE | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S33 | New-listing stock mode default | Product controls menu; W.stockMode is per listing | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S34 | Low-stock reminder default | Product controls menu; W.lowStockThreshold is per listing | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S35 | New-listing visibility default | Product controls menu; W.publicListing is per listing | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S36 | Invoice auto-delivery choice | WorkspaceInvoiceDeliveryPreference.mode; INVOICE-PREF | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S37 | Return-policy default | No Store-default binding found in W→P; W.returnPolicy per listing | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S38 | Dispatch lead-time default | W.deliveryPromise string; FACT.dispatchPromise optional | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S39 | Freight policy default | P.freightIncluded; W→P does not map | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S40 | MOQ default | W.minimumOrder; P.minimumOrder | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| P01 | Listing ID | W.id → P.id | SYSTEM | No listing-ID input; generated Store-scoped identity. |
+| P02 | Canonical product ID | W.canonicalId → P.canonicalId | CATALOGUE | Resolve exact catalogue match; do not expose arbitrary canonical IDs as approval. |
+| P03 | Channel Shop / Wholesale | W→P.destination fixed to Shop | OFFER-GAP | Channel offer selection needs shared Store model and adapter; current projection fixed Shop. |
+| P04 | Category | W.categoryId → P.categoryId | CSV-EXISTING | categoryId -> W.categoryId -> P.categoryId; validate allowed category, inherit exact match. |
+| P05 | Brand | W.brand → P.brand / brandLabel | CSV-EXISTING | brand -> W.brand -> P.brand; exact identity matching. |
+| P06 | Product name | W.title → P.title → customerTitle | CSV-EXISTING | title -> W.title -> P.title; customer formatting is not new CSV input. |
+| P07 | Variant / grade | W.variant → P.variant → customerVariant | CSV-EXISTING | variant -> W.variant -> P.variant; exact pack/variant match required. |
+| P08 | Pack description | W.pack → P.pack | CSV-EXISTING | pack -> W.pack -> P.pack; not enough for structured unit conversion. |
+| P09 | Net amount per pack | COMP.netQuantity string; COMPARE.identity structured comparison | CATALOGUE-GAP | netQuantity text proposed below; structured quantity/unit requires shared schema, not guessed parsing. |
+| P10 | Units per case / pack conversion | Currently encoded in P.pack; COMPARE.identity | CATALOGUE-GAP | Explicit contained retail unit and case/pack conversion needs shared master schema; no column wired today. |
+| P11 | Barcode / GTIN | W.barcode; no P.barcode | INTERNAL-CSV | barcode supports exact scan/match; preserve leading zeros. Not a required public label. |
+| P12 | Store SKU | W.sku; no direct P.sku | INTERNAL-CSV | sku is Store identity, not a customer-facing product fact. |
+| P13 | Selling / pack price | W.sellingPrice → P.price; FACT.price | CSV-EXISTING | sellingPrice -> W.sellingPrice -> Shop P.price; integer currency restriction retained, not endorsed as final currency contract. |
+| P14 | Retail versus wholesale price | One W.sellingPrice; P.destination + price; COMPARE.channel | OFFER-GAP | Separate retail/wholesale price cannot fit current single sellingPrice or Shop-only adapter. |
+| P15 | MRP including taxes | W.mrp → P.mrp (nullable int) | CSV-EXISTING | mrp -> W.mrp -> P.mrp; inherit exact matched edition; different batch MRP requires batch treatment. |
+| P16 | Unit price | W.unitPrice → P.unitPrice (String) | DERIVED-GAP | unitPrice accepted as text today; target compute from channel price and structured selling quantity. Do not require repeated stale text. |
+| P17 | Stock quantity | W.stock (int); used by published / canSellAtCounter | INTERNAL-CSV | stock is inventory input; drives availability, not automatically exact public quantity disclosure. |
+| P18 | Stock mode | W.stockMode | INTERNAL-CSV | stockMode -> W.stockMode; inherited Store default still missing. |
+| P19 | Product available | W.available; exact-mode E derives stock > 0 | INTERNAL-CSV | available currently applies in availabilityOnly; exactQuantity derives availability from stock. |
+| P20 | Public/private listing intent | W.publicListing → P.catalogueListing | PUBLICATION | Not template input. Import always Store-only; explicit reviewed publication separate. |
+| P21 | Minimum order quantity | W.minimumOrder → P.minimumOrder (int, default 1) | CSV-EXISTING | minimumOrder -> W.minimumOrder -> P.minimumOrder; channel/default inheritance still needed. |
+| P22 | Quantity increment | COMPARE.incrementPacks; no equivalent W field | OFFER-GAP | incrementPacks exists in comparison contract; missing shared Store/CSV/checkout wiring. |
+| P23 | Tier quantity breakpoint | BuyV2ComparisonPriceTier.minimumPacks | OFFER-GAP | minimumPacks tier breakpoint supported by public comparison contract; Store ownership and CSV representation pending. |
+| P24 | Tier pack price | BuyV2ComparisonPriceTier.packPriceMinor | OFFER-GAP | packPriceMinor tier value supported by public comparison contract; do not mix with existing whole-rupee sellingPrice. |
+| P25 | Delivery promise text | W.deliveryPromise → P.deliveryPromise | STORE-DEFAULT | deliveryPromise text works today; inherit actual Store/channel fulfilment terms; no invented pickup/delivery promise. |
+| P26 | Origin / location description | W.origin → P.origin | SEMANTIC-GAP | origin text currently serves product/location meanings; distinguish product countryOfOrigin from Store locality before CSV labels change. |
+| P27 | Return summary | W.returnPolicy → P.returnPolicy | STORE-DEFAULT | returnPolicy summary accepted today; structured policy/default inheritance absent. Allow approved product exception, not duplicate every row. |
+| P28 | Composition / ingredients | W.composition → P.composition | CSV-EXISTING | composition -> W.composition -> P.composition; category applicability and reviewed catalogue facts. |
+| P29 | Safety/regulatory note | W.regulatoryNote → P.regulatoryNote | CSV-EXISTING | regulatoryNote -> W.regulatoryNote -> P.regulatoryNote; applicable product fact, not licence approval. |
+| P30 | Prescription restriction | W.requiresPrescription → P.requiresPrescription | OUT-OF-SCOPE | Prescription authority is catalogue/system-owned; do not add medicine scope or unrestricted CSV switch. |
+| P31 | Merchandising grouping label | P.merchandisingLabel; no W mapping | SYSTEM | Merchandising label supplied by marketplace, not supplier CSV. |
+| P32 | Badge / Store price / maker offer | W→P.badge default `Store price`; P.badge | SYSTEM | Badges derived from supported offer/trust source; no self-awarded trust label. |
+| P33 | Price checked / confirmation text | W→P.confirmedOn default `Updated by store`; ROUTE `Updated by Store` | SYSTEM | Price confirmation/time from publication revision; current Updated by Store is not independent verification. |
+| P34 | Freight included | P.freightIncluded; W→P omits (default false) | STORE-DEFAULT | Freight inclusion from Store/channel/product policy and quote; missing W projection, not a retailer-guessed total. |
+| P35 | Manufacturer verified | P.manufacturerVerified; W→P omits (default false) | SYSTEM | Manufacturer verification from authorised verification source. |
+| P36 | Supplier selling grant | P.procurementSupplierGrant; W→P omits | SYSTEM | Wholesale supplier grant must be permission-backed; CSV channel cannot grant it. |
+| P37 | Private purchase cost | W.purchasePrice; deliberately absent from P | INTERNAL-CSV | purchasePrice remains internal and required today; do not publish cost or infer public necessity. |
+| P38 | Low-stock threshold | W.lowStockThreshold | INTERNAL-CSV | lowStockThreshold remains internal; default/store override, no Buy field. |
+| P39 | Stock receipt movement | WorkspaceStockMovement; session import/update | BATCH | Receipt/adjustment movement not a public product identity column. |
+| P40 | Product description | CONTENT.description; no W description mapping | CONTENT | Current public adapter generates description and UI suppresses duplicate summary. Custom description support is conditional catalogue-content gap, not mandatory duplicate CSV column. |
+| P41 | Product highlight | CONTENT.highlights[] | CONTENT | Current highlights derive from variant/unitPrice/returnPolicy and duplicate values are suppressed; independent approved highlights need content model wiring. |
+| P42 | Specification label | BuyV2ProductSpecification.label | CONTENT | Current specification labels Brand/Pack/Variant are generated; category-specific extra labels belong to controlled catalogue attributes. |
+| P43 | Specification value | BuyV2ProductSpecification.value | CONTENT | Current specification values reuse mapped identity; extra applicable values need approved catalogue schema and common editor/CSV path. |
+| C01 | Generic name / fallback Product | genericName | CSV-MISSING | Proposed genericName -> WorkspaceProductCompliance.genericName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C02 | Net quantity / fallback Pack | netQuantity | CSV-MISSING | Proposed netQuantity -> WorkspaceProductCompliance.netQuantity -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C03 | Manufacturer | manufacturerName | CSV-MISSING | Proposed manufacturerName -> WorkspaceProductCompliance.manufacturerName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C04 | Packer | packerName | CSV-MISSING | Proposed packerName -> WorkspaceProductCompliance.packerName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C05 | Importer | importerName | CSV-MISSING | Proposed importerName -> WorkspaceProductCompliance.importerName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C06 | Country of origin | countryOfOrigin | CSV-MISSING | Proposed countryOfOrigin -> WorkspaceProductCompliance.countryOfOrigin -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C07 | Manufactured or packed | manufacturedOrPackedOnLabel | BATCH | manufacturedOrPackedOn is batch-specific; preserve separately, never copy one date across SKU stock. |
+| C08 | Best before / use by | bestBeforeOrUseByLabel | BATCH | bestBeforeOrUseBy is batch-specific; preserve separately, never copy one date across SKU stock. |
+| C09 | FSSAI licence | fssaiLicenseNumber | CSV-MISSING | Proposed fssaiLicenseNumber -> WorkspaceProductCompliance.fssaiLicenseNumber -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C10 | Consumer care | consumerCare | CSV-MISSING | Proposed consumerCare -> WorkspaceProductCompliance.consumerCare -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| M01 | Illustration caption | W.visualLabel → P.visualLabel | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M02 | Illustration kind | W.visualKind → P.visualKind | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M03 | Media asset ID | P.mediaAssets[].id / CONTENT.media[].id | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M04 | Media caption | MEDIA asset.label | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M05 | Accessible media description | MEDIA asset.semanticLabel | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M06 | Image/video/fallback type | MEDIA asset.kind | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M07 | Image/video resource | MEDIA asset.source | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M08 | Video poster resource | MEDIA asset.posterSource | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M09 | Video transcript | MEDIA asset.transcript | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M10 | Supplier media ownership | MEDIA binding.supplierWorkspaceId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M11 | Store media binding | MEDIA binding.storeId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M12 | Product media binding | MEDIA binding.productId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M13 | SKU media binding | MEDIA binding.skuId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M14 | Asset revision | MEDIA binding.assetRevision | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M15 | MIME type | MEDIA file.mimeType | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M16 | File size | MEDIA file.byteLength | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M17 | Pixel width | MEDIA file.width | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M18 | Pixel height | MEDIA file.height | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M19 | Normalized file flag | MEDIA file.normalized | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M20 | Frame count | MEDIA file.frameCount | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M21 | Video duration | MEDIA file.duration | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M22 | Frame rate | MEDIA file.frameRate | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M23 | Video codec | MEDIA file.videoCodec | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M24 | Video profile | MEDIA file.videoProfile | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M25 | Audio codec | MEDIA file.audioCodec | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M26 | Poster metadata | MEDIA binding.posterFile | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| R01 | Policy summary | summary | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R02 | Available remedy | remedies[] | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R03 | Return/claim window | windowLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R04 | Conditions | conditionsLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R05 | Evidence/verification requirement | verificationLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R06 | How to initiate | initiationLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R07 | Approval requirement | approvalLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R08 | Pickup arrangement | pickupLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R09 | Refund method | refundMethodLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R10 | Refund timeline | refundTimelineLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R11 | Warranty | warrantyLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing. Product applicability may require catalogue-specific exception. |
+| R12 | Non-returnable reason | nonReturnableReason | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing. Product applicability may require catalogue-specific exception. |
+| R13 | Policy version | policyVersion | SYSTEM | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R14 | Effective date | effectiveFromLabel | SYSTEM | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| F01 | Available / Out of stock / Not accepting orders | FACT.orderabilityLabel; W.toBuyPublicFacts | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F02 | Open/closed | FACT.storeOperatingState | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F03 | Next opening | FACT.nextOpeningLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F04 | Order cutoff | FACT.orderCutoffLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F05 | Delivery charge label | FACT.deliveryFeeLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F06 | Delivery mode | FACT.fulfilmentMode | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F07 | Arrival / delivery estimate | FACT.deliveryPromise | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F08 | Dispatch promise | FACT.dispatchPromise | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F09 | Delivery provider / Handled by | FACT.deliveryProviderName | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F10 | Delivery service | FACT.deliveryServiceLevel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F11 | Collection eligible | FACT.storeCollection / COLLECT.supportsCollection | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F12 | Live price | FACT.price | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F13 | Facts source | FACT.sourceId | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F14 | Facts observation time | FACT.observedAt | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F15 | Stale facts state | FACT.stale | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F16 | Store distance | STORE.distanceMeters | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F17 | Product rating | TRUST.productRating | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F18 | Product rating count | TRUST.productRatingCount | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F19 | Verified-buyer count | TRUST.verifiedBuyerRatingCount | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F20 | Seller rating | TRUST.partnerRating | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F21 | Seller order count | TRUST.partnerOrderCount | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F22 | Seller location | TRUST.partnerLocation | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F23 | Service reliability | TRUST.serviceReliabilityLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F24 | Trust return summary | TRUST.returnSummary | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F25 | Customer review rating | BuyV2CustomerReview.rating | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F26 | Customer review comment | BuyV2CustomerReview.comment | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F27 | Review updated date | BuyV2CustomerReview.updatedLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F28 | Review product identity | BuyV2CustomerReview.productCanonicalId | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F29 | Content unavailable/loading/offline message | CONTENT.state/customerMessage | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F30 | Trust unavailable/loading/offline message | TRUST.state/customerMessage | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F31 | Promised-by label | FACT.promisedByLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F32 | Address confirmed | STOREFRONT-UI: trust.state ready AND nonempty locality | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| B01 | Coupon/payment-offer identity | BENEFIT.id | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B02 | Coupon vs payment offer | BENEFIT.kind | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B03 | Campaign channel | BENEFIT.destination | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B04 | Offer title | BENEFIT.title | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B05 | Offer description | BENEFIT.detail | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B06 | Campaign strategy | BENEFIT.strategy | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B07 | Sponsor type | BENEFIT.sponsor | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B08 | Sponsor name | BENEFIT.sponsorName | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B09 | Saving amount | BENEFIT.savingAmount | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B10 | Valid from | BENEFIT.validFrom | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B11 | Expires | BENEFIT.validUntil | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B12 | Free-delivery benefit | BENEFIT.freeDelivery | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B13 | Minimum spend | BENEFIT.minimumSpend | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B14 | Minimum quantity | BENEFIT.minimumQuantity | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B15 | Eligible payment methods | BENEFIT.eligiblePaymentMethods | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B16 | Published offer reference | BENEFIT.offerId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B17 | Benefit source | BENEFIT.sourceId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B18 | Published placement identity | BuyV2PublishedCatalogueOffer.publicationId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B19 | Publisher identity | BuyV2PublishedCatalogueOffer.publisherId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B20 | Publisher type | BuyV2PublishedCatalogueOffer.publisherType | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B21 | Publisher display name | BuyV2PublishedCatalogueOffer.publisherName | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B22 | Published headline | BuyV2PublishedCatalogueOffer.headline | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B23 | Published observed time | BuyV2PublishedCatalogueOffer.observedAt | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B24 | Published expiry | BuyV2PublishedCatalogueOffer.validUntil | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B25 | Published source | BuyV2PublishedCatalogueOffer.sourceId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| O01 | Quantity | BuyV2CartLine.quantity | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O02 | Cart channel | BuyV2CartScope / checkoutDestinations | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O03 | Delivery / Collect at store | session.collectionCheckoutSelected | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O04 | Saved address identity | ADDR.id; selectedAddressId | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O05 | Address type | ADDR.kind | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O06 | Address label | ADDR.label | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O07 | Recipient name | ADDR.recipient | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O08 | Phone number | ADDR.phone | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O09 | House, building and street | ADDR.line | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O10 | Area or locality | ADDR.area | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O11 | PIN code | ADDR.pinCode | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O12 | Nearby landmark | ADDR.landmark | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O13 | Request GST invoice | BuyV2GstInvoiceController.requestedFor(destination) | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O14 | Buyer legal name | BuyV2GstInvoiceDetails.legalName | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O15 | Buyer GSTIN | BuyV2GstInvoiceDetails.gstin | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O16 | Buyer billing address | BuyV2GstInvoiceDetails.billingAddress | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O17 | Remember GST details | GST controller/store; _remember | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O18 | Selected payment method | session.selectedPayment → REQUEST.paymentMethod | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O19 | Purchase order reference | session.purchaseOrderReference | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O20 | Selected commercial term | selected IDs → REQUEST.commercialPaymentTermIds | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O21 | Selected coupon | session selectedCartBenefits; quote adapter selectedBenefits | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O22 | Selected payment offer | session selectedCartBenefits; quote adapter selectedBenefits | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O23 | Delivery instruction | session delivery instructions; ORDER.deliveryInstruction | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O24 | Optional delivery tip | session tipForGroup; QUOTE.tip; ORDER.tip | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O25 | Final confirmation | submitOrder → SUBMIT | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| T01 | Seller accepted methods | TERMS.acceptedPaymentMethods; BuyV2CommerceSnapshot.paymentMethods | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T02 | Collection model / payee | PAYMENT-UI public copy MoolSocial; isStoreProcurement supplier copy | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T03 | COD acceptance | Public method Cash on Delivery | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T04 | Purchase-order acceptance | Public/Store method sets Purchase order | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T05 | Commercial term identity | TERMS.id | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T06 | Fulfilment-group binding | TERMS.fulfilmentKey | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T07 | Sales channel | TERMS.destination | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T08 | Supplier identity shown on term | TERMS.supplierName | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T09 | Payment-term type | TERMS.kind | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T10 | Advance percentage | TERMS.advancePercent | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T11 | Due-event label | TERMS.balanceDueLabel | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T12 | Credit days | TERMS.netDays | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T13 | Supplier micro/small classification | TERMS.supplierIsMicroOrSmall | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T14 | Financier name | TERMS.financierName | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T15 | APR | TERMS.annualPercentageRate | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T16 | Key-facts link | TERMS.keyFactsUri | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T17 | UPI transaction limit | TERMS.upiTransactionLimit | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T18 | Term source | TERMS.sourceId | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T19 | Term order total | TERMS.orderTotal | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T20 | Amount payable now | TERMS.amountDueNow / session.checkoutAmountDueNow | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T21 | Balance payable later | TERMS.balanceDue | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T22 | Payment provider reference | REQUEST result.paymentReference | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T23 | Payment handoff URI | REQUEST result.paymentActionUri | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T24 | Payment outcome/message | REQUEST result.outcome/customerMessage | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T25 | Bank beneficiary name for collection | BANK.beneficiaryName | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T26 | Collection bank name | BANK.bankName | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T27 | Collection account number | BANK.accountNumber | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T28 | Collection IFSC | BANK.ifsc | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T29 | Transfer reference | BANK.transferReference | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| Q01 | Line total | BuyV2CartLine.total = product.price × quantity | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q02 | Minimum order total | TRADE-UI facts.price × product.minimumOrder | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q03 | Product / distinct-line count | Cart lines count | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q04 | Units / packs count | BuyV2FulfilmentGroup.itemCount / line quantities | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q05 | Combined cart subtotal | Cart aggregates all scopes | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q06 | Item subtotal | QUOTE line.itemSubtotal | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q07 | Coupon saving | QUOTE line.couponSaving | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q08 | Tax | QUOTE line.tax | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q09 | Freight | QUOTE line.freight | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q10 | Delivery fee | QUOTE line.deliveryFee | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q11 | Tip | QUOTE line.tip | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q12 | Provider/payment charge | QUOTE line.paymentCharge | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q13 | Group payable total | QUOTE line.total | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q14 | Checkout payable total | QUOTE.total / session.checkoutPayableTotal | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q15 | Quote identity | QUOTE.id → REQUEST.checkoutQuoteId | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q16 | Quote source | QUOTE.sourceId | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q17 | Quote evaluation time | QUOTE.evaluatedAt | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q18 | Quote expiry | QUOTE.validUntil | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q19 | Shipment identity | BuyV2FulfilmentGroup.groupKey | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q20 | From / supplier | BuyV2FulfilmentGroup.partner | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q21 | Arrives | BuyV2FulfilmentGroup.promise / promisedByLabel | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q22 | Dispatches | BuyV2FulfilmentGroup.dispatchPromise | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q23 | Handled by | BuyV2FulfilmentGroup.deliveryProviderName | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q24 | Service | BuyV2FulfilmentGroup.deliveryServiceLevel | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q25 | Submission identity | REQUEST.idempotencyKey | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q26 | Supplier role | BuyV2FulfilmentGroup.partnerType | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| I01 | Invoice number | TAX.invoiceNumber | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I02 | Invoice date | TAX.issuedAt | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I03 | Invoice status | ORDER.taxInvoiceState | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I04 | Seller legal name | TAX.sellerLegalName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I05 | Seller address | TAX.sellerAddress | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I06 | Seller GSTIN | TAX.sellerGstin | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I07 | Seller PAN | TAX.sellerPan | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I08 | Seller CIN | TAX.sellerCin | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I09 | Seller FSSAI number | TAX.sellerFssaiNumber | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I10 | Recipient legal name | TAX.recipientLegalName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I11 | Recipient billing address | TAX.recipientBillingAddress | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I12 | Buyer GSTIN | TAX.buyerGstin | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I13 | Place of supply | TAX.placeOfSupply | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I14 | Reverse charge | TAX.reverseCharge | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I15 | IRN | TAX.irn | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I16 | Acknowledgement number | TAX.acknowledgementNumber | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I17 | Authorised signatory | TAX.authorizedSignatory | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I18 | Tax treatment | TAX.supplyStatement | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I19 | Correction / revision | TAX.revisionLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I20 | Invoice source | TAX.sourceId | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I21 | Line description | TAX line.description | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I22 | HSN/SAC | TAX line.hsnSac | TAX-CLASSIFICATION-GAP | Catalogue/product tax classification input missing from Store mapping. Controlled proposed hsnSac/gstRate for unmatched-product review only; not tax-engine authority or calculated tax amounts. |
+| I23 | Line quantity | TAX line.quantity | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I24 | Line unit | TAX line.unit | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I25 | Line unit price | TAX line.unitPrice | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I26 | Taxable value | TAX line.taxableValue | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I27 | GST rate | TAX line.gstRate | TAX-CLASSIFICATION-GAP | Catalogue/product tax classification input missing from Store mapping. Controlled proposed hsnSac/gstRate for unmatched-product review only; not tax-engine authority or calculated tax amounts. |
+| I28 | CGST amount | TAX line.cgst | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I29 | SGST amount | TAX line.sgst | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I30 | IGST amount | TAX line.igst | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I31 | Cess amount | TAX line.cess | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I32 | Total tax | TAX.totalTax / line.totalTax | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I33 | Order ID | ORDER.id | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I34 | Buyer name | ORDER.buyerName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I35 | Buyer role | ORDER.buyerType | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I36 | Payment method | ORDER.paymentMethod | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I37 | Purchase order | ORDER.purchaseOrderReference | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I38 | Payment term | ORDER.paymentTermLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I39 | Amount paid now | ORDER.amountPaidNow | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I40 | Payment status | ORDER.paymentStatusLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I41 | Balance due | ORDER.balanceDue | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I42 | Balance due event | ORDER.balanceDueLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I43 | Coupon reduction | ORDER.discount | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I44 | Tip | ORDER.tip | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I45 | Taxes | ORDER.tax | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I46 | Freight | ORDER.freight | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I47 | Delivery fee | ORDER.deliveryFee | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I48 | Payment charge | ORDER.paymentCharge | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I49 | Order total | ORDER.total / totalMinor | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I50 | Receipt reference | ORDER.receiptReference | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I51 | Platform service invoice | ORDER.platformTaxInvoiceDetails | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I52 | Delivery recipient | ORDER.recipient | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I53 | Delivery address | ORDER.addressLine | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I54 | Recorded estimate | ORDER.promise | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I55 | Updated delivery estimate | ORDER.updatedDeliveryEstimate | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I56 | Dispatch promise | ORDER.dispatchPromise | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I57 | Delivery partner name | ORDER.deliveryPartnerName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I58 | Delivery partner role | ORDER.deliveryPartnerType | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I59 | Delivery service | ORDER.deliveryServiceLevel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I60 | Tracking reference | ORDER.trackingReference | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I61 | Proof of delivery | ORDER.proofOfDeliveryStatus | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I62 | Delivery instruction | ORDER.deliveryInstruction | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I63 | Order stage | ORDER.status / progress | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I64 | Invoice available | ORDER.invoiceAvailable | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I65 | Recorded promised-by label | ORDER.promisedByLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| L01 | Settlement beneficiary legal name | No full beneficiary config in inspected STATE/FINANCE | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L02 | Settlement bank name | STATE.workspacePayoutBankName (display) | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L03 | Settlement account number | STATE.workspacePayoutAccountEnding only | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L04 | Settlement IFSC | No config in inspected STATE/FINANCE | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L05 | Beneficiary verification status | No complete setup state traced | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L06 | Settlement schedule | No Store-configurable schedule traced | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L07 | Store UPI ID | Not a settlement config in inspected STATE/FINANCE; BANK not UPI model | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L08 | Ledger account scope | FINANCE.accountScope | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L09 | Ledger Store ID | FINANCE.workspaceId | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L10 | Ledger revision | FINANCE.revision | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L11 | Ledger as-of time | FINANCE.asOf | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L12 | Sales today | FINANCE.salesTodayMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L13 | Customer dues | FINANCE.duesMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L14 | Available for settlement | FINANCE.availableMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L15 | Held amount | FINANCE.heldMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L16 | Settlement requested | FINANCE.requestedMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L17 | Paid to bank | FINANCE.paidOutMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L18 | Fees/platform adjustments | FINANCE.feesMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L19 | Delivery adjustments | FINANCE.deliveryAdjustmentsMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L20 | Refunds | FINANCE.refundsMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L21 | Tax withheld | FINANCE.taxWithheldMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L22 | History complete | FINANCE.historyComplete | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L23 | Payout reference | PAYOUT.id | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L24 | Payout operation identity | PAYOUT.operationId | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L25 | Payout revision | PAYOUT.revision | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L26 | Payout amount | PAYOUT.amountMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L27 | Payout update time | PAYOUT.updatedAt | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L28 | Payout status | PAYOUT.state | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L29 | Masked bank label | PAYOUT.bankLabel | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L30 | Expected payout date | PAYOUT.expectedBy | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L31 | Payout message | PAYOUT.message | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L32 | Requested withdrawal amount | Settlement request form → WorkSession request path | OWNER-ACTION | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| A01 | Search text | Buy catalogue query/session search | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A02 | Selected shopping area | BuyV2ShoppingArea / BuyV2CatalogueQuery | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A03 | Quick / Scheduled | BuyV2ShopSaleType | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A04 | Wholesale / Bulk | BuyV2WholesaleSaleType | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A05 | Price filter | Catalogue query/refinement | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A06 | Brand filter | Catalogue query/refinement | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A07 | Pack filter | BuyV2PackFilter | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A08 | Sort / recommendations | BuyV2ProductSort / recommendation source | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A09 | Product/catalogue result count | BuyV2CataloguePage.totalCount | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A10 | Store product count | Store catalogue page.totalCount | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A11 | Comparison origin | COMPARE.originLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A12 | Comparison local flag | COMPARE.local | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A13 | Comparison serviceable | COMPARE.serviceable | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A14 | Comparison customer eligible | COMPARE.customerEligible | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A15 | Comparison available packs | COMPARE.availablePacks | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A16 | Comparison pack price | COMPARE.packPriceMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A17 | Comparison tax | BuyV2ComparisonCharges.taxMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A18 | Comparison freight | BuyV2ComparisonCharges.freightMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A19 | Mandatory comparison fees | BuyV2ComparisonCharges.mandatoryFeesMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A20 | Immediate comparison discount | BuyV2ComparisonCharges.immediateDiscountMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A21 | Earliest arrival | COMPARE.arrivalStart | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A22 | Latest arrival | COMPARE.arrivalEnd | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A23 | Comparison dispatch label | COMPARE.dispatchLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A24 | Local market insight locality | SIGNAL.localityLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A25 | Insight headline | SIGNAL.headline | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A26 | Insight detail | SIGNAL.detail | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A27 | Insight source label | SIGNAL.sourceLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A28 | Insight updated label | SIGNAL.updatedLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A29 | Price-valid-until label | SIGNAL.priceValidUntilLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A30 | Save product | Saved-product identity/state | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A31 | Share product / Store | Product/Store route and share destination | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A32 | Ask seller / manufacturer | Product + Store recipient routing | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A33 | Report product | Commerce adapter reportProduct(product, reason) | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+
+## Active v23 — one-time Store setup versus per-SKU CSV, awaiting visuals
+
+Founder directed separation first, then pending CSV frontend screens, including
+exact variants and public-field mapping. This bounded increment implements the
+eight missing pack-detail columns through existing WorkspaceProductCompliance,
+shared editor/snapshot and Buy adapter. No duplicate product model or backend.
+
+One-time Store profile/legal/contact, payment acceptance, UPI/bank setup, delivery
+coverage and default terms stay out of SKU CSV. Settings screens/default inheritance
+remain pending; this guide must not be mistaken for their implementation.
+Each new-SKU import row carries identity, applicable variant/pack, supported price,
+opening stock and current required private purchase cost. Exact catalogue matches
+preserve blank optional facts; facts are per exact SKU, not per Store. CSV adds new
+products, not silent restock/update of existing stock. Identical rows are rejected.
+
+Added columns: genericName, netQuantity, manufacturerName, packerName,
+importerName, countryOfOrigin, fssaiLicenseNumber, consumerCare. Template and guide
+reuse one label/schema owner. It now has 29 supported headers; this is NOT a complete
+Wholesale contract. Dates remain batch-specific and are cleared on new Store copy.
+Changed or new pack facts set the existing publication review hold; identical
+trimmed values keep the prior hold state, never clear it. Imports remain private.
+
+Guide groups per-SKU inputs, variant/pricing/stock options, product/pack facts and
+Store Settings guidance. Other approved layouts stay unchanged. No APK or OPPO.
+
+Evidence: task outputs/store-csv-fields-v23/ONE-TIME-AND-CSV-DECISION.md and the
+prior outputs/store-csv-public-reconciliation-v22.md (400 unique retained IDs,
+not 400 runtime tests). tests-r1.log: 32 affected tests passed, including all eight
+CSV -> snapshot -> public properties and rendered public pack panel, blank/same/
+changed match facts, 1000 variants, excluded Store/batch inputs, 10000-row bound,
+connected save/cancel/scope checks and shared editor regressions. analysis-r1.log
+clean. Initial capture framing was adjusted to show expanded content after scroll
+settles; this is test-only framing, not layout acceptance. Final images are at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-csv-fields-v23-final.
+
+Pending: founder approval of the import guide; detailed row/field error-review
+screen, shared Wholesale offers and currency/units, structured variant axes,
+Store defaults, content/tax-classification gaps, publication readiness, backend
+and physical OPPO. No claim that the eight columns finish full publication.
+v20/v21 were not approved; v23 is local/uncommitted. Preserve pushed dff6c124.
+
+## Active v20 — CSV validation and batch review, awaiting founder visuals
+
+Founder selected this next frontend step. Implemented locally; no backend/APK,
+commit/push or new-screen acceptance yet. Preserve v19 checkpoint dff6c124.
+
+Journey: Import CSV > existing file picker > full-page Review import > select
+ready rows / inspect Needs attention > optional existing product editor with
+Apply to import > explicit Save N to Store. Back/cancel and draft edits do not
+write stock. Save uses the existing inventory/persistence and Counter Sale source;
+all imported products remain Store-only, never silently published.
+
+Shared model owner now parses quoted fields, escaped quotes, embedded newlines,
+CRLF and UTF-8 BOM; validates headings, column counts, numbers and stock modes.
+Limits: 10 MB source, 10,000 products, 50 CSV columns, 4,000-character CSV cells.
+Unknown columns fail explicitly rather than silently dropping data. Current
+integer-price rules are shared with the existing editor, not independently
+invented decimal/Wholesale behavior. Required values and prior price-above-cost
+rule remain unchanged; broader pricing semantics is still separate work.
+
+Matching uses exact brand/title/variant/pack and supplied barcode/canonical ID,
+never the first loose OR match. Conflicting/ambiguous records are blocked.
+Existing stock, repeated SKUs/barcodes/identities and concurrent stock changes
+are rejected without overwrite. Imported source IDs cannot overwrite inventory.
+Catalogue photos are inherited only from the matched exact SKU; batch dates
+are cleared. No catalogue match means a private product needing photo review.
+Ready records use the existing full product editor in draft mode. Blocked source
+records are corrected in the original file and re-imported; no separate editor
+or speculative spreadsheet system. Nonselected/blocked records are not saved.
+Sticky Store/account scope checks cover picker, review and final save.
+
+Large review rows are lazily rendered; the shared inventory import indexes
+existing IDs/SKUs for batch processing. Normal Store/catalogue editor, public
+mapping, stock statement and Counter Sale regression coverage is retained.
+
+Evidence at task outputs/store-csv-review-v20:
+- tests-r3.log: 32 affected tests passed.
+- tests-final.log: 8 final CSV tests passed after final accessibility copy and
+  large-list checks. Includes 10,000-row parse/lazy rendering, all-invalid disable,
+  quoted fields, invalid amounts, duplicates, matching, existing inventory,
+  cancellation, draft edit/no premature save, Store and concurrent-stock changes.
+- analysis-final.log: five owners analyzed clean. Scoped diff check passed.
+- Local Flutter images: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-csv-review-v20-final.
+  csv-connected-review-cancel.png and csv-connected-attention.png are actual
+  Store > Add product > Import CSV navigation with synthetic file data.
+  Normal and 200% text component renders are also retained.
+
+Recorded local defects: the first error-state review overflowed at 200% text.
+Header/error and lazy rows now share a scroll area above the reachable save
+footer. The following test needed to scroll a lazily disposed heading back into
+view; corrected without weakening its assertions. Short Check label at enlarged
+text prevents chip truncation. Initial test API/theme mismatches and brace/style
+infos were corrected; failed logs remain, only named passing runs qualify.
+
+Remaining: founder visual approval, physical file-picker/keyboard/performance and
+OPPO replay. No live catalogue/backend publication proof, import history or cloud
+durability claim. Later public-field mapping, Store defaults and broader PDF
+font coverage remain separate frontend work; historical backend reports deferred.
+
 ## Active v19 — frontend direct Android Stock downloads
 
 Founder requested remaining frontend work first; backend reports remain deferred.

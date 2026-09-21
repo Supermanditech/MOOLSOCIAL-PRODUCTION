@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/design/mool_colors.dart';
 import '../../../ui_v2/buy/buy_v2_design.dart';
 import '../work_models.dart';
+import '../work_stock_export.dart';
 
 // Share the entry's mode callback without introducing another route or draft.
 class _StoreAddModeScope extends InheritedWidget {
@@ -115,6 +116,7 @@ class StoreAddProductEntryScreen extends StatefulWidget {
     required this.catalogue,
     required this.manual,
     required this.importCsv,
+    this.downloadCsvTemplate = downloadStoreProductCsvTemplate,
     this.catalogueEditing = false,
     this.onCloseCatalogueEditor,
   });
@@ -124,6 +126,7 @@ class StoreAddProductEntryScreen extends StatefulWidget {
   final Widget catalogue;
   final Widget manual;
   final Future<String?> Function() importCsv;
+  final Future<String?> Function() downloadCsvTemplate;
   final bool catalogueEditing;
   final VoidCallback? onCloseCatalogueEditor;
 
@@ -135,10 +138,33 @@ class StoreAddProductEntryScreen extends StatefulWidget {
 class _StoreAddProductEntryScreenState
     extends State<StoreAddProductEntryScreen> {
   bool _importing = false;
+  bool _templateBusy = false;
   String? _importStatus;
+  Future<void> _downloadTemplate() async {
+    if (_templateBusy || _importing) return;
+    setState(() {
+      _templateBusy = true;
+      _importStatus = null;
+    });
+    try {
+      final message = await widget.downloadCsvTemplate();
+      if (mounted) setState(() => _importStatus = message);
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _importStatus = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _importStatus =
+              'Could not download the template. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _templateBusy = false);
+    }
+  }
 
   Future<void> _import() async {
-    if (_importing) return;
+    if (_importing || _templateBusy) return;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _importing = true;
@@ -178,13 +204,13 @@ class _StoreAddProductEntryScreenState
                   : _StoreAddModeSelector(
                       index: widget.selectedIndex,
                       onSelected: widget.onSelected,
-                      enabled: !_importing,
+                      enabled: !_importing && !_templateBusy,
                     ),
             ),
       body: SafeArea(
         child: _StoreAddModeScope(
           onSelected: widget.onSelected,
-          enabled: !_importing,
+          enabled: !_importing && !_templateBusy,
           child: IndexedStack(
             index: widget.selectedIndex,
             children: [widget.catalogue, widget.manual, _csvPanel()],
@@ -194,94 +220,625 @@ class _StoreAddProductEntryScreenState
     );
   }
 
+  Widget _columnGuide(bool required, {bool packFacts = false}) => Column(
+    children: [
+      for (final entry in WorkspaceProductImport.templateLabels.entries)
+        if (WorkspaceProductImport.requiredColumns.contains(entry.key) ==
+                required &&
+            WorkspaceProductImport.packFieldLabels.containsKey(entry.key) ==
+                packFacts)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: LayoutBuilder(
+              builder: (context, size) {
+                final label = Text(
+                  entry.value,
+                  style: const TextStyle(fontSize: 12, color: MoolColors.navy),
+                );
+                final name = Text(
+                  entry.key,
+                  style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+                );
+                return MediaQuery.textScalerOf(context).scale(1) > 1.5
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [label, name],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: label),
+                          Expanded(child: name),
+                        ],
+                      );
+              },
+            ),
+          ),
+    ],
+  );
+
   Widget _csvPanel() => SingleChildScrollView(
     key: const Key('work-add-product-csv-panel'),
-    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: MoolColors.canvas,
-            border: Border.all(color: MoolColors.line),
-            borderRadius: BorderRadius.circular(18),
+        const Text(
+          'Add your product list',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: MoolColors.navy,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.upload_file_outlined,
-                size: 32,
-                color: MoolColors.navy,
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'One row per SKU, variant and pack. Up to 10,000 products · 10 MB.',
+          style: TextStyle(fontSize: 12, height: 1.4, color: MoolColors.muted),
+        ),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          key: const Key('work-add-product-choose-csv'),
+          onPressed: _importing || _templateBusy ? null : _import,
+          icon: const Icon(Icons.upload_file_outlined, size: 20),
+          label: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(_importing ? 'Opening…' : 'Choose CSV file'),
+          ),
+        ),
+        TextButton.icon(
+          key: const Key('work-add-product-download-template'),
+          onPressed: _templateBusy || _importing ? null : _downloadTemplate,
+          icon: const Icon(Icons.download_outlined, size: 18),
+          label: Text(_templateBusy ? 'Downloading…' : 'Download CSV template'),
+        ),
+        const Text(
+          'Review before saving. Importing does not publish products.',
+          style: TextStyle(fontSize: 12, height: 1.4, color: MoolColors.muted),
+        ),
+        if (_importStatus != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                _importStatus!,
+                key: const Key('work-add-product-import-status'),
+                style: const TextStyle(fontSize: 12, color: MoolColors.navy),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Import your product list',
+            ),
+          ),
+        const SizedBox(height: 18),
+        const Text(
+          'Fill for each SKU',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: MoolColors.navy,
+          ),
+        ),
+        const SizedBox(height: 4),
+        _columnGuide(true),
+        const SizedBox(height: 6),
+        const Text(
+          'Purchase cost stays private. Prices use whole rupees, without ₹ or commas. Stock uses whole quantities.',
+          style: TextStyle(fontSize: 11, height: 1.5, color: MoolColors.muted),
+        ),
+        const Divider(height: 24),
+        ExpansionTile(
+          key: const Key('work-csv-optional-columns'),
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          title: const Text(
+            'Variant, pricing and stock options',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          subtitle: const Text(
+            'Include the exact variant when applicable',
+            style: TextStyle(fontSize: 11),
+          ),
+          children: [
+            _columnGuide(false),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Use a separate row for each variant and pack. Keep SKU and barcode columns as text to preserve leading zeros. Stock tracking: exactQuantity or availabilityOnly. Available for sale: true or false. Low-stock levels stay private.',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: MoolColors.navy,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Choose a CSV file to add products to your store.',
-                style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 11,
                   height: 1.5,
                   color: MoolColors.muted,
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  key: const Key('work-add-product-choose-csv'),
-                  onPressed: _importing ? null : _import,
-                  icon: const Icon(Icons.upload_rounded),
-                  label: Text(_importing ? 'Importing…' : 'Choose CSV file'),
+            ),
+          ],
+        ),
+        ExpansionTile(
+          key: const Key('work-csv-pack-facts'),
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          title: const Text(
+            'Product and pack details',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          subtitle: const Text(
+            'Fill missing facts or correct catalogue details',
+            style: TextStyle(fontSize: 11),
+          ),
+          children: [
+            const Text(
+              'An exact catalogue match keeps its photo and pack facts. Leave these cells blank to keep those facts. Add only applicable details; changes need review before publication.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: MoolColors.muted,
+              ),
+            ),
+            _columnGuide(false, packFacts: true),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Manufacturing and expiry dates belong to each stock batch, not every unit of this SKU.',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.5,
+                  color: MoolColors.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        ExpansionTile(
+          key: const Key('work-csv-catalogue-settings'),
+          tilePadding: EdgeInsets.zero,
+          title: const Text(
+            'Set once in Store Settings',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          children: const [
+            Padding(
+              padding: EdgeInsets.only(bottom: 14),
+              child: Text(
+                'Keep your Store profile, business details, accepted payment methods, UPI and bank setup, delivery coverage and default terms out of this CSV. These belong in Store Settings, not in every product row.\n\nUse product-specific delivery or return details only where that product differs. Never include bank details, payment status or invoice totals in this file.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: MoolColors.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+/// File review reuses product records and the same editor via [editProduct].
+class StoreProductImportReviewScreen extends StatefulWidget {
+  const StoreProductImportReviewScreen({
+    super.key,
+    required this.fileName,
+    required this.review,
+    required this.editProduct,
+    required this.saveProducts,
+  });
+  final String fileName;
+  final WorkspaceProductImport review;
+  final Future<WorkspaceCatalogueItem?> Function(WorkspaceCatalogueItem)
+  editProduct;
+  final Future<String?> Function(List<WorkspaceCatalogueItem>) saveProducts;
+  @override
+  State<StoreProductImportReviewScreen> createState() =>
+      _StoreProductImportReviewScreenState();
+}
+
+class _StoreProductImportReviewScreenState
+    extends State<StoreProductImportReviewScreen> {
+  final _scroll = ScrollController();
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _showError(String error) {
+    setState(() => _error = error);
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  late final List<WorkspaceProductImportRow> _rows = List.of(
+    widget.review.rows,
+  );
+  late final Set<int> _selected = {
+    for (final r in _rows)
+      if (r.product != null) r.number,
+  };
+  bool _issuesOnly = false, _busy = false;
+  String? _error;
+  Future<void> _edit(int index) async {
+    final row = _rows[index];
+    final edited = await widget.editProduct(row.product!);
+    if (!mounted || edited == null) return;
+    final duplicate = _rows.any(
+      (r) =>
+          r.number != row.number &&
+          r.product != null &&
+          (r.product!.sku.toLowerCase() == edited.sku.toLowerCase() ||
+              (edited.barcode.isNotEmpty &&
+                  r.product!.barcode == edited.barcode) ||
+              WorkspaceProductImport.identity(r.product!) ==
+                  WorkspaceProductImport.identity(edited)),
+    );
+    setState(() {
+      if (duplicate) {
+        _error =
+            'This SKU, barcode or product is already in this file. Your previous details are unchanged.';
+      } else {
+        _error = null;
+        _rows[index] = WorkspaceProductImportRow(
+          row.number,
+          edited.title,
+          edited.copyWith(publicListing: false),
+          null,
+          row.matched,
+        );
+      }
+    });
+  }
+
+  Future<void> _save() async {
+    if (_busy || _selected.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final error = await widget.saveProducts([
+        for (final r in _rows)
+          if (_selected.contains(r.number) && r.product != null) r.product!,
+      ]);
+      if (!mounted) return;
+      if (error != null) {
+        _showError(error);
+      } else {
+        Navigator.of(context).pop(true);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Could not save products. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _rows.where((r) => r.product != null).length;
+    final attention = _rows.length - ready;
+    final visible = _rows
+        .asMap()
+        .entries
+        .where(
+          (e) =>
+              _issuesOnly ? e.value.product == null : e.value.product != null,
+        )
+        .toList();
+    return PopScope(
+      canPop: !_busy,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('Review import'),
+          backgroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: CustomScrollView(
+                  key: const Key('work-import-rows'),
+                  controller: _scroll,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MoolColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                ChoiceChip(
+                                  key: const Key('work-import-ready'),
+                                  label: Text('Ready · $ready'),
+                                  selected: !_issuesOnly,
+                                  onSelected: _busy
+                                      ? null
+                                      : (_) =>
+                                            setState(() => _issuesOnly = false),
+                                ),
+                                ChoiceChip(
+                                  key: const Key('work-import-issues'),
+                                  label: Text(
+                                    MediaQuery.textScalerOf(context).scale(1) >
+                                            1.5
+                                        ? 'Check · $attention'
+                                        : 'Needs attention · $attention',
+                                  ),
+                                  selected: _issuesOnly,
+                                  onSelected: _busy
+                                      ? null
+                                      : (_) =>
+                                            setState(() => _issuesOnly = true),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _issuesOnly
+                                  ? 'First issue shown for each row. Correct your CSV, then import again.'
+                                  : 'Save selected products to Store stock. Nothing is published.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MoolColors.muted,
+                              ),
+                            ),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: Divider(height: 1)),
+                    visible.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  _issuesOnly
+                                      ? 'No rows need attention.'
+                                      : 'No products are ready. Check Needs attention.',
+                                ),
+                              ),
+                            ),
+                          )
+                        : SliverList.builder(
+                            itemCount: visible.length,
+                            itemBuilder: (context, i) {
+                              final entry = visible[i],
+                                  row = entry.value,
+                                  product = row.product;
+                              return Container(
+                                key: Key('work-import-row-${row.number}'),
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(color: MoolColors.line),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (product != null)
+                                      Checkbox(
+                                        value: _selected.contains(row.number),
+                                        onChanged: _busy
+                                            ? null
+                                            : (value) => setState(() {
+                                                if (value == true) {
+                                                  _selected.add(row.number);
+                                                } else {
+                                                  _selected.remove(row.number);
+                                                }
+                                              }),
+                                      )
+                                    else
+                                      const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 20,
+                                          color: Color(0xFF9A4A00),
+                                        ),
+                                      ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 4,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              row.title,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: MoolColors.navy,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            if (product == null &&
+                                                [
+                                                  row.sku,
+                                                  row.variant,
+                                                  row.pack,
+                                                ].any((v) => v.isNotEmpty))
+                                              Text(
+                                                [
+                                                  if (row.sku.isNotEmpty)
+                                                    'SKU ${row.sku}',
+                                                  if (row.variant.isNotEmpty)
+                                                    row.variant,
+                                                  if (row.pack.isNotEmpty)
+                                                    row.pack,
+                                                ].join(' · '),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: MoolColors.muted,
+                                                ),
+                                              ),
+                                            Text(
+                                              product == null
+                                                  ? 'Row ${row.number}'
+                                                  : '${product.variant.isEmpty ? '' : '${product.variant} · '}${product.pack} · ₹${product.sellingPrice} · ${product.stockMode == WorkspaceStockMode.availabilityOnly ? (product.available ? 'Available' : 'Unavailable') : '${product.stock} in stock'}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: MoolColors.muted,
+                                              ),
+                                            ),
+                                            if (product == null) ...[
+                                              for (final entry
+                                                  in row.issueValues.entries)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 8,
+                                                      ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        '${WorkspaceProductImport.templateLabels[entry.key] ?? entry.key} · ${entry.key}',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              MoolColors.navy,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        'Entered: ${entry.value.isEmpty ? '(empty)' : entry.value}',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              MoolColors.muted,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 8,
+                                                ),
+                                                child: Text(
+                                                  'Correction: ${row.issue}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: MoolColors.navy,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                            if (product != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 4,
+                                                ),
+                                                child: Text(
+                                                  product.catalogueFactsRequireReview
+                                                      ? 'Product facts need review · Store only'
+                                                      : row.matched
+                                                      ? 'Catalogue match · Store only'
+                                                      : 'New product · Photo review needed',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: MoolColors.muted,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    if (product != null)
+                                      IconButton(
+                                        key: Key(
+                                          'work-import-edit-${row.number}',
+                                        ),
+                                        tooltip: 'Edit product',
+                                        onPressed: _busy
+                                            ? null
+                                            : () => _edit(entry.key),
+                                        icon: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 20,
+                                          color: MoolColors.navy,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (attention > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          '$attention rows need correction and will not be added.',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: MoolColors.muted,
+                          ),
+                        ),
+                      ),
+                    FilledButton(
+                      key: const Key('work-import-save'),
+                      onPressed: _busy || _selected.isEmpty ? null : _save,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          _busy
+                              ? 'Saving…'
+                              : 'Save ${_selected.length} to Store',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        const Text(
-          'Include these columns',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: MoolColors.navy,
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'title · brand · pack · purchasePrice · sellingPrice · stock',
-          style: TextStyle(fontSize: 13, height: 1.6, color: MoolColors.muted),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Use these exact column names in the first row of your file.',
-          style: TextStyle(fontSize: 13, height: 1.5, color: MoolColors.muted),
-        ),
-        if (_importStatus != null) ...[
-          const SizedBox(height: 20),
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              _importStatus!,
-              key: const Key('work-add-product-import-status'),
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 /// Selects identity only. Store prices, stock and visibility are edited next.

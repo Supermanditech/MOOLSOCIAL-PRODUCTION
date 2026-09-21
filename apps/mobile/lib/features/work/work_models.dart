@@ -4767,6 +4767,622 @@ class WorkspaceCataloguePhoto {
   }
 }
 
+/// One row of a file review. Blocked rows never become inventory implicitly.
+class WorkspaceProductImportRow {
+  const WorkspaceProductImportRow(
+    this.number,
+    this.title,
+    this.product,
+    this.issue,
+    this.matched, {
+    this.issueValues = const {},
+    this.variant = '',
+    this.pack = '',
+    this.sku = '',
+  });
+  final int number;
+  final String title;
+  final WorkspaceCatalogueItem? product;
+  final String? issue;
+  final bool matched;
+  final Map<String, String> issueValues;
+  final String variant, pack, sku;
+}
+
+class WorkspaceProductImport {
+  const WorkspaceProductImport(this.rows);
+  final List<WorkspaceProductImportRow> rows;
+  // The same compliance keys used by the shared editor and Buy projection.
+  // Batch dates are deliberately not SKU-wide import fields.
+  static const packFieldLabels = {
+    'genericName': 'Generic product name',
+    'netQuantity': 'Net quantity',
+    'manufacturerName': 'Manufacturer',
+    'packerName': 'Packer',
+    'importerName': 'Importer, if applicable',
+    'countryOfOrigin': 'Country of origin',
+    'fssaiLicenseNumber': 'Manufacturer FSSAI number, if applicable',
+    'consumerCare': 'Product consumer care',
+  };
+  static const requiredColumns = {
+    'title',
+    'brand',
+    'pack',
+    'purchasePrice',
+    'sellingPrice',
+    'stock',
+  };
+  static final columns = Set<String>.unmodifiable({
+    ...requiredColumns,
+    'sku',
+    'barcode',
+    'canonicalId',
+    'variant',
+    'categoryId',
+    'mrp',
+    'minimumOrder',
+    'lowStockThreshold',
+    'stockMode',
+    'available',
+    'publicListing',
+    'unitPrice',
+    'deliveryPromise',
+    'returnPolicy',
+    'origin',
+    'visualLabel',
+    'composition',
+    'regulatoryNote',
+    ...packFieldLabels.keys,
+  });
+  // One schema owns the download headings and the retailer's column guide.
+  // Identity/approval metadata and publication requests are not template inputs.
+  static const templateLabels = {
+    'title': 'Product name',
+    'brand': 'Brand or maker',
+    'pack': 'Pack size',
+    'purchasePrice': 'Purchase cost',
+    'sellingPrice': 'Selling price',
+    'stock': 'Stock quantity',
+    'sku': 'Your Store SKU',
+    'barcode': 'Product barcode',
+    'variant': 'Variant',
+    'categoryId': 'Category',
+    'mrp': 'MRP',
+    'minimumOrder': 'Minimum order',
+    'lowStockThreshold': 'Low-stock level',
+    'stockMode': 'Stock tracking',
+    'available': 'Available for sale',
+    'unitPrice': 'Unit-price label',
+    'deliveryPromise': 'Product delivery terms',
+    'returnPolicy': 'Product return terms',
+    'origin': 'Product origin',
+    'composition': 'Ingredients or composition',
+    'regulatoryNote': 'Product regulatory note',
+    ...packFieldLabels,
+  };
+  static String get csvTemplate => '\uFEFF${templateLabels.keys.join(',')}\r\n';
+  static String identity(WorkspaceCatalogueItem p) => jsonEncode([
+    p.brand.toLowerCase().trim(),
+    p.title.toLowerCase().trim(),
+    p.pack.toLowerCase().trim(),
+    p.variant.toLowerCase().trim(),
+  ]);
+
+  /// RFC-style quoted cells, escaped quotes, embedded newlines and UTF-8 BOM.
+  /// Limits apply before allocating an unbounded row list.
+  static List<List<String>> csv(String text, {List<int>? rowNumbers}) {
+    if (text.startsWith('\uFEFF')) text = text.substring(1);
+    final rows = <List<String>>[];
+    var recordNumber = 1;
+    var row = <String>[];
+    var cell = StringBuffer();
+    var quoted = false, endedQuote = false;
+    void endCell() {
+      row.add(cell.toString().trim());
+      if (row.length > 50) {
+        throw const FormatException(
+          'Too many columns. Use the listed product columns.',
+        );
+      }
+      cell = StringBuffer();
+      endedQuote = false;
+    }
+
+    void endRow() {
+      endCell();
+      if (row.any((value) => value.isNotEmpty)) {
+        rows.add(row);
+        rowNumbers?.add(recordNumber);
+      }
+      recordNumber++;
+      row = [];
+      if (rows.length > 10001) {
+        throw const FormatException('Import up to 10,000 products at a time.');
+      }
+    }
+
+    for (var i = 0; i < text.length; i++) {
+      final c = text[i];
+      if (quoted) {
+        if (c == '"') {
+          if (i + 1 < text.length && text[i + 1] == '"') {
+            cell.write('"');
+            i++;
+          } else {
+            quoted = false;
+            endedQuote = true;
+          }
+        } else {
+          cell.write(c);
+        }
+      } else if (c == ',') {
+        endCell();
+      } else if (c == '\n' || c == '\r') {
+        if (c == '\r' && i + 1 < text.length && text[i + 1] == '\n') i++;
+        endRow();
+      } else if (c == '"' && cell.isEmpty && !endedQuote) {
+        quoted = true;
+      } else if (c == '"' || (endedQuote && c.trim().isNotEmpty)) {
+        throw const FormatException(
+          'Check the quotation marks in your CSV file.',
+        );
+      } else if (!endedQuote) {
+        cell.write(c);
+      }
+      if (cell.length > 4000) {
+        throw const FormatException(
+          'A cell is too long. Keep each value within 4,000 characters.',
+        );
+      }
+    }
+    if (quoted) {
+      throw const FormatException(
+        'A quoted cell is not closed. Check your CSV file.',
+      );
+    }
+    if (cell.isNotEmpty || row.isNotEmpty || endedQuote) endRow();
+    return rows;
+  }
+
+  static WorkspaceProductImport parse(
+    String text, {
+    bool json = false,
+    required List<WorkspaceCatalogueItem> catalogue,
+    required List<WorkspaceCatalogueItem> owned,
+  }) {
+    if (text.length > 10 * 1024 * 1024) {
+      throw const FormatException('Choose a file smaller than 10 MB.');
+    }
+    final records = <Map<String, String>>[];
+    final rowNumbers = <int>[];
+    final malformed = <int>{};
+    if (json) {
+      final decoded = jsonDecode(text);
+      if (decoded is! List || decoded.isEmpty || decoded.length > 10000) {
+        throw const FormatException('Choose a list of 1 to 10,000 products.');
+      }
+      for (final value in decoded) {
+        if (value is! Map) {
+          throw const FormatException('Every product must be a record.');
+        }
+        records.add(
+          value.map(
+            (key, value) => MapEntry('$key', value == null ? '' : '$value'),
+          ),
+        );
+        rowNumbers.add(records.length);
+      }
+    } else {
+      final table = csv(text, rowNumbers: rowNumbers);
+      if (rowNumbers.isNotEmpty) rowNumbers.removeAt(0);
+      if (table.length < 2) {
+        throw const FormatException(
+          'Include column headings and at least one product.',
+        );
+      }
+      final headers = table.first;
+      if (headers.toSet().length != headers.length ||
+          headers.any((h) => h.isEmpty)) {
+        throw const FormatException('Use a unique name for every column.');
+      }
+      if (!headers.toSet().containsAll(requiredColumns)) {
+        throw const FormatException(
+          'Required columns: title, brand, pack, purchasePrice, sellingPrice, stock.',
+        );
+      }
+      for (final values in table.skip(1)) {
+        if (values.length != headers.length) malformed.add(records.length);
+        records.add({
+          for (var i = 0; i < headers.length; i++)
+            headers[i]: i < values.length ? values[i] : '',
+        });
+      }
+    }
+    final unknown = records.expand((r) => r.keys).toSet().difference(columns);
+    if (unknown.isNotEmpty) {
+      throw FormatException(
+        'Unsupported columns: ${unknown.take(5).join(', ')}. No products were saved.',
+      );
+    }
+    final byBarcode = <String, List<WorkspaceCatalogueItem>>{};
+    final byCanonical = <String, List<WorkspaceCatalogueItem>>{};
+    final byIdentity = <String, List<WorkspaceCatalogueItem>>{};
+    for (final p in catalogue) {
+      if (p.barcode.isNotEmpty) {
+        byBarcode.putIfAbsent(p.barcode, () => []).add(p);
+      }
+      byCanonical.putIfAbsent(p.canonicalId, () => []).add(p);
+      byIdentity.putIfAbsent(identity(p), () => []).add(p);
+    }
+    final skus = owned.map((p) => p.sku.toLowerCase().trim()).toSet();
+    final barcodes = owned
+        .where((p) => p.barcode.isNotEmpty)
+        .map((p) => p.barcode)
+        .toSet();
+    final identities = owned.map(identity).toSet();
+    final ownedIds = owned.map((p) => p.id).toSet();
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final result = <WorkspaceProductImportRow>[];
+    for (var index = 0; index < records.length; index++) {
+      final r = records[index].map((k, v) => MapEntry(k, v.trim()));
+      String value(String key) => r[key] ?? '';
+      final title = value('title');
+      WorkspaceProductImportRow blocked(
+        String issue, {
+        List<String> fields = const [],
+      }) => WorkspaceProductImportRow(
+        rowNumbers[index],
+        title.isEmpty ? 'Unnamed product' : title,
+        null,
+        issue,
+        false,
+        issueValues: Map.unmodifiable({
+          for (final key in fields) key: value(key),
+        }),
+        variant: value('variant'),
+        pack: value('pack'),
+        sku: value('sku'),
+      );
+      if (malformed.contains(index)) {
+        result.add(blocked('Column count does not match the headings.'));
+        continue;
+      }
+      final purchase = int.tryParse(value('purchasePrice'));
+      final selling = int.tryParse(value('sellingPrice'));
+      final stock = int.tryParse(value('stock'));
+      final mrp = int.tryParse(value('mrp'));
+      final minimum = value('minimumOrder').isEmpty
+          ? 1
+          : int.tryParse(value('minimumOrder'));
+      final low = value('lowStockThreshold').isEmpty
+          ? 5
+          : int.tryParse(value('lowStockThreshold'));
+      final error = workspaceProductValuesIssue(
+        title: title,
+        brand: value('brand'),
+        pack: value('pack'),
+        category: value('categoryId').isEmpty ? 'other' : value('categoryId'),
+        sku: value('sku').isEmpty ? 'import-$stamp-$index' : value('sku'),
+        purchase: purchase,
+        selling: selling,
+        stock: stock,
+        mrp: mrp,
+        lowStockThreshold: low,
+        minimumOrder: minimum,
+        delivery: value('deliveryPromise').isEmpty
+            ? 'Store pickup or local delivery'
+            : value('deliveryPromise'),
+      );
+      if (error != null) {
+        result.add(blocked(error.message, fields: [error.field]));
+        continue;
+      }
+      if (value('mrp').isNotEmpty && mrp == null) {
+        result.add(
+          blocked('Enter MRP as a whole-rupee amount.', fields: ['mrp']),
+        );
+        continue;
+      }
+      final oversized = {
+        'purchasePrice': purchase!,
+        'sellingPrice': selling!,
+        'stock': stock!,
+        'mrp': mrp ?? 0,
+        'minimumOrder': minimum!,
+        'lowStockThreshold': low!,
+      }.entries.where((e) => e.value > 2147483647).map((e) => e.key).toList();
+      if (oversized.isNotEmpty) {
+        result.add(
+          blocked(
+            'Use a whole number no greater than 2147483647.',
+            fields: oversized,
+          ),
+        );
+        continue;
+      }
+      final invalidFlags = ['available', 'publicListing']
+          .where(
+            (k) =>
+                value(k).isNotEmpty &&
+                !['true', 'false'].contains(value(k).toLowerCase()),
+          )
+          .toList();
+      if (invalidFlags.isNotEmpty) {
+        result.add(
+          blocked(
+            'Use true or false for availability and visibility.',
+            fields: invalidFlags,
+          ),
+        );
+        continue;
+      }
+      if (value('stockMode').isNotEmpty &&
+          ![
+            'exactquantity',
+            'availabilityonly',
+          ].contains(value('stockMode').toLowerCase())) {
+        result.add(
+          blocked(
+            'Stock mode must be exactQuantity or availabilityOnly.',
+            fields: ['stockMode'],
+          ),
+        );
+        continue;
+      }
+      final barcode = value('barcode'), canonical = value('canonicalId');
+      final exactKey = jsonEncode([
+        value('brand').toLowerCase(),
+        title.toLowerCase(),
+        value('pack').toLowerCase(),
+        value('variant').toLowerCase(),
+      ]);
+      var candidates = barcode.isNotEmpty
+          ? byBarcode[barcode] ?? []
+          : canonical.isNotEmpty
+          ? byCanonical[canonical] ?? []
+          : byIdentity[exactKey] ?? [];
+      if (canonical.isNotEmpty) {
+        candidates = candidates
+            .where((p) => p.canonicalId == canonical)
+            .toList();
+      }
+      candidates = candidates.where((p) => identity(p) == exactKey).toList();
+      if (candidates.length > 1) {
+        result.add(
+          blocked(
+            'More than one catalogue match. Add the exact barcode or correct the variant.',
+            fields: ['barcode', 'variant', 'pack'],
+          ),
+        );
+        continue;
+      }
+      if (candidates.isEmpty &&
+          (canonical.isNotEmpty ||
+              (barcode.isNotEmpty && byBarcode.containsKey(barcode)))) {
+        result.add(
+          blocked(
+            'Catalogue identity does not match the name, brand, variant or pack.',
+            fields: ['barcode', 'title', 'brand', 'variant', 'pack'],
+          ),
+        );
+        continue;
+      }
+      final matched = candidates.firstOrNull;
+      final id = matched?.id ?? 'import-$stamp-$index';
+      final sku = value('sku').isNotEmpty
+          ? value('sku')
+          : matched?.sku ?? 'SKU-$stamp-$index';
+      if (ownedIds.contains(id) ||
+          skus.contains(sku.toLowerCase()) ||
+          (barcode.isNotEmpty && barcodes.contains(barcode)) ||
+          identities.contains(exactKey)) {
+        result.add(
+          blocked(
+            'Already in Store stock or repeated in this file. Edit the saved product instead.',
+            fields: skus.contains(sku.toLowerCase())
+                ? ['sku']
+                : barcode.isNotEmpty && barcodes.contains(barcode)
+                ? ['barcode']
+                : ['title', 'brand', 'variant', 'pack'],
+          ),
+        );
+        continue;
+      }
+      final mode = value('stockMode').toLowerCase() == 'availabilityonly'
+          ? WorkspaceStockMode.availabilityOnly
+          : WorkspaceStockMode.exactQuantity;
+      final base =
+          matched ??
+          WorkspaceCatalogueItem(
+            id: id,
+            canonicalId: id,
+            categoryId: 'other',
+            brand: value('brand'),
+            title: title,
+            variant: value('variant'),
+            pack: value('pack'),
+            sku: sku,
+            barcode: barcode,
+            purchasePrice: purchase,
+            sellingPrice: selling,
+            unitPrice: '',
+            stock: stock,
+            deliveryPromise: 'Store pickup or local delivery',
+            origin: '',
+            visualLabel: '$title ${value('pack')}',
+            visualKind: 'catalogue-packshot',
+            publicListing: false,
+          );
+      final packFacts = <String, Object?>{
+        ...?base.compliance?.toJson(),
+        // A new Store copy must not inherit another stock receipt's dates.
+        'manufacturedOrPackedOn': null,
+        'bestBeforeOrUseBy': null,
+      };
+      var packFactsChanged = false;
+      for (final key in packFieldLabels.keys) {
+        final supplied = value(key);
+        if (supplied.isEmpty) continue; // Preserve exact-match facts.
+        if (packFacts[key] != supplied) packFactsChanged = true;
+        packFacts[key] = supplied;
+      }
+      final product = base.copyWith(
+        sku: sku,
+        visualLabel: value('visualLabel').isEmpty
+            ? base.visualLabel
+            : value('visualLabel'),
+        compliance: base.compliance == null && !packFactsChanged
+            ? null
+            : WorkspaceProductCompliance.fromJson(packFacts),
+        purchasePrice: purchase,
+        sellingPrice: selling,
+        stock: stock,
+        mrp: mrp ?? base.mrp,
+        minimumOrder: minimum,
+        lowStockThreshold: low,
+        unitPrice: value('unitPrice').isEmpty
+            ? '₹$selling/${base.pack}'
+            : value('unitPrice'),
+        deliveryPromise: value('deliveryPromise').isEmpty
+            ? base.deliveryPromise
+            : value('deliveryPromise'),
+        stockMode: mode,
+        available: mode == WorkspaceStockMode.availabilityOnly
+            ? value('available').toLowerCase() != 'false'
+            : stock > 0,
+        publicListing: false, // Import never publishes silently.
+        categoryId: value('categoryId').isEmpty
+            ? base.categoryId
+            : value('categoryId'),
+        origin: value('origin').isEmpty ? base.origin : value('origin'),
+        returnPolicy: value('returnPolicy').isEmpty
+            ? base.returnPolicy
+            : value('returnPolicy'),
+        composition: value('composition').isEmpty
+            ? base.composition
+            : value('composition'),
+        regulatoryNote: value('regulatoryNote').isEmpty
+            ? base.regulatoryNote
+            : value('regulatoryNote'),
+        catalogueFactsRequireReview:
+            base.catalogueFactsRequireReview ||
+            packFactsChanged ||
+            [
+              'categoryId',
+              'origin',
+              'composition',
+              'regulatoryNote',
+              'visualLabel',
+            ].any((k) => value(k).isNotEmpty),
+      );
+      if (product.mrp != null && product.mrp! < selling) {
+        result.add(
+          blocked(
+            value('mrp').isEmpty
+                ? 'Customer price exceeds the catalogue MRP of ₹${product.mrp}. Correct the selling price or check the pack MRP.'
+                : 'MRP cannot be lower than the customer price.',
+            fields: value('mrp').isEmpty
+                ? ['sellingPrice']
+                : ['mrp', 'sellingPrice'],
+          ),
+        );
+        continue;
+      }
+      skus.add(sku.toLowerCase());
+      if (barcode.isNotEmpty) barcodes.add(barcode);
+      identities.add(exactKey);
+      ownedIds.add(id);
+      result.add(
+        WorkspaceProductImportRow(
+          rowNumbers[index],
+          title,
+          product,
+          null,
+          matched != null,
+        ),
+      );
+    }
+    return WorkspaceProductImport(List.unmodifiable(result));
+  }
+}
+
+/// One field-aware validator; the shared editor keeps its existing text API.
+({String field, String message})? workspaceProductValuesIssue({
+  required String title,
+  required String brand,
+  required String pack,
+  required String category,
+  required String sku,
+  required int? purchase,
+  required int? selling,
+  required int? stock,
+  required int? mrp,
+  required int? lowStockThreshold,
+  required int? minimumOrder,
+  required String delivery,
+}) => title.isEmpty
+    ? (field: 'title', message: 'Enter the product name shown to customers.')
+    : brand.isEmpty
+    ? (field: 'brand', message: 'Enter the product brand or maker.')
+    : pack.isEmpty
+    ? (field: 'pack', message: 'Enter the customer pack size.')
+    : category.isEmpty
+    ? (field: 'categoryId', message: 'Choose or enter the product category.')
+    : sku.isEmpty
+    ? (field: 'sku', message: 'Enter a unique store SKU.')
+    : purchase == null || purchase <= 0
+    ? (field: 'purchasePrice', message: 'Enter purchase cost.')
+    : selling == null || selling <= purchase
+    ? (
+        field: 'sellingPrice',
+        message: 'Enter a customer price above the purchase cost.',
+      )
+    : stock == null || stock < 0
+    ? (field: 'stock', message: 'Enter the available stock.')
+    : lowStockThreshold == null || lowStockThreshold < 0
+    ? (
+        field: 'lowStockThreshold',
+        message: 'Enter when you want a low-stock reminder.',
+      )
+    : mrp != null && mrp < selling
+    ? (field: 'mrp', message: 'MRP cannot be lower than the customer price.')
+    : delivery.isEmpty
+    ? (field: 'deliveryPromise', message: 'Add the customer delivery promise.')
+    : minimumOrder == null || minimumOrder <= 0
+    ? (
+        field: 'minimumOrder',
+        message: 'Enter the minimum customer order quantity.',
+      )
+    : null;
+
+String? validateWorkspaceProductValues({
+  required String title,
+  required String brand,
+  required String pack,
+  required String category,
+  required String sku,
+  required int? purchase,
+  required int? selling,
+  required int? stock,
+  required int? mrp,
+  required int? lowStockThreshold,
+  required int? minimumOrder,
+  required String delivery,
+}) => workspaceProductValuesIssue(
+  title: title,
+  brand: brand,
+  pack: pack,
+  category: category,
+  sku: sku,
+  purchase: purchase,
+  selling: selling,
+  stock: stock,
+  mrp: mrp,
+  lowStockThreshold: lowStockThreshold,
+  minimumOrder: minimumOrder,
+  delivery: delivery,
+)?.message;
+
 class WorkspaceCatalogueItem {
   const WorkspaceCatalogueItem({
     required this.id,

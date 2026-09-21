@@ -134,15 +134,18 @@ Future<Uint8List> _catalogueTestPhoto() async {
 
 // Host-only authoritative-response fixtures. These never qualify live grants.
 final class _EntryCsvFile extends PlatformFile {
-  final _file = XFile.fromData(
-    Uint8List.fromList(
-      utf8.encode(
-        'title,brand,pack,purchasePrice,sellingPrice,stock\n'
-        'Local rice,Store brand,1 kg,40,50,5\n',
-      ),
-    ),
-    name: 'products.csv',
-  );
+  _EntryCsvFile([String? content])
+    : _file = XFile.fromData(
+        Uint8List.fromList(
+          utf8.encode(
+            content ??
+                'title,brand,pack,purchasePrice,sellingPrice,stock\n'
+                    'Local rice,Store brand,1 kg,40,50,5\n',
+          ),
+        ),
+        name: 'products.csv',
+      );
+  final XFile _file;
   @override
   String get name => 'products.csv';
   @override
@@ -8527,6 +8530,10 @@ void main() {
         work.activeWorkspace = originalWorkspace;
       }
       if (scenario == 'import') {
+        expect(work.workspaceCatalogueItems, before);
+        expect(find.text('Review import'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-import-save')));
+        await tester.pumpAndSettle();
         expect(work.workspaceCatalogueItems.length, before.length + 1);
         final added = work.workspaceCatalogueItems.singleWhere(
           (p) => p.title == 'Local rice',
@@ -8534,13 +8541,15 @@ void main() {
         expect(added.stock, 5);
         expect(added.sellingPrice, 50);
         expect(added.publicListing, isFalse);
-        expect(find.textContaining('1 products added'), findsWidgets);
+        expect(find.textContaining('1 products saved'), findsWidgets);
       } else {
         expect(work.workspaceCatalogueItems, before);
       }
       if (scenario == 'failure') {
         expect(
-          find.text('Could not open the file. Please try again.'),
+          find.text(
+            'Could not read this file. Choose a UTF-8 CSV or JSON file and try again.',
+          ),
           findsOneWidget,
         );
         picker.fail = false;
@@ -8552,6 +8561,853 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  String csv23(List<Map<String, String>> rows) {
+    final headers = WorkspaceProductImport.templateLabels.keys;
+    String cell(String value) => '"${value.replaceAll('"', '""')}"';
+    return '${WorkspaceProductImport.csvTemplate}${rows.map((r) => headers.map((h) => cell(r[h] ?? '')).join(',')).join('\r\n')}\r\n';
+  }
+
+  const csv23Required = {
+    'title': 'Rice',
+    'brand': 'Local',
+    'pack': '1 kg',
+    'purchasePrice': '40',
+    'sellingPrice': '50',
+    'stock': '10',
+  };
+
+  test(
+    'CSV23 eight pack fields reach shared snapshot and public adapter',
+    () async {
+      final facts = {
+        for (final key in WorkspaceProductImport.packFieldLabels.keys)
+          key: mappedPack.toJson()[key]! as String,
+        'consumerCare': 'Product care,\nMon–Sat',
+      };
+      final parsed = WorkspaceProductImport.parse(
+        csv23([
+          {...csv23Required, ...facts, 'variant': 'Long grain'},
+        ]),
+        catalogue: const [],
+        owned: const [],
+      ).rows.single.product!;
+      expect(parsed.variant, 'Long grain');
+      expect(parsed.compliance!.manufacturedOrPackedOn, isNull);
+      expect(parsed.compliance!.bestBeforeOrUseBy, isNull);
+      expect(parsed.catalogueFactsRequireReview, isTrue);
+      expect(parsed.copyWith(publicListing: true).published, isFalse);
+      for (final field in facts.entries) {
+        expect(parsed.compliance!.toJson()[field.key], field.value);
+      }
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      work.importWorkspaceProducts([parsed]);
+      final saved = work.workspaceCatalogueItems.singleWhere(
+        (p) => p.id == parsed.id,
+      );
+      final snapshot =
+          (gateway.lastOperationalSnapshot!.state['catalogue'] as List)
+              .cast<Map>()
+              .singleWhere((r) => r['id'] == parsed.id);
+      final restoredFacts = WorkspaceProductCompliance.fromJson(
+        jsonDecode(jsonEncode(snapshot['compliance'])),
+      )!;
+      expect(restoredFacts.toJson(), saved.compliance!.toJson());
+      final public = saved.toBuyPublicProduct(storeName: 'Store');
+      final c = public.compliance!;
+      expect(
+        [
+          c.genericName,
+          c.netQuantity,
+          c.manufacturerName,
+          c.packerName,
+          c.importerName,
+          c.countryOfOrigin,
+          c.fssaiLicenseNumber,
+          c.consumerCare,
+        ],
+        WorkspaceProductImport.packFieldLabels.keys
+            .map((k) => facts[k])
+            .toList(),
+      );
+      expect(public.variant, 'Long grain');
+      expect(public.pack, '1 kg');
+      expect(public.catalogueListing, isFalse);
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
+
+  test(
+    'CSV23 blank exact-match facts preserve values and changes hold review',
+    () {
+      final master = workspaceMasterCatalogue.first.copyWith(
+        compliance: mappedPack,
+        cataloguePhoto: photoFixture(),
+      );
+      final row = {
+        ...csv23Required,
+        'title': master.title,
+        'brand': master.brand,
+        'pack': master.pack,
+        'variant': master.variant,
+        'barcode': master.barcode,
+      };
+      WorkspaceCatalogueItem read(Map<String, String> r) =>
+          WorkspaceProductImport.parse(
+            csv23([r]),
+            catalogue: [master],
+            owned: const [],
+          ).rows.single.product!;
+      final blank = read(row);
+      expect(blank.cataloguePhoto, master.cataloguePhoto);
+      expect(
+        blank.catalogueFactsRequireReview,
+        master.catalogueFactsRequireReview,
+      );
+      expect(blank.compliance!.manufacturedOrPackedOn, isNull);
+      expect(blank.compliance!.bestBeforeOrUseBy, isNull);
+      for (final key in WorkspaceProductImport.packFieldLabels.keys) {
+        expect(blank.compliance!.toJson()[key], mappedPack.toJson()[key]);
+        final same = read({...row, key: '  ${mappedPack.toJson()[key]}  '});
+        expect(
+          same.catalogueFactsRequireReview,
+          master.catalogueFactsRequireReview,
+        );
+        final changed = read({...row, key: 'Corrected pack fact'});
+        expect(changed.compliance!.toJson()[key], 'Corrected pack fact');
+        expect(changed.catalogueFactsRequireReview, isTrue);
+        expect(changed.copyWith(publicListing: true).published, isFalse);
+      }
+    },
+  );
+
+  test('CSV23 exact variants remain separate across 1000 SKU rows', () {
+    final rows = List.generate(
+      1000,
+      (i) => {
+        ...csv23Required,
+        'variant': 'Grade $i',
+        'sku': 'SKU-$i',
+        'barcode': '000$i',
+        'manufacturerName': 'Maker $i',
+      },
+    );
+    final report = WorkspaceProductImport.parse(
+      csv23(rows),
+      catalogue: const [],
+      owned: const [],
+    );
+    expect(report.rows, hasLength(1000));
+    expect(report.rows.every((r) => r.product != null), isTrue);
+    expect(report.rows.map((r) => r.product!.variant).toSet(), hasLength(1000));
+    expect(report.rows.first.product!.barcode, '0000');
+    expect(report.rows.last.product!.compliance!.manufacturerName, 'Maker 999');
+    final duplicates = WorkspaceProductImport.parse(
+      csv23([rows.first, rows[1], rows.first]),
+      catalogue: const [],
+      owned: const [],
+    );
+    expect(duplicates.rows[0].product, isNotNull);
+    expect(duplicates.rows[1].product, isNotNull);
+    expect(duplicates.rows[2].issue, contains('repeated'));
+  });
+
+  test(
+    'CSV24 issues identify the exact field and preserve supplied values',
+    () {
+      final capped = workspaceMasterCatalogue.first.copyWith(mrp: 50);
+      final cappedRow = WorkspaceProductImport.parse(
+        csv23([
+          {
+            ...csv23Required,
+            'title': capped.title,
+            'brand': capped.brand,
+            'variant': capped.variant,
+            'pack': capped.pack,
+            'sellingPrice': '60',
+          },
+        ]),
+        catalogue: [capped],
+        owned: const [],
+      ).rows.single;
+      expect(cappedRow.issueValues, {'sellingPrice': '60'});
+      expect(cappedRow.issue, contains('catalogue MRP of ₹50'));
+      for (final example in <(String, String)>[
+        ('title', ''),
+        ('brand', ''),
+        ('pack', ''),
+        ('purchasePrice', 'bad'),
+        ('sellingPrice', '10'),
+        ('stock', '-2'),
+        ('lowStockThreshold', '-1'),
+        ('mrp', 'abc'),
+        ('minimumOrder', '0'),
+        ('available', 'maybe'),
+        ('stockMode', 'unknown'),
+        ('stock', '2147483648'),
+      ]) {
+        final row = WorkspaceProductImport.parse(
+          csv23([
+            {
+              ...csv23Required,
+              'variant': 'Long grain',
+              'sku': 'RICE-001',
+              example.$1: example.$2,
+            },
+          ]),
+          catalogue: const [],
+          owned: const [],
+        ).rows.single;
+        expect(row.product, isNull, reason: example.$1);
+        expect(row.issueValues[example.$1], example.$2, reason: example.$1);
+        expect(row.number, 2);
+        expect(row.variant, 'Long grain');
+        expect(row.sku, 'RICE-001');
+        expect(() => row.issueValues['stock'] = '9', throwsUnsupportedError);
+      }
+      final duplicated = WorkspaceProductImport.parse(
+        csv23([
+          {...csv23Required, 'sku': 'RICE-001'},
+          {...csv23Required, 'title': 'Other rice', 'sku': 'RICE-001'},
+        ]),
+        catalogue: const [],
+        owned: const [],
+      ).rows.last;
+      expect(duplicated.issueValues, {'sku': 'RICE-001'});
+      final conflict = workspaceMasterCatalogue.first;
+      final mismatch = WorkspaceProductImport.parse(
+        csv23([
+          {...csv23Required, 'barcode': conflict.barcode},
+        ]),
+        catalogue: [conflict],
+        owned: const [],
+      ).rows.single;
+      if (conflict.barcode.isNotEmpty) {
+        expect(mismatch.product, isNull);
+        expect(mismatch.issueValues['barcode'], conflict.barcode);
+        expect(mismatch.issueValues['pack'], '1 kg');
+      }
+    },
+  );
+
+  for (final display in [(360.0, 806.0, 1.0), (320.0, 568.0, 2.0)]) {
+    testWidgets('CSV24 connected field review $display', (tester) async {
+      final picker = _EntryFilePicker()
+        ..file = _EntryCsvFile(
+          csv23([
+            {
+              ...csv23Required,
+              'variant': 'Long grain',
+              'sku': 'RICE-L',
+              'manufacturerName': 'Local mill',
+            },
+            {...csv23Required, 'variant': 'Short grain', 'sku': 'RICE-S'},
+            {
+              ...csv23Required,
+              'title': 'Sugar',
+              'variant': 'Fine',
+              'sku': 'SUGAR-1',
+              'stock': '-2',
+            },
+            {
+              ...csv23Required,
+              'title': 'Salt',
+              'variant': 'Iodised',
+              'sku': 'SALT-1',
+              'sellingPrice': '30',
+            },
+          ]),
+        );
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = picker;
+      addTearDown(() => FilePickerPlatform.instance = previous);
+      final work = storeViewFixture();
+      final before = List.of(work.workspaceCatalogueItems);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      await reveal(tester, find.byKey(const Key('work-quick-add-products')));
+      await tester.tap(find.byKey(const Key('work-quick-add-products')));
+      await tester.pumpAndSettle();
+      await chooseAddProductMode(tester, 'import');
+      await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+      await tester.pumpAndSettle();
+      expect(find.text('Save 2 to Store'), findsOneWidget);
+      expect(
+        find.text('Product facts need review · Store only'),
+        findsOneWidget,
+      );
+      await captureStoreView(
+        tester,
+        'csv-review-ready-${display.$1.toInt()}-${display.$3}',
+      );
+      await tester.tap(find.byKey(const Key('work-import-issues')));
+      await tester.pumpAndSettle();
+      await captureStoreView(
+        tester,
+        'csv-review-fields-${display.$1.toInt()}-${display.$3}',
+      );
+      await tester.scrollUntilVisible(
+        find.text('Entered: -2'),
+        120,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('work-import-rows')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('Stock quantity · stock'), findsOneWidget);
+      expect(find.text('SKU SUGAR-1 · Fine · 1 kg'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Entered: 30'),
+        120,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('work-import-rows')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('Selling price · sellingPrice'), findsOneWidget);
+      expect(
+        find.text(
+          'Correction: Enter a customer price above the purchase cost.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-import-save')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(work.workspaceCatalogueItems, before);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems, before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('CSV23 Store and batch fields are not SKU-template inputs', () {
+    final headers = WorkspaceProductImport.templateLabels.keys.toSet();
+    expect(
+      headers.containsAll(WorkspaceProductImport.packFieldLabels.keys),
+      isTrue,
+    );
+    expect(headers, hasLength(29));
+    for (final field in [
+      'bankAccount',
+      'upiId',
+      'acceptedPaymentMethods',
+      'sellerGstin',
+      'manufacturedOrPackedOn',
+      'bestBeforeOrUseBy',
+      'paymentStatus',
+    ]) {
+      expect(headers, isNot(contains(field)));
+      expect(
+        () => WorkspaceProductImport.parse(
+          'title,brand,pack,purchasePrice,sellingPrice,stock,$field\nRice,Local,1 kg,40,50,10,x',
+          catalogue: const [],
+          owned: const [],
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
+  testWidgets('CSV23 imported facts render in public pack panel', (
+    tester,
+  ) async {
+    final row = {
+      ...csv23Required,
+      for (final key in WorkspaceProductImport.packFieldLabels.keys)
+        key: mappedPack.toJson()[key]! as String,
+    };
+    final item = WorkspaceProductImport.parse(
+      csv23([row]),
+      catalogue: const [],
+      owned: const [],
+    ).rows.single.product!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: BuyV2ProductCompliancePanel(
+              product: item.toBuyPublicProduct(storeName: 'Store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final key in WorkspaceProductImport.packFieldLabels.keys) {
+      final field = find.text(row[key]!);
+      expect(field, findsOneWidget);
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      expect(field.hitTestable(), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'CSV21 blank template headers match the importer and contain no stock',
+    () {
+      final table = WorkspaceProductImport.csv(
+        WorkspaceProductImport.csvTemplate,
+      );
+      expect(table, hasLength(1));
+      expect(table.single, WorkspaceProductImport.templateLabels.keys.toList());
+      expect(WorkspaceProductImport.columns.containsAll(table.single), isTrue);
+      expect(
+        table.single.toSet().containsAll(
+          WorkspaceProductImport.requiredColumns,
+        ),
+        isTrue,
+      );
+      expect(table.single, isNot(contains('publicListing')));
+      expect(table.single, isNot(contains('canonicalId')));
+      final values = {
+        'title': 'Rice',
+        'brand': 'Local',
+        'pack': '1 kg',
+        'purchasePrice': '40',
+        'sellingPrice': '50',
+        'stock': '1000',
+        'barcode': '00123',
+      };
+      final filled =
+          '${WorkspaceProductImport.csvTemplate}${table.single.map((h) => values[h] ?? '').join(',')}\r\n';
+      final review = WorkspaceProductImport.parse(
+        filled,
+        catalogue: const [],
+        owned: const [],
+      );
+      expect(review.rows.single.product!.stock, 1000);
+      expect(review.rows.single.product!.barcode, '00123');
+      expect(review.rows.single.product!.publicListing, isFalse);
+    },
+  );
+
+  for (final display in [(360.0, 806.0, 1.0), (320.0, 568.0, 2.0)]) {
+    testWidgets(
+      'CSV21 import guide and native template action $display',
+      (tester) async {
+        const channel = MethodChannel(
+          'com.moolsocial.app/store_stock_download',
+        );
+        MethodCall? savedCall;
+        Completer<bool>? saving;
+        var fail = false;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (call) async {
+            savedCall = call;
+            if (fail) throw PlatformException(code: 'stock_download_failed');
+            return saving == null ? true : saving.future;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+        final work = storeViewFixture();
+        final before = List.of(work.workspaceCatalogueItems);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await reveal(tester, find.byKey(const Key('work-quick-add-products')));
+        await tester.tap(find.byKey(const Key('work-quick-add-products')));
+        await tester.pumpAndSettle();
+        await chooseAddProductMode(tester, 'import');
+        await captureStoreView(
+          tester,
+          'csv-guide-${display.$1.toInt()}-${display.$3}',
+        );
+        final download = find.byKey(
+          const Key('work-add-product-download-template'),
+        );
+        await tester.ensureVisible(download);
+        await tester.tap(download);
+        await tester.pumpAndSettle();
+        expect(savedCall!.method, 'save');
+        expect(
+          (savedCall!.arguments as Map)['fileName'],
+          'store-products-template.csv',
+        );
+        expect(
+          (savedCall!.arguments as Map)['bytes'] as Uint8List,
+          utf8.encode(WorkspaceProductImport.csvTemplate),
+        );
+        expect(
+          find.text('Template saved in Downloads / MoolSocial.'),
+          findsOneWidget,
+        );
+        expect(work.workspaceCatalogueItems, before);
+        saving = Completer<bool>();
+        await tester.tap(download);
+        await tester.pump();
+        expect(tester.widget<TextButton>(download).onPressed, isNull);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('work-add-product-choose-csv')),
+              )
+              .onPressed,
+          isNull,
+        );
+        saving.complete(false);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('cancelled'), findsOneWidget);
+        saving = null;
+        fail = true;
+        await tester.tap(download);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Could not save'), findsOneWidget);
+        fail = false;
+        await tester.tap(download);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Template saved'), findsOneWidget);
+        final optional = find.byKey(const Key('work-csv-optional-columns'));
+        await tester.ensureVisible(optional);
+        await tester.tap(optional);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Your Store SKU'));
+        await captureStoreView(
+          tester,
+          'csv-guide-optional-${display.$1.toInt()}-${display.$3}',
+        );
+        expect(find.text('stockMode'), findsOneWidget);
+        expect(find.text('canonicalId'), findsNothing);
+        final optionTitle = find.text('Variant, pricing and stock options');
+        await tester.ensureVisible(optionTitle);
+        await tester.tap(optionTitle);
+        await tester.pumpAndSettle();
+        final packTitle = find.text('Product and pack details');
+        await tester.ensureVisible(packTitle);
+        await tester.tap(packTitle);
+        await tester.pumpAndSettle();
+        await Scrollable.ensureVisible(tester.element(packTitle), alignment: 0);
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'csv-pack-fields-${display.$1.toInt()}-${display.$3}',
+        );
+        for (final key in WorkspaceProductImport.packFieldLabels.keys) {
+          expect(find.text(key), findsOneWidget);
+          await tester.ensureVisible(find.text(key));
+          await tester.pumpAndSettle();
+          expect(find.text(key).hitTestable(), findsOneWidget);
+        }
+        await tester.ensureVisible(packTitle);
+        await tester.tap(packTitle);
+        await tester.pumpAndSettle();
+        final settingsTitle = find.text('Set once in Store Settings');
+        await tester.ensureVisible(settingsTitle);
+        await tester.tap(settingsTitle);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.textContaining('Keep your Store profile'),
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'csv-store-settings-guide-${display.$1.toInt()}-${display.$3}',
+        );
+        expect(work.workspaceCatalogueItems, before);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
+
+  test('CSV20 quoted records validation matching and bounds', () {
+    const head = 'title,brand,pack,purchasePrice,sellingPrice,stock';
+    WorkspaceProductImport parse(
+      String text, {
+      List<WorkspaceCatalogueItem> catalogue = const [],
+      List<WorkspaceCatalogueItem> owned = const [],
+    }) =>
+        WorkspaceProductImport.parse(text, catalogue: catalogue, owned: owned);
+    final quoted = parse(
+      '\uFEFF$head,sku,barcode\r\n"Rice, premium\nnew crop",Local,1 kg,40,50,10,"00-A","00123"\r\n',
+    );
+    expect(quoted.rows.single.product!.title, 'Rice, premium\nnew crop');
+    expect(quoted.rows.single.product!.barcode, '00123');
+    expect(quoted.rows.single.product!.sku, '00-A');
+    expect(WorkspaceProductImport.csv('"a""b",c\n').single, ['a"b', 'c']);
+    for (final invalid in [
+      '$head\n"Unclosed,Local,1kg,40,50,1',
+      '$head\n"Closed"x,Local,1kg,40,50,1',
+      'title,title\nRice,Rice',
+      '$head,secret\nRice,Local,1kg,40,50,1,x',
+    ]) {
+      expect(() => parse(invalid), throwsFormatException);
+    }
+    final malformed = parse(
+      '$head\nRice,Local,1kg,40,50\nRice,Local,1kg,40,50,1,extra',
+    );
+    expect(malformed.rows.every((r) => r.issue != null), isTrue);
+    final numeric = parse(
+      '$head\nRice,Local,1kg,40,-1,1\nRice,Local,1kg,40,50,-1\nRice,Local,1kg,40.5,50,1',
+    );
+    expect(numeric.rows.every((r) => r.product == null), isTrue);
+    final duplicate = parse(
+      '$head,sku\nRice,Local,1kg,40,50,1,001\nRice,Local,1kg,40,50,1,002\nSugar,Local,1kg,40,50,1,001',
+    );
+    expect(duplicate.rows.where((r) => r.product != null).length, 1);
+    final item = workspaceMasterCatalogue.first;
+    final line = '${item.title},${item.brand},${item.pack},10,20,5';
+    final matched = parse(
+      '$head,variant,barcode\n$line,${item.variant},${item.barcode}',
+      catalogue: [item],
+    ).rows.single;
+    expect(matched.matched, isTrue);
+    expect(matched.product!.publicListing, isFalse);
+    expect(matched.product!.cataloguePhoto, item.cataloguePhoto);
+    final ambiguous = parse(
+      '$head,variant\n$line,${item.variant}',
+      catalogue: [item, item],
+    );
+    expect(ambiguous.rows.single.issue, contains('More than one'));
+    final mismatch = parse(
+      '$head,variant,barcode\nRice,Local,9 kg,10,20,5,wrong,${item.barcode}',
+      catalogue: [item.copyWith(barcode: '123')],
+    );
+    // Unknown barcode is a private new product; known conflicting barcode is blocked.
+    final knownConflict = parse(
+      '$head,barcode\nRice,Local,9 kg,10,20,5,123',
+      catalogue: [item.copyWith(barcode: '123')],
+    );
+    expect(knownConflict.rows.single.product, isNull);
+    expect(mismatch.rows.length, 1);
+    expect(
+      parse(
+        '$head,variant\n$line,${item.variant}',
+        catalogue: [item],
+        owned: [item],
+      ).rows.single.product,
+      isNull,
+    );
+    final large =
+        '$head\n${List.generate(10000, (i) => 'Product $i,Local,1kg,10,20,1').join('\n')}';
+    expect(parse(large).rows.length, 10000);
+    expect(
+      () => parse('$large\nOne more,Local,1kg,10,20,1'),
+      throwsFormatException,
+    );
+  });
+
+  for (final display in [(360.0, 806.0, 1.0), (320.0, 568.0, 2.0)]) {
+    testWidgets('CSV20 review screen selection edit and attention $display', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(display.$1, display.$2);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final report = WorkspaceProductImport.parse(
+        'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n'
+        '"Premium basmati rice, extra long grain",Local,1 kg,80,100,24,RICE1\n'
+        'Toor dal,Local,1 kg,100,120,10,DAL1\n'
+        'Sugar,Local,1 kg,40,50,-2,SUGAR1\n'
+        'Toor dal,Local,1 kg,100,120,10,DAL1',
+        catalogue: const [],
+        owned: const [],
+      );
+      List<WorkspaceCatalogueItem>? saved;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(display.$3)),
+            child: child!,
+          ),
+          home: RepaintBoundary(
+            key: const Key('store-review-root'),
+            child: StoreProductImportReviewScreen(
+              fileName: 'store-products.csv',
+              review: report,
+              editProduct: (p) async => p.copyWith(sellingPrice: 105),
+              saveProducts: (products) async {
+                saved = products;
+                return 'Connection interrupted. Try again.';
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await captureStoreView(
+        tester,
+        'csv-ready-${display.$1.toInt()}-${display.$3}',
+      );
+      expect(saved, isNull);
+      await tester.ensureVisible(find.byKey(const Key('work-import-edit-2')));
+      await tester.tap(find.byKey(const Key('work-import-edit-2')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('₹105'), findsOneWidget);
+      final selected = find.byType(Checkbox).first;
+      await tester.tap(selected);
+      await tester.pumpAndSettle();
+      expect(find.text('Save 1 to Store'), findsOneWidget);
+      tester
+          .widget<CustomScrollView>(find.byKey(const Key('work-import-rows')))
+          .controller!
+          .jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('work-import-issues')));
+      await tester.tap(find.byKey(const Key('work-import-issues')));
+      await tester.pumpAndSettle();
+      await captureStoreView(
+        tester,
+        'csv-attention-${display.$1.toInt()}-${display.$3}',
+      );
+      expect(find.textContaining('available stock'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      await tester.pumpAndSettle();
+      expect(saved!.length, 1);
+      expect(saved!.single.title, 'Toor dal');
+      expect(find.text('Connection interrupted. Try again.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final action in ['cancel', 'save', 'store changed', 'stock changed']) {
+    testWidgets('CSV20 connected review $action preserves stock until save', (
+      tester,
+    ) async {
+      final picker = _EntryFilePicker()
+        ..file = _EntryCsvFile(
+          'title,brand,pack,purchasePrice,sellingPrice,stock\n'
+          'Local rice,Store brand,1 kg,40,50,5\n'
+          'Sugar,Local,1 kg,40,50,-2\n'
+          'Local rice,Store brand,1 kg,40,50,5',
+        );
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = picker;
+      addTearDown(() => FilePickerPlatform.instance = previous);
+      final work = storeViewFixture();
+      final before = List.of(work.workspaceCatalogueItems);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+      );
+      await reveal(tester, find.byKey(const Key('work-quick-add-products')));
+      await tester.tap(find.byKey(const Key('work-quick-add-products')));
+      await tester.pumpAndSettle();
+      await chooseAddProductMode(tester, 'import');
+      await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems, before);
+      await captureStoreView(tester, 'csv-connected-review-$action');
+      if (action == 'cancel') {
+        await tester.tap(find.byKey(const Key('work-import-issues')));
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'csv-connected-attention');
+      }
+      if (action == 'cancel') {
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems, before);
+      } else {
+        if (action == 'save') {
+          await tester.tap(find.byKey(const Key('work-import-edit-2')));
+          await tester.pumpAndSettle();
+          final apply = find.byKey(const Key('work-product-save'));
+          await reveal(tester, apply);
+          expect(find.text('Apply to import'), findsOneWidget);
+          await tester.tap(apply);
+          await tester.pumpAndSettle();
+          expect(work.workspaceCatalogueItems, before);
+        }
+        if (action == 'store changed') {
+          work.workspaceId = 'changed';
+          work.activeWorkspace = null;
+          work.showNotice('Store changed');
+        }
+        if (action == 'stock changed') {
+          final fresh = WorkspaceProductImport.parse(
+            'title,brand,pack,purchasePrice,sellingPrice,stock\nLocal rice,Store brand,1 kg,40,50,5',
+            catalogue: const [],
+            owned: const [],
+          ).rows.single.product!;
+          work.importWorkspaceProducts([fresh]);
+        }
+        final count = work.workspaceCatalogueItems.length;
+        await tester.tap(find.byKey(const Key('work-import-save')));
+        await tester.pumpAndSettle();
+        expect(
+          work.workspaceCatalogueItems.length,
+          action == 'save' ? before.length + 1 : count,
+        );
+        if (action != 'save') {
+          expect(find.byType(StoreProductImportReviewScreen), findsOneWidget);
+        }
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('CSV20 all invalid disables save and large review builds lazily', (
+    tester,
+  ) async {
+    const header = 'title,brand,pack,purchasePrice,sellingPrice,stock';
+    var calls = 0;
+    Future<void> show(String input) async {
+      final report = WorkspaceProductImport.parse(
+        input,
+        catalogue: const [],
+        owned: const [],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreProductImportReviewScreen(
+            key: ValueKey(report),
+            fileName: 'products.csv',
+            review: report,
+            editProduct: (p) async => p,
+            saveProducts: (products) async {
+              calls++;
+              return 'Try again.';
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await show('$header\nRice,Local,1 kg,40,50,-1');
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('work-import-save')))
+          .onPressed,
+      isNull,
+    );
+    expect(calls, 0);
+    await show(
+      '$header\n${List.generate(10000, (i) => 'Product $i,Local,1kg,10,20,1').join('\n')}',
+    );
+    expect(find.text('Save 10000 to Store'), findsOneWidget);
+    expect(find.byType(Checkbox).evaluate().length, lessThan(30));
+    expect(find.text('Product 9999'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('CATALOGUE01 owner offer saves privately from the Store rail', (
     tester,

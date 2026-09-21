@@ -13302,180 +13302,114 @@ class _WorkspaceCatalogueSurfaceState
   }
 
   Future<String?> _importCatalogue({bool csvOnly = false}) async {
+    final identity = widget.session.counterDraftIdentity;
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
-    final picked = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
-    );
-    if (!mounted || picked == null) return null;
+    var invalidated = false;
+    bool current() =>
+        !invalidated &&
+        mounted &&
+        identity == widget.session.counterDraftIdentity &&
+        storeId ==
+            (widget.session.activeWorkspace?.id ?? widget.session.workspaceId);
+    void trackScope() {
+      if (!current()) invalidated = true;
+    }
+
+    widget.session.addListener(trackScope);
     try {
-      final content = utf8.decode(await picked.readAsBytes());
+      final picked = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
+      );
+      if (!current()) return 'Your store changed. Import the file again.';
+      if (picked == null) return null;
+      if (await picked.length() > 10 * 1024 * 1024) {
+        return 'Choose a file smaller than 10 MB.';
+      }
+      final bytes = await picked.readAsBytes();
+      if (!current()) return 'Your store changed. Import the file again.';
+      if (bytes.length > 10 * 1024 * 1024) {
+        return 'Choose a file smaller than 10 MB.';
+      }
+      final review = WorkspaceProductImport.parse(
+        utf8.decode(bytes),
+        json: picked.name.toLowerCase().endsWith('.json'),
+        catalogue: workspaceMasterCatalogue,
+        owned: List.of(widget.session.workspaceCatalogueItems),
+      );
+      if (!current()) return 'Your store changed. Import the file again.';
       if (!mounted) return null;
-      if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
-          storeId) {
-        widget.session.showError('Your store changed. Import the file again.');
-        return 'Your store changed. Import the file again.';
-      }
-      final rows = <Map<String, String>>[];
-      if (picked.name.toLowerCase().endsWith('.json')) {
-        final decoded = jsonDecode(content);
-        if (decoded is! List) throw const FormatException();
-        for (final entry in decoded) {
-          if (entry is! Map) continue;
-          rows.add(
-            entry.map(
-              (key, value) => MapEntry('$key', value == null ? '' : '$value'),
-            ),
-          );
-        }
-      } else {
-        final lines = const LineSplitter()
-            .convert(content)
-            .where((line) => line.trim().isNotEmpty)
-            .toList();
-        if (lines.length < 2) throw const FormatException();
-        final headers = lines.first
-            .split(',')
-            .map((value) => value.trim())
-            .toList();
-        for (final line in lines.skip(1)) {
-          final values = line.split(',').map((value) => value.trim()).toList();
-          rows.add({
-            for (var index = 0; index < headers.length; index++)
-              headers[index]: index < values.length ? values[index] : '',
-          });
-        }
-      }
-      final imported = <WorkspaceCatalogueItem>[];
-      var catalogueMatches = 0;
-      var privateDrafts = 0;
-      var skippedRows = 0;
-      for (var index = 0; index < rows.length; index++) {
-        final row = rows[index];
-        final title = row['title']?.trim() ?? '';
-        final brand = row['brand']?.trim() ?? '';
-        final pack = row['pack']?.trim() ?? '';
-        final selling = int.tryParse(row['sellingPrice'] ?? '');
-        final purchase = int.tryParse(row['purchasePrice'] ?? '');
-        final stock = int.tryParse(row['stock'] ?? '');
-        if (title.isEmpty ||
-            brand.isEmpty ||
-            pack.isEmpty ||
-            selling == null ||
-            purchase == null ||
-            stock == null) {
-          skippedRows++;
-          continue;
-        }
-        final stamp = DateTime.now().microsecondsSinceEpoch + index;
-        final barcode = row['barcode']?.trim() ?? '';
-        final canonicalId = row['canonicalId']?.trim() ?? '';
-        final matched = workspaceMasterCatalogue
-            .where(
-              (product) =>
-                  (barcode.isNotEmpty && product.barcode == barcode) ||
-                  (canonicalId.isNotEmpty &&
-                      product.canonicalId == canonicalId) ||
-                  (product.brand.toLowerCase() == brand.toLowerCase() &&
-                      product.title.toLowerCase() == title.toLowerCase() &&
-                      product.pack.toLowerCase() == pack.toLowerCase()),
-            )
-            .firstOrNull;
-        final stockMode =
-            row['stockMode']?.toLowerCase().contains('availability') == true
-            ? WorkspaceStockMode.availabilityOnly
-            : WorkspaceStockMode.exactQuantity;
-        final publicRequested = row['publicListing']?.toLowerCase() != 'false';
-        final available = stockMode == WorkspaceStockMode.availabilityOnly
-            ? row['available']?.toLowerCase() != 'false'
-            : stock > 0;
-        final lowStockThreshold =
-            int.tryParse(row['lowStockThreshold'] ?? '') ?? 5;
-        if (matched != null) {
-          catalogueMatches++;
-          imported.add(
-            matched.copyWith(
-              sku: row['sku']?.trim().isNotEmpty == true
-                  ? row['sku']!.trim()
-                  : matched.sku,
-              purchasePrice: purchase,
-              sellingPrice: selling,
-              unitPrice: row['unitPrice']?.trim().isNotEmpty == true
-                  ? row['unitPrice']!.trim()
-                  : '₹$selling/${matched.pack}',
-              stock: stock,
-              deliveryPromise: row['deliveryPromise']?.trim().isNotEmpty == true
-                  ? row['deliveryPromise']!.trim()
-                  : matched.deliveryPromise,
-              mrp: int.tryParse(row['mrp'] ?? '') ?? matched.mrp,
-              minimumOrder: int.tryParse(row['minimumOrder'] ?? '') ?? 1,
-              available: available,
-              publicListing: publicRequested && selling > 0 && available,
-              stockMode: stockMode,
-              lowStockThreshold: lowStockThreshold,
-            ),
-          );
-        } else {
-          privateDrafts++;
-          imported.add(
-            WorkspaceCatalogueItem(
-              id: row['id']?.trim().isNotEmpty == true
-                  ? row['id']!.trim()
-                  : 'import-$stamp',
-              canonicalId: canonicalId.isNotEmpty
-                  ? canonicalId
-                  : 'import-$stamp',
-              categoryId: row['categoryId']?.trim().isNotEmpty == true
-                  ? row['categoryId']!.trim()
-                  : 'other',
-              brand: brand,
-              title: title,
-              variant: row['variant']?.trim() ?? '',
-              pack: pack,
-              sku: row['sku']?.trim().isNotEmpty == true
-                  ? row['sku']!.trim()
-                  : 'SKU-$stamp',
-              barcode: barcode,
-              purchasePrice: purchase,
-              sellingPrice: selling,
-              unitPrice: row['unitPrice']?.trim().isNotEmpty == true
-                  ? row['unitPrice']!.trim()
-                  : '₹$selling/$pack',
-              stock: stock,
-              deliveryPromise: row['deliveryPromise']?.trim().isNotEmpty == true
-                  ? row['deliveryPromise']!.trim()
-                  : 'Store pickup or local delivery',
-              origin: row['origin']?.trim().isNotEmpty == true
-                  ? row['origin']!.trim()
-                  : 'India',
-              visualLabel: row['visualLabel']?.trim().isNotEmpty == true
-                  ? row['visualLabel']!.trim()
-                  : '$brand $title $pack',
-              visualKind: 'catalogue-packshot',
-              mrp: int.tryParse(row['mrp'] ?? ''),
-              minimumOrder: int.tryParse(row['minimumOrder'] ?? '') ?? 1,
-              returnPolicy: row['returnPolicy']?.trim(),
-              available: available,
-              publicListing: false,
-              stockMode: stockMode,
-              lowStockThreshold: lowStockThreshold,
-            ),
-          );
-        }
-      }
-      if (imported.isEmpty) throw const FormatException();
-      widget.session.importWorkspaceProducts(imported);
-      widget.session.showNotice(
-        '${imported.length} products added · $catalogueMatches matched · $privateDrafts private for review${skippedRows > 0 ? ' · $skippedRows rows need correction' : ''}.',
+      var savedCount = 0;
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (reviewContext) => StoreProductImportReviewScreen(
+            fileName: picked.name,
+            review: review,
+            editProduct: (product) async {
+              if (!current()) return null;
+              return Navigator.of(reviewContext).push<WorkspaceCatalogueItem>(
+                MaterialPageRoute(
+                  builder: (editorContext) => Scaffold(
+                    appBar: AppBar(title: const Text('Review product')),
+                    body: SafeArea(
+                      child: _CatalogueProductEditor(
+                        session: widget.session,
+                        product: product,
+                        embeddedPage: true,
+                        onDone: () => Navigator.of(editorContext).pop(),
+                        onDraftReviewed: (edited) =>
+                            Navigator.of(editorContext).pop(edited),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+            saveProducts: (products) async {
+              if (!current()) {
+                return 'Your store changed. Close this review and import again.';
+              }
+              // Recheck against live inventory: it may have changed while reviewing.
+              final owned = widget.session.workspaceCatalogueItems;
+              final ids = owned.map((p) => p.id).toSet();
+              final skus = owned.map((p) => p.sku.trim().toLowerCase()).toSet();
+              final barcodes = owned
+                  .where((p) => p.barcode.isNotEmpty)
+                  .map((p) => p.barcode)
+                  .toSet();
+              final identities = owned
+                  .map(WorkspaceProductImport.identity)
+                  .toSet();
+              for (final p in products) {
+                if (!ids.add(p.id) ||
+                    !skus.add(p.sku.trim().toLowerCase()) ||
+                    (p.barcode.isNotEmpty && !barcodes.add(p.barcode)) ||
+                    !identities.add(WorkspaceProductImport.identity(p))) {
+                  return 'Store stock changed or contains a duplicate. Import the file again; nothing was added.';
+                }
+              }
+              widget.session.importWorkspaceProducts(
+                products.map((p) => p.copyWith(publicListing: false)).toList(),
+              );
+              savedCount = products.length;
+              return null;
+            },
+          ),
+        ),
       );
-      if (mounted) setState(() {});
-      return '${imported.length} products added · $catalogueMatches matched · $privateDrafts private for review${skippedRows > 0 ? ' · $skippedRows rows need correction' : ''}.';
-    } on Object {
-      widget.session.showError(
-        'Import a CSV or JSON file containing title, brand, pack, purchasePrice, sellingPrice and stock.',
-      );
-      return 'Check your file includes title, brand, pack, purchasePrice, sellingPrice and stock.';
+      if (!current()) {
+        return 'Your store changed. Open the correct Store to check its stock.';
+      }
+      if (saved != true) return 'Import cancelled. No products were added.';
+      setState(() {});
+      return '$savedCount products saved to Store stock. Nothing was published.';
+    } on FormatException catch (error) {
+      return error.message;
+    } catch (_) {
+      return 'Could not read this file. Choose a UTF-8 CSV or JSON file and try again.';
+    } finally {
+      widget.session.removeListener(trackScope);
     }
   }
 
@@ -15514,6 +15448,7 @@ class _CatalogueProductEditor extends StatefulWidget {
     this.embeddedPage = false,
     this.onDone,
     this.onSaved,
+    this.onDraftReviewed,
   });
 
   final WorkSession session;
@@ -15521,6 +15456,7 @@ class _CatalogueProductEditor extends StatefulWidget {
   final bool embeddedPage;
   final VoidCallback? onDone;
   final VoidCallback? onSaved;
+  final ValueChanged<WorkspaceCatalogueItem>? onDraftReviewed;
 
   @override
   State<_CatalogueProductEditor> createState() =>
@@ -15790,78 +15726,72 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         : int.tryParse(_stock.text.trim());
     final lowStockThreshold = int.tryParse(_lowStockThreshold.text.trim());
     final minimumOrder = int.tryParse(_minimumOrder.text.trim());
-    final error = _title.text.trim().isEmpty
-        ? 'Enter the product name shown to customers.'
-        : _brand.text.trim().isEmpty
-        ? 'Enter the product brand or maker.'
-        : _pack.text.trim().isEmpty
-        ? 'Enter the customer pack size.'
-        : _category.text.trim().isEmpty
-        ? 'Choose or enter the product category.'
-        : _sku.text.trim().isEmpty
-        ? 'Enter a unique store SKU.'
-        : purchase == null || purchase <= 0
-        ? 'Enter purchase cost.'
-        : selling == null || selling <= purchase
-        ? 'Enter a customer price above the purchase cost.'
-        : stock == null || stock < 0
-        ? 'Enter the available stock.'
-        : lowStockThreshold == null || lowStockThreshold < 0
-        ? 'Enter when you want a low-stock reminder.'
-        : mrp != null && mrp < selling
-        ? 'MRP cannot be lower than the customer price.'
-        : _delivery.text.trim().isEmpty
-        ? 'Add the customer delivery promise.'
-        : minimumOrder == null || minimumOrder <= 0
-        ? 'Enter the minimum customer order quantity.'
-        : null;
+    final error = validateWorkspaceProductValues(
+      title: _title.text.trim(),
+      brand: _brand.text.trim(),
+      pack: _pack.text.trim(),
+      category: _category.text.trim(),
+      sku: _sku.text.trim(),
+      purchase: purchase,
+      selling: selling,
+      stock: stock,
+      mrp: mrp,
+      lowStockThreshold: lowStockThreshold,
+      minimumOrder: minimumOrder,
+      delivery: _delivery.text.trim(),
+    );
     if (error != null) {
       setState(() => _error = error);
       return;
     }
-    widget.session.addOrUpdateWorkspaceProduct(
-      widget.product.copyWith(
-        categoryId: _category.text.trim(),
-        brand: _brand.text.trim(),
-        title: _title.text.trim(),
-        variant: _variant.text.trim(),
-        pack: _pack.text.trim(),
-        sku: _sku.text.trim(),
-        barcode: _barcode.text.trim(),
-        purchasePrice: purchase,
-        sellingPrice: selling,
-        mrp: mrp,
-        stock: stock,
-        unitPrice:
-            _unitPrice.text.trim().isEmpty ||
-                _unitPrice.text.trim() == widget.product.unitPrice
-            ? '₹$selling/${_pack.text.trim()}'
-            : _unitPrice.text.trim(),
-        deliveryPromise: _delivery.text.trim(),
-        origin: _origin.text.trim(),
-        visualLabel: _visualLabel.text.trim().isEmpty
-            ? '${_brand.text.trim()} ${_title.text.trim()} ${_pack.text.trim()}'
-            : _visualLabel.text.trim(),
-        minimumOrder: minimumOrder,
-        returnPolicy: _returnPolicy.text.trim(),
-        composition: _composition.text.trim(),
-        regulatoryNote: _regulatory.text.trim(),
-        compliance: _packInformation,
-        catalogueFactsRequireReview: _factsNeedReview,
-        available: _stockMode == WorkspaceStockMode.availabilityOnly
-            ? _available
-            : stock! > 0,
-        publicListing:
-            _public &&
-            _catalogueMatched &&
-            !_factsNeedReview &&
-            (_stockMode == WorkspaceStockMode.availabilityOnly
-                ? _available
-                : stock! > 0),
-        stockMode: _stockMode,
-        lowStockThreshold: lowStockThreshold,
-      ),
+    final reviewedProduct = widget.product.copyWith(
+      categoryId: _category.text.trim(),
+      brand: _brand.text.trim(),
+      title: _title.text.trim(),
+      variant: _variant.text.trim(),
+      pack: _pack.text.trim(),
+      sku: _sku.text.trim(),
+      barcode: _barcode.text.trim(),
+      purchasePrice: purchase,
+      sellingPrice: selling,
+      mrp: mrp,
+      stock: stock,
+      unitPrice:
+          _unitPrice.text.trim().isEmpty ||
+              _unitPrice.text.trim() == widget.product.unitPrice
+          ? '₹$selling/${_pack.text.trim()}'
+          : _unitPrice.text.trim(),
+      deliveryPromise: _delivery.text.trim(),
+      origin: _origin.text.trim(),
+      visualLabel: _visualLabel.text.trim().isEmpty
+          ? '${_brand.text.trim()} ${_title.text.trim()} ${_pack.text.trim()}'
+          : _visualLabel.text.trim(),
+      minimumOrder: minimumOrder,
+      returnPolicy: _returnPolicy.text.trim(),
+      composition: _composition.text.trim(),
+      regulatoryNote: _regulatory.text.trim(),
+      compliance: _packInformation,
+      catalogueFactsRequireReview: _factsNeedReview,
+      available: _stockMode == WorkspaceStockMode.availabilityOnly
+          ? _available
+          : stock! > 0,
+      publicListing:
+          _public &&
+          _catalogueMatched &&
+          !_factsNeedReview &&
+          (_stockMode == WorkspaceStockMode.availabilityOnly
+              ? _available
+              : stock! > 0),
+      stockMode: _stockMode,
+      lowStockThreshold: lowStockThreshold,
     );
+    if (widget.onDraftReviewed != null) {
+      _saved = true;
+      FocusManager.instance.primaryFocus?.unfocus();
+      widget.onDraftReviewed!(reviewedProduct.copyWith(publicListing: false));
+      return;
+    }
+    widget.session.addOrUpdateWorkspaceProduct(reviewedProduct);
     _saved = true;
     if (widget.onSaved != null) {
       FocusManager.instance.primaryFocus?.unfocus();
@@ -16505,7 +16435,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   ),
                                   onPressed: _save,
                                   child: Text(
-                                    _wasOwned
+                                    widget.onDraftReviewed != null
+                                        ? 'Apply to import'
+                                        : _wasOwned
                                         ? 'Save changes'
                                         : 'Save to Store',
                                     textAlign: TextAlign.center,

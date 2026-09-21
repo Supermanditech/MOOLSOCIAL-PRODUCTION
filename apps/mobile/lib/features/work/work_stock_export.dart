@@ -44,7 +44,7 @@ Future<bool> saveStoreStockFile(
         );
       }
       throw const FormatException(
-        'Could not save to Downloads. Tap a format to try again.',
+        'Could not save to Downloads. Please try again.',
       );
     } on MissingPluginException {
       throw const FormatException(
@@ -53,7 +53,9 @@ Future<bool> saveStoreStockFile(
     }
   }
   return await FilePicker.saveFile(
-        dialogTitle: 'Save stock statement',
+        dialogTitle: fileName == 'store-products-template.csv'
+            ? 'Save CSV template'
+            : 'Save stock statement',
         fileName: fileName,
         mimeType: format.mimeType,
         type: FileType.custom,
@@ -64,6 +66,18 @@ Future<bool> saveStoreStockFile(
 }
 
 enum StoreStockPeriod { current, today, week, month, custom }
+
+Future<String?> downloadStoreProductCsvTemplate() async {
+  final saved = await saveStoreStockFile(
+    Uint8List.fromList(utf8.encode(WorkspaceProductImport.csvTemplate)),
+    'store-products-template.csv',
+    StoreStockExportFormat.csv,
+  );
+  if (!saved) return 'Template download cancelled. Try again.';
+  return !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+      ? 'Template saved in Downloads / MoolSocial.'
+      : 'CSV template saved.';
+}
 
 class StoreStockDownloadControls extends StatefulWidget {
   const StoreStockDownloadControls({

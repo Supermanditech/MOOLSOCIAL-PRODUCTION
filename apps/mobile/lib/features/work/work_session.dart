@@ -7904,12 +7904,23 @@ class WorkSession extends ChangeNotifier {
   }
 
   void importWorkspaceProducts(List<WorkspaceCatalogueItem> products) {
+    final byId = <String, int>{};
+    final bySku = <String, int>{};
+    for (var i = 0; i < workspaceCatalogueItems.length; i++) {
+      byId.putIfAbsent(workspaceCatalogueItems[i].id, () => i);
+      bySku.putIfAbsent(workspaceCatalogueItems[i].sku, () => i);
+    }
     for (final product in products) {
-      final index = workspaceCatalogueItems.indexWhere(
-        (item) => item.id == product.id || item.sku == product.sku,
-      );
+      final idIndex = byId[product.id], skuIndex = bySku[product.sku];
+      final index = idIndex == null
+          ? skuIndex ?? -1
+          : skuIndex == null
+          ? idIndex
+          : (idIndex < skuIndex ? idIndex : skuIndex);
       if (index < 0) {
         workspaceCatalogueItems.add(product);
+        byId[product.id] = workspaceCatalogueItems.length - 1;
+        bySku[product.sku] = workspaceCatalogueItems.length - 1;
         _recordWorkspaceStockMovement(
           product: product,
           kind: WorkspaceStockMovementKind.goodsReceived,
@@ -7919,6 +7930,10 @@ class WorkSession extends ChangeNotifier {
       } else {
         final previous = workspaceCatalogueItems[index];
         workspaceCatalogueItems[index] = product;
+        if (previous.id != product.id) byId.remove(previous.id);
+        if (previous.sku != product.sku) bySku.remove(previous.sku);
+        byId[product.id] = index;
+        bySku[product.sku] = index;
         _recordWorkspaceStockMovement(
           product: product,
           kind: WorkspaceStockMovementKind.goodsReceived,
