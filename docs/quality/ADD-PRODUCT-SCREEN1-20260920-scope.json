@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "79A1377425C0CD5CCE5F45C608DC9824B499B272C84F47F9431B2F08C3613335",
+      "manifestSha256": "36B605115BECC1AA3004819B1F4B5A168C994954F8FD121B14BC1E71AF94E59A",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -47,7 +47,7 @@
       ],
       "explicitExclusions": [
         "No downstream screen redesign before founder approval",
-        "No backend/APK/OPPO/live action"
+        "No backend, production release, real payments or messages; only the exact founder-authorized r66.37 OPPO review candidate"
       ],
       "dependenciesAndApprovals": [
         "Founder Screen 1 visual approval",
@@ -82,7 +82,7 @@
     "explicitExclusions": [
       "CSV batch-review redesign pending its screenwise approval",
       "Backend",
-      "APK/install/live service",
+      "Any build/install other than the exact UAW-STORE-ADD-PRODUCT-R66.37-REVIEW-20260921 non-production OPPO candidate; live service writes",
       "Counter Sale changes"
     ],
     "dependenciesAndApprovals": [
@@ -107,8 +107,8 @@
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": false,
-    "deviceInstallAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
     "externalServiceWriteAuthorized": false
   }
 }

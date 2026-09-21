@@ -2101,6 +2101,22 @@ $runtimeBaselineBranch = [string]$gitDiscipline.acceptedRuntimeBaseline.branch
 $runtimeBaselineTag = [string]$gitDiscipline.acceptedRuntimeBaseline.tag
 $governanceTag = [string]$gitDiscipline.workStart.annotatedTag
 $rootForward = ConvertTo-ProductionForwardPath $root
+$storeAddProductSource = (
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  $ProductionLane -ceq 'codex_ui' -and
+  $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+  $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+  $branch -ceq 'work/codex-ui/add-product-screen1-20260920' -and
+  $rootForward -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920'
+)
+$storeAddProductIntegration = (
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  $ProductionLane -ceq 'integration' -and
+  $ProductionWorkId -ceq 'store-add-product-20260921' -and
+  $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-ADD-PRODUCT-20260921' -and
+  $branch -ceq 'integration/moolsocial/store-add-product-20260921' -and
+  $rootForward -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921'
+)
 $counterSaleIntegration = Test-CounterSaleIntegrationIdentity @{
   Role = $AgentRole; Task = $AgentTask; Lane = $ProductionLane
   WorkId = $ProductionWorkId; TicketId = $ProductionTicketId
@@ -2216,7 +2232,7 @@ if ($ProductionLane -ceq 'baseline') {
   } else {
     Assert-Coordination (
       [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $AgentTask.StartsWith(
+      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $storeAddProductIntegration -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))
@@ -2848,7 +2864,8 @@ if ($ProductionLane -ceq 'baseline') {
         $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
         $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
         $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
-        $effectiveOwner -cin $addProductBootstrapOwners
+        ($effectiveOwner -cin $addProductBootstrapOwners -or
+          $effectiveOwner -ceq 'scripts/check-approved-ui-locks.ps1')
       )
       $allowedOwner = $false
       # Founder requested completion of dialog-free Stock downloads, frontend only.
@@ -2891,13 +2908,33 @@ if ($ProductionLane -ceq 'baseline') {
         $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
         $effectiveOwner -ceq 'apps/mobile/lib/features/journey01/journey_router.dart'
       )
+      # Exact successor may verify inherited owners; integration phases still
+      # forbid direct source commits and require the sealed complete apps tree.
+      $storeAddProductInheritedOwner = $storeAddProductIntegration -and
+        $effectiveOwner -cin @(
+          'apps/mobile/lib/features/work/screens/store_add_product_sheet.dart',
+          'apps/mobile/lib/features/work/work_stock_export.dart',
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt',
+          'apps/mobile/pubspec.yaml', 'apps/mobile/pubspec.lock',
+          'apps/mobile/.dart_tool/package_config.json',
+          'apps/mobile/.dart_tool/package_graph.json',
+          'apps/mobile/.flutter-plugins-dependencies',
+          'apps/mobile/lib/features/work/work_models.dart',
+          'apps/mobile/lib/features/work/work_session.dart',
+          'apps/mobile/lib/features/journey01/journey_router.dart',
+          'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+          'apps/mobile/test/work_workspace_layout_safety_test.dart',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'scripts/check-approved-ui-locks.ps1'
+        )
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
           $allowedOwner = $true
           break
         }
       }
-      if ($addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -2935,7 +2972,7 @@ if ($ProductionLane -ceq 'baseline') {
         'coordination_bootstrap','task_start','implementation','pre_commit','handoff',
         'founder_acceptance','ticket_acceptance','ticket_close'
       )
-      if ($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission -or $counterSaleAdmission) { 'integration_admission_authorize' }
+      if ($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission -or $counterSaleAdmission -or $storeAddProductSource) { 'integration_admission_authorize' }
     }
     'codex_auth' {
       @('coordination_bootstrap','task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
@@ -5915,7 +5952,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (($ProductionPhase -cin @(
       'handoff','founder_acceptance','ticket_acceptance','ticket_close'
-    )) -or (($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission -or $counterSaleAdmission) -and
+    )) -or (($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission -or $counterSaleAdmission -or $storeAddProductSource) -and
       $ProductionPhase -ceq 'integration_admission_authorize')) {
     Assert-Coordination ($head -cne $baseCommit) `
       'production handoff contains no feature commit.'
@@ -6063,7 +6100,39 @@ if ($ProductionLane -ceq 'baseline') {
   }
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
-    if ($counterSaleAdmission) {
+    if ($storeAddProductSource) {
+      $qualifiedSource = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+      & git -C $root merge-base --is-ancestor $qualifiedSource $head
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Add Product qualified source ancestry changed.'
+      $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $appTrees.Count -eq 2 -and
+        $appTrees[0] -ceq $appTrees[1]) 'Add Product app changed after qualification.'
+      Assert-Coordination ((Test-ProductionWorktreeClean) -and
+        (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Add Product source must be clean and remote-equal.'
+      Assert-Coordination (
+        $IntegrationTargetWorkId -ceq 'store-add-product-20260921' -and
+        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-ADD-PRODUCT-20260921' -and
+        (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq
+          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921' -and
+        (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
+      ) 'Add Product integration target identity changed.'
+      $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
+        $targetBranch[0] -ceq 'integration/moolsocial/store-add-product-20260921') 'Add Product target branch changed.'
+      $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
+        $targetHead[0] -ceq $workStartCommit) 'Add Product integration must start at governance.'
+      # Validate all currently claimed files in the sealed source before merge;
+      # do not invent predecessor evidence or borrow an older build admission.
+      foreach ($owner in $effectiveOwners) {
+        & git -C $root cat-file -e "${head}:$owner" 2>$null
+        Assert-Coordination ($LASTEXITCODE -eq 0) "Add Product inherited owner absent from sealed source: $owner"
+      }
+      Assert-ProductionManagedWorktreesClean
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/store-add-product-20260921')
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Add Product integration remote already exists.'
+      Write-Output 'merge(store-add-product-20260921): seal qualified Store frontend review source'
+    } elseif ($counterSaleAdmission) {
       $qualifiedSource = 'bfb47131adae3458ae92cc67fb8fb932a295e16c'
       $counterTargetId = 'counter-sale-20260919-v2'
       if ($IntegrationTargetWorkId -ceq 'counter-sale-20260919-v3') {
@@ -6362,6 +6431,16 @@ if ($ProductionLane -ceq 'baseline') {
       @($approvedBranches | Select-Object -Unique).Count -eq
         $approvedBranches.Count
     ) 'integration requires unique approved feature commits and branches.'
+    if ($storeAddProductIntegration) {
+      Assert-Coordination ($approvedCommits.Count -eq 1 -and
+        $approvedBranches[0] -ceq 'work/codex-ui/add-product-screen1-20260920') 'Add Product integration requires its exact source branch.'
+      $qualifiedSource = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+      & git -C $root merge-base --is-ancestor $qualifiedSource $approvedCommits[0]
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Add Product source ancestor is missing.'
+      $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $appTrees.Count -eq 2 -and
+        $appTrees[0] -ceq $appTrees[1]) 'Add Product integration changed the qualified app tree.'
+    }
     if ($counterSaleIntegration) {
       Assert-Coordination ($approvedCommits.Count -eq 1 -and
         $approvedBranches[0] -ceq 'work/codex-ui/counter-sale-20260919') 'Counter Sale integration requires exactly its qualified feature branch.'

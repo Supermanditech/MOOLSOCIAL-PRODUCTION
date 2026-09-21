@@ -50,6 +50,7 @@
         "apps/mobile/test/work_workspace_layout_safety_test.dart",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1",
         "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
         "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
         "docs/quality/ADD-PRODUCT-SCREEN1-20260920-incremental.json"

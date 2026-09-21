@@ -160,6 +160,12 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v5' {
       'integration/moolsocial/counter-sale-20260919-v5'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920' {
+      'work/codex-ui/add-product-screen1-20260920'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921' {
+      'integration/moolsocial/store-add-product-20260921'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -270,6 +276,39 @@ function Get-CursorAccessibilityNativeProjection {
     }
   }
   $utf8 = [Text.UTF8Encoding]::new($false)
+  if ($requiredBranch -cin @(
+      'work/codex-ui/add-product-screen1-20260920',
+      'integration/moolsocial/store-add-product-20260921'
+    )) {
+    # Founder-authorized r66.37 review: exact download bridge only. Project its
+    # three registration/lifecycle blocks back to the unchanged combined native
+    # source; all existing accessibility/auth/reference hashes still run below.
+    & git -C $root merge-base --is-ancestor '79d5401338881f55e65b08c0e7843cbac016fcfb' HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Store download projection requires its qualified source ancestor.' }
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
+        'aebb6246f8e040840efe029557293d202e8b3a822d53752fadac0fc2743ecb56') {
+      throw 'Store download projection rejects changed native source.'
+    }
+    $bridgePath = Join-Path $root 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
+    if (-not (Test-Path -LiteralPath $bridgePath -PathType Leaf)) {
+      throw 'Store download bridge is missing.'
+    }
+    $bridgeSource = [IO.File]::ReadAllText($bridgePath).Replace("`r`n", "`n")
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -cne
+        '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd') {
+      throw 'Store download projection rejects changed bridge source.'
+    }
+    foreach ($registration in @(
+        "    private var storeStockDownload: StoreStockDownloadBridge? = null`n",
+        "        storeStockDownload?.close()`n        storeStockDownload = StoreStockDownloadBridge(this, flutterEngine.dartExecutor.binaryMessenger)`n",
+        "        storeStockDownload?.close()`n        storeStockDownload = null`n"
+      )) {
+      if ([regex]::Matches($Source, [regex]::Escape($registration)).Count -ne 1) {
+        throw 'Store download projection requires one exact registration/lifecycle block.'
+      }
+      $Source = $Source.Replace($registration, '')
+    }
+  }
   $expectedSourceHash = if ($combined) {
     '8a4bf4853c24176662fa9dafc8dced9da3a929903c60438eeaa7731e511460c4'
   } else { 'bffb6fea0876c45bee5c5a6b96c790ee49738ee6e9f8738a836a4a04b40bd3ec' }

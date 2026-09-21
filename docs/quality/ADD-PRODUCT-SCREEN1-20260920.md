@@ -1,5 +1,43 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Current bounded OPPO successor authority — 21 September 2026
+
+Founder explicitly authorised one successor OPPO review APK and physical testing
+of all implemented changes since r66.36: pending Counter Sale CS-OPPO-015,
+Add Product catalogue/manual/CSV, stock statement and PDF/XLSX/CSV downloads.
+Founder then approved ONLY exact native-download/build/integration admission and
+its regression checks, with no broader governance/policy, backend or redesign.
+This supersedes older build/install exclusions below for this candidate only.
+
+Qualified application checkpoint: 79d5401338881f55e65b08c0e7843cbac016fcfb,
+committed/pushed with exact remote readback. All 14 app/dependency paths changed
+since previous integration e1e4985f are included; a425fd89 Counter Sale receipt
+keyboard fix is an ancestor. Cursor's independent checkout is not an input and
+must not be edited or advanced by this task.
+
+Candidate planned: UAW-STORE-ADD-PRODUCT-R66.37-REVIEW-20260921,
+1.0.0-r66.37 / 2026092101, debug RuntimeUiReview, com.moolsocial.app.runtime.
+Single fresh integration target:
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921,
+branch integration/moolsocial/store-add-product-20260921. Admission requires
+governance-tag start, qualified-source ancestry, unchanged complete apps tree,
+clean remote-exact source, inherited owner presence and all existing merge checks.
+No production/main change, data clear, uninstall, live payment or message.
+
+Native admission now validates exact new MainActivity and download-bridge bytes,
+removes only the five approved registration/lifecycle lines for comparison, and
+then executes the unchanged prior source/accessibility/projection/reference
+hash checks. Full lock gate passed; isolated fixture: 1 positive / 8 rejected.
+Exact integration identity fixture: 2 positive / 14 rejected. Logs retained in
+the task outputs as store-add-product-oppo-native-lock-01.log,
+store-add-product-oppo-native-fixtures-01.log and
+store-add-product-oppo-integration-identities-01.log.
+
+Current source paired 45-file regressions are still running, not passed yet.
+The complete device plan is task outputs/store-add-product-oppo-20260921-plan.md.
+Build-source manifest, final preflight, APK and installed hashes, fresh screenshot
+evidence and defect register remain pending. This is not device acceptance.
+
 ## Current continuation — v24 visually approved; v25 mapping checks
 
 Founder approved the displayed v24 CSV Ready / Needs attention layouts on
