@@ -864,7 +864,8 @@ function Assert-ProductionManagedWorktreesClean {
   # The separate public Consumer audit is not an input to this Store candidate.
   # Founder authorization: future Cursor integration is admitted separately.
   if ($IndependentCursorAudit) {
-    Assert-Coordination ($storeBuyFinalAdmission -or $storeBuyFinalSeptember12) `
+    Assert-Coordination ($storeBuyFinalAdmission -or $storeBuyFinalSeptember12 -or
+      $storeAddProductSource -or $storeAddProductIntegration) `
       'Independent Cursor audit scope is restricted to the admitted Store candidate.'
     Assert-Coordination (@($ApprovedFeatureBranches | Where-Object {
       [string]$_ -like 'work/cursor-ui/*'
@@ -902,12 +903,19 @@ function Assert-ProductionManagedWorktreesClean {
   foreach ($managedPath in $managedPaths) {
     Assert-Coordination (Test-Path -LiteralPath $managedPath -PathType Container) `
       "managed production worktree is unavailable: $managedPath"
-    if ($IndependentCursorAudit -and $managedPath -ceq
-        'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913') {
+    # Founder confirmed 21 September: active Cursor Buy work is excluded from
+    # this exact Store APK; its integration will happen later. Never modify it.
+    $independentCursorPath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913'
+    $independentCursorBranch = 'work/cursor-ui/redmi-v6-audit-20260913'
+    if ($storeAddProductSource -or $storeAddProductIntegration) {
+      $independentCursorPath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921'
+      $independentCursorBranch = 'work/cursor-ui/buy-ready-20260921'
+    }
+    if ($IndependentCursorAudit -and $managedPath -ceq $independentCursorPath) {
       $independentBranch = @(& git -C $managedPath branch --show-current)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and
         $independentBranch.Count -eq 1 -and $independentBranch[0] -ceq
-          'work/cursor-ui/redmi-v6-audit-20260913') `
+          $independentCursorBranch) `
         'Independent Cursor audit identity changed.'
       continue
     }
@@ -6128,7 +6136,7 @@ if ($ProductionLane -ceq 'baseline') {
         & git -C $root cat-file -e "${head}:$owner" 2>$null
         Assert-Coordination ($LASTEXITCODE -eq 0) "Add Product inherited owner absent from sealed source: $owner"
       }
-      Assert-ProductionManagedWorktreesClean
+      Assert-ProductionManagedWorktreesClean -IndependentCursorAudit
       $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/store-add-product-20260921')
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Add Product integration remote already exists.'
       Write-Output 'merge(store-add-product-20260921): seal qualified Store frontend review source'
@@ -6408,7 +6416,7 @@ if ($ProductionLane -ceq 'baseline') {
     Assert-Coordination (
       $head -ceq $workStartCommit -and (Test-ProductionWorktreeClean)
     ) 'integration must start clean at the governance tag.'
-    Assert-ProductionManagedWorktreesClean
+    Assert-ProductionManagedWorktreesClean -IndependentCursorAudit:$storeAddProductIntegration
   }
 
   if ($ProductionPhase -cin @(
@@ -6416,7 +6424,7 @@ if ($ProductionLane -ceq 'baseline') {
     )) {
     Assert-Coordination (Test-ProductionWorktreeClean) `
       'integration verification requires a clean worktree.'
-    Assert-ProductionManagedWorktreesClean -IndependentCursorAudit:$storeBuyFinalSeptember12
+    Assert-ProductionManagedWorktreesClean -IndependentCursorAudit:($storeBuyFinalSeptember12 -or $storeAddProductIntegration)
     $approvedCommits = @($ApprovedFeatureCommits | ForEach-Object {
       [string]$_
     })

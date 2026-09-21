@@ -15,6 +15,15 @@ since previous integration e1e4985f are included; a425fd89 Counter Sale receipt
 keyboard fix is an ancestor. Cursor's independent checkout is not an input and
 must not be edited or advanced by this task.
 
+Founder clarified during admission that Cursor is actively working on the public
+Store screen and will integrate later, not into this APK. Reuse the existing
+independent-Cursor admission only for this exact Store source/integration pair
+and exact Cursor buy-ready-20260921 root/branch. Reject Cursor as a candidate
+input; keep source, integration and every other managed checkout clean. No Cursor
+files are read into the build, committed, stashed, reset or advanced here.
+The first admission refusal remains in the task log. This scoped non-input
+handling is not a general dirty-worktree waiver or an application change.
+
 Candidate planned: UAW-STORE-ADD-PRODUCT-R66.37-REVIEW-20260921,
 1.0.0-r66.37 / 2026092101, debug RuntimeUiReview, com.moolsocial.app.runtime.
 Single fresh integration target:
