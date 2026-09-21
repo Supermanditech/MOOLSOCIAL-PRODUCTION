@@ -1421,22 +1421,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     );
   }
 
-  List<BuyV2Order> get _deliveryOrders {
-    final active = widget.session.activeDeliveryOrders;
-    final selected = widget.session.orders
-        .where(
-          (order) =>
-              order.id == _presentedQuickOrderId &&
-              order.collection == null &&
-              order.destination != BuyV2Destination.medicine,
-        )
-        .firstOrNull;
-    return [
-      ...active,
-      if (selected != null && !active.any((order) => order.id == selected.id))
-        selected,
-    ];
-  }
+  // A retained selection is not proof of an active delivery. Completed orders
+  // remain in Orders, but must not keep the global delivery control alive.
+  List<BuyV2Order> get _deliveryOrders => widget.session.activeDeliveryOrders;
 
   BuyV2Order? get _deliveryOrder {
     final deliveries = _deliveryOrders;

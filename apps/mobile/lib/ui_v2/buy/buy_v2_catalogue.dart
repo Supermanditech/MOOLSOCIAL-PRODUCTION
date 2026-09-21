@@ -1060,21 +1060,18 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(8, 0, 4, 0),
                         child: Container(
+                          key: ValueKey('buy-offer-theme-card-${product.id}'),
                           clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: BuyV2Colors.line),
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: _mool
-                                  ? [
-                                      const Color(0xFF21182C),
-                                      const Color(0xFF513447),
-                                    ]
-                                  : [
-                                      const Color(0xFF201C24),
-                                      const Color(0xFF49303A),
-                                    ],
+                              colors: const [
+                                Colors.white,
+                                BuyV2Colors.softBlue,
+                              ],
                             ),
                           ),
                           child: InkWell(
@@ -1096,7 +1093,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         Text(
                                           entry.offer.headline,
                                           style: const TextStyle(
-                                            color: Color(0xFFFFD381),
+                                            color: BuyV2Colors.navy,
                                             fontSize: 11,
                                             height: 1.15,
                                             fontWeight: FontWeight.w700,
@@ -1106,7 +1103,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         Text(
                                           product.customerTitle,
                                           style: const TextStyle(
-                                            color: Colors.white,
+                                            color: BuyV2Colors.ink,
                                             fontSize: 15,
                                             height: 1.15,
                                             fontWeight: FontWeight.w800,
@@ -1116,7 +1113,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         Text(
                                           buyV2Money(product.price),
                                           style: const TextStyle(
-                                            color: Color(0xFFFFD381),
+                                            color: BuyV2Colors.navy,
                                             fontSize: 22,
                                             height: 1.15,
                                             fontWeight: FontWeight.w900,
@@ -1125,7 +1122,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         Text(
                                           product.pack,
                                           style: const TextStyle(
-                                            color: Colors.white,
+                                            color: BuyV2Colors.ink,
                                             fontSize: 11,
                                             height: 1.15,
                                             fontWeight: FontWeight.w500,
@@ -1135,7 +1132,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                           Text(
                                             'Minimum ${product.minimumOrder} packs',
                                             style: const TextStyle(
-                                              color: Colors.white,
+                                              color: BuyV2Colors.ink,
                                               fontSize: 11,
                                               height: 1.15,
                                               fontWeight: FontWeight.w500,
@@ -1148,7 +1145,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             'buy-offer-publisher-${entry.offer.identity}',
                                           ),
                                           style: const TextStyle(
-                                            color: Color(0xFFE4E9E3),
+                                            color: BuyV2Colors.muted,
                                             fontSize: 11,
                                             height: 1.15,
                                             fontWeight: FontWeight.w500,
@@ -1167,24 +1164,14 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                         colors: [
-                                          Color(0xFFF7EAE3),
-                                          Color(0xFFECDDE7),
+                                          Colors.white,
+                                          BuyV2Colors.softOrange,
                                         ],
                                       ),
                                       border: Border(
                                         left: BorderSide(
-                                          color: Color(0x337C5264),
+                                          color: BuyV2Colors.line,
                                         ),
-                                      ),
-                                    ),
-                                    foregroundDecoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0x05A36B76),
-                                          Color(0x16A36B76),
-                                        ],
                                       ),
                                     ),
                                     child: Flex(
@@ -1206,9 +1193,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             ),
                                             onPressed: open,
                                             style: TextButton.styleFrom(
-                                              foregroundColor: const Color(
-                                                0xFF30232D,
-                                              ),
+                                              foregroundColor: BuyV2Colors.navy,
                                               padding: EdgeInsets.zero,
                                               minimumSize: const Size(44, 48),
                                             ),

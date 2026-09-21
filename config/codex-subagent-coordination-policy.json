@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4616,
-    "sha256": "1263ACB2AE92BFA45538AD69146301491447DA1A71CA1239AC49CF33853AA6E6"
+    "sha256": "8701A819DA1DAAF284997CA56C53BAE37EAC6BCC8E08A41E2DC39712AAB042F1"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -64,7 +64,8 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
-        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json"
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart"
       ]
     },
     {
@@ -103,7 +104,6 @@
         "docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt",
         "docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt",
         "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart",

@@ -67,6 +67,24 @@ void main() {
         expect(session.view, BuyV2View.product);
       }
 
+      await captureR66Visual(tester, 'cursor-offers-brand-$scale');
+      final themedCards = find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith(
+              'buy-offer-theme-card-',
+            ),
+      );
+      expect(themedCards, findsWidgets);
+      for (final card in tester.widgetList<Container>(themedCards)) {
+        final decoration = card.decoration! as BoxDecoration;
+        expect((decoration.gradient! as LinearGradient).colors, [
+          Colors.white,
+          BuyV2Colors.softBlue,
+        ]);
+        expect(decoration.border, Border.all(color: BuyV2Colors.line));
+      }
       await openOffer();
       final productId = session.selectedProductId!;
       final publicationId = session.featuredOfferPublicationId;

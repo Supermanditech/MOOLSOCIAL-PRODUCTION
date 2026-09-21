@@ -222,7 +222,9 @@
       "REG4642",
       "REG4643",
       "REG4644",
-      "REG4645"
+      "REG4645",
+      "REG4634",
+      "REG4635"
     ],
     "focusedStoreTests": {
       "passed": 31,
@@ -232,6 +234,8 @@
     "compactSelectionTests": "58_selected_scenarios_covered_initial_passes_and_corrected_targeted_reruns",
     "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md",
     "finalStoreProfilesPassed": 4,
-    "screenshots": "C:\\GUARANTEED OUTCOME\\outputs\\cursor-buy-ready-20260921\\buy-compact-final"
+    "screenshots": "C:\\GUARANTEED OUTCOME\\outputs\\cursor-buy-ready-20260921\\buy-compact-final",
+    "sessionReconciliation": "frontend_requests_implemented_local_verification;current_device_replay_and_production_pickup_gateway_pending",
+    "deliveryOffersTestsPassed": 19
   }
 }

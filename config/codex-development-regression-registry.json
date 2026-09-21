@@ -166,23 +166,44 @@
     },
     {
       "id": "REG-20260921-4634-CURSOR-DELIVERY-RAIL-WITHOUT-ACTIVE-ORDER",
-      "status": "open_founder_reported_reproduction_pending",
-      "appliesTo": ["implementation", "testing", "buy", "navigation"],
+      "status": "implemented_local_verified_device_pending",
+      "appliesTo": [
+        "implementation",
+        "testing",
+        "buy",
+        "navigation"
+      ],
       "mistake": "Founder reports that the main bottom rail Delivery icon remains visible even when no order has been placed or no active delivery exists.",
-      "rootCause": "Not yet verified. Inspect the existing rail visibility predicate and authoritative active-order state; do not assume a fixture, routing or backend cause before reproduction.",
+      "rootCause": "Screen appended retained selected order even after it left activeDeliveryOrders. This kept terminal delivery state in global navigation.",
       "prevention": "Pending fix and regression coverage: hide Delivery with no placed order or no active delivery; show it for an eligible active delivery using existing navigation. Check fresh and retained sessions, completion/cancellation, multiple orders and return navigation. Registration is not proof of a fix.",
-      "gates": ["apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart"],
-      "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"]
+      "gates": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ],
+      "repairEvidence": "Screen now uses only session.activeDeliveryOrders. Completion/withdrawal hides the rail; history remains intact. Fresh empty, Care-only, multiple active, partial completion, final completion, restored screen and new active order pass. Existing delivery/navigation14 pass. Physical follow-up qualification pending."
     },
     {
       "id": "REG-20260921-4635-CURSOR-OFFERS-PROMO-CARD-THEME-MISMATCH",
-      "status": "open_founder_reported_reproduction_pending",
-      "appliesTo": ["implementation", "testing", "buy", "visual_review"],
+      "status": "implemented_local_verified_device_pending",
+      "appliesTo": [
+        "implementation",
+        "testing",
+        "buy",
+        "visual_review"
+      ],
       "mistake": "Founder reports that the promotional card under Offers has a design and colours that do not match its background or the app theme.",
-      "rootCause": "Not yet verified. Inspect the existing Offers promo card styling against the accepted Buy home theme before identifying the exact conflicting styles.",
+      "rootCause": "Published promotion component hardcoded a separate dark brown/plum card and pink/gold palette instead of existing Buy theme tokens.",
       "prevention": "Pending fix and visual regression coverage: reuse existing app theme colours, card styling, typography and spacing while retaining contrast, offer content and existing tap navigation. Capture the actual Offers screen for founder review; registration is not visual acceptance or a fix.",
-      "gates": ["apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart"],
-      "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"]
+      "gates": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ],
+      "repairEvidence": "Use white/softBlue card, standard line border, ink/navy/muted text and white/softOrange image/CTA panel. Remove rose overlay. Existing publication identity, carousel, product, cart and Back callbacks preserved. Four promotion tests pass at1x/2x; local screenshots inspected. Founder visual acceptance and new device qualification remain pending."
     },
     {
       "id": "REG-20260921-4633-CURSOR-CAPTURE-RUNTIME-AND-PUBLIC-STORE-IDENTITY",

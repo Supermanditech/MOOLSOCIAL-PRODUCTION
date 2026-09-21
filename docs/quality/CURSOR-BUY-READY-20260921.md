@@ -1,5 +1,64 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Session reconciliation: remaining Delivery/Offers implementations completed locally
+
+REG4634: global Delivery reads only active placed delivery records. Remove the
+retained terminal-order fallback; keep Orders/history and existing active delivery
+selection/tracking/navigation. Empty and Care-only sessions have no Delivery
+control; multiple and new active deliveries show it; final completion/removal hides
+it even after screen restoration. Existing model has no delivery cancellation enum:
+withdrawn orders are covered through authoritative refresh; no cancellation state
+or successful payment is fabricated. Review fixtures containing active orders still
+correctly show Delivery; a seeded review profile is not an empty-account proof.
+REG4635: replace dark brown/pink Offers promo palette with existing Buy white,
+softBlue, softOrange, ink/navy/muted and line tokens. Preserve content, publication
+identity, carousel position, CTA/product/cart/Back behavior. Local1x/2x captures
+inspected in outputs/cursor-buy-ready-20260921/offers-brand-r1.
+
+Request-by-request audit (latest founder instruction takes precedence):
+- Independent Cursor worktree/full integrated baseline and durable memory: done.
+- Public Visit store screen (not operator Store) and home-like store SKU layout: done.
+- Store-only search/category/filter/Saved/SKU/navigation: implemented and tested.
+- Store name placement, professional size/long-name wrap and charcoal colour: done.
+- Recurring text-only store-name sheen, reduced motion and lifecycle pauses: done.
+- Header Order/Collect marketing text and its animation: removed by later explicit
+  founder instruction; do not re-add superseded copy or a screen video.
+- Delivery/Collect at store choice for every resolved store, selected tick and
+  existing validation/cart wiring: implemented; optional merchant opt-in removed.
+- Delivery rail and Offers theme reports: implemented by this change.
+- Redmi findings (filter CTA clipping, rice/price-label relevance): fixed locally.
+- More stores below store and branch navigation/Back: restored and tested.
+- Compact selection text across Shop/Wholesale/Offers/filters/categories: implemented;
+  area/action minimum hit targets and enlarged text retained. Existing compact SKU
+  grids remain intact; this is not a claim that every Buy pixel was re-approved.
+- Fresh r66.31 APK/checksum/install/device audit: previously completed. Later fixes
+  require a new candidate and device replay; installed r66.31 is not current source.
+- Native baseline blocker and prior Saved geometry/test defects: fixed, evidence
+  preserved. Historical pending sections below are chronological, not current backlog.
+No additional forgotten frontend implementation was identified in the session audit.
+
+Remaining qualification/dependencies, not silently closed: fresh Redmi build and
+replay including motion/accessibility; founder review of latest visuals; production
+pickup gateway/authenticated quote-payment-order completion; future Codex integration
+and the previously recorded historical commit-subject handoff blocker. No backend,
+provider, native, shared routing or release policy redesign is authorized by this
+frontend reconciliation. No push, production release or live order/payment occurred.
+
+Validation: new Delivery lifecycle regression1 pass (9861/cf8c14), existing
+delivery/navigation14 pass (17786/4f2399), promotion4 pass (62554/f8b450), scoped
+analysis4 files no issues (60265/5ab110). Final Delivery capture replay38243/52163f passed1. Empty-account and completed-history
+PNGs in outputs/cursor-buy-ready-20260921/delivery-rail-capture-r2 show no Delivery
+rail; completed-history image inspected. No products are seeded in this test profile;
+the empty product notice is expected. SHA256 manifests accompany both image sets.
+Owner admission required exactly one extra UI owner: transfer screen from recorded
+old RV6 task to current primary and add that path to the existing exact owner list;
+implementation gate passed32 owners (d6a3b6). No other policy rule or check relaxed.
+Whole-screen formatter would have changed unrelated inherited formatting; restored
+baseline formatting and retained only3 added/16 removed delivery-predicate lines.
+A capture setup command used an incorrect relative working directory and made no
+edits; corrected at worktree root. Original test pass remains valid, capture retried.
+
+
 ## Latest: Store repairs and compact Buy selection controls implemented locally
 
 Founder added the compact-spacing ticket during Store repairs. REG4642/4643
@@ -820,3 +879,9 @@ Compact screenshot inspection caught selected chip labels losing contrast when e
 Compact r1 caught four area-row minimum-target regressions (44/47 versus existing48px requirement). Restore48px list-row minimum; retain compact typography and do not weaken assertions. Store filters remain within compact height bound and footer hit-target checks.
 
 Large-text screenshot review revealed Reset taking most footer width and forcing Apply into character wrapping despite hit-test success. Allocate equal flexible width to both actions; add minimum120px Apply width and maximum100px height checks at every profile. Keep full text and font scaling, no ellipsis or scale suppression.
+
+## Founder-authorized remaining session defects: Delivery and Offers
+
+22 September: implement REG4634 Delivery rail only for active placed delivery records, REG4635 theme-consistent Offers promotions, and reconcile all session requests. Launch-supporting UI correctness using existing order state, navigation, published offers and colours. Exact runtime owners: screen (delivery selection predicate only), catalogue (promo styling), session only if required by existing authoritative lifecycle. Focused existing test owners: session and promotion rail. Exclude backend/provider/native/routing contracts and unrelated worktrees. Validate zero/active/completed/retained/multiple orders, existing fulfilment exclusions, offer callbacks/return and normal/large-text captures. Cancellation not invented where order contract has no cancellation state. Production payment and new Redmi qualification remain separate evidence obligations.
+
+Current user authorization transfers only buy_v2_screen.dart ownership from the recorded retired RV6 audit task to this independent Cursor ticket, to fix its actual rail predicate; no other task owner or policy rule changes.

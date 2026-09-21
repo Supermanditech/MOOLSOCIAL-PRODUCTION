@@ -1695,6 +1695,114 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  testWidgets(
+    'Cursor delivery rail follows active orders not retained selection',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      BuyV2Order order(
+        String id,
+        BuyV2OrderStatus status, {
+        BuyV2Destination destination = BuyV2Destination.shop,
+      }) => BuyV2Order(
+        id: id,
+        destination: destination,
+        title: 'Placed order',
+        itemSummary: '1 item',
+        total: 100,
+        partner: 'Verified store',
+        partnerType: 'Retailer',
+        promise: 'Confirmed delivery',
+        destinationLabel: 'Home',
+        progress: status == BuyV2OrderStatus.delivered ? 1 : .5,
+        status: status,
+      );
+      final adapter = _R669ProcurementCommerce(
+        const BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready),
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        commerceAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      Future<void> showOrders(List<BuyV2Order> orders) async {
+        adapter.snapshot = BuyV2CommerceSnapshot(
+          state: BuyV2CommerceLoadState.ready,
+          orders: orders,
+        );
+        await session.restoreCommerce();
+        await tester.pumpAndSettle();
+      }
+
+      await showOrders([]);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final delivery = find.byKey(const ValueKey('buy-quick-delivery-toggle'));
+      expect(delivery, findsNothing);
+      await captureR66Visual(tester, "cursor-delivery-empty");
+      await showOrders([
+        order(
+          'care-only',
+          BuyV2OrderStatus.dispatched,
+          destination: BuyV2Destination.medicine,
+        ),
+      ]);
+      expect(delivery, findsNothing);
+      await showOrders([
+        order('one', BuyV2OrderStatus.dispatched),
+        order('two', BuyV2OrderStatus.arriving),
+      ]);
+      expect(delivery, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-expand')));
+      await tester.pumpAndSettle();
+      await showOrders([
+        order('one', BuyV2OrderStatus.delivered),
+        order('two', BuyV2OrderStatus.arriving),
+      ]);
+      expect(session.activeDeliveryOrders.map((o) => o.id), ['two']);
+      expect(delivery, findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-delivery-count')), findsNothing);
+      await showOrders([
+        order('one', BuyV2OrderStatus.delivered),
+        order('two', BuyV2OrderStatus.delivered),
+      ]);
+      expect(delivery, findsNothing);
+      expect(session.orders.length, 2);
+      await captureR66Visual(
+        tester,
+        "cursor-delivery-completed-history-retained",
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(delivery, findsNothing);
+      await showOrders([order('new', BuyV2OrderStatus.confirmed)]);
+      expect(delivery, findsOneWidget);
+      await showOrders([]);
+      expect(delivery, findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
   test(
     'Cursor store search and filters never broaden to home catalogue',
     () async {
