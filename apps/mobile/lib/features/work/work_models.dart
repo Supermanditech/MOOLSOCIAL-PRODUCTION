@@ -4840,7 +4840,7 @@ class WorkspaceProductImport {
     'title': 'Product name',
     'brand': 'Brand or maker',
     'pack': 'Pack size',
-    'purchasePrice': 'Purchase cost',
+    'purchasePrice': 'Purchase price',
     'sellingPrice': 'Selling price',
     'stock': 'Stock quantity',
     'sku': 'Your Store SKU',
@@ -5340,11 +5340,11 @@ class WorkspaceProductImport {
     : sku.isEmpty
     ? (field: 'sku', message: 'Enter a unique store SKU.')
     : purchase == null || purchase <= 0
-    ? (field: 'purchasePrice', message: 'Enter purchase cost.')
+    ? (field: 'purchasePrice', message: 'Enter purchase price.')
     : selling == null || selling <= purchase
     ? (
         field: 'sellingPrice',
-        message: 'Enter a customer price above the purchase cost.',
+        message: 'Enter a customer price above the purchase price.',
       )
     : stock == null || stock < 0
     ? (field: 'stock', message: 'Enter the available stock.')

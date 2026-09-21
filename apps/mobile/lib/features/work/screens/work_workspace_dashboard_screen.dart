@@ -13415,7 +13415,18 @@ class _WorkspaceCatalogueSurfaceState
               return Navigator.of(reviewContext).push<WorkspaceCatalogueItem>(
                 MaterialPageRoute(
                   builder: (editorContext) => Scaffold(
-                    appBar: AppBar(title: const Text('Review product')),
+                    appBar: AppBar(
+                      toolbarHeight: 48,
+                      titleSpacing: 0,
+                      title: const Text(
+                        'Review product',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: MoolColors.navy,
+                        ),
+                      ),
+                    ),
                     body: SafeArea(
                       child: _CatalogueProductEditor(
                         session: widget.session,
@@ -15555,6 +15566,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       _variant,
       _barcode,
       _category,
+      _composition,
+      _regulatory,
+      ..._packFields.values,
     ]) {
       field.addListener(_refreshIdentity);
     }
@@ -15640,18 +15654,28 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         text: widget.product.compliance?.toJson()[key] as String? ?? '',
       ),
   };
-  Widget _packField(String field) => _AccessibleWorkTextField(
-    keyName: 'work-product-pack-$field',
-    controller: _packFields[field]!,
-    label: _packFieldLabels[field]!,
-    textInputAction: TextInputAction.next,
-    stackedLabel: MediaQuery.textScalerOf(context).scale(16) > 19.2,
+  Widget _packField(String field) => _field(
+    'pack-$field',
+    'work-product-pack-$field',
+    _packFieldLabels[field]!,
+    _packFields[field]!,
+    hint: 'As printed on the pack',
+    lines:
+        {
+          'genericName',
+          'manufacturerName',
+          'packerName',
+          'importerName',
+          'consumerCare',
+        }.contains(field)
+        ? 0
+        : 1,
   );
 
   Widget _packFieldsLayout() => LayoutBuilder(
     builder: (context, constraints) {
       final sideBySide =
-          constraints.maxWidth >= 320 &&
+          constraints.maxWidth >= 300 &&
           MediaQuery.textScalerOf(context).scale(16) <= 19.2;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -15703,7 +15727,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   bool get _factsNeedReview =>
       widget.product.catalogueFactsRequireReview || _masterFactsChanged;
   late bool _available = widget.product.available;
-  late WorkspaceStockMode _stockMode = widget.product.stockMode;
+  late final WorkspaceStockMode _stockMode = widget.product.stockMode;
   String? _error;
 
   bool get _catalogueMatched => widget.product
@@ -15742,6 +15766,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     for (final controller in _packFields.values) {
       controller.dispose();
     }
+    for (final node in _fieldFocus.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -15776,9 +15803,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           item.sku.trim().toLowerCase() == _sku.text.trim().toLowerCase(),
     );
     if (duplicate) {
-      setState(
-        () => _error =
-            'This store SKU is already in use. Edit that product or choose a different SKU.',
+      _reject(
+        'This store SKU is already in use. Choose a different SKU.',
+        field: 'sku',
       );
       return;
     }
@@ -15790,7 +15817,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         : int.tryParse(_stock.text.trim());
     final lowStockThreshold = int.tryParse(_lowStockThreshold.text.trim());
     final minimumOrder = int.tryParse(_minimumOrder.text.trim());
-    final error = validateWorkspaceProductValues(
+    final issue = workspaceProductValuesIssue(
       title: _title.text.trim(),
       brand: _brand.text.trim(),
       pack: _pack.text.trim(),
@@ -15804,8 +15831,16 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       minimumOrder: minimumOrder,
       delivery: _delivery.text.trim(),
     );
-    if (error != null) {
-      setState(() => _error = error);
+    if (issue != null) {
+      _reject(issue.message, field: issue.field);
+      return;
+    }
+    if (!_categories.containsKey(_category.text.trim())) {
+      _reject('Choose a category from the list.', field: 'categoryId');
+      return;
+    }
+    if (_mrp.text.trim().isNotEmpty && mrp == null) {
+      _reject('Enter MRP in whole rupees, or leave it empty.', field: 'mrp');
       return;
     }
     final reviewedProduct = widget.product.copyWith(
@@ -15866,283 +15901,462 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     }
   }
 
+  final _sectionKeys = <String, GlobalKey>{};
+  final _fieldKeys = <String, GlobalKey>{};
+  final _fieldFocus = <String, FocusNode>{};
+  final _expanded = <String, bool>{'summary': true};
+  String? _errorField;
+
+  Map<String, String> get _categories => {
+    for (final category in [
+      ...BuyV2Catalogue.shopCategories,
+      ...BuyV2Catalogue.wholesaleCategories,
+    ])
+      if (category.id != 'all') category.id: category.label,
+    for (final item in workspaceMasterCatalogue)
+      item.categoryId: item.categoryId
+          .split('-')
+          .map(
+            (part) => part.isEmpty
+                ? part
+                : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' '),
+    'other': 'Other products',
+  };
+
+  String _fieldSection(String field) =>
+      {
+        'title',
+        'purchasePrice',
+        'sellingPrice',
+        'mrp',
+        'stock',
+        'lowStockThreshold',
+        'minimumOrder',
+      }.contains(field)
+      ? 'summary'
+      : 'details';
+
+  void _reject(String message, {String? field}) {
+    final section = field == null ? null : _fieldSection(field);
+    setState(() {
+      _error = message;
+      _errorField = field;
+      if (section != null) _expanded[section] = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || field == null) return;
+      _fieldFocus[field]?.requestFocus();
+      final target = _fieldKeys[field]?.currentContext;
+      if (target != null) {
+        unawaited(
+          Scrollable.ensureVisible(
+            target,
+            alignment: .25,
+            duration: const Duration(milliseconds: 180),
+          ),
+        );
+      }
+    });
+  }
+
+  void _clearFieldError(String field) {
+    if (_errorField == field) {
+      setState(() {
+        _error = null;
+        _errorField = null;
+      });
+    }
+  }
+
+  Widget _field(
+    String id,
+    String keyName,
+    String label,
+    TextEditingController controller, {
+    bool numeric = false,
+    bool money = false,
+    int lines = 1,
+    String? hint,
+  }) {
+    final large = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final error = _errorField == id ? _error : null;
+    return Container(
+      key: _fieldKeys.putIfAbsent(id, () => GlobalKey()),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (large)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                label,
+                key: Key('$keyName-label'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          TextField(
+            key: Key(keyName),
+            controller: controller,
+            focusNode: _fieldFocus.putIfAbsent(id, () => FocusNode()),
+            keyboardType: numeric
+                ? TextInputType.number
+                : lines > 1
+                ? TextInputType.multiline
+                : TextInputType.text,
+            textInputAction: lines > 1
+                ? TextInputAction.newline
+                : TextInputAction.next,
+            minLines: lines == 0 ? 1 : lines,
+            maxLines: lines != 1 ? null : 1,
+            scrollPadding: const EdgeInsets.fromLTRB(16, 24, 16, 104),
+            onChanged: (_) {
+              _clearFieldError(id);
+              setState(() {});
+            },
+            decoration: InputDecoration(
+              constraints: const BoxConstraints(minHeight: 48),
+              labelText: large ? null : label,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              hintText: hint,
+              prefixText: money ? '₹ ' : null,
+              error: error == null
+                  ? null
+                  : Semantics(
+                      liveRegion: true,
+                      child: Text(error, key: const Key('work-product-error')),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _group(List<Widget> fields) => LayoutBuilder(
+    builder: (context, constraints) {
+      final paired =
+          constraints.maxWidth >= 300 &&
+          MediaQuery.textScalerOf(context).scale(1) <= 1.2;
+      final width = paired
+          ? (constraints.maxWidth - 8) / 2
+          : constraints.maxWidth;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 10,
+        children: [
+          for (final field in fields) SizedBox(width: width, child: field),
+        ],
+      );
+    },
+  );
+
+  Widget _section(
+    String id,
+    String keyName,
+    String title,
+    List<Widget> children, {
+    Widget? leading,
+    bool initiallyExpanded = false,
+  }) {
+    final open = _expanded[id] ?? initiallyExpanded;
+    return Container(
+      key: Key(keyName),
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        gradient: id == 'summary'
+            ? const LinearGradient(
+                colors: [Color(0xfff2f4ff), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        border: Border.all(color: MoolColors.line),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: _sectionKeys.putIfAbsent(id, () => GlobalKey()),
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  setState(() => _expanded[id] = !open);
+                },
+                child: Semantics(
+                  button: true,
+                  expanded: open,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        children: [
+                          if (leading != null) ...[
+                            leading,
+                            const SizedBox(width: 10),
+                          ],
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: MoolColors.navy,
+                                  ),
+                            ),
+                          ),
+                          Icon(
+                            open ? Icons.expand_less : Icons.expand_more,
+                            color: MoolColors.navy,
+                            size: 22,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (open)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _categoryField() => Container(
+    key: _fieldKeys.putIfAbsent('categoryId', () => GlobalKey()),
+    child: DropdownButtonFormField<String>(
+      key: const Key('work-product-category'),
+      initialValue: _categories.containsKey(_category.text)
+          ? _category.text
+          : null,
+      isExpanded: true,
+      itemHeight: null,
+      focusNode: _fieldFocus.putIfAbsent('categoryId', () => FocusNode()),
+      decoration: InputDecoration(
+        labelText: 'Category',
+        errorText: _errorField == 'categoryId' ? _error : null,
+      ),
+      hint: const Text('Choose category'),
+      selectedItemBuilder: (context) => [
+        for (final entry in _categories.entries)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Tooltip(
+              message: entry.value,
+              child: Text(
+                entry.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+      ],
+      items: [
+        for (final entry in _categories.entries)
+          DropdownMenuItem(
+            value: entry.key,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(entry.value),
+            ),
+          ),
+      ],
+      onChanged: (value) {
+        if (value == null) return;
+        _category.text = value;
+        _clearFieldError('categoryId');
+      },
+    ),
+  );
+
+  Widget _referenceLine(
+    String title,
+    String value, {
+    bool selectable = false,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.bodySmall),
+        selectable ? SelectableText(value) : Text(value),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final keyboardInset = widget.embeddedPage
         ? 0.0
         : MediaQuery.viewInsetsOf(context).bottom;
-    return Material(
-      color: Colors.white,
-      borderRadius: widget.embeddedPage
-          ? BorderRadius.zero
-          : const BorderRadius.vertical(top: Radius.circular(28)),
-      child: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              MoolSpacing.md,
-              MoolSpacing.md,
-              MoolSpacing.md,
-              keyboardInset + (_error == null ? 96 : 168),
-            ),
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!widget.embeddedPage)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.product.title.isEmpty
-                                ? 'Add product'
-                                : 'Edit ${widget.product.title}',
-                            style: const TextStyle(
-                              color: MoolColors.navy,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          key: const Key('work-product-close'),
-                          tooltip: 'Close product editor',
-                          onPressed: _finish,
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ),
-                  if (!widget.embeddedPage)
-                    Text(
-                      widget.product.title.isEmpty
-                          ? 'Add details, price and available stock.'
-                          : '${widget.product.brand} · ${widget.product.pack} · ${widget.product.sku}',
-                      style: const TextStyle(color: MoolColors.muted),
-                    ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  if (widget.embeddedPage) ...[
-                    _AccessibleWorkTextField(
-                      keyName: 'work-product-title',
-                      controller: _title,
-                      label: 'Product name',
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Container(
-                    key: const Key('work-product-fast-editor'),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F6FF),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 56,
-                              height: 56,
-                              child: BuyV2ProductPackshot(
-                                borderRadius: 0,
-                                product: widget.product
-                                    .copyWith(
-                                      title: _title.text.trim(),
-                                      brand: _brand.text.trim(),
-                                      pack: _pack.text.trim(),
-                                      variant: _variant.text.trim(),
-                                      barcode: _barcode.text.trim(),
-                                    )
-                                    .toCataloguePreviewProduct(),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.embeddedPage
-                                        ? (_brand.text.trim().isEmpty
-                                              ? 'Product details'
-                                              : _brand.text.trim())
-                                        : _title.text.trim().isEmpty
-                                        ? 'New product'
-                                        : _title.text.trim(),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: MoolColors.ink,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  Text(
-                                    _pack.text.trim().isEmpty
-                                        ? 'Add the customer pack or size'
-                                        : '${_variant.text.trim()} · ${_pack.text.trim()}',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: MoolColors.muted,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (!widget.embeddedPage)
-                              Icon(
-                                _catalogueMatched
-                                    ? Icons.verified_rounded
-                                    : Icons.lock_outline_rounded,
-                                color: _catalogueMatched
-                                    ? const Color(0xFF08765D)
-                                    : MoolColors.muted,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _ResponsiveFieldPair(
-                          minWidth: 280,
-                          first: _MoneyField(
-                            keyName: 'work-product-selling-price',
-                            controller: _selling,
-                            label: 'Selling price',
-                          ),
-                          second: _MoneyField(
-                            keyName: 'work-product-mrp',
-                            controller: _mrp,
-                            label: 'MRP',
-                          ),
-                        ),
-                        if (widget.embeddedPage) ...[
-                          const SizedBox(height: 12),
-                          _MoneyField(
-                            keyName: 'work-product-purchase-price',
-                            controller: _purchase,
-                            label: 'Purchase cost',
-                          ),
-                        ],
-                        const SizedBox(height: 9),
-                        const Text(
-                          'How do you track this product?',
+    final product = widget.product.copyWith(
+      title: _title.text.trim(),
+      brand: _brand.text.trim(),
+      pack: _pack.text.trim(),
+      variant: _variant.text.trim(),
+      barcode: _barcode.text.trim(),
+      categoryId: _category.text.trim(),
+    );
+    return StoreSettingsStyle(
+      child: Builder(
+        builder: (context) => Material(
+          color: const Color(0xfff7f8fc),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: keyboardInset),
+            child: Column(
+              children: [
+                if (!widget.embeddedPage)
+                  Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Review product',
                           style: TextStyle(
-                            color: MoolColors.ink,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: MoolColors.navy,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ChoiceChip(
-                                key: const Key('work-product-stock-exact'),
-                                label: const FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text('Exact quantity'),
-                                ),
-                                selected:
-                                    _stockMode ==
-                                    WorkspaceStockMode.exactQuantity,
-                                onSelected: (_) => setState(
-                                  () => _stockMode =
-                                      WorkspaceStockMode.exactQuantity,
-                                ),
+                      ),
+                      IconButton(
+                        key: const Key('work-product-close'),
+                        tooltip: 'Close product editor',
+                        onPressed: _finish,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    key: const Key('work-product-editor-scroll'),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _section(
+                          'summary',
+                          'work-product-fast-editor',
+                          'Product, price & stock',
+                          [
+                            _field(
+                              'title',
+                              'work-product-title',
+                              'Product name',
+                              _title,
+                              lines: 0,
+                            ),
+                            const SizedBox(height: 10),
+                            _group([
+                              _field(
+                                'sellingPrice',
+                                'work-product-selling-price',
+                                'Selling price',
+                                _selling,
+                                numeric: true,
+                                money: true,
                               ),
-                            ),
-                            const SizedBox(width: 7),
-                            Expanded(
-                              child: ChoiceChip(
-                                key: const Key('work-product-stock-available'),
-                                label: const FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text('Availability only'),
+                              _field(
+                                'mrp',
+                                'work-product-mrp',
+                                'MRP',
+                                _mrp,
+                                numeric: true,
+                                money: true,
+                                hint: 'Optional',
+                              ),
+                              _field(
+                                'purchasePrice',
+                                'work-product-purchase-price',
+                                'Purchase price',
+                                _purchase,
+                                numeric: true,
+                                money: true,
+                              ),
+                              if (_stockMode ==
+                                  WorkspaceStockMode.exactQuantity)
+                                _field(
+                                  'stock',
+                                  'work-product-stock',
+                                  'Stock quantity',
+                                  _stock,
+                                  numeric: true,
                                 ),
-                                selected:
-                                    _stockMode ==
-                                    WorkspaceStockMode.availabilityOnly,
-                                onSelected: (_) => setState(
-                                  () => _stockMode =
-                                      WorkspaceStockMode.availabilityOnly,
+                              _field(
+                                'lowStockThreshold',
+                                'work-product-low-stock-threshold',
+                                'Low-stock alert',
+                                _lowStockThreshold,
+                                numeric: true,
+                              ),
+                              _field(
+                                'minimumOrder',
+                                'work-product-minimum-order',
+                                'Minimum order',
+                                _minimumOrder,
+                                numeric: true,
+                              ),
+                            ]),
+                            if (_stockMode ==
+                                WorkspaceStockMode.availabilityOnly)
+                              SwitchListTile.adaptive(
+                                key: const Key('work-product-available'),
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('In stock'),
+                                value: _available,
+                                subtitle: const Text(
+                                  'Quantity is not tracked for this product.',
                                 ),
+                                onChanged: (value) =>
+                                    setState(() => _available = value),
                               ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Enter whole rupees and units · Purchase price is private.',
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (_stockMode == WorkspaceStockMode.exactQuantity)
-                          _ResponsiveFieldPair(
-                            minWidth: 280,
-                            first: _AccessibleWorkTextField(
-                              keyName: 'work-product-stock',
-                              controller: _stock,
-                              keyboardType: TextInputType.number,
-                              label: 'Stock quantity',
-                            ),
-                            second: _AccessibleWorkTextField(
-                              keyName: 'work-product-low-stock-threshold',
-                              controller: _lowStockThreshold,
-                              keyboardType: TextInputType.number,
-                              label: 'Low-stock alert',
-                            ),
-                          )
-                        else
-                          Material(
-                            color: Colors.transparent,
-                            child: SwitchListTile.adaptive(
-                              key: const Key('work-product-available'),
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Available for customers'),
-                              subtitle: const Text(
-                                'Turn this off when you cannot fulfil orders.',
-                              ),
-                              value: _available,
-                              onChanged: (value) =>
-                                  setState(() => _available = value),
-                            ),
-                          ),
-                        if (widget.embeddedPage && !_wasOwned)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 12),
-                            child: Text(
-                              'Store stock only · Publish separately',
-                              style: TextStyle(
-                                color: MoolColors.muted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          )
-                        else
-                          Row(
-                            key: const Key('work-product-public'),
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Show to customers',
-                                      style: TextStyle(
-                                        color: MoolColors.ink,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    Text(
-                                      _catalogueMatched && !_factsNeedReview
-                                          ? 'Include in your customer preview. Live publication is not connected yet.'
-                                          : 'This product stays private until its details are reviewed.',
-                                      style: const TextStyle(
-                                        color: MoolColors.muted,
-                                        fontSize: 9.5,
-                                        height: 1.25,
-                                      ),
-                                    ),
-                                  ],
+                            if (!_wasOwned || widget.onDraftReviewed != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  'Store stock only · Publish separately',
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 ),
-                              ),
-                              Switch.adaptive(
+                              )
+                            else
+                              SwitchListTile.adaptive(
+                                key: const Key('work-product-public'),
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text(
+                                  'Include in customer preview',
+                                ),
+                                subtitle: Text(
+                                  _catalogueMatched && !_factsNeedReview
+                                      ? 'Preview only · Not live publication'
+                                      : 'Private until product details are reviewed',
+                                ),
                                 value:
                                     _catalogueMatched &&
                                     !_factsNeedReview &&
@@ -16152,376 +16366,262 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                     ? (value) => setState(() => _public = value)
                                     : null,
                               ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ExpansionTile(
-                    key: const Key('work-product-details-section'),
-                    initiallyExpanded: widget.product.title.isEmpty,
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: const Text(
-                      'Product and store details',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    subtitle: const Text('Brand, pack, barcode and delivery'),
-                    children: [
-                      if (!widget.embeddedPage) ...[
-                        _AccessibleWorkTextField(
-                          keyName: 'work-product-title',
-                          controller: _title,
-                          label: 'Product name',
-                        ),
-                        const SizedBox(height: MoolSpacing.xs),
-                      ],
-                      _ResponsiveFieldPair(
-                        first: _AccessibleWorkTextField(
-                          keyName: 'work-product-brand',
-                          controller: _brand,
-                          label: 'Brand or maker',
-                        ),
-                        second: _AccessibleWorkTextField(
-                          keyName: 'work-product-category',
-                          controller: _category,
-                          label: 'Category',
-                        ),
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _ResponsiveFieldPair(
-                        first: _AccessibleWorkTextField(
-                          keyName: 'work-product-variant',
-                          controller: _variant,
-                          label: 'Variant',
-                        ),
-                        second: _AccessibleWorkTextField(
-                          keyName: 'work-product-pack',
-                          controller: _pack,
-                          label: 'Pack or size',
-                        ),
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _ResponsiveFieldPair(
-                        first: _AccessibleWorkTextField(
-                          keyName: 'work-product-sku',
-                          controller: _sku,
-                          label: 'Store SKU',
-                        ),
-                        second: _AccessibleWorkTextField(
-                          keyName: 'work-product-barcode',
-                          controller: _barcode,
-                          keyboardType: TextInputType.number,
-                          label: 'Barcode',
-                        ),
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      if (!widget.embeddedPage)
-                        _MoneyField(
-                          keyName: 'work-product-purchase-price',
-                          controller: _purchase,
-                          label: 'Purchase cost — only you can see this',
-                        ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-delivery',
-                        controller: _delivery,
-                        label: 'Customer delivery promise',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _ResponsiveFieldPair(
-                        first: _AccessibleWorkTextField(
-                          keyName: 'work-product-unit-price',
-                          controller: _unitPrice,
-                          label: 'Unit price shown to customers',
-                          hint: '₹264/L',
-                        ),
-                        second: _AccessibleWorkTextField(
-                          keyName: 'work-product-minimum-order',
-                          controller: _minimumOrder,
-                          keyboardType: TextInputType.number,
-                          label: 'Minimum customer order',
-                        ),
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-origin',
-                        controller: _origin,
-                        label: 'Origin / source location',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                    ],
-                  ),
-                  ExpansionTile(
-                    key: const Key('work-product-customer-facts-section'),
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: const Text(
-                      'Details customers may need',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Return, ingredients, safety and product photo description',
-                    ),
-                    children: [
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-return-policy',
-                        controller: _returnPolicy,
-                        maxLines: 2,
-                        label: 'Return policy',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-composition',
-                        controller: _composition,
-                        maxLines: 2,
-                        label: 'Composition or ingredients',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-regulatory',
-                        controller: _regulatory,
-                        maxLines: 2,
-                        label: 'Regulatory or safety information',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-visual-label',
-                        controller: _visualLabel,
-                        label: 'Product photo description',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                    ],
-                  ),
-                  ExpansionTile(
-                    key: const Key('work-product-pack-information'),
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: const Text(
-                      'Pack information',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Manufacturer, quantity, origin and consumer care',
-                    ),
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          'Check against the selected pack. Changes stay private until reviewed.',
-                        ),
-                      ),
-                      _packFieldsLayout(),
-                    ],
-                  ),
-                  ExpansionTile(
-                    key: const Key('work-product-store-defaults'),
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: const Text(
-                      'Store-wide setup',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    subtitle: const Text('Set up once in Store settings'),
-                    children: const [
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Store details, payment acceptance, delivery coverage and settlement belong in Store settings, not on each product.',
-                        ),
-                      ),
-                    ],
-                  ),
-                  ExpansionTile(
-                    key: const Key('work-product-reference'),
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: const Text(
-                      'Product reference',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Catalogue identity, photo and batch information',
-                    ),
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Catalogue reference'),
-                        subtitle: SelectableText(widget.product.canonicalId),
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Product reference'),
-                        subtitle: SelectableText(widget.product.id),
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Product photo'),
-                        subtitle: Text(
-                          widget.product.cataloguePhoto == null
-                              ? 'Photo not available'
-                              : widget.product.cataloguePhoto!.status ==
-                                    WorkspaceCataloguePhotoStatus.approved
-                              ? 'Catalogue photo'
-                              : 'Photo awaiting approval',
-                        ),
-                      ),
-                      if (widget.product.compliance?.manufacturedOrPackedOn
-                          case final String date)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Manufactured or packed'),
-                          subtitle: Text(date),
-                        ),
-                      if (widget.product.compliance?.bestBeforeOrUseBy
-                          case final String date)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Best before / use by'),
-                          subtitle: Text(date),
-                        ),
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Record dates for each stock batch. Catalogue identity and approval are managed by MoolSocial.',
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (widget.session.workspaceCatalogueItems.any(
-                    (product) => product.id == widget.product.id,
-                  )) ...[
-                    const SizedBox(height: MoolSpacing.xs),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        key: const Key('work-product-retire'),
-                        onPressed: () {
-                          widget.session.retireWorkspaceProduct(
-                            widget.product.id,
-                          );
-                          _finish();
-                        },
-                        icon: const Icon(Icons.remove_circle_outline_rounded),
-                        label: const Text('Remove from active catalogue'),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 76),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom:
-                keyboardInset + MediaQuery.viewPaddingOf(context).bottom + 8,
-            child: Material(
-              color: Colors.white,
-              elevation: 3,
-              shadowColor: const Color(0x22001B4D),
-              borderRadius: BorderRadius.circular(18),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            _error!,
-                            key: const Key('work-product-error'),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFFB42318),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                          ],
+                          leading: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: BuyV2ProductPackshot(
+                              borderRadius: 6,
+                              product: product.toCataloguePreviewProduct(),
                             ),
                           ),
                         ),
-                      ),
-                    Row(
-                      children: [
-                        if (widget.embeddedPage &&
-                            MediaQuery.textScalerOf(context).scale(1) >= 1.5)
-                          IconButton.outlined(
-                            key: const Key('work-product-cancel'),
-                            tooltip: 'Cancel changes',
-                            onPressed: _finish,
-                            icon: const Icon(Icons.close_rounded),
-                          )
-                        else
-                          Expanded(
-                            flex: 2,
-                            child: OutlinedButton(
-                              key: const Key('work-product-cancel'),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                textStyle: Theme.of(
-                                  context,
-                                ).textTheme.labelLarge?.copyWith(fontSize: 14),
+                        _section(
+                          'details',
+                          'work-product-details-section',
+                          'Product and store details',
+                          [
+                            _group([
+                              _field(
+                                'brand',
+                                'work-product-brand',
+                                'Brand or maker',
+                                _brand,
                               ),
-                              onPressed: _finish,
-                              child: const Text('Cancel'),
+                              _categoryField(),
+                              _field(
+                                'variant',
+                                'work-product-variant',
+                                'Variant',
+                                _variant,
+                              ),
+                              _field(
+                                'pack',
+                                'work-product-pack',
+                                'Pack or size',
+                                _pack,
+                              ),
+                              _field(
+                                'sku',
+                                'work-product-sku',
+                                'Store SKU',
+                                _sku,
+                              ),
+                              _field(
+                                'barcode',
+                                'work-product-barcode',
+                                'Barcode',
+                                _barcode,
+                              ),
+                            ]),
+                            const SizedBox(height: 10),
+                            _field(
+                              'deliveryPromise',
+                              'work-product-delivery',
+                              'Customer delivery promise',
+                              _delivery,
+                            ),
+                            const SizedBox(height: 10),
+                            _group([
+                              _field(
+                                'unitPrice',
+                                'work-product-unit-price',
+                                'Unit price',
+                                _unitPrice,
+                                hint: '₹264/L',
+                              ),
+                              _field(
+                                'origin',
+                                'work-product-origin',
+                                'Origin / source',
+                                _origin,
+                              ),
+                            ]),
+                          ],
+                          initiallyExpanded: widget.product.title.isEmpty,
+                        ),
+                        _section(
+                          'facts',
+                          'work-product-customer-facts-section',
+                          'Details customers may need',
+                          [
+                            _field(
+                              'returnPolicy',
+                              'work-product-return-policy',
+                            'Return policy',
+                            _returnPolicy,
+                            lines: 0,
+                            ),
+                            const SizedBox(height: 10),
+                            _field(
+                              'composition',
+                              'work-product-composition',
+                            'Composition or ingredients',
+                            _composition,
+                            lines: 0,
+                            ),
+                            const SizedBox(height: 10),
+                            _field(
+                              'regulatory',
+                              'work-product-regulatory',
+                            'Safety information',
+                            _regulatory,
+                            lines: 0,
+                            ),
+                            const SizedBox(height: 10),
+                            _field(
+                              'visualLabel',
+                              'work-product-visual-label',
+                            'Product photo description',
+                            _visualLabel,
+                            lines: 0,
+                            ),
+                          ],
+                        ),
+                        _section(
+                          'pack',
+                          'work-product-pack-information',
+                          'Pack information',
+                          [
+                            Text(
+                              'Check the selected pack · Changes require review.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            _packFieldsLayout(),
+                          ],
+                        ),
+                        _section(
+                          'defaults',
+                          'work-product-store-defaults',
+                          'Store-wide setup',
+                          [
+                            const Text(
+                              'Store details, accepted payments and settlement: set once in Store settings.',
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Delivery coverage and charges: set by MoolSocial.',
+                            ),
+                          ],
+                        ),
+                        _section(
+                          'reference',
+                          'work-product-reference',
+                          'Product reference',
+                          [
+                            _referenceLine(
+                              'Catalogue reference',
+                              widget.product.canonicalId,
+                              selectable: true,
+                            ),
+                            _referenceLine(
+                              'Product reference',
+                              widget.product.id,
+                              selectable: true,
+                            ),
+                            _referenceLine(
+                              'Product photo',
+                              product
+                                      .toCataloguePreviewProduct()
+                                      .mediaAssets
+                                      .isEmpty
+                                  ? 'Photo not available for this pack'
+                                  : 'Catalogue photo',
+                            ),
+                            if (widget
+                                    .product
+                                    .compliance
+                                    ?.manufacturedOrPackedOn
+                                case final String date)
+                              _referenceLine('Manufactured or packed', date),
+                            if (widget.product.compliance?.bestBeforeOrUseBy
+                                case final String date)
+                              _referenceLine('Best before / use by', date),
+                            Text(
+                              'Batch dates are separate. MoolSocial manages catalogue approval.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                        if (_wasOwned)
+                          OutlinedButton.icon(
+                            key: const Key('work-product-retire'),
+                            onPressed: () {
+                              widget.session.retireWorkspaceProduct(
+                                widget.product.id,
+                              );
+                              _finish();
+                            },
+                            icon: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                            ),
+                            label: const Text('Remove from active catalogue'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_error != null && _errorField == null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                _error!,
+                                key: const Key('work-product-error'),
+                                style: const TextStyle(
+                                  color: Color(0xffb42318),
+                                ),
+                              ),
                             ),
                           ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 3,
-                          child: widget.embeddedPage
-                              ? FilledButton(
-                                  key: const Key('work-product-save'),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size(48, 48),
-                                    padding: const EdgeInsets.all(8),
-                                    textStyle: Theme.of(context)
-                                        .textTheme
-                                        .labelLarge
-                                        ?.copyWith(fontSize: 14),
-                                  ),
-                                  onPressed: _save,
-                                  child: Text(
-                                    widget.onDraftReviewed != null
-                                        ? 'Apply to import'
-                                        : _wasOwned
-                                        ? 'Save changes'
-                                        : 'Save to Store',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                )
-                              : FilledButton.icon(
-                                  key: const Key('work-product-save'),
-                                  onPressed: _save,
-                                  icon: const Icon(Icons.check_rounded),
-                                  label: const Text('Save product'),
+                        Row(
+                          children: [
+                            IconButton.outlined(
+                              key: const Key('work-product-cancel'),
+                              tooltip: 'Cancel changes',
+                              onPressed: _finish,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton(
+                                key: const Key('work-product-save'),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                  backgroundColor: MoolColors.navy,
+                                  foregroundColor: Colors.white,
                                 ),
+                                onPressed: _save,
+                                child: Text(
+                                  widget.onDraftReviewed != null
+                                      ? 'Apply to import'
+                                      : _wasOwned
+                                      ? 'Save changes'
+                                      : 'Save to Store',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -16532,7 +16632,6 @@ class _AccessibleWorkTextField extends StatefulWidget {
     required this.keyName,
     required this.controller,
     required this.label,
-    this.hint,
     this.keyboardType,
     this.textInputAction,
     this.onChanged,
@@ -16546,7 +16645,6 @@ class _AccessibleWorkTextField extends StatefulWidget {
   final String keyName;
   final TextEditingController controller;
   final String label;
-  final String? hint;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onChanged;
@@ -16605,7 +16703,6 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
       minLines: widget.minLines,
       decoration: InputDecoration(
         label: widget.stackedLabel ? null : Text(widget.label),
-        hintText: widget.hint,
         prefixIcon: widget.prefixIcon,
         prefixText: widget.prefixText,
       ),
@@ -24654,15 +24751,11 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface>
 }
 
 class _ResponsiveFieldPair extends StatelessWidget {
-  const _ResponsiveFieldPair({
-    required this.first,
-    required this.second,
-    this.minWidth = 390,
-  });
+  const _ResponsiveFieldPair({required this.first, required this.second});
 
   final Widget first;
   final Widget second;
-  final double minWidth;
+  static const double minWidth = 390;
 
   @override
   Widget build(BuildContext context) {

@@ -193,6 +193,13 @@ class _StoreAddProductEntryScreenState
       appBar: catalogue
           ? null
           : AppBar(
+              toolbarHeight: 48,
+              titleSpacing: 0,
+              titleTextStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: MoolColors.navy,
+              ),
               backgroundColor: Colors.white,
               leading: BackButton(
                 onPressed: widget.catalogueEditing && widget.selectedIndex == 0

@@ -8990,7 +8990,7 @@ void main() {
       expect(find.text('Selling price · sellingPrice'), findsOneWidget);
       expect(
         find.text(
-          'Correction: Enter a customer price above the purchase cost.',
+          'Correction: Enter a customer price above the purchase price.',
         ),
         findsOneWidget,
       );
@@ -9448,6 +9448,7 @@ void main() {
           final apply = find.byKey(const Key('work-product-save'));
           await reveal(tester, apply);
           expect(find.text('Apply to import'), findsOneWidget);
+          await captureStoreView(tester, 'batch2a-csv-editor-360');
           await tester.tap(apply);
           await tester.pumpAndSettle();
           expect(work.workspaceCatalogueItems, before);
@@ -11649,6 +11650,7 @@ void main() {
       expect(input('work-product-stock').controller.text, '0');
       expect(input('work-product-purchase-price').controller.text, isEmpty);
       final caseId = '${display.$1.toInt()}-${display.$3}';
+      await tester.pumpAndSettle();
       await captureStoreView(tester, 'review-prefilled-$caseId');
       final save = find.byKey(const Key('work-product-save'));
       expect(find.text('Save to Store'), findsOneWidget);
@@ -23359,6 +23361,297 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final display in [(360.0, 806.0, 1.0), (320.0, 640.0, 2.0)]) {
+    testWidgets(
+      'BATCH2A shared editor compact sections and visible validation $display',
+      (tester) async {
+        final media = await installCataloguePhotoClient(tester);
+        var reviewPhoto = photoFixture();
+        const imageDir = String.fromEnvironment(
+          'MOOL_CATALOGUE_TEST_IMAGE_DIR',
+        );
+        if (imageDir.isNotEmpty) {
+          final bytes = (await tester.runAsync(
+            () => File('$imageDir/sunflower-oil-1l-test.png').readAsBytes(),
+          ))!;
+          final dimensions = (await tester.runAsync(() async {
+            final codec = await ui.instantiateImageCodec(bytes);
+            final frame = await codec.getNextFrame();
+            final size = (frame.image.width, frame.image.height);
+            frame.image.dispose();
+            codec.dispose();
+            return size;
+          }))!;
+          reviewPhoto = photoFixture(
+            file: BuyV2MediaFileMetadata(
+              mimeType: 'image/png',
+              byteLength: bytes.length,
+              width: dimensions.$1,
+              height: dimensions.$2,
+              frameCount: 1,
+              normalized: true,
+            ),
+          );
+          media.client.responses[Uri.parse(reviewPhoto.source)] = bytes;
+        }
+        final work = storeViewFixture();
+        final product = workspaceMasterCatalogue.first.copyWith(
+          purchasePrice: 200,
+          sellingPrice: 264,
+          stock: 24,
+          compliance: mappedPack,
+          cataloguePhoto: reviewPhoto,
+        );
+        work.workspaceCatalogueItems
+          ..clear()
+          ..add(product);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await reveal(tester, find.byKey(const Key('work-quick-add-products')));
+        await tester.tap(find.byKey(const Key('work-quick-add-products')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key('work-catalogue-add-${product.id}')));
+        await tester.pumpAndSettle();
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(
+                find.descendant(
+                  of: find.byKey(const Key('work-product-fast-editor')),
+                  matching: find.byType(RawImage),
+                ),
+              )
+              .any((image) => image.image != null),
+        );
+        expect(find.text('How do you track this product?'), findsNothing);
+        expect(find.text('Exact quantity'), findsNothing);
+        expect(find.text('Availability only'), findsNothing);
+        expect(find.text('Purchase cost'), findsNothing);
+        expect(find.text('Purchase price'), findsOneWidget);
+        final suffix = '${display.$1.toInt()}-${display.$3}';
+        await captureStoreView(tester, 'batch2a-review-$suffix');
+        final summaryHeading = find.text('Product, price & stock');
+        await tester.ensureVisible(summaryHeading);
+        await tester.tap(summaryHeading);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-product-purchase-price')),
+          findsNothing,
+        );
+        await captureStoreView(tester, 'batch2a-collapsed-$suffix');
+        final details = find.text('Product and store details');
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        final category = find.byKey(const Key('work-product-category'));
+        expect(
+          find.descendant(of: category, matching: find.byType(TextField)),
+          findsNothing,
+        );
+        expect(find.text('Cooking Oil'), findsWidgets);
+        final selectedCategory = find
+            .descendant(of: category, matching: find.text('Cooking Oil'))
+            .hitTestable()
+            .first;
+        expect(
+          tester.getRect(selectedCategory).bottom,
+          lessThanOrEqualTo(tester.getRect(category).bottom),
+        );
+        expect(
+          tester.getRect(selectedCategory).top,
+          greaterThanOrEqualTo(tester.getRect(category).top),
+        );
+        final sku = find.byKey(const Key('work-product-sku'));
+        await tester.ensureVisible(sku);
+        await tester.enterText(sku, '');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(find.text('Enter a unique store SKU.'), findsOneWidget);
+        expect(sku.hitTestable(), findsOneWidget);
+        expect(
+          tester.getBottomRight(sku).dy,
+          lessThanOrEqualTo(
+            tester.getTopLeft(find.byKey(const Key('work-product-save'))).dy,
+          ),
+        );
+        await captureStoreView(tester, 'batch2a-validation-$suffix');
+        await tester.enterText(sku, product.sku);
+        await tester.pumpAndSettle();
+        expect(find.text('Enter a unique store SKU.'), findsNothing);
+        tester.view.resetViewInsets();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(details);
+        await captureStoreView(tester, 'batch2a-details-$suffix');
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        for (final section in [
+          ('Details customers may need', 'facts'),
+          ('Pack information', 'pack'),
+          ('Store-wide setup', 'defaults'),
+          ('Product reference', 'reference'),
+        ]) {
+          final heading = find.text(section.$1).first;
+          await tester.ensureVisible(heading);
+          await tester.tap(heading);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(heading);
+          await captureStoreView(tester, 'batch2a-${section.$2}-$suffix');
+          await tester.tap(heading);
+          await tester.pumpAndSettle();
+        }
+        await tester.ensureVisible(summaryHeading);
+        await tester.tap(summaryHeading);
+        await tester.pumpAndSettle();
+        for (final value in [
+          ('work-product-purchase-price', '10'),
+          ('work-product-selling-price', '10000000'),
+          ('work-product-mrp', '10000000'),
+        ]) {
+          final field = find.byKey(Key(value.$1));
+          await tester.ensureVisible(field);
+          await tester.enterText(field, value.$2);
+        }
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.ensureVisible(
+          find.byKey(const Key('work-product-selling-price')),
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'batch2a-large-amount-$suffix');
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems.single.sellingPrice, 10000000);
+        expect(work.workspaceCatalogueItems.single.purchasePrice, 10);
+        expect(
+          work.workspaceCatalogueItems.single.compliance?.netQuantity,
+          mappedPack.netQuantity,
+        );
+        expect(tester.takeException(), isNull);
+        media.restore();
+      },
+    );
+  }
+
+  for (final scenario in [
+    'availability',
+    'category',
+    'invalid MRP',
+    'manual',
+  ]) {
+    testWidgets('BATCH2A preserves data and validates $scenario', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      final product = workspaceMasterCatalogue.first.copyWith(
+        stockMode: scenario == 'availability'
+            ? WorkspaceStockMode.availabilityOnly
+            : WorkspaceStockMode.exactQuantity,
+        stock: 12,
+        available: true,
+        purchasePrice: 200,
+        sellingPrice: 264,
+        categoryId: scenario == 'category' ? 'unmapped-private-category' : null,
+      );
+      work.workspaceCatalogueItems
+        ..clear()
+        ..add(product);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+      );
+      await reveal(tester, find.byKey(const Key('work-quick-add-products')));
+      await tester.tap(find.byKey(const Key('work-quick-add-products')));
+      await tester.pumpAndSettle();
+      if (scenario == 'manual') {
+        await chooseAddProductMode(tester, 'enter');
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Enter the product name shown to customers.'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('work-product-title')).hitTestable(),
+          findsOneWidget,
+        );
+        await tester.enterText(
+          find.byKey(const Key('work-product-title')),
+          'Local rice',
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Enter the product name shown to customers.'),
+          findsNothing,
+        );
+        expect(work.workspaceCatalogueItems, [product]);
+      } else {
+        await tester.tap(find.byKey(Key('work-catalogue-add-${product.id}')));
+        await tester.pumpAndSettle();
+        if (scenario == 'availability') {
+          expect(find.byKey(const Key('work-product-stock')), findsNothing);
+          final available = find.byKey(const Key('work-product-available'));
+          await tester.ensureVisible(available);
+          await tester.tap(available);
+          await tester.pumpAndSettle();
+          await captureStoreView(tester, 'batch2a-availability-360');
+        } else if (scenario == 'category') {
+          await tester.tap(find.byKey(const Key('work-product-save')));
+          await tester.pumpAndSettle();
+          expect(find.text('Choose a category from the list.'), findsOneWidget);
+          final category = find.byKey(const Key('work-product-category'));
+          await tester.ensureVisible(category);
+          await tester.tap(category);
+          await tester.pumpAndSettle();
+          final option = find.text('Dairy & bakery').last;
+          await tester.ensureVisible(option);
+          await tester.tap(option);
+          await tester.pumpAndSettle();
+          expect(find.text('Choose a category from the list.'), findsNothing);
+          await captureStoreView(tester, 'batch2a-category-360');
+        } else {
+          final mrp = find.byKey(const Key('work-product-mrp'));
+          await tester.ensureVisible(mrp);
+          await tester.enterText(mrp, '270.5');
+          await tester.tap(find.byKey(const Key('work-product-save')));
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Enter MRP in whole rupees, or leave it empty.'),
+            findsOneWidget,
+          );
+          expect(work.workspaceCatalogueItems, [product]);
+          await tester.enterText(mrp, '270');
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        final saved = work.workspaceCatalogueItems.single;
+        if (scenario == 'availability') {
+          expect(saved.stockMode, WorkspaceStockMode.availabilityOnly);
+          expect(saved.stock, 12);
+          expect(saved.available, isFalse);
+        } else if (scenario == 'category') {
+          expect(saved.categoryId, 'dairy-bakery');
+          expect(saved.publicListing, isFalse);
+        } else {
+          expect(saved.mrp, 270);
+        }
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('product editor keeps Save and Cancel above keyboard', (
     tester,
