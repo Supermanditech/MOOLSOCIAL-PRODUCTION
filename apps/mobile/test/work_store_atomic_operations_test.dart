@@ -11791,17 +11791,131 @@ void main() {
     expect(session.workspaceCatalogueItems.single.stock, 1);
   });
 
+  test(
+    'BATCH1 invalid Store settings cannot silently clamp or partly save',
+    () {
+      final session = liveSession();
+      final before = (
+        session.workspaceDeliveryRadiusKm,
+        session.workspaceDeliveryFee,
+        session.workspaceFreeDeliveryAbove,
+        session.workspaceDeliveryCity,
+        session.workspaceDeliveryPincode,
+        session.workspacePickupEnabled,
+      );
+      for (final values in [
+        ('', 'Changed area', '342003'),
+        ('Changed city', '', '342003'),
+        ('Changed city', 'Changed area', '3420037'),
+        ('Changed city', 'Changed area', '000000'),
+      ]) {
+        session.saveWorkspaceDeliverySettings(
+          city: values.$1,
+          area: values.$2,
+          pincode: values.$3,
+          pickupEnabled: !before.$6,
+        );
+        expect((
+          session.workspaceDeliveryRadiusKm,
+          session.workspaceDeliveryFee,
+          session.workspaceFreeDeliveryAbove,
+          session.workspaceDeliveryCity,
+          session.workspaceDeliveryPincode,
+          session.workspacePickupEnabled,
+        ), before);
+      }
+      final staff = (
+        session.workspaceCounterCount,
+        session.workspaceStaffAccessEnabled,
+      );
+      for (final count in [-1, 0, 21, 100]) {
+        session.saveWorkspaceStaffSettings(
+          staffAccessEnabled: !staff.$2,
+          counterCount: count,
+        );
+        expect((
+          session.workspaceCounterCount,
+          session.workspaceStaffAccessEnabled,
+        ), staff);
+      }
+    },
+  );
+
+  test('BATCH1 unlimited and large order limits retain exact values', () {
+    final gateway = ReviewWorkGateway();
+    final session = liveSession(gateway);
+    for (final value in [0, 21, 101, 1000, 10000000]) {
+      session.saveWorkspaceTradingControls(
+        openingTime: '09:30',
+        closingTime: '18:45',
+        maximumActiveOrders: value,
+        alertSound: true,
+        alertVibration: false,
+      );
+      expect(session.workspaceMaximumActiveOrders, value);
+      expect(
+        gateway.lastOperationalSnapshot!.state['maximumActiveOrders'],
+        value,
+      );
+    }
+    session.saveWorkspaceTradingControls(
+      openingTime: 'Changed',
+      closingTime: 'Changed',
+      maximumActiveOrders: -1,
+      alertSound: false,
+      alertVibration: true,
+    );
+    expect(session.workspaceMaximumActiveOrders, 10000000);
+    expect(session.workspaceOpeningTime, '09:30');
+    expect(session.workspaceOrderAlertSound, isTrue);
+    expect(session.workspaceOrderAlertVibration, isFalse);
+  });
+
   test('Store configuration persists delivery staff and counter controls', () {
     final gateway = ReviewWorkGateway();
     final session = liveSession(gateway);
-    session.saveWorkspaceDeliverySettings(radiusKm: 8, fee: 25, freeAbove: 599);
+    final fleetRadius = session.workspaceDeliveryRadiusKm;
+    final fee = session.workspaceDeliveryFee;
+    final freeAbove = session.workspaceFreeDeliveryAbove;
+    session.saveWorkspaceDeliverySettings(
+      city: 'Jodhpur',
+      area: 'Sardarpura',
+      pincode: '342003',
+      pickupEnabled: true,
+    );
+    expect(
+      gateway.lastOperationalSnapshot!.state.keys,
+      isNot(contains('deliveryRadiusKm')),
+    );
+    expect(
+      gateway.lastOperationalSnapshot!.state.keys,
+      isNot(contains('deliveryFee')),
+    );
+    expect(
+      gateway.lastOperationalSnapshot!.state.keys,
+      isNot(contains('freeDeliveryAbove')),
+    );
     session.saveWorkspaceStaffSettings(
       staffAccessEnabled: true,
       counterCount: 3,
     );
-    expect(session.workspaceDeliveryRadiusKm, 8);
-    expect(session.workspaceDeliveryFee, 25);
-    expect(session.workspaceFreeDeliveryAbove, 599);
+    expect(session.workspaceDeliveryRadiusKm, fleetRadius);
+    expect(
+      gateway.lastOperationalSnapshot!.state.containsKey('deliveryRadiusKm'),
+      isFalse,
+    );
+    expect(
+      gateway.lastOperationalSnapshot!.state.keys,
+      isNot(contains('deliveryFee')),
+    );
+    expect(
+      gateway.lastOperationalSnapshot!.state.keys,
+      isNot(contains('freeDeliveryAbove')),
+    );
+    expect(session.workspaceDeliveryFee, fee);
+    expect(session.workspaceFreeDeliveryAbove, freeAbove);
+    expect(session.workspaceDeliveryPincode, '342003');
+    expect(session.workspacePickupEnabled, isTrue);
     expect(session.workspaceStaffAccessEnabled, isTrue);
     expect(session.workspaceCounterCount, 3);
   });

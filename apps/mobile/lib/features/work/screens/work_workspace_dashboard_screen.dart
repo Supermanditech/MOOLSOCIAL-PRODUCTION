@@ -20,6 +20,7 @@ import '../../buy/buy_v2_models.dart';
 import '../../buy/buy_v2_session.dart';
 import '../../journey01/journey_services.dart';
 import '../widgets/work_widgets.dart';
+import '../widgets/store_settings_widgets.dart';
 import '../work_models.dart';
 import '../work_invoice_pdf.dart';
 import '../work_stock_export.dart';
@@ -485,6 +486,9 @@ class _WorkWorkspaceDashboardScreenState
   final ScrollController _searchScroll = ScrollController();
   double _searchReturnOffset = 0;
   final ScrollController _alertsScroll = ScrollController();
+  final ScrollController _settingsScroll = ScrollController();
+  final _settingsForm = GlobalKey<FormState>();
+  double _settingsReturnOffset = 0;
   double _alertsReturnOffset = 0;
   String? _focusedOrderId, _focusedCustomerId;
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
@@ -593,6 +597,7 @@ class _WorkWorkspaceDashboardScreenState
     _searchController.dispose();
     _searchScroll.dispose();
     _alertsScroll.dispose();
+    _settingsScroll.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
@@ -1026,6 +1031,11 @@ class _WorkWorkspaceDashboardScreenState
               ),
       ),
     ];
+    final compactSettings =
+        _view == _WorkspaceControlView.status ||
+        (_view == _WorkspaceControlView.operation &&
+            (_operation == _WorkspaceOperation.deliverySettings ||
+                _operation == _WorkspaceOperation.staff));
     final storeRootSurface =
         _view == _WorkspaceControlView.dashboard ||
         _view == _WorkspaceControlView.search ||
@@ -1158,8 +1168,34 @@ class _WorkWorkspaceDashboardScreenState
       session: session,
       title: title,
       subtitle: subtitle,
-      headerHeight: storeRootSurface ? storeHeaderHeight : 88,
-      headerTitle: storeRootSurface
+      headerHeight: compactSettings
+          ? 64
+          : storeRootSurface
+          ? storeHeaderHeight
+          : 88,
+      headerTitle: compactSettings
+          ? Row(
+              children: [
+                if (_view == _WorkspaceControlView.operation)
+                  IconButton(
+                    key: const Key('work-operation-back'),
+                    tooltip: 'Back to Store settings',
+                    onPressed: () => unawaited(_leaveOperation()),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                Expanded(
+                  child: Text(
+                    'Store settings',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : storeRootSurface
           ? _WorkspaceDashboardHeader(
               session: session,
               workspace: workspace,
@@ -1313,7 +1349,9 @@ class _WorkWorkspaceDashboardScreenState
             _view == _WorkspaceControlView.operation &&
             !saleOpen &&
             !salesOpen &&
-            _operation != _WorkspaceOperation.orders,
+            _operation != _WorkspaceOperation.orders &&
+            _operation != _WorkspaceOperation.deliverySettings &&
+            _operation != _WorkspaceOperation.staff,
         active: _view == _WorkspaceControlView.procurement
             ? (_trackedPurchase == null ? 'restock' : 'sourcing')
             : _operation.name,
@@ -1420,60 +1458,63 @@ class _WorkWorkspaceDashboardScreenState
             onOpenRecord: (record) =>
                 _openSearchRecord(record, workspace.id, openScopedRoute),
           ),
-          _WorkspaceControlView.status => _WorkspaceStatusSurface(
-            session: session,
-            acceptingOrders: _draftAcceptingOrders,
-            visibleToCustomers: _draftVisibleToCustomers,
-            fulfilmentMode: _draftFulfilmentMode,
-            busyMinutes: _draftBusyMinutes,
-            reopensAt: _draftReopensAt,
-            openingTime: _draftOpeningTime,
-            closingTime: _draftClosingTime,
-            maximumActiveOrders: _draftMaximumActiveOrders,
-            alertSound: _draftOrderAlertSound,
-            alertVibration: _draftOrderAlertVibration,
-            onAcceptingChanged: (value) => setState(() {
-              _draftAcceptingOrders = value;
-              if (!value && _draftReopensAt.isEmpty) {
-                _draftReopensAt = 'Tomorrow at 8:00 AM';
-              }
-            }),
-            onVisibilityChanged: (value) => setState(() {
-              _draftVisibleToCustomers = value;
-            }),
-            onFulfilmentChanged: (value) => setState(() {
-              _draftFulfilmentMode = value;
-            }),
-            onBusyMinutesChanged: (value) => setState(() {
-              _draftBusyMinutes = value;
-            }),
-            onReopensChanged: (value) => setState(() {
-              _draftReopensAt = value;
-            }),
-            onOpeningTimeChanged: (value) => setState(() {
-              _draftOpeningTime = value;
-            }),
-            onClosingTimeChanged: (value) => setState(() {
-              _draftClosingTime = value;
-            }),
-            onMaximumActiveOrdersChanged: (value) => setState(() {
-              _draftMaximumActiveOrders = value;
-            }),
-            onAlertSoundChanged: (value) => setState(() {
-              _draftOrderAlertSound = value;
-            }),
-            onAlertVibrationChanged: (value) => setState(() {
-              _draftOrderAlertVibration = value;
-            }),
-            onProductControls: () =>
-                _showOperation(_WorkspaceOperation.catalogue),
-            onDeliveryControls: () =>
-                _showOperation(_WorkspaceOperation.deliverySettings),
-            onStaffControls: () => _showOperation(_WorkspaceOperation.staff),
-            onPaymentControls: () =>
-                _showOperation(_WorkspaceOperation.payments),
-            onBusinessDetails: () =>
-                _showOperation(_WorkspaceOperation.businessRecord),
+          _WorkspaceControlView.status => Form(
+            key: _settingsForm,
+            child: _WorkspaceStatusSurface(
+              scrollController: _settingsScroll,
+              session: session,
+              acceptingOrders: _draftAcceptingOrders,
+              visibleToCustomers: _draftVisibleToCustomers,
+              fulfilmentMode: _draftFulfilmentMode,
+              busyMinutes: _draftBusyMinutes,
+              reopensAt: _draftReopensAt,
+              openingTime: _draftOpeningTime,
+              closingTime: _draftClosingTime,
+              maximumActiveOrders: _draftMaximumActiveOrders,
+              alertSound: _draftOrderAlertSound,
+              alertVibration: _draftOrderAlertVibration,
+              onAcceptingChanged: (value) => setState(() {
+                _draftAcceptingOrders = value;
+                if (!value && _draftReopensAt.isEmpty) {
+                  _draftReopensAt = 'Tomorrow at 8:00 AM';
+                }
+              }),
+              onVisibilityChanged: (value) => setState(() {
+                _draftVisibleToCustomers = value;
+              }),
+              onFulfilmentChanged: (value) => setState(() {
+                _draftFulfilmentMode = value;
+              }),
+              onBusyMinutesChanged: (value) => setState(() {
+                _draftBusyMinutes = value;
+              }),
+              onReopensChanged: (value) => setState(() {
+                _draftReopensAt = value;
+              }),
+              onOpeningTimeChanged: (value) => setState(() {
+                _draftOpeningTime = value;
+              }),
+              onClosingTimeChanged: (value) => setState(() {
+                _draftClosingTime = value;
+              }),
+              onMaximumActiveOrdersChanged: (value) => setState(() {
+                _draftMaximumActiveOrders = value;
+              }),
+              onAlertSoundChanged: (value) => setState(() {
+                _draftOrderAlertSound = value;
+              }),
+              onAlertVibrationChanged: (value) => setState(() {
+                _draftOrderAlertVibration = value;
+              }),
+              onProductControls: () =>
+                  _showOperation(_WorkspaceOperation.catalogue),
+              onDeliveryControls: () =>
+                  _showOperation(_WorkspaceOperation.deliverySettings),
+              onPaymentControls: () =>
+                  _showOperation(_WorkspaceOperation.payments),
+              onBusinessDetails: () =>
+                  _showOperation(_WorkspaceOperation.businessRecord),
+            ),
           ),
           _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
             session: session,
@@ -1951,6 +1992,9 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnView = returnView;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.status) {
+        _settingsReturnOffset = _settingsScroll.hasClients
+            ? _settingsScroll.offset
+            : 0;
         _operationReturnView = _WorkspaceControlView.status;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
@@ -2342,7 +2386,20 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     if (_operationReturnView == _WorkspaceControlView.status) {
-      _showStatus();
+      // Nested settings must not reset unsaved Store controls or their position.
+      setState(() => _view = _WorkspaceControlView.status);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _view == _WorkspaceControlView.status &&
+            _settingsScroll.hasClients) {
+          _settingsScroll.jumpTo(
+            _settingsReturnOffset.clamp(
+              0.0,
+              _settingsScroll.position.maxScrollExtent,
+            ),
+          );
+        }
+      });
       return;
     }
     final parent = _operationReturnOperation;
@@ -2563,6 +2620,13 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   void _saveAvailability() {
+    if (_draftMaximumActiveOrders < 0 ||
+        !(_settingsForm.currentState?.validate() ?? true)) {
+      _settingsForm.currentState?.validate();
+      if (_settingsScroll.hasClients) _settingsScroll.jumpTo(0);
+      session.showError('Enter an active-order limit or choose Unlimited.');
+      return;
+    }
     session.setWorkspaceVisibility(_draftVisibleToCustomers);
     session.saveWorkspaceAvailability(
       acceptingOrders: _draftAcceptingOrders,
@@ -2622,7 +2686,7 @@ class _WorkWorkspaceDashboardScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Save these changes or continue editing before leaving.',
+              'Keep editing to save your changes, or discard them.',
               style: TextStyle(color: MoolColors.muted),
             ),
             const SizedBox(height: 14),
@@ -2919,7 +2983,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.settings => 'Workspace settings',
     _WorkspaceOperation.preview => 'Customer store preview',
     _WorkspaceOperation.groupBuying => 'Group Bulk Buying',
-    _WorkspaceOperation.deliverySettings => 'Delivery area and charges',
+    _WorkspaceOperation.deliverySettings => 'Delivery & pickup',
     _WorkspaceOperation.staff => 'Staff and counters',
     _WorkspaceOperation.businessRecord => 'Business details and documents',
     _WorkspaceOperation.offers => 'Store offers',
@@ -2958,7 +3022,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.groupBuying =>
       'Buy together with verified retailers at a confirmed group price',
     _WorkspaceOperation.deliverySettings =>
-      'Customer service area, delivery fee and free-delivery threshold',
+      'Store pickup location; MoolSocial manages delivery coverage and charges',
     _WorkspaceOperation.staff => 'Counter capacity and controlled staff access',
     _WorkspaceOperation.businessRecord =>
       'Approved business identity and submitted documents',
@@ -23320,118 +23384,85 @@ class _WorkspaceDeliverySettingsSurfaceState
     text: widget.session.workspaceDeliveryPincode,
   );
   late bool _pickupEnabled = widget.session.workspacePickupEnabled;
-  late final TextEditingController _radius = TextEditingController(
-    text: '${widget.session.workspaceDeliveryRadiusKm}',
-  );
-  late final TextEditingController _fee = TextEditingController(
-    text: '${widget.session.workspaceDeliveryFee}',
-  );
-  late final TextEditingController _freeAbove = TextEditingController(
-    text: '${widget.session.workspaceFreeDeliveryAbove}',
-  );
 
   @override
   void dispose() {
     _city.dispose();
     _area.dispose();
     _pincode.dispose();
-    _radius.dispose();
-    _fee.dispose();
-    _freeAbove.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return StoreSettingsForm(
       key: const Key('work-delivery-settings-screen'),
-      padding: const EdgeInsets.all(18),
-      children: [
-        const _WorkspaceSectionLabel(
-          title: 'Customer delivery coverage',
-          detail: 'Shown before the customer confirms an order',
-        ),
-        const SizedBox(height: 12),
-        _AccessibleWorkTextField(
-          keyName: 'work-delivery-city',
+      title: 'Delivery & pickup',
+      detail: '',
+      fields: [
+        StoreSettingsInput(
+          id: 'work-delivery-city',
+          label: 'Store city',
           controller: _city,
-          label: 'City',
+          validate: StoreSettingsInput.requiredText,
         ),
-        const SizedBox(height: 8),
-        _ResponsiveFieldPair(
-          first: _AccessibleWorkTextField(
-            keyName: 'work-delivery-area',
-            controller: _area,
-            label: 'Area',
-          ),
-          second: _AccessibleWorkTextField(
-            keyName: 'work-delivery-pincode',
-            controller: _pincode,
-            keyboardType: TextInputType.number,
-            label: 'Pincode',
-          ),
+        StoreSettingsInput(
+          id: 'work-delivery-area',
+          label: 'Store area',
+          controller: _area,
+          validate: StoreSettingsInput.requiredText,
         ),
-        SwitchListTile.adaptive(
-          key: const Key('work-delivery-pickup'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Customer pickup available'),
-          subtitle: const Text(
-            'Customers can collect a packed order in store.',
-          ),
-          value: _pickupEnabled,
-          onChanged: (value) => setState(() => _pickupEnabled = value),
-        ),
-        _NumberField(
-          keyName: 'work-delivery-radius',
-          controller: _radius,
-          label: 'Delivery radius in kilometres',
-        ),
-        const SizedBox(height: 10),
-        _MoneyField(
-          keyName: 'work-delivery-fee',
-          controller: _fee,
-          label: 'Customer delivery fee',
-        ),
-        const SizedBox(height: 10),
-        _MoneyField(
-          keyName: 'work-delivery-free-above',
-          controller: _freeAbove,
-          label: 'Free delivery above',
-        ),
-        const SizedBox(height: 10),
-        const WorkCard(
-          color: Color(0xFFF4F6FF),
-          child: Text(
-            'Customers see where you deliver, the delivery charge and whether pickup is available before checkout.',
-            style: TextStyle(color: MoolColors.ink, height: 1.35),
-          ),
-        ),
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          key: const Key('work-delivery-settings-save'),
-          onPressed: () {
-            widget.session.saveWorkspaceDeliverySettings(
-              radiusKm: int.tryParse(_radius.text) ?? 0,
-              fee: int.tryParse(_fee.text) ?? 0,
-              freeAbove: int.tryParse(_freeAbove.text) ?? 0,
-              city: _city.text,
-              area: _area.text,
-              pincode: _pincode.text,
-              pickupEnabled: _pickupEnabled,
-            );
-          },
-          icon: const Icon(Icons.check_rounded),
-          label: const Text('Save delivery settings'),
+        StoreSettingsInput(
+          id: 'work-delivery-pincode',
+          label: 'PIN code',
+          controller: _pincode,
+          numeric: true,
+          validate: StoreSettingsInput.pin,
         ),
       ],
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Coverage & charges · Set by MoolSocial',
+              key: Key('work-delivery-fleet-coverage'),
+              style: TextStyle(fontSize: 12, color: MoolColors.muted),
+            ),
+          ),
+          StoreSettingsCard(
+            child: SwitchListTile.adaptive(
+              key: const Key('work-delivery-pickup'),
+              title: const Text('Allow Store pickup'),
+              value: _pickupEnabled,
+              onChanged: (value) => setState(() => _pickupEnabled = value),
+            ),
+          ),
+        ],
+      ),
+      saveKey: 'work-delivery-settings-save',
+      saveLabel: 'Save pickup details',
+      onSave: () {
+        widget.session.saveWorkspaceDeliverySettings(
+          city: _city.text,
+          area: _area.text,
+          pincode: _pincode.text,
+          pickupEnabled: _pickupEnabled,
+        );
+      },
     );
   }
 }
 
 class _WorkspaceStaffSettingsSurface extends StatefulWidget {
-  const _WorkspaceStaffSettingsSurface({required this.session});
+  const _WorkspaceStaffSettingsSurface({
+    required this.session,
+    this.embedded = false,
+  });
 
   final WorkSession session;
+  final bool embedded;
 
   @override
   State<_WorkspaceStaffSettingsSurface> createState() =>
@@ -23453,47 +23484,40 @@ class _WorkspaceStaffSettingsSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return StoreSettingsForm(
       key: const Key('work-staff-settings-screen'),
-      padding: const EdgeInsets.all(18),
-      children: [
-        const _WorkspaceSectionLabel(
-          title: 'Staff and counters',
-          detail:
-              'Give staff access without sharing payments or business documents',
+      embedded: widget.embedded,
+      title: 'Staff and counters',
+      detail: 'Set up billing on your Store-managed devices.',
+      leading: StoreSettingsCard(
+        tonal: true,
+        child: SwitchListTile.adaptive(
+          key: const Key('work-staff-access-toggle'),
+          value: _enabled,
+          onChanged: (value) => setState(() => _enabled = value),
+          title: const Text('Counter staff access'),
+          subtitle: Text(_enabled ? 'On' : 'Off'),
         ),
-        const SizedBox(height: 12),
-        WorkCard(
-          child: SwitchListTile.adaptive(
-            key: const Key('work-staff-access-toggle'),
-            contentPadding: EdgeInsets.zero,
-            value: _enabled,
-            onChanged: (value) => setState(() => _enabled = value),
-            title: const Text('Allow counter staff access'),
-            subtitle: const Text(
-              'Use this only on Store-managed devices. Payments and business documents remain owner-only.',
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _NumberField(
-          keyName: 'work-counter-count',
+      ),
+      fields: [
+        StoreSettingsInput(
+          id: 'work-counter-count',
+          label: 'Billing counters',
           controller: _counters,
-          label: 'Active billing counters',
-        ),
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          key: const Key('work-staff-settings-save'),
-          onPressed: () {
-            widget.session.saveWorkspaceStaffSettings(
-              staffAccessEnabled: _enabled,
-              counterCount: int.tryParse(_counters.text) ?? 1,
-            );
-          },
-          icon: const Icon(Icons.admin_panel_settings_outlined),
-          label: const Text('Save staff controls'),
+          numeric: true,
+          helper: '1–20 counters',
+          validate: (value) => StoreSettingsInput.whole(value, 1, 20),
         ),
       ],
+      trailing: const Text('Does not grant staff account access.'),
+      saveKey: 'work-staff-settings-save',
+      saveLabel: 'Save staff controls',
+      onSave: () {
+        widget.session.saveWorkspaceStaffSettings(
+          staffAccessEnabled: _enabled,
+          counterCount: int.parse(_counters.text.trim()),
+        );
+      },
     );
   }
 }
@@ -28168,8 +28192,30 @@ class _OrderCatalogueRow extends StatelessWidget {
   }
 }
 
+class _SettingsHoursPair extends StatelessWidget {
+  const _SettingsHoursPair({required this.opening, required this.closing});
+  final Widget opening, closing;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 290 ||
+          MediaQuery.textScalerOf(context).scale(14) > 19) {
+        return Column(children: [opening, closing]);
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: opening),
+          Expanded(child: closing),
+        ],
+      );
+    },
+  );
+}
+
 class _WorkspaceStatusSurface extends StatelessWidget {
   const _WorkspaceStatusSurface({
+    required this.scrollController,
     required this.session,
     required this.acceptingOrders,
     required this.visibleToCustomers,
@@ -28193,12 +28239,12 @@ class _WorkspaceStatusSurface extends StatelessWidget {
     required this.onAlertVibrationChanged,
     required this.onProductControls,
     required this.onDeliveryControls,
-    required this.onStaffControls,
     required this.onPaymentControls,
     required this.onBusinessDetails,
   });
 
   final WorkSession session;
+  final ScrollController scrollController;
   final bool acceptingOrders;
   final bool visibleToCustomers;
   final String fulfilmentMode;
@@ -28221,7 +28267,6 @@ class _WorkspaceStatusSurface extends StatelessWidget {
   final ValueChanged<bool> onAlertVibrationChanged;
   final VoidCallback onProductControls;
   final VoidCallback onDeliveryControls;
-  final VoidCallback onStaffControls;
   final VoidCallback onPaymentControls;
   final VoidCallback onBusinessDetails;
 
@@ -28232,289 +28277,254 @@ class _WorkspaceStatusSurface extends StatelessWidget {
         : reopensAt.isEmpty
         ? WorkspaceStoreState.off
         : WorkspaceStoreState.paused;
-    return ListView(
-      key: const Key('work-dashboard-status-screen'),
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.md,
-        MoolSpacing.xs,
-        MoolSpacing.md,
-        MoolSpacing.xl,
-      ),
-      children: [
-        const _SettingsSectionLabel(
-          title: 'Today',
-          detail: 'Today’s store controls',
+    return StoreSettingsStyle(
+      child: ListView(
+        key: const Key('work-dashboard-status-screen'),
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(
+          MoolSpacing.md,
+          MoolSpacing.xs,
+          MoolSpacing.md,
+          MoolSpacing.xl,
         ),
-        const SizedBox(height: 10),
-        SegmentedButton<WorkspaceStoreState>(
-          key: const Key('work-status-store-state'),
-          segments: const [
-            ButtonSegment(
-              value: WorkspaceStoreState.open,
-              icon: Icon(Icons.play_circle_outline_rounded),
-              label: Text('Open'),
+        children: [
+          const SizedBox(height: 4),
+          SegmentedButton<WorkspaceStoreState>(
+            key: const Key('work-status-store-state'),
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: WorkspaceStoreState.open,
+                label: Text('Open'),
+              ),
+              ButtonSegment(
+                value: WorkspaceStoreState.paused,
+                label: Text('Paused'),
+              ),
+              ButtonSegment(value: WorkspaceStoreState.off, label: Text('Off')),
+            ],
+            selected: {currentState},
+            onSelectionChanged: (selection) {
+              switch (selection.first) {
+                case WorkspaceStoreState.open:
+                  onAcceptingChanged(true);
+                  onReopensChanged('');
+                case WorkspaceStoreState.paused:
+                  onAcceptingChanged(false);
+                  onReopensChanged(reopensAt.isEmpty ? 'In 1 hour' : reopensAt);
+                case WorkspaceStoreState.off:
+                  onAcceptingChanged(false);
+                  onReopensChanged('');
+              }
+            },
+          ),
+          if (currentState == WorkspaceStoreState.paused) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Pause until',
+              style: TextStyle(color: MoolColors.muted, fontSize: 12),
             ),
-            ButtonSegment(
-              value: WorkspaceStoreState.paused,
-              icon: Icon(Icons.pause_circle_outline_rounded),
-              label: Text('Paused'),
-            ),
-            ButtonSegment(
-              value: WorkspaceStoreState.off,
-              icon: Icon(Icons.power_settings_new_rounded),
-              label: Text('Off'),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final option in const [
+                  'In 30 minutes',
+                  'In 1 hour',
+                  'Tomorrow at 8:00 AM',
+                ])
+                  ChoiceChip(
+                    key: Key(
+                      'work-status-reopens-${option.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}',
+                    ),
+                    label: Text(option),
+                    selected: reopensAt == option,
+                    onSelected: (selected) {
+                      if (selected) onReopensChanged(option);
+                    },
+                  ),
+              ],
             ),
           ],
-          selected: {currentState},
-          onSelectionChanged: (selection) {
-            switch (selection.first) {
-              case WorkspaceStoreState.open:
-                onAcceptingChanged(true);
-                onReopensChanged('');
-              case WorkspaceStoreState.paused:
-                onAcceptingChanged(false);
-                onReopensChanged('In 1 hour');
-              case WorkspaceStoreState.off:
-                onAcceptingChanged(false);
-                onReopensChanged('');
-            }
-          },
-        ),
-        const SizedBox(height: 12),
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              SwitchListTile.adaptive(
-                key: const Key('work-status-visibility'),
-                title: const Text('Public storefront'),
-                subtitle: const Text(
-                  'Allow customers to discover your store and public products.',
+          if (currentState == WorkspaceStoreState.off)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Ordering stays off until you reopen your Store.',
+                style: TextStyle(color: MoolColors.muted, fontSize: 12),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                SwitchListTile.adaptive(
+                  key: const Key('work-status-visibility'),
+                  title: const Text('Show Store to customers'),
+                  value: visibleToCustomers,
+                  onChanged: onVisibilityChanged,
                 ),
-                value: visibleToCustomers,
-                onChanged: onVisibilityChanged,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                key: const Key('work-status-opening-time'),
-                leading: Icon(Icons.schedule_rounded),
-                title: const Text('Opens'),
-                subtitle: Text(openingTime),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: () async {
-                  final selected = await showTimePicker(
-                    context: context,
-                    initialTime: const TimeOfDay(hour: 8, minute: 0),
-                  );
-                  if (selected != null && context.mounted) {
-                    onOpeningTimeChanged(selected.format(context));
-                  }
-                },
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                key: const Key('work-status-closing-time'),
-                leading: const Icon(Icons.nightlight_outlined),
-                title: const Text('Closes'),
-                subtitle: Text(closingTime),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: () async {
-                  final selected = await showTimePicker(
-                    context: context,
-                    initialTime: const TimeOfDay(hour: 22, minute: 0),
-                  );
-                  if (selected != null && context.mounted) {
-                    onClosingTimeChanged(selected.format(context));
-                  }
-                },
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              const ListTile(
-                leading: Icon(Icons.layers_outlined),
-                title: Text('Active-order preference'),
-                subtitle: Text(
-                  'This does not pause orders automatically. Pause your store when needed.',
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _SettingsHoursPair(
+                  opening: ListTile(
+                    key: const Key('work-status-opening-time'),
+                    title: const Text('Opens'),
+                    subtitle: Text(
+                      parseStoreHours(openingTime)?.format(context) ??
+                          openingTime,
+                    ),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final selected = await showTimePicker(
+                        context: context,
+                        initialTime:
+                            parseStoreHours(openingTime) ??
+                            const TimeOfDay(hour: 8, minute: 0),
+                        builder: (_, child) =>
+                            StoreSettingsStyle(child: child!),
+                      );
+                      if (selected != null && context.mounted) {
+                        onOpeningTimeChanged(storeHoursValue(selected));
+                      }
+                    },
+                  ),
+                  closing: ListTile(
+                    key: const Key('work-status-closing-time'),
+                    title: const Text('Closes'),
+                    subtitle: Text(
+                      parseStoreHours(closingTime)?.format(context) ??
+                          closingTime,
+                    ),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final selected = await showTimePicker(
+                        context: context,
+                        initialTime:
+                            parseStoreHours(closingTime) ??
+                            const TimeOfDay(hour: 22, minute: 0),
+                        builder: (_, child) =>
+                            StoreSettingsStyle(child: child!),
+                      );
+                      if (selected != null && context.mounted) {
+                        onClosingTimeChanged(storeHoursValue(selected));
+                      }
+                    },
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                StoreOrderLimit(
+                  value: maximumActiveOrders,
+                  onChanged: onMaximumActiveOrdersChanged,
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _SettingsHoursPair(
+                  opening: SwitchListTile.adaptive(
+                    key: const Key('work-status-alert-sound'),
+                    title: const Text('Sound'),
+                    value: alertSound,
+                    onChanged: onAlertSoundChanged,
+                  ),
+                  closing: SwitchListTile.adaptive(
+                    key: const Key('work-status-alert-vibration'),
+                    title: const Text('Vibration'),
+                    value: alertVibration,
+                    onChanged: onAlertVibrationChanged,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          StoreSettingsCard(
+            child: Column(
+              children: [
+                StoreSettingsChoice<int>(
+                  label: 'Preparation',
+                  value: busyMinutes,
+                  controlKey: 'work-status-preparation',
+                  options: {
+                    for (final minutes in {0, 5, 10, 15, 20, 30, busyMinutes})
+                      minutes: minutes == 0 ? 'Standard' : '$minutes min',
+                  },
+                  onChanged: onBusyMinutesChanged,
+                ),
+                const Divider(height: 1, indent: 12, endIndent: 12),
+                StoreSettingsChoice<String>(
+                  label: 'Fulfilment',
+                  value: fulfilmentMode,
+                  controlKey: 'work-status-fulfilment',
+                  options: {
+                    fulfilmentMode: fulfilmentMode,
+                    'Delivery and pickup': 'Delivery + pickup',
+                    'Pickup only': 'Pickup only',
+                    'Delivery only': 'Delivery only',
+                  },
+                  onChanged: onFulfilmentChanged,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: const Text('Product controls'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: onProductControls,
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.local_shipping_outlined),
+                  title: const Text('Delivery & pickup'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: onDeliveryControls,
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ExpansionTile(
+                  key: const Key('work-staff-section'),
+                  leading: const Icon(Icons.groups_outlined),
+                  title: const Text('Staff and counters'),
                   children: [
-                    for (final count in const [4, 8, 12, 20])
-                      ChoiceChip(
-                        key: Key('work-status-max-orders-$count'),
-                        label: Text('$count orders'),
-                        selected: maximumActiveOrders == count,
-                        onSelected: (selected) {
-                          if (selected) onMaximumActiveOrdersChanged(count);
-                        },
-                      ),
+                    _WorkspaceStaffSettingsSurface(
+                      session: session,
+                      embedded: true,
+                    ),
                   ],
                 ),
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              SwitchListTile.adaptive(
-                key: const Key('work-status-alert-sound'),
-                secondary: const Icon(Icons.volume_up_outlined),
-                title: const Text('Order alert sound'),
-                value: alertSound,
-                onChanged: onAlertSoundChanged,
-              ),
-              SwitchListTile.adaptive(
-                key: const Key('work-status-alert-vibration'),
-                secondary: const Icon(Icons.vibration_rounded),
-                title: const Text('Order alert vibration'),
-                value: alertVibration,
-                onChanged: onAlertVibrationChanged,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        const _SettingsSectionLabel(
-          title: 'Default preparation time',
-          detail: 'A specific accepted order can be adjusted separately',
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: MoolSpacing.xs,
-          runSpacing: MoolSpacing.xs,
-          children: [
-            for (final minutes in const [0, 5, 10, 15, 20, 30])
-              ChoiceChip(
-                key: Key('work-status-busy-$minutes'),
-                label: Text(minutes == 0 ? 'Standard' : '$minutes min'),
-                selected: busyMinutes == minutes,
-                onSelected: acceptingOrders
-                    ? (selected) {
-                        if (selected) onBusyMinutesChanged(minutes);
-                      }
-                    : null,
-              ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        const _SettingsSectionLabel(
-          title: 'Pickup and delivery',
-          detail: 'Only enabled choices appear to customers',
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: MoolSpacing.xs,
-          runSpacing: MoolSpacing.xs,
-          children: [
-            for (final mode in const [
-              'Delivery and pickup',
-              'Pickup only',
-              'Delivery only',
-            ])
-              ChoiceChip(
-                key: Key(
-                  'work-status-mode-${mode.toLowerCase().replaceAll(' ', '-')}',
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_outlined),
+                  title: const Text('Payment and settlement'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: onPaymentControls,
                 ),
-                label: Text(mode),
-                selected: fulfilmentMode == mode,
-                onSelected: acceptingOrders
-                    ? (selected) {
-                        if (selected) onFulfilmentChanged(mode);
-                      }
-                    : null,
-              ),
-          ],
-        ),
-        if (!acceptingOrders) ...[
-          const SizedBox(height: 18),
-          const _SettingsSectionLabel(
-            title: 'Ordering resumes',
-            detail: 'Shown to customers while the store is paused',
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: MoolSpacing.xs,
-            runSpacing: MoolSpacing.xs,
-            children: [
-              for (final option in const [
-                'In 30 minutes',
-                'In 1 hour',
-                'Tomorrow at 8:00 AM',
-              ])
-                ChoiceChip(
-                  key: Key(
-                    'work-status-reopens-${option.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}',
-                  ),
-                  label: Text(option),
-                  selected: reopensAt == option,
-                  onSelected: (selected) {
-                    if (selected) onReopensChanged(option);
-                  },
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _StoreInvoiceDeliveryPreferenceView(
+                  key: ValueKey(session.storeInvoiceDeliveryScope),
+                  session: session,
+                  scope: session.storeInvoiceDeliveryScope,
+                  settings: true,
                 ),
-            ],
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.fact_check_outlined),
+                  title: const Text('Business details and documents'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: onBusinessDetails,
+                ),
+              ],
+            ),
           ),
         ],
-        const SizedBox(height: 22),
-        const _SettingsSectionLabel(
-          title: 'Store',
-          detail: 'Longer-term configuration',
-        ),
-        const SizedBox(height: 10),
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: const Text('Product controls'),
-                subtitle: const Text(
-                  'Visibility, stock mode and low-stock defaults',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: onProductControls,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: const Icon(Icons.local_shipping_outlined),
-                title: const Text('Delivery area and charges'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: onDeliveryControls,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: const Icon(Icons.groups_outlined),
-                title: const Text('Staff and counters'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: onStaffControls,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: const Icon(Icons.account_balance_outlined),
-                title: const Text('Payment and settlement'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: onPaymentControls,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              _StoreInvoiceDeliveryPreferenceView(
-                key: ValueKey(session.storeInvoiceDeliveryScope),
-                session: session,
-                scope: session.storeInvoiceDeliveryScope,
-                settings: true,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: const Icon(Icons.fact_check_outlined),
-                title: const Text('Business details and documents'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: onBusinessDetails,
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -28654,75 +28664,54 @@ class _StoreInvoiceDeliveryPreferenceViewState
         ),
       );
     }
-    return ExpansionTile(
-      key: const Key('work-invoice-delivery-settings'),
-      leading: const Icon(Icons.receipt_long_outlined),
-      title: const Text('Invoice delivery'),
-      subtitle: Text(
-        mode == null
-            ? 'Choose how to send invoices'
-            : 'Auto-send: ${mode.label}',
-      ),
-      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      expandedCrossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        feedback,
-        // Leave room for InputDecorator's floating label below the tile header.
-        const SizedBox(height: 12),
-        if (mode != null)
-          InputDecorator(
-            decoration: const InputDecoration(labelText: 'Auto-send invoice'),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<WorkspaceInvoiceDeliveryMode>(
-                key: const Key('work-invoice-delivery-mode'),
-                isExpanded: true,
-                value: mode,
-                onChanged: _busy || _error != null ? null : _save,
-                items: [
-                  for (final choice in WorkspaceInvoiceDeliveryMode.values)
-                    DropdownMenuItem(value: choice, child: Text(choice.label)),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: 8),
-        const Text(
-          'Changes save automatically for this Store on this device.',
-          style: TextStyle(color: MoolColors.muted, fontSize: 12),
-        ),
-        const SizedBox(height: 8),
-        const Text('WhatsApp sender: MoolSocial'),
-        const Text(
-          'Automatic sending is not available yet. Choose your preferred channel for future invoices.',
-          style: TextStyle(color: MoolColors.muted, fontSize: 12),
-        ),
-      ],
-    );
-  }
-}
-
-class _SettingsSectionLabel extends StatelessWidget {
-  const _SettingsSectionLabel({required this.title, required this.detail});
-
-  final String title;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
     return Column(
+      key: const Key('work-invoice-delivery-settings'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: MoolColors.navy,
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
+        SwitchListTile.adaptive(
+          key: const Key('work-invoice-delivery-mode'),
+          title: const Text('Auto-send invoice'),
+          subtitle: Text(
+            _busy
+                ? 'Loading…'
+                : mode == WorkspaceInvoiceDeliveryMode.off
+                ? 'Off · Invoices stay in history'
+                : 'On · Sending not connected yet',
           ),
+          value: mode != null && mode != WorkspaceInvoiceDeliveryMode.off,
+          onChanged: _busy || _error != null || mode == null
+              ? null
+              : (enabled) => _save(
+                  enabled
+                      ? WorkspaceInvoiceDeliveryMode.automatic
+                      : WorkspaceInvoiceDeliveryMode.off,
+                ),
         ),
-        Text(
-          detail,
-          style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              feedback,
+              const Text(
+                'Auto-saved on this device. Sending unavailable.',
+                style: TextStyle(color: MoolColors.muted, fontSize: 12),
+              ),
+              if (mode == WorkspaceInvoiceDeliveryMode.automatic)
+                const Text(
+                  'Members: Chat · Others: WhatsApp',
+                  style: TextStyle(color: MoolColors.muted, fontSize: 12),
+                ),
+              // Preserve earlier explicit preferences until the retailer changes them.
+              if (mode != null &&
+                  mode != WorkspaceInvoiceDeliveryMode.automatic &&
+                  mode != WorkspaceInvoiceDeliveryMode.off)
+                Text(
+                  'Previous channel: ${mode.label}. Turn off and on to use automatic routing.',
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+                ),
+            ],
+          ),
         ),
       ],
     );

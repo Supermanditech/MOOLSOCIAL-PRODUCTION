@@ -23090,8 +23090,8 @@ void main() {
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openStoreSettings(tester);
     await tester.pumpAndSettle();
-    await reveal(tester, find.text('Delivery area and charges'));
-    await tester.tap(find.text('Delivery area and charges'));
+    await reveal(tester, find.text('Delivery & pickup'));
+    await tester.tap(find.text('Delivery & pickup'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-delivery-settings-screen')), findsOne);
 
@@ -26350,6 +26350,237 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 1.4]) {
+    testWidgets('BATCH1 settings validation hours and availability $scale', (
+      tester,
+    ) async {
+      final preferences = _InvoiceDeliveryFixtureStore();
+      final work =
+          storeViewFixture(
+              null,
+              _ContactDraftFixtureStore(),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              preferences,
+            )
+            ..workspaceOpeningTime = '09:30'
+            ..workspaceClosingTime = '6:45 PM';
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: scale,
+        viewport: Size(scale == 1 ? 360 : 320, 800),
+      );
+      Future<void> press(Finder target) async {
+        final settings = find.byKey(const Key('work-dashboard-status-screen'));
+        if (target.evaluate().isEmpty && settings.evaluate().isNotEmpty) {
+          await tester.drag(settings, const Offset(0, 2000));
+          await tester.pumpAndSettle();
+        }
+        await reveal(tester, target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      Finder keyed(String key) => find.byKey(Key(key));
+      await openStoreSettings(tester);
+      await captureStoreView(tester, 'batch1-settings-open-$scale');
+      await press(keyed('work-status-opening-time'));
+      expect(
+        tester
+            .widget<TimePickerDialog>(find.byType(TimePickerDialog))
+            .initialTime,
+        const TimeOfDay(hour: 9, minute: 30),
+      );
+      await captureStoreView(tester, 'batch1-hours-$scale');
+      await press(find.text('Cancel'));
+      await press(keyed('work-status-closing-time'));
+      expect(
+        tester
+            .widget<TimePickerDialog>(find.byType(TimePickerDialog))
+            .initialTime,
+        const TimeOfDay(hour: 18, minute: 45),
+      );
+      await press(find.text('Cancel'));
+      await tester.drag(
+        keyed('work-dashboard-status-screen'),
+        const Offset(0, 1500),
+      );
+      await tester.pumpAndSettle();
+      await press(find.text('Off'));
+      expect(find.text('Pause until'), findsNothing);
+      expect(find.text('In 30 minutes'), findsNothing);
+      await captureStoreView(tester, 'batch1-settings-off-$scale');
+      await press(find.text('Paused'));
+      expect(find.text('Pause until').hitTestable(), findsOneWidget);
+      expect(find.text('In 30 minutes').hitTestable(), findsOneWidget);
+      await press(find.text('In 30 minutes'));
+      await tester.drag(
+        keyed('work-dashboard-status-screen'),
+        const Offset(0, 1500),
+      );
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'batch1-settings-paused-$scale');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(keyed('work-settings-discard-dialog'), findsOneWidget);
+      await press(find.text('Keep editing'));
+      await press(find.text('Open'));
+      await reveal(tester, keyed('work-status-order-limit'));
+      await tester.enterText(keyed('work-status-order-limit'), '12');
+      expect(work.workspaceOpeningTime, '09:30');
+      expect(work.workspaceClosingTime, '6:45 PM');
+      await press(find.text('Delivery & pickup'));
+      expect(keyed('work-delivery-radius'), findsNothing);
+      expect(find.text('Delivery radius'), findsNothing);
+      expect(keyed('work-delivery-fee'), findsNothing);
+      expect(keyed('work-delivery-free-above'), findsNothing);
+      expect(find.text('Delivery fee'), findsNothing);
+      expect(find.text('Free delivery above'), findsNothing);
+      expect(find.text('Delivery area and charges'), findsNothing);
+      expect(find.text('Enter amounts in whole rupees.'), findsNothing);
+      expect(
+        find.text('Coverage & charges · Set by MoolSocial'),
+        findsOneWidget,
+      );
+      expect(keyed('work-delivery-fleet-coverage'), findsOneWidget);
+      await captureStoreView(tester, 'batch1-delivery-$scale');
+      final fee = work.workspaceDeliveryFee;
+      final freeAbove = work.workspaceFreeDeliveryAbove;
+      final pin = work.workspaceDeliveryPincode;
+      await tester.enterText(keyed('work-delivery-pincode'), '3420037');
+      await press(keyed('work-delivery-settings-save'));
+      expect(find.text('Enter a valid 6-digit PIN code.'), findsOneWidget);
+      expect(work.workspaceDeliveryPincode, pin);
+      expect(work.workspaceDeliveryFee, fee);
+      await captureStoreView(tester, 'batch1-delivery-errors-$scale');
+      await tester.enterText(keyed('work-delivery-pincode'), '342003');
+      await tester.enterText(keyed('work-delivery-city'), 'Jodhpur');
+      await tester.enterText(keyed('work-delivery-area'), 'Sardarpura');
+      await press(keyed('work-delivery-settings-save'));
+      expect(work.workspaceDeliveryFee, fee);
+      expect(work.workspaceFreeDeliveryAbove, freeAbove);
+      expect(work.workspaceDeliveryPincode, '342003');
+      await press(keyed('work-operation-back'));
+      await press(find.text('Staff and counters'));
+      await Scrollable.ensureVisible(
+        tester.element(keyed('work-staff-settings-save')),
+        alignment: 1,
+      );
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'batch1-staff-$scale');
+      final counters = work.workspaceCounterCount;
+      final staffEnabled = work.workspaceStaffAccessEnabled;
+      await press(keyed('work-staff-access-toggle'));
+      await tester.enterText(keyed('work-counter-count'), '100');
+      await press(keyed('work-staff-settings-save'));
+      expect(find.text('Enter a whole number from 1 to 20.'), findsOneWidget);
+      expect(work.workspaceCounterCount, counters);
+      expect(work.workspaceStaffAccessEnabled, staffEnabled);
+      await captureStoreView(tester, 'batch1-staff-errors-$scale');
+      await tester.enterText(keyed('work-counter-count'), '3');
+      await press(keyed('work-staff-settings-save'));
+      expect(work.workspaceCounterCount, 3);
+      expect(work.workspaceStaffAccessEnabled, !staffEnabled);
+      await press(find.byTooltip('Dismiss message'));
+      await press(find.text('Staff and counters'));
+      await reveal(tester, keyed('work-invoice-delivery-settings'));
+      await captureStoreView(tester, 'batch1-invoice-off-$scale');
+      await press(keyed('work-invoice-delivery-mode'));
+      expect(
+        preferences.values.values.single.mode,
+        WorkspaceInvoiceDeliveryMode.automatic,
+      );
+      await captureStoreView(tester, 'batch1-invoice-on-$scale');
+      await tester.drag(
+        keyed('work-dashboard-status-screen'),
+        const Offset(0, 2500),
+      );
+      await tester.pumpAndSettle();
+      await reveal(tester, keyed('work-status-order-limit'));
+      expect(
+        tester
+            .widget<TextFormField>(keyed('work-status-order-limit'))
+            .controller!
+            .text,
+        '12',
+      );
+      expect(work.workspaceMaximumActiveOrders, isNot(12));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 1.4]) {
+    testWidgets(
+      'BATCH1 custom and unlimited order preferences save without clamping $scale',
+      (tester) async {
+        final work = liveStore();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          textScale: scale,
+          viewport: Size(scale == 1 ? 360 : 320, 800),
+        );
+        final limit = find.byKey(const Key('work-status-order-limit'));
+        final unlimited = find.byKey(const Key('work-status-orders-unlimited'));
+        final save = find.byKey(const Key('work-status-save'));
+        await openStoreSettings(tester);
+        await tester.enterText(limit, '1000');
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'batch1-orders-custom-$scale');
+        await reveal(tester, find.byKey(const Key('work-status-preparation')));
+        await tester.tap(find.byKey(const Key('work-status-preparation')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('15 min').last);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-status-fulfilment')));
+        await tester.tap(find.byKey(const Key('work-status-fulfilment')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Pickup only').last);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(work.workspaceMaximumActiveOrders, 1000);
+        expect(work.workspaceBusyMinutes, 15);
+        expect(work.workspaceFulfilmentMode, 'Pickup only');
+        await openStoreSettings(tester);
+        expect(tester.widget<TextFormField>(limit).controller!.text, '1000');
+        await tester.tap(unlimited);
+        await tester.pumpAndSettle();
+        expect(limit, findsNothing);
+        await captureStoreView(tester, 'batch1-orders-unlimited-$scale');
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(work.workspaceMaximumActiveOrders, 0);
+        await openStoreSettings(tester);
+        expect(tester.widget<FilterChip>(unlimited).selected, isTrue);
+        await tester.tap(unlimited);
+        await tester.pumpAndSettle();
+        for (final invalid in ['', '0', '-5', '2.5', 'abc']) {
+          await tester.enterText(limit, invalid);
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-dashboard-status-screen')),
+            findsOneWidget,
+          );
+          expect(work.workspaceMaximumActiveOrders, 0);
+        }
+        await tester.enterText(limit, '50');
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(work.workspaceMaximumActiveOrders, 50);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('Store settings save editable hours capacity and alerts', (
     tester,
   ) async {
@@ -26357,8 +26588,11 @@ void main() {
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openStoreSettings(tester);
     await tester.pumpAndSettle();
-    await reveal(tester, find.byKey(const Key('work-status-max-orders-12')));
-    await tester.tap(find.byKey(const Key('work-status-max-orders-12')));
+    await reveal(tester, find.byKey(const Key('work-status-order-limit')));
+    await tester.enterText(
+      find.byKey(const Key('work-status-order-limit')),
+      '12',
+    );
     await reveal(tester, find.byKey(const Key('work-status-alert-sound')));
     await tester.tap(find.byKey(const Key('work-status-alert-sound')));
     await tester.tap(find.byKey(const Key('work-status-save')));
@@ -26408,8 +26642,8 @@ void main() {
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openStoreSettings(tester);
     await tester.pumpAndSettle();
-    await reveal(tester, find.text('Delivery area and charges'));
-    await tester.tap(find.text('Delivery area and charges'));
+    await reveal(tester, find.text('Delivery & pickup'));
+    await tester.tap(find.text('Delivery & pickup'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
@@ -27054,7 +27288,6 @@ void main() {
 
         Future<void> openSettings() async {
           await openStoreSettings(tester);
-          await press('work-invoice-delivery-settings');
           await reveal(
             tester,
             find.byKey(const Key('work-invoice-delivery-mode')),
@@ -27062,21 +27295,14 @@ void main() {
         }
 
         await openSettings();
-        final dropdown = find.byKey(const Key('work-invoice-delivery-mode'));
-        expect(
-          tester
-              .widget<DropdownButton<WorkspaceInvoiceDeliveryMode>>(dropdown)
-              .value,
-          WorkspaceInvoiceDeliveryMode.off,
-        );
+        final toggle = find.byKey(const Key('work-invoice-delivery-mode'));
+        expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
         for (final mode in [
           WorkspaceInvoiceDeliveryMode.automatic,
-          WorkspaceInvoiceDeliveryMode.moolSocialChat,
-          WorkspaceInvoiceDeliveryMode.whatsapp,
+          WorkspaceInvoiceDeliveryMode.off,
+          WorkspaceInvoiceDeliveryMode.automatic,
         ]) {
           await press('work-invoice-delivery-mode');
-          await tester.tap(find.text(mode.label).last);
-          await tester.pumpAndSettle();
           expect(preferences.values.values.single.mode, mode);
         }
         expect(find.textContaining('consent'), findsNothing);
@@ -27088,12 +27314,7 @@ void main() {
           findsNothing,
         );
         await openSettings();
-        expect(
-          tester
-              .widget<DropdownButton<WorkspaceInvoiceDeliveryMode>>(dropdown)
-              .value,
-          WorkspaceInvoiceDeliveryMode.whatsapp,
-        );
+        expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
         await press('work-store-home');
         await openCounterSaleFromSales(tester);
         await enterSaleCustomer(tester, '9000092035');
@@ -27111,7 +27332,7 @@ void main() {
           tester,
           find.byKey(const Key('work-invoice-auto-delivery-unavailable')),
         );
-        expect(find.textContaining('Auto-send: WhatsApp'), findsOneWidget);
+        expect(find.textContaining('Auto-send: Auto'), findsOneWidget);
         expect(
           find.textContaining('Automatic delivery unavailable'),
           findsOneWidget,
@@ -27167,30 +27388,45 @@ void main() {
       }
 
       await openStoreSettings(tester);
-      await press('work-invoice-delivery-settings');
+      await reveal(
+        tester,
+        find.byKey(const Key('work-invoice-delivery-settings')),
+      );
       expect(
         find.byKey(const Key('work-invoice-delivery-error')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('work-invoice-delivery-mode')), findsNothing);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const Key('work-invoice-delivery-mode')),
+            )
+            .onChanged,
+        isNull,
+      );
       preferences.failRead = false;
       await press('work-invoice-delivery-reload');
       preferences.failSave = true;
       await press('work-invoice-delivery-mode');
-      await tester.tap(find.text('Auto').last);
-      await tester.pumpAndSettle();
       expect(preferences.values, isEmpty);
       expect(find.textContaining('Could not confirm the save'), findsOneWidget);
-      expect(find.byKey(const Key('work-invoice-delivery-mode')), findsNothing);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const Key('work-invoice-delivery-mode')),
+            )
+            .onChanged,
+        isNull,
+      );
       preferences.failSave = false;
       await press('work-invoice-delivery-reload');
       expect(
         tester
-            .widget<DropdownButton<WorkspaceInvoiceDeliveryMode>>(
+            .widget<SwitchListTile>(
               find.byKey(const Key('work-invoice-delivery-mode')),
             )
             .value,
-        WorkspaceInvoiceDeliveryMode.off,
+        isFalse,
       );
       expect(tester.takeException(), isNull);
     },

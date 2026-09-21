@@ -6738,9 +6738,7 @@ class WorkSession extends ChangeNotifier {
           'sharedChannels': invoice.sharedChannels.toList(growable: false),
         },
     ],
-    'deliveryRadiusKm': workspaceDeliveryRadiusKm,
-    'deliveryFee': workspaceDeliveryFee,
-    'freeDeliveryAbove': workspaceFreeDeliveryAbove,
+    // MoolSocial-owned coverage/pricing are not retailer-editable snapshot fields.
     'deliveryCity': workspaceDeliveryCity,
     'deliveryArea': workspaceDeliveryArea,
     'deliveryPincode': workspaceDeliveryPincode,
@@ -6839,9 +6837,15 @@ class WorkSession extends ChangeNotifier {
     required bool alertSound,
     required bool alertVibration,
   }) {
+    // 0 means explicitly unlimited; positive values are retailer-entered limits.
+    // This is a planning preference, not admission control for incoming orders.
+    if (maximumActiveOrders < 0) {
+      showError('Enter an active-order limit or choose Unlimited.');
+      return;
+    }
     workspaceOpeningTime = openingTime.trim();
     workspaceClosingTime = closingTime.trim();
-    workspaceMaximumActiveOrders = maximumActiveOrders.clamp(1, 100);
+    workspaceMaximumActiveOrders = maximumActiveOrders;
     workspaceOrderAlertSound = alertSound;
     workspaceOrderAlertVibration = alertVibration;
     _recordWorkspaceActivity('Store hours and order alerts updated.');
@@ -6924,23 +6928,27 @@ class WorkSession extends ChangeNotifier {
   }
 
   void saveWorkspaceDeliverySettings({
-    required int radiusKm,
-    required int fee,
-    required int freeAbove,
     String? city,
     String? area,
     String? pincode,
     bool? pickupEnabled,
   }) {
-    workspaceDeliveryRadiusKm = radiusKm.clamp(1, 50);
-    workspaceDeliveryFee = fee.clamp(0, 10000);
-    workspaceFreeDeliveryAbove = freeAbove.clamp(0, 1000000);
+    // Retailers own pickup location/preferences, not MoolSocial coverage/pricing.
+    final nextCity = (city ?? workspaceDeliveryCity).trim();
+    final nextArea = (area ?? workspaceDeliveryArea).trim();
+    final nextPincode = (pincode ?? workspaceDeliveryPincode).trim();
+    if (nextCity.isEmpty ||
+        nextArea.isEmpty ||
+        !RegExp(r'^[1-9][0-9]{5}$').hasMatch(nextPincode)) {
+      showError('Check the Store city, area and PIN code before saving.');
+      return;
+    }
     workspaceDeliveryCity = city?.trim() ?? workspaceDeliveryCity;
     workspaceDeliveryArea = area?.trim() ?? workspaceDeliveryArea;
     workspaceDeliveryPincode = pincode?.trim() ?? workspaceDeliveryPincode;
     workspacePickupEnabled = pickupEnabled ?? workspacePickupEnabled;
-    _recordWorkspaceActivity('Store delivery coverage and charges updated.');
-    showNotice('Delivery area and customer charges updated.');
+    _recordWorkspaceActivity('Store pickup location and preferences updated.');
+    showNotice('Store pickup details updated.');
     _persistOperationalState('delivery-settings');
   }
 
@@ -6948,8 +6956,12 @@ class WorkSession extends ChangeNotifier {
     required bool staffAccessEnabled,
     required int counterCount,
   }) {
+    if (counterCount < 1 || counterCount > 20) {
+      showError('Enter a whole counter count from 1 to 20.');
+      return;
+    }
     workspaceStaffAccessEnabled = staffAccessEnabled;
-    workspaceCounterCount = counterCount.clamp(1, 20);
+    workspaceCounterCount = counterCount;
     _recordWorkspaceActivity('Store counter and staff access updated.');
     showNotice('Staff and counter settings updated.');
     _persistOperationalState('staff-settings');
