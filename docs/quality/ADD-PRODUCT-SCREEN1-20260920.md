@@ -1,0 +1,1607 @@
+# UAW-ADD-PRODUCT-SCREEN1-20260920
+
+## Current bounded OPPO successor authority — 21 September 2026
+
+Founder explicitly authorised one successor OPPO review APK and physical testing
+of all implemented changes since r66.36: pending Counter Sale CS-OPPO-015,
+Add Product catalogue/manual/CSV, stock statement and PDF/XLSX/CSV downloads.
+Founder then approved ONLY exact native-download/build/integration admission and
+its regression checks, with no broader governance/policy, backend or redesign.
+This supersedes older build/install exclusions below for this candidate only.
+
+Qualified application checkpoint: 79d5401338881f55e65b08c0e7843cbac016fcfb,
+committed/pushed with exact remote readback. All 14 app/dependency paths changed
+since previous integration e1e4985f are included; a425fd89 Counter Sale receipt
+keyboard fix is an ancestor. Cursor's independent checkout is not an input and
+must not be edited or advanced by this task.
+
+Founder clarified during admission that Cursor is actively working on the public
+Store screen and will integrate later, not into this APK. Reuse the existing
+independent-Cursor admission only for this exact Store source/integration pair
+and exact Cursor buy-ready-20260921 root/branch. Reject Cursor as a candidate
+input; keep source, integration and every other managed checkout clean. No Cursor
+files are read into the build, committed, stashed, reset or advanced here.
+The first admission refusal remains in the task log. This scoped non-input
+handling is not a general dirty-worktree waiver or an application change.
+
+Candidate planned: UAW-STORE-ADD-PRODUCT-R66.37-REVIEW-20260921,
+1.0.0-r66.37 / 2026092101, debug RuntimeUiReview, com.moolsocial.app.runtime.
+Single fresh integration target:
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921,
+branch integration/moolsocial/store-add-product-20260921. Admission requires
+governance-tag start, qualified-source ancestry, unchanged complete apps tree,
+clean remote-exact source, inherited owner presence and all existing merge checks.
+No production/main change, data clear, uninstall, live payment or message.
+
+Native admission now validates exact new MainActivity and download-bridge bytes,
+removes only the five approved registration/lifecycle lines for comparison, and
+then executes the unchanged prior source/accessibility/projection/reference
+hash checks. Full lock gate passed; isolated fixture: 1 positive / 8 rejected.
+Exact integration identity fixture: 2 positive / 14 rejected. Logs retained in
+the task outputs as store-add-product-oppo-native-lock-01.log,
+store-add-product-oppo-native-fixtures-01.log and
+store-add-product-oppo-integration-identities-01.log.
+
+Current source paired 45-file regressions are still running, not passed yet.
+The complete device plan is task outputs/store-add-product-oppo-20260921-plan.md.
+Build-source manifest, final preflight, APK and installed hashes, fresh screenshot
+evidence and defect register remain pending. This is not device acceptance.
+
+## Current continuation — v24 visually approved; v25 mapping checks
+
+Founder approved the displayed v24 CSV Ready / Needs attention layouts on
+21 September 2026 and authorised continued frontend work. This supersedes the
+older "NOT founder-approved" status below. Technical public Buy/Wholesale versus
+CSV field responsibility remains Codex's, including variants and exact packs.
+Do not ask the founder to certify technical coverage through visual approval.
+The separate enhancement/design/UIUX/theme/colour/gradient/brand round is deferred.
+
+v25 is a bounded continuation inside existing import/model/test owners, with no
+layout or Buy-owned source changes. Blank minimumOrder now preserves an exact
+catalogue SKU's rule; an explicit valid override still wins. Repeated unchanged
+category/origin/composition/regulatory/visual-label facts no longer create a new
+fact-change hold. Actual changes and existing review holds remain blocked from
+publication; all imports still start private. These are product-level prefill
+rules, not implementation of Store default inheritance or Wholesale offers.
+
+Local verification evidence is retained in the task outputs folder as
+store-csv-v25-tests-r2.log (38 focused tests passed) and
+store-csv-v25-analysis-r2.log (six-owner analysis clean). The first-run logs remain
+preserved separately. No new APK, device test, backend, commit or push
+is authorised by this visual approval alone. Cursor remains on its independent
+06432e2b checkpoint; do not advance its branch while it may be working.
+
+v25 initial verification: 37 passed, one new test failed because its template-
+only fixture omitted the legacy visualLabel column whose correction it asserted.
+Analysis also requested Dart's null-aware map-element syntax. Preserve both logs;
+neither initial run is a clean pass. Correct the test fixture to actually supply
+the accepted legacy column (without adding it to the retailer template), retain
+the changed-value assertion, and use the analyzer-recommended syntax. The
+global registry is outside this ticket's owner claim; no policy/registry change
+or invented regression ID is made by this continuation.
+
+Remaining frontend work stays explicit: separate Wholesale offers/channel and
+pricing contracts; one-time Store defaults/inheritance; structured variant/pack
+conversion where public contracts require it; complete publication readiness.
+Do not add decorative CSV headings that lack shared editor/persistence/public
+wiring, and do not classify these frontend gaps as backend-only dependencies.
+
+## Current checkpoint — v24 CSV review and independent Cursor baseline
+
+Founder visually approved the v23 guide. Technical correctness of CSV mapping
+to Buy/Wholesale remains Codex responsibility; visual approval is not technical
+acceptance. Founder requested later design/UIUX/theme/colour/gradient/brand polish.
+The v24 field-error review screen is implemented but NOT founder-approved yet.
+The complete Add Product journey, Wholesale wiring, backend and OPPO remain open.
+
+Founder explicitly authorised: finish pending checks, create a ticket-scoped work
+checkpoint containing current work, advance the clean unused Cursor Buy worktree
+to that exact commit, then provide a Cursor readiness message. This is checkpoint
+authority, not acceptance, release, broad policy changes or remote push authority.
+
+v24 reuses one field-aware validator and preserves the manual editor's text API.
+Review now shows source row, SKU/variant/pack, exact column, entered value and
+correction. Existing validation still stops at the first issue per row; the UI
+states that limitation. Saveable rows remain Store-only, separate from publication
+readiness, with changed catalogue facts visibly held for review. Inherited MRP
+errors identify the entered selling price, not an allegedly empty supplied MRP.
+Initial test patch missed a formatter-split anchor; reapplied at the verified
+location without weakening assertions. All source edits remain scoped.
+
+Evidence: task outputs/store-csv-review-v24/tests-r1.log (23 affected tests passed),
+analysis-final.log (six source/test owners clean), checkpoint-tests.log (36 final
+focused tests passed), checkpoint-analysis.log (clean after MRP correction).
+Actual normal/200% local renders inspected at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-csv-review-v24-r1.
+No fresh physical download, scanner, keyboard or OPPO qualification is claimed.
+Earlier v21 native template payload checks passed; actual MediaStore I/O remains
+device-pending. Screenshots/logs remain retained locally outside Git; source,
+tests, requirements and the 400-row mapping appendix are checkpointed here.
+
+Cursor preparation: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921,
+branch work/cursor-ui/buy-ready-20260921. Started at pushed dff6c124 and includes
+previous Cursor Buy baseline ee42be0. Advance fast-forward only after this checkpoint;
+do not copy dirty files or alter old Cursor worktrees. This new worktree is setup-
+only, with no implementation ticket/claim until founder assigns its first ticket.
+Existing Redmi claims cannot be borrowed. Cursor must coordinate shared Buy model,
+session/content and route changes with Codex's Store/CSV public-field mapping.
+No APK, backend, deployment or production/main changes are authorised here.
+
+Inherited qualification limitation: check-approved-ui-locks.ps1 rejects both this
+Add Product path and the clean Cursor setup at unchanged dff6c124 with "Approved
+UI Accessibility projection requires its exact isolated native owner." Its
+hardcoded path list omits both new checkouts. The protected MainActivity owner,
+approved-reference manifest and UI-lock script are unchanged by this checkpoint.
+Do not call that check passed or weaken/patch it here. Ticket pre_commit,
+scope/incremental checks and local tests passed separately. This is a preservation
+checkpoint only; production/build/acceptance qualification stays blocked pending
+separate exact path admission and the other recorded runtime requirements.
+
+## Preserved v22 mapping — complete 400-ID disposition
+
+This is the retained source/CSV-responsibility inventory, not a claim of 400
+implemented fields or fresh public-device tests. v23 adds only the eight C-series
+pack fields; their prior CSV-MISSING labels below are historical and superseded
+by the v23 implementation notes. All other gaps remain explicitly pending.
+Original detailed inventory and source aliases are retained locally at:
+C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/store-public-exact-field-map-20260920.md.
+v22 reconciliation: outputs/store-csv-public-reconciliation-v22.md in that task.
+Do not use the inventory to expand scope or grant unsupported CSV inputs.
+
+| ID | Field | Original source anchor | v22 treatment | Required disposition / gap |
+|---|---|---|---|---|
+| S01 | Store/branch identity | WS.id; STORE.id; P.storeId missing in W→P | SYSTEM | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S02 | Store / seller display name | WS.name or WorkSession.workName → W→P.seller; FACT.partner | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S03 | Seller type / business role | WS.profileLabel/profileId; P.sellerType hardcoded `Store` by W→P | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S04 | Business verification | WS.verified; P.manufacturerVerified not mapped | SYSTEM | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S05 | Store locality | WS.area / workArea; STORE.area | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S06 | Store full address | STORE.address; no address in W→P | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S07 | Store region identity | STORE.regionId | SYSTEM | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S08 | Ask seller contact destination | Seller/Store identity used by product action; not a contact field in W→P | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S09 | Seller legal name | TAX.sellerLegalName | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S10 | Seller registered/billing address | TAX.sellerAddress | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S11 | Seller GSTIN | TAX.sellerGstin | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S12 | Seller PAN | TAX.sellerPan (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S13 | Seller CIN | TAX.sellerCin (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S14 | Seller FSSAI licence/registration | TAX.sellerFssaiNumber (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S15 | Authorised signatory | TAX.authorizedSignatory (nullable) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S16 | Opening time | STATE.workspaceOpeningTime; SAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S17 | Closing time | STATE.workspaceClosingTime; SAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S18 | Fulfilment capability | STATE.workspaceFulfilmentMode | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S19 | Pickup available | workspacePickupEnabled; DSAVE; COLLECT.supportsCollection | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S20 | Delivery city | workspaceDeliveryCity; DSAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S21 | Delivery area | workspaceDeliveryArea; DSAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S22 | Delivery PIN | workspaceDeliveryPincode; DSAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S23 | Delivery radius | workspaceDeliveryRadiusKm; DSAVE (int km) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S24 | Delivery fee default | workspaceDeliveryFee; DSAVE (int rupees) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S25 | Free-delivery threshold | workspaceFreeDeliveryAbove; DSAVE (int rupees) | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S26 | Preparation-time default | SETTINGS.busyMinutes / STATE.workspaceBusyMinutes | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S27 | Active-order preference | workspaceMaximumActiveOrders; SAVE | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S28 | Order alert sound | workspaceOrderAlertSound; SAVE | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S29 | Order alert vibration | workspaceOrderAlertVibration; SAVE | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S30 | Public storefront visibility | workspaceVisibleToCustomers | STORE-LIVE | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S31 | Taking orders / Open-Paused-Off | workspaceAcceptingOrders / workspaceStoreState | STORE-LIVE | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S32 | Reopening time | workspaceReopensAt | STORE-LIVE | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S33 | New-listing stock mode default | Product controls menu; W.stockMode is per listing | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S34 | Low-stock reminder default | Product controls menu; W.lowStockThreshold is per listing | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S35 | New-listing visibility default | Product controls menu; W.publicListing is per listing | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S36 | Invoice auto-delivery choice | WorkspaceInvoiceDeliveryPreference.mode; INVOICE-PREF | STORE-SETTINGS | No SKU CSV. Internal Store preference, not public product information. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S37 | Return-policy default | No Store-default binding found in W→P; W.returnPolicy per listing | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S38 | Dispatch lead-time default | W.deliveryPromise string; FACT.dispatchPromise optional | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S39 | Freight policy default | P.freightIncluded; W→P does not map | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| S40 | MOQ default | W.minimumOrder; P.minimumOrder | STORE-SETTINGS | No SKU CSV. Reuse Store/branch settings/defaults with authenticated source; inheritance not proven by this register. |
+| P01 | Listing ID | W.id → P.id | SYSTEM | No listing-ID input; generated Store-scoped identity. |
+| P02 | Canonical product ID | W.canonicalId → P.canonicalId | CATALOGUE | Resolve exact catalogue match; do not expose arbitrary canonical IDs as approval. |
+| P03 | Channel Shop / Wholesale | W→P.destination fixed to Shop | OFFER-GAP | Channel offer selection needs shared Store model and adapter; current projection fixed Shop. |
+| P04 | Category | W.categoryId → P.categoryId | CSV-EXISTING | categoryId -> W.categoryId -> P.categoryId; validate allowed category, inherit exact match. |
+| P05 | Brand | W.brand → P.brand / brandLabel | CSV-EXISTING | brand -> W.brand -> P.brand; exact identity matching. |
+| P06 | Product name | W.title → P.title → customerTitle | CSV-EXISTING | title -> W.title -> P.title; customer formatting is not new CSV input. |
+| P07 | Variant / grade | W.variant → P.variant → customerVariant | CSV-EXISTING | variant -> W.variant -> P.variant; exact pack/variant match required. |
+| P08 | Pack description | W.pack → P.pack | CSV-EXISTING | pack -> W.pack -> P.pack; not enough for structured unit conversion. |
+| P09 | Net amount per pack | COMP.netQuantity string; COMPARE.identity structured comparison | CATALOGUE-GAP | netQuantity text proposed below; structured quantity/unit requires shared schema, not guessed parsing. |
+| P10 | Units per case / pack conversion | Currently encoded in P.pack; COMPARE.identity | CATALOGUE-GAP | Explicit contained retail unit and case/pack conversion needs shared master schema; no column wired today. |
+| P11 | Barcode / GTIN | W.barcode; no P.barcode | INTERNAL-CSV | barcode supports exact scan/match; preserve leading zeros. Not a required public label. |
+| P12 | Store SKU | W.sku; no direct P.sku | INTERNAL-CSV | sku is Store identity, not a customer-facing product fact. |
+| P13 | Selling / pack price | W.sellingPrice → P.price; FACT.price | CSV-EXISTING | sellingPrice -> W.sellingPrice -> Shop P.price; integer currency restriction retained, not endorsed as final currency contract. |
+| P14 | Retail versus wholesale price | One W.sellingPrice; P.destination + price; COMPARE.channel | OFFER-GAP | Separate retail/wholesale price cannot fit current single sellingPrice or Shop-only adapter. |
+| P15 | MRP including taxes | W.mrp → P.mrp (nullable int) | CSV-EXISTING | mrp -> W.mrp -> P.mrp; inherit exact matched edition; different batch MRP requires batch treatment. |
+| P16 | Unit price | W.unitPrice → P.unitPrice (String) | DERIVED-GAP | unitPrice accepted as text today; target compute from channel price and structured selling quantity. Do not require repeated stale text. |
+| P17 | Stock quantity | W.stock (int); used by published / canSellAtCounter | INTERNAL-CSV | stock is inventory input; drives availability, not automatically exact public quantity disclosure. |
+| P18 | Stock mode | W.stockMode | INTERNAL-CSV | stockMode -> W.stockMode; inherited Store default still missing. |
+| P19 | Product available | W.available; exact-mode E derives stock > 0 | INTERNAL-CSV | available currently applies in availabilityOnly; exactQuantity derives availability from stock. |
+| P20 | Public/private listing intent | W.publicListing → P.catalogueListing | PUBLICATION | Not template input. Import always Store-only; explicit reviewed publication separate. |
+| P21 | Minimum order quantity | W.minimumOrder → P.minimumOrder (int, default 1) | CSV-EXISTING | minimumOrder -> W.minimumOrder -> P.minimumOrder; channel/default inheritance still needed. |
+| P22 | Quantity increment | COMPARE.incrementPacks; no equivalent W field | OFFER-GAP | incrementPacks exists in comparison contract; missing shared Store/CSV/checkout wiring. |
+| P23 | Tier quantity breakpoint | BuyV2ComparisonPriceTier.minimumPacks | OFFER-GAP | minimumPacks tier breakpoint supported by public comparison contract; Store ownership and CSV representation pending. |
+| P24 | Tier pack price | BuyV2ComparisonPriceTier.packPriceMinor | OFFER-GAP | packPriceMinor tier value supported by public comparison contract; do not mix with existing whole-rupee sellingPrice. |
+| P25 | Delivery promise text | W.deliveryPromise → P.deliveryPromise | STORE-DEFAULT | deliveryPromise text works today; inherit actual Store/channel fulfilment terms; no invented pickup/delivery promise. |
+| P26 | Origin / location description | W.origin → P.origin | SEMANTIC-GAP | origin text currently serves product/location meanings; distinguish product countryOfOrigin from Store locality before CSV labels change. |
+| P27 | Return summary | W.returnPolicy → P.returnPolicy | STORE-DEFAULT | returnPolicy summary accepted today; structured policy/default inheritance absent. Allow approved product exception, not duplicate every row. |
+| P28 | Composition / ingredients | W.composition → P.composition | CSV-EXISTING | composition -> W.composition -> P.composition; category applicability and reviewed catalogue facts. |
+| P29 | Safety/regulatory note | W.regulatoryNote → P.regulatoryNote | CSV-EXISTING | regulatoryNote -> W.regulatoryNote -> P.regulatoryNote; applicable product fact, not licence approval. |
+| P30 | Prescription restriction | W.requiresPrescription → P.requiresPrescription | OUT-OF-SCOPE | Prescription authority is catalogue/system-owned; do not add medicine scope or unrestricted CSV switch. |
+| P31 | Merchandising grouping label | P.merchandisingLabel; no W mapping | SYSTEM | Merchandising label supplied by marketplace, not supplier CSV. |
+| P32 | Badge / Store price / maker offer | W→P.badge default `Store price`; P.badge | SYSTEM | Badges derived from supported offer/trust source; no self-awarded trust label. |
+| P33 | Price checked / confirmation text | W→P.confirmedOn default `Updated by store`; ROUTE `Updated by Store` | SYSTEM | Price confirmation/time from publication revision; current Updated by Store is not independent verification. |
+| P34 | Freight included | P.freightIncluded; W→P omits (default false) | STORE-DEFAULT | Freight inclusion from Store/channel/product policy and quote; missing W projection, not a retailer-guessed total. |
+| P35 | Manufacturer verified | P.manufacturerVerified; W→P omits (default false) | SYSTEM | Manufacturer verification from authorised verification source. |
+| P36 | Supplier selling grant | P.procurementSupplierGrant; W→P omits | SYSTEM | Wholesale supplier grant must be permission-backed; CSV channel cannot grant it. |
+| P37 | Private purchase cost | W.purchasePrice; deliberately absent from P | INTERNAL-CSV | purchasePrice remains internal and required today; do not publish cost or infer public necessity. |
+| P38 | Low-stock threshold | W.lowStockThreshold | INTERNAL-CSV | lowStockThreshold remains internal; default/store override, no Buy field. |
+| P39 | Stock receipt movement | WorkspaceStockMovement; session import/update | BATCH | Receipt/adjustment movement not a public product identity column. |
+| P40 | Product description | CONTENT.description; no W description mapping | CONTENT | Current public adapter generates description and UI suppresses duplicate summary. Custom description support is conditional catalogue-content gap, not mandatory duplicate CSV column. |
+| P41 | Product highlight | CONTENT.highlights[] | CONTENT | Current highlights derive from variant/unitPrice/returnPolicy and duplicate values are suppressed; independent approved highlights need content model wiring. |
+| P42 | Specification label | BuyV2ProductSpecification.label | CONTENT | Current specification labels Brand/Pack/Variant are generated; category-specific extra labels belong to controlled catalogue attributes. |
+| P43 | Specification value | BuyV2ProductSpecification.value | CONTENT | Current specification values reuse mapped identity; extra applicable values need approved catalogue schema and common editor/CSV path. |
+| C01 | Generic name / fallback Product | genericName | CSV-MISSING | Proposed genericName -> WorkspaceProductCompliance.genericName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C02 | Net quantity / fallback Pack | netQuantity | CSV-MISSING | Proposed netQuantity -> WorkspaceProductCompliance.netQuantity -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C03 | Manufacturer | manufacturerName | CSV-MISSING | Proposed manufacturerName -> WorkspaceProductCompliance.manufacturerName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C04 | Packer | packerName | CSV-MISSING | Proposed packerName -> WorkspaceProductCompliance.packerName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C05 | Importer | importerName | CSV-MISSING | Proposed importerName -> WorkspaceProductCompliance.importerName -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C06 | Country of origin | countryOfOrigin | CSV-MISSING | Proposed countryOfOrigin -> WorkspaceProductCompliance.countryOfOrigin -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C07 | Manufactured or packed | manufacturedOrPackedOnLabel | BATCH | manufacturedOrPackedOn is batch-specific; preserve separately, never copy one date across SKU stock. |
+| C08 | Best before / use by | bestBeforeOrUseByLabel | BATCH | bestBeforeOrUseBy is batch-specific; preserve separately, never copy one date across SKU stock. |
+| C09 | FSSAI licence | fssaiLicenseNumber | CSV-MISSING | Proposed fssaiLicenseNumber -> WorkspaceProductCompliance.fssaiLicenseNumber -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| C10 | Consumer care | consumerCare | CSV-MISSING | Proposed consumerCare -> WorkspaceProductCompliance.consumerCare -> BuyV2ProductCompliance -> public pack panel. Existing editor/adapter supports it; CSV rejects this heading today. Exact match may prefill; changes need review. |
+| M01 | Illustration caption | W.visualLabel → P.visualLabel | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M02 | Illustration kind | W.visualKind → P.visualKind | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M03 | Media asset ID | P.mediaAssets[].id / CONTENT.media[].id | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M04 | Media caption | MEDIA asset.label | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M05 | Accessible media description | MEDIA asset.semanticLabel | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M06 | Image/video/fallback type | MEDIA asset.kind | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M07 | Image/video resource | MEDIA asset.source | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required.  |
+| M08 | Video poster resource | MEDIA asset.posterSource | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M09 | Video transcript | MEDIA asset.transcript | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M10 | Supplier media ownership | MEDIA binding.supplierWorkspaceId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M11 | Store media binding | MEDIA binding.storeId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M12 | Product media binding | MEDIA binding.productId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M13 | SKU media binding | MEDIA binding.skuId | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M14 | Asset revision | MEDIA binding.assetRevision | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M15 | MIME type | MEDIA file.mimeType | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M16 | File size | MEDIA file.byteLength | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M17 | Pixel width | MEDIA file.width | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M18 | Pixel height | MEDIA file.height | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M19 | Normalized file flag | MEDIA file.normalized | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M20 | Frame count | MEDIA file.frameCount | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M21 | Video duration | MEDIA file.duration | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M22 | Frame rate | MEDIA file.frameRate | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M23 | Video codec | MEDIA file.videoCodec | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M24 | Video profile | MEDIA file.videoProfile | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M25 | Audio codec | MEDIA file.audioCodec | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| M26 | Poster metadata | MEDIA binding.posterFile | CATALOGUE-MEDIA | No raw media/approval CSV columns. Exact SKU photo linkage and guarded public adapter exist; approved production media still required. Conditional media metadata, not retailer product-row repetition. |
+| R01 | Policy summary | summary | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R02 | Available remedy | remedies[] | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R03 | Return/claim window | windowLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R04 | Conditions | conditionsLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R05 | Evidence/verification requirement | verificationLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R06 | How to initiate | initiationLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R07 | Approval requirement | approvalLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R08 | Pickup arrangement | pickupLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R09 | Refund method | refundMethodLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R10 | Refund timeline | refundTimelineLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R11 | Warranty | warrantyLabel | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing. Product applicability may require catalogue-specific exception. |
+| R12 | Non-returnable reason | nonReturnableReason | STORE-POLICY | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing. Product applicability may require catalogue-specific exception. |
+| R13 | Policy version | policyVersion | SYSTEM | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| R14 | Effective date | effectiveFromLabel | SYSTEM | No repeated free-form policy columns. Store/channel policy with permitted product exception; structured projection remains missing.  |
+| F01 | Available / Out of stock / Not accepting orders | FACT.orderabilityLabel; W.toBuyPublicFacts | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F02 | Open/closed | FACT.storeOperatingState | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F03 | Next opening | FACT.nextOpeningLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F04 | Order cutoff | FACT.orderCutoffLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F05 | Delivery charge label | FACT.deliveryFeeLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F06 | Delivery mode | FACT.fulfilmentMode | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F07 | Arrival / delivery estimate | FACT.deliveryPromise | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F08 | Dispatch promise | FACT.dispatchPromise | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F09 | Delivery provider / Handled by | FACT.deliveryProviderName | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F10 | Delivery service | FACT.deliveryServiceLevel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F11 | Collection eligible | FACT.storeCollection / COLLECT.supportsCollection | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F12 | Live price | FACT.price | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F13 | Facts source | FACT.sourceId | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F14 | Facts observation time | FACT.observedAt | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F15 | Stale facts state | FACT.stale | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F16 | Store distance | STORE.distanceMeters | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F17 | Product rating | TRUST.productRating | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F18 | Product rating count | TRUST.productRatingCount | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F19 | Verified-buyer count | TRUST.verifiedBuyerRatingCount | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F20 | Seller rating | TRUST.partnerRating | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F21 | Seller order count | TRUST.partnerOrderCount | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F22 | Seller location | TRUST.partnerLocation | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F23 | Service reliability | TRUST.serviceReliabilityLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F24 | Trust return summary | TRUST.returnSummary | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F25 | Customer review rating | BuyV2CustomerReview.rating | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F26 | Customer review comment | BuyV2CustomerReview.comment | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F27 | Review updated date | BuyV2CustomerReview.updatedLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F28 | Review product identity | BuyV2CustomerReview.productCanonicalId | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F29 | Content unavailable/loading/offline message | CONTENT.state/customerMessage | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F30 | Trust unavailable/loading/offline message | TRUST.state/customerMessage | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F31 | Promised-by label | FACT.promisedByLabel | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| F32 | Address confirmed | STOREFRONT-UI: trust.state ready AND nonempty locality | LIVE-SYSTEM | No SKU CSV. Resolve existing product/Store/policy inputs through current fulfilment/trust service. Never import ratings, verification, distances or live ETA as self-asserted values. |
+| B01 | Coupon/payment-offer identity | BENEFIT.id | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B02 | Coupon vs payment offer | BENEFIT.kind | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B03 | Campaign channel | BENEFIT.destination | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B04 | Offer title | BENEFIT.title | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B05 | Offer description | BENEFIT.detail | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B06 | Campaign strategy | BENEFIT.strategy | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B07 | Sponsor type | BENEFIT.sponsor | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B08 | Sponsor name | BENEFIT.sponsorName | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B09 | Saving amount | BENEFIT.savingAmount | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B10 | Valid from | BENEFIT.validFrom | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B11 | Expires | BENEFIT.validUntil | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B12 | Free-delivery benefit | BENEFIT.freeDelivery | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B13 | Minimum spend | BENEFIT.minimumSpend | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B14 | Minimum quantity | BENEFIT.minimumQuantity | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B15 | Eligible payment methods | BENEFIT.eligiblePaymentMethods | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B16 | Published offer reference | BENEFIT.offerId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B17 | Benefit source | BENEFIT.sourceId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B18 | Published placement identity | BuyV2PublishedCatalogueOffer.publicationId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B19 | Publisher identity | BuyV2PublishedCatalogueOffer.publisherId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B20 | Publisher type | BuyV2PublishedCatalogueOffer.publisherType | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B21 | Publisher display name | BuyV2PublishedCatalogueOffer.publisherName | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B22 | Published headline | BuyV2PublishedCatalogueOffer.headline | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B23 | Published observed time | BuyV2PublishedCatalogueOffer.observedAt | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B24 | Published expiry | BuyV2PublishedCatalogueOffer.validUntil | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| B25 | Published source | BuyV2PublishedCatalogueOffer.sourceId | CAMPAIGN | Separate offer/campaign owner and quote; not basic product-import fields. No campaign UI implementation authorised here. |
+| O01 | Quantity | BuyV2CartLine.quantity | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O02 | Cart channel | BuyV2CartScope / checkoutDestinations | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O03 | Delivery / Collect at store | session.collectionCheckoutSelected | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O04 | Saved address identity | ADDR.id; selectedAddressId | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O05 | Address type | ADDR.kind | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O06 | Address label | ADDR.label | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O07 | Recipient name | ADDR.recipient | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O08 | Phone number | ADDR.phone | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O09 | House, building and street | ADDR.line | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O10 | Area or locality | ADDR.area | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O11 | PIN code | ADDR.pinCode | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O12 | Nearby landmark | ADDR.landmark | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O13 | Request GST invoice | BuyV2GstInvoiceController.requestedFor(destination) | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O14 | Buyer legal name | BuyV2GstInvoiceDetails.legalName | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O15 | Buyer GSTIN | BuyV2GstInvoiceDetails.gstin | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O16 | Buyer billing address | BuyV2GstInvoiceDetails.billingAddress | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O17 | Remember GST details | GST controller/store; _remember | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O18 | Selected payment method | session.selectedPayment → REQUEST.paymentMethod | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O19 | Purchase order reference | session.purchaseOrderReference | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O20 | Selected commercial term | selected IDs → REQUEST.commercialPaymentTermIds | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O21 | Selected coupon | session selectedCartBenefits; quote adapter selectedBenefits | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O22 | Selected payment offer | session selectedCartBenefits; quote adapter selectedBenefits | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O23 | Delivery instruction | session delivery instructions; ORDER.deliveryInstruction | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O24 | Optional delivery tip | session tipForGroup; QUOTE.tip; ORDER.tip | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| O25 | Final confirmation | submitOrder → SUBMIT | BUYER-ORDER | Buyer/order choice, not seller SKU CSV. |
+| T01 | Seller accepted methods | TERMS.acceptedPaymentMethods; BuyV2CommerceSnapshot.paymentMethods | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T02 | Collection model / payee | PAYMENT-UI public copy MoolSocial; isStoreProcurement supplier copy | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T03 | COD acceptance | Public method Cash on Delivery | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T04 | Purchase-order acceptance | Public/Store method sets Purchase order | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T05 | Commercial term identity | TERMS.id | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T06 | Fulfilment-group binding | TERMS.fulfilmentKey | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T07 | Sales channel | TERMS.destination | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T08 | Supplier identity shown on term | TERMS.supplierName | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T09 | Payment-term type | TERMS.kind | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T10 | Advance percentage | TERMS.advancePercent | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T11 | Due-event label | TERMS.balanceDueLabel | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T12 | Credit days | TERMS.netDays | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T13 | Supplier micro/small classification | TERMS.supplierIsMicroOrSmall | STORE-PAYMENT | No SKU CSV. Store/channel acceptance or authorised terms; one-time setup and policy-backed eligibility. |
+| T14 | Financier name | TERMS.financierName | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T15 | APR | TERMS.annualPercentageRate | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T16 | Key-facts link | TERMS.keyFactsUri | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T17 | UPI transaction limit | TERMS.upiTransactionLimit | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T18 | Term source | TERMS.sourceId | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T19 | Term order total | TERMS.orderTotal | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T20 | Amount payable now | TERMS.amountDueNow / session.checkoutAmountDueNow | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T21 | Balance payable later | TERMS.balanceDue | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T22 | Payment provider reference | REQUEST result.paymentReference | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T23 | Payment handoff URI | REQUEST result.paymentActionUri | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T24 | Payment outcome/message | REQUEST result.outcome/customerMessage | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| T25 | Bank beneficiary name for collection | BANK.beneficiaryName | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T26 | Collection bank name | BANK.bankName | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T27 | Collection account number | BANK.accountNumber | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T28 | Collection IFSC | BANK.ifsc | STORE-PAYMENT | No SKU CSV. Approved collection configuration, distinct from private settlement account. |
+| T29 | Transfer reference | BANK.transferReference | PAYMENT-SYSTEM | No SKU CSV. Provider/quote/term outcome; cannot be supplied by a retailer file. |
+| Q01 | Line total | BuyV2CartLine.total = product.price × quantity | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q02 | Minimum order total | TRADE-UI facts.price × product.minimumOrder | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q03 | Product / distinct-line count | Cart lines count | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q04 | Units / packs count | BuyV2FulfilmentGroup.itemCount / line quantities | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q05 | Combined cart subtotal | Cart aggregates all scopes | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q06 | Item subtotal | QUOTE line.itemSubtotal | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q07 | Coupon saving | QUOTE line.couponSaving | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q08 | Tax | QUOTE line.tax | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q09 | Freight | QUOTE line.freight | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q10 | Delivery fee | QUOTE line.deliveryFee | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q11 | Tip | QUOTE line.tip | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q12 | Provider/payment charge | QUOTE line.paymentCharge | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q13 | Group payable total | QUOTE line.total | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q14 | Checkout payable total | QUOTE.total / session.checkoutPayableTotal | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q15 | Quote identity | QUOTE.id → REQUEST.checkoutQuoteId | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q16 | Quote source | QUOTE.sourceId | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q17 | Quote evaluation time | QUOTE.evaluatedAt | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q18 | Quote expiry | QUOTE.validUntil | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q19 | Shipment identity | BuyV2FulfilmentGroup.groupKey | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q20 | From / supplier | BuyV2FulfilmentGroup.partner | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q21 | Arrives | BuyV2FulfilmentGroup.promise / promisedByLabel | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q22 | Dispatches | BuyV2FulfilmentGroup.dispatchPromise | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q23 | Handled by | BuyV2FulfilmentGroup.deliveryProviderName | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q24 | Service | BuyV2FulfilmentGroup.deliveryServiceLevel | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q25 | Submission identity | REQUEST.idempotencyKey | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| Q26 | Supplier role | BuyV2FulfilmentGroup.partnerType | QUOTE-SYSTEM | Computed/bound cart and fulfilment data; not SKU CSV. Source product, Store, buyer and quote inputs remain separate. |
+| I01 | Invoice number | TAX.invoiceNumber | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I02 | Invoice date | TAX.issuedAt | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I03 | Invoice status | ORDER.taxInvoiceState | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I04 | Seller legal name | TAX.sellerLegalName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I05 | Seller address | TAX.sellerAddress | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I06 | Seller GSTIN | TAX.sellerGstin | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I07 | Seller PAN | TAX.sellerPan | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I08 | Seller CIN | TAX.sellerCin | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I09 | Seller FSSAI number | TAX.sellerFssaiNumber | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I10 | Recipient legal name | TAX.recipientLegalName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I11 | Recipient billing address | TAX.recipientBillingAddress | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I12 | Buyer GSTIN | TAX.buyerGstin | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I13 | Place of supply | TAX.placeOfSupply | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I14 | Reverse charge | TAX.reverseCharge | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I15 | IRN | TAX.irn | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I16 | Acknowledgement number | TAX.acknowledgementNumber | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I17 | Authorised signatory | TAX.authorizedSignatory | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I18 | Tax treatment | TAX.supplyStatement | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I19 | Correction / revision | TAX.revisionLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I20 | Invoice source | TAX.sourceId | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I21 | Line description | TAX line.description | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I22 | HSN/SAC | TAX line.hsnSac | TAX-CLASSIFICATION-GAP | Catalogue/product tax classification input missing from Store mapping. Controlled proposed hsnSac/gstRate for unmatched-product review only; not tax-engine authority or calculated tax amounts. |
+| I23 | Line quantity | TAX line.quantity | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I24 | Line unit | TAX line.unit | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I25 | Line unit price | TAX line.unitPrice | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I26 | Taxable value | TAX line.taxableValue | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I27 | GST rate | TAX line.gstRate | TAX-CLASSIFICATION-GAP | Catalogue/product tax classification input missing from Store mapping. Controlled proposed hsnSac/gstRate for unmatched-product review only; not tax-engine authority or calculated tax amounts. |
+| I28 | CGST amount | TAX line.cgst | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I29 | SGST amount | TAX line.sgst | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I30 | IGST amount | TAX line.igst | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I31 | Cess amount | TAX line.cess | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I32 | Total tax | TAX.totalTax / line.totalTax | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I33 | Order ID | ORDER.id | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I34 | Buyer name | ORDER.buyerName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I35 | Buyer role | ORDER.buyerType | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I36 | Payment method | ORDER.paymentMethod | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I37 | Purchase order | ORDER.purchaseOrderReference | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I38 | Payment term | ORDER.paymentTermLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I39 | Amount paid now | ORDER.amountPaidNow | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I40 | Payment status | ORDER.paymentStatusLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I41 | Balance due | ORDER.balanceDue | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I42 | Balance due event | ORDER.balanceDueLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I43 | Coupon reduction | ORDER.discount | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I44 | Tip | ORDER.tip | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I45 | Taxes | ORDER.tax | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I46 | Freight | ORDER.freight | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I47 | Delivery fee | ORDER.deliveryFee | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I48 | Payment charge | ORDER.paymentCharge | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I49 | Order total | ORDER.total / totalMinor | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I50 | Receipt reference | ORDER.receiptReference | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I51 | Platform service invoice | ORDER.platformTaxInvoiceDetails | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I52 | Delivery recipient | ORDER.recipient | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I53 | Delivery address | ORDER.addressLine | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I54 | Recorded estimate | ORDER.promise | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I55 | Updated delivery estimate | ORDER.updatedDeliveryEstimate | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I56 | Dispatch promise | ORDER.dispatchPromise | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I57 | Delivery partner name | ORDER.deliveryPartnerName | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I58 | Delivery partner role | ORDER.deliveryPartnerType | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I59 | Delivery service | ORDER.deliveryServiceLevel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I60 | Tracking reference | ORDER.trackingReference | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I61 | Proof of delivery | ORDER.proofOfDeliveryStatus | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I62 | Delivery instruction | ORDER.deliveryInstruction | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I63 | Order stage | ORDER.status / progress | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I64 | Invoice available | ORDER.invoiceAvailable | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| I65 | Recorded promised-by label | ORDER.promisedByLabel | ORDER-SNAPSHOT | Invoice/order snapshot of accepted source values; no repeated invoice/account/order fields in SKU CSV. |
+| L01 | Settlement beneficiary legal name | No full beneficiary config in inspected STATE/FINANCE | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L02 | Settlement bank name | STATE.workspacePayoutBankName (display) | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L03 | Settlement account number | STATE.workspacePayoutAccountEnding only | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L04 | Settlement IFSC | No config in inspected STATE/FINANCE | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L05 | Beneficiary verification status | No complete setup state traced | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L06 | Settlement schedule | No Store-configurable schedule traced | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L07 | Store UPI ID | Not a settlement config in inspected STATE/FINANCE; BANK not UPI model | PRIVATE-STORE-SETTINGS | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L08 | Ledger account scope | FINANCE.accountScope | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L09 | Ledger Store ID | FINANCE.workspaceId | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L10 | Ledger revision | FINANCE.revision | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L11 | Ledger as-of time | FINANCE.asOf | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L12 | Sales today | FINANCE.salesTodayMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L13 | Customer dues | FINANCE.duesMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L14 | Available for settlement | FINANCE.availableMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L15 | Held amount | FINANCE.heldMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L16 | Settlement requested | FINANCE.requestedMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L17 | Paid to bank | FINANCE.paidOutMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L18 | Fees/platform adjustments | FINANCE.feesMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L19 | Delivery adjustments | FINANCE.deliveryAdjustmentsMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L20 | Refunds | FINANCE.refundsMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L21 | Tax withheld | FINANCE.taxWithheldMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L22 | History complete | FINANCE.historyComplete | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L23 | Payout reference | PAYOUT.id | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L24 | Payout operation identity | PAYOUT.operationId | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L25 | Payout revision | PAYOUT.revision | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L26 | Payout amount | PAYOUT.amountMinor | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L27 | Payout update time | PAYOUT.updatedAt | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L28 | Payout status | PAYOUT.state | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L29 | Masked bank label | PAYOUT.bankLabel | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L30 | Expected payout date | PAYOUT.expectedBy | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L31 | Payout message | PAYOUT.message | SETTLEMENT-SYSTEM | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| L32 | Requested withdrawal amount | Settlement request form → WorkSession request path | OWNER-ACTION | Private settlement/account/ledger information; not product CSV and not generally customer-visible. Keep separate from buyer-facing collection details. |
+| A01 | Search text | Buy catalogue query/session search | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A02 | Selected shopping area | BuyV2ShoppingArea / BuyV2CatalogueQuery | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A03 | Quick / Scheduled | BuyV2ShopSaleType | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A04 | Wholesale / Bulk | BuyV2WholesaleSaleType | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A05 | Price filter | Catalogue query/refinement | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A06 | Brand filter | Catalogue query/refinement | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A07 | Pack filter | BuyV2PackFilter | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A08 | Sort / recommendations | BuyV2ProductSort / recommendation source | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A09 | Product/catalogue result count | BuyV2CataloguePage.totalCount | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A10 | Store product count | Store catalogue page.totalCount | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A11 | Comparison origin | COMPARE.originLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A12 | Comparison local flag | COMPARE.local | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A13 | Comparison serviceable | COMPARE.serviceable | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A14 | Comparison customer eligible | COMPARE.customerEligible | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A15 | Comparison available packs | COMPARE.availablePacks | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A16 | Comparison pack price | COMPARE.packPriceMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A17 | Comparison tax | BuyV2ComparisonCharges.taxMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A18 | Comparison freight | BuyV2ComparisonCharges.freightMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A19 | Mandatory comparison fees | BuyV2ComparisonCharges.mandatoryFeesMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A20 | Immediate comparison discount | BuyV2ComparisonCharges.immediateDiscountMinor | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A21 | Earliest arrival | COMPARE.arrivalStart | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A22 | Latest arrival | COMPARE.arrivalEnd | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A23 | Comparison dispatch label | COMPARE.dispatchLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A24 | Local market insight locality | SIGNAL.localityLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A25 | Insight headline | SIGNAL.headline | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A26 | Insight detail | SIGNAL.detail | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A27 | Insight source label | SIGNAL.sourceLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A28 | Insight updated label | SIGNAL.updatedLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A29 | Price-valid-until label | SIGNAL.priceValidUntilLabel | DISCOVERY-SYSTEM | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A30 | Save product | Saved-product identity/state | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A31 | Share product / Store | Product/Store route and share destination | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A32 | Ask seller / manufacturer | Product + Store recipient routing | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+| A33 | Report product | Commerce adapter reportProduct(product, reason) | BUYER-DISCOVERY | Not additional SKU CSV. Uses mapped product attributes, Store scope, buyer selections, sourced comparisons or marketplace data. |
+
+## Active v23 — one-time Store setup versus per-SKU CSV, awaiting visuals
+
+Founder directed separation first, then pending CSV frontend screens, including
+exact variants and public-field mapping. This bounded increment implements the
+eight missing pack-detail columns through existing WorkspaceProductCompliance,
+shared editor/snapshot and Buy adapter. No duplicate product model or backend.
+
+One-time Store profile/legal/contact, payment acceptance, UPI/bank setup, delivery
+coverage and default terms stay out of SKU CSV. Settings screens/default inheritance
+remain pending; this guide must not be mistaken for their implementation.
+Each new-SKU import row carries identity, applicable variant/pack, supported price,
+opening stock and current required private purchase cost. Exact catalogue matches
+preserve blank optional facts; facts are per exact SKU, not per Store. CSV adds new
+products, not silent restock/update of existing stock. Identical rows are rejected.
+
+Added columns: genericName, netQuantity, manufacturerName, packerName,
+importerName, countryOfOrigin, fssaiLicenseNumber, consumerCare. Template and guide
+reuse one label/schema owner. It now has 29 supported headers; this is NOT a complete
+Wholesale contract. Dates remain batch-specific and are cleared on new Store copy.
+Changed or new pack facts set the existing publication review hold; identical
+trimmed values keep the prior hold state, never clear it. Imports remain private.
+
+Guide groups per-SKU inputs, variant/pricing/stock options, product/pack facts and
+Store Settings guidance. Other approved layouts stay unchanged. No APK or OPPO.
+
+Evidence: task outputs/store-csv-fields-v23/ONE-TIME-AND-CSV-DECISION.md and the
+prior outputs/store-csv-public-reconciliation-v22.md (400 unique retained IDs,
+not 400 runtime tests). tests-r1.log: 32 affected tests passed, including all eight
+CSV -> snapshot -> public properties and rendered public pack panel, blank/same/
+changed match facts, 1000 variants, excluded Store/batch inputs, 10000-row bound,
+connected save/cancel/scope checks and shared editor regressions. analysis-r1.log
+clean. Initial capture framing was adjusted to show expanded content after scroll
+settles; this is test-only framing, not layout acceptance. Final images are at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-csv-fields-v23-final.
+
+Pending: founder approval of the import guide; detailed row/field error-review
+screen, shared Wholesale offers and currency/units, structured variant axes,
+Store defaults, content/tax-classification gaps, publication readiness, backend
+and physical OPPO. No claim that the eight columns finish full publication.
+v20/v21 were not approved; v23 is local/uncommitted. Preserve pushed dff6c124.
+
+## Active v20 — CSV validation and batch review, awaiting founder visuals
+
+Founder selected this next frontend step. Implemented locally; no backend/APK,
+commit/push or new-screen acceptance yet. Preserve v19 checkpoint dff6c124.
+
+Journey: Import CSV > existing file picker > full-page Review import > select
+ready rows / inspect Needs attention > optional existing product editor with
+Apply to import > explicit Save N to Store. Back/cancel and draft edits do not
+write stock. Save uses the existing inventory/persistence and Counter Sale source;
+all imported products remain Store-only, never silently published.
+
+Shared model owner now parses quoted fields, escaped quotes, embedded newlines,
+CRLF and UTF-8 BOM; validates headings, column counts, numbers and stock modes.
+Limits: 10 MB source, 10,000 products, 50 CSV columns, 4,000-character CSV cells.
+Unknown columns fail explicitly rather than silently dropping data. Current
+integer-price rules are shared with the existing editor, not independently
+invented decimal/Wholesale behavior. Required values and prior price-above-cost
+rule remain unchanged; broader pricing semantics is still separate work.
+
+Matching uses exact brand/title/variant/pack and supplied barcode/canonical ID,
+never the first loose OR match. Conflicting/ambiguous records are blocked.
+Existing stock, repeated SKUs/barcodes/identities and concurrent stock changes
+are rejected without overwrite. Imported source IDs cannot overwrite inventory.
+Catalogue photos are inherited only from the matched exact SKU; batch dates
+are cleared. No catalogue match means a private product needing photo review.
+Ready records use the existing full product editor in draft mode. Blocked source
+records are corrected in the original file and re-imported; no separate editor
+or speculative spreadsheet system. Nonselected/blocked records are not saved.
+Sticky Store/account scope checks cover picker, review and final save.
+
+Large review rows are lazily rendered; the shared inventory import indexes
+existing IDs/SKUs for batch processing. Normal Store/catalogue editor, public
+mapping, stock statement and Counter Sale regression coverage is retained.
+
+Evidence at task outputs/store-csv-review-v20:
+- tests-r3.log: 32 affected tests passed.
+- tests-final.log: 8 final CSV tests passed after final accessibility copy and
+  large-list checks. Includes 10,000-row parse/lazy rendering, all-invalid disable,
+  quoted fields, invalid amounts, duplicates, matching, existing inventory,
+  cancellation, draft edit/no premature save, Store and concurrent-stock changes.
+- analysis-final.log: five owners analyzed clean. Scoped diff check passed.
+- Local Flutter images: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-csv-review-v20-final.
+  csv-connected-review-cancel.png and csv-connected-attention.png are actual
+  Store > Add product > Import CSV navigation with synthetic file data.
+  Normal and 200% text component renders are also retained.
+
+Recorded local defects: the first error-state review overflowed at 200% text.
+Header/error and lazy rows now share a scroll area above the reachable save
+footer. The following test needed to scroll a lazily disposed heading back into
+view; corrected without weakening its assertions. Short Check label at enlarged
+text prevents chip truncation. Initial test API/theme mismatches and brace/style
+infos were corrected; failed logs remain, only named passing runs qualify.
+
+Remaining: founder visual approval, physical file-picker/keyboard/performance and
+OPPO replay. No live catalogue/backend publication proof, import history or cloud
+durability claim. Later public-field mapping, Store defaults and broader PDF
+font coverage remain separate frontend work; historical backend reports deferred.
+
+## Active v19 — frontend direct Android Stock downloads
+
+Founder requested remaining frontend work first; backend reports remain deferred.
+Bounded continuation completes the previously recorded native saver, without
+redesigning approved Stock/catalogue/editor screens. MainActivity changes only
+register/dispose the isolated Stock bridge; authentication and invoice saving are
+unchanged. Narrow ticket owner admission covers those two Android files only.
+
+- Android 10+ uses MediaStore Downloads/MoolSocial, without a document picker,
+  new storage permissions, backend, dependency or APK.
+- Allowlisted generated names, matching MIME types, basic PDF/XLSX signatures
+  and a 64 MiB limit protect the bridge. New collision-resistant names never
+  overwrite an existing report. Pending rows publish only after the stream closes;
+  failure removes only the incomplete row created by that attempt.
+- Background writing, duplicate-request blocking and activity disposal guards
+  avoid blocking the main thread. Success displays the Downloads location.
+- Pre-Android-10 returns a clear unsupported message, not a picker/permission
+  fallback. Other platforms retain the existing FilePicker path. Do not describe
+  this as universal cross-platform dialog-free saving.
+- No changes to current/historical semantics or report serializers.
+
+Evidence in task outputs/store-stock-native-v19:
+native-compile.log: bridge compiled against Android/Flutter SDK jars, no APK.
+native-payload-tests.log: 12 local JVM validation checks passed.
+flutter-tests-r3.log: 6 focused tests passed, including all formats through a
+mocked Android channel, missing/failed/unsupported platform results, retry/busy,
+date guards and both normal/large-text Stock states.
+analysis-final.log: no issues. Native MediaStore writes, low-storage recovery,
+app interruption, actual files opening and performance remain OPPO-pending.
+This is implementation evidence, not physical download or journey acceptance.
+
+Local development issues retained: an ambiguous patch initially put the new
+saved-location text in the PDF section; immediate source inspection corrected it
+before compile. First analysis found a missing test-only platform override import.
+First mock run stalled on an unhandled platform call; cancelled with log retained.
+Second failed on override cleanup timing. Explicit missing-plugin mock plus the
+framework's platform variant fixed these harness issues; only r3 is a full pass.
+
+Frontend queue (not backend-only and not silently complete): CSV quoted parsing,
+ambiguous matching/batch review; remaining public product/Wholesale field mapping;
+Store default/settings inheritance; wider PDF script coverage. Continue one
+bounded journey screen at a time, preserve approved layouts and obtain founder
+review for new visuals. Backend history/catalogue/publication remains deferred.
+Reference: https://developer.android.com/training/data-storage/shared/media
+uses MediaStore.Downloads and IS_PENDING for app-created Android 10+ files.
+
+## Active v18 — inline periods and export actions, design approved
+
+Founder approved this design on 21 September 2026 after the resumed local work.
+This supersedes v17's download modal and pending design approval; it does not
+accept backend history, native direct saving or the full Add Product journey.
+
+- No application download popup. Current stock / Today / This week / This month /
+  Custom dates are inline, with PDF / Excel / CSV actions directly below.
+- Custom dates use inline DD/MM/YYYY fields; invalid, reversed and future ranges
+  are checked. Week starts Monday; month starts on day one in local device time.
+- Historical selection hides current stock balances and disables all formats.
+  Never relabel today's balances as a historical/accounting statement.
+- Current stock exports every matching inventory record, not only the visible
+  page. No filter means all Store stock. Empty results disable all formats.
+- Existing immutable snapshots, duplicate-tap, cancellation, retry and sticky
+  Store/account invalidation protections remain. Serializers are unchanged.
+- Native FilePicker still presents the operating-system save chooser. Fully
+  dialog-free Android Downloads integration remains a frontend/platform follow-up;
+  do not claim one-tap native saving is complete or device-tested.
+
+Local evidence: task outputs/store-stock-inline-v18/final-tests.log: 59 passed.
+Includes 320px/200% text, search/edit, lazy 5,000/10,000 SKU stock, filter and
+keyboard regressions, all inline format triggers, invalid dates, unavailable
+history, empty results, cancellation/retry and store-switch guards. Final renders:
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-stock-inline-v18-final.
+Focused analysis initially found five brace-style infos; corrected before final
+analysis. Earlier full v17 serializer evidence remains valid; no re-run claim.
+
+Keep Store > Reports & Downloads as a future consolidated destination, while
+retaining contextual export on each statement. Backend historical records remain
+deferred. Existing catalogue/editor/Counter Sale layouts stay unchanged. This is
+a scoped source checkpoint, not OPPO acceptance, publication or journey closure.
+
+## Active v17 — stock downloads and complete developed-journey review
+
+Local implementation and review evidence completed; founder approval PENDING.
+Contextual Download is on the statement summary row, outside both scroll axes.
+All stock is default; current results retain search/category/filter context.
+PDF contains current stock/prices and SKU/barcode/category/visibility references;
+Excel and CSV include all 32 recorded product fields. No per-SKU download. CSV is
+a rectangular table with Store/time/scope columns and formula-injection escaping.
+Excel identifiers are typed text (explicit @ format); stock/prices are numeric;
+untracked quantities remain blank, not a manufactured zero or availability flag.
+Save is via existing native FilePicker, with cancel/failure/retry, busy guarding,
+immutable captured records and a sticky account/Store invalidation guard.
+
+Frontend-only dependency: excel_community 2.4.0 plus its equatable transitive
+dependency. Existing locked versions unchanged. No backend/platform edits.
+Serialization is one shared export owner, not three inventory/report systems.
+
+Verification (task outputs/store-stock-download-v17):
+- journey-r2.log: 100 passed, one existing AP-S1-001 landscape skip.
+- export-scale-final.log: five final targeted tests passed, including all three
+  formats at 10,000 records, PDF pagination, non-Latin fallback and sheet recovery.
+- details-r4.log: two earlier supplemental detail/scale tests passed; final
+  normal-text detail renders supersede r4 images.
+- analysis-final.log: clean focused analysis; scoped git diff --check passed.
+- independent-files-verified.log: Python CSV/OpenXML/PDF readback independently
+  confirms rectangular CSV, preserved text identifiers, zero vs unknown, first
+  and final SKU in the 10,000-record PDF. Sample files are test evidence only.
+- ALL-SCREENS.md indexes 25 existing/new screen states; all image paths checked.
+
+Local defect AP-STOCK-EXPORT-001: one giant PDF table repeatedly laid out its
+remaining rows, causing a slow 10,000-record run. Interrupted that test without
+deleting its log. Fixed by bounded 50-row tables in the worker isolate; final
+five-test run completed in 22 seconds. Large PDFs remain lengthy (synthetic
+10,000-record example: 1,600 pages including references); Excel/CSV are preferable
+for large-list analysis. OPPO memory/performance/native save still unverified.
+AP-STOCK-EXPORT-002: bundled Inter cannot render all scripts (Hindi exercised).
+PDF fails explicitly and offers Excel/CSV; Unicode survives those exports.
+Broader font support remains a frontend follow-up, not a claimed backend feature.
+The spreadsheet preview renderer displays some text identifiers as numbers even
+though independent OpenXML readback retains exact strings and @ formatting;
+native Excel visual verification remains pending. Do not use that preview as
+proof of native Excel display. Production catalogue/history/approval remain open.
+
+Preserved preflight mistakes: newly registered helper initially had no file;
+created its declaration before retrying the unchanged existence check. First
+analysis found XLSX import/constructor and PDF-context API mismatches and a
+nullable Store ID; corrected against installed APIs before tests. No failed or
+interrupted run is reported as a pass. No commit/push/APK/OPPO acceptance yet.
+
+Founder requested completion of the current-stock frontend on 21 September 2026.
+Keep one visible contextual Download action beside the statement controls, never
+one download per SKU and never only inside a More menu. Preserve approved compact
+rows and existing catalogue/editor architecture. Offer all Store stock (default)
+or current search/filter results, across all loaded inventory, not the visible
+page; PDF, Excel (.xlsx), CSV. Founder explicitly approved one spreadsheet
+dependency. Reuse FilePicker and PDF; isolate serialization in work_stock_export.
+
+Durable follow-up: Store > Reports & Downloads will later collect Store reports.
+Contextual statement Download must remain even after that hub is introduced.
+Do not build a speculative hub now. The frontend exports Current stock snapshot
+from saved Store inventory, with store, scope and generation time. It is not a
+historical/accounting statement, audited balance or confirmed backend quantity.
+Backend follow-up owns complete authorized dataset retrieval, historical movement
+records, receipts, adjustments, returns, valuation and accounting periods. Never
+infer these from current balances. Sold today and expiry alerts remain excluded
+from the stock screen. Other public/editor mapping stays unchanged.
+
+Qualification: full-scope vs filtered exports, empty/cancel/failure/retry, duplicate
+tap and changed Store/account guards, typed Excel values and CSV formula safety,
+large inventory, PDF pagination/content, compact/large-text download sheet and
+the developed Add Product journey. Native OPPO file saving/backend remain pending.
+Show actual local screens to founder; apply feedback. Only AFTER this review is
+approved may the requested scoped Git checkpoint/push proceed. No commit, APK,
+OPPO acceptance, backend implementation or journey closure from this note.
+
+
+## Active v16 — horizontally scrollable, compact stock statement
+
+Founder visually approved the displayed final v16/r11 Stock statement on
+21 September 2026. This supersedes the pending-review notes below. Preserve the
+56px normal rows, frozen product column and horizontal statement; no further
+layout changes unless requested or a verified defect requires correction.
+Approval is visual only, not a Git checkpoint, APK/OPPO acceptance or backend
+authorization. Detailed exports/history and previously recorded gaps remain open.
+
+Founder approved the daily-stock/detail/export separation, explicitly excluded
+Sold today and expiry alerts from this stock screen, and then requested compact
+bank-statement rows. Only the Stock visual unit advances; catalogue/editor and
+Counter Sale approvals remain unchanged. Await revised visual review, no APK.
+
+- One shared horizontal controller moves headings and data rows; the product
+  identity column remains frozen. Existing lazy search/category/filter/paging
+  remains the owner, not a new inventory collection.
+- Current recorded stock, selling price, recorded purchase price, MRP and reorder
+  threshold reuse saved product values. Summary low count excludes zero/out stock;
+  availability-only products do not invent quantity or reorder thresholds.
+- Product names/thumbnails stay fixed; compact normal rows are 56 logical pixels
+  (previous attempt 104), with 24x32 thumbnails, two-line names and pack/SKU text.
+  More room is retained for enlarged text. Visibility moves into existing product
+  details; no separate Public/Private stock column or row control.
+- Received today is not implemented without a complete receipt source. No Sold
+  today, expiry alert, guessed valuation, synthetic transaction totals or exports
+  claiming audit completeness. Current inventory is local/session data, not live
+  backend stock or proof of physical quantity.
+
+Deferred follow-up split (not implemented by this screen):
+1. Frontend details: use existing editor/ledger where available; remaining batch,
+   reservation, physical-count and document drilldowns need exact backend data.
+2. Frontend export: date/filter/summary-detail selection, PDF/Excel/CSV output;
+   only a current stock snapshot may use local current balances. Complete history
+   cannot be reconstructed from today's quantities. No fake download-success UI.
+3. Backend reports: authoritative receipts, movements, reservations, batches,
+   returns/adjustments with actor/reason/reference, consistent full-dataset export,
+   permissions and valuation basis. Stock statement is not a separate database.
+
+Retained development evidence in task outputs/store-stock-horizontal-v16/:
+- r1/r2: table gestures in tests targeted an offscreen center and an ambiguous
+  Out of stock label; use visible product gesture and the actual filter menu.
+- r3: enlarged-text viewport prevented row access; preserve scroll structure but
+  scale its minimum extent. Money cells widened by actual formatted amount size;
+  tests now explicitly pan cells clear of the frozen column before tapping.
+- Existing no-horizontal-money assertion remains for finance/checkout. Only stock
+  table assertions follow founder's new horizontal contract; large values retain
+  full strings and existing full-width price/editor access, not abbreviation.
+- r5: large-record fixture incorrectly used copyWith(id:); use the actual
+  immutable-product constructor. Initial parser/lint errors corrected before
+  captures. Earlier failed logs are retained, not used as passing evidence.
+- Before the bank-statement density revision, r7 passed 97 with one existing
+  skip. r8 found a 47px product target and 3px text overflow: use 3px vertical
+  padding and explicit 1.2 line height, retaining >=48px edit targets.
+
+Final compact v16: focused-r9.log passed 97, one existing skip. stock-r9.log
+passed six capture tests; analysis-final-r9.log is clean. The 10,000-record test
+mounts the actual horizontal statement, verifies 50-to-100 lazy paging without
+losing horizontal offset, and finds the exact final SKU across the full dataset.
+Stock quantity validation/reason/history and repeat editing passed at 1x/2x;
+visibility remains available in the existing editor, tested true/false and saved.
+No backend paging, camera scanning, OPPO or audit-export acceptance is claimed.
+Local renders: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-stock-horizontal-v16-r11/.
+r10 only aligns the middle capture to the purchase column after the real swipe
+assertion, avoiding a transient clipped-edge capture; app source is unchanged.
+r11 shortens the three-line purchase heading to Purchase price so it fits the
+compact header. Its value still means recorded purchase price, not last receipt.
+Await founder visual approval; local work remains uncommitted, no APK or push.
+
+## Active v15 — founder-requested Store stock statement only
+
+Founder rejected Store stock tiles/grid and requested a statement-style tabular
+list with thumbnails. All other screens remain approved. Supersedes v14 stock
+list/grid only: keep shared saved inventory, search/filter/edit actions, but no
+stock view toggle. The MoolSocial catalogue list/grid remains unchanged.
+
+Local r1 detected a header font issue in captures: a fresh DefaultTextStyle lost
+the theme font. Inherit the theme label style before applying header emphasis.
+One standalone fallback test still expected a separate grid stock label after
+grid removal; assert the actual combined list price/availability text instead.
+Retain r1 logs/renders; rerun and visually inspect before founder handoff.
+
+r2 broader regression caught loss of the stock-row MRP/SKU display during the
+table conversion. Preserve SKU under pack and MRP under selling price; retain
+exact-money fitment assertions against the new MRP cell rather than the removed
+combined subtitle. No product metadata or price rules are changed.
+
+v15 implemented: one statement list, thumbnail/product/pack/SKU, aligned selling
+price with MRP and stock columns, row dividers instead of tiles/cards. Tap the
+product to edit; existing direct price/quantity/visibility handlers remain.
+Large text/large amounts reflow within divided statement rows to retain readable
+values and actions. Stock has no grid toggle; catalogue list/grid is unchanged.
+Final focused-r3.log: 96 passed, one existing skip. stock-r3.log: six passed.
+analysis-final.log: no issues. Only subsequent source edit adds lint-required
+braces around the unchanged WorkCard fallback. Final screenshot visually checked:
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-stock-statement-v15-r3/saved-stock-statement-loaded-360-1.0.png.
+Logs retained in task outputs/store-stock-statement-v15/. These are local renders,
+not OPPO/backend proof. Await visual approval of this revised stock statement;
+all other founder approvals preserved. No commit, push, APK or backend change.
+
+## Active v14 — saved Store stock list/grid
+
+Founder approved v13 and explicitly said continue to Store stock. This authorizes
+only the next saved-inventory screen: reuse catalogue search/category/lazy paging
+and list/grid, retain existing stock/price/edit/visibility handlers, remove master
+suggestions from real stock, and test saved inventory reaching Counter Sale.
+No separate inventory owner, backend, APK or changes to approved catalogue/editor
+layouts. Show actual owned values, including zero/availability-only stock, not
+master quantities. Show the Store stock screen after local tests for founder review.
+
+Implemented locally; founder review of this screen is pending:
+- Store stock defaults to list, with grid toggle and shared search, category,
+  filtering and lazy 50-item pages. Existing price/quantity/edit actions remain.
+- Only saved workspaceCatalogueItems appear. Master catalogue suggestions do not
+  count as stock. Add product opens the approved shared catalogue/editor flow.
+- Counter Sale consumes the same saved inventory; no second stock collection.
+- Production stock must be backend-authoritative. These local fixtures/session
+  values prove frontend behavior only, not live stock synchronization, server
+  pagination, publication approval or production persistence.
+- Fixed a regression found at 200% text: returning from stock quantity editing
+  could lose the visible stock action. Stable scroll structure, page storage and
+  restoration of the edited control now preserve access; 1x/2x tests pass.
+
+Final local verification: 96 focused tests passed, one existing skip; six STOCK14
+capture tests passed. Analysis of all three changed Dart owners is clean.
+Coverage includes saved/empty stock, search, category/visibility filters, zero and
+availability-only quantities, edit/save/readback, Add product cancellation,
+5,000/10,000 in-memory owned records, lazy pages and scanner-result matching.
+This is not a real camera scan, server performance benchmark or OPPO retest.
+Earlier failed runs remain retained; final evidence supersedes their stale
+navigation and offscreen test interactions, not unverified runtime failures.
+
+Evidence in the task workspace: outputs/store-stock-v14/focused-final-r2.log,
+stock-r6.log and analysis-final-r2.log. Final renders inspected at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-stock-v14-r6/:
+saved-stock-list-360-1.0.png, saved-stock-grid-360-1.0.png and
+saved-stock-empty-360.png (also narrow 200% variants).
+Approved catalogue/editor layouts remain preserved. No backend work, new APK,
+OPPO testing, commit or push in this increment. Pause for Store stock approval.
+
+## Current v13 — compact pack fields and real Store stock boundary
+
+Founder visually approved the displayed v13 compact pack-fields screen on
+21 September 2026. Preserve this layout; the sizing-review pause is resolved.
+Next visual unit is Store stock list/grid for saved retailer inventory, with
+local testing and founder review. This is not backend/publication/OPPO approval
+and does not imply a Git commit or push.
+
+Founder approved the compact-field proposal and clarified that the next Store
+stock screen means saved retailer-owned products/actual stock, not the master
+MoolSocial catalogue. This clarification is recorded for the next screen.
+Public/private owned items share workspaceCatalogueItems with Counter Sale;
+a master catalogue selection is not stock until the retailer saves it. New
+copies continue to start at stock zero; do not fabricate physical quantities.
+
+This increment changes only pack-field layout and tests:
+- Net quantity and Country of origin share a 2:3 row at >=320px available width
+  and text scale <=1.2. At narrower widths or enlarged text they stack.
+- Generic/product and long manufacturer/packer/importer/licence/care fields keep
+  full width. Vertical gaps reduce from 12px to 8px; fields remain >=48px.
+- Enlarged text uses separate wrapping labels, not overlapping floating labels.
+  Local r1 visual inspection found label overlap at 200%; corrected in r2 with
+  explicit label/input separation assertions. r1 is retained, not final evidence.
+- Keyboard Next moves net quantity -> country; edits survive save and Buy
+  conversion. The eight editable pack fields remain the exact same compliance
+  keys; two batch dates remain read-only with v12 batch isolation unchanged.
+- Actual BuyV2ProductCompliancePanel is mounted in a new test: all ten mapped
+  facts render and are scroll-reachable. This proves local public presentation,
+  not server publication/approval. No Buy presentation owner changed.
+- Remaining 400-field mapping gaps, Store-default inheritance, authoritative
+  persistence and Wholesale/backend work remain pending as documented in v12.
+
+Final evidence: task outputs/add-product-compact-v13/mapping-r2.log (7 tests),
+addreview-final.log (4), addphoto-final.log (9), catalogue01-final.log (3):
+23 focused tests. analysis-final.log checks both changed Dart owners.
+Local renders inspected:
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-compact-v13-r2/
+including 360px compact, 320px stacked and 200% text.
+This is a narrow regression set, not a fresh full-app regression or OPPO test.
+
+Saved locally, uncommitted on work/codex-ui/add-product-screen1-20260920,
+HEAD 015e16e4aa018f5a8e5adca6204504fd8fb69b45. No APK, backend or Counter Sale
+changes. Show compact screen before the next Store stock list/grid visual unit.
+
+## Founder approval — v12 screens, 21 September 2026
+
+Founder explicitly approved the displayed exact variant/pack catalogue tiles,
+prefilled Review product and expanded Pack information screens. This resolves
+the v12 visual-approval pause recorded below; preserve these approved layouts.
+Next visual unit: Store stock, offering list/grid views over the same inventory
+used by Counter Sale. Continue screenwise local testing and founder review.
+This approval does not close the 400-field mapping gaps, grant backend work,
+prove OPPO acceptance, authorize a release, or claim that local changes are
+committed/pushed. Those pending statuses remain unchanged.
+
+## Current v12 — exact variant/pack and product metadata review
+
+Founder requested full public-field/metadata mapping and inspection of catalogue
+variant presentation. This increment stays in the shared catalogue/editor:
+no new route, backend, Store Settings implementation or Store stock redesign.
+All other approved layouts remain unchanged.
+
+- Exact variant and pack are visible on each tile/list row. Add to Store selects
+  that exact SKU, not a product family. Grid stays 176px with a 48px action;
+  long labels retain full tooltip text. Search includes variant/pack; view
+  switching, owned filtering and scanner callback identity are tested.
+- Existing WorkspaceProductCompliance supplies eight editable pack facts:
+  generic name, net quantity, manufacturer, packer, importer, country of origin,
+  manufacturer FSSAI number and consumer care. Existing two batch date fields
+  are read-only in SKU reference, preserved on edit and cleared for a new Store
+  copy. Real batch receipt workflow remains separate.
+- Ten pack facts now project to BuyV2ProductCompliance and the operational
+  snapshot; composition/regulatory/prescription/visual/unit-price metadata is
+  also retained in that snapshot. Metadata-only changes invalidate the public
+  preview cache. No authoritative server readback or approval is implied.
+- Edited master facts set a retained catalogueFactsRequireReview hold. It
+  survives reopening/copy/save, disables public eligibility and the editor
+  visibility switch, without disabling private Counter Sale use. Backend
+  restore and authoritative approval must retain/enforce this hold; there is no
+  retailer control to clear it.
+- Store-wide setup is separated in explanatory copy. It is NOT a working
+  default-inheritance engine or Store Settings screen. Payment acceptance,
+  coverage/service defaults and private settlement credentials are not repeated
+  as product fields. Catalogue/product IDs and photo approval remain read-only.
+- Save to Store / Save changes and shared inventory remain unchanged. Catalogue
+  and manual entry share one editor. CSV batch review/parser improvements remain
+  pending; no third implementation is created.
+
+### v12 exact mapping and remaining scope
+
+The 400 unique original IDs are retained, with original source/rule/ownership
+and an explicit current disposition, at:
+C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/add-product-mapping-v12/field-disposition.md
+
+This is not 400 completed fields or 400 retailer inputs. Newly exercised:
+P07/P08 exact variant/pack; C01-C06/C09/C10 editable pack data and Buy projection;
+C07/C08 read-only batch isolation; P01/P02 read-only references. Existing
+price/stock/identity editor owners are reused, not replaced.
+
+Explicit frontend gaps remain: P03/P10/P14/P22-P24 channel, conversion, Wholesale
+prices/increments/tiers; P09 numeric net-amount semantics; P31-P36 structured
+merchandising/freight/grant/trust ownership; P40-P43 description/highlights/
+specifications; structured returns and Store-default inheritance. P30 is a
+restriction, not a new retailer self-approval control. Store-wide payment and
+settlement screens are separate approved-owner work, not backend-only gaps.
+Integer/decimal price semantics and CSV quoted parsing/ambiguous matches remain
+in the original gap register.
+
+Backend remains deferred: real catalogue/cursor API, approved media, publication
+acknowledgement, persisted review state, verified payment/settlement/fulfilment.
+5000/10000 tests prove local supplied-data paging, not server paging or OPPO
+performance. No app-wide approval or production readiness claim.
+
+### v12 local evidence / approval gate
+
+44 focused tests passed: ADDMAP 5, ADDREVIEW 4, ADDBROWSE 3, ADDENTRY 10,
+ADDGRID 5, ADDPHOTO 9, CATALOGUE01 3, COUNTER1919 public/private 2, S09 catalogue
+suggestions 3. One pre-existing dashboard-landscape skip remains. Six Dart
+owners analyzed clean. Not a full application regression or OPPO acceptance.
+
+Logs: task outputs/add-product-mapping-v12/, final runs mapping-r3.log,
+review-final.log, browse-final.log, addentry-final.log, addgrid-final.log,
+addphoto-final.log, catalogue01-final.log, counter-final.log,
+s09-catalogue-suggestions-final.log and analysis-final.log.
+Earlier attempts are retained, not final pass evidence: the r1 mapping harness
+mistook SelectableText's read-only EditableText for writable inputs and targeted
+an expanded tile instead of its visible heading; assertions/tap targeting were
+corrected without removing readonly checks.
+
+Inspected actual Flutter renders:
+- C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-mapping-v12-r3/
+- C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-review-v12-r1/
+- C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-variants-v12-r1/
+
+Variant-family images/prices are synthetic test cases. Photographic renders use
+generic test-only sample assets, not authenticated brand photos. No media upload.
+
+STOP for founder variant presentation/revised editor approval. Store stock
+list/grid is still the next separate visual unit. Source and evidence are local,
+uncommitted; no APK/OPPO/commit/push. Branch
+work/codex-ui/add-product-screen1-20260920, HEAD
+015e16e4aa018f5a8e5adca6204504fd8fb69b45. Counter Sale a425fd89 and pending
+CS-OPPO-015 physical retest are preserved.
+
+## Previous v11 — approved catalogue, shared review before saving
+
+Founder approved v10 catalogue and requested fuller thumbnails without larger
+tiles, suitable final-action wording, and the shared editable Store stock flow.
+This increment implements the next review screen only. Final action is **Save
+to Store** (existing product: **Save changes**), not Submit or Publish. Store
+stock list/grid redesign remains the next visual approval unit, not complete.
+
+- Catalogue thumbnails remove renderer padding and use 40px of the existing
+  176px tile; interior spacing is reduced, not tile size increased. Images keep
+  their aspect ratio with contain fit: no stretched/cropped labels and no
+  altered originals. List thumbnails also remove internal padding.
+- Add to Store opens the existing shared full-page editor; it no longer writes
+  an immediate private draft. Product facts, reference selling price, MRP and
+  photo link are retained. Retailer purchase cost starts blank and actual stock
+  starts at zero: shared-catalogue stock/cost is not asserted as retailer stock.
+- Cancel/back creates no inventory record. Save to Store validates then writes
+  the same session inventory and returns to the existing Store stock surface.
+  Its heading is renamed only; its list/grid redesign is still pending.
+- Reopening the saved product prefills retailer edits; Save changes updates the
+  same ID. Concurrent duplicate, duplicate SKU and Store switch are rejected.
+  Unedited reference unit-price copy now follows the changed selling price.
+- Catalogue/manual reuse the editor and save owner. Existing CSV import remains
+  shared-model ingestion; CSV batch-review changes are not claimed implemented.
+- Stock is private by default; saving is not public Buy publication. Existing
+  photo identity/test-only/public validation is retained. No backend, approved
+  media upload, APK, OPPO or production operation occurred.
+
+### v11 local evidence
+
+39 targeted tests passed: ADDREVIEW 4, ADDBROWSE 3, ADDENTRY 10, ADDGRID 5,
+ADDPHOTO 9, COUNTER1919 public/private inventory 2, CATALOGUE01 3 and S09
+catalogue suggestions 3. One pre-existing dashboard-landscape skip remains.
+Analysis of the changed Dart owners is clean and diff whitespace check passes.
+
+New connected test saves a private SKU, reopens and changes its price, verifies
+one inventory record and retained photo, then finds it by SKU in Counter Sale,
+adds directly and simulates barcode keyboard input for another unit. No live
+scanner or OPPO proof is implied. Existing Counter Sale private/public/zero
+stock tests pass without editing Counter Sale logic.
+
+Final inspected native Flutter renders:
+- `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-review-v11-r5/`
+- `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-thumbnails-v11-r2/`
+
+Logs: task `outputs/add-product-review-v11/`, using `*-final.log`,
+`review-r5.log` and `browse-r2.log`. Earlier attempts are not pass evidence.
+Observed/fixed during local verification: missing packshot import and wrong
+test helper name; 4px tile overflow after enlarging the image (fixed internal
+spacing); missing route-settle before customer entry in the test; enlarged-text
+footer wrapping (accessible icon Cancel + wider Save at large scale). Existing
+direct-add tests were updated to assert no write before the approved Save action.
+
+Source remains local/uncommitted in branch
+`work/codex-ui/add-product-screen1-20260920` at HEAD
+`015e16e4aa018f5a8e5adca6204504fd8fb69b45`. Next founder decision: Review product
+screen approval; then implement Store stock list/grid against this same inventory.
+Counter Sale CS-OPPO-015 physical retest remains pending and untouched.
+
+## Current v10 scope — category / scale / shared inventory journey
+
+Founder requested product-specific test imagery, category onboarding, 5,000–10,000
+SKU pagination, editable prefilled review before final Store submission, one
+Store stock source feeding Counter Sale, and list/grid choice in both catalogue
+and stock. All three input paths still share models/editor/save/publication.
+MVP-supporting. Minimal journey: catalogue/manual/CSV -> shared review/editor ->
+Submit to Store -> Store stock. Stock remains editable and supplies eligible
+products to Counter Sale search/scanner/item selection; publication to Buy is
+separate. Never create a second stock collection or a customer-cart dependency.
+
+Screenwise gate remains: implement catalogue browsing (category, list/grid,
+bounded local pagination, test images) first, render/test/show it, then pause for
+founder approval before redesigning review/submission or Store stock. Record the
+later steps; do not claim they are complete from this catalogue change.
+Current large-list scope: support a supplied full catalogue of 10,000 records
+with indexed inventory matching and lazy 50-item presentation pages, search and
+categories across the full input. This is NOT a connected server cursor API;
+backend paging/authoritative category/photo delivery remains a later adapter.
+No backend uploads, API provisioning, APK, OPPO or production store action.
+
+Imagegen generated three generic TEST SAMPLE packshots: sunflower oil 1 L,
+whole wheat atta 1 kg and iodised salt 1 kg. They are review fixtures, not brand
+photographs. Saved under the task outputs/add-product-catalogue-v10/test-images
+directory. Local tests may serve these via the existing in-process image client;
+never mark them approved or package them as production master catalogue media.
+
+### v10 local implementation / evidence
+
+Catalogue now has category counts (including Uncategorised), category-scoped
+search, list/grid selection, and lazy 50-record presentation pages with scroll
+loading plus an explicit Load more control. Search/filter counts cover the full
+supplied input, not just the loaded page. Search/category/view changes reset the
+page/scroll safely. Owned SKU lookup uses ID/identity maps rather than scanning
+the full inventory for each card. Grid/list share the same existing callbacks.
+The approved compact grid remains three columns at 360px with 48px actions;
+list actions move below the details with enlarged text.
+
+Actual local Flutter renders were inspected under
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-catalogue-v10-r5/`:
+grid, list, category chooser/filter and 320px large-text list. Product-specific
+test PNGs use an in-process HTTP client; decoded original metadata is used and
+test-only publication denial is asserted. A list-button font inheritance defect
+found by visual review was corrected and has a regression assertion. Earlier
+runs retain test-harness errors; r5 is the corrected browse evidence.
+
+Test logs and asset prompts/hashes are in the task's
+`outputs/add-product-catalogue-v10/` directory. Frontend synthetic scale tests
+exercise 5,000 and 10,000 records, half already owned, no duplicate rows, lazy
+50/100 rows, last-SKU search without walking pages, category counts over all
+records, Saved filtering, list/grid state and scroll reset. They do not establish
+physical-device performance or a real paginated backend contract.
+
+Final local result: 27 targeted tests pass (ADDBROWSE 3, ADDGRID 5,
+ADDENTRY 10, ADDPHOTO 9), with the one pre-existing upstream dashboard landscape
+test skipped. Analysis of all six current Dart owners is clean. No new OPPO
+evidence or release clearance is implied.
+
+### Explicit next-screen handoff — not implemented by v10
+
+- Keep the name **Store stock** for retailer-owned inventory. It is one shared
+  stock source, not a separate catalogue/cart per feature.
+- Replace the current immediate-private-draft Add callback with **Add to Store
+  -> prefilled editable review -> Submit to Store**. Until that approved next
+  screen is implemented, Add still uses the existing private-draft handler.
+- Reuse the same editor/validation/save for catalogue, manual and CSV. Preserve
+  supplied product facts/photo reference; let the retailer edit selected values.
+  Identity changes must revalidate the photo; no silent mismatched packshot.
+- Successful final submission updates Store stock; editing remains available.
+  Provide list/grid choice there using the same inventory data, not a duplicate
+  collection. These stock-screen changes remain pending visual approval.
+- Verify submitted eligible public/private stock appears in Counter Sale item
+  selection, typed search and barcode lookup. Draft creation alone is not proof
+  of sellable stock. Verify price/stock edits and zero-stock behavior end-to-end.
+- Public Buy publication remains separate and validates image/identity/rules.
+- Backend-owned catalogue cursor/search/filter totals, approved photo upload and
+  authoritative persistence are deferred, not represented as implemented.
+
+No commit, push, APK, OPPO run or production media upload in this increment.
+
+## Current frontend follow-up v9 — Add to Store / public photo route
+
+Founder requested Store-contextual button wording and completion of pending
+frontend photo work, explicitly deferring backend work. Button is now
+"Add to Store", then "Edit" after adding; dense approved grid is unchanged.
+One exact ticket/root/branch exception admits journey_router.dart only for this
+frontend continuation. No broad journey01 permission or backend authority.
+Public Store preview now supplies the actual Store ID to the photo adapter.
+Its cache identity includes product identity and photo metadata/revision/source,
+so replacement cannot retain the previous public session/photo reference.
+
+Local verification: 26 distinct checks passed (ADDPHOTO 9, ADDENTRY 10,
+ADDGRID 5, exact public product navigation 1, Storefront Back 1). The known
+upstream dashboard landscape AP-S1-001 remains skipped, not passed. Focused
+analysis clean and git diff --check passed. Real Image.network decoding was
+exercised with an in-process HTTP fixture, never an external service. Verified
+loading/decoded/404 fallback, 32px thumbnail versus retained 1024px metadata,
+BoxFit.contain, private add, actual Store-to-Buy route and replacement revision.
+Captured normal/200% text, loading/failure, dense 50-SKU fixture and public photo
+screens; inspected actual rasters. Fixture image is a synthetic navy test pack,
+not a supplier-approved photo. No fixture media is shipped in the catalogue.
+
+Current passing evidence (earlier failed attempts retained separately):
+- C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-photo-frontend-v9-r4/
+- C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-photo-frontend-v9-entry/
+- C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-photo-frontend-v9-grid/
+
+Test-harness corrections: replace the owned record as well as the master fixture;
+allow real image decode before settling fake-clock animations; restore the image
+HTTP debug override before framework invariants; flush the review-save timer.
+The first public capture was taken during its fade (blank body), so the final
+test additionally settles after decoding and requires hit-testable product text.
+Do not use r1/r2/r3 attempts as passing evidence; r4 passes all nine photo tests.
+
+Release boundary: check-approved-ui-locks.ps1 is still blocked by its inherited
+MainActivity accessibility projection's exact-worktree check. No Android or
+locked Screen 01-03 owner changed; no lock was relaxed. This is NOT APK/release
+clearance. Backend ingestion, trusted photo approval, immutable revision URLs,
+live readback and production mandatory-photo migration remain deferred. Existing
+photo-less legacy publication eligibility is unchanged. No APK/OPPO/live action.
+All changes remain local/uncommitted on registration HEAD 015e16e4. Stop for
+founder review of the contextual wording before the next visual journey screen.
+
+The public-route and actual-render blockers in the historical section below are
+resolved for this frontend slice; its backend/migration exclusions still apply.
+
+## Approved v8 grid / bounded photo continuation — 2026-09-21
+
+Founder approved the compact grid and directed production-compatible image
+references with test photography permitted for later local review. Next is
+authorized for frontend photo wiring, not photo ingestion/backend deployment.
+Classification: mvp_supporting, reusing Buy media validation/rendering and the
+shared Store model rather than a new media service or three entry implementations.
+Keep layout unchanged. Retain exact SKU/variant/pack identity, original source and
+revision; pricing/stock edits preserve media, identity edits invalidate it.
+Test images are preview-only, never admitted to public product media. Approved
+references can be replaced without re-adding inventory. Missing/broken media uses
+the existing fallback. Source reference is serialized into the existing
+operational snapshot; backend readback/authority remains separately pending.
+Test identity changes, invalid metadata, replacement revision/source, test-media
+isolation, serialization and private Add/Edit retention. No new route, dependency,
+Buy owner edit, photo upload, production action, APK or OPPO work.
+Narrow additional owners: work_models.dart and work_session.dart. Photo tests
+reuse work_workspace_layout_safety_test.dart; no separate test owner was added.
+
+Local result: shared WorkspaceCataloguePhoto stores exact identity, source,
+revision, file metadata and pending/testOnly/approved status. Store grid reuses
+Buy's media renderer through an explicit preview adapter. Public conversion
+excludes test/pending/mismatched/invalid media and requires a supplied Store ID.
+Price/stock/local-SKU edits retain references; identity changes suppress photos.
+Operational snapshot includes the reference and decoder preserves test status.
+Seven ADDPHOTO, five ADDGRID and three CATALOGUE01 tests passed (15 distinct).
+Focused analysis clean; diff whitespace check passed. No UI layout change or
+new photographed render; no network media was fetched in these metadata tests.
+Fixture URLs use example.invalid and are not deployed catalogue entries.
+
+Still OPEN, not a production-readiness claim:
+- Protected journey_router.dart currently calls the public adapter without a
+  Store ID and caches without photo revision; exact public-route binding and
+  invalidation need an admitted follow-up. Its claim was rejected by the lane
+  allowlist and removed; no router or Buy source was edited or gate weakened.
+- Real catalogue photo ingestion, trusted approval, immutable revision-specific
+  URLs, production snapshot readback and cache-refresh/device testing are pending.
+- Existing photo-less records retain legacy publication eligibility. Mandatory
+  photo enforcement/migration is not implemented by this bounded reference slice.
+- Actual test-photo rendering/loading/failure visual evidence remains pending;
+  the founder explicitly allowed test photography later.
+All app work remains local/uncommitted; no APK, OPPO, backend or live-store action.
+Preflight correction: a proposed new test owner did not yet exist; reuse the
+already-claimed test owner. Flutter-generated dependency ordering/timestamp churn
+was reverted only in its two generated files; subsequent tests used --no-pub.
+
+## Current founder revision — denser SKU tiles v8
+
+Reduce tile footprint, keeping approved search/selector chrome. Three columns at
+normal phone text size, fewer columns for enlarged text; small 32px thumbnail,
+readable title/pack and 48px Add/Edit target. Reuse Buy photo rendering and
+unchanged product identity; display thumbnail size never changes original media.
+No fabricated pack photos or live-photo/publication wiring claim. Prove density,
+scroll reachability and enlarged text locally, then show for founder approval.
+
+v8 result: normal 360-width layout is three columns with 176px tiles (previously
+two columns/220px), 32px media display and 48px Add/Edit buttons. Up to three
+title lines; enlarged text reduces columns automatically. Fifteen distinct
+focused local checks passed: ADDENTRY 10, ADDGRID 5 (includes 50-SKU synthetic
+fixture and scroll-to-last-item). One existing upstream dashboard-landscape
+test remains explicitly skipped. Focused analysis clean. Nine complete tiles
+visible at 360x806 in the 50-record test fixture, with another row partly visible.
+Actual three-record catalogue and synthetic density captures inspected under
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-dense-grid-v8/`.
+Fixture records are test-only, never added to the master catalogue. Product photo
+source/identity adapter is unchanged; still no admitted photos in the real seed.
+Small inventory thumbnail does not establish public photo/publication readiness.
+Saved locally, uncommitted; no APK/OPPO/backend. Await founder tile approval.
+
+## Current founder revision — visible mode selector v7
+
+Founder visually approved this selector on 2026-09-21. MoolSocial catalogue is
+the default; visible label/arrow switches manual/CSV in-place. Approval applies
+to this entry/selector layout, not full Add Product field/publication/CSV-scale
+or physical OPPO acceptance. No further layout changes without a found defect.
+
+Keep MoolSocial catalogue as default. Its visible label and dropdown arrow select
+MoolSocial catalogue / Add manually / Import CSV in-place. Remove the hidden
+top-right overflow trigger. Reuse the same selector on manual/CSV headers so the
+current mode and return path stay discoverable. Search-first layout, private
+inventory Add/Edit, existing handlers and retained drafts stay unchanged.
+Local visual/function checks only; stop for founder approval, no APK/backend.
+
+v7 local result: 17 focused tests passed (ADDENTRY 10, ADDGRID 4, CATALOGUE01 3),
+one known upstream dashboard-landscape reproduction skipped; focused analysis
+clean. Arrow hit-testing opens the three mode choices inside the catalogue
+toolbar; no overflow icon remains. Existing route-identity, search/draft retention,
+menu switching, keyboard, CSV, private Add/Edit, filters and duplicate/Store
+guards pass. Grid still starts around y=125 at 360x806. Inspected normal/200%
+catalogue, opened selector, manual and CSV renders under
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-visible-selector-v7/`.
+No new routes/data owners: one inherited callback scope and one shared selector
+reuse the entry's existing state. Local uncommitted changes; no APK/OPPO/backend.
+Enlarged-text inspection caught brand splitting in the narrow label; compact
+identity typography corrected to keep MoolSocial intact and a word-box regression
+added at 320/360/412 and 200% text. This is a local fit correction, not new scope.
+
+## Current founder revision — search-first v6
+
+Remove the Add product title and persistent three-mode tabs from catalogue.
+Search is the first safe-area row, with Back and a compact Add options menu.
+Menu retains catalogue/manual/CSV in-place switching and draft retention. Manual,
+CSV and catalogue editor may show their own compact contextual header; never a
+misleading catalogue search. Preserve v5 catalogue toolbar/grid and all handlers.
+Only local rendering/testing and founder visual review; no APK/backend scope.
+
+v6 local evidence: search band starts at y=0 inside the safe area; grid begins
+around y=125 at 360x806 (v5 about y=241). No persistent title/mode tabs. Menu
+items remain reachable, switch in-place and preserve draft/search. Catalogue
+editor has contextual Back to grid. ADDENTRY 10 and ADDGRID 4 tests passed with
+one known upstream dashboard-landscape skip; CATALOGUE01 3 passed, including
+editor Back and re-entry. Focused analysis clean. Existing toolbar, draft/save,
+filters and scanner behavior retained. Inspected normal/200% catalogue and menu
+captures under `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-search-first-v6/`.
+No APK/OPPO/commit. Await founder approval; v5 and earlier chrome superseded.
+
+## Current founder revision — Buy-aligned compact chrome (2026-09-21)
+
+Founder rejected v4 catalogue chrome's wasted space. Reuse Buy's visual placement:
+borderless inline search/scanner band followed by 48px category menu on the left,
+compact catalogue identity/count in the middle and Saved/filter icons on the
+right. No separate heading/count row. Three entry modes remain above catalogue
+search (hidden in manual/CSV) because embedding all three labels beside actions
+would crowd the Buy two-mode slot. Preserve grid/private Add/Edit and shared
+handlers; no customer-cart coupling, Buy owner edits, backend or new routes.
+Verify local behavior, vertical fit and enlarged text; show v5 for approval.
+
+v5 local result: 17 tests passed (ADDENTRY 10, ADDGRID 4, CATALOGUE01 3), one
+known upstream dashboard-landscape test skipped. Focused analysis clean.
+Grid starts at about y=241 rather than v4 y=321 at 360x806. Regression asserts
+grid top <=250, search above toolbar, category left of Saved left of filter,
+48px hit targets and no search/toolbar/grid in manual or CSV modes. Private
+Add/Edit, search/filter, scanner retry and CSV behavior remain checked.
+Buy's private cart-bound toolbar cannot be embedded directly without coupling
+Store inventory to BuySession. Store uses the same menu/bookmark/tune icon order,
+48px rounded chrome and borderless search treatment with its existing callbacks;
+no Buy source/session/offer/card code was changed. Actual v5 local renders:
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-buy-chrome-v5/`.
+Normal/200% catalogue and manual/CSV views inspected. Missing-photo fallback
+remains truthful. No APK, OPPO or implementation commit; await founder approval.
+
+## Current founder revision — compact inventory grid (2026-09-21)
+
+Founder approved the tabs/layout, not the catalogue row presentation. Change
+only catalogue content to compact SKU tiles with inline search/scanner, category,
+Saved and filters. Reuse Buy media/scanner and the existing shared product editor;
+do not reuse its customer cart/session as Store inventory. Add saves a private,
+unavailable inventory draft without invented stock/cost; Edit opens the shared
+editor. Saved means products already saved in this Store, not customer bookmarks.
+Keep manual/CSV and approved tabs unchanged. Categories/brands derive from actual
+inventory/catalogue records; do not invent extra products or supplier photos.
+Local UI/functional tests and actual renders precede founder approval. No APK,
+backend, new catalogue data pipeline, or publication authority is implied.
+
+Local v4 result: 17 focused tests passed (ADDENTRY 10, ADDGRID 4, CATALOGUE01 3),
+one existing upstream dashboard-landscape reproduction explicitly skipped.
+Focused analysis of both runtime owners and the test owner: no issues. Tested
+private Add/idempotence, duplicate SKU and Store-switch guards, Saved/category/
+brand/new-only/search composition, empty results, scanner retry/barcode matching,
+shared edit/save, responsive tabs, retained draft and keyboard controls, and CSV
+regressions. Scanner was injected locally; no camera/device proof is claimed.
+Inspected actual local normal, Saved/after-add and 200% text renders under
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-grid-local-v4/`.
+Buy packshot component reused via the existing Store-to-Buy identity adapter;
+these three records have no admitted photo, so the truthful fallback is shown.
+Buy customer-cart/session code remains untouched. Source/tests remain saved
+locally, uncommitted; no APK, physical OPPO or live catalogue acceptance.
+STOP for founder approval of the revised product tiles.
+
+## Current founder revision — one page, in-place tabs
+
+Supersedes the v2 arrow-card entry and its local result below. Founder rejected
+forward-arrow journeys: Catalogue, Add manually and Import CSV must switch the
+full content area inside the same Add product screen. No further route or modal
+for selecting these entry modes. Use a compact premium white/navy tab treatment,
+catalogue-first content and existing picker/editor/import handlers. The native
+file chooser is still needed to select a CSV file; it is not a separate app journey.
+Keep input/search when switching tabs, prevent repeated imports, retain Store
+scope/validation, and show actual local renders before further screen work.
+Embedding the existing editor/import content is authorised by this revision;
+do not build separate product pipelines or claim backend/OPPO completion.
+
+## Current local result — tabbed revision v3, awaiting founder approval
+
+One Add product route now opens catalogue-first with Catalogue / Add manually /
+Import CSV tabs. Modes replace the body in place: no chevron entry cards, new
+mode routes or editor bottom sheet. Catalogue selection embeds the existing
+editor; manual reuses that editor; CSV reuses the existing importer with inline
+result/error status and guarded duplicate taps. Draft and search text persist
+across tab switches. Cancel clears the manual draft and returns to catalogue.
+Save/Cancel remain above a simulated 300-pixel keyboard inset. Embedded Save
+uses a short label to avoid the tall wrapped footer found at 200% text.
+
+Verification: ADDENTRY 10 passed, one explicitly skipped AP-S1-001 upstream
+dashboard reproduction; catalogue persistence/validation and dashboard return
+checks are recorded in the task's v3 evidence report. Focused analysis of both
+runtime owners and the test owner reports no issues. Normal 360-width catalogue,
+manual and CSV renders, compact 200% views and keyboard-inset evidence inspected.
+Catalogue preview contains review fixture products, not a connected live master
+catalogue. Keyboard inset simulation is not physical keyboard/OPPO evidence.
+
+Evidence directory:
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-tabs-local-v3/`.
+Historical v1/v2 evidence below is retained, not the current accepted design.
+No APK, OPPO, backend, publication, new dependency or implementation commit/push.
+Stop for founder approval of these three states of Screen 1. Full catalogue,
+manual and CSV architecture/scale qualification remain open beyond this revision.
+
+## Historical local result — v2 arrow-card entry (superseded)
+
+Screen 1 is implemented locally. Both Store quick action and Products Add button
+open the same entry. Catalogue/manual/CSV reuse existing handlers. Entry remains
+available after cancelling a picker/editor; repeated import taps are suppressed.
+Store identity is checked before entry actions and after asynchronous CSV reading.
+No inventory is created by opening or cancelling Screen 1.
+
+Final focused run: 13 passed, one explicitly skipped upstream defect reproduction.
+Command: `flutter test --no-pub test/work_workspace_layout_safety_test.dart
+--name 'ADDENTRY01|CATALOGUE01|DASHRAIL product and promotion' --reporter expanded
+--update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true
+--dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=add-product-screen1-local-v2`.
+These newly captured renders are review evidence, not approved golden baselines.
+Focused analysis of both touched runtime owners and the test owner: no issues.
+
+Coverage: empty Store navigation and cancel at 320/360/412 portrait widths,
+200% text, direct entry in 740x360 landscape at 140% text, native-picker adapter
+cancel/error/retry, simple private CSV row import, Store switch during file
+selection, duplicate-tap suppression, existing catalogue save/duplicate-SKU/Store
+switch protections and return to dashboard/promotion. Fixture import is not live
+publication, CSV scale qualification or completion of the full shared journey.
+
+Local images: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/add-product-screen1-local-v2/`.
+Normal 360-width, 200% compact and landscape renders visually inspected.
+v1 images remain retained; v2 supersedes their large-text card layout only.
+
+| Finding | Exact reproduction / actual | Disposition |
+| --- | --- | --- |
+| AP-S1-001 | Empty Store dashboard, 740x360, 140% text: RenderFlex overflows by 102 pixels BEFORE tapping Add product. A stage assertion reproduced it before entry code executes. | OPEN upstream dashboard defect. Reproduction retained explicitly skipped; no landscape connected-journey pass claimed. No dashboard redesign in this ticket. |
+| AP-S1-002 | Screen 1 catalogue card at 320x568, 200% text split MoolSocial across lines in v1 despite no framework overflow. | Fixed locally: icons move above full-width labels at enlarged text. Word-box regression asserts brand fits one line; v2 visually inspected. OPPO pending. |
+
+No APK, OPPO test, backend work or downstream redesign. Runtime/test edits remain
+uncommitted while founder reviews Screen 1. Registration checkpoint is
+`015e16e4`; annotated work-start tag identifies a425fd89 only, not acceptance.
+Next: founder approve/reject Screen 1; do not implement Screen 2 before approval.
+
+Status: OPEN. Screen 1 implementation/local review only; no founder visual or
+physical OPPO acceptance yet. Actor: authorised Retailer/Grocery Store operator.
+
+## Founder authority and isolation
+
+Founder approved Screen 1 registration/isolation and explicitly approved starting
+from remotely verified `a425fd89445a4650533b14903d99215cfed74034` when v88 was
+confirmed absent. This is a ticket-specific work checkpoint, not accepted runtime.
+Do not create/move v88, alter central baseline, or falsely close Counter Sale.
+Counter Sale CS-OPPO-015 is committed/pushed and remains physically unverified.
+Its original checkout stays untouched; there is no concurrent Counter Sale work.
+
+Standing authority covers only narrow, necessary blockers for this approved
+ticket. No broad governance changes, new modules/backend scope, paid services,
+destructive operations, production actions, APK/install or automatic acceptance.
+Implement/test one screen, present the actual render, then wait for founder
+approval before downstream work. Routine covered prerequisites need no repeated
+permission request. Preserve source, evidence and all existing checks.
+
+## Outcome and minimum complete scope
+
+Classification: mvp_supporting / launch-supporting. Store inventory entry supports
+the approved Buy-to-Retailer/Grocery commerce launch. Opening Add product presents
+three understandable options, including when the Store has no products:
+
+- Find in MoolSocial catalogue: existing search/scan picker.
+- Add manually: existing blank product and shared editor.
+- Import CSV: existing importer, not another product system.
+
+The title is Add product. Never label this First product. Back/cancel returns
+without creating inventory. Keep Store identity stable across async navigation.
+
+## Reuse and exact owners
+
+- `apps/mobile/lib/features/work/screens/store_add_product_sheet.dart`: entry
+  presentation alongside existing picker; no additional state/service owner.
+- `apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart`:
+  existing `_addProducts`, `_blankProduct`, `_edit`, `_importCatalogue` wiring.
+- `apps/mobile/test/work_workspace_layout_safety_test.dart`: affected entry route.
+  Reuse this existing test owner for focused entry actions, responsive layout
+  and retained local renders rather than adding another harness.
+
+Existing `work_models.dart`, WorkSession inventory/persistence, scanner and CSV
+handler are reused, not rewritten. New entry presentation is necessary because
+the old picker immediately mixes search and products and does not expose all
+three approved entry choices. No new backend, route registry or dependencies.
+
+## Standing journey architecture — remains open beyond Screen 1
+
+Three inputs, ONE product implementation: catalogue/search/scan prefills the
+Store record; manual starts blank; CSV populates multiple records. Share model,
+editor, validation, inventory, save/update and publication rules. Only input
+handling differs. Do not code three independent systems.
+
+Later approved catalogue blocks must support tap-to-add and selective editing
+without compulsory review; existing Store products edit instead of duplicating.
+One-time Store/payment/delivery setup stays in Store Settings. Never mutate a
+global master product from a Store edit. Do not invent prices, stock, approved
+photos or cloud publication. Added and publicly published are different states.
+Current catalogue fixtures are not proof of a live shared catalogue or 5,000-SKU
+scale. CSV matching/quoted fields/errors/retry and downstream editor shortcomings
+remain separate later journey work; exposing entry buttons does not solve them.
+
+## Tests and approval boundary
+
+Test entry actions/cancellation, existing picker/manual/CSV dispatch, zero-product
+Store, Store-switch guard, 320/360/412 widths, enlarged text and landscape.
+Inspect actual Flutter local renders, not imagined mockups. No OPPO/APK claim.
+Show ONLY Screen 1 for founder approval; later screens require separate approval.
+Full journey remains open until all three paths have connected local tests,
+founder-approved screens and physical OPPO testing with defects dispositioned.
+
+## Scope guard
+
+Apply the founder's supplied scope-guard image: smallest sufficient change,
+reuse first, relevant call paths only, no speculative abstractions or unrelated
+refactors/dependencies. Preserve validation/security/accessibility. Run relevant
+checks and don't repeat passing tests absent changed inputs or required gates.
+Report actual evidence/gaps; do not substitute planning for implementation.
+
+## Exclusions and dependencies
+
+No catalogue-block/editor/import redesign before Screen 1 approval. No shared
+catalogue backend, media pipeline, payment, Store setup, Counter Sale redesign,
+APK, live messages/payments, production release or acceptance tag. The exact
+checkpoint admission does not approve a missing central baseline.

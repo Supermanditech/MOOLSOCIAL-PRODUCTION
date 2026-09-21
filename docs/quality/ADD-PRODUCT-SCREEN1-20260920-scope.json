@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "9EE7185A2892B32303157C1E0BDFE9153259BD83E5510C9122BA2A6FE5B204ED",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": [
+        "reuse",
+        "thin_policy_adapter",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
+      ],
+      "newScreens": [
+        "Add product entry inside existing picker owner"
+      ],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "necessityProof": "Existing picker lacks the approved three-way entry. Reuse blank product/editor, catalogue picker/scanner and importer; no duplicate business rules.",
+      "robustnessCoverage": [
+        "Empty Store and cancellation",
+        "All three existing handler destinations",
+        "Compact/landscape/large-text fitment",
+        "Store-switch recovery"
+      ],
+      "adjustments": [
+        "Ticket-specific verified checkpoint instead of absent central v88; no acceptance implied"
+      ],
+      "explicitExclusions": [
+        "No downstream screen redesign before founder approval",
+        "No backend, production release, real payments or messages; only the exact founder-authorized r66.37 OPPO review candidate"
+      ],
+      "dependenciesAndApprovals": [
+        "Founder Screen 1 visual approval",
+        "Later full shared-journey local and OPPO testing"
+      ],
+      "timelineImpactDays": 1,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {
+    "branch": "work/codex-ui/add-product-screen1-20260920",
+    "head": "a425fd89445a4650533b14903d99215cfed74034",
+    "successorRegistered": true,
+    "approvalState": "Founder approved exact Screen 1 checkpoint exception and narrow blocker registration; Counter Sale physical retest remains pending."
+  },
+  "ticket": {
+    "id": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+    "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Existing Retailer/Grocery inventory entry supporting the approved Buy-to-Store commerce launch.",
+    "minimumCompleteScope": [
+      "Screen 1 three entry choices wired to existing handlers",
+      "Shared Store photo reference with exact identity, preview isolation and existing Buy rendering; no media backend",
+      "Founder-authorized Store-contextual Add to Store copy and exact Store-to-Buy photo route/cache binding with local renderer tests",
+      "Catalogue category counts, list/grid toggle, local 50-item pages over up to 10000 supplied SKUs and product-specific test imagery",
+      "Founder-approved next screen: shared prefilled editable review with Save to Store, fuller thumbnails within existing tiles, local shared-inventory Counter Sale verification; stop before Store stock list/grid redesign",
+      "Founder-authorized exact variant and pack presentation, shared product metadata editor and public-field disposition; preserve one-time Store setup and system ownership, defer backend and pause for revised editor approval",
+      "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review"
+    ],
+    "explicitExclusions": [
+      "CSV batch-review redesign pending its screenwise approval",
+      "Backend",
+      "Any build/install other than the exact UAW-STORE-ADD-PRODUCT-R66.37-REVIEW-20260921 non-production OPPO candidate; live service writes",
+      "Counter Sale changes"
+    ],
+    "dependenciesAndApprovals": [
+      "Founder visual approval before next screen"
+    ],
+    "testAndEvidencePlan": [
+      "Focused entry actions and connected navigation",
+      "Compact/large-text local renders"
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+  },
+  "authorization": {
+    "state": "existing_ticket_authority_confirmed",
+    "evidence": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "externalServiceWriteAuthorized": false
+  }
+}

@@ -200,15 +200,27 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('CURRENT'), findsOneWidget);
+    expect(find.text('LAST KNOWN'), findsOneWidget);
+    expect(find.text('CURRENT'), findsNothing);
     expect(find.text('LIVE'), findsNothing);
     expect(
       renderedProgress(tester, const ValueKey('buy-tracking-progress')),
       activeOrder.progress,
     );
     expect(
-      renderedProgress(tester, const ValueKey('buy-tracking-route-progress')),
-      activeOrder.progress,
+      find.byKey(const ValueKey('buy-tracking-route-connector')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-tracking-route')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is LinearProgressIndicator ||
+              widget is BuyV2HonestProgressIndicator,
+        ),
+      ),
+      findsNothing,
     );
     await tester.scrollUntilVisible(
       find.text('Order updates'),
@@ -248,7 +260,8 @@ void main() {
 
     session.openTracking(activeOrder.id);
     await tester.pumpAndSettle();
-    expect(find.text('CURRENT'), findsOneWidget);
+    expect(find.text('LAST KNOWN'), findsOneWidget);
+    expect(find.text('CURRENT'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
