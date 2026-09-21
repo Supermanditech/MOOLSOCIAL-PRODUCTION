@@ -773,6 +773,19 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
 /// fixture cohort; no inventory, payment or serviceability is claimed live.
 /// Only the requested page creates Product/Store objects, never the Cartesian
 /// estate. Stable IDs are also resolved through the future transport's seam.
+/// Store search accepts word prefixes, never an infix like rice inside price.
+bool buyV2MatchesStoreSearch(String query, String content) {
+  if (query.trim().isEmpty) return true;
+  final separator = RegExp(r'[^\p{L}\p{N}]+', unicode: true);
+  final words = content.toLowerCase().split(separator);
+  final terms = query
+      .toLowerCase()
+      .split(separator)
+      .where((term) => term.isNotEmpty);
+  return terms.isNotEmpty &&
+      terms.every((term) => words.any((word) => word.startsWith(term)));
+}
+
 class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
   BuyV2DevelopmentCatalogueSource({
     required this.destination,
@@ -1000,7 +1013,7 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     if (ignoreText || text.isEmpty) return true;
     final haystack = '${base.title} ${base.brand} ${base.pack} sku ${sku + 1}'
         .toLowerCase();
-    return text.split(RegExp(r'\s+')).every(haystack.contains);
+    return buyV2MatchesStoreSearch(text, haystack);
   }
 
   String _queryHash(BuyV2CatalogueQuery query) =>

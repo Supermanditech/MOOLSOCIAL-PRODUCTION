@@ -661,7 +661,10 @@ Future<String?> _chooseOffersCategory(
               Row(
                 children: [
                   Expanded(
-                    child: Text('Offer categories', style: context.buyTitle),
+                    child: Text(
+                      'Offer categories',
+                      style: context.buyTitle.copyWith(fontSize: 16),
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Close categories',
@@ -671,6 +674,14 @@ Future<String?> _chooseOffersCategory(
                 ],
               ),
               ListTile(
+                dense: true,
+                minTileHeight: 48,
+                titleTextStyle: const TextStyle(
+                  color: BuyV2Colors.ink,
+                  fontSize: 13,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                ),
                 key: const ValueKey('buy-offers-category-all'),
                 title: const Text('All categories'),
                 selected: selected == 'all',
@@ -678,6 +689,14 @@ Future<String?> _chooseOffersCategory(
               ),
               for (final category in _offerCategories(session))
                 ListTile(
+                  dense: true,
+                  minTileHeight: 48,
+                  titleTextStyle: const TextStyle(
+                    color: BuyV2Colors.ink,
+                    fontSize: 13,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
                   key: ValueKey('buy-offers-category-${category.id}'),
                   title: Text(category.label),
                   selected: selected == category.id,
@@ -713,10 +732,21 @@ Future<({BuyV2OfferPublisherType? publisher})?> _chooseOfferPublisher(
       children: [
         Padding(
           padding: const EdgeInsets.all(12),
-          child: Text('Filter offers', style: context.buyTitle),
+          child: Text(
+            'Filter offers',
+            style: context.buyTitle.copyWith(fontSize: 16),
+          ),
         ),
         for (final publisher in [null, ...BuyV2OfferPublisherType.values])
           ListTile(
+            dense: true,
+            minTileHeight: 48,
+            titleTextStyle: const TextStyle(
+              color: BuyV2Colors.ink,
+              fontSize: 13,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+            ),
             key: ValueKey('buy-offer-filter-${publisher?.name ?? 'all'}'),
             title: Text(_offerPublisherLabel(publisher)),
             selected: selected == publisher,
@@ -1363,6 +1393,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     required this.query,
     required this.scopeKey,
     this.header,
+    this.footer,
     this.onOpenProduct,
     this.storeContext = false,
     this.showAreaControl = false,
@@ -1378,6 +1409,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final BuyV2CatalogueQuery query;
   final String scopeKey;
   final Widget? header;
+  final Widget? footer;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
   final bool showAreaControl;
@@ -1903,6 +1935,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                   ),
                 ),
               if (widget.session.isStoreProcurement) pageControls,
+              if (widget.footer != null) widget.footer!,
             ],
           ),
         ),
@@ -2499,7 +2532,10 @@ Future<void> showBuyV2CatalogueArea(
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Shopping area', style: context.buyTitle),
+                          child: Text(
+                            'Shopping area',
+                            style: context.buyTitle.copyWith(fontSize: 16),
+                          ),
                         ),
                         IconButton(
                           tooltip: 'Close shopping area',
@@ -2592,6 +2628,14 @@ Future<void> showBuyV2CatalogueArea(
                           children: [
                             for (final area in results)
                               ListTile(
+                                dense: true,
+                                minTileHeight: 48,
+                                titleTextStyle: const TextStyle(
+                                  color: BuyV2Colors.ink,
+                                  fontSize: 13,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w600,
+                                ),
                                 key: ValueKey(
                                   'buy-google-area-${area.googlePlaceId}',
                                 ),
@@ -2640,6 +2684,14 @@ Future<void> showBuyV2CatalogueArea(
                         ),
                       ),
                     ListTile(
+                      dense: true,
+                      minTileHeight: 48,
+                      titleTextStyle: const TextStyle(
+                        color: BuyV2Colors.ink,
+                        fontSize: 13,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
                       key: const ValueKey('buy-catalogue-any-area'),
                       title: const Text('Any area'),
                       selected:
@@ -2664,6 +2716,14 @@ Future<void> showBuyV2CatalogueArea(
                     ),
                     for (final area in areas)
                       ListTile(
+                        dense: true,
+                        minTileHeight: 48,
+                        titleTextStyle: const TextStyle(
+                          color: BuyV2Colors.ink,
+                          fontSize: 13,
+                          height: 1.2,
+                          fontWeight: FontWeight.w600,
+                        ),
                         key: ValueKey('buy-catalogue-area-${area.key}'),
                         title: Text(area.value),
                         selected:
@@ -7810,6 +7870,13 @@ class _PagedFullStoreCatalogue extends StatefulWidget {
 
 class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   late TextEditingController _search;
+  BuyV2CataloguePager<BuyV2StoreListing>? _relatedStores;
+  String get _relatedScope => "$_scope-related-stores";
+
+  void _relatedChanged() {
+    if (mounted) setState(() {});
+  }
+
   final _searchFocus = FocusNode();
   String _category = 'all';
   bool _savedOnly = false;
@@ -7831,10 +7898,33 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
     _search = TextEditingController(
       text: sameStore ? retained?.query ?? '' : '',
     );
+    if (widget.onOpenOtherStore != null) {
+      final pager = widget.session.acquireCatalogueStores(_relatedScope);
+      _relatedStores = pager;
+      pager.addListener(_relatedChanged);
+      final base = widget.session.catalogueQuery(
+        catalogueDestination: widget.product.destination,
+      );
+      final query = BuyV2CatalogueQuery(
+        destination: widget.product.destination,
+        regionId:
+            widget.session.catalogueStore(widget.product.storeId!)?.regionId ??
+            base.regionId,
+        areaScope: BuyV2CatalogueAreaScope.regional,
+        procurementContext: base.procurementContext,
+      );
+      Future<void>.microtask(() async {
+        if (mounted) await pager.open(query);
+      });
+    }
   }
 
   @override
   void dispose() {
+    _relatedStores?.removeListener(_relatedChanged);
+    if (_relatedStores != null) {
+      widget.session.releaseCatalogueStores(_relatedScope);
+    }
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -7863,7 +7953,10 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Store categories', style: context.buyTitle),
+                    child: Text(
+                      'Store categories',
+                      style: context.buyTitle.copyWith(fontSize: 16),
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Close store categories',
@@ -7873,6 +7966,14 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 ],
               ),
               ListTile(
+                dense: true,
+                minTileHeight: 48,
+                titleTextStyle: const TextStyle(
+                  color: BuyV2Colors.ink,
+                  fontSize: 13,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                ),
                 key: const ValueKey('buy-store-category-all'),
                 selected: _category == 'all',
                 title: const Text('All products'),
@@ -7882,6 +7983,14 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 (value) => value.id != 'all',
               ))
                 ListTile(
+                  dense: true,
+                  minTileHeight: 48,
+                  titleTextStyle: const TextStyle(
+                    color: BuyV2Colors.ink,
+                    fontSize: 13,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
                   key: ValueKey('buy-store-category-${category.id}'),
                   selected: _category == category.id,
                   title: Text(category.label),
@@ -7899,80 +8008,152 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
 
   Future<void> _chooseFilters() async {
     _searchFocus.unfocus();
+    final bottomClearance =
+        BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
     var price = _maximumPrice;
     var sort = _sort;
     final applied = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: false,
       backgroundColor: Colors.white,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, update) => SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+        builder: (context, update) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Store filters',
+                            style: context.buyTitle.copyWith(fontSize: 16),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close store filters',
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    Text('Price per pack', style: context.buyBody),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final limit in <int?>[null, 100, 500, 1000])
+                          ChoiceChip(
+                            visualDensity: VisualDensity.compact,
+                            checkmarkColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: price == limit
+                                  ? Colors.white
+                                  : BuyV2Colors.navy,
+                              fontSize: 12,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            key: ValueKey('buy-store-price-${limit ?? 'any'}'),
+                            label: Text(
+                              limit == null ? 'Any price' : 'Up to ₹$limit',
+                            ),
+                            selected: price == limit,
+                            onSelected: (_) => update(() => price = limit),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Sort products', style: context.buyBody),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final choice in const [
+                          (BuyV2ProductSort.relevance, 'Relevance'),
+                          (
+                            BuyV2ProductSort.priceLowToHigh,
+                            'Price: low to high',
+                          ),
+                          (
+                            BuyV2ProductSort.priceHighToLow,
+                            'Price: high to low',
+                          ),
+                        ])
+                          ChoiceChip(
+                            visualDensity: VisualDensity.compact,
+                            checkmarkColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: sort == choice.$1
+                                  ? Colors.white
+                                  : BuyV2Colors.navy,
+                              fontSize: 12,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            key: ValueKey('buy-store-sort-${choice.$1.name}'),
+                            label: Text(choice.$2),
+                            selected: sort == choice.$1,
+                            onSelected: (_) => update(() => sort = choice.$1),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(12, 4, 12, 8 + bottomClearance),
+              child: Row(
                 children: [
                   Expanded(
-                    child: Text('Store filters', style: context.buyTitle),
-                  ),
-                  IconButton(
-                    tooltip: 'Close store filters',
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              Text('Price per pack', style: context.buyBody),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final limit in <int?>[null, 100, 500, 1000])
-                    ChoiceChip(
-                      key: ValueKey('buy-store-price-${limit ?? 'any'}'),
-                      label: Text(
-                        limit == null ? 'Any price' : 'Up to ₹$limit',
+                    child: TextButton(
+                      onPressed: () => update(() {
+                        price = null;
+                        sort = BuyV2ProductSort.relevance;
+                      }),
+                      child: const Text(
+                        'Reset store filters',
+                        style: TextStyle(fontSize: 12),
                       ),
-                      selected: price == limit,
-                      onSelected: (_) => update(() => price = limit),
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('buy-store-filters-apply'),
+                      onPressed: () => Navigator.of(sheetContext).pop(true),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                      ),
+                      child: const Text(
+                        'Show products',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text('Sort products', style: context.buyBody),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final choice in const [
-                    (BuyV2ProductSort.relevance, 'Relevance'),
-                    (BuyV2ProductSort.priceLowToHigh, 'Price: low to high'),
-                    (BuyV2ProductSort.priceHighToLow, 'Price: high to low'),
-                  ])
-                    ChoiceChip(
-                      key: ValueKey('buy-store-sort-${choice.$1.name}'),
-                      label: Text(choice.$2),
-                      selected: sort == choice.$1,
-                      onSelected: (_) => update(() => sort = choice.$1),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => update(() {
-                  price = null;
-                  sort = BuyV2ProductSort.relevance;
-                }),
-                child: const Text('Reset store filters'),
-              ),
-              FilledButton(
-                key: const ValueKey('buy-store-filters-apply'),
-                onPressed: () => Navigator.of(sheetContext).pop(true),
-                child: const Text('Show products'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -7999,6 +8180,55 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
           widget.session.beginStoreCollection(widget.product.id);
         },
       );
+
+  Widget? _otherStores() {
+    final open = widget.onOpenOtherStore;
+    final stores =
+        _relatedStores?.page?.items
+            .where(
+              (store) =>
+                  store.id != widget.product.storeId &&
+                  store.previewProduct != null,
+            )
+            .take(4)
+            .map((store) => store.previewProduct!)
+            .toList() ??
+        widget.session.otherStorePreviewsFor(widget.product);
+    if (open != null && _relatedStores?.message != null) {
+      return _CataloguePageNotice(
+        title: 'More stores could not load',
+        detail: 'Try again to browse other stores.',
+        action: 'Try again',
+        onAction: _relatedStores!.retry,
+      );
+    }
+    if (open == null || stores.isEmpty) return null;
+    return Padding(
+      key: const ValueKey('buy-store-more-stores'),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('More stores', style: context.buyTitle),
+          for (final other in stores)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: _RelatedStoreCard(
+                key: ValueKey('buy-store-more-${other.storeId}'),
+                product: other,
+                branchAddress:
+                    widget.session.catalogueStore(other.storeId!)?.address ??
+                    other.origin,
+                onTap: () {
+                  _searchFocus.unfocus();
+                  open(other);
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _showStoreInfo() async {
     _searchFocus.unfocus();
@@ -8081,6 +8311,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         .savedProductsFor(product.destination)
         .where((item) => item.storeId == product.storeId)
         .toList(growable: false);
+    final moreStores = _otherStores();
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
       child: Column(
@@ -8284,6 +8515,10 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
       final products = BuyV2SearchRelevance.rankProducts(
         saved.where(
           (item) =>
+              buyV2MatchesStoreSearch(
+                _search.text,
+                '${item.title} ${item.brand} ${item.variant} ${item.id}',
+              ) &&
               (_category == 'all' || item.categoryId == _category) &&
               (_maximumPrice == null ||
                   widget.session.productFactsFor(item).price <= _maximumPrice!),
@@ -8328,6 +8563,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 storeContext: true,
                 onOpenProduct: openProduct,
               ),
+            ?moreStores,
           ],
         ),
       );
@@ -8361,6 +8597,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
             : base,
         onOpenProduct: openProduct,
         header: header,
+        footer: moreStores,
       ),
     );
   }

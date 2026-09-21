@@ -10,7 +10,44 @@
   },
   "entries": [
     {
+      "id": "REG-20260922-4644-CURSOR-STOREFRONT-MORE-STORES-NAVIGATION",
+      "status": "open_verification",
+      "appliesTo": [
+        "implementation",
+        "testing",
+        "buy"
+      ],
+      "mistake": "Founder reports More stores cards missing below visited store; require store-specific SKU/search/filter scope.",
+      "rootCause": "Storefront redesign moved existing cards into details and depended on cached stores, which page retention can evict.",
+      "prevention": "Use existing regional Store pager and related-card callback below current-store SKU results. Exclude current store. Test another branch, Back, Saved isolation and unchanged home query. Preserve request retry and lease disposal.",
+      "gates": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "REG-20260922-4645-CURSOR-BUY-SPREAD-OUT-SELECTION-TEXT",
+      "status": "open_verification",
+      "appliesTo": [
+        "implementation",
+        "testing",
+        "buy"
+      ],
+      "mistake": "Founder rejects spread-out Store filter text and requests compact selection surfaces across Shop, Wholesale, Offers, categories and Buy.",
+      "rootCause": "Oversized inherited title and list spacing; separate full-width Reset row adds height.",
+      "prevention": "Use compact headings, option spacing and Reset/Apply row while preserving safe-area clearance, at least44px actions, wrapping and enlarged-text navigation. Audit related Buy selection sheets, keep callbacks and do not change global app theme.",
+      "gates": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
       "id": "REG-20260921-4642-CURSOR-STOREFRONT-FILTER-CTA-CLIPPED",
+      "repairEvidence": "Fixed locally with scrollable options and pinned action clearance. R6 focused suite31 passes; fresh Redmi validation pending.",
       "status": "open_verification",
       "appliesTo": [
         "implementation",
@@ -29,6 +66,7 @@
     },
     {
       "id": "REG-20260921-4643-CURSOR-STOREFRONT-SEARCH-RICE-PRICE-LABELS",
+      "repairEvidence": "Development catalogue used infix matching. Word-prefix matcher reused for visited-store Saved results; exact rice/price-label, prefix, multiword, Unicode, price/category/store identity and empty-result tests pass. Production backend search not changed.",
       "status": "open_verification",
       "appliesTo": [
         "implementation",

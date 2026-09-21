@@ -1696,6 +1696,83 @@ void r669SharedProductTests() {
 
 void main() {
   test(
+    'Cursor store search and filters never broaden to home catalogue',
+    () async {
+      expect(
+        buyV2MatchesStoreSearch('rice', 'Self-adhesive price labels'),
+        isFalse,
+      );
+      expect(buyV2MatchesStoreSearch('ric', 'Premium basmati rice'), isTrue);
+      expect(buyV2MatchesStoreSearch('गेहूँ', 'ताज़ा गेहूँ आटा'), isTrue);
+      final source = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+      );
+      Future<BuyV2CataloguePage<BuyV2Product>> search(
+        String text, {
+        int? price,
+        String category = 'all',
+      }) => source.loadProducts(
+        BuyV2CatalogueQuery(
+          destination: BuyV2Destination.shop,
+          regionId: 'jodhpur',
+          storeId: source.storeIdAt(0),
+          query: text,
+          maximumPrice: price,
+          categoryId: category,
+          sort: BuyV2ProductSort.priceLowToHigh,
+        ),
+        pageSize: 50,
+      );
+      for (final text in ['rice', 'ric', 'basmati rice', 'rice basmati']) {
+        final page = await search(text);
+        expect(page.items, isNotEmpty);
+        expect(
+          page.items.every((p) => p.storeId == source.storeIdAt(0)),
+          isTrue,
+        );
+        expect(
+          page.items.any((p) => p.title.toLowerCase().contains('price labels')),
+          isFalse,
+        );
+        expect(
+          page.items.every((p) => p.title.toLowerCase().contains('rice')),
+          isTrue,
+        );
+      }
+      final labels = await search('price labels');
+      expect(labels.items, isNotEmpty);
+      expect(
+        labels.items.every(
+          (p) => p.title.toLowerCase().contains('price labels'),
+        ),
+        isTrue,
+      );
+      final all = await search('');
+      final category = all.items.first.categoryId;
+      final filtered = await search('', price: 100, category: category);
+      expect(filtered.items, isNotEmpty);
+      expect(
+        filtered.items.every(
+          (p) =>
+              p.storeId == source.storeIdAt(0) &&
+              p.price <= 100 &&
+              p.categoryId == category,
+        ),
+        isTrue,
+      );
+      final prices = filtered.items.map((p) => p.price).toList();
+      expect(prices, orderedEquals([...prices]..sort()));
+      expect((await search('no-such-sku-xyz')).items, isEmpty);
+      expect(
+        (await search(
+          'sku 4999',
+        )).items.any((p) => p.id == source.productIdAt(0, 4998)),
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'R669 review draft codec relaunch keeps cart and isolates customer',
     () async {
       final preferences = _R669StringPreferences();

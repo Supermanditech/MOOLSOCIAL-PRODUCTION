@@ -32,6 +32,7 @@ class _FixtureCustomerStore implements BuyV2CustomerStateStore {
 
 void main() {
   for (final profile in const [
+    (360.0, 1.0, false),
     (390.0, 1.0, false),
     (320.0, 2.0, false),
     (390.0, 1.0, true),
@@ -40,7 +41,8 @@ void main() {
       'Cursor storefront scoped controls and navigation ${profile.$1} ${profile.$2} reduced ${profile.$3}',
       (tester) async {
         tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = Size(profile.$1, 844);
+        tester.view.physicalSize = Size(profile.$1, 800);
+        tester.view.viewPadding = const FakeViewPadding(top: 34, bottom: 48);
         addTearDown(tester.view.reset);
         final core = BuySession();
         final source = _StoreJourneySource(
@@ -58,7 +60,7 @@ void main() {
         addTearDown(session.dispose);
         addTearDown(core.dispose);
         final id = source.productIdAt(0, 0);
-        final otherId = source.productIdAt(1, 0);
+        final otherId = source.productIdAt(10, 0);
         await session.openLinkedProduct(otherId);
         session.toggleSaved(otherId);
         await session.openLinkedProduct(id);
@@ -178,7 +180,20 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('buy-store-price-100')));
         final apply = find.byKey(const ValueKey('buy-store-filters-apply'));
-        await tester.ensureVisible(apply);
+        expect(apply.hitTestable(), findsOneWidget);
+        expect(tester.getSize(apply).width, greaterThanOrEqualTo(120));
+        expect(tester.getSize(apply).height, lessThanOrEqualTo(100));
+        expect(tester.getRect(apply).bottom, lessThanOrEqualTo(752));
+        if (profile.$2 == 1) {
+          expect(
+            tester.getSize(find.byType(BottomSheet).last).height,
+            lessThan(430),
+          );
+        }
+        await captureR66Visual(
+          tester,
+          "store-repair-filter-${profile.$1}-${profile.$2}-${profile.$3}",
+        );
         await tester.tap(apply);
         await tester.pumpAndSettle();
         expect(source.productQueries.last.maximumPrice, 100);
@@ -238,8 +253,37 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(savedList, findsOneWidget);
+        final otherStore = find.byKey(
+          ValueKey('buy-store-more-${source.storeIdAt(10)}'),
+        );
+        final savedScroll = find
+            .descendant(of: savedList, matching: find.byType(Scrollable))
+            .first;
+        await tester.scrollUntilVisible(
+          otherStore,
+          400,
+          scrollable: savedScroll,
+        );
+        await captureR66Visual(
+          tester,
+          "store-repair-more-${profile.$1}-${profile.$2}-${profile.$3}",
+        );
+        await tester.tap(otherStore);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(
+            ValueKey('buy-paged-scroll-store-shop-${source.storeIdAt(10)}'),
+          ),
+          findsOneWidget,
+        );
+        expect(source.productQueries.last.storeId, source.storeIdAt(10));
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(savedList, findsOneWidget);
         final close = find.byKey(const ValueKey('buy-paged-store-close'));
-        await tester.ensureVisible(close);
+        await tester.scrollUntilVisible(close, -400, scrollable: savedScroll);
+        await tester.pumpAndSettle();
+        expect(close.hitTestable(), findsOneWidget);
         await tester.tap(close);
         await tester.pumpAndSettle();
         expect(find.byKey(ValueKey('buy-shop-seller-sheet-$id')), findsNothing);

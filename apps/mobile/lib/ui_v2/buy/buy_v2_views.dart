@@ -14007,14 +14007,17 @@ class _DiscoveryRefinementSection extends StatelessWidget {
   Widget build(BuildContext context) => ExpansionTile(
     key: ValueKey('buy-refine-section-$id'),
     tilePadding: EdgeInsets.zero,
-    childrenPadding: const EdgeInsets.only(bottom: 8),
+    dense: true,
+    minTileHeight: 48,
+    visualDensity: VisualDensity.compact,
+    childrenPadding: const EdgeInsets.only(bottom: 4),
     title: Text(title, style: Theme.of(context).textTheme.titleSmall),
     subtitle: Text(summary, style: context.buyMeta),
     shape: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
     collapsedShape: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
     children: [
       for (final child in children)
-        Padding(padding: const EdgeInsets.only(bottom: 6), child: child),
+        Padding(padding: const EdgeInsets.only(bottom: 4), child: child),
     ],
   );
 }
@@ -14044,7 +14047,7 @@ class _DiscoveryChoice extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Row(
               children: [
                 Expanded(
@@ -14052,6 +14055,8 @@ class _DiscoveryChoice extends StatelessWidget {
                     label,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: selected ? Colors.white : BuyV2Colors.navy,
+                      fontSize: 13,
+                      height: 1.2,
                     ),
                   ),
                 ),

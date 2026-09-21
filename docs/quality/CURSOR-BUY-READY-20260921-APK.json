@@ -214,5 +214,24 @@
     "signerSha256": "cbdfc5969ad51ed570afb1cf2fe60377e559d43f59d59e2ab66ccaf78ea9ac25",
     "buildReceipt": "59314/4bf1ae",
     "buildExitCode": 0
+  },
+  "followupRepair": {
+    "state": "local_checks_passed_device_requalification_pending",
+    "previousInstalledCandidateUnchanged": true,
+    "defects": [
+      "REG4642",
+      "REG4643",
+      "REG4644",
+      "REG4645"
+    ],
+    "focusedStoreTests": {
+      "passed": 31,
+      "failed": 0,
+      "receipt": "13030/6775ca"
+    },
+    "compactSelectionTests": "58_selected_scenarios_covered_initial_passes_and_corrected_targeted_reruns",
+    "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md",
+    "finalStoreProfilesPassed": 4,
+    "screenshots": "C:\\GUARANTEED OUTCOME\\outputs\\cursor-buy-ready-20260921\\buy-compact-final"
   }
 }

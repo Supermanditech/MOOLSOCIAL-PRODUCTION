@@ -1,5 +1,54 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Latest: Store repairs and compact Buy selection controls implemented locally
+
+Founder added the compact-spacing ticket during Store repairs. REG4642/4643
+repairs and REG4644 More stores wiring are implemented. REG4645 compact controls
+cover individual Store filters/categories, Offers publisher/categories, area
+selection, and shared Shop/Wholesale discovery sections. Existing compact SKU
+and main category grids retain their layout; global app theme is unchanged.
+Store SKU queries keep exact storeId; Saved is store-filtered; price/category,
+search, sort, empty results and Back preserve scope and the home query. More stores
+uses the existing leased regional pager and callback, excludes the current store,
+and remains a separate navigation section below products, with retry/disposal.
+
+Validation:
+- R6 Store/source/published-catalogue checks:31 passed,0 failed (13030/6775ca).
+- Compact initial selection run:47 passed,11 failed; every failure was the
+  existing48px list-row requirement. Restored48px, retaining all assertions.
+- Corrected Store/area profiles:8 passed (1214/f426d8).
+- Shop/Wholesale normal-text store journeys:4 passed (86434/8debed).
+- Shop/Wholesale2x store journeys:4 passed (62295/7c1a9f).
+- Final compact footer/navigation captures:4 passed (48678/fdb3f1).
+  Checks include fully visible Apply, width>=120,height<=100, normal sheet<430,
+  store/category/Saved isolation, another-store navigation, Back and home state.
+- Final scoped analysis:5 files, no issues (95087/e094f4). Format checked; existing
+  unrelated whole-session baseline formatting remains preserved.
+All58 scenarios selected for the compact audit are covered by successful runs
+and corrected targeted reruns; no full Buy suite or fresh APK claim is made.
+
+Actual local Flutter screenshots inspected at normal and2x text:
+C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/buy-compact-final/.
+Normal filter: store-repair-filter-360.0-1.0-false.png.
+Large filter: store-repair-filter-320.0-2.0-false.png.
+More stores: store-repair-more-360.0-1.0-false.png.
+SHA256 evidence-manifest.json binds the final PNGs. Initial selected-label
+contrast and large-text footer wrapping findings are repaired and recaptured.
+
+Fresh Redmi requalification remains pending. Installed r66.31 and its SHA-bound
+artifact are preserved and do NOT contain these follow-up changes. No production
+payment, order, integration, push or technical acceptance is claimed. Formal
+handoff still has the previously recorded19127ea6 subject blocker; no history
+rewrite or policy rule changes made. Registry binding changed only to record
+these founder-requested defects/ticket. Runtime owners:catalogue,session,views;
+focused test owners:partner catalogue,session. Existing prior open defects remain.
+
+
+## Authorized defect repair: REG4642 / REG4643 and Store-specific navigation
+
+Founder CONTINUE FIXING THEM authorizes these two public Buy storefront defects. Launch-required: shoppers must apply filters and find relevant store SKUs. Reuse existing catalogue sheet, development catalogue matcher and existing focused tests; no new screen, backend or state owner. Exact runtime owners buy_v2_catalogue.dart and buy_v2_session.dart; tests buy_v2_partner_catalogue_test.dart and buy_v2_session_test.dart. Preserve production catalogue contracts, Store/Counter Sale/CSV, checkout, navigation and prior APK evidence. Sequence: reproduce, minimal repair, focused regression and analysis. Review data remains review-only; no payment/order action. Device requalification requires a fresh candidate; installed r66.31 cannot prove this repair. Formal integration commit-subject blocker remains separate; no policy expansion.
+
+
 ## Redmi build and device audit complete; two defects remain open
 
 Fresh r66.31 / code2026092101 debug review APK built successfully from
@@ -753,3 +802,21 @@ Future integration: retain the complete checkpoint, keep Buy changes isolated,
 coordinate shared Store/Buy contracts and routing, and qualify exact commits plus
 combined regressions in the designated integration worktree. Visual approval is
 not technical acceptance. No inherited r61.5 authorization may be reused.
+
+Founder additionally requested store-specific search/filter/SKU isolation and restoring More stores below the store. Reuse existing related-store cards and callback as a footer; no new navigation contract. Initial tooling invocation used incorrect working-directory-relative paths and made no edits; corrected at worktree root. Its Flutter dependency resolution changed generated support metadata; exact clean-start HEAD bytes restored after archiving generated copies outside the worktree. Subsequent tests use --no-pub.
+
+Navigation test r3 failed4 profiles because cached other-store previews alone were absent after page retention. Repair uses the existing leased Store pager for a bounded same-region list, independent of SKU search/filter, excludes the current store, and keeps retry plus dispose/release. No general-home SKU content is inserted. Earlier r2 passed5 focused tests; analyzer identified one null-aware collection lint, corrected.
+
+R4 navigation exercised the restored cards, selected-store query and Back successfully, then the test failed locating the lazy offscreen Close header. Preserve retained scroll and explicitly scroll back to Close in the test. Search prefix matcher also applies to this store Saved results, retaining Unicode words and excluding price-label infixes.
+
+R5 passed30/failed1: 320px/2x Close test tapped before scroll settled, leaving the sheet open. Add pumpAndSettle plus hitTestable before that tap, without changing the Close callback or weakening its disappearance assertion. Related-store requests explicitly remain regional even when home browses all areas.
+
+## Added in-progress ticket: Buy compact selection spacing
+
+Founder rejected spread-out filter text and explicitly added this ticket between current repairs. Launch-supporting: reduce excess spacing across Buy selection surfaces (Shop/Wholesale discovery, Offers publisher/categories, individual Store filters/categories, related filter tools). Reuse existing catalogue and views owners; preserve 44px minimum actions, enlarged text, callbacks and data scope. Audit already-compact SKU/category layouts without shrinking their tap targets. No global application theme, Store-workspace, backend or policy changes. Validate focused Store navigation plus existing discovery/category/filter tests and actual local captures.
+
+Compact screenshot inspection caught selected chip labels losing contrast when explicit typography replaced inherited state color. Correct selected text/checkmark to white and unselected text to navy. Remove redundant filter drag handle (Close and gesture dismissal retained) to reduce unused header space. Keep screenshot evidence and recapture final controls; no acceptance from an uninspected image.
+
+Compact r1 caught four area-row minimum-target regressions (44/47 versus existing48px requirement). Restore48px list-row minimum; retain compact typography and do not weaken assertions. Store filters remain within compact height bound and footer hit-target checks.
+
+Large-text screenshot review revealed Reset taking most footer width and forcing Apply into character wrapping despite hit-test success. Allocate equal flexible width to both actions; add minimum120px Apply width and maximum100px height checks at every profile. Keep full text and font scaling, no ellipsis or scale suppression.
