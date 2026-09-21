@@ -1,5 +1,25 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Both full cycles complete; final analysis passed
+
+45755/293074 exit0: corrected cycle2 passed2459, skipped27 inherited cases,
+failed0, matching cycle1. Neither cycle excluded reference tags. Full mobile
+analysis59495/9c47c2 exit0: no issues (63.1s). Manifest recheckcd7023:758 owners,
+zero drift. Clean checkpoint8d8e32:zero status bytes/records atd278c18b.
+Whole-file format checkaa3412 failed on six inherited session-format differences;
+no file was changed. Exact baseline-context checkfb5506 proves every difference
+exists byte-equivalently in79d54013 and none intersects ticket edits. Other ten
+changed Dart files format cleanly. Preserve unrelated baseline formatting;
+this is a scoped formatting disposition, not a claim of global format cleanliness.
+The first diagnostic33f038 used default console encoding and failed to print;
+UTF8 diagnostic8569d5 and exact comparisonfb5506 provide the valid evidence.
+
+Founder queried excessive delay and policy drift. Three complete Buy runs took
+about77 minutes (initial failed plus two corrected passes). Registration and
+exact-source/hash admission were the bounded previously authorized blocker work;
+no further gate/policy development is planned. Proceed to wrapper and Redmi.
+
+
 ## Fresh qualification: first corrected full cycle passed
 
 Build-phase memory13593/81c7e8 exit0 validates4612 entries,238 applicable with

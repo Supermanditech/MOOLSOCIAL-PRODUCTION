@@ -18,21 +18,28 @@
   "localRepairValidation": {
     "broaderTestsPassed": 633,
     "savedTestsPassed": 4,
-    "analysis": "passed_no_issues",
+    "analysis": "full_mobile_passed_no_issues",
     "remainingProtectedImageComparisonsFailed": 0,
     "referenceVersion": "cursor-storefront-pickup-20260921-r2-founder-accepted",
     "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md",
-    "fullBuyRegressionRerun": "running_corrected_cycles",
+    "fullBuyRegressionRerun": "both_corrected_cycles_passed",
     "savedGeometryTestsPassed": 165,
     "fullBuyRegressionCycle1": {
       "passed": 2459,
       "skipped": 27,
       "failed": 0,
       "log": "C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/qualification-corrected-buy-cycle-1.log"
+    },
+    "formatDisposition": "10_files_clean;6_session_format_differences_exact_inherited_baseline;zero_ticket_intersections",
+    "fullBuyRegressionCycle2": {
+      "passed": 2459,
+      "skipped": 27,
+      "failed": 0,
+      "log": "C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/qualification-corrected-buy-cycle-2.log"
     }
   },
   "preBuildValidation": {
-    "state": "pending",
+    "state": "passed",
     "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md"
   },
   "preBuildGates": [
@@ -129,8 +136,10 @@
     },
     {
       "id": "format-analysis",
-      "state": "pending",
-      "evidence": []
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
     },
     {
       "id": "buy-regression-1",
@@ -141,8 +150,10 @@
     },
     {
       "id": "buy-regression-2",
-      "state": "pending",
-      "evidence": []
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
     }
   ],
   "device": {
