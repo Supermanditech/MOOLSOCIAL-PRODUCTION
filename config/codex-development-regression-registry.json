@@ -10,6 +10,39 @@
   },
   "entries": [
     {
+      "id": "REG-20260921-4634-CURSOR-DELIVERY-RAIL-WITHOUT-ACTIVE-ORDER",
+      "status": "open_founder_reported_reproduction_pending",
+      "appliesTo": ["implementation", "testing", "buy", "navigation"],
+      "mistake": "Founder reports that the main bottom rail Delivery icon remains visible even when no order has been placed or no active delivery exists.",
+      "rootCause": "Not yet verified. Inspect the existing rail visibility predicate and authoritative active-order state; do not assume a fixture, routing or backend cause before reproduction.",
+      "prevention": "Pending fix and regression coverage: hide Delivery with no placed order or no active delivery; show it for an eligible active delivery using existing navigation. Check fresh and retained sessions, completion/cancellation, multiple orders and return navigation. Registration is not proof of a fix.",
+      "gates": ["apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart"],
+      "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"]
+    },
+    {
+      "id": "REG-20260921-4635-CURSOR-OFFERS-PROMO-CARD-THEME-MISMATCH",
+      "status": "open_founder_reported_reproduction_pending",
+      "appliesTo": ["implementation", "testing", "buy", "visual_review"],
+      "mistake": "Founder reports that the promotional card under Offers has a design and colours that do not match its background or the app theme.",
+      "rootCause": "Not yet verified. Inspect the existing Offers promo card styling against the accepted Buy home theme before identifying the exact conflicting styles.",
+      "prevention": "Pending fix and visual regression coverage: reuse existing app theme colours, card styling, typography and spacing while retaining contrast, offer content and existing tap navigation. Capture the actual Offers screen for founder review; registration is not visual acceptance or a fix.",
+      "gates": ["apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart"],
+      "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"]
+    },
+    {
+      "id": "REG-20260921-4633-CURSOR-CAPTURE-RUNTIME-AND-PUBLIC-STORE-IDENTITY",
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "testing", "evidence", "implementation"],
+      "mistake": "Cursor presented a small default-fixture Buy catalogue and the operator Store dashboard when the founder requested latest reviewed public Buy and the public storefront reached through Visit store.",
+      "rootCause": "The capture test omitted the reviewed APK's MOOLSOCIAL_DEVICE_REVIEW mode and substituted a guessed Store workspace route for the requested customer tap journey. Readiness wording also failed to distinguish a moving Codex checkpoint from a qualified runtime baseline.",
+      "retryEvidence": "First corrected run (session29975, terminalc54f21) stopped both tests before capture because the production router's review-mode secure draft recovery lacked the existing FlutterSecureStorage in-memory test setup. Preserve both failures; initialize the installed plugin's built-in mock before mounting. The clean-support wrapper returned integer1 while the outer shell exited0, so assert and propagate the wrapper return rather than accepting shell status alone.",
+      "retryCatalogueOracle": "Session64642 terminala844fe correctly propagated exit1. The route mounted, but the capture wrongly required generated provider IDs in visibleProducts; reviewed public discovery retains canonical product IDs while resolving paged provider offers. Assert the existing pagedCatalogueEnabled state, and use actual rendered card IDs for tap continuity. This corrects the test oracle, not production code or accepted output.",
+      "retryCardIdentity": "Session21734 terminalc449cb captured current public Buy successfully, then failed before Visit store because it used the legacy buy-product card key and session.visibleProducts instead of the actual BuyV2PagedProductCatalogue card. Resolve the rendered buy-paged-card key, derive its product ID, tap that card, then require selected-product and public-store owner continuity. Preserve corrected-r4/public-buy.png; recapture to a new directory.",
+      "prevention": "Verify the current Codex checkpoint and integrated Cursor ancestor; bind capture to that exact source. Assert review-mode catalogue activation, enter public Buy through MoolSocialApp, tap a rendered product and its Visit store action, assert the public seller-sheet owner and absence of WorkWorkspaceDashboardScreen. Preserve initial PNGs and write correction to a new directory. Never call local fixture captures backend, device or release acceptance.",
+      "gates": ["apps/mobile/test/cursor_buy_store_baseline_capture_test.dart"],
+      "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"]
+    },
+    {
       "id": "REG-20260806-001-MOOL-ROOT-NONINTERACTIVE",
       "status": "resolved_gate_active",
       "appliesTo": [

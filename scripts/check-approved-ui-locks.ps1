@@ -133,6 +133,9 @@ function Get-CursorAccessibilityNativeProjection {
   # REG4608: admit only the exact merged accessibility + PDF composition in
   # this correction lane and its single fresh final-admission destination.
   $combinedBranch = switch ($actualRoot.Replace('\','/')) {
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921' {
+      'work/cursor-ui/buy-ready-20260921'
+    }
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
       'work/codex-ui/store-procurement-bridge-20260912'
     }
@@ -182,6 +185,13 @@ function Get-CursorAccessibilityNativeProjection {
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/buy-ready-20260921') {
+    $cursorReadyBaseline = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+    & git -C $root merge-base --is-ancestor $cursorReadyBaseline HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cursor capture requires the complete assigned baseline.' }
+    & git -C $root diff --quiet $cursorReadyBaseline -- 'apps/mobile/android' 'approved-references'
+    if ($LASTEXITCODE -ne 0) { throw 'Cursor capture changed native owners or approved references.' }
   }
   if ($requiredBranch -cin @('work/codex-ui/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919-v2', 'integration/moolsocial/counter-sale-20260919-v3', 'integration/moolsocial/counter-sale-20260919-v4', 'integration/moolsocial/counter-sale-20260919-v5')) {
     # REG4631: this ticket inherits the accepted combined native implementation.

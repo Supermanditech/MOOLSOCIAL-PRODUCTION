@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4603,
-    "sha256": "D77C0CBAC571EC1509A5B239A568414DB93AA5FD337A384000F1076416FADD95"
+    "entryCount": 4606,
+    "sha256": "9235EA4F6603B60434031E9C9B17759F9EA1143E314C9F3370F53636367F63CC"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,25 +34,12 @@
       "task": "/root",
       "role": "primary",
       "owners": [
-        "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
-        "apps/mobile/lib/features/work/work_stock_export.dart",
-        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
-        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt",
-        "apps/mobile/pubspec.yaml",
-        "apps/mobile/pubspec.lock",
-        "apps/mobile/.dart_tool/package_config.json",
-        "apps/mobile/.dart_tool/package_graph.json",
-        "apps/mobile/.flutter-plugins-dependencies",
-        "apps/mobile/lib/features/work/work_models.dart",
-        "apps/mobile/lib/features/work/work_session.dart",
-        "apps/mobile/lib/features/journey01/journey_router.dart",
-        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
-        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
-        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
-        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-incremental.json"
+        "scripts/check-approved-ui-locks.ps1",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart"
       ]
     },
     {
@@ -173,6 +160,29 @@
       "featureBranchesMustStartAtTag": true
     },
     "continuationBindings": [
+      {
+        "id": "cursor_buy_ready_20260921",
+        "state": "founder_authorized_2026_09_21",
+        "lane": "cursor_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "buy-ready-20260921",
+        "ticketId": "UAW-CURSOR-BUY-READY-20260921",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921",
+        "branch": "work/cursor-ui/buy-ready-20260921",
+        "baselineHead": "79d5401338881f55e65b08c0e7843cbac016fcfb",
+        "bootstrapCommitSubject": "coordination(buy-ready-20260921): admit independent baseline capture",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/check-approved-ui-locks.ps1",
+          "docs/quality/CURSOR-BUY-READY-20260921.md",
+          "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
       {
         "id": "codex_add_product_screen1_20260920",
         "state": "founder_authorized_2026_09_20",

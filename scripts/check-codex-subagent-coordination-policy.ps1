@@ -1038,8 +1038,49 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 80) `
+Assert-Coordination ($continuationBindings.Count -eq 81) `
   'founder-authorized continuation binding inventory changed.'
+
+# Exact founder-authorized local capture admission; no application owner or APK.
+$cursorReadyOwners = @(
+  'config/codex-development-regression-registry.json',
+  'config/codex-subagent-coordination-policy.json',
+  'scripts/check-codex-subagent-coordination-policy.ps1',
+  'scripts/check-approved-ui-locks.ps1',
+  'docs/quality/CURSOR-BUY-READY-20260921.md',
+  'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
+)
+$cursorReadyBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_buy_ready_20260921' })
+Assert-Coordination ($cursorReadyBindings.Count -eq 1) 'Cursor baseline capture binding missing or duplicated.'
+$cursorReadyBinding = $cursorReadyBindings[0]
+$cursorReadyExpected = @{
+  state = 'founder_authorized_2026_09_21'; lane = 'cursor_ui'; role = 'primary'; task = '/root'
+  workId = 'buy-ready-20260921'; ticketId = 'UAW-CURSOR-BUY-READY-20260921'
+  worktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921'
+  branch = 'work/cursor-ui/buy-ready-20260921'
+  baselineHead = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+  bootstrapCommitSubject = 'coordination(buy-ready-20260921): admit independent baseline capture'
+}
+foreach ($field in $cursorReadyExpected.Keys) {
+  Assert-Coordination ([string]$cursorReadyBinding.$field -ceq [string]$cursorReadyExpected[$field]) "Cursor baseline capture binding changed: $field"
+}
+Assert-Coordination (
+  (@($cursorReadyBinding.bootstrapOwners | Sort-Object) -join '|') -ceq (@($cursorReadyOwners | Sort-Object) -join '|') -and
+  $cursorReadyBinding.cursorIndependent -eq $true -and $cursorReadyBinding.integrationRequiredBeforeSuccessorApk -eq $true
+) 'Cursor baseline capture owners or integration boundary changed.'
+$cursorReadyAdmission = (
+  $root.Replace('\','/').TrimEnd('/') -ceq $cursorReadyBinding.worktreePath -and
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  $ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq $cursorReadyBinding.workId -and
+  $ProductionTicketId -ceq $cursorReadyBinding.ticketId
+)
+if ($cursorReadyAdmission) {
+  Assert-Coordination ($ProductionPhase -cin @('coordination_bootstrap','task_start','implementation','pre_commit','handoff')) 'Cursor setup cannot authorize acceptance, APK or release.'
+  & git -C $root diff --quiet $cursorReadyBinding.baselineHead -- 'apps/mobile/lib' 'apps/mobile/android' 'apps/mobile/ios' 'apps/mobile/pubspec.yaml' 'apps/mobile/pubspec.lock' 'backend' 'contracts' 'packages'
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'Cursor capture must preserve the complete application baseline.'
+  $cursorReadyClaim = @($policy.activeClaims | Where-Object { $_.task -ceq '/root' })
+  Assert-Coordination ($cursorReadyClaim.Count -eq 1 -and (@($cursorReadyClaim[0].owners | Sort-Object) -join '|') -ceq (@($cursorReadyOwners | Sort-Object) -join '|')) 'Cursor capture claim must contain only its exact setup and test owners.'
+}
 
 # Founder-authorized Screen 1 exception: a work checkpoint, never acceptance.
 $addProductBindings = @($continuationBindings | Where-Object { $_.id -ceq 'codex_add_product_screen1_20260920' })
@@ -1166,6 +1207,8 @@ foreach ($continuationBinding in $continuationBindings) {
     (
       ([string]$continuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_20') -or
+      ([string]$continuationBinding.id -ceq 'cursor_buy_ready_20260921' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_21') -or
       ([string]$continuationBinding.id -ceq 'codex_counter_sale_20260919' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_19') -or
       ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
@@ -2215,8 +2258,8 @@ if ($ProductionLane -ceq 'baseline') {
     ) 'continuation bootstrap requires the primary coordination owner.'
   } else {
     Assert-Coordination (
-      [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $AgentTask.StartsWith(
+      ($cursorReadyAdmission -or [string]$selectedLane.agentRole -ceq $AgentRole) -and
+      ($cursorReadyAdmission -or $storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))
@@ -2363,6 +2406,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $cursorReadyOwner = $cursorReadyAdmission -and $effectiveOwner -cin $cursorReadyOwners
       $storeProcurementBridgeOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
@@ -2897,7 +2941,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -2909,7 +2953,7 @@ if ($ProductionLane -ceq 'baseline') {
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
-          $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
+          $cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
           $addProductPhotoRouteOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
