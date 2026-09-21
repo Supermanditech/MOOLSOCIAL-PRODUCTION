@@ -8344,6 +8344,11 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                     focusNode: _searchFocus,
                     maxLength: 80,
                     textInputAction: TextInputAction.search,
+                    style: const TextStyle(
+                      color: BuyV2Colors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                     decoration: InputDecoration(
                       hintText:
                           MediaQuery.textScalerOf(context).scale(1) > 1.25 ||
@@ -8352,7 +8357,20 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                           ? 'Search'
                           : 'Search this store',
                       counterText: '',
-                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintStyle: const TextStyle(
+                        color: BuyV2Colors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: BuyV2Colors.navy,
+                        size: 21,
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 42,
+                        minHeight: 46,
+                      ),
                       suffixIcon: _search.text.isEmpty
                           ? widget.storefront
                                 ? IconButton(
@@ -8374,7 +8392,15 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                               onPressed: () => setState(_search.clear),
                               icon: const Icon(Icons.close_rounded),
                             ),
-                      border: const OutlineInputBorder(),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                     onChanged: (_) => setState(() {}),
                     onSubmitted: (_) => _searchFocus.unfocus(),

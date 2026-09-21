@@ -167,6 +167,10 @@ void main() {
         final field = find.byKey(const ValueKey('buy-store-product-search'));
         expect(tester.widget<TextField>(field).decoration?.label, isNull);
         await _revealPagedHeader(tester, scope, field);
+        await captureR66Visual(
+          tester,
+          'store-unboxed-search-${profile.$1}-${profile.$2}-${profile.$3}',
+        );
         await tester.enterText(field, 'sku 4999');
         await tester.pumpAndSettle();
         expect(source.productQueries.last.query, 'sku 4999');

@@ -1,5 +1,29 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Store search: match Buy Home unboxed presentation
+
+Founder-selected launch-supporting Buy presentation change, 22 September 2026.
+Public customer opens Visit store and searches that store's catalogue. Reuse
+the existing TextField, controller, query owner and navigation; change only its
+decoration and typography to Buy Home's unboxed tokens. Exact runtime owner:
+apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart; existing focused journey owner:
+apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart.
+Store ID filtering, clear/info/close actions, category/filter/Saved, query recovery
+and home query isolation remain unchanged. No shared contract, backend, routing,
+APK or policy change. Verify the existing four viewport/accessibility journeys,
+scoped analysis and local rendered screenshots. Device remains old r66.31.
+
+Completed locally: border and fill removed for every input state; Buy Home's
+13px ink text, 12px muted hint, navy search icon and compact padding reused.
+Focused analysis: no issues. Existing connected store journeys: all four passed
+(360/390 normal, 320 at 2x text, 390 reduced motion), including store-scoped
+query, category/filter/Saved, related-store navigation and preserved home query.
+Evidence: outputs/cursor-buy-ready-20260921/store-unboxed-search-r1.log and
+store-unboxed-search-r1/store-unboxed-search-*.png. Normal and 2x screenshots
+inspected. Regression-memory gate passed with the existing historical archive
+parameter after its default invocation could not locate retained REG3955 evidence.
+No new APK or device acceptance is claimed.
+
 ## Founder Redmi recheck: filter action still clipped in installed r66.31
 
 22 September00:39: captured the popup already open on Redmi without navigating
