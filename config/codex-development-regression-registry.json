@@ -10,6 +10,42 @@
   },
   "entries": [
     {
+      "id": "REG-20260921-4642-CURSOR-STOREFRONT-FILTER-CTA-CLIPPED",
+      "status": "open_verification",
+      "appliesTo": [
+        "implementation",
+        "testing",
+        "buy"
+      ],
+      "mistake": "On Redmi 720x1600 font1.0, Show products is clipped below the filter sheet; only its blue upper edge can be tapped. UI XML reports zero bounds. Swiping did not expose the label. Reset and partial-edge apply work. Screens07,08,12.",
+      "rootCause": "Observed device behavior; source cause and inherited-versus-ticket attribution not yet established.",
+      "prevention": "Keep this defect open until the complete labelled apply button is visible and tappable on Redmi, including enlarged text, with existing filtering preserved.",
+      "gates": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "REG-20260921-4643-CURSOR-STOREFRONT-SEARCH-RICE-PRICE-LABELS",
+      "status": "open_verification",
+      "appliesTo": [
+        "implementation",
+        "testing",
+        "buy"
+      ],
+      "mistake": "Store search rice returns Self-adhesive price labels alongside rice products. Screenshot05 demonstrates an unrelated result.",
+      "rootCause": "Observed device behavior; source cause and inherited-versus-ticket attribution not yet established.",
+      "prevention": "Check whole-token and intended partial-word search relevance against this exact example while retaining intended product/category matches; replay on device.",
+      "gates": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
       "id": "REG-20260921-4641-CURSOR-APK-QUALIFICATION-REGRESSION-AND-SOURCE",
       "archiveParameterRequired": "Memory67358/fbe745 failed because invocation omitted EvidenceArchiveRoot; historical REG3955 untracked evidence is resolved through existing MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904 support. Retry with the existing archive parameter, retaining checks and never creating replacement evidence. Carry that same archive root into fresh build wrapper.",
       "inheritedScreenImportQualification": "Backend45621/3d844a rejected unchanged screen dart:io import. Exact screen equals inherited79d54013; diff from former1880614 pin is33 additions/6 deletions limited to embedded Store layout and formatting, with sound/import seam unchanged. Qualify only d5279222 plus portable screen hash C6438E31C55DA94A9B3CD4D1FF403535B1CB5B9C5727341E02AF90EDB4993992 in the existing review projection; preserve all other forbidden imports and production rejection. Initial control registrationcf7d6e stopped before mutation on repeated literal; corrected primary-scoped edit passed4bf291.",

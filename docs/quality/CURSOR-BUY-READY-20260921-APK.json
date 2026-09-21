@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "qualification_pending_full_regression_and_source_seal",
-  "buildAuthorization": "founder_requested_pending_required_gates",
+  "machineState": "device_tested_defects_open",
+  "buildAuthorization": "consumed_for_this_candidate",
   "candidate": {
     "id": "UAW-CURSOR-STOREFRONT-PICKUP-20260921-R1",
     "versionName": "1.0.0-r66.31",
@@ -10,7 +10,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_cursor_ui_review_debug",
     "branch": "work/cursor-ui/buy-ready-20260921",
-    "head": "432befc4c7be1b36170588e57b2eb331c45021fc"
+    "head": "d73d609d8389101d5981c3c8929b7ac745bf059b"
   },
   "promotion": {
     "state": "forbidden_non_promotable"
@@ -161,8 +161,16 @@
     "model": "Xiaomi 23106RN0DA"
   },
   "postBuildGates": {
-    "installedChecksum": "pending",
-    "storeTicketDefectAudit": "pending"
+    "installedChecksum": "passed",
+    "storeTicketDefectAudit": "completed_two_open_findings",
+    "installedApkSha256": "84A3FEBB5A2DF080E7CB2E645ACE7FE8BA794C49B6B54CF7DD41327C3BFAFB8D",
+    "installedVersionName": "1.0.0-r66.31-cursorreview",
+    "deviceEvidenceDirectory": "C:\\GUARANTEED OUTCOME\\outputs\\cursor-buy-ready-20260921\\redmi-r66-31-uat",
+    "defects": [
+      "REG-20260921-4642-CURSOR-STOREFRONT-FILTER-CTA-CLIPPED",
+      "REG-20260921-4643-CURSOR-STOREFRONT-SEARCH-RICE-PRICE-LABELS"
+    ],
+    "productionOrderPaymentAcceptance": "not_qualified_review_session_requires_sign_in"
   },
   "qualifiedApplicationSource": "d5279222466211f0526c625e58b8da5dc0d78218",
   "requiredRuntimeDefines": {
@@ -195,5 +203,16 @@
     "manifestPath": "apps/mobile/build/review-candidates/cursor-storefront-pickup-20260921-r1/source-manifest.txt",
     "manifestSha256": "E2E9F1B5A215DEBCDFC3DD891CDFF911FE9A349E57CF54D16B0A2F782BE00E54",
     "fileCount": 758
+  },
+  "authorizationEvidence": "Founder requested final Redmi APK, authorized production-grade blocker fixes, and APPROVED CONTINUE. Fresh candidate only; no inherited r61.5 authorization.",
+  "artifact": {
+    "path": "apps/mobile/build/review-candidates/cursor-storefront-pickup-20260921-r1/uaw-cursor-storefront-pickup-20260921-r1-device-review-debug.apk",
+    "sha256": "84A3FEBB5A2DF080E7CB2E645ACE7FE8BA794C49B6B54CF7DD41327C3BFAFB8D",
+    "bytes": 215559761,
+    "package": "com.moolsocial.app.cursorreview",
+    "installedVersionName": "1.0.0-r66.31-cursorreview",
+    "signerSha256": "cbdfc5969ad51ed570afb1cf2fe60377e559d43f59d59e2ab66ccaf78ea9ac25",
+    "buildReceipt": "59314/4bf1ae",
+    "buildExitCode": 0
   }
 }

@@ -1,5 +1,47 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Redmi build and device audit complete; two defects remain open
+
+Fresh r66.31 / code2026092101 debug review APK built successfully from
+HEAD d73d609d8389101d5981c3c8929b7ac745bf059b (receipt59314/4bf1ae).
+Package com.moolsocial.app.cursorreview, installed version1.0.0-r66.31-cursorreview.
+Data-preserving installation on Redmi TG8HCYTGGQT885OF succeeded. Pulled installed
+base.apk SHA256 equals the fresh artifact:
+84A3FEBB5A2DF080E7CB2E645ACE7FE8BA794C49B6B54CF7DD41327C3BFAFB8D.
+Build authorization consumed for this candidate; review only, not production accepted.
+Artifact: apps/mobile/build/review-candidates/cursor-storefront-pickup-20260921-r1/uaw-cursor-storefront-pickup-20260921-r1-device-review-debug.apk.
+
+Actual device evidence: C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/redmi-r66-31-uat.
+Public product Visit store opens the individual store. Saved filtering, category
+selection, product return, price/sort application and Reset work. Search has the
+relevance finding below. Cart retains Shop4 items/Rs355 and Wholesale2 items.
+Delivery/Collect at store ticks switch exclusively. Collection shows the store;
+its payment page retains the sign-in requirement and disables Review order.
+Returning to Delivery restores Work address and Rs355 (screen23). Cart values
+remain unchanged (24). Continue browsing and background/foreground return to
+store with category and cart retained (25). No real order/payment submitted.
+Screen22 is collection before the correct Delivery tap, despite its filename.
+Bounded current-process error log is empty; this is not a complete crash-history proof.
+Font and animation settings were unchanged. Continuous animation and enlarged-text
+physical acceptance remain unclaimed; host tests cover their implemented behavior.
+
+Open device findings registered:
+- REG-20260921-4642: Store filter Show products button clipped, label offscreen;
+  XML zero bounds. Swipe did not recover it; partial blue-edge tap applies.
+  Screens07,08,12 preserve the defect. Reset itself works (13).
+- REG-20260921-4643: searching rice also returns Self-adhesive price labels (05).
+  Source cause and inherited-versus-ticket attribution remain unconfirmed.
+Existing REG4634 Delivery rail and REG4635 offer-theme findings remain open.
+The seeded profile has active orders, so it does not prove the no-order rail case.
+Screens01/15 were transition frames, not confirmed persistent failures. XML04/09
+was not captured successfully; only their PNGs are evidence.
+
+No application or test source changed after APK build. Only evidence, the two
+requested defect records, and their existing registry count/hash binding changed.
+No policy rule or gate behavior changed during this device handoff. No push,
+production integration, ticket closure or release acceptance is claimed.
+
+
 ## Both full cycles complete; final analysis passed
 
 45755/293074 exit0: corrected cycle2 passed2459, skipped27 inherited cases,
