@@ -1020,7 +1020,7 @@ void main() {
     );
     expect(
       tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).height,
-      equals(28),
+      equals(44),
     );
     expect(
       tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).width,

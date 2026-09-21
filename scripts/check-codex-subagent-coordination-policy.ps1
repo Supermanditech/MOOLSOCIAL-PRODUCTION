@@ -1054,6 +1054,7 @@ $cursorStorefrontOwners = @(
   'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
   # Founder explicitly authorized all-store pickup after shared scope disclosure.
   'apps/mobile/lib/features/buy/buy_v2_session.dart',
   'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',

@@ -12190,6 +12190,7 @@ class BuyV2ProductCard extends StatelessWidget {
                       _ProductVisual(
                         minimumControlExtent: 48,
                         squarePhoto: true,
+                        savedContext: savedContext,
                         product: product,
                         compact: true,
                         reservedActionWidth: savedContext && !compactSavedAction
@@ -13207,6 +13208,7 @@ class _ProductVisual extends StatelessWidget {
     this.reservedActionWidth = 42,
     this.minimumControlExtent = 44,
     this.squarePhoto = false,
+    this.savedContext = false,
   });
 
   final BuyV2Product product;
@@ -13214,6 +13216,7 @@ class _ProductVisual extends StatelessWidget {
   final double reservedActionWidth;
   final double minimumControlExtent;
   final bool squarePhoto;
+  final bool savedContext;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildVisual);
@@ -13224,8 +13227,10 @@ class _ProductVisual extends StatelessWidget {
       context,
       product,
       constraints.maxWidth,
-      squarePhoto ? 30 : reservedActionWidth,
-      minimumControlExtent: squarePhoto ? 28 : minimumControlExtent,
+      squarePhoto && !savedContext ? 30 : reservedActionWidth,
+      minimumControlExtent: squarePhoto
+          ? (savedContext ? 44 : 28)
+          : minimumControlExtent,
     );
     final photoInset = compact ? visualLayout.photoInset : 0.0;
     final photoExtent = squarePhoto

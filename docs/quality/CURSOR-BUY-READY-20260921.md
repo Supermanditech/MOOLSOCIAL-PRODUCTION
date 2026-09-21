@@ -1,5 +1,26 @@
 # Cursor Buy baseline capture — 21 September 2026
 
+## Committed reference acceptance; full regression repair
+
+Saved geometry repair96690/799c44 exit0:165 tests passed across cart relevance,
+product variants and shared SKU fit. Existing overlap/gap assertions unchanged.
+Format/analysisbf099e exit0:2 files,0 changes,no issues. These focused checks do
+not substitute for the pending two full cycles.
+
+Founder approval was executed in local commit19127ea6a7c389eeda000016af672409f2defcff.
+Full cycle62287/9df18c exit1:2454 passed,27 inherited skips,5 failures.
+Log: outputs/cursor-buy-ready-20260921/qualification-full-buy-cycle-1.log.
+Four failures expose insufficient clearance for the existing44px Saved Remove
+control in square-photo cards. Fix the visual layout using actual Saved action
+width/height; preserve photo-square, non-overlap, thin-gap and badge assertions.
+The fifth is the old28px assertion in cart relevance; register this exact test
+owner and assert44px while retaining Add/Remove/confirmation behavior.
+This is mvp_supporting qualification repair within the existing catalogue owner;
+no new service, route, backend or dependency. All prior evidence remains below.
+Ten accepted-reference replay checks pass. Fresh source qualification, two full
+passing runs, APK build and Redmi testing remain pending. No build authority used.
+
+
 ## Founder acceptance and local commit authorization received
 
 Founder APPROVED CONTINUE explicitly accepts the reviewed new reference version

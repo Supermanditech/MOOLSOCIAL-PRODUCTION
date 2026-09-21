@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4612,
-    "sha256": "C93554198F3D46CE8AB2BC2AE03676481432C2543E284BDAA0EB76A62FAAEA37"
+    "sha256": "872949E60F77F003BB3DE93CCE5FCE3549EF1DD77F27E6E29BFE851C1FFF0C7B"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -43,6 +43,7 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
