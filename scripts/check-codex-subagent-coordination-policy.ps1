@@ -2851,6 +2851,20 @@ if ($ProductionLane -ceq 'baseline') {
         $effectiveOwner -cin $addProductBootstrapOwners
       )
       $allowedOwner = $false
+      # Founder requested completion of dialog-free Stock downloads, frontend only.
+      # Admit exactly its bridge and registration; no auth, manifest or release changes.
+      $addProductStockDownloadOwner = (
+        $hasContinuationBinding -and
+        $selectedContinuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+        $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+        $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
+        $effectiveOwner -cin @(
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
+        )
+      )
       # Founder approved one XLSX dependency for the current-stock export only.
       $addProductExportDependencyOwner = (
         $hasContinuationBinding -and
@@ -2883,7 +2897,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -2895,7 +2909,7 @@ if ($ProductionLane -ceq 'baseline') {
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
-          $addProductExportDependencyOwner -or
+          $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
           $addProductPhotoRouteOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or

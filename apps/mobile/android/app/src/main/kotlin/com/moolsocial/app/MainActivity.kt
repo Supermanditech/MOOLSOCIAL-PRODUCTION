@@ -50,9 +50,12 @@ class MainActivity : FlutterActivity() {
     private var pendingInvoiceBytes: ByteArray? = null
     private var pendingGoogleIdentityResult: MethodChannel.Result? = null
     private var workDocumentPreview: WorkDocumentPreviewBridge? = null
+    private var storeStockDownload: StoreStockDownloadBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        storeStockDownload?.close()
+        storeStockDownload = StoreStockDownloadBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         workDocumentPreview?.close()
         workDocumentPreview = WorkDocumentPreviewBridge(
             this,
@@ -481,6 +484,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        storeStockDownload?.close()
+        storeStockDownload = null
         workDocumentPreview?.close()
         workDocumentPreview = null
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_DESTROY_BEGIN

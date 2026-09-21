@@ -36,6 +36,8 @@
       "owners": [
         "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
         "apps/mobile/lib/features/work/work_stock_export.dart",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt",
         "apps/mobile/pubspec.yaml",
         "apps/mobile/pubspec.lock",
         "apps/mobile/.dart_tool/package_config.json",

@@ -1,5 +1,51 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Active v19 — frontend direct Android Stock downloads
+
+Founder requested remaining frontend work first; backend reports remain deferred.
+Bounded continuation completes the previously recorded native saver, without
+redesigning approved Stock/catalogue/editor screens. MainActivity changes only
+register/dispose the isolated Stock bridge; authentication and invoice saving are
+unchanged. Narrow ticket owner admission covers those two Android files only.
+
+- Android 10+ uses MediaStore Downloads/MoolSocial, without a document picker,
+  new storage permissions, backend, dependency or APK.
+- Allowlisted generated names, matching MIME types, basic PDF/XLSX signatures
+  and a 64 MiB limit protect the bridge. New collision-resistant names never
+  overwrite an existing report. Pending rows publish only after the stream closes;
+  failure removes only the incomplete row created by that attempt.
+- Background writing, duplicate-request blocking and activity disposal guards
+  avoid blocking the main thread. Success displays the Downloads location.
+- Pre-Android-10 returns a clear unsupported message, not a picker/permission
+  fallback. Other platforms retain the existing FilePicker path. Do not describe
+  this as universal cross-platform dialog-free saving.
+- No changes to current/historical semantics or report serializers.
+
+Evidence in task outputs/store-stock-native-v19:
+native-compile.log: bridge compiled against Android/Flutter SDK jars, no APK.
+native-payload-tests.log: 12 local JVM validation checks passed.
+flutter-tests-r3.log: 6 focused tests passed, including all formats through a
+mocked Android channel, missing/failed/unsupported platform results, retry/busy,
+date guards and both normal/large-text Stock states.
+analysis-final.log: no issues. Native MediaStore writes, low-storage recovery,
+app interruption, actual files opening and performance remain OPPO-pending.
+This is implementation evidence, not physical download or journey acceptance.
+
+Local development issues retained: an ambiguous patch initially put the new
+saved-location text in the PDF section; immediate source inspection corrected it
+before compile. First analysis found a missing test-only platform override import.
+First mock run stalled on an unhandled platform call; cancelled with log retained.
+Second failed on override cleanup timing. Explicit missing-plugin mock plus the
+framework's platform variant fixed these harness issues; only r3 is a full pass.
+
+Frontend queue (not backend-only and not silently complete): CSV quoted parsing,
+ambiguous matching/batch review; remaining public product/Wholesale field mapping;
+Store default/settings inheritance; wider PDF script coverage. Continue one
+bounded journey screen at a time, preserve approved layouts and obtain founder
+review for new visuals. Backend history/catalogue/publication remains deferred.
+Reference: https://developer.android.com/training/data-storage/shared/media
+uses MediaStore.Downloads and IS_PENDING for app-created Android 10+ files.
+
 ## Active v18 — inline periods and export actions, design approved
 
 Founder approved this design on 21 September 2026 after the resumed local work.

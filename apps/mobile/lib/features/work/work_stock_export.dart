@@ -26,16 +26,42 @@ Future<bool> saveStoreStockFile(
   Uint8List bytes,
   String fileName,
   StoreStockExportFormat format,
-) async =>
-    await FilePicker.saveFile(
-      dialogTitle: 'Save stock statement',
-      fileName: fileName,
-      mimeType: format.mimeType,
-      type: FileType.custom,
-      allowedExtensions: [format.extension],
-      bytes: bytes,
-    ) !=
-    null;
+) async {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      return await const MethodChannel(
+            'com.moolsocial.app/store_stock_download',
+          ).invokeMethod<bool>('save', {
+            'bytes': bytes,
+            'fileName': fileName,
+            'mimeType': format.mimeType,
+          }) ==
+          true;
+    } on PlatformException catch (error) {
+      if (error.code == 'stock_download_unsupported') {
+        throw const FormatException(
+          'Direct downloads require Android 10 or later.',
+        );
+      }
+      throw const FormatException(
+        'Could not save to Downloads. Tap a format to try again.',
+      );
+    } on MissingPluginException {
+      throw const FormatException(
+        'Downloads are unavailable in this app version.',
+      );
+    }
+  }
+  return await FilePicker.saveFile(
+        dialogTitle: 'Save stock statement',
+        fileName: fileName,
+        mimeType: format.mimeType,
+        type: FileType.custom,
+        allowedExtensions: [format.extension],
+        bytes: bytes,
+      ) !=
+      null;
+}
 
 enum StoreStockPeriod { current, today, week, month, custom }
 
@@ -301,6 +327,14 @@ class _StoreStockDownloadControlsState
                 style: const TextStyle(fontSize: 12),
               ),
             ),
+          ),
+        if (_status?.contains(' saved · ') == true &&
+            widget.saveFile == saveStoreStockFile &&
+            !kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android)
+          const Text(
+            'Saved in Downloads / MoolSocial.',
+            style: TextStyle(fontSize: 12),
           ),
       ],
     );

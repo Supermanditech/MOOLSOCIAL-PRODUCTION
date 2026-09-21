@@ -10151,6 +10151,89 @@ void main() {
     },
   );
 
+  testWidgets(
+    'STOCK19 Android saver uses direct channel and reports failure without picker',
+    (tester) async {
+      const channel = MethodChannel('com.moolsocial.app/store_stock_download');
+      final calls = <MethodCall>[];
+      var failure = '';
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (failure.isNotEmpty) throw PlatformException(code: failure);
+            return true;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      for (final format in StoreStockExportFormat.values) {
+        expect(
+          await saveStoreStockFile(
+            bytes,
+            'stock-snapshot-20260921120000.${format.extension}',
+            format,
+          ),
+          isTrue,
+        );
+        expect(calls.last.method, 'save');
+        expect((calls.last.arguments as Map)['mimeType'], format.mimeType);
+        expect((calls.last.arguments as Map)['bytes'], bytes);
+      }
+      failure = 'stock_download_failed';
+      await expectLater(
+        saveStoreStockFile(
+          bytes,
+          'stock-snapshot-20260921120000.csv',
+          StoreStockExportFormat.csv,
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('Could not save to Downloads'),
+          ),
+        ),
+      );
+      failure = 'stock_download_unsupported';
+      await expectLater(
+        saveStoreStockFile(
+          bytes,
+          'stock-snapshot-20260921120000.csv',
+          StoreStockExportFormat.csv,
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('Android 10'),
+          ),
+        ),
+      );
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            channel,
+            (_) async => throw MissingPluginException(),
+          );
+      await expectLater(
+        saveStoreStockFile(
+          bytes,
+          'stock-snapshot-20260921120000.csv',
+          StoreStockExportFormat.csv,
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('unavailable'),
+          ),
+        ),
+      );
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   testWidgets('STOCK18 empty results disable every format', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
