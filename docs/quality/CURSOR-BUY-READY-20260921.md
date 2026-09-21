@@ -1,6 +1,35 @@
-# Cursor Buy baseline capture — 21 September 2026
+# Cursor Buy baseline capture â€” 21 September 2026
 
 ## Exact Redmi source admission repair
+
+Backend import self-testbcfa36 passed all existing eight cases. Exact projection
+d51e1f passed positive plus four negatives (altered content, other owner, other
+source and production mode). Full backend retry66273/fa8417 exit0 passes with the three inherited review
+exceptions explicitly retained; backendQualified=false, productionPromotion=false.
+Log: outputs/cursor-buy-ready-20260921/qualified-backend-boundary-r2.log.
+
+### Fresh-candidate motion and device disposition
+
+Candidate UAW-CURSOR-STOREFRONT-PICKUP-20260921-R1 uses existing CursorUiReview
+debug isolation; package com.moolsocial.app.cursorreview, version1.0.0-r66.31,
+code2026092101. This is a non-promotable review APK, not backend/payment acceptance.
+Founder explicitly requested recurring animation of the store name after a
+single sweep was rejected. That precise recurring-name exception is recorded;
+do not claim it is only a one-time finite transition. Existing implementation
+uses finite timed sweeps, pauses for reduced motion, background and covered
+routes, and disposes timers/controllers. Existing navigation motion is reused.
+Pickup wording is in the existing checkout choice, not a promotional header.
+Device motion/accessibility remain pending until this candidate is installed.
+
+Redmi audit: confirm package/version/signer and pull installed base APK for
+SHA256 equality. Preserve app data and the old APK. Exercise public Buy ->
+product -> Visit store; inspect store name/search/category/filter/save, SKU
+layout, Back and cart continuity. Exercise Delivery/Collect at store ticks,
+store/address validation and branch/cart preservation using isolated fixtures.
+Check long labels, keyboard, background/foreground and enlarged text. Record
+screenshots/XML and defects; never perform a real payment or message. Existing
+REG4634 delivery-rail persistence and REG4635 offer-theme defects remain open.
+
 
 Protected source368c52/f12a04 exit0 qualifies51 files at exactd5279222.
 Predicate fixtured4847e passes positive plus11 negative cases: wrong root/source/
@@ -8,7 +37,12 @@ branch, missing baseline/source ancestry, extra runtime owner, changed protected
 inventory, HEAD/working drift, untracked source and failed inventory command.
 Data egress51196/e786ea exit0; new-source pin retains existing user Copy checks.
 Egress self-test806d5e exit0 rejects seven forbidden cases and accepts two safe.
-App brand17569/51d106 exit0. Backend boundary45621 is still running.
+App brand17569/51d106 exit0. Backend45621/3d844a rejected one unchanged screen dart:io import.
+Screen equals baseline79d54013; the former1880614 source differs only in
+embedded Store layout/formatting (33 additions/6 deletions), not the arrival
+sound/import seam. Register the exact backend checker to bind the existing
+review projection to d5279222 and full portable screen hash C6438E31...B4993992.
+No new transport or app code is introduced; production rejection stays active.
 The build remains isolated CursorUiReview debug, forbidden for promotion; no
 integration acceptance or integration-lane candidate_preflight is asserted.
 
@@ -188,7 +222,7 @@ request. Current changes remain reviewable in this worktree. Candidate state
 remains blocked_regression_and_source_checkpoint; no APK built or installed,
 no checksum/device acceptance, no inherited authorization consumed.
 
-## Native lock reconciliation — founder authorized production-grade fix
+## Native lock reconciliation â€” founder authorized production-grade fix
 
 REG4640 root cause traced to committed Store export additions: dff6c124 adds
 five MainActivity registration/disposal lines;06432e2b extends the bridge's CSV
@@ -393,7 +427,7 @@ Only catalogue presentation and its focused test changed in this correction;
 shared/native owners preserved. No new video or APK. Visual review pending;
 existing broader suite/UI-lock limitations below still apply.
 
-## Corrected public-side scope — supersedes the initial capture below
+## Corrected public-side scope â€” supersedes the initial capture below
 
 Founder rejected the first capture: "Store" means the public storefront after
 tapping Visit store, not the operator dashboard. The first Buy capture omitted
@@ -537,7 +571,7 @@ not evidence that those tests already prevent these defects. Their registration
 does not expand the storefront implementation ticket. Registry now has 4606
 entries; its coordination checksum binding is refreshed without relaxing gates.
 
-## Initial capture — retained, rejected scope
+## Initial capture â€” retained, rejected scope
 
 Ticket: UAW-CURSOR-BUY-READY-20260921. Work ID: buy-ready-20260921.
 Lane: cursor_ui. Independent agent: primary /root in this worktree only.

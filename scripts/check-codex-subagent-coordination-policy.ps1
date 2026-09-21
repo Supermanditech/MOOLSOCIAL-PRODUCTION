@@ -1078,7 +1078,8 @@ $cursorStorefrontOwners = @(
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
   'scripts/check-buy-protected-baseline.ps1',
-  'scripts/check-buy-data-egress-boundary.ps1'
+  'scripts/check-buy-data-egress-boundary.ps1',
+  'scripts/check-buy-backend-contract-boundary.ps1'
 )
 $cursorReadyBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_buy_ready_20260921' })
 Assert-Coordination ($cursorReadyBindings.Count -eq 1) 'Cursor baseline capture binding missing or duplicated.'

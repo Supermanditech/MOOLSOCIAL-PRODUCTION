@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4612,
-    "sha256": "872949E60F77F003BB3DE93CCE5FCE3549EF1DD77F27E6E29BFE851C1FFF0C7B"
+    "sha256": "529A944C4C695362A68869EA2C1F227355123F2CDE0BD4F256ACF7322717D8BB"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -40,6 +40,7 @@
         "scripts/check-approved-ui-locks.ps1",
         "scripts/check-buy-protected-baseline.ps1",
         "scripts/check-buy-data-egress-boundary.ps1",
+        "scripts/check-buy-backend-contract-boundary.ps1",
         "docs/quality/CURSOR-BUY-READY-20260921.md",
         "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",

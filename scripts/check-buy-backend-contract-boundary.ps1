@@ -179,6 +179,10 @@ function Get-MobileBoundaryViolations {
           # D014 and exact SKU successor retain the same arrival-sound seam.
           $IntegratedReviewSourceCommit -cin @('41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab', 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957', '1880614bb499a47993df86ebed6599926414fc50') -and
           $soundSourceHash -ceq '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
+        ) -or (
+          # Inherited integrated Store embedding; arrival cue/imports unchanged.
+          $IntegratedReviewSourceCommit -ceq 'd5279222466211f0526c625e58b8da5dc0d78218' -and
+          $soundSourceHash -ceq 'C6438E31C55DA94A9B3CD4D1FF403535B1CB5B9C5727341E02AF90EDB4993992'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }
