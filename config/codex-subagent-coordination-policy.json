@@ -38,6 +38,8 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-buy-protected-baseline.ps1",
+        "scripts/check-buy-data-egress-boundary.ps1",
         "docs/quality/CURSOR-BUY-READY-20260921.md",
         "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",

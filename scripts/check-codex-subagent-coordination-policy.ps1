@@ -1075,6 +1075,11 @@ $cursorStorefrontOwners = @(
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json'
 )
+# Exact founder-authorized source admission for the isolated Redmi review.
+$cursorReviewQualificationOwners = @(
+  'scripts/check-buy-protected-baseline.ps1',
+  'scripts/check-buy-data-egress-boundary.ps1'
+)
 $cursorReadyBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_buy_ready_20260921' })
 Assert-Coordination ($cursorReadyBindings.Count -eq 1) 'Cursor baseline capture binding missing or duplicated.'
 $cursorReadyBinding = $cursorReadyBindings[0]
@@ -1105,7 +1110,7 @@ if ($cursorReadyAdmission) {
   Assert-Coordination ($LASTEXITCODE -eq 0) 'Cursor runtime preservation inventory failed.'
   $cursorAllowedRuntime = if ($ProductionPhase -ceq 'coordination_bootstrap') { @() } else { @($cursorStorefrontOwners | Where-Object { $_.StartsWith('apps/mobile/lib/') }) }
   Assert-Coordination (@($cursorRuntimeChanges | Where-Object { $_ -cnotin $cursorAllowedRuntime }).Count -eq 0) 'Cursor must preserve all application owners outside the exact storefront and founder-authorized pickup extension.'
-  $cursorClaimOwners = if ($ProductionPhase -ceq 'coordination_bootstrap') { $cursorReadyOwners } else { @($cursorReadyOwners) + @($cursorStorefrontOwners) }
+  $cursorClaimOwners = if ($ProductionPhase -ceq 'coordination_bootstrap') { $cursorReadyOwners } else { @($cursorReadyOwners) + @($cursorStorefrontOwners) + @($cursorReviewQualificationOwners) }
   $cursorReadyClaim = @($policy.activeClaims | Where-Object { $_.task -ceq '/root' })
   Assert-Coordination ($cursorReadyClaim.Count -eq 1 -and (@($cursorReadyClaim[0].owners | Sort-Object) -join '|') -ceq (@($cursorClaimOwners | Sort-Object) -join '|')) 'Cursor claim must contain only its exact setup and selected storefront owners.'
 }
@@ -2434,7 +2439,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
-      $cursorReadyOwner = $cursorReadyAdmission -and $effectiveOwner -cin $cursorReadyOwners
+      $cursorReadyOwner = $cursorReadyAdmission -and $effectiveOwner -cin (@($cursorReadyOwners) + @($cursorReviewQualificationOwners))
       $storeProcurementBridgeOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and

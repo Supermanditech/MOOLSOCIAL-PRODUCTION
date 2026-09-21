@@ -342,8 +342,48 @@ function Test-RedmiReviewBuySource {
   return $true
 }
 
+function Test-CursorStorefrontPickupReviewSource {
+  param([string]$SourceCommit)
+  # Founder-authorized isolated debug review; never replaces accepted baseline.
+  if ($SourceCommit -cne 'd5279222466211f0526c625e58b8da5dc0d78218') { return $false }
+  $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+  if ($canonicalRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
+  $branch = @(& git -C $root branch --show-current)
+  if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
+      $branch[0] -cne 'work/cursor-ui/buy-ready-20260921') { return $false }
+  $baseline = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+  & git -C $root merge-base --is-ancestor $baseline $SourceCommit
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root merge-base --is-ancestor $SourceCommit HEAD
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $runtimeRoots = @('apps/mobile/lib','apps/mobile/android','apps/mobile/ios',
+    'apps/mobile/pubspec.yaml','apps/mobile/pubspec.lock','backend','contracts','packages')
+  $expectedDelta = @(
+    'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+    'apps/mobile/lib/features/buy/buy_v2_session.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
+  )
+  $delta = @(& git -C $root diff --name-only $baseline $SourceCommit -- @runtimeRoots)
+  if ($LASTEXITCODE -ne 0 -or
+      (@($delta | Sort-Object) -join '|') -cne ($expectedDelta -join '|')) { return $false }
+  $protectedRoots = @('apps/mobile/lib/features/buy','apps/mobile/lib/ui_v2/buy') +
+    @($explicitFiles | ForEach-Object { $_.Replace('\','/') })
+  $sealedFiles = @(& git -C $root ls-tree -r --name-only $SourceCommit -- @protectedRoots)
+  if ($LASTEXITCODE -ne 0 -or
+      (@($sealedFiles | Sort-Object -Unique) -join '|') -cne ($relativeFiles -join '|')) { return $false }
+  $boundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
+  & git -C $root diff --quiet $SourceCommit HEAD -- @boundaries
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root diff --quiet $SourceCommit -- @boundaries
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaries)
+  return $LASTEXITCODE -eq 0 -and $untracked.Count -eq 0
+}
+
 function Test-IntegratedStoreBuyReviewSource {
   param([string]$SourceCommit)
+  if (Test-CursorStorefrontPickupReviewSource $SourceCommit) { return $true }
   $redmiSuccessor = $SourceCommit -cin @(
     '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d',
     '11b6562e7bf382afeb11e1801a0a390477fcae8f',

@@ -1,5 +1,34 @@
 # Cursor Buy baseline capture — 21 September 2026
 
+## Exact Redmi source admission repair
+
+Protected source368c52/f12a04 exit0 qualifies51 files at exactd5279222.
+Predicate fixtured4847e passes positive plus11 negative cases: wrong root/source/
+branch, missing baseline/source ancestry, extra runtime owner, changed protected
+inventory, HEAD/working drift, untracked source and failed inventory command.
+Data egress51196/e786ea exit0; new-source pin retains existing user Copy checks.
+Egress self-test806d5e exit0 rejects seven forbidden cases and accepts two safe.
+App brand17569/51d106 exit0. Backend boundary45621 is still running.
+The build remains isolated CursorUiReview debug, forbidden for promotion; no
+integration acceptance or integration-lane candidate_preflight is asserted.
+
+
+Saved repair is committed at d5279222466211f0526c625e58b8da5dc0d78218.
+Two full Buy cycles run against these immutable app/test bytes. During the run,
+only two exact source-admission checker owners and their existing registration/
+handoff are maintained; no app/test/native/dependency or generated support edits.
+The inherited protected-source checker does not recognize this authorized lane.
+Admit only this root, branch, source commit, baseline ancestry and exact four
+runtime-owner delta; require unchanged apps/backend/contracts/packages and reject
+untracked source. Existing accepted baseline and other source pins stay intact.
+The existing clipboard action remains byte-equivalent; its exact review-source
+pin may advance only after the protected-source gate qualifies that commit.
+This is the previously authorized blocker repair, not production integration or
+promotion. Debug review only; the future integration requirement is preserved.
+Initial registration cf7d6e matched a repeated literal outside primary scope;
+its assertion stopped before mutation. Retry targets the exact primary claim.
+
+
 ## Committed reference acceptance; full regression repair
 
 Saved geometry repair96690/799c44 exit0:165 tests passed across cart relevance,
