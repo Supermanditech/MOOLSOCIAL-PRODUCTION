@@ -1,6 +1,48 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Fresh qualification: first corrected full cycle passed
+
+Build-phase memory13593/81c7e8 exit0 validates4612 entries,238 applicable with
+EvidenceArchiveRoot=C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904.
+Earlier invocation67358/fbe745 omitted this existing archive parameter and failed
+on historical REG3955 evidence; no evidence was fabricated or gate changed.
+The wrapper must receive the same archive root. Current registry binding:
+EBB94598682854BBF4D8EEF858A6FD460569CA6EE6C57B1C232C7F7FBA7C006C.
+Build drive has46GiB available; no cleanup or user-file deletion performed.
+
+Preserved installed APK signature0882ed exit0 verifies; signer SHA256
+cbdfc5969ad51ed570afb1cf2fe60377e559d43f59d59e2ab66ccaf78ea9ac25.
+Compare fresh artifact signer before data-preserving install.
+
+Session45755 cycle1 receipt365d8c exit0:2459 passed,27 inherited skips,0 failures.
+No tags/reference comparisons excluded. Cycle2 is running, not yet accepted.
+Application/test source remains exactly d5279222466211f0526c625e58b8da5dc0d78218;
+control-only commits eb7a14e9 and432befc4 qualify that same source.
+Manifest758 files created and live hashes verified: SHA256
+E2E9F1B5A215DEBCDFC3DD891CDFF911FE9A349E57CF54D16B0A2F782BE00E54.
+Path apps/mobile/build/review-candidates/cursor-storefront-pickup-20260921-r1/source-manifest.txt.
+Existing manifest helper covers730 app/test/native/build owners; add all tracked
+mobile assets and the11 accepted reference-version files. No original owner
+removed. Reverify every live hash before the wrapper build.
+Motion-policy state beee7a passed. Redmi settings:720x1600,density320,font1.0,
+animation1.0. Installed r66.30 APK preserved without device mutation at
+outputs/cursor-buy-ready-20260921/redmi-installed-r66-30-before-upgrade.apk,
+SHA256 2AA02DA4E28CE087E21D61F558BC8C705251E0A56A1A73721068E6A9C2C160B3.
+No new APK has been built or installed. Final analysis/cycle2 remain pending.
+
+
 ## Exact Redmi source admission repair
+
+Candidate preparation retains buildAuthorization pending. Existing current-turn
+build-profile/package isolation d40318 passed; clean-support f52278 passed with
+fixture containment verified. Clean source digest1d916e had zero records before
+repair; app/test source remains exactlyd5279222 after control-only commits.
+UI locks a1e567 passed after the Saved repair; integration coverage0af533 proved
+18 approved/2 rejected commits. Startup/auth/native/dependency owners unchanged;
+existing startup/config regression entries and REG4641 remain active. Earlier
+failed candidate logs and installed r66.30 are retained, never relabelled current.
+Source manifest, final analysis and both corrected cycles still pending.
+
 
 Backend import self-testbcfa36 passed all existing eight cases. Exact projection
 d51e1f passed positive plus four negatives (altered content, other owner, other

@@ -10,9 +10,11 @@
     "buildMode": "debug",
     "gateProfile": "uaw_cursor_ui_review_debug",
     "branch": "work/cursor-ui/buy-ready-20260921",
-    "head": "635ab9810ba8805104642f8f78512c80fe1b20f5"
+    "head": "432befc4c7be1b36170588e57b2eb331c45021fc"
   },
-  "promotion": { "state": "forbidden_non_promotable" },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
   "localRepairValidation": {
     "broaderTestsPassed": 633,
     "savedTestsPassed": 4,
@@ -20,17 +22,167 @@
     "remainingProtectedImageComparisonsFailed": 0,
     "referenceVersion": "cursor-storefront-pickup-20260921-r2-founder-accepted",
     "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md",
-    "fullBuyRegressionRerun": "pending_after_accepted_reference_replay"
+    "fullBuyRegressionRerun": "running_corrected_cycles",
+    "savedGeometryTestsPassed": 165,
+    "fullBuyRegressionCycle1": {
+      "passed": 2459,
+      "skipped": 27,
+      "failed": 0,
+      "log": "C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/qualification-corrected-buy-cycle-1.log"
+    }
   },
-  "preBuildValidation": { "state": "pending", "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md" },
+  "preBuildValidation": {
+    "state": "pending",
+    "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md"
+  },
   "preBuildGates": [
-    { "id": "approved-ui-locks", "state": "passed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
-    { "id": "candidate-build-foundation", "state": "passed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
-    { "id": "buy-regression-1", "state": "failed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
-    { "id": "protected-buy-source", "state": "failed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
-    { "id": "buy-regression-2", "state": "pending", "evidence": [] },
-    { "id": "clean-state-regression", "state": "pending", "evidence": [] }
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "approved-ui-locks",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "candidate-build-foundation",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "protected-buy-source",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "pending",
+      "evidence": []
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "pending",
+      "evidence": []
+    }
   ],
-  "device": { "serial": "TG8HCYTGGQT885OF", "model": "Xiaomi 23106RN0DA" },
-  "postBuildGates": { "installedChecksum": "pending", "storeTicketDefectAudit": "pending" }
+  "device": {
+    "serial": "TG8HCYTGGQT885OF",
+    "model": "Xiaomi 23106RN0DA"
+  },
+  "postBuildGates": {
+    "installedChecksum": "pending",
+    "storeTicketDefectAudit": "pending"
+  },
+  "qualifiedApplicationSource": "d5279222466211f0526c625e58b8da5dc0d78218",
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-STOREFRONT-PICKUP-20260921-R1"
+  },
+  "premiumMotionPolicy": {
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "docs/quality/CURSOR-BUY-READY-20260921.md",
+    "disposition": "docs/quality/CURSOR-BUY-READY-20260921.md",
+    "state": "host_checks_passed_Redmi_pending_founder_recurring_name_exception_recorded",
+    "applied": [
+      "founder_authorized_recurring_store_name_sweeps_paused_for_reduced_motion_background_and_covered_routes"
+    ],
+    "reused": [
+      "existing_navigation_cart_and_checkout_motion"
+    ],
+    "dependencyHeld": [
+      "physical_Redmi_motion_and_accessibility",
+      "production_provider_payment_and_backend_acceptance"
+    ],
+    "inapplicable": [
+      "new_header_pickup_promotion_removed_by_founder"
+    ]
+  },
+  "source": {
+    "manifestPath": "apps/mobile/build/review-candidates/cursor-storefront-pickup-20260921-r1/source-manifest.txt",
+    "manifestSha256": "E2E9F1B5A215DEBCDFC3DD891CDFF911FE9A349E57CF54D16B0A2F782BE00E54",
+    "fileCount": 758
+  }
 }
