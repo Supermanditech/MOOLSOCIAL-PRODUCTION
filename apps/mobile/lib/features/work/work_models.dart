@@ -5226,6 +5226,18 @@ class WorkspaceProductImport {
         if (packFacts[key] != supplied) packFactsChanged = true;
         packFacts[key] = supplied;
       }
+      final catalogueFacts = {
+        'categoryId': base.categoryId,
+        'origin': base.origin,
+        'composition': base.composition,
+        'regulatoryNote': base.regulatoryNote,
+        'visualLabel': base.visualLabel,
+      };
+      final catalogueFactsChanged = catalogueFacts.entries.any(
+        (entry) =>
+            value(entry.key).isNotEmpty &&
+            value(entry.key) != (entry.value ?? '').trim(),
+      );
       final product = base.copyWith(
         sku: sku,
         visualLabel: value('visualLabel').isEmpty
@@ -5238,7 +5250,10 @@ class WorkspaceProductImport {
         sellingPrice: selling,
         stock: stock,
         mrp: mrp ?? base.mrp,
-        minimumOrder: minimum,
+        // An omitted override keeps the exact SKU's existing order rule.
+        minimumOrder: value('minimumOrder').isEmpty
+            ? base.minimumOrder
+            : minimum,
         lowStockThreshold: low,
         unitPrice: value('unitPrice').isEmpty
             ? '₹$selling/${base.pack}'
@@ -5267,13 +5282,7 @@ class WorkspaceProductImport {
         catalogueFactsRequireReview:
             base.catalogueFactsRequireReview ||
             packFactsChanged ||
-            [
-              'categoryId',
-              'origin',
-              'composition',
-              'regulatoryNote',
-              'visualLabel',
-            ].any((k) => value(k).isNotEmpty),
+            catalogueFactsChanged,
       );
       if (product.mrp != null && product.mrp! < selling) {
         result.add(

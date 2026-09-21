@@ -8683,6 +8683,122 @@ void main() {
     },
   );
 
+  test(
+    'CSV25 exact-match public facts distinguish unchanged and corrected values',
+    () {
+      final master = workspaceMasterCatalogue.first.copyWith(
+        origin: 'India',
+        composition: 'Sunflower oil',
+        regulatoryNote: 'Store in a cool, dry place',
+        catalogueFactsRequireReview: false,
+      );
+      final facts = {
+        'categoryId': master.categoryId,
+        'origin': master.origin,
+        'composition': master.composition!,
+        'regulatoryNote': master.regulatoryNote!,
+        'visualLabel': master.visualLabel,
+      };
+      final row = {
+        ...csv23Required,
+        'title': master.title,
+        'brand': master.brand,
+        'pack': master.pack,
+        'variant': master.variant,
+        'barcode': master.barcode,
+      };
+      WorkspaceCatalogueItem read(
+        Map<String, String> input, {
+        bool held = false,
+      }) {
+        // visualLabel remains a legacy accepted column, not a template input.
+        final headers = [
+          ...WorkspaceProductImport.templateLabels.keys,
+          'visualLabel',
+        ];
+        String cell(String value) => '"${value.replaceAll('"', '""')}"';
+        final csv =
+            '${headers.join(',')}\r\n'
+            '${headers.map((h) => cell(input[h] ?? '')).join(',')}\r\n';
+        return WorkspaceProductImport.parse(
+          csv,
+          catalogue: [master.copyWith(catalogueFactsRequireReview: held)],
+          owned: const [],
+        ).rows.single.product!;
+      }
+
+      Map<String, String?> publicFacts(WorkspaceCatalogueItem product) {
+        final public = product.toBuyPublicProduct(storeName: 'Store');
+        expect(public.title, master.title);
+        expect(public.brand, master.brand);
+        expect(public.variant, master.variant);
+        expect(public.pack, master.pack);
+        expect(public.catalogueListing, isFalse);
+        return {
+          'categoryId': public.categoryId,
+          'origin': public.origin,
+          'composition': public.composition,
+          'regulatoryNote': public.regulatoryNote,
+          'visualLabel': public.visualLabel,
+        };
+      }
+
+      expect(publicFacts(read(row)), facts);
+      for (final fact in facts.entries) {
+        final unchanged = {...row, fact.key: '  ${fact.value}  '};
+        expect(read(unchanged).catalogueFactsRequireReview, isFalse);
+        expect(publicFacts(read(unchanged)), facts);
+        expect(read(unchanged, held: true).catalogueFactsRequireReview, isTrue);
+        final corrected = read({...row, fact.key: 'Corrected ${fact.key}'});
+        expect(corrected.catalogueFactsRequireReview, isTrue);
+        expect(corrected.copyWith(publicListing: true).published, isFalse);
+        expect(publicFacts(corrected)[fact.key], 'Corrected ${fact.key}');
+      }
+    },
+  );
+
+  test('CSV25 minimum order preserves exact SKU rule or explicit override', () {
+    final master = workspaceMasterCatalogue.first.copyWith(minimumOrder: 12);
+    final row = {
+      ...csv23Required,
+      'title': master.title,
+      'brand': master.brand,
+      'pack': master.pack,
+      'variant': master.variant,
+    };
+    for (final override in [null, '', '6']) {
+      final product = WorkspaceProductImport.parse(
+        csv23([
+          {...row, 'minimumOrder': ?override},
+        ]),
+        catalogue: [master],
+        owned: const [],
+      ).rows.single.product!;
+      final expected = override == '6' ? 6 : 12;
+      expect(product.minimumOrder, expected);
+      expect(
+        product.toBuyPublicProduct(storeName: 'Store').minimumOrder,
+        expected,
+      );
+      expect(product.publicListing, isFalse);
+    }
+    final unmatched = WorkspaceProductImport.parse(
+      csv23([csv23Required]),
+      catalogue: const [],
+      owned: const [],
+    ).rows.single.product!;
+    expect(unmatched.minimumOrder, 1);
+    final invalid = WorkspaceProductImport.parse(
+      csv23([
+        {...row, 'minimumOrder': '0'},
+      ]),
+      catalogue: [master],
+      owned: const [],
+    ).rows.single;
+    expect(invalid.product, isNull);
+    expect(invalid.issueValues, {'minimumOrder': '0'});
+  });
+
   test('CSV23 exact variants remain separate across 1000 SKU rows', () {
     final rows = List.generate(
       1000,

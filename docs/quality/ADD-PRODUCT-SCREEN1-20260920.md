@@ -1,5 +1,44 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Current continuation — v24 visually approved; v25 mapping checks
+
+Founder approved the displayed v24 CSV Ready / Needs attention layouts on
+21 September 2026 and authorised continued frontend work. This supersedes the
+older "NOT founder-approved" status below. Technical public Buy/Wholesale versus
+CSV field responsibility remains Codex's, including variants and exact packs.
+Do not ask the founder to certify technical coverage through visual approval.
+The separate enhancement/design/UIUX/theme/colour/gradient/brand round is deferred.
+
+v25 is a bounded continuation inside existing import/model/test owners, with no
+layout or Buy-owned source changes. Blank minimumOrder now preserves an exact
+catalogue SKU's rule; an explicit valid override still wins. Repeated unchanged
+category/origin/composition/regulatory/visual-label facts no longer create a new
+fact-change hold. Actual changes and existing review holds remain blocked from
+publication; all imports still start private. These are product-level prefill
+rules, not implementation of Store default inheritance or Wholesale offers.
+
+Local verification evidence is retained in the task outputs folder as
+store-csv-v25-tests-r2.log (38 focused tests passed) and
+store-csv-v25-analysis-r2.log (six-owner analysis clean). The first-run logs remain
+preserved separately. No new APK, device test, backend, commit or push
+is authorised by this visual approval alone. Cursor remains on its independent
+06432e2b checkpoint; do not advance its branch while it may be working.
+
+v25 initial verification: 37 passed, one new test failed because its template-
+only fixture omitted the legacy visualLabel column whose correction it asserted.
+Analysis also requested Dart's null-aware map-element syntax. Preserve both logs;
+neither initial run is a clean pass. Correct the test fixture to actually supply
+the accepted legacy column (without adding it to the retailer template), retain
+the changed-value assertion, and use the analyzer-recommended syntax. The
+global registry is outside this ticket's owner claim; no policy/registry change
+or invented regression ID is made by this continuation.
+
+Remaining frontend work stays explicit: separate Wholesale offers/channel and
+pricing contracts; one-time Store defaults/inheritance; structured variant/pack
+conversion where public contracts require it; complete publication readiness.
+Do not add decorative CSV headings that lack shared editor/persistence/public
+wiring, and do not classify these frontend gaps as backend-only dependencies.
+
 ## Current checkpoint — v24 CSV review and independent Cursor baseline
 
 Founder visually approved the v23 guide. Technical correctness of CSV mapping
