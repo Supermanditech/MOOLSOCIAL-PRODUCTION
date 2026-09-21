@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -259,14 +261,38 @@ GoRouter createJourneyRouter(
         .where((item) => item.id == productId && item.published)
         .firstOrNull;
     if (product == null) return buyV2Session;
-    final signature = [
+    final storeId = workSession.activeWorkspace?.id ?? workSession.workspaceId;
+    final signature = jsonEncode([
+      storeId,
       product.id,
+      product.canonicalId,
+      product.title,
+      product.brand,
+      product.variant,
+      product.pack,
+      product.barcode,
       product.sellingPrice,
+      product.mrp,
+      product.unitPrice,
+      product.minimumOrder,
+      product.returnPolicy,
+      product.categoryId,
+      product.origin,
+      product.composition,
+      product.regulatoryNote,
+      product.requiresPrescription,
+      product.visualLabel,
+      product.visualKind,
+      product.compliance?.toJson(),
       product.stock,
+      product.stockMode.name,
+      product.available,
       product.deliveryPromise,
       product.publicListing,
+      product.catalogueFactsRequireReview,
+      product.cataloguePhoto?.toJson(),
       workSession.activeWorkspace?.name ?? workSession.workName,
-    ].join('|');
+    ]);
     if (workspacePublicBuySession != null &&
         workspacePublicBuySignature == signature) {
       return workspacePublicBuySession!;
@@ -274,6 +300,7 @@ GoRouter createJourneyRouter(
     workspacePublicBuySession?.dispose();
     final publicProduct = product.toBuyPublicProduct(
       storeName: workSession.activeWorkspace?.name ?? workSession.workName,
+      storeId: storeId,
       confirmedOn: 'Updated by Store',
     );
     final next = _WorkspacePublicBuySession(

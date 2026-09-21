@@ -9,6 +9,7 @@
       "dependencies": [
         "crypto",
         "cupertino_icons",
+        "excel_community",
         "file_picker",
         "firebase_app_check",
         "firebase_auth",
@@ -87,6 +88,17 @@
       "dependencies": [
         "flutter",
         "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "excel_community",
+      "version": "2.4.0",
+      "dependencies": [
+        "archive",
+        "collection",
+        "equatable",
+        "web",
+        "xml"
       ]
     },
     {
@@ -586,11 +598,44 @@
       ]
     },
     {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "archive",
+      "version": "4.0.9",
+      "dependencies": [
+        "path",
+        "posix"
+      ]
+    },
+    {
       "name": "path_parsing",
       "version": "1.1.0",
       "dependencies": [
         "meta",
         "vector_math"
+      ]
+    },
+    {
+      "name": "image",
+      "version": "4.10.1",
+      "dependencies": [
+        "archive"
+      ]
+    },
+    {
+      "name": "bidi",
+      "version": "2.0.13",
+      "dependencies": []
+    },
+    {
+      "name": "barcode",
+      "version": "2.2.9",
+      "dependencies": [
+        "meta",
+        "qr"
       ]
     },
     {
@@ -868,11 +913,6 @@
         "flutter",
         "speech_to_text_platform_interface"
       ]
-    },
-    {
-      "name": "web",
-      "version": "1.1.1",
-      "dependencies": []
     },
     {
       "name": "flutter_web_plugins",
@@ -1615,6 +1655,22 @@
       ]
     },
     {
+      "name": "posix",
+      "version": "6.5.2",
+      "dependencies": [
+        "ffi",
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "qr",
+      "version": "3.0.2",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
       "name": "args",
       "version": "2.7.0",
       "dependencies": []
@@ -2113,47 +2169,11 @@
       ]
     },
     {
-      "name": "bidi",
-      "version": "2.0.13",
-      "dependencies": []
-    },
-    {
-      "name": "barcode",
-      "version": "2.2.9",
+      "name": "equatable",
+      "version": "2.1.0",
       "dependencies": [
-        "meta",
-        "qr"
-      ]
-    },
-    {
-      "name": "qr",
-      "version": "3.0.2",
-      "dependencies": [
+        "collection",
         "meta"
-      ]
-    },
-    {
-      "name": "archive",
-      "version": "4.0.9",
-      "dependencies": [
-        "path",
-        "posix"
-      ]
-    },
-    {
-      "name": "posix",
-      "version": "6.5.2",
-      "dependencies": [
-        "ffi",
-        "meta",
-        "path"
-      ]
-    },
-    {
-      "name": "image",
-      "version": "4.10.1",
-      "dependencies": [
-        "archive"
       ]
     }
   ],

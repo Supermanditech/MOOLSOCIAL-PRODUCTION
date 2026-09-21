@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:file_picker/file_picker.dart';
+import 'package:excel_community/excel_community.dart' as xls;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -22,17 +26,166 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_stock_export.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'package:moolsocial/features/work/screens/store_add_product_sheet.dart';
 import 'package:moolsocial/features/work/screens/work_invoice_pdf_screen.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+
+// Host-only transport for the real Image.network renderer; no external request.
+final class _CataloguePhotoClient extends Fake implements HttpClient {
+  _CataloguePhotoClient(this.bytes);
+  final Uint8List bytes;
+  final requested = <Uri>[];
+  final failures = <Uri>{};
+  final responses = <Uri, Uint8List>{};
+  Completer<Uint8List>? pending;
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    requested.add(url);
+    return _CataloguePhotoRequest(
+      failures.contains(url)
+          ? null
+          : pending?.future ?? Future.value(responses[url] ?? bytes),
+    );
+  }
+}
+
+final class _CataloguePhotoRequest extends Fake implements HttpClientRequest {
+  _CataloguePhotoRequest(this.bytes);
+  final Future<Uint8List>? bytes;
+  @override
+  Future<HttpClientResponse> close() async => _CataloguePhotoResponse(
+    bytes == null ? Uint8List(0) : await bytes!,
+    bytes == null ? 404 : 200,
+  );
+}
+
+final class _CataloguePhotoResponse extends Fake implements HttpClientResponse {
+  _CataloguePhotoResponse(this.bytes, this.statusCode);
+  final Uint8List bytes;
+  @override
+  final int statusCode;
+  @override
+  int get contentLength => bytes.length;
+  @override
+  HttpClientResponseCompressionState get compressionState =>
+      HttpClientResponseCompressionState.notCompressed;
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int>)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => Stream<List<int>>.value(bytes).listen(
+    onData,
+    onError: onError,
+    onDone: onDone,
+    cancelOnError: cancelOnError,
+  );
+}
+
+Future<Uint8List> _catalogueTestPhoto() async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, 1024, 1024),
+    Paint()..color = Colors.white,
+  );
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(
+      const Rect.fromLTWH(220, 60, 584, 904),
+      const Radius.circular(45),
+    ),
+    Paint()..color = const Color(0xff071d49),
+  );
+  final label = TextPainter(
+    text: const TextSpan(
+      text: 'TEST\nPACK',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 135,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+    textAlign: TextAlign.center,
+    textDirection: TextDirection.ltr,
+  )..layout(maxWidth: 540);
+  label.paint(canvas, const Offset(242, 330));
+  label.dispose();
+  final picture = recorder.endRecording();
+  final bitmap = await picture.toImage(1024, 1024);
+  try {
+    final data = (await bitmap.toByteData(format: ui.ImageByteFormat.png))!;
+    return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  } finally {
+    bitmap.dispose();
+    picture.dispose();
+  }
+}
 
 // Host-only authoritative-response fixtures. These never qualify live grants.
+final class _EntryCsvFile extends PlatformFile {
+  final _file = XFile.fromData(
+    Uint8List.fromList(
+      utf8.encode(
+        'title,brand,pack,purchasePrice,sellingPrice,stock\n'
+        'Local rice,Store brand,1 kg,40,50,5\n',
+      ),
+    ),
+    name: 'products.csv',
+  );
+  @override
+  String get name => 'products.csv';
+  @override
+  Uri get uri => Uri.parse('memory:products.csv');
+  @override
+  XFile get xFile => _file;
+  @override
+  Future<int> length() => _file.length();
+  @override
+  Future<Uint8List> readAsBytes() => _file.readAsBytes();
+  @override
+  Stream<Uint8List> readAsByteStream() async* {
+    yield await readAsBytes();
+  }
+}
+
+class _EntryFilePicker extends FilePickerPlatform {
+  int calls = 0;
+  List<String>? extensions;
+  Completer<PlatformFile?>? pending;
+  bool fail = false;
+  PlatformFile? file;
+  @override
+  Future<PlatformFile?> pickFile({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async {
+    calls++;
+    extensions = allowedExtensions;
+    if (fail) throw StateError('Picker unavailable');
+    return pending == null ? file : await pending!.future;
+  }
+}
+
 class _InvoiceDeliveryFixtureStore
     implements WorkInvoiceDeliveryPreferenceStore {
   final values = <String, WorkspaceInvoiceDeliveryPreference>{};
@@ -547,7 +700,399 @@ Future<void> addCounterProduct(WidgetTester tester, Finder entry) async {
   );
 }
 
+Future<void> chooseAddProductMode(WidgetTester tester, String mode) async {
+  await tester.tap(find.byKey(const Key('work-add-product-options')));
+  await tester.pumpAndSettle();
+  final option = find.byKey(Key('work-add-product-$mode'));
+  await tester.ensureVisible(option);
+  await tester.tap(option);
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  const mappedPack = WorkspaceProductCompliance(
+    genericName: 'Sunflower oil',
+    netQuantity: '1 L',
+    manufacturerName: 'Fixture manufacturer',
+    packerName: 'Fixture packer',
+    importerName: 'Fixture importer',
+    countryOfOrigin: 'Fixture origin',
+    manufacturedOrPackedOn: 'Batch supplied date',
+    bestBeforeOrUseBy: 'Batch supplied expiry',
+    fssaiLicenseNumber: 'Fixture manufacturer licence',
+    consumerCare: 'Fixture consumer care',
+  );
+  test('ADDMAP ten pack facts round-trip and public adapter', () {
+    final data = mappedPack.toJson();
+    expect(data, hasLength(10));
+    expect(
+      WorkspaceProductCompliance.fromJson(
+        jsonDecode(jsonEncode(data)),
+      )!.toJson(),
+      data,
+    );
+    final item = workspaceMasterCatalogue.first.copyWith(
+      compliance: mappedPack,
+    );
+    final public = item.toBuyPublicProduct(
+      storeName: 'Fixture Store',
+      storeId: 'fixture-store',
+    );
+    final c = public.compliance!;
+    expect([
+      c.genericName,
+      c.netQuantity,
+      c.manufacturerName,
+      c.packerName,
+      c.importerName,
+      c.countryOfOrigin,
+      c.manufacturedOrPackedOnLabel,
+      c.bestBeforeOrUseByLabel,
+      c.fssaiLicenseNumber,
+      c.consumerCare,
+    ], data.values.toList());
+    expect(public.variant, item.variant);
+    expect(public.pack, item.pack);
+    expect(
+      () => WorkspaceProductCompliance.fromJson({'manufacturerName': true}),
+      throwsFormatException,
+    );
+    expect(
+      WorkspaceProductCompliance.fromJson({
+        'manufacturerName': '  ',
+      })!.manufacturerName,
+      isNull,
+    );
+  });
+  testWidgets('ADDMAP public product panel renders every mapped pack fact', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 806);
+    addTearDown(tester.view.reset);
+    final item = workspaceMasterCatalogue.first.copyWith(
+      compliance: mappedPack,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: BuyV2ProductCompliancePanel(
+              product: item.toBuyPublicProduct(storeName: 'Fixture Store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final value in mappedPack.toJson().values) {
+      final text = find.text(value! as String);
+      expect(text, findsOneWidget);
+      await tester.ensureVisible(text);
+      await tester.pumpAndSettle();
+      expect(text.hitTestable(), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'ADDMAP operational snapshot keeps pack facts and product metadata',
+    () async {
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      final item = workspaceMasterCatalogue.first.copyWith(
+        compliance: mappedPack,
+        composition: 'Fixture ingredients',
+        regulatoryNote: 'Fixture safety',
+        publicListing: false,
+      );
+      work.addOrUpdateWorkspaceProduct(item);
+      final rows = gateway.lastOperationalSnapshot!.state['catalogue'] as List;
+      final row = rows.cast<Map>().singleWhere((row) => row['id'] == item.id);
+      expect(
+        WorkspaceProductCompliance.fromJson(row['compliance'])!.toJson(),
+        mappedPack.toJson(),
+      );
+      for (final field in [
+        'composition',
+        'regulatoryNote',
+        'requiresPrescription',
+        'unitPrice',
+        'visualLabel',
+        'visualKind',
+      ]) {
+        expect(row.containsKey(field), isTrue, reason: field);
+      }
+      expect(row['composition'], item.composition);
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
+  WorkspaceCataloguePhoto photoFixture({
+    WorkspaceCataloguePhotoStatus status =
+        WorkspaceCataloguePhotoStatus.testOnly,
+    String revision = 'test-r1',
+    String? source,
+    BuyV2MediaFileMetadata? file,
+  }) {
+    final product = workspaceMasterCatalogue.first;
+    return WorkspaceCataloguePhoto(
+      assetId: 'test-photo-oil',
+      revision: revision,
+      source: source ?? 'https://example.invalid/catalogue/$revision/oil.png',
+      publisherWorkspaceId: 'test-moolsocial-catalogue',
+      canonicalId: product.canonicalId,
+      brand: product.brand,
+      variant: product.variant,
+      pack: product.pack,
+      barcode: product.barcode,
+      status: status,
+      file:
+          file ??
+          const BuyV2MediaFileMetadata(
+            mimeType: 'image/png',
+            byteLength: 8192,
+            width: 1024,
+            height: 1024,
+            normalized: true,
+            frameCount: 1,
+          ),
+    );
+  }
+
+  test('ADDPHOTO test photo is preview-only and cannot become public', () {
+    final item = workspaceMasterCatalogue.first.copyWith(
+      cataloguePhoto: photoFixture(),
+      stock: 10,
+    );
+    final preview = item.toCataloguePreviewProduct();
+    expect(preview.mediaAssets.single.source, contains('test-r1'));
+    expect(preview.catalogueListing, isFalse);
+    final public = item.toBuyPublicProduct(
+      storeName: 'Test Store',
+      storeId: 'store-1',
+    );
+    expect(public.mediaAssets, isEmpty);
+    expect(public.catalogueListing, isFalse);
+    expect(item.published, isFalse);
+    expect(item.canSellAtCounter, isTrue);
+    expect(
+      item
+          .toBuyPublicFacts(
+            storeName: 'Test Store',
+            sourceId: 'fixture',
+            storeVisible: true,
+            acceptingOrders: true,
+            observedAt: DateTime(2026),
+          )
+          .orderabilityLabel,
+      'Not listed for customers',
+    );
+  });
+
+  test(
+    'ADDPHOTO approved reference reuses Buy policy and exact Store binding',
+    () {
+      final photo = photoFixture(
+        status: WorkspaceCataloguePhotoStatus.approved,
+      );
+      final item = workspaceMasterCatalogue.first.copyWith(
+        cataloguePhoto: photo,
+        stock: 10,
+      );
+      final public = item.toBuyPublicProduct(
+        storeName: 'Test Store',
+        storeId: 'store-1',
+      );
+      final media = BuyV2SupplierMediaPolicy.admittedAssets(public).single;
+      expect(media.source, photo.source);
+      expect(media.binding!.file.width, 1024);
+      expect(media.binding!.storeId, 'store-1');
+      expect(media.binding!.skuId, item.id);
+      expect(media.binding!.assetRevision, photo.revision);
+      expect(public.catalogueListing, isTrue);
+      expect(item.published, isTrue);
+      // A caller with no authoritative Store identity cannot expose the photo.
+      expect(
+        item.toBuyPublicProduct(storeName: 'Test Store').mediaAssets,
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'ADDPHOTO price edits retain photo but identity edits cannot reuse it',
+    () {
+      final photo = photoFixture(
+        status: WorkspaceCataloguePhotoStatus.approved,
+      );
+      final item = workspaceMasterCatalogue.first.copyWith(
+        cataloguePhoto: photo,
+      );
+      final edited = item.copyWith(stock: 12, sellingPrice: 300, sku: 'MY-SKU');
+      expect(edited.cataloguePhoto, same(photo));
+      expect(edited.toCataloguePreviewProduct().mediaAssets, hasLength(1));
+      for (final mismatch in [
+        item.copyWith(canonicalId: 'other'),
+        item.copyWith(brand: 'Other'),
+        item.copyWith(pack: '5 L'),
+        item.copyWith(variant: 'Other'),
+        item.copyWith(barcode: 'other'),
+      ]) {
+        expect(mismatch.toCataloguePreviewProduct().mediaAssets, isEmpty);
+        expect(
+          mismatch
+              .toBuyPublicProduct(storeName: 'Store', storeId: 'store-1')
+              .mediaAssets,
+          isEmpty,
+        );
+        expect(mismatch.published, isFalse);
+      }
+    },
+  );
+
+  test(
+    'ADDPHOTO replacement changes source and revision without a new SKU',
+    () {
+      final original = workspaceMasterCatalogue.first.copyWith(
+        cataloguePhoto: photoFixture(),
+      );
+      final replacement = original.copyWith(
+        cataloguePhoto: photoFixture(
+          status: WorkspaceCataloguePhotoStatus.approved,
+          revision: 'approved-r2',
+        ),
+      );
+      expect(replacement.id, original.id);
+      expect(replacement.sku, original.sku);
+      final media = replacement
+          .toBuyPublicProduct(storeName: 'Store', storeId: 'store-1')
+          .mediaAssets
+          .single;
+      expect(media.source, endsWith('/approved-r2/oil.png'));
+      expect(media.binding!.assetRevision, 'approved-r2');
+      expect(
+        original.cataloguePhoto!.status,
+        WorkspaceCataloguePhotoStatus.testOnly,
+      );
+      expect(
+        replacement.copyWith(clearCataloguePhoto: true).cataloguePhoto,
+        isNull,
+      );
+    },
+  );
+
+  test('ADDPHOTO serialized reference retains identity and fails closed', () {
+    final photo = photoFixture();
+    final json = jsonDecode(jsonEncode(photo.toJson()));
+    final restored = WorkspaceCataloguePhoto.fromJson(json)!;
+    expect(restored.toJson(), photo.toJson());
+    expect(restored.status, WorkspaceCataloguePhotoStatus.testOnly);
+    expect(restored.matches(workspaceMasterCatalogue.first), isTrue);
+    expect(
+      WorkspaceCataloguePhoto.fromJson({
+        ...photo.toJson(),
+        'status': 'unknown',
+      }),
+      isNull,
+    );
+    expect(WorkspaceCataloguePhoto.fromJson({'assetId': 'partial'}), isNull);
+    expect(WorkspaceCataloguePhoto.fromJson(null), isNull);
+    final animated = photoFixture(
+      file: const BuyV2MediaFileMetadata(
+        mimeType: 'image/png',
+        byteLength: 8192,
+        width: 1024,
+        height: 1024,
+        normalized: true,
+        frameCount: 1,
+        duration: Duration(seconds: 1),
+      ),
+    );
+    expect(WorkspaceCataloguePhoto.fromJson(animated.toJson()), isNull);
+  });
+
+  test(
+    'ADDPHOTO pending insecure empty and invalid files stay unavailable',
+    () {
+      for (final photo in [
+        photoFixture(status: WorkspaceCataloguePhotoStatus.pending),
+        photoFixture(source: ''),
+        photoFixture(source: 'http://example.invalid/a.png'),
+        photoFixture(
+          file: const BuyV2MediaFileMetadata(
+            mimeType: 'image/png',
+            byteLength: 8192,
+            width: 32,
+            height: 32,
+            normalized: true,
+            frameCount: 1,
+          ),
+        ),
+        photoFixture(
+          file: const BuyV2MediaFileMetadata(
+            mimeType: 'image/png',
+            byteLength: 8192,
+            width: 1024,
+            height: 1024,
+            normalized: false,
+            frameCount: 1,
+          ),
+        ),
+      ]) {
+        final item = workspaceMasterCatalogue.first.copyWith(
+          cataloguePhoto: photo,
+        );
+        expect(item.toCataloguePreviewProduct().mediaAssets, isEmpty);
+        expect(
+          item
+              .toBuyPublicProduct(storeName: 'Store', storeId: 'store-1')
+              .mediaAssets,
+          isEmpty,
+        );
+      }
+    },
+  );
+
+  test(
+    'ADDPHOTO Store add edit and import retain the shared photo record',
+    () async {
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      final item = workspaceMasterCatalogue.first.copyWith(
+        cataloguePhoto: photoFixture(),
+        publicListing: false,
+        available: false,
+      );
+      work.addOrUpdateWorkspaceProduct(item);
+      var saved = work.workspaceCatalogueItems.firstWhere(
+        (p) => p.id == item.id,
+      );
+      expect(saved.cataloguePhoto, same(item.cataloguePhoto));
+      work.addOrUpdateWorkspaceProduct(saved.copyWith(sellingPrice: 310));
+      saved = work.workspaceCatalogueItems.firstWhere((p) => p.id == item.id);
+      expect(saved.cataloguePhoto, same(item.cataloguePhoto));
+      work.importWorkspaceProducts([saved.copyWith(stock: 20)]);
+      expect(
+        work.workspaceCatalogueItems.where((p) => p.id == item.id),
+        hasLength(1),
+      );
+      expect(
+        work.workspaceCatalogueItems
+            .firstWhere((p) => p.id == item.id)
+            .cataloguePhoto,
+        same(item.cataloguePhoto),
+      );
+      final rows = gateway.lastOperationalSnapshot!.state['catalogue'] as List;
+      final row = rows.cast<Map>().singleWhere((row) => row['id'] == item.id);
+      final restored = WorkspaceCataloguePhoto.fromJson(row['cataloguePhoto']);
+      expect(restored!.toJson(), item.cataloguePhoto!.toJson());
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
+
   const storeReviewRuntime =
       bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
       bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
@@ -752,6 +1297,28 @@ void main() {
     }
   }
 
+  // Founder now requires a horizontally scrollable stock statement. Keep the
+  // old no-horizontal-scroll assertion for finance/checkout, not table cells.
+  void expectStatementMoneyUntruncated(WidgetTester tester, Finder amount) {
+    expect(amount, findsOneWidget);
+    final paragraph = tester.renderObject<RenderParagraph>(amount);
+    final value = tester.widget<Text>(amount).data!;
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: value.length),
+    );
+    expect(boxes, hasLength(1));
+    expect(boxes.single.left, greaterThanOrEqualTo(-.5));
+    expect(boxes.single.right, lessThanOrEqualTo(paragraph.size.width + .5));
+    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(
+      find.ancestor(
+        of: amount,
+        matching: find.byKey(const Key('work-stock-horizontal')),
+      ),
+      findsOneWidget,
+    );
+  }
+
   void expectFinanceActionWords(WidgetTester tester) {
     for (final entry in const {
       'work-pulse-sales': 'View statement',
@@ -845,6 +1412,7 @@ void main() {
     bool dashboardAccountAuthenticated = true,
     bool uiReviewOnly = false,
     BuyV2CustomerStateStore? consumerStateStore,
+    bool settle = true,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = viewport;
@@ -921,7 +1489,7 @@ void main() {
         child: (wrapper ?? (child) => child)(app),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 
   WorkSession storeViewFixture([
@@ -1084,6 +1652,37 @@ void main() {
     }
     expect(finder, findsOneWidget);
     await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    final stockTable = find.ancestor(
+      of: finder,
+      matching: find.byKey(const Key('work-stock-horizontal')),
+    );
+    final targetKey = tester.widget(finder).key;
+    if (stockTable.evaluate().isNotEmpty &&
+        targetKey is ValueKey<String> &&
+        [
+          'work-catalogue-price-',
+          'work-catalogue-stock-',
+          'work-catalogue-purchase-',
+          'work-catalogue-mrp-',
+          'work-catalogue-reorder-',
+        ].any(targetKey.value.startsWith)) {
+      // Pan the requested cell into the data viewport, not under the frozen
+      // product column. The previous list had no horizontal gesture to replay.
+      await Scrollable.ensureVisible(tester.element(finder), alignment: .5);
+      await tester.pumpAndSettle();
+      expect(finder.hitTestable(), findsOneWidget);
+    }
+  }
+
+  Future<void> openStoreStockStatement(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-catalogue-more')));
+    await tester.pumpAndSettle();
+    final statement = find.byKey(
+      const Key('work-catalogue-open-stock-statement'),
+    );
+    await reveal(tester, statement);
+    await tester.tap(statement);
     await tester.pumpAndSettle();
   }
 
@@ -3027,24 +3626,13 @@ void main() {
         find.byKey(const Key('work-catalogue-add')).hitTestable(),
         findsOneWidget,
       );
-      final product = find.byKey(
-        Key('work-catalogue-master-${workspaceMasterCatalogue.first.id}'),
-      );
-      final heading = find.byKey(const Key('work-catalogue-heading'));
-      expect(
-        tester
-            .renderObject<RenderParagraph>(heading)
-            .getBoxesForSelection(
-              const TextSelection(baseOffset: 0, extentOffset: 8),
-            )
-            .length,
-        1,
-      );
-      if (display.scale > 1.4) await reveal(tester, product);
-      expect(product.hitTestable(), findsOneWidget);
+      expect(find.text(workspaceMasterCatalogue.first.title), findsNothing);
+      expect(find.text('0 products'), findsOneWidget);
       await captureStoreView(tester, 'r665-refinement-stock-$suffix');
-      await tester.tap(product);
+      await tester.tap(find.byKey(const Key('work-catalogue-add')));
       await tester.pumpAndSettle();
+      expect(find.text('MoolSocial catalogue'), findsOneWidget);
+      expect(find.text(workspaceMasterCatalogue.first.title), findsOneWidget);
       expect(work.workspaceCatalogueItems, isEmpty);
       expect(tester.takeException(), isNull);
       await tester.binding.handlePopRoute();
@@ -3404,32 +3992,13 @@ void main() {
           expect((paragraph.text as TextSpan).style!.fontSize, 14);
           await captureStoreView(tester, 'r665-catalogue-measure-${amount.$1}');
         }
-        expectExactMoneyVisible(tester, exactPrice);
-        if (display.$3 >= 1.4 || amount.$1 >= 10000000) {
+        expectStatementMoneyUntruncated(tester, exactPrice);
+        {
           final mrp = find.byKey(Key('work-catalogue-mrp-${product.id}'));
           await reveal(tester, mrp);
-          expectExactMoneyVisible(
+          expectStatementMoneyUntruncated(
             tester,
             find.descendant(of: mrp, matching: find.text(amount.$2)),
-          );
-        } else {
-          final facts = find.text(
-            '${product.pack} · MRP ${amount.$2} · ${product.sku}',
-          );
-          expect(facts, findsOneWidget);
-          final paragraph = tester.renderObject<RenderParagraph>(facts);
-          final content = tester.widget<Text>(facts).data!;
-          final start = content.indexOf(amount.$2);
-          final boxes = paragraph.getBoxesForSelection(
-            TextSelection(
-              baseOffset: start,
-              extentOffset: start + amount.$2.length,
-            ),
-          );
-          expect(boxes, hasLength(1));
-          expect(
-            boxes.single.right,
-            lessThanOrEqualTo(paragraph.size.width + .5),
           );
         }
         if (amount.$1 == 10000000000) {
@@ -3471,54 +4040,55 @@ void main() {
     }
 
     for (final isPublic in [true, false]) {
-      testWidgets('S09 catalogue visibility label $isPublic $display', (
-        tester,
-      ) async {
-        final work = liveStore();
-        final product = work.workspaceCatalogueItems.first.copyWith(
-          publicListing: isPublic,
-        );
-        work.workspaceCatalogueItems
-          ..clear()
-          ..add(product);
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.$1, display.$2),
-          textScale: display.$3,
-        );
-        await tester.tap(find.byKey(const Key('work-store-stock')));
-        await tester.pumpAndSettle();
-        final action = find.byKey(
-          Key('work-catalogue-visibility-${product.id}'),
-        );
-        await reveal(tester, action);
-        expect(action.hitTestable(), findsOneWidget);
-        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
-        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
-        final label = isPublic ? 'Public' : 'Private';
-        final text = find.descendant(of: action, matching: find.text(label));
-        final paragraph = tester.renderObject<RenderParagraph>(text);
-        expect(paragraph.didExceedMaxLines, isFalse);
-        expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
-        final boxes = paragraph.getBoxesForSelection(
-          TextSelection(baseOffset: 0, extentOffset: label.length),
-        );
-        expect(boxes, hasLength(1));
-        expect(
-          boxes.single.right,
-          lessThanOrEqualTo(paragraph.size.width + .5),
-        );
-        await captureStoreView(
-          tester,
-          'r665-catalogue-visibility-$isPublic-${display.$1}-${display.$3}',
-        );
-        expect(work.workspaceCatalogueItems.single.publicListing, isPublic);
-        expect(work.workspaceVisibleToCustomers, isTrue);
-        expect(work.workspaceOrders, isEmpty);
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'S09 catalogue visibility in product details $isPublic $display',
+        (tester) async {
+          final work = liveStore();
+          final product = work.workspaceCatalogueItems.first.copyWith(
+            publicListing: isPublic,
+          );
+          work.workspaceCatalogueItems
+            ..clear()
+            ..add(product);
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+          );
+          await tester.tap(find.byKey(const Key('work-store-stock')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(Key('work-catalogue-visibility-${product.id}')),
+            findsNothing,
+          );
+          final action = find.byKey(Key('work-catalogue-edit-${product.id}'));
+          await reveal(tester, action);
+          expect(action.hitTestable(), findsOneWidget);
+          expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+          expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          final publicRow = find.byKey(const Key('work-product-public'));
+          await reveal(tester, publicRow);
+          final toggle = find.descendant(
+            of: publicRow,
+            matching: find.byType(Switch),
+          );
+          expect(toggle, findsOneWidget);
+          expect(tester.widget<Switch>(toggle).value, isPublic);
+          expect(find.text('Show to customers'), findsOneWidget);
+          await captureStoreView(
+            tester,
+            'r665-catalogue-visibility-$isPublic-${display.$1}-${display.$3}',
+          );
+          expect(work.workspaceCatalogueItems.single.publicListing, isPublic);
+          expect(work.workspaceVisibleToCustomers, isTrue);
+          expect(work.workspaceOrders, isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
 
     testWidgets('S09 catalogue suggestions keep complete identity $display', (
@@ -3535,18 +4105,18 @@ void main() {
       await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
       final product = workspaceMasterCatalogue.first;
-      final card = find.byKey(Key('work-catalogue-master-${product.id}'));
+      expect(find.text(product.title), findsNothing);
+      await tester.tap(find.byKey(const Key('work-catalogue-add')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-catalogue-view-toggle')));
+      await tester.pumpAndSettle();
+      final card = find.byKey(Key('work-catalogue-add-${product.id}'));
       await reveal(tester, card);
-      for (final label in [
-        product.title,
-        '${product.brand} · ${product.pack}',
-        'Add this product',
-      ]) {
-        final text = find.descendant(of: card, matching: find.text(label));
+      for (final label in [product.title, product.variant, product.pack]) {
+        final text = find.text(label);
         expect(text, findsOneWidget);
         final paragraph = tester.renderObject<RenderParagraph>(text);
         expect(paragraph.didExceedMaxLines, isFalse);
-        expect(paragraph.overflow, isNot(TextOverflow.ellipsis));
         expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
       }
       await captureStoreView(
@@ -3559,6 +4129,9 @@ void main() {
         find.byKey(const Key('work-product-selling-price')),
         findsOneWidget,
       );
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('MoolSocial catalogue'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(
@@ -7661,6 +8234,325 @@ void main() {
     });
   }
 
+  for (final display in [
+    (320.0, 568.0, 1.0),
+    (360.0, 806.0, 1.0),
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('ADDENTRY02 same-page modes preserve input $display', (
+      tester,
+    ) async {
+      final work = storeViewFixture()..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      final open = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, open);
+      await captureStoreView(
+        tester,
+        'store-add-entry-${display.$1}-${display.$3}',
+      );
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      final page = find.byKey(const Key('work-add-product-entry'));
+      final route = ModalRoute.of(tester.element(page));
+      expect(find.text('Add product'), findsNothing);
+      expect(find.text('MoolSocial catalogue'), findsOneWidget);
+      final modeLabel = tester.renderObject<RenderParagraph>(
+        find.text('MoolSocial catalogue'),
+      );
+      final brandBoxes = modeLabel.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 10),
+      );
+      expect(
+        brandBoxes,
+        hasLength(1),
+        reason: 'Keep MoolSocial intact at enlarged text sizes.',
+      );
+      expect(
+        brandBoxes.single.right,
+        lessThanOrEqualTo(modeLabel.size.width + .5),
+      );
+      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(
+        tester,
+        'add-product-tabs-catalogue-${display.$1}-${display.$3}',
+      );
+
+      Future<void> select(String mode) async {
+        await chooseAddProductMode(tester, mode);
+        expect(ModalRoute.of(tester.element(page)), same(route));
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+
+      await select('enter');
+      expect(find.byKey(const Key('work-product-fast-editor')), findsOneWidget);
+      expect(
+        tester.getSize(find.byKey(const Key('work-product-save'))).height,
+        lessThanOrEqualTo(64),
+        reason: 'The embedded save action must not wrap into a tall footer.',
+      );
+      await captureStoreView(
+        tester,
+        'add-product-tabs-manual-${display.$1}-${display.$3}',
+      );
+      await tester.enterText(
+        find.byKey(const Key('work-product-title')),
+        'Local rice',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await select('import');
+      expect(
+        find.byKey(const Key('work-add-product-csv-panel')),
+        findsOneWidget,
+      );
+      await captureStoreView(
+        tester,
+        'add-product-tabs-csv-${display.$1}-${display.$3}',
+      );
+      final chooseFile = find.byKey(const Key('work-add-product-choose-csv'));
+      await tester.ensureVisible(chooseFile);
+      await tester.pumpAndSettle();
+      expect(chooseFile.hitTestable(), findsOneWidget);
+      await select('find');
+      await tester.enterText(
+        find.byKey(const Key('work-add-products-search')),
+        'Tata',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await select('enter');
+      final title = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const Key('work-product-title')),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(title.controller.text, 'Local rice');
+      await select('find');
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('work-add-products-search')),
+            )
+            .controller!
+            .text,
+        'Tata',
+      );
+      expect(work.workspaceCatalogueItems, isEmpty);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(page, findsNothing);
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('work-catalogue-add')));
+      await tester.pumpAndSettle();
+      expect(page, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('ADDENTRY03 manual keyboard keeps save and cancel reachable', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+      textScale: 1,
+    );
+    final open = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, open);
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+    await chooseAddProductMode(tester, 'enter');
+    await tester.enterText(
+      find.byKey(const Key('work-product-title')),
+      'Unsaved rice',
+    );
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    final save = find.byKey(const Key('work-product-save'));
+    final cancel = find.byKey(const Key('work-product-cancel'));
+    expect(save.hitTestable(), findsOneWidget);
+    expect(cancel.hitTestable(), findsOneWidget);
+    expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(506));
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, 'add-product-tabs-manual-keyboard-360');
+    await tester.tap(cancel);
+    tester.testTextInput.hide();
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(find.text('MoolSocial catalogue'), findsOneWidget);
+    expect(find.byKey(const Key('work-add-product-entry')), findsOneWidget);
+    expect(work.workspaceCatalogueItems, isEmpty);
+    await chooseAddProductMode(tester, 'enter');
+    final title = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const Key('work-product-title')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(title.controller.text, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ADDENTRY02 landscape mode menu remains reachable', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(740, 360);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var selected = 0;
+    var imports = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (_, child) => MediaQuery(
+          data: const MediaQueryData(
+            size: Size(740, 360),
+            textScaler: TextScaler.linear(1.4),
+          ),
+          child: child!,
+        ),
+        home: StatefulBuilder(
+          builder: (_, setPageState) => StoreAddProductEntryScreen(
+            selectedIndex: selected,
+            onSelected: (index) => setPageState(() => selected = index),
+            catalogue: StoreAddProductSheet(
+              embedded: true,
+              catalogue: workspaceMasterCatalogue,
+              ownedProducts: const [],
+              createProduct: (_) => workspaceMasterCatalogue.first,
+              scanBarcode: () async => null,
+              onSelected: (_) {},
+            ),
+            manual: const SizedBox.shrink(),
+            importCsv: () async {
+              imports++;
+              return null;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final mode in ['find', 'enter', 'import']) {
+      await chooseAddProductMode(tester, mode);
+    }
+    expect(selected, 2);
+    final chooseFile = find.byKey(const Key('work-add-product-choose-csv'));
+    await tester.ensureVisible(chooseFile);
+    await tester.pumpAndSettle();
+    await tester.tap(chooseFile);
+    await tester.pumpAndSettle();
+    expect(imports, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ADDENTRY01 upstream dashboard landscape AP-S1-001', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: storeViewFixture()..workspaceCatalogueItems.clear(),
+      viewport: const Size(740, 360),
+      textScale: 1.4,
+    );
+    expect(tester.takeException(), isNull);
+  }, skip: true); // AP-S1-001, retained upstream failure before entry opens.
+
+  for (final scenario in ['cancel', 'import', 'failure', 'store switch']) {
+    testWidgets('ADDENTRY02 CSV $scenario uses existing importer', (
+      tester,
+    ) async {
+      final picker = _EntryFilePicker();
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = picker;
+      addTearDown(() => FilePickerPlatform.instance = previous);
+      final work = storeViewFixture();
+      final before = List.of(work.workspaceCatalogueItems);
+      final originalWorkspace = work.activeWorkspace;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+      );
+      final open = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      await chooseAddProductMode(tester, 'import');
+      expect(
+        picker.calls,
+        0,
+        reason: 'Opening the CSV tab must not open the native picker.',
+      );
+      if (scenario == 'failure') picker.fail = true;
+      if (scenario == 'import') picker.file = _EntryCsvFile();
+      if (scenario == 'store switch') {
+        picker.pending = Completer<PlatformFile?>();
+      }
+      final csv = find.byKey(const Key('work-add-product-choose-csv'));
+      await tester.tap(csv);
+      await tester.pumpAndSettle();
+      expect(picker.calls, 1);
+      expect(picker.extensions, ['csv']);
+      if (scenario == 'store switch') {
+        await tester.tap(csv);
+        await tester.pump();
+        expect(picker.calls, 1);
+        work.activeWorkspace = null;
+        work.workspaceId = 'another-store';
+        picker.pending!.complete(_EntryCsvFile());
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems, isEmpty);
+        work.activeWorkspace = originalWorkspace;
+      }
+      if (scenario == 'import') {
+        expect(work.workspaceCatalogueItems.length, before.length + 1);
+        final added = work.workspaceCatalogueItems.singleWhere(
+          (p) => p.title == 'Local rice',
+        );
+        expect(added.stock, 5);
+        expect(added.sellingPrice, 50);
+        expect(added.publicListing, isFalse);
+        expect(find.textContaining('1 products added'), findsWidgets);
+      } else {
+        expect(work.workspaceCatalogueItems, before);
+      }
+      if (scenario == 'failure') {
+        expect(
+          find.text('Could not open the file. Please try again.'),
+          findsOneWidget,
+        );
+        picker.fail = false;
+        await tester.tap(csv);
+        await tester.pumpAndSettle();
+        expect(picker.calls, 2);
+      }
+      expect(find.byType(StoreAddProductEntryScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('CATALOGUE01 owner offer saves privately from the Store rail', (
     tester,
   ) async {
@@ -7682,8 +8574,18 @@ void main() {
     await reveal(tester, entry);
     await tester.tap(entry);
     await tester.pumpAndSettle();
+    await chooseAddProductMode(tester, 'find');
     final choice = find.byKey(Key('work-add-product-${product.id}'));
     await reveal(tester, choice);
+    await tester.tap(choice);
+    await tester.pumpAndSettle();
+    expect(work.workspaceCatalogueItems.length, count);
+    expect(find.byKey(const Key('work-catalogue-grid')), findsNothing);
+    expect(find.text('Review product'), findsOneWidget);
+    expect(find.byKey(const Key('work-add-products-search')), findsNothing);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-catalogue-grid')), findsOneWidget);
     await tester.tap(choice);
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -7740,6 +8642,7 @@ void main() {
       await reveal(tester, action);
       await tester.tap(action);
       await tester.pumpAndSettle();
+      await chooseAddProductMode(tester, 'find');
       await tester.tap(find.byKey(Key('work-add-product-${before.first.id}')));
       await tester.pumpAndSettle();
       if (scenario == 'duplicate SKU') {
@@ -7771,6 +8674,2393 @@ void main() {
     });
   }
 
+  testWidgets('ADDGRID review before save, Saved, category and filters', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+      textScale: 1,
+    );
+    final open = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, open);
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+    final grid = find.byKey(const Key('work-catalogue-grid'));
+    final toolbar = find.byKey(const Key('work-catalogue-toolbar'));
+    final searchBand = find.byKey(const Key('work-catalogue-search-band'));
+    expect(tester.getTopLeft(searchBand).dy, 0);
+    expect(find.text('Add product'), findsNothing);
+    expect(find.text('Add manually'), findsNothing);
+    expect(find.text('Import CSV'), findsNothing);
+    final selector = find.byKey(const Key('work-add-product-options'));
+    expect(find.descendant(of: toolbar, matching: selector), findsOneWidget);
+    expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+    final arrow = find.descendant(
+      of: selector,
+      matching: find.byIcon(Icons.keyboard_arrow_down_rounded),
+    );
+    expect(arrow.hitTestable(), findsOneWidget);
+    await tester.tap(arrow);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-add-product-enter')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('work-add-product-import')).hitTestable(),
+      findsOneWidget,
+    );
+    await captureStoreView(tester, 'inventory-add-options-menu-360');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(grid).dy,
+      lessThanOrEqualTo(140),
+      reason: 'Catalogue chrome must not consume the product viewport.',
+    );
+    expect(
+      tester.getBottomLeft(searchBand).dy,
+      lessThanOrEqualTo(tester.getTopLeft(toolbar).dy),
+    );
+    final categoryControl = find.byKey(const Key('work-catalogue-category'));
+    final savedControl = find.byKey(const Key('work-catalogue-saved'));
+    final filterControl = find.byKey(const Key('work-catalogue-filter'));
+    expect(
+      tester.getCenter(categoryControl).dx,
+      lessThan(tester.getCenter(savedControl).dx),
+    );
+    expect(
+      tester.getCenter(savedControl).dx,
+      lessThan(tester.getCenter(filterControl).dx),
+    );
+    for (final control in [categoryControl, savedControl, filterControl]) {
+      expect(control.hitTestable(), findsOneWidget);
+      expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+    }
+    final product = workspaceMasterCatalogue.first;
+    final picker = tester.widget<StoreAddProductSheet>(
+      find.byType(StoreAddProductSheet),
+    );
+    final add = find.byKey(Key('work-catalogue-add-${product.id}'));
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    picker.onAdd!(
+      product,
+    ); // A stale repeated tap must not overwrite or duplicate.
+    await tester.pumpAndSettle();
+    expect(work.workspaceCatalogueItems, isEmpty);
+    expect(find.text('Review product'), findsOneWidget);
+    expect(find.byKey(const Key('work-product-fast-editor')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('work-product-purchase-price')),
+      '200',
+    );
+    await tester.enterText(find.byKey(const Key('work-product-stock')), '6');
+    await tester.tap(find.byKey(const Key('work-product-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
+    expect(find.text('Store stock'), findsOneWidget);
+    expect(work.workspaceCatalogueItems.length, 1);
+    final saved = work.workspaceCatalogueItems.single;
+    expect(saved.publicListing, isFalse);
+    expect(saved.available, isTrue);
+    expect(saved.stock, 6);
+    expect(saved.purchasePrice, 200);
+    expect(saved.sellingPrice, product.sellingPrice);
+    expect(saved.title, product.title);
+    expect(saved.mrp, product.mrp);
+    expect(saved.barcode, product.barcode);
+    await tester.tap(find.byKey(const Key('work-catalogue-add')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-catalogue-grid')), findsOneWidget);
+    expect(find.byKey(const Key('work-product-fast-editor')), findsNothing);
+    await captureStoreView(tester, 'inventory-grid-after-add-360');
+    await tester.tap(find.byKey(const Key('work-catalogue-saved')));
+    await tester.pumpAndSettle();
+    expect(find.text('1 product · In your store'), findsOneWidget);
+    expect(
+      find.byKey(Key('work-add-product-${workspaceMasterCatalogue.last.id}')),
+      findsNothing,
+    );
+    await captureStoreView(tester, 'inventory-grid-saved-360');
+    await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-catalogue-category')));
+    await tester.pumpAndSettle();
+    await captureStoreView(tester, 'catalogue-category-menu-360');
+    await tester.tap(find.text('Salt Spices').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('work-add-product-${product.id}')), findsNothing);
+    expect(
+      find.byKey(Key('work-add-product-${workspaceMasterCatalogue.last.id}')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+    await tester.pumpAndSettle();
+    final filter = find.byKey(const Key('work-catalogue-filter'));
+    await tester.ensureVisible(filter);
+    await tester.tap(filter);
+    await tester.pumpAndSettle();
+    await captureStoreView(tester, 'catalogue-filter-menu-360');
+    await tester.tap(find.text('Not added yet'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('work-add-product-${product.id}')), findsNothing);
+    expect(find.text('2 products'), findsOneWidget);
+    await tester.tap(filter);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tata').last);
+    await tester.pumpAndSettle();
+    expect(find.text('1 product'), findsOneWidget);
+    await captureStoreView(tester, 'catalogue-filter-result-360');
+    await tester.enterText(
+      find.byKey(const Key('work-add-products-search')),
+      'missing product',
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No matching product'), findsOneWidget);
+    await captureStoreView(tester, 'catalogue-search-empty-360');
+    expect(work.workspaceCatalogueItems.length, 1);
+    expect(tester.takeException(), isNull);
+    for (final mode in ['enter', 'import']) {
+      await chooseAddProductMode(tester, mode);
+      expect(searchBand, findsNothing);
+      expect(toolbar, findsNothing);
+      expect(grid, findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  Future<({_CataloguePhotoClient client, VoidCallback restore})>
+  installCataloguePhotoClient(WidgetTester tester) async {
+    final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+    final client = _CataloguePhotoClient(bytes);
+    final previous = debugNetworkImageHttpClientProvider;
+    imageCache.clear();
+    imageCache.clearLiveImages();
+    debugNetworkImageHttpClientProvider = () => client;
+    void restore() {
+      debugNetworkImageHttpClientProvider = previous;
+      imageCache.clear();
+      imageCache.clearLiveImages();
+    }
+
+    addTearDown(restore);
+    return (client: client, restore: restore);
+  }
+
+  Future<void> awaitCataloguePhoto(
+    WidgetTester tester,
+    bool Function() ready,
+  ) async {
+    for (var i = 0; i < 100 && !ready(); i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 15)),
+      );
+      await tester.pump();
+    }
+    expect(
+      ready(),
+      isTrue,
+      reason: 'Real image renderer reached the expected state',
+    );
+  }
+
+  testWidgets(
+    'ADDPHOTOUI actual grid loading decoded failure and private Add',
+    (tester) async {
+      final media = await installCataloguePhotoClient(tester);
+      final client = media.client;
+      client.pending = Completer<Uint8List>();
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 806);
+      addTearDown(tester.view.reset);
+      var product = workspaceMasterCatalogue.first.copyWith(
+        cataloguePhoto: photoFixture(),
+      );
+      final owned = <WorkspaceCatalogueItem>[];
+      late StateSetter update;
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: const Key('store-review-root'),
+          child: MaterialApp(
+            theme: MoolTheme.light(),
+            debugShowCheckedModeBanner: false,
+            home: StatefulBuilder(
+              builder: (_, setLocalState) {
+                update = setLocalState;
+                return StoreAddProductEntryScreen(
+                  selectedIndex: 0,
+                  onSelected: (_) {},
+                  manual: const SizedBox.shrink(),
+                  importCsv: () async => null,
+                  catalogue: StoreAddProductSheet(
+                    embedded: true,
+                    catalogue: [product, ...workspaceMasterCatalogue.skip(1)],
+                    ownedProducts: List.of(owned),
+                    createProduct: (_) => product,
+                    scanBarcode: () async => null,
+                    onSelected: (_) {},
+                    onAdd: (item) => setLocalState(
+                      () => owned.add(
+                        item.copyWith(available: false, publicListing: false),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final add = find.byKey(Key('work-catalogue-add-${product.id}'));
+      expect(
+        find.descendant(of: add, matching: find.text('Add to Store')),
+        findsOneWidget,
+      );
+      final initialRect = tester.getRect(add);
+      expect(initialRect.height, greaterThanOrEqualTo(48));
+      await captureStoreView(tester, 'catalogue-photo-loading-FIXTURE-360');
+      client.pending!.complete(client.bytes);
+      client.pending = null;
+      bool decoded() => tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .any((image) => image.image != null);
+      await awaitCataloguePhoto(tester, decoded);
+      expect(tester.getRect(add), initialRect);
+      final photoImage = tester.widget<Image>(
+        find.byKey(
+          Key('buy-supplier-photo-${product.id}-test-photo-oil-test-r1'),
+        ),
+      );
+      expect(photoImage.fit, BoxFit.contain);
+      final bitmap = tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .firstWhere((image) => image.image != null)
+          .image!;
+      expect(
+        bitmap.width,
+        lessThan(1024),
+        reason: 'Small preview decodes a thumbnail, not the full source',
+      );
+      expect(product.cataloguePhoto!.file.width, 1024);
+      await captureStoreView(
+        tester,
+        'catalogue-add-to-store-photo-FIXTURE-360',
+      );
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(owned.single.cataloguePhoto, same(product.cataloguePhoto));
+      expect(owned.single.publicListing, isFalse);
+      expect(
+        find.descendant(of: add, matching: find.text('Edit')),
+        findsOneWidget,
+      );
+      const failedSource = 'https://example.invalid/catalogue/failure/oil.png';
+      client.failures.add(Uri.parse(failedSource));
+      update(() {
+        product = product.copyWith(
+          cataloguePhoto: photoFixture(
+            revision: 'failure',
+            source: failedSource,
+          ),
+        );
+        owned[0] = product.copyWith(publicListing: false, available: false);
+      });
+      await tester.pump();
+      await awaitCataloguePhoto(
+        tester,
+        () =>
+            find
+                .byKey(
+                  Key(
+                    'buy-supplier-photo-${product.id}-test-photo-oil-failure',
+                  ),
+                )
+                .evaluate()
+                .isNotEmpty &&
+            !decoded(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(BuyV2ProductPhotoUnavailable), findsWidgets);
+      expect(tester.getRect(add), initialRect);
+      await captureStoreView(tester, 'catalogue-photo-failed-FIXTURE-360');
+      expect(tester.takeException(), isNull);
+      media.restore();
+    },
+  );
+
+  testWidgets(
+    'ADDPHOTOROUTE Store public product retains identity and refreshes photo revision',
+    (tester) async {
+      final media = await installCataloguePhotoClient(tester);
+      final client = media.client;
+      final work = storeViewFixture();
+      final product = work.workspaceCatalogueItems.first.copyWith(
+        cataloguePhoto: photoFixture(
+          status: WorkspaceCataloguePhotoStatus.approved,
+        ),
+      );
+      work.workspaceCatalogueItems[0] = product;
+      final route =
+          '/app/buy?view=product&product=${product.id}&workspaceProduct=${product.id}&return=/app/work/workspace/dashboard';
+      await mount(
+        tester,
+        route: route,
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+        bottomInset: 0,
+        settle: false,
+      );
+      await awaitCataloguePhoto(
+        tester,
+        () =>
+            find.byType(BuyV2Screen).evaluate().isNotEmpty &&
+            tester
+                    .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+                    .session
+                    .findProduct(product.id)
+                    ?.mediaAssets
+                    .isNotEmpty ==
+                true,
+      );
+      final screen = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen));
+      final public = screen.session.findProduct(product.id)!;
+      expect(public.storeId, work.activeWorkspace!.id);
+      expect(
+        public.mediaAssets.single.binding!.storeId,
+        work.activeWorkspace!.id,
+      );
+      expect(public.mediaAssets.single.source, product.cataloguePhoto!.source);
+      await awaitCataloguePhoto(
+        tester,
+        () => tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .any((image) => image.image != null),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(product.title).hitTestable(), findsWidgets);
+      await captureStoreView(tester, 'store-to-buy-photo-FIXTURE-360');
+      final router = GoRouter.of(tester.element(find.byType(BuyV2Screen)));
+      router.go('/app/work/workspace/dashboard');
+      await tester.pumpAndSettle();
+      final replacement = product.copyWith(
+        cataloguePhoto: photoFixture(
+          status: WorkspaceCataloguePhotoStatus.approved,
+          revision: 'replacement-r2',
+        ),
+      );
+      work.addOrUpdateWorkspaceProduct(replacement);
+      router.go(route);
+      await awaitCataloguePhoto(
+        tester,
+        () =>
+            find.byType(BuyV2Screen).evaluate().isNotEmpty &&
+            tester
+                    .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+                    .session
+                    .findProduct(product.id)
+                    ?.mediaAssets
+                    .firstOrNull
+                    ?.binding
+                    ?.assetRevision ==
+                'replacement-r2',
+      );
+      final refreshedScreen = tester.widget<BuyV2Screen>(
+        find.byType(BuyV2Screen),
+      );
+      expect(refreshedScreen.session, isNot(same(screen.session)));
+      final refreshed = refreshedScreen.session.findProduct(product.id)!;
+      expect(
+        refreshed.mediaAssets.single.binding!.assetRevision,
+        'replacement-r2',
+      );
+      await awaitCataloguePhoto(
+        tester,
+        () =>
+            client.requested.any((uri) => uri.path.contains('replacement-r2')),
+      );
+      expect(
+        refreshed.mediaAssets.single.source,
+        isNot(public.mediaAssets.single.source),
+      );
+      await awaitCataloguePhoto(
+        tester,
+        () => tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .any((image) => image.image != null),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(product.title).hitTestable(), findsWidgets);
+      await captureStoreView(tester, 'store-to-buy-photo-replaced-FIXTURE-360');
+      router.go('/app/work/workspace/dashboard');
+      await tester.pumpAndSettle();
+      work.addOrUpdateWorkspaceProduct(
+        replacement.copyWith(compliance: mappedPack),
+      );
+      router.go(route);
+      await awaitCataloguePhoto(
+        tester,
+        () =>
+            find.byType(BuyV2Screen).evaluate().isNotEmpty &&
+            tester
+                    .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+                    .session
+                    .findProduct(product.id)
+                    ?.compliance
+                    ?.manufacturerName ==
+                mappedPack.manufacturerName,
+      );
+      final metadataScreen = tester.widget<BuyV2Screen>(
+        find.byType(BuyV2Screen),
+      );
+      expect(metadataScreen.session, isNot(same(refreshedScreen.session)));
+      expect(
+        metadataScreen.session
+            .findProduct(product.id)!
+            .compliance!
+            .consumerCare,
+        mappedPack.consumerCare,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      media.restore();
+    },
+  );
+
+  testWidgets(
+    'ADDMAP exact variant and pack stay distinct in both catalogue views',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 806);
+      addTearDown(tester.view.reset);
+      final variants = [
+        for (var i = 0; i < 3; i++)
+          workspaceMasterCatalogue[i].copyWith(
+            canonicalId: 'fixture-oil-family',
+            title: 'Sunflower oil',
+            brand: 'Fixture brand',
+            variant: i == 1 ? 'Cold pressed' : 'Refined',
+            pack: i == 2 ? '5 L can' : '1 L pouch',
+          ),
+      ];
+      WorkspaceCatalogueItem? selected;
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: const Key('store-review-root'),
+          child: MaterialApp(
+            theme: MoolTheme.light(),
+            debugShowCheckedModeBanner: false,
+            home: StoreAddProductSheet(
+              embedded: true,
+              catalogue: variants,
+              ownedProducts: [variants.first],
+              createProduct: (_) => variants.first,
+              scanBarcode: () async => variants[1].barcode,
+              onSelected: (item) => selected = item,
+              onAdd: (item) => selected = item,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('3 products'), findsOneWidget);
+      expect(find.text('Cold pressed'), findsOneWidget);
+      expect(find.text('Refined'), findsNWidgets(2));
+      final delegate =
+          tester.widget<SliverGrid>(find.byType(SliverGrid)).gridDelegate
+              as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.mainAxisExtent, 176);
+      expect(delegate.crossAxisCount, 3);
+      await captureStoreView(tester, 'catalogue-exact-variants-grid-360');
+      await tester.tap(find.byKey(Key('work-catalogue-add-${variants[1].id}')));
+      expect(selected, same(variants[1]));
+      await tester.enterText(
+        find.byKey(const Key('work-add-products-search')),
+        'Cold pressed',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('1 product'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-catalogue-view-toggle')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(Key('work-catalogue-add-${variants[1].id}')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'catalogue-exact-variants-list-360');
+      await tester.tap(find.byKey(const Key('work-catalogue-saved')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 product · In your store'), findsOneWidget);
+      expect(
+        find.byKey(Key('work-catalogue-add-${variants[1].id}')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('work-add-products-scan')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(Key('work-catalogue-add-${variants[1].id}')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final display in [(360.0, 1.0), (320.0, 1.0), (320.0, 2.0)]) {
+    final scale = display.$2;
+    testWidgets(
+      'ADDMAP editable pack facts preserve batch and readonly metadata $display',
+      (tester) async {
+        final product = workspaceMasterCatalogue.first.copyWith(
+          compliance: mappedPack,
+          stock: 12,
+        );
+        final work = storeViewFixture()..workspaceCatalogueItems.clear();
+        work.workspaceCatalogueItems.add(product);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$1 == 360 ? 806 : 568),
+          textScale: scale,
+        );
+        final open = find.byKey(const Key('work-quick-add-products'));
+        await reveal(tester, open);
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key('work-catalogue-add-${product.id}')));
+        await tester.pumpAndSettle();
+        final section = find.byKey(const Key('work-product-pack-information'));
+        await tester.ensureVisible(section);
+        await tester.tap(section);
+        await tester.pumpAndSettle();
+        final values = mappedPack.toJson()
+          ..remove('manufacturedOrPackedOn')
+          ..remove('bestBeforeOrUseBy');
+        for (final entry in values.entries) {
+          final field = find.byKey(Key('work-product-pack-${entry.key}'));
+          final input = tester.widget<EditableText>(
+            find.descendant(of: field, matching: find.byType(EditableText)),
+          );
+          expect(input.controller.text, entry.value);
+        }
+        final quantityField = find.byKey(
+          const Key('work-product-pack-netQuantity'),
+        );
+        final originField = find.byKey(
+          const Key('work-product-pack-countryOfOrigin'),
+        );
+        final quantityRect = tester.getRect(quantityField);
+        final originRect = tester.getRect(originField);
+        if (display.$1 == 360 && scale == 1) {
+          expect(quantityRect.top, originRect.top);
+          expect(quantityRect.width, lessThan(originRect.width));
+          expect(quantityRect.right, lessThan(originRect.left));
+        } else {
+          expect(originRect.top, greaterThan(quantityRect.bottom));
+          expect(quantityRect.width, originRect.width);
+        }
+        for (final rect in [quantityRect, originRect]) {
+          expect(rect.height, greaterThanOrEqualTo(48));
+        }
+        if (scale > 1.2) {
+          for (final entry in values.entries) {
+            final input = find.byKey(Key('work-product-pack-${entry.key}'));
+            final label = find.byKey(
+              Key('work-product-pack-${entry.key}-label'),
+            );
+            expect(label, findsOneWidget);
+            expect(
+              tester.getRect(label).bottom,
+              lessThan(tester.getRect(input).top),
+            );
+          }
+        }
+        await tester.ensureVisible(quantityField);
+        await tester.enterText(quantityField, '2 L');
+        await tester.testTextInput.receiveAction(TextInputAction.next);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<EditableText>(
+                find.descendant(
+                  of: originField,
+                  matching: find.byType(EditableText),
+                ),
+              )
+              .focusNode
+              .hasFocus,
+          isTrue,
+        );
+        await tester.enterText(originField, 'India');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await Scrollable.ensureVisible(
+          tester.element(
+            find.descendant(
+              of: section,
+              matching: find.text('Pack information'),
+            ),
+          ),
+          alignment: 0,
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'pack-information-start-${display.$1.toInt()}-$scale',
+        );
+        final manufacturer = find.byKey(
+          const Key('work-product-pack-manufacturerName'),
+        );
+        await tester.ensureVisible(manufacturer);
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'pack-information-top-${display.$1.toInt()}-$scale',
+        );
+        await tester.enterText(manufacturer, 'Revised fixture manufacturer');
+        final care = find.byKey(const Key('work-product-pack-consumerCare'));
+        await tester.ensureVisible(care);
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'pack-information-bottom-${display.$1.toInt()}-$scale',
+        );
+        final sectionHeading = find.descendant(
+          of: section,
+          matching: find.text('Pack information'),
+        );
+        await tester.ensureVisible(sectionHeading);
+        await tester.tap(sectionHeading);
+        await tester.pumpAndSettle();
+        final reference = find.byKey(const Key('work-product-reference'));
+        await tester.ensureVisible(reference);
+        await tester.tap(reference);
+        await tester.pumpAndSettle();
+        final references = tester.widgetList<EditableText>(
+          find.descendant(of: reference, matching: find.byType(EditableText)),
+        );
+        expect(references, hasLength(2));
+        expect(references.every((text) => text.readOnly), isTrue);
+        expect(find.text(product.canonicalId), findsOneWidget);
+        expect(find.text('Batch supplied date'), findsOneWidget);
+        expect(find.text('Batch supplied expiry'), findsOneWidget);
+        await captureStoreView(tester, 'product-reference-readonly-$scale');
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        final saved = work.workspaceCatalogueItems.single;
+        expect(saved.compliance!.netQuantity, '2 L');
+        expect(saved.compliance!.countryOfOrigin, 'India');
+        final publicPack = saved
+            .toBuyPublicProduct(storeName: 'Fixture Store')
+            .compliance!;
+        expect(publicPack.netQuantity, '2 L');
+        expect(publicPack.countryOfOrigin, 'India');
+        expect(
+          saved.compliance!.manufacturerName,
+          'Revised fixture manufacturer',
+        );
+        expect(
+          saved.compliance!.bestBeforeOrUseBy,
+          mappedPack.bestBeforeOrUseBy,
+        );
+        expect(
+          saved.compliance!.manufacturedOrPackedOn,
+          mappedPack.manufacturedOrPackedOn,
+        );
+        expect(
+          saved.publicListing,
+          isFalse,
+          reason: 'Edited master facts must not remain publicly approved.',
+        );
+        expect(saved.catalogueFactsRequireReview, isTrue);
+        final forcedPublic = saved.copyWith(publicListing: true);
+        expect(forcedPublic.published, isFalse);
+        expect(forcedPublic.canSellAtCounter, isTrue);
+        expect(
+          forcedPublic
+              .toBuyPublicProduct(storeName: 'Fixture Store')
+              .catalogueListing,
+          isFalse,
+        );
+        await tester.tap(find.byKey(const Key('work-catalogue-add')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key('work-catalogue-add-${saved.id}')));
+        await tester.pumpAndSettle();
+        final visibility = find.descendant(
+          of: find.byKey(const Key('work-product-public')),
+          matching: find.byType(Switch),
+        );
+        expect(tester.widget<Switch>(visibility).onChanged, isNull);
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(
+          work.workspaceCatalogueItems.single.catalogueFactsRequireReview,
+          isTrue,
+        );
+        expect(work.workspaceCatalogueItems.single.published, isFalse);
+        expect(
+          saved
+              .toBuyPublicProduct(storeName: 'Fixture Store')
+              .compliance!
+              .manufacturerName,
+          'Revised fixture manufacturer',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final display in [(360.0, 806.0, 1.0), (320.0, 568.0, 2.0)]) {
+    testWidgets(
+      'STOCK14 saved stock statement search edit and exact inventory $display',
+      (tester) async {
+        final media = await installCataloguePhotoClient(tester);
+        final work = storeViewFixture()..workspaceCatalogueItems.clear();
+        const imageDir = String.fromEnvironment(
+          'MOOL_CATALOGUE_TEST_IMAGE_DIR',
+        );
+        const imageFiles = [
+          'sunflower-oil-1l-test.png',
+          'whole-wheat-atta-1kg-test.png',
+        ];
+        for (var i = 0; i < 2; i++) {
+          final source = workspaceMasterCatalogue[i];
+          var bytes = media.client.bytes;
+          if (imageDir.isNotEmpty) {
+            bytes = (await tester.runAsync(
+              () => File('$imageDir/${imageFiles[i]}').readAsBytes(),
+            ))!;
+          }
+          final dimensions = (await tester.runAsync(() async {
+            final codec = await ui.instantiateImageCodec(bytes);
+            final frame = await codec.getNextFrame();
+            final size = (frame.image.width, frame.image.height);
+            frame.image.dispose();
+            codec.dispose();
+            return size;
+          }))!;
+          final uri = 'https://example.invalid/stock14/${source.id}.png';
+          media.client.responses[Uri.parse(uri)] = bytes;
+          work.workspaceCatalogueItems.add(
+            source.copyWith(
+              stock: i == 0 ? 24 : 0,
+              available: i == 0,
+              publicListing: false,
+              cataloguePhoto: WorkspaceCataloguePhoto(
+                assetId: 'stock14-${source.id}',
+                revision: 'test-r1',
+                source: uri,
+                publisherWorkspaceId: 'test-catalogue',
+                canonicalId: source.canonicalId,
+                brand: source.brand,
+                variant: source.variant,
+                pack: source.pack,
+                barcode: source.barcode,
+                status: WorkspaceCataloguePhotoStatus.testOnly,
+                file: BuyV2MediaFileMetadata(
+                  mimeType: 'image/png',
+                  byteLength: bytes.length,
+                  width: dimensions.$1,
+                  height: dimensions.$2,
+                  normalized: true,
+                  frameCount: 1,
+                ),
+              ),
+            ),
+          );
+        }
+        final product = work.workspaceCatalogueItems.first;
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        if (display.$3 < 1.4) {
+          await awaitCataloguePhoto(
+            tester,
+            () => tester
+                .widgetList<RawImage>(find.byType(RawImage))
+                .any((i) => i.image != null),
+          );
+        }
+        await tester.pumpAndSettle();
+        expect(find.text('Store stock'), findsOneWidget);
+        expect(find.text('2 products'), findsOneWidget);
+        expect(find.text('Add from MoolSocial catalogue'), findsNothing);
+        expect(find.text('Tata Salt'), findsNothing);
+        expect(find.byKey(const Key('work-catalogue-list')), findsOneWidget);
+        await captureStoreView(
+          tester,
+          'saved-stock-statement-${display.$1.toInt()}-${display.$3}',
+        );
+        expect(
+          find.byKey(const Key('work-catalogue-view-toggle')),
+          findsNothing,
+        );
+        expect(find.byKey(const Key('work-catalogue-grid')), findsNothing);
+        expect(
+          find.byKey(const Key('work-stock-statement-header')),
+          findsOneWidget,
+        );
+        expect(find.text('24 in stock'), findsOneWidget);
+        await awaitCataloguePhoto(
+          tester,
+          () =>
+              tester
+                  .widgetList<RawImage>(find.byType(RawImage))
+                  .where((i) => i.image != null)
+                  .length >=
+              (display.$3 < 1.4 ? 2 : 1),
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'saved-stock-statement-loaded-${display.$1.toInt()}-${display.$3}',
+        );
+        expect(find.text('Sold today'), findsNothing);
+        expect(find.text('Nearest expiry'), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(Dialog), findsNothing);
+        expect(find.text('PDF'), findsOneWidget);
+        expect(find.text('Excel'), findsOneWidget);
+        expect(find.text('CSV'), findsOneWidget);
+        await captureStoreView(
+          tester,
+          'stock-download-inline-${display.$1.toInt()}-${display.$3}',
+        );
+        await tester.ensureVisible(
+          find.byKey(const Key('work-stock-period-today')),
+        );
+        await tester.tap(find.byKey(const Key('work-stock-period-today')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-stock-history-unavailable')),
+          findsOneWidget,
+        );
+        expect(find.text('24 in stock'), findsNothing);
+        expect(
+          tester
+              .widget<TextButton>(
+                find.byKey(const Key('work-stock-download-pdf')),
+              )
+              .onPressed,
+          isNull,
+        );
+        await captureStoreView(
+          tester,
+          'stock-period-today-${display.$1.toInt()}-${display.$3}',
+        );
+        await tester.ensureVisible(
+          find.byKey(const Key('work-stock-period-custom')),
+        );
+        await tester.tap(find.byKey(const Key('work-stock-period-custom')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('work-stock-from')),
+          '01/09/2026',
+        );
+        await tester.enterText(
+          find.byKey(const Key('work-stock-to')),
+          '15/09/2026',
+        );
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'stock-period-custom-${display.$1.toInt()}-${display.$3}',
+        );
+        expect(tester.takeException(), isNull);
+        await tester.ensureVisible(
+          find.byKey(const Key('work-stock-period-current')),
+        );
+        await tester.tap(find.byKey(const Key('work-stock-period-current')));
+        await tester.pumpAndSettle();
+        final productAnchor = find.byKey(
+          Key('work-catalogue-edit-${product.id}'),
+        );
+        await reveal(tester, productAnchor);
+        final originalX = tester.getTopLeft(productAnchor).dx;
+        final horizontal = find.byKey(const Key('work-stock-horizontal'));
+        await tester.drag(productAnchor, const Offset(-240, 0));
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(productAnchor).dx, closeTo(originalX, .5));
+        final horizontalController = tester
+            .widget<SingleChildScrollView>(horizontal)
+            .controller!;
+        expect(horizontalController.offset, greaterThan(0));
+        // Capture a settled, column-aligned purchase/MRP view after proving the
+        // real swipe; do not use a frame with a price clipped at the viewport edge.
+        horizontalController.jumpTo(200 * display.$3);
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'saved-stock-middle-${display.$1.toInt()}-${display.$3}',
+        );
+        horizontalController.jumpTo(
+          horizontalController.position.maxScrollExtent,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(productAnchor).dx, closeTo(originalX, .5));
+        final reorder = find.byKey(Key('work-catalogue-reorder-${product.id}'));
+        expect(reorder, findsOneWidget);
+        await captureStoreView(
+          tester,
+          'saved-stock-right-${display.$1.toInt()}-${display.$3}',
+        );
+        horizontalController.jumpTo(0);
+        await tester.pumpAndSettle();
+        final search = find.byKey(const Key('work-add-products-search'));
+        await tester.enterText(search, 'Tata Salt');
+        await tester.pumpAndSettle();
+        expect(
+          find.text('No matching stock. Try another search or filter.'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(
+            Key('work-catalogue-add-${workspaceMasterCatalogue.last.id}'),
+          ),
+          findsNothing,
+        );
+        await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-catalogue-filter')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Out of stock').last);
+        await tester.pumpAndSettle();
+        expect(find.text('1 product'), findsOneWidget);
+        expect(find.text('0 in stock'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+        await tester.pumpAndSettle();
+        await tester.enterText(search, product.sku);
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        final stockEdit = find.byKey(Key('work-catalogue-edit-${product.id}'));
+        await reveal(tester, stockEdit);
+        await tester.tap(stockEdit);
+        await tester.pumpAndSettle();
+        expect(find.text('Edit product'), findsOneWidget);
+        final price = find.byKey(const Key('work-product-selling-price'));
+        await tester.ensureVisible(price);
+        await tester.enterText(price, '266');
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems, hasLength(2));
+        expect(work.workspaceCatalogueItems.first.id, product.id);
+        expect(work.workspaceCatalogueItems.first.sellingPrice, 266);
+        expect(work.workspaceCatalogueItems.first.stock, 24);
+        expect(find.text('₹266'), findsOneWidget);
+        expect(find.text('1 product'), findsOneWidget);
+        final clearSearch = find.byKey(const Key('work-catalogue-clear'));
+        await reveal(tester, clearSearch);
+        expect(clearSearch.hitTestable(), findsOneWidget);
+        await tester.tap(clearSearch);
+        await tester.pumpAndSettle();
+        expect(find.text('2 products'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        media.restore();
+      },
+    );
+  }
+
+  testWidgets(
+    'STOCK16 horizontal table retains lazy pages and exact SKU search',
+    (tester) async {
+      final work = storeViewFixture()..workspaceCatalogueItems.clear();
+      final source = workspaceMasterCatalogue.first;
+      work.workspaceCatalogueItems.addAll(
+        List.generate(
+          10000,
+          (i) => WorkspaceCatalogueItem(
+            id: 'statement-$i',
+            canonicalId: 'statement-canonical-$i',
+            categoryId: source.categoryId,
+            brand: source.brand,
+            title: source.title,
+            variant: source.variant,
+            pack: source.pack,
+            purchasePrice: source.purchasePrice,
+            sellingPrice: source.sellingPrice,
+            unitPrice: source.unitPrice,
+            deliveryPromise: source.deliveryPromise,
+            origin: source.origin,
+            visualLabel: source.visualLabel,
+            visualKind: source.visualKind,
+            sku: 'STOCK-$i',
+            barcode: '890${i.toString().padLeft(10, '0')}',
+            stock: i,
+            publicListing: false,
+          ),
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+      );
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      expect(find.text('10000 products'), findsOneWidget);
+      expect(
+        tester
+            .widget<SliverList>(find.byType(SliverList))
+            .delegate
+            .estimatedChildCount,
+        50,
+      );
+      final horizontal = tester
+          .widget<SingleChildScrollView>(
+            find.byKey(const Key('work-stock-horizontal')),
+          )
+          .controller!;
+      horizontal.jumpTo(240);
+      await tester.pumpAndSettle();
+      final vertical = tester
+          .widget<CustomScrollView>(
+            find.byKey(const Key('work-catalogue-list')),
+          )
+          .controller!;
+      vertical.jumpTo(vertical.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<SliverList>(find.byType(SliverList))
+            .delegate
+            .estimatedChildCount,
+        100,
+      );
+      expect(horizontal.offset, 240);
+      await tester.enterText(
+        find.byKey(const Key('work-add-products-search')),
+        'STOCK-9999',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('1 product'), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-catalogue-edit-statement-9999')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-catalogue-grid')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('STOCK17 files preserve complete typed stock and safe CSV', (
+    tester,
+  ) async {
+    final source = workspaceMasterCatalogue.first;
+    final products = [
+      source.copyWith(
+        title: '=SUM(1,2) "oil"',
+        sku: '00123',
+        barcode: '001234567890',
+        stock: 0,
+      ),
+      workspaceMasterCatalogue[1].copyWith(
+        stockMode: WorkspaceStockMode.availabilityOnly,
+        stock: 999,
+        available: false,
+      ),
+    ];
+    final snapshot = StoreStockSnapshot(
+      storeId: 'store-review',
+      storeName: 'Review Store',
+      scope: 'All Store stock',
+      generatedAt: DateTime.utc(2026, 9, 21, 10),
+      products: products,
+    );
+    products.clear();
+    expect(snapshot.rows, hasLength(2));
+    final csv = (await tester.runAsync(
+      () => snapshot.generate(StoreStockExportFormat.csv),
+    ))!;
+    final csvText = utf8.decode(csv);
+    expect(csvText, contains("'=SUM(1,2)"));
+    expect(csvText, contains('""oil""'));
+    expect(csvText, isNot(contains('999')));
+    final excel = (await tester.runAsync(
+      () => snapshot.generate(StoreStockExportFormat.excel),
+    ))!;
+    final sheet = xls.Excel.decodeBytes(excel)['Current stock'];
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('B7')).value,
+      xls.TextCellValue('00123'),
+    );
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('C7')).value,
+      xls.TextCellValue('001234567890'),
+    );
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('H7')).value,
+      xls.IntCellValue(0),
+    );
+    expect(sheet.cell(xls.CellIndex.indexByString('H8')).value, isNull);
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('K7')).value,
+      xls.IntCellValue(264),
+    );
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('A7')).value,
+      isA<xls.TextCellValue>(),
+    );
+    final pdf = (await tester.runAsync(
+      () => snapshot.generate(StoreStockExportFormat.pdf),
+    ))!;
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_STOCK_EXPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      await tester.runAsync(() async {
+        await Directory(output).create(recursive: true);
+        await File('$output/current-stock.csv').writeAsBytes(csv);
+        await File('$output/current-stock.xlsx').writeAsBytes(excel);
+        await File('$output/current-stock.pdf').writeAsBytes(pdf);
+      });
+    }
+    expect(
+      () => StoreStockSnapshot(
+        storeId: '',
+        storeName: 'Store',
+        scope: 'All',
+        generatedAt: DateTime.now(),
+        products: [source],
+      ),
+      throwsFormatException,
+    );
+  });
+
+  testWidgets('STOCK17 PDF pagination and unsupported script remain truthful', (
+    tester,
+  ) async {
+    final source = workspaceMasterCatalogue.first;
+    final many = StoreStockSnapshot(
+      storeId: 'store',
+      storeName: 'Review Store',
+      scope: 'All Store stock',
+      generatedAt: DateTime.utc(2026, 9, 21),
+      products: List.generate(
+        200,
+        (i) => source.copyWith(sku: 'PDF-$i', stock: i),
+      ),
+    );
+    final pdf = (await tester.runAsync(
+      () => many.generate(StoreStockExportFormat.pdf),
+    ))!;
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_STOCK_EXPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      await tester.runAsync(
+        () => File('$output/paginated-stock.pdf').writeAsBytes(pdf),
+      );
+    }
+    final unsupported = StoreStockSnapshot(
+      storeId: 'store',
+      storeName: 'Store',
+      scope: 'All',
+      generatedAt: DateTime.now(),
+      products: [source.copyWith(title: 'चावल')],
+    );
+    final error = await tester.runAsync(() async {
+      try {
+        await unsupported.generate(StoreStockExportFormat.pdf);
+        return null;
+      } catch (e) {
+        return e;
+      }
+    });
+    expect(error, isA<FormatException>());
+    final csv = (await tester.runAsync(
+      () => unsupported.generate(StoreStockExportFormat.csv),
+    ))!;
+    expect(utf8.decode(csv), contains('चावल'));
+  });
+
+  testWidgets('ADDSCREENS existing editor detail sections', (tester) async {
+    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+      textScale: 1.0,
+    );
+    final open = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, open);
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        Key('work-catalogue-add-${workspaceMasterCatalogue.first.id}'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final section in [
+      (
+        'Product and store details',
+        'work-product-brand',
+        'product-details-identity',
+      ),
+      (
+        'Details customers may need',
+        'work-product-return-policy',
+        'product-details-customer',
+      ),
+      (
+        'Store-wide setup',
+        'work-product-store-defaults',
+        'product-store-defaults',
+      ),
+    ]) {
+      final title = find.text(section.$1);
+      await tester.ensureVisible(title);
+      await tester.pumpAndSettle();
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(Key(section.$2)));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, '${section.$3}-360');
+      if (section.$3 == 'product-details-identity') {
+        await tester.ensureVisible(
+          find.byKey(const Key('work-product-origin')),
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'product-details-delivery-360');
+      }
+      await tester.ensureVisible(title);
+      await tester.pumpAndSettle();
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+    }
+    expect(work.workspaceCatalogueItems, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('STOCK17 exports 10000 records not a visible page', (
+    tester,
+  ) async {
+    final source = workspaceMasterCatalogue.first;
+    final snapshot = StoreStockSnapshot(
+      storeId: 'scale',
+      storeName: 'Scale Store',
+      scope: 'All Store stock',
+      generatedAt: DateTime.utc(2026, 9, 21),
+      products: List.generate(
+        10000,
+        (i) => source.copyWith(sku: 'SKU-$i', stock: i),
+      ),
+    );
+    final bytes = (await tester.runAsync(
+      () => snapshot.generate(StoreStockExportFormat.excel),
+    ))!;
+    final largePdf = (await tester.runAsync(
+      () => snapshot.generate(StoreStockExportFormat.pdf),
+    ))!;
+    expect(ascii.decode(largePdf.take(5).toList()), '%PDF-');
+    const bulkOutput = String.fromEnvironment('MOOL_STOCK_EXPORT_TEST_DIR');
+    if (bulkOutput.isNotEmpty) {
+      await tester.runAsync(
+        () => File('$bulkOutput/stock-10000.pdf').writeAsBytes(largePdf),
+      );
+    }
+    final book = xls.Excel.decodeBytes(bytes)['Current stock'];
+    expect(book.maxRows, 10006);
+    expect(
+      book.cell(xls.CellIndex.indexByString('B10006')).value,
+      xls.TextCellValue('SKU-9999'),
+    );
+    expect(
+      book.cell(xls.CellIndex.indexByString('H10006')).value,
+      xls.IntCellValue(9999),
+    );
+    final csv = (await tester.runAsync(
+      () => snapshot.generate(StoreStockExportFormat.csv),
+    ))!;
+    expect(utf8.decode(csv), contains('SKU-9999'));
+  });
+
+  testWidgets('STOCK17 selection cancellation retry busy and scope guards', (
+    tester,
+  ) async {
+    StoreStockSnapshot? generated;
+    var current = true, calls = 0, attempt = 0;
+    Completer<Uint8List>? pending;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoreStockDownloadControls(
+            storeId: 'store',
+            storeName: 'Store',
+            filteredProducts: [workspaceMasterCatalogue.first],
+            filterDescription: 'Search: oil',
+            isCurrent: () => current,
+            generateFile: (snapshot, format) async {
+              generated = snapshot;
+              return pending?.future ?? Future.value(Uint8List.fromList([1]));
+            },
+            saveFile: (bytes, name, format) async {
+              calls++;
+              attempt++;
+              if (attempt == 1) return false;
+              if (attempt == 2) throw StateError('save failure');
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('work-stock-download-csv')));
+    await tester.pumpAndSettle();
+    expect(generated!.rows, hasLength(1));
+    expect(generated!.scope, contains('Search: oil'));
+    expect(
+      find.text('Download cancelled. Tap a format to try again.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-stock-download-csv')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Could not save'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-stock-download-csv')));
+    await tester.pumpAndSettle();
+    expect(find.text('CSV saved · 1 products'), findsOneWidget);
+    pending = Completer<Uint8List>();
+    await tester.tap(find.byKey(const Key('work-stock-download-csv')));
+    await tester.pump();
+    final busy = tester.widget<TextButton>(
+      find.byKey(const Key('work-stock-download-csv')),
+    );
+    expect(busy.onPressed, isNull);
+    current = false;
+    pending.complete(Uint8List.fromList([1]));
+    await tester.pumpAndSettle();
+    expect(calls, 3);
+    expect(
+      find.text('Your store changed. Reopen Stock to download.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'STOCK18 inline periods validate and never export current balances as history',
+    (tester) async {
+      var generated = 0, saved = 0;
+      final scope = ChangeNotifier();
+      var current = true;
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StoreStockDownloadControls(
+              storeId: 'store',
+              storeName: 'Store',
+              filteredProducts: [workspaceMasterCatalogue.first],
+              filterDescription: '',
+              isCurrent: () => current,
+              scopeChanges: scope,
+              generateFile: (snapshot, format) async {
+                generated++;
+                expect(snapshot.scope, 'All Store stock');
+                return Uint8List.fromList([1]);
+              },
+              saveFile: (bytes, name, format) async {
+                saved++;
+                return true;
+              },
+            ),
+          ),
+        ),
+      );
+      Future<void> select(String period) async {
+        final chip = find.byKey(Key('work-stock-period-$period'));
+        await tester.ensureVisible(chip);
+        await tester.tap(chip);
+        await tester.pumpAndSettle();
+      }
+
+      for (final period in ['today', 'week', 'month', 'custom']) {
+        await select(period);
+        for (final format in ['pdf', 'xlsx', 'csv']) {
+          expect(
+            tester
+                .widget<TextButton>(
+                  find.byKey(Key('work-stock-download-$format')),
+                )
+                .onPressed,
+            isNull,
+          );
+        }
+      }
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text('Enter both dates as DD/MM/YYYY.'), findsOneWidget);
+      Future<void> dates(String from, String to, String message) async {
+        await tester.enterText(find.byKey(const Key('work-stock-from')), from);
+        await tester.enterText(find.byKey(const Key('work-stock-to')), to);
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsOneWidget);
+      }
+
+      await dates(
+        '31/02/2024',
+        '01/03/2024',
+        'Enter valid dates as DD/MM/YYYY.',
+      );
+      await dates(
+        '02/03/2024',
+        '01/03/2024',
+        'From date must be on or before To date.',
+      );
+      await dates('01/01/2999', '02/01/2999', 'Choose dates up to today.');
+      await dates('29/02/2024', '01/03/2024', '29/02/2024 – 01/03/2024');
+      expect(generated, 0);
+      expect(saved, 0);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await select('current');
+      for (final format in ['pdf', 'xlsx', 'csv']) {
+        await tester.tap(find.byKey(Key('work-stock-download-$format')));
+        await tester.pumpAndSettle();
+      }
+      expect(generated, 3);
+      expect(saved, 3);
+      // Switching away and back must not revive an in-flight store scope.
+      current = false;
+      scope.notifyListeners();
+      current = true;
+      scope.notifyListeners();
+      await tester.tap(find.byKey(const Key('work-stock-download-csv')));
+      await tester.pumpAndSettle();
+      expect(generated, 3);
+      expect(saved, 3);
+      expect(
+        find.text('Your store changed. Reopen Stock to download.'),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('STOCK18 empty results disable every format', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoreStockDownloadControls(
+            storeId: 'store',
+            storeName: 'Store',
+            filteredProducts: const [],
+            filterDescription: 'No matching search',
+            isCurrent: () => true,
+          ),
+        ),
+      ),
+    );
+    for (final format in ['pdf', 'xlsx', 'csv']) {
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(Key('work-stock-download-$format')))
+            .onPressed,
+        isNull,
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('STOCK14 empty stock never contains master suggestions', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    expect(find.text('0 products'), findsOneWidget);
+    expect(
+      find.text('No products saved yet. Tap + to add a product to your store.'),
+      findsOneWidget,
+    );
+    expect(find.text(workspaceMasterCatalogue.first.title), findsNothing);
+    await captureStoreView(tester, 'saved-stock-empty-360');
+    await tester.tap(find.byKey(const Key('work-catalogue-add')));
+    await tester.pumpAndSettle();
+    expect(find.text('MoolSocial catalogue'), findsOneWidget);
+    expect(find.text(workspaceMasterCatalogue.first.title), findsOneWidget);
+    expect(work.workspaceCatalogueItems, isEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Store stock'), findsOneWidget);
+    expect(work.workspaceCatalogueItems, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final count in [5000, 10000]) {
+    testWidgets('STOCK14 $count owned products reuse paging and scan', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 806);
+      addTearDown(tester.view.reset);
+      final products = List.generate(
+        count,
+        (i) => WorkspaceCatalogueItem(
+          id: 'owned-$i',
+          canonicalId: 'canonical-$i',
+          categoryId: i.isEven ? 'rice' : 'flour',
+          brand: 'Fixture',
+          title: 'Long saved product $i',
+          variant: 'Grade A',
+          pack: '1 kg',
+          sku: 'OWN-$i',
+          barcode: '890${i.toString().padLeft(10, '0')}',
+          purchasePrice: 50,
+          sellingPrice: 60,
+          unitPrice: '₹60/kg',
+          stock: i,
+          deliveryPromise: '',
+          origin: '',
+          visualLabel: '',
+          visualKind: '',
+          publicListing: false,
+          available: i > 0,
+        ),
+      );
+      WorkspaceCatalogueItem? selected;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: StoreAddProductSheet(
+            embedded: true,
+            stockOnly: true,
+            catalogue: workspaceMasterCatalogue,
+            ownedProducts: products,
+            createProduct: (_) =>
+                throw StateError('Stock must not create an unknown product'),
+            scanBarcode: () async => products.last.barcode,
+            onSelected: (p) => selected = p,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('$count products'), findsOneWidget);
+      expect(
+        tester
+            .widget<SliverList>(find.byType(SliverList))
+            .delegate
+            .estimatedChildCount,
+        50,
+      );
+      await tester.tap(find.byKey(const Key('work-add-products-scan')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 product'), findsOneWidget);
+      await tester.tap(
+        find.byKey(Key('work-catalogue-add-${products.last.id}')),
+      );
+      expect(selected, same(products.last));
+      await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-catalogue-view-toggle')), findsNothing);
+      expect(
+        tester
+            .widget<SliverList>(find.byType(SliverList))
+            .delegate
+            .estimatedChildCount,
+        50,
+      );
+      final scroll = tester
+          .widget<CustomScrollView>(
+            find.byKey(const Key('work-catalogue-list')),
+          )
+          .controller!;
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<SliverList>(find.byType(SliverList))
+            .delegate
+            .estimatedChildCount,
+        100,
+      );
+      expect(find.text('Tata Salt'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('STOCK14 availability stock and category visibility filters', (
+    tester,
+  ) async {
+    final counted = workspaceMasterCatalogue.first.copyWith(
+      stock: 24,
+      publicListing: false,
+    );
+    final availability = workspaceMasterCatalogue.last.copyWith(
+      stock: 999,
+      stockMode: WorkspaceStockMode.availabilityOnly,
+      available: true,
+      publicListing: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: StoreAddProductSheet(
+          embedded: true,
+          stockOnly: true,
+          catalogue: workspaceMasterCatalogue,
+          ownedProducts: [counted, availability],
+          createProduct: (_) => counted,
+          scanBarcode: () async => 'unknown-barcode',
+          onSelected: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-catalogue-view-toggle')), findsNothing);
+    expect(find.textContaining(' · Available'), findsOneWidget);
+    expect(find.textContaining('999 in stock'), findsNothing);
+    await tester.tap(find.byKey(const Key('work-catalogue-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Public selected').last);
+    await tester.pumpAndSettle();
+    expect(find.text('1 product'), findsOneWidget);
+    expect(
+      find.byKey(Key('work-catalogue-add-${availability.id}')),
+      findsOneWidget,
+    );
+    expect(find.byKey(Key('work-catalogue-add-${counted.id}')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-catalogue-category')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cooking Oil'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('work-catalogue-add-${counted.id}')), findsOneWidget);
+    expect(
+      find.byKey(Key('work-catalogue-add-${availability.id}')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const Key('work-add-products-scan')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No matching stock. Try another search or filter.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(Key('work-catalogue-add-${counted.id}')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ADDBROWSE product-specific photos categories grid and list', (
+    tester,
+  ) async {
+    final media = await installCataloguePhotoClient(tester);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 806);
+    addTearDown(tester.view.reset);
+    const imageDir = String.fromEnvironment('MOOL_CATALOGUE_TEST_IMAGE_DIR');
+    const files = [
+      'sunflower-oil-1l-test.png',
+      'whole-wheat-atta-1kg-test.png',
+      'iodised-salt-1kg-test.png',
+    ];
+    final products = <WorkspaceCatalogueItem>[];
+    for (var i = 0; i < 3; i++) {
+      final source = workspaceMasterCatalogue[i];
+      final bytes = imageDir.isEmpty
+          ? media.client.bytes
+          : (await tester.runAsync(
+              () => File('$imageDir/${files[i]}').readAsBytes(),
+            ))!;
+      final size = (await tester.runAsync(() async {
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        final result = (width: frame.image.width, height: frame.image.height);
+        frame.image.dispose();
+        codec.dispose();
+        return result;
+      }))!;
+      final uri = Uri.parse(
+        'https://example.invalid/catalogue/v10/${source.id}.png',
+      );
+      media.client.responses[uri] = bytes;
+      final photo = WorkspaceCataloguePhoto(
+        assetId: 'test-${source.id}',
+        revision: 'v10',
+        source: uri.toString(),
+        publisherWorkspaceId: 'test-moolsocial-catalogue',
+        canonicalId: source.canonicalId,
+        brand: source.brand,
+        variant: source.variant,
+        pack: source.pack,
+        barcode: source.barcode,
+        status: WorkspaceCataloguePhotoStatus.testOnly,
+        file: BuyV2MediaFileMetadata(
+          mimeType: 'image/png',
+          byteLength: bytes.length,
+          width: size.width,
+          height: size.height,
+          normalized: true,
+          frameCount: 1,
+        ),
+      );
+      final item = source.copyWith(cataloguePhoto: photo);
+      expect(
+        item
+            .copyWith(stock: 10, available: true, publicListing: true)
+            .published,
+        isFalse,
+      );
+      products.add(item);
+    }
+    var scale = 1.0;
+    late StateSetter update;
+    WorkspaceCatalogueItem? activated;
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: const Key('store-review-root'),
+        child: MaterialApp(
+          theme: MoolTheme.light(),
+          debugShowCheckedModeBanner: false,
+          home: StatefulBuilder(
+            builder: (context, setLocalState) {
+              update = setLocalState;
+              return MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: StoreAddProductEntryScreen(
+                  selectedIndex: 0,
+                  onSelected: (_) {},
+                  manual: const SizedBox.shrink(),
+                  importCsv: () async => null,
+                  catalogue: StoreAddProductSheet(
+                    embedded: true,
+                    catalogue: products,
+                    ownedProducts: const [],
+                    createProduct: (_) => products.first,
+                    scanBarcode: () async => null,
+                    onAdd: (item) => activated = item,
+                    onSelected: (item) => activated = item,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    bool decoded() =>
+        tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .where((image) => image.image != null)
+            .length ==
+        3;
+    await awaitCataloguePhoto(tester, decoded);
+    await tester.pumpAndSettle();
+    expect(media.client.requested.toSet().length, 3);
+    await captureStoreView(tester, 'catalogue-grid-test-images-360');
+    await tester.tap(find.byKey(const Key('work-catalogue-category')));
+    await tester.pumpAndSettle();
+    expect(find.text('Cooking Oil'), findsOneWidget);
+    expect(find.text('Flour Grains'), findsOneWidget);
+    expect(find.text('Salt Spices'), findsOneWidget);
+    await captureStoreView(tester, 'catalogue-categories-360');
+    await tester.tap(find.text('Cooking Oil'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(Key('work-catalogue-add-${products[0].id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(Key('work-catalogue-add-${products[1].id}')),
+      findsNothing,
+    );
+    await captureStoreView(tester, 'catalogue-category-filter-360');
+    await tester.tap(find.byKey(const Key('work-catalogue-view-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-catalogue-list')), findsOneWidget);
+    expect(
+      find.byKey(Key('work-catalogue-add-${products[1].id}')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+    await tester.pumpAndSettle();
+    await awaitCataloguePhoto(tester, decoded);
+    await captureStoreView(tester, 'catalogue-list-test-images-360');
+    final action = find.byKey(Key('work-catalogue-add-${products[0].id}'));
+    final buttonText = tester.renderObject<RenderParagraph>(
+      find.descendant(of: action, matching: find.text('Add to Store')),
+    );
+    expect(buttonText.text.style?.fontFamily, 'Inter');
+    expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+    await tester.tap(action);
+    expect(activated, products.first);
+    tester.view.physicalSize = const Size(320, 568);
+    update(() => scale = 2);
+    await tester.pumpAndSettle();
+    await captureStoreView(tester, 'catalogue-list-large-text-320');
+    expect(tester.takeException(), isNull);
+    media.restore();
+  });
+
+  for (final display in [
+    (360.0, 806.0, 1.0),
+    (320.0, 568.0, 1.0),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('ADDREVIEW prefilled save and Counter Sale $display', (
+      tester,
+    ) async {
+      final media = await installCataloguePhotoClient(tester);
+      var photo = photoFixture();
+      const imageDir = String.fromEnvironment('MOOL_CATALOGUE_TEST_IMAGE_DIR');
+      if (imageDir.isNotEmpty) {
+        final bytes = (await tester.runAsync(
+          () => File('$imageDir/sunflower-oil-1l-test.png').readAsBytes(),
+        ))!;
+        final dimensions = (await tester.runAsync(() async {
+          final codec = await ui.instantiateImageCodec(bytes);
+          final frame = await codec.getNextFrame();
+          final size = (frame.image.width, frame.image.height);
+          frame.image.dispose();
+          codec.dispose();
+          return size;
+        }))!;
+        photo = photoFixture(
+          file: BuyV2MediaFileMetadata(
+            mimeType: 'image/png',
+            byteLength: bytes.length,
+            width: dimensions.$1,
+            height: dimensions.$2,
+            frameCount: 1,
+            normalized: true,
+          ),
+        );
+        media.client.responses[Uri.parse(photo.source)] = bytes;
+      }
+      final work = storeViewFixture()..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      final open = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      final picker = tester.widget<StoreAddProductSheet>(
+        find.byType(StoreAddProductSheet),
+      );
+      // Supply test catalogue media through the actual route callback; save is a real tap.
+      final product = workspaceMasterCatalogue.first.copyWith(
+        cataloguePhoto: photo,
+        compliance: mappedPack,
+      );
+      picker.onAdd!(product);
+      await tester.pump();
+      await awaitCataloguePhoto(
+        tester,
+        () => tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .any((image) => image.image != null),
+      );
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems, isEmpty);
+      EditableText input(String key) => tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(input('work-product-title').controller.text, product.title);
+      expect(
+        input('work-product-selling-price').controller.text,
+        '${product.sellingPrice}',
+      );
+      expect(input('work-product-stock').controller.text, '0');
+      expect(input('work-product-purchase-price').controller.text, isEmpty);
+      final caseId = '${display.$1.toInt()}-${display.$3}';
+      await captureStoreView(tester, 'review-prefilled-$caseId');
+      final save = find.byKey(const Key('work-product-save'));
+      expect(find.text('Save to Store'), findsOneWidget);
+      expect(save.hitTestable(), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-product-error')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(work.workspaceCatalogueItems, isEmpty);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(save.hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomRight(save).dy,
+        lessThanOrEqualTo(display.$2 - 260),
+      );
+      await captureStoreView(tester, 'review-keyboard-validation-$caseId');
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      for (final field in [
+        ('work-product-purchase-price', '200'),
+        ('work-product-selling-price', '262'),
+        ('work-product-stock', '8'),
+      ]) {
+        final target = find.byKey(Key(field.$1));
+        await tester.ensureVisible(target);
+        await tester.enterText(target, field.$2);
+      }
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
+      expect(find.byKey(const Key('work-catalogue-heading')), findsOneWidget);
+      final stored = work.workspaceCatalogueItems.single;
+      expect(stored.stock, 8);
+      expect(stored.sellingPrice, 262);
+      expect(stored.publicListing, isFalse);
+      expect(stored.available, isTrue);
+      expect(stored.cataloguePhoto!.toJson(), photo.toJson());
+      expect(stored.title, product.title);
+      expect(stored.compliance!.manufacturerName, mappedPack.manufacturerName);
+      expect(stored.compliance!.manufacturedOrPackedOn, isNull);
+      expect(stored.compliance!.bestBeforeOrUseBy, isNull);
+      if (display.$1 == 360) {
+        await tester.tap(find.byKey(const Key('work-catalogue-add')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key('work-catalogue-add-${stored.id}')));
+        await tester.pumpAndSettle();
+        expect(find.text('Save changes'), findsOneWidget);
+        expect(input('work-product-selling-price').controller.text, '262');
+        expect(input('work-product-purchase-price').controller.text, '200');
+        expect(input('work-product-stock').controller.text, '8');
+        await tester.enterText(
+          find.byKey(const Key('work-product-selling-price')),
+          '260',
+        );
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems, hasLength(1));
+        expect(work.workspaceCatalogueItems.single.sellingPrice, 260);
+        expect(work.workspaceCatalogueItems.single.unitPrice, contains('260'));
+        expect(
+          work.workspaceCatalogueItems.single.cataloguePhoto!.toJson(),
+          photo.toJson(),
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        final counter = find.byKey(const Key('work-quick-counter-sale'));
+        await reveal(tester, counter);
+        await tester.tap(counter);
+        await tester.pumpAndSettle();
+        await enterSaleCustomer(tester, '9829012345', name: 'Rakesh');
+        final search = find.byKey(const Key('work-counter-product-search'));
+        await tester.enterText(search, stored.sku);
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(Key('work-sale-product-${stored.id}')),
+          findsOneWidget,
+        );
+        final add = find.byKey(Key('work-order-add-${stored.id}'));
+        await reveal(tester, add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderQuantities[stored.id], 1);
+        await tester.tap(find.byKey(const Key('work-counter-usb-scan')));
+        await tester.pumpAndSettle();
+        for (final character in stored.barcode.split('')) {
+          final key = LogicalKeyboardKey(character.codeUnitAt(0));
+          await tester.sendKeyDownEvent(key, character: character);
+          await tester.sendKeyUpEvent(key);
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderQuantities[stored.id], 2);
+        await captureStoreView(tester, 'saved-stock-counter-sale-search');
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(milliseconds: 500));
+      media.restore();
+    });
+  }
+
+  testWidgets(
+    'ADDREVIEW cancel and concurrent duplicate never write inventory',
+    (tester) async {
+      final work = storeViewFixture()..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+      );
+      final open = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      final product = workspaceMasterCatalogue.first;
+      final add = find.byKey(Key('work-catalogue-add-${product.id}'));
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-product-title')),
+        'Unsaved title',
+      );
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems, isEmpty);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final existing = product.copyWith(stock: 99, publicListing: false);
+      work.addOrUpdateWorkspaceProduct(existing);
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'This product was already added. Open it from Store stock to edit.',
+        ),
+        findsOneWidget,
+      );
+      expect(work.workspaceCatalogueItems.single, same(existing));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final count in [5000, 10000]) {
+    testWidgets(
+      'ADDBROWSE $count SKUs lazy paging whole-catalogue search and categories',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 806);
+        addTearDown(tester.view.reset);
+        final products = List.generate(
+          count,
+          (i) => WorkspaceCatalogueItem(
+            id: 'scale-$i',
+            canonicalId: 'scale-$i',
+            title: 'Long catalogue product number $i',
+            sku: 'SKU-${i.toString().padLeft(5, '0')}',
+            barcode: '890${i.toString().padLeft(10, '0')}',
+            categoryId: i % 2 == 0 ? 'cooking-oil' : '',
+            brand: 'Test catalogue',
+            variant: 'Standard',
+            pack: '1 L pouch',
+            purchasePrice: 0,
+            sellingPrice: 0,
+            unitPrice: '',
+            stock: 0,
+            deliveryPromise: '',
+            origin: '',
+            visualLabel: '',
+            visualKind: '',
+            publicListing: false,
+            available: false,
+          ),
+        );
+        // Half are already owned: no duplicate catalogue rows or quadratic matching.
+        final owned = products.take(count ~/ 2).toList();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: StoreAddProductSheet(
+              embedded: true,
+              catalogue: products,
+              ownedProducts: owned,
+              createProduct: (_) => products.first,
+              scanBarcode: () async => null,
+              onSelected: (_) {},
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        int loaded() => tester
+            .widget<SliverGrid>(find.byType(SliverGrid))
+            .delegate
+            .estimatedChildCount!;
+        expect(find.text('$count products'), findsOneWidget);
+        expect(loaded(), 50);
+        expect(find.byType(FilledButton).evaluate().length, lessThan(30));
+        final scroll = tester
+            .widget<CustomScrollView>(
+              find.byKey(const Key('work-catalogue-grid')),
+            )
+            .controller!;
+        scroll.jumpTo(scroll.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(loaded(), 100);
+        // Search must find the last item without loading thousands of preceding rows.
+        await tester.enterText(
+          find.byKey(const Key('work-add-products-search')),
+          products.last.sku,
+        );
+        await tester.pumpAndSettle();
+        expect(loaded(), 1);
+        expect(
+          find.byKey(Key('work-catalogue-add-${products.last.id}')),
+          findsOneWidget,
+        );
+        expect(scroll.offset, 0);
+        await tester.tap(find.byKey(const Key('work-catalogue-view-toggle')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-catalogue-list')), findsOneWidget);
+        expect(
+          find.byKey(Key('work-catalogue-add-${products.last.id}')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-catalogue-category')));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: find.byType(PopupMenuItem<String>),
+            matching: find.text('${count ~/ 2}'),
+          ),
+          findsNWidgets(2),
+        );
+        await tester.tap(find.text('Uncategorised'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Uncategorised · ${count ~/ 2} products'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('work-catalogue-add-scale-0')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-catalogue-add-scale-1')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-catalogue-saved')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Uncategorised · ${count ~/ 4} products · In your store'),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-catalogue-view-toggle')));
+        await tester.pumpAndSettle();
+        expect(loaded(), 50);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('ADDGRID dense 50-SKU fixture preserves tap targets and scroll', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 806);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const titles = [
+      'Sunflower oil',
+      'Whole wheat atta',
+      'Iodised salt',
+      'Basmati rice',
+      'Toor dal',
+      'Green tea',
+      'Bath soap',
+      'Laundry powder',
+      'Notebook',
+      'Extra long product name with a larger family pack',
+    ];
+    final products = List.generate(
+      50,
+      (i) => WorkspaceCatalogueItem(
+        id: 'density-$i',
+        canonicalId: 'density-$i',
+        categoryId: 'test-category',
+        brand: 'Test catalogue',
+        title: '${titles[i % titles.length]} ${i + 1}',
+        variant: 'Standard',
+        pack: '1 kg pack',
+        sku: 'DENSE-$i',
+        barcode: '890$i',
+        purchasePrice: 0,
+        sellingPrice: 0,
+        unitPrice: '',
+        stock: 0,
+        deliveryPromise: '',
+        origin: '',
+        visualLabel: '',
+        visualKind: '',
+        mrp: 100 + i,
+        publicListing: false,
+        available: false,
+      ),
+    );
+    final owned = <WorkspaceCatalogueItem>[];
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: const Key('store-review-root'),
+        child: MaterialApp(
+          theme: MoolTheme.light(),
+          debugShowCheckedModeBanner: false,
+          home: StatefulBuilder(
+            builder: (_, setLocalState) => StoreAddProductEntryScreen(
+              selectedIndex: 0,
+              onSelected: (_) {},
+              manual: const SizedBox.shrink(),
+              importCsv: () async => null,
+              catalogue: StoreAddProductSheet(
+                embedded: true,
+                catalogue: products,
+                ownedProducts: List.of(owned),
+                createProduct: (_) => products.first,
+                scanBarcode: () async => null,
+                onSelected: (_) {},
+                onAdd: (product) => setLocalState(() => owned.add(product)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final grid = find.byKey(const Key('work-catalogue-grid'));
+    final delegate =
+        tester
+                .widget<SliverGrid>(
+                  find.descendant(of: grid, matching: find.byType(SliverGrid)),
+                )
+                .gridDelegate
+            as SliverGridDelegateWithFixedCrossAxisCount;
+    expect(delegate.crossAxisCount, 3);
+    expect(delegate.mainAxisExtent, 176);
+    final add = find.byKey(const Key('work-catalogue-add-density-0'));
+    expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(add).width, greaterThanOrEqualTo(48));
+    expect(
+      find.byKey(const Key('work-catalogue-add-density-8')).hitTestable(),
+      findsOneWidget,
+    );
+    await captureStoreView(tester, 'dense-grid-50-sku-FIXTURE-360');
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(owned.single.id, 'density-0');
+    final last = find.byKey(const Key('work-catalogue-add-density-49'));
+    await tester.scrollUntilVisible(
+      last,
+      300,
+      scrollable: find
+          .descendant(of: grid, matching: find.byType(Scrollable))
+          .first,
+      maxScrolls: 30,
+    );
+    await tester.pumpAndSettle();
+    expect(last.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ADDGRID scanner retry and barcode stay in catalogue', (
+    tester,
+  ) async {
+    var calls = 0;
+    var fail = true;
+    var selected = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: StoreAddProductSheet(
+          embedded: true,
+          catalogue: workspaceMasterCatalogue,
+          ownedProducts: const [],
+          createProduct: (_) => workspaceMasterCatalogue.first,
+          onSelected: (_) => selected++,
+          scanBarcode: () async {
+            calls++;
+            if (fail) throw StateError('Scanner unavailable');
+            return workspaceMasterCatalogue.last.barcode;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scan = find.byKey(const Key('work-add-products-scan'));
+    await tester.tap(scan);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Could not scan. Search or enter the product instead.'),
+      findsOneWidget,
+    );
+    fail = false;
+    await tester.tap(scan);
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    expect(
+      find.byKey(Key('work-add-product-${workspaceMasterCatalogue.last.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(Key('work-add-product-${workspaceMasterCatalogue.first.id}')),
+      findsNothing,
+    );
+    expect(
+      selected,
+      0,
+      reason: 'Scanning matches identity; it must not publish or open a cart.',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final conflict in ['duplicate SKU', 'store changed']) {
+    testWidgets('ADDGRID direct add blocks $conflict', (tester) async {
+      final work = storeViewFixture();
+      final originalWorkspace = work.activeWorkspace;
+      final product = workspaceMasterCatalogue.last;
+      work.workspaceCatalogueItems.clear();
+      if (conflict == 'duplicate SKU') {
+        work.workspaceCatalogueItems.add(
+          workspaceMasterCatalogue.first.copyWith(sku: product.sku),
+        );
+      }
+      final before = List.of(work.workspaceCatalogueItems);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+      );
+      final open = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      final picker = tester.widget<StoreAddProductSheet>(
+        find.byType(StoreAddProductSheet),
+      );
+      if (conflict == 'store changed') {
+        work.activeWorkspace = null;
+        work.workspaceId = 'different-store';
+      }
+      picker.onAdd!(product);
+      await tester.pumpAndSettle();
+      if (conflict == 'store changed') {
+        expect(work.workspaceCatalogueItems, isEmpty);
+        work.activeWorkspace = originalWorkspace;
+      }
+      expect(work.workspaceCatalogueItems, before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('DASHRAIL product and promotion reuse scoped destinations', (
     tester,
   ) async {
@@ -7792,13 +11082,14 @@ void main() {
     await reveal(tester, action);
     await tester.tap(action);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-add-products-picker')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-add-product-manual')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-add-product-entry')), findsOneWidget);
+    await chooseAddProductMode(tester, 'enter');
     expect(find.byKey(const Key('work-product-fast-editor')), findsOneWidget);
     await captureStoreView(tester, 'dashboard-add-products');
+    expect(find.byType(BottomSheet), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
@@ -19273,7 +22564,7 @@ void main() {
     await tester.tap(find.byKey(const Key('work-store-stock')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Products'), findsWidgets);
+    expect(find.text('Store stock'), findsOneWidget);
     expect(find.byKey(const Key('work-catalogue-scan')), findsNothing);
     expect(find.byKey(const Key('work-dashboard-scan')), findsOneWidget);
     expect(find.byKey(const Key('work-catalogue-add')), findsOneWidget);
@@ -19287,18 +22578,22 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(
-      find.byKey(const Key('work-catalogue-price-oil-fortune-1l')),
+    final priceCell = find.byKey(
+      const Key('work-catalogue-price-oil-fortune-1l'),
     );
+    await reveal(tester, priceCell);
+    await tester.tap(priceCell);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('work-quick-price')), '265');
     await tester.tap(find.byKey(const Key('work-quick-price-save')));
     await tester.pumpAndSettle();
     expect(work.workspaceCatalogueItems.first.sellingPrice, 265);
 
-    await tester.tap(
-      find.byKey(const Key('work-catalogue-stock-oil-fortune-1l')),
+    final stockCell = find.byKey(
+      const Key('work-catalogue-stock-oil-fortune-1l'),
     );
+    await reveal(tester, stockCell);
+    await tester.tap(stockCell);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('work-quick-stock')), '4');
     await tester.tap(find.byKey(const Key('work-quick-stock-save')));
@@ -19306,9 +22601,19 @@ void main() {
     expect(work.workspaceCatalogueItems.first.stock, 4);
     expect(work.workspaceStockMovements.first.reason, 'Counted in store');
 
-    await tester.tap(
-      find.byKey(const Key('work-catalogue-visibility-oil-fortune-1l')),
+    final editProduct = find.byKey(
+      const Key('work-catalogue-edit-oil-fortune-1l'),
     );
+    await reveal(tester, editProduct);
+    await tester.tap(editProduct);
+    await tester.pumpAndSettle();
+    final publicRow = find.byKey(const Key('work-product-public'));
+    await reveal(tester, publicRow);
+    await tester.tap(
+      find.descendant(of: publicRow, matching: find.byType(Switch)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-product-save')));
     await tester.pumpAndSettle();
     expect(work.workspaceCatalogueItems.first.publicListing, isFalse);
     expect(tester.takeException(), isNull);
@@ -20168,9 +23473,7 @@ void main() {
         );
         await tester.tap(find.byKey(const Key('work-store-stock')));
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('work-catalogue-stock-statement')),
-        );
+        await openStoreStockStatement(tester);
         await tester.pumpAndSettle();
         await captureStoreView(tester, 'stock-position-$stockViewSuffix');
         await tester.ensureVisible(
@@ -20339,9 +23642,7 @@ void main() {
         );
         await tester.tap(find.byKey(const Key('work-store-stock')));
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('work-catalogue-stock-statement')),
-        );
+        await openStoreStockStatement(tester);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Changes'));
         await tester.pumpAndSettle();
@@ -20408,7 +23709,7 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('work-store-stock')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-catalogue-stock-statement')));
+    await openStoreStockStatement(tester);
     await tester.pumpAndSettle();
     final mounted = find.byWidgetPredicate(
       (widget) =>
@@ -20985,7 +24286,7 @@ void main() {
       buy.updateQuery('previous purchase search');
       await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-catalogue-stock-statement')));
+      await openStoreStockStatement(tester);
       await tester.pumpAndSettle();
 
       expect(
@@ -28915,9 +32216,7 @@ void main() {
         afterMount: () async {
           await tester.tap(find.byKey(const Key('work-store-stock')));
           await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(const Key('work-catalogue-stock-statement')),
-          );
+          await openStoreStockStatement(tester);
         },
       );
     },

@@ -2851,13 +2851,39 @@ if ($ProductionLane -ceq 'baseline') {
         $effectiveOwner -cin $addProductBootstrapOwners
       )
       $allowedOwner = $false
+      # Founder approved one XLSX dependency for the current-stock export only.
+      $addProductExportDependencyOwner = (
+        $hasContinuationBinding -and
+        $selectedContinuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+        $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+        $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
+        $effectiveOwner -cin @(
+          'apps/mobile/pubspec.yaml', 'apps/mobile/pubspec.lock',
+          'apps/mobile/.dart_tool/package_config.json', 'apps/mobile/.dart_tool/package_graph.json',
+          'apps/mobile/.flutter-plugins-dependencies'
+        )
+      )
+      # Founder authorized the remaining Store-to-Buy photo frontend wiring on
+      # 2026-09-21. Exact ticket/root/branch and one route owner only; no general
+      # journey01 permission or authentication/platform/backend authority.
+      $addProductPhotoRouteOwner = (
+        $hasContinuationBinding -and
+        $selectedContinuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+        $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+        $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
+        $effectiveOwner -ceq 'apps/mobile/lib/features/journey01/journey_router.dart'
+      )
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
           $allowedOwner = $true
           break
         }
       }
-      if ($addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -2869,6 +2895,8 @@ if ($ProductionLane -ceq 'baseline') {
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
+          $addProductExportDependencyOwner -or
+          $addProductPhotoRouteOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or

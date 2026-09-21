@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "4F35A2421011FA7502C270CB4A9676D09415E0DA04839F39999296C06680C434",
+      "manifestSha256": "06A6175CB3B2836C610317937D9B6F915F125FEB26A5531F26FA5AF6700B0BA8",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -71,10 +71,16 @@
     "classification": "mvp_supporting",
     "classificationReason": "Existing Retailer/Grocery inventory entry supporting the approved Buy-to-Store commerce launch.",
     "minimumCompleteScope": [
-      "Screen 1 three entry choices wired to existing handlers"
+      "Screen 1 three entry choices wired to existing handlers",
+      "Shared Store photo reference with exact identity, preview isolation and existing Buy rendering; no media backend",
+      "Founder-authorized Store-contextual Add to Store copy and exact Store-to-Buy photo route/cache binding with local renderer tests",
+      "Catalogue category counts, list/grid toggle, local 50-item pages over up to 10000 supplied SKUs and product-specific test imagery",
+      "Founder-approved next screen: shared prefilled editable review with Save to Store, fuller thumbnails within existing tiles, local shared-inventory Counter Sale verification; stop before Store stock list/grid redesign",
+      "Founder-authorized exact variant and pack presentation, shared product metadata editor and public-field disposition; preserve one-time Store setup and system ownership, defer backend and pause for revised editor approval",
+      "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review"
     ],
     "explicitExclusions": [
-      "Downstream redesign",
+      "CSV batch-review redesign pending its screenwise approval",
       "Backend",
       "APK/install/live service",
       "Counter Sale changes"

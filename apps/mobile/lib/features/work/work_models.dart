@@ -3109,6 +3109,61 @@ class WorkspaceProductCompliance {
   final String? bestBeforeOrUseBy;
   final String? fssaiLicenseNumber;
   final String? consumerCare;
+
+  Map<String, Object?> toJson() => {
+    'genericName': genericName,
+    'netQuantity': netQuantity,
+    'manufacturerName': manufacturerName,
+    'packerName': packerName,
+    'importerName': importerName,
+    'countryOfOrigin': countryOfOrigin,
+    'manufacturedOrPackedOn': manufacturedOrPackedOn,
+    'bestBeforeOrUseBy': bestBeforeOrUseBy,
+    'fssaiLicenseNumber': fssaiLicenseNumber,
+    'consumerCare': consumerCare,
+  };
+
+  static WorkspaceProductCompliance? fromJson(Object? value) {
+    if (value == null) return null;
+    if (value is! Map) {
+      throw const FormatException('Invalid product information');
+    }
+    String? field(String key) {
+      final raw = value[key];
+      if (raw == null) return null;
+      if (raw is! String) {
+        throw const FormatException('Invalid product information');
+      }
+      final text = raw.trim();
+      return text.isEmpty ? null : text;
+    }
+
+    return WorkspaceProductCompliance(
+      genericName: field('genericName'),
+      netQuantity: field('netQuantity'),
+      manufacturerName: field('manufacturerName'),
+      packerName: field('packerName'),
+      importerName: field('importerName'),
+      countryOfOrigin: field('countryOfOrigin'),
+      manufacturedOrPackedOn: field('manufacturedOrPackedOn'),
+      bestBeforeOrUseBy: field('bestBeforeOrUseBy'),
+      fssaiLicenseNumber: field('fssaiLicenseNumber'),
+      consumerCare: field('consumerCare'),
+    );
+  }
+
+  BuyV2ProductCompliance toBuyPublicCompliance() => BuyV2ProductCompliance(
+    genericName: genericName,
+    netQuantity: netQuantity,
+    manufacturerName: manufacturerName,
+    packerName: packerName,
+    importerName: importerName,
+    countryOfOrigin: countryOfOrigin,
+    manufacturedOrPackedOnLabel: manufacturedOrPackedOn,
+    bestBeforeOrUseByLabel: bestBeforeOrUseBy,
+    fssaiLicenseNumber: fssaiLicenseNumber,
+    consumerCare: consumerCare,
+  );
 }
 
 /// Purchased facts from the order, never reconstructed from today's catalogue.
@@ -4576,6 +4631,142 @@ class WorkspaceStockHistoryPage {
       );
 }
 
+enum WorkspaceCataloguePhotoStatus { pending, testOnly, approved }
+
+/// Catalogue-owned metadata, not retailer approval authority. A production
+/// adapter must supply the approval and a revision-specific immutable URL.
+/// The original source is retained; thumbnail dimensions are presentation only.
+class WorkspaceCataloguePhoto {
+  const WorkspaceCataloguePhoto({
+    required this.assetId,
+    required this.revision,
+    required this.source,
+    required this.publisherWorkspaceId,
+    required this.canonicalId,
+    required this.brand,
+    required this.variant,
+    required this.pack,
+    required this.barcode,
+    required this.file,
+    this.status = WorkspaceCataloguePhotoStatus.pending,
+  });
+
+  final String assetId, revision, source, publisherWorkspaceId;
+  final String canonicalId, brand, variant, pack, barcode;
+  final BuyV2MediaFileMetadata file;
+  final WorkspaceCataloguePhotoStatus status;
+
+  bool matches(WorkspaceCatalogueItem product) =>
+      canonicalId.isNotEmpty &&
+      canonicalId == product.canonicalId &&
+      brand == product.brand &&
+      variant == product.variant &&
+      pack == product.pack &&
+      barcode == product.barcode;
+
+  BuyV2ProductMediaAsset _asset(
+    WorkspaceCatalogueItem product,
+    String storeId,
+  ) => BuyV2ProductMediaAsset(
+    id: assetId,
+    label: 'Product photo',
+    semanticLabel: '${product.brand} ${product.title}, ${product.pack}',
+    kind: BuyV2ProductContentMediaKind.network,
+    source: source,
+    binding: BuyV2ProductMediaBinding(
+      supplierWorkspaceId: publisherWorkspaceId,
+      storeId: storeId,
+      productId: product.canonicalId,
+      skuId: product.id,
+      assetRevision: revision,
+      file: file,
+    ),
+  );
+
+  Map<String, Object?> toJson() => {
+    'assetId': assetId,
+    'revision': revision,
+    'source': source,
+    'publisherWorkspaceId': publisherWorkspaceId,
+    'canonicalId': canonicalId,
+    'brand': brand,
+    'variant': variant,
+    'pack': pack,
+    'barcode': barcode,
+    'status': status.name,
+    'file': {
+      'mimeType': file.mimeType,
+      'byteLength': file.byteLength,
+      'width': file.width,
+      'height': file.height,
+      'normalized': file.normalized,
+      'frameCount': file.frameCount,
+      'durationMicroseconds': file.duration?.inMicroseconds,
+      'frameRate': file.frameRate,
+      'videoCodec': file.videoCodec,
+      'videoProfile': file.videoProfile,
+      'audioCodec': file.audioCodec,
+    },
+  };
+
+  /// Invalid/unrecognised persisted metadata fails closed. This decoder does not
+  /// turn local JSON into trusted approval; backend authorization is separate.
+  static WorkspaceCataloguePhoto? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final metadata = value['file'];
+    if (metadata is! Map) return null;
+    const fields = [
+      'assetId',
+      'revision',
+      'source',
+      'publisherWorkspaceId',
+      'canonicalId',
+      'brand',
+      'variant',
+      'pack',
+      'barcode',
+    ];
+    if (fields.any((key) => value[key] is! String) ||
+        metadata['mimeType'] is! String ||
+        metadata['byteLength'] is! int ||
+        metadata['width'] is! int ||
+        metadata['height'] is! int ||
+        metadata['normalized'] is! bool ||
+        (metadata['frameCount'] != null && metadata['frameCount'] is! int) ||
+        metadata['durationMicroseconds'] != null ||
+        metadata['frameRate'] != null ||
+        metadata['videoCodec'] != null ||
+        metadata['videoProfile'] != null ||
+        metadata['audioCodec'] != null) {
+      return null;
+    }
+    final status = WorkspaceCataloguePhotoStatus.values
+        .where((status) => status.name == value['status'])
+        .firstOrNull;
+    if (status == null) return null;
+    return WorkspaceCataloguePhoto(
+      assetId: value['assetId'] as String,
+      revision: value['revision'] as String,
+      source: value['source'] as String,
+      publisherWorkspaceId: value['publisherWorkspaceId'] as String,
+      canonicalId: value['canonicalId'] as String,
+      brand: value['brand'] as String,
+      variant: value['variant'] as String,
+      pack: value['pack'] as String,
+      barcode: value['barcode'] as String,
+      status: status,
+      file: BuyV2MediaFileMetadata(
+        mimeType: metadata['mimeType'] as String,
+        byteLength: metadata['byteLength'] as int,
+        width: metadata['width'] as int,
+        height: metadata['height'] as int,
+        normalized: metadata['normalized'] as bool,
+        frameCount: metadata['frameCount'] as int?,
+      ),
+    );
+  }
+}
+
 class WorkspaceCatalogueItem {
   const WorkspaceCatalogueItem({
     required this.id,
@@ -4606,6 +4797,8 @@ class WorkspaceCatalogueItem {
     this.publicListing = true,
     this.stockMode = WorkspaceStockMode.exactQuantity,
     this.lowStockThreshold = 5,
+    this.cataloguePhoto,
+    this.catalogueFactsRequireReview = false,
   });
 
   final String id;
@@ -4636,6 +4829,31 @@ class WorkspaceCatalogueItem {
   final bool publicListing;
   final WorkspaceStockMode stockMode;
   final int lowStockThreshold;
+  final WorkspaceCataloguePhoto? cataloguePhoto;
+
+  /// Local fail-closed hold; only a future authoritative review may clear it.
+  final bool catalogueFactsRequireReview;
+
+  /// Explicit Store preview only. Test media never travels through the public
+  /// adapter. Reuse Buy's file/identity validation and renderer in both cases.
+  BuyV2Product toCataloguePreviewProduct() {
+    final photo = cataloguePhoto;
+    final product = toBuyPublicProduct(storeName: '');
+    if (photo == null ||
+        photo.source.trim().isEmpty ||
+        !photo.matches(this) ||
+        photo.status == WorkspaceCataloguePhotoStatus.pending) {
+      return product;
+    }
+    final preview = product.copyWith(
+      storeId: photo.publisherWorkspaceId,
+      catalogueListing: false,
+    );
+    final asset = photo._asset(this, photo.publisherWorkspaceId);
+    return BuyV2SupplierMediaPolicy.publicationMessage(preview, asset) == null
+        ? preview.copyWith(mediaAssets: [asset])
+        : preview;
+  }
 
   bool get matchesMasterCatalogueIdentity => workspaceMasterCatalogue.any(
     (item) =>
@@ -4650,8 +4868,17 @@ class WorkspaceCatalogueItem {
 
   bool get published =>
       publicListing &&
+      !catalogueFactsRequireReview &&
+      _photoAllowsPublication &&
       available &&
       (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
+
+  // Existing photo-less catalogue records retain their prior eligibility. The
+  // future catalogue migration must enforce mandatory photos server-side too.
+  bool get _photoAllowsPublication =>
+      cataloguePhoto == null ||
+      (cataloguePhoto!.status == WorkspaceCataloguePhotoStatus.approved &&
+          toCataloguePreviewProduct().mediaAssets.isNotEmpty);
 
   // Public discovery and the retailer's own counter inventory are independent.
   bool get canSellAtCounter =>
@@ -4660,35 +4887,59 @@ class WorkspaceCatalogueItem {
 
   BuyV2Product toBuyPublicProduct({
     required String storeName,
+    String? storeId,
     String badge = 'Store price',
     String confirmedOn = 'Updated by store',
-  }) => BuyV2Product(
-    id: id,
-    canonicalId: canonicalId,
-    destination: BuyV2Destination.shop,
-    categoryId: categoryId,
-    brand: brand,
-    title: title,
-    variant: variant,
-    pack: pack,
-    price: sellingPrice,
-    unitPrice: unitPrice,
-    badge: badge,
-    seller: storeName,
-    sellerType: 'Store',
-    deliveryPromise: deliveryPromise,
-    origin: origin,
-    confirmedOn: confirmedOn,
-    visualLabel: visualLabel,
-    visualKind: visualKind,
-    mrp: mrp,
-    requiresPrescription: requiresPrescription,
-    composition: composition,
-    regulatoryNote: regulatoryNote,
-    minimumOrder: minimumOrder,
-    returnPolicy: returnPolicy,
-    catalogueListing: publicListing,
-  );
+  }) {
+    final product = BuyV2Product(
+      id: id,
+      storeId: storeId,
+      canonicalId: canonicalId,
+      destination: BuyV2Destination.shop,
+      categoryId: categoryId,
+      brand: brand,
+      title: title,
+      variant: variant,
+      pack: pack,
+      price: sellingPrice,
+      unitPrice: unitPrice,
+      badge: badge,
+      seller: storeName,
+      sellerType: 'Store',
+      deliveryPromise: deliveryPromise,
+      origin: origin,
+      confirmedOn: confirmedOn,
+      visualLabel: visualLabel,
+      visualKind: visualKind,
+      mrp: mrp,
+      requiresPrescription: requiresPrescription,
+      composition: composition,
+      regulatoryNote: regulatoryNote,
+      compliance: compliance?.toBuyPublicCompliance(),
+      minimumOrder: minimumOrder,
+      returnPolicy: returnPolicy,
+      catalogueListing:
+          publicListing &&
+          !catalogueFactsRequireReview &&
+          cataloguePhoto == null,
+    );
+    final photo = cataloguePhoto;
+    if (photo == null ||
+        photo.source.trim().isEmpty ||
+        !photo.matches(this) ||
+        photo.status != WorkspaceCataloguePhotoStatus.approved ||
+        storeId == null ||
+        storeId.trim().isEmpty) {
+      return product;
+    }
+    final asset = photo._asset(this, storeId);
+    return BuyV2SupplierMediaPolicy.publicationMessage(product, asset) == null
+        ? product.copyWith(
+            mediaAssets: [asset],
+            catalogueListing: publicListing && !catalogueFactsRequireReview,
+          )
+        : product;
+  }
 
   BuyV2ProductFactsSnapshot toBuyPublicFacts({
     required String storeName,
@@ -4704,6 +4955,7 @@ class WorkspaceCatalogueItem {
     final orderable =
         storeVisible &&
         publicListing &&
+        _photoAllowsPublication &&
         available &&
         (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0) &&
         acceptingOrders;
@@ -4714,7 +4966,7 @@ class WorkspaceCatalogueItem {
       partner: storeName,
       orderabilityLabel: orderable
           ? 'Available to order'
-          : !storeVisible || !publicListing
+          : !storeVisible || !publicListing || !_photoAllowsPublication
           ? 'Not listed for customers'
           : !available ||
                 (stockMode == WorkspaceStockMode.exactQuantity && stock <= 0)
@@ -4760,6 +5012,9 @@ class WorkspaceCatalogueItem {
     bool? publicListing,
     WorkspaceStockMode? stockMode,
     int? lowStockThreshold,
+    WorkspaceCataloguePhoto? cataloguePhoto,
+    bool clearCataloguePhoto = false,
+    bool? catalogueFactsRequireReview,
   }) => WorkspaceCatalogueItem(
     id: id,
     canonicalId: canonicalId ?? this.canonicalId,
@@ -4789,6 +5044,11 @@ class WorkspaceCatalogueItem {
     publicListing: publicListing ?? this.publicListing,
     stockMode: stockMode ?? this.stockMode,
     lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+    cataloguePhoto: clearCataloguePhoto
+        ? null
+        : cataloguePhoto ?? this.cataloguePhoto,
+    catalogueFactsRequireReview:
+        catalogueFactsRequireReview ?? this.catalogueFactsRequireReview,
   );
 }
 

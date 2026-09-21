@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/buy/buy_v2_design.dart' show BuyV2ProductPackshot;
 import '../../../ui_v2/buy/buy_v2_screen.dart';
 import '../../../ui_v2/buy/buy_v2_scanner.dart';
 import '../../../ui_v2/profile/global_profile_panel_v2.dart';
@@ -21,6 +22,7 @@ import '../../journey01/journey_services.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_invoice_pdf.dart';
+import '../work_stock_export.dart';
 import 'work_invoice_pdf_screen.dart';
 import 'store_add_product_sheet.dart';
 import '../work_services.dart';
@@ -12653,6 +12655,17 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 class _WorkspaceCatalogueSurfaceState
     extends State<_WorkspaceCatalogueSurface> {
   bool _lowStockOnly = false;
+  final _stockActionKeys = <String, GlobalKey>{};
+
+  void _restoreStockAction(String productId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _stockActionKeys[productId]?.currentContext;
+      if (target != null) {
+        unawaited(Scrollable.ensureVisible(target, alignment: .5));
+      }
+    });
+  }
 
   WorkspaceCatalogueItem _blankProduct({String barcode = ''}) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
@@ -12682,33 +12695,138 @@ class _WorkspaceCatalogueSurfaceState
   Future<void> _addProducts() async {
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
-    final product = await Navigator.of(context).push<WorkspaceCatalogueItem>(
+    var tab = 0;
+    var manualProduct = _blankProduct();
+    WorkspaceCatalogueItem? catalogueProduct;
+    bool storeUnchanged() {
+      if (!mounted) return false;
+      if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+          storeId) {
+        widget.session.showError('Your store changed. Open Add product again.');
+        return false;
+      }
+      return true;
+    }
+
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (context) => StoreAddProductSheet(
-          catalogue: workspaceMasterCatalogue,
-          ownedProducts: List.of(widget.session.workspaceCatalogueItems),
-          createProduct: (barcode) => _blankProduct(barcode: barcode),
-          scanBarcode: () => showBuyV2ProductScanner(context),
+        builder: (_) => StatefulBuilder(
+          builder: (pageContext, setPageState) => StoreAddProductEntryScreen(
+            selectedIndex: tab,
+            catalogueEditing: catalogueProduct != null,
+            onCloseCatalogueEditor: () =>
+                setPageState(() => catalogueProduct = null),
+            onSelected: (index) {
+              if (storeUnchanged()) setPageState(() => tab = index);
+            },
+            catalogue: IndexedStack(
+              index: catalogueProduct == null ? 0 : 1,
+              children: [
+                StoreAddProductSheet(
+                  embedded: true,
+                  catalogue: workspaceMasterCatalogue,
+                  ownedProducts: List.of(
+                    widget.session.workspaceCatalogueItems,
+                  ),
+                  createProduct: (barcode) => _blankProduct(barcode: barcode),
+                  scanBarcode: () => showBuyV2ProductScanner(pageContext),
+                  onAdd: (product) {
+                    if (!storeUnchanged()) return;
+                    if (catalogueProduct != null) return;
+                    final existing = widget.session.workspaceCatalogueItems;
+                    if (existing.any(
+                      (item) =>
+                          item.id == product.id ||
+                          (item.canonicalId == product.canonicalId &&
+                              item.pack == product.pack &&
+                              item.variant == product.variant &&
+                              item.barcode == product.barcode),
+                    )) {
+                      setPageState(() {});
+                      return;
+                    }
+                    if (existing.any((item) => item.sku == product.sku)) {
+                      widget.session.showError(
+                        'This SKU is already in your store. Edit the existing product.',
+                      );
+                      return;
+                    }
+                    setPageState(() {
+                      catalogueProduct = product.copyWith(
+                        purchasePrice: 0,
+                        stock: 0,
+                        available: false,
+                        publicListing: false,
+                        compliance: product.compliance == null
+                            ? null
+                            : WorkspaceProductCompliance.fromJson({
+                                ...product.compliance!.toJson(),
+                                'manufacturedOrPackedOn': null,
+                                'bestBeforeOrUseBy': null,
+                              }),
+                      );
+                    });
+                  },
+                  onSelected: (product) {
+                    if (storeUnchanged()) {
+                      setPageState(() => catalogueProduct = product);
+                    }
+                  },
+                ),
+                if (catalogueProduct != null)
+                  _CatalogueProductEditor(
+                    key: ValueKey('catalogue-${catalogueProduct!.id}'),
+                    session: widget.session,
+                    product: catalogueProduct!,
+                    embeddedPage: true,
+                    onDone: () => setPageState(() => catalogueProduct = null),
+                    onSaved: () => Navigator.of(pageContext).pop(),
+                  )
+                else
+                  const SizedBox.shrink(),
+              ],
+            ),
+            manual: _CatalogueProductEditor(
+              key: ValueKey('manual-${manualProduct.id}'),
+              session: widget.session,
+              product: manualProduct,
+              embeddedPage: true,
+              onSaved: () => Navigator.of(pageContext).pop(),
+              onDone: () => setPageState(() {
+                manualProduct = _blankProduct();
+                tab = 0;
+              }),
+            ),
+            importCsv: () async {
+              if (!storeUnchanged()) {
+                return 'Your store changed. Open Add product again.';
+              }
+              final result = await _importCatalogue(csvOnly: true);
+              if (pageContext.mounted) setPageState(() {});
+              return result;
+            },
+          ),
         ),
       ),
     );
-    if (!mounted || product == null) return;
-    if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
-        storeId) {
-      widget.session.showError('Your store changed. Open Add products again.');
-      return;
-    }
-    await _edit(product);
   }
 
   Future<void> _edit(WorkspaceCatalogueItem product) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) =>
-          _CatalogueProductEditor(session: widget.session, product: product),
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (pageContext) => Scaffold(
+          appBar: AppBar(title: const Text('Edit product')),
+          body: SafeArea(
+            child: _CatalogueProductEditor(
+              session: widget.session,
+              product: product,
+              embeddedPage: true,
+              onDone: () => Navigator.of(pageContext).pop(),
+              onSaved: () => Navigator.of(pageContext).pop(),
+            ),
+          ),
+        ),
+      ),
     );
     if (mounted) setState(() {});
   }
@@ -12986,7 +13104,10 @@ class _WorkspaceCatalogueSurfaceState
     unawaited(
       Future<void>.delayed(const Duration(milliseconds: 320), quantity.dispose),
     );
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _restoreStockAction(product.id);
+    }
   }
 
   void _togglePublic(WorkspaceCatalogueItem product) {
@@ -13112,10 +13233,11 @@ class _WorkspaceCatalogueSurfaceState
       case 'low':
         setState(() => _lowStockOnly = !_lowStockOnly);
       case 'catalogue':
-        await _showMasterCatalogue();
+        await _addProducts();
     }
   }
 
+  // ignore: unused_element
   Future<void> _showMasterCatalogue() async {
     final ownedIds = widget.session.workspaceCatalogueItems
         .map((product) => product.id)
@@ -13179,14 +13301,22 @@ class _WorkspaceCatalogueSurfaceState
     );
   }
 
-  Future<void> _importCatalogue() async {
+  Future<String?> _importCatalogue({bool csvOnly = false}) async {
+    final storeId =
+        widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     final picked = await FilePicker.pickFile(
       type: FileType.custom,
-      allowedExtensions: const ['csv', 'json'],
+      allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
     );
-    if (!mounted || picked == null) return;
+    if (!mounted || picked == null) return null;
     try {
       final content = utf8.decode(await picked.readAsBytes());
+      if (!mounted) return null;
+      if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+          storeId) {
+        widget.session.showError('Your store changed. Import the file again.');
+        return 'Your store changed. Import the file again.';
+      }
       final rows = <Map<String, String>>[];
       if (picked.name.toLowerCase().endsWith('.json')) {
         final decoded = jsonDecode(content);
@@ -13340,193 +13470,78 @@ class _WorkspaceCatalogueSurfaceState
         '${imported.length} products added · $catalogueMatches matched · $privateDrafts private for review${skippedRows > 0 ? ' · $skippedRows rows need correction' : ''}.',
       );
       if (mounted) setState(() {});
+      return '${imported.length} products added · $catalogueMatches matched · $privateDrafts private for review${skippedRows > 0 ? ' · $skippedRows rows need correction' : ''}.';
     } on Object {
       widget.session.showError(
         'Import a CSV or JSON file containing title, brand, pack, purchasePrice, sellingPrice and stock.',
       );
+      return 'Check your file includes title, brand, pack, purchasePrice, sellingPrice and stock.';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final own = widget.session.workspaceCatalogueItems
-        .where(
-          (product) =>
-              !_lowStockOnly ||
-              (product.stockMode == WorkspaceStockMode.exactQuantity &&
-                  product.stock <= product.lowStockThreshold),
-        )
-        .toList();
-    final available = workspaceMasterCatalogue
-        .where((product) => !_lowStockOnly)
-        .where(
-          (product) => widget.session.workspaceCatalogueItems.every(
-            (owned) => owned.id != product.id,
-          ),
-        )
-        .toList();
-    return Container(
+    return SizedBox.expand(
       key: const Key('work-dashboard-catalogue-screen'),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFF9FAFF), Color(0xFFEEF2FF)],
+      child: StoreAddProductSheet(
+        key: ValueKey(
+          'store-stock-${widget.session.activeWorkspace?.id ?? widget.session.workspaceId}',
         ),
-      ),
-      child: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              const Text(
-                'Products',
-                key: Key('work-catalogue-heading'),
-                style: TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (MediaQuery.sizeOf(context).width < 360 &&
-                      MediaQuery.textScalerOf(context).scale(14) > 17)
-                    IconButton.filled(
-                      key: const Key('work-catalogue-add'),
-                      tooltip: 'Add product',
-                      onPressed: () => _edit(_blankProduct()),
-                      icon: const Icon(Icons.add_rounded),
-                    )
-                  else
-                    FilledButton.icon(
-                      key: const Key('work-catalogue-add'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                      onPressed: () => _edit(_blankProduct()),
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Add'),
+        embedded: true,
+        stockOnly: true,
+        onlyLowStock: _lowStockOnly,
+        catalogue: const [],
+        ownedProducts: List.of(widget.session.workspaceCatalogueItems),
+        createProduct: (barcode) => _blankProduct(barcode: barcode),
+        scanBarcode: () => showBuyV2ProductScanner(context),
+        onSelected: _edit,
+        onAddProduct: _addProducts,
+        onStockTools: _showCatalogueTools,
+        stockExportBuilder: (filtered, filters, onPeriodChanged) {
+          final scope = widget.session.counterDraftIdentity;
+          final storeId =
+              widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+          return StoreStockDownloadControls(
+            key: ValueKey((scope, storeId)),
+            storeId: storeId ?? '',
+            storeName: widget.session.activeWorkspace?.name ?? 'Store',
+            filteredProducts: filtered,
+            filterDescription: filters,
+            onCurrentPeriodChanged: onPeriodChanged,
+            scopeChanges: widget.session,
+            isCurrent: () =>
+                mounted &&
+                scope == widget.session.counterDraftIdentity &&
+                storeId ==
+                    (widget.session.activeWorkspace?.id ??
+                        widget.session.workspaceId),
+          );
+        },
+        stockStatementBuilder: (products, count, vertical, loadMore) =>
+            _StoreStockStatementTable(
+              products: products,
+              visibleCount: count,
+              vertical: vertical,
+              loadMore: loadMore,
+              rowBuilder: (product, horizontal, frozenWidth, widths, height) =>
+                  _WorkspaceProductRow(
+                    product: product,
+                    owned: true,
+                    statement: true,
+                    horizontal: horizontal,
+                    frozenWidth: frozenWidth,
+                    statementWidths: widths,
+                    statementHeight: height,
+                    stockActionKey: _stockActionKeys.putIfAbsent(
+                      product.id,
+                      () => GlobalKey(),
                     ),
-                  const SizedBox(width: 4),
-                  IconButton.filledTonal(
-                    key: const Key('work-catalogue-stock-statement'),
-                    tooltip: 'Stock statement',
-                    onPressed: widget.onOpenStockStatement,
-                    icon: const Icon(Icons.list_alt_rounded),
+                    onEdit: () => _edit(product),
+                    onChangePrice: () => _changePrice(product),
+                    onUpdateStock: () => _updateStock(product),
+                    onTogglePublic: () => _togglePublic(product),
                   ),
-                  IconButton.filledTonal(
-                    key: const Key('work-catalogue-more'),
-                    tooltip: 'More product tools',
-                    onPressed: _showCatalogueTools,
-                    icon: const Icon(Icons.more_horiz_rounded),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Prices, stock and public listings',
-            style: TextStyle(color: MoolColors.muted, fontSize: 12),
-          ),
-          const SizedBox(height: 9),
-          if (widget.session.workspaceCatalogueItems.isNotEmpty)
-            _CatalogueSummary(session: widget.session),
-          if (_lowStockOnly) ...[
-            const SizedBox(height: 8),
-            Material(
-              color: const Color(0xFFFFF3E4),
-              borderRadius: BorderRadius.circular(14),
-              child: ListTile(
-                dense: true,
-                leading: const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Color(0xFF9A4A00),
-                ),
-                title: const Text(
-                  'Showing products that need stock',
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-                trailing: TextButton(
-                  onPressed: () => setState(() => _lowStockOnly = false),
-                  child: const Text('Show all'),
-                ),
-              ),
             ),
-          ],
-          const SizedBox(height: 8),
-          if (own.isEmpty && (_lowStockOnly || available.isEmpty))
-            Container(
-              key: const Key('work-catalogue-empty-guidance'),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _lowStockOnly
-                    ? 'No products currently need restocking.'
-                    : 'Choose a product below, or scan or add your own.',
-                style: const TextStyle(color: MoolColors.muted),
-              ),
-            )
-          else
-            for (final product in own) ...[
-              _WorkspaceProductRow(
-                product: product,
-                owned: true,
-                onEdit: () => _edit(product),
-                onChangePrice: () => _changePrice(product),
-                onUpdateStock: () => _updateStock(product),
-                onTogglePublic: () => _togglePublic(product),
-              ),
-              const SizedBox(height: 8),
-            ],
-          if (!_lowStockOnly && available.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            const Text(
-              'Add from MoolSocial catalogue',
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const Text(
-              'Product details are ready. Confirm only your price and availability.',
-              style: TextStyle(color: MoolColors.muted, fontSize: 10),
-            ),
-            const SizedBox(height: 10),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var index = 0; index < available.length; index++) ...[
-                      if (index != 0) const SizedBox(width: 10),
-                      _VerifiedProductMatch(
-                        product: available[index],
-                        onTap: () => _edit(available[index]),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }
@@ -13725,6 +13740,7 @@ class _SkuFactChip extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _VerifiedProductMatch extends StatelessWidget {
   const _VerifiedProductMatch({required this.product, required this.onTap});
 
@@ -13929,6 +13945,259 @@ class _CatalogueMetric extends StatelessWidget {
   }
 }
 
+// One horizontal viewport owns the header and all rows. Product cells are
+// translated back by that same offset, keeping their identity column frozen.
+class _StoreStockStatementTable extends StatefulWidget {
+  const _StoreStockStatementTable({
+    required this.products,
+    required this.visibleCount,
+    required this.vertical,
+    required this.loadMore,
+    required this.rowBuilder,
+  });
+  final List<WorkspaceCatalogueItem> products;
+  final int visibleCount;
+  final ScrollController vertical;
+  final VoidCallback loadMore;
+  final Widget Function(
+    WorkspaceCatalogueItem,
+    ScrollController,
+    double,
+    List<double>,
+    double,
+  )
+  rowBuilder;
+
+  @override
+  State<_StoreStockStatementTable> createState() =>
+      _StoreStockStatementTableState();
+}
+
+class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
+  final _horizontal = ScrollController();
+  @override
+  void dispose() {
+    _horizontal.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.5);
+    // Ordinary grocery prices stay compact; widen only for actual larger
+    // amounts instead of wasting a full mobile viewport on every price column.
+    var moneyCharacters = 0;
+    for (final product in widget.products) {
+      for (final amount in [
+        product.sellingPrice,
+        product.purchasePrice,
+        product.mrp ?? product.sellingPrice,
+      ]) {
+        final length = '₹${_formatStoreAmount(amount)}'.length;
+        if (length > moneyCharacters) moneyCharacters = length;
+      }
+    }
+    final moneyWidth = (moneyCharacters * 10.0 + 24).clamp(96.0, 260.0);
+    final widths = <double>[
+      104,
+      moneyWidth,
+      moneyWidth,
+      moneyWidth,
+      104,
+    ].map((w) => w * scale).toList();
+    return Column(
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final frozen = (box.maxWidth * .45).clamp(144.0, 240.0);
+              final total = frozen + widths.reduce((a, b) => a + b);
+              return Scrollbar(
+                controller: _horizontal,
+                thumbVisibility: true,
+                interactive: true,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
+                child: SingleChildScrollView(
+                  key: const Key('work-stock-horizontal'),
+                  controller: _horizontal,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: total,
+                    height: box.maxHeight,
+                    child: Column(
+                      children: [
+                        _StockFrozenRow(
+                          key: const Key('work-stock-statement-header'),
+                          horizontal: _horizontal,
+                          frozenWidth: frozen,
+                          height: 36 * scale,
+                          background: const Color(0xFFF1F4FF),
+                          identity: const Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Product',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: MoolColors.muted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          data: Row(
+                            children: [
+                              for (var i = 0; i < widths.length; i++)
+                                SizedBox(
+                                  width: widths[i],
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Text(
+                                      const [
+                                        'Stock',
+                                        'Selling price',
+                                        'Purchase price',
+                                        'MRP',
+                                        'Reorder level',
+                                      ][i],
+                                      key: Key('work-stock-heading-$i'),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: MoolColors.muted,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: (n) {
+                              if (n.metrics.axis == Axis.vertical &&
+                                  n is ScrollUpdateNotification &&
+                                  n.metrics.extentAfter < 160) {
+                                widget.loadMore();
+                              }
+                              return false;
+                            },
+                            child: CustomScrollView(
+                              key: const Key('work-catalogue-list'),
+                              controller: widget.vertical,
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              slivers: [
+                                SliverList.builder(
+                                  itemCount: widget.visibleCount,
+                                  itemBuilder: (_, i) => widget.rowBuilder(
+                                    widget.products[i],
+                                    _horizontal,
+                                    frozen,
+                                    widths,
+                                    56 * scale,
+                                  ),
+                                ),
+                                if (widget.visibleCount <
+                                    widget.products.length)
+                                  SliverToBoxAdapter(
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: SizedBox(
+                                        width: frozen,
+                                        child: TextButton(
+                                          key: const Key(
+                                            'work-catalogue-load-more',
+                                          ),
+                                          onPressed: widget.loadMore,
+                                          child: const Text('Load more'),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                const SliverToBoxAdapter(
+                                  child: SizedBox(height: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StockFrozenRow extends StatelessWidget {
+  const _StockFrozenRow({
+    super.key,
+    required this.horizontal,
+    required this.frozenWidth,
+    required this.height,
+    required this.identity,
+    required this.data,
+    this.background = Colors.white,
+  });
+  final ScrollController horizontal;
+  final double frozenWidth;
+  final double height;
+  final Widget identity;
+  final Widget data;
+  final Color background;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: height,
+    child: AnimatedBuilder(
+      animation: horizontal,
+      builder: (_, _) => Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: background,
+                border: const Border(
+                  bottom: BorderSide(color: Color(0xFFE6E9F1)),
+                ),
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(left: frozenWidth),
+                child: data,
+              ),
+            ),
+          ),
+          Positioned(
+            left: horizontal.hasClients ? horizontal.offset : 0,
+            top: 0,
+            bottom: 0,
+            width: frozenWidth,
+            child: Container(
+              decoration: BoxDecoration(
+                color: background,
+                border: const Border(
+                  right: BorderSide(color: Color(0xFFDCE1EF)),
+                  bottom: BorderSide(color: Color(0xFFE6E9F1)),
+                ),
+              ),
+              child: identity,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _WorkspaceProductRow extends StatelessWidget {
   const _WorkspaceProductRow({
     required this.product,
@@ -13937,6 +14206,12 @@ class _WorkspaceProductRow extends StatelessWidget {
     this.onChangePrice,
     this.onUpdateStock,
     this.onTogglePublic,
+    this.stockActionKey,
+    this.statement = false,
+    this.horizontal,
+    this.frozenWidth = 144,
+    this.statementWidths = const [104, 152, 152, 152, 104],
+    this.statementHeight = 104,
   });
 
   final WorkspaceCatalogueItem product;
@@ -13945,9 +14220,16 @@ class _WorkspaceProductRow extends StatelessWidget {
   final VoidCallback? onChangePrice;
   final VoidCallback? onUpdateStock;
   final VoidCallback? onTogglePublic;
+  final Key? stockActionKey;
+  final bool statement;
+  final ScrollController? horizontal;
+  final double frozenWidth;
+  final List<double> statementWidths;
+  final double statementHeight;
 
   @override
   Widget build(BuildContext context) {
+    if (owned && statement) return _statementProduct(context);
     if (owned &&
         (MediaQuery.textScalerOf(context).scale(1) >= 1.4 ||
             product.sellingPrice.abs() >= 10000000 ||
@@ -13961,13 +14243,12 @@ class _WorkspaceProductRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 7, 6, 7),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: const Color(0xFFEAF2FF),
-              foregroundColor: MoolColors.navy,
-              child: Text(
-                product.brand.isEmpty ? '?' : product.brand.substring(0, 1),
-                style: const TextStyle(fontWeight: FontWeight.w900),
+            SizedBox(
+              width: 40,
+              height: 48,
+              child: BuyV2ProductPackshot(
+                product: product.toCataloguePreviewProduct(),
+                borderRadius: 0,
               ),
             ),
             const SizedBox(width: MoolSpacing.xs),
@@ -13977,7 +14258,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                 children: [
                   Text(
                     product.title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: MoolColors.ink,
@@ -14008,6 +14289,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                           onTap: onChangePrice,
                         ),
                         _ProductQuickValue(
+                          key: stockActionKey,
                           keyName: 'work-catalogue-stock-${product.id}',
                           icon: Icons.inventory_2_outlined,
                           label:
@@ -14070,6 +14352,199 @@ class _WorkspaceProductRow extends StatelessWidget {
     );
   }
 
+  Widget _statementProduct(BuildContext context) {
+    final counted = product.stockMode == WorkspaceStockMode.exactQuantity;
+    final quantity = counted
+        ? '${product.stock} in stock'
+        : (product.available ? 'Available' : 'Unavailable');
+    final low =
+        counted &&
+        product.stock > 0 &&
+        product.stock <= product.lowStockThreshold;
+    final out = counted ? product.stock <= 0 : !product.available;
+    Widget cell(
+      int column,
+      String keyName,
+      String value, {
+      VoidCallback? onTap,
+      Key? anchor,
+      String? note,
+    }) => SizedBox(
+      key: anchor,
+      width: statementWidths[column],
+      height: statementHeight,
+      child: InkWell(
+        key: Key(keyName),
+        onTap: onTap,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: MoolColors.navy,
+                  ),
+                ),
+                if (note != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    note,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF9A4A00),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return KeyedSubtree(
+      key: Key('work-public-sku-${product.id}'),
+      child: Material(
+        key: Key('work-catalogue-owned-${product.id}'),
+        color: Colors.white,
+        child: _StockFrozenRow(
+          horizontal: horizontal!,
+          frozenWidth: frozenWidth,
+          height: statementHeight,
+          identity: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 32,
+                  child: BuyV2ProductPackshot(
+                    product: product.toCataloguePreviewProduct(),
+                    borderRadius: 0,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: InkWell(
+                    key: Key('work-catalogue-edit-${product.id}'),
+                    onTap: onEdit,
+                    child: Tooltip(
+                      message:
+                          '${product.title} · ${product.variant} · ${product.pack} · ${product.sku}',
+                      child: Semantics(
+                        button: true,
+                        label: 'Edit ${product.title}',
+                        child: SizedBox(
+                          height: statementHeight,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w700,
+                                  color: MoolColors.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${product.pack} · ${product.sku}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  height: 1.2,
+                                  color: MoolColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          data: Row(
+            children: [
+              cell(
+                0,
+                'work-catalogue-stock-${product.id}',
+                quantity,
+                onTap: onUpdateStock,
+                anchor: stockActionKey,
+                note: out
+                    ? 'Out of stock'
+                    : low
+                    ? 'Low stock'
+                    : null,
+              ),
+              cell(
+                1,
+                'work-catalogue-price-${product.id}',
+                '₹${_formatStoreAmount(product.sellingPrice)}',
+                onTap: onChangePrice,
+              ),
+              cell(
+                2,
+                'work-catalogue-purchase-${product.id}',
+                '₹${_formatStoreAmount(product.purchasePrice)}',
+                onTap: onEdit,
+              ),
+              cell(
+                3,
+                'work-catalogue-mrp-${product.id}',
+                '₹${_formatStoreAmount(product.mrp ?? product.sellingPrice)}',
+                onTap: onEdit,
+              ),
+              cell(
+                4,
+                'work-catalogue-reorder-${product.id}',
+                counted ? '${product.lowStockThreshold}' : 'Not applicable',
+                onTap: onEdit,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _expandedSurface({
+    required EdgeInsets padding,
+    required Widget child,
+  }) {
+    if (!statement) {
+      return WorkCard(
+        keyName: 'work-catalogue-owned-${product.id}',
+        padding: padding,
+        child: child,
+      );
+    }
+    return Container(
+      key: Key('work-catalogue-owned-${product.id}'),
+      padding: padding,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE6E9F1))),
+      ),
+      child: child,
+    );
+  }
+
   Widget _expandedProduct(BuildContext context) {
     final compactInsets =
         MediaQuery.sizeOf(context).width < 360 &&
@@ -14081,8 +14556,7 @@ class _WorkspaceProductRow extends StatelessWidget {
     );
     return KeyedSubtree(
       key: Key('work-public-sku-${product.id}'),
-      child: WorkCard(
-        keyName: 'work-catalogue-owned-${product.id}',
+      child: _expandedSurface(
         padding: EdgeInsets.symmetric(
           horizontal: compactInsets ? 4 : 12,
           vertical: 12,
@@ -14093,6 +14567,17 @@ class _WorkspaceProductRow extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (statement) ...[
+                  SizedBox(
+                    width: 32,
+                    height: 42,
+                    child: BuyV2ProductPackshot(
+                      product: product.toCataloguePreviewProduct(),
+                      borderRadius: 0,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 Expanded(
                   child: Text(
                     product.title,
@@ -14171,6 +14656,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                     minWidth: 48,
                   ),
                   child: _ProductQuickValue(
+                    key: stockActionKey,
                     keyName: 'work-catalogue-stock-${product.id}',
                     icon: Icons.inventory_2_outlined,
                     label:
@@ -14251,6 +14737,7 @@ class _ProductVisibilityButton extends StatelessWidget {
 
 class _ProductQuickValue extends StatelessWidget {
   const _ProductQuickValue({
+    super.key,
     required this.keyName,
     required this.icon,
     required this.label,
@@ -15020,10 +15507,20 @@ class _StoreEmptyPanel extends StatelessWidget {
 }
 
 class _CatalogueProductEditor extends StatefulWidget {
-  const _CatalogueProductEditor({required this.session, required this.product});
+  const _CatalogueProductEditor({
+    super.key,
+    required this.session,
+    required this.product,
+    this.embeddedPage = false,
+    this.onDone,
+    this.onSaved,
+  });
 
   final WorkSession session;
   final WorkspaceCatalogueItem product;
+  final bool embeddedPage;
+  final VoidCallback? onDone;
+  final VoidCallback? onSaved;
 
   @override
   State<_CatalogueProductEditor> createState() =>
@@ -15032,12 +15529,38 @@ class _CatalogueProductEditor extends StatefulWidget {
 
 class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late final String? _storeId;
+  late final bool _wasOwned;
+  bool _saved = false;
+
+  void _finish() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (widget.onDone != null) {
+      widget.onDone!();
+    } else {
+      Navigator.pop(context);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    _wasOwned = widget.session.workspaceCatalogueItems.any(
+      (item) => item.id == widget.product.id,
+    );
+    for (final field in [
+      _title,
+      _brand,
+      _pack,
+      _variant,
+      _barcode,
+      _category,
+    ]) {
+      field.addListener(_refreshIdentity);
+    }
   }
+
+  void _refreshIdentity() => setState(() {});
 
   late final TextEditingController _title = TextEditingController(
     text: widget.product.title,
@@ -15101,7 +15624,84 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late final TextEditingController _visualLabel = TextEditingController(
     text: widget.product.visualLabel,
   );
+  static const _packFieldLabels = {
+    'genericName': 'Generic product name',
+    'netQuantity': 'Net quantity',
+    'manufacturerName': 'Manufacturer',
+    'packerName': 'Packer',
+    'importerName': 'Importer, if applicable',
+    'countryOfOrigin': 'Country of origin',
+    'fssaiLicenseNumber': 'Manufacturer FSSAI number, if applicable',
+    'consumerCare': 'Product consumer care',
+  };
+  late final _packFields = {
+    for (final key in _packFieldLabels.keys)
+      key: TextEditingController(
+        text: widget.product.compliance?.toJson()[key] as String? ?? '',
+      ),
+  };
+  Widget _packField(String field) => _AccessibleWorkTextField(
+    keyName: 'work-product-pack-$field',
+    controller: _packFields[field]!,
+    label: _packFieldLabels[field]!,
+    textInputAction: TextInputAction.next,
+    stackedLabel: MediaQuery.textScalerOf(context).scale(16) > 19.2,
+  );
+
+  Widget _packFieldsLayout() => LayoutBuilder(
+    builder: (context, constraints) {
+      final sideBySide =
+          constraints.maxWidth >= 320 &&
+          MediaQuery.textScalerOf(context).scale(16) <= 19.2;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _packField('genericName'),
+          const SizedBox(height: 8),
+          if (sideBySide)
+            Row(
+              key: const Key('work-product-pack-compact-row'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 2, child: _packField('netQuantity')),
+                const SizedBox(width: 8),
+                Expanded(flex: 3, child: _packField('countryOfOrigin')),
+              ],
+            )
+          else ...[
+            _packField('netQuantity'),
+            const SizedBox(height: 8),
+            _packField('countryOfOrigin'),
+          ],
+          for (final field in [
+            'manufacturerName',
+            'packerName',
+            'importerName',
+            'fssaiLicenseNumber',
+            'consumerCare',
+          ]) ...[const SizedBox(height: 8), _packField(field)],
+          const SizedBox(height: 8),
+        ],
+      );
+    },
+  );
+
+  WorkspaceProductCompliance get _packInformation =>
+      WorkspaceProductCompliance.fromJson({
+        ...?widget.product.compliance?.toJson(),
+        for (final entry in _packFields.entries) entry.key: entry.value.text,
+      })!;
+  bool get _masterFactsChanged =>
+      jsonEncode(_packInformation.toJson()) !=
+          jsonEncode(
+            (widget.product.compliance ?? const WorkspaceProductCompliance())
+                .toJson(),
+          ) ||
+      _composition.text.trim() != (widget.product.composition ?? '').trim() ||
+      _regulatory.text.trim() != (widget.product.regulatoryNote ?? '').trim();
   late bool _public = widget.product.publicListing;
+  bool get _factsNeedReview =>
+      widget.product.catalogueFactsRequireReview || _masterFactsChanged;
   late bool _available = widget.product.available;
   late WorkspaceStockMode _stockMode = widget.product.stockMode;
   String? _error;
@@ -15139,15 +15739,34 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     _composition.dispose();
     _regulatory.dispose();
     _visualLabel.dispose();
+    for (final controller in _packFields.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   void _save() {
+    if (_saved) return;
     if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
         _storeId) {
       setState(
         () => _error =
             'Your store changed. Close this product and open it in the correct store.',
+      );
+      return;
+    }
+    if (!_wasOwned &&
+        widget.session.workspaceCatalogueItems.any(
+          (item) =>
+              item.id == widget.product.id ||
+              (item.canonicalId == widget.product.canonicalId &&
+                  item.pack == _pack.text.trim() &&
+                  item.variant == _variant.text.trim() &&
+                  item.barcode == _barcode.text.trim()),
+        )) {
+      setState(
+        () => _error =
+            'This product was already added. Open it from Store stock to edit.',
       );
       return;
     }
@@ -15182,7 +15801,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         : _sku.text.trim().isEmpty
         ? 'Enter a unique store SKU.'
         : purchase == null || purchase <= 0
-        ? 'Enter the purchase cost to calculate your margin.'
+        ? 'Enter purchase cost.'
         : selling == null || selling <= purchase
         ? 'Enter a customer price above the purchase cost.'
         : stock == null || stock < 0
@@ -15213,7 +15832,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         sellingPrice: selling,
         mrp: mrp,
         stock: stock,
-        unitPrice: _unitPrice.text.trim().isEmpty
+        unitPrice:
+            _unitPrice.text.trim().isEmpty ||
+                _unitPrice.text.trim() == widget.product.unitPrice
             ? '₹$selling/${_pack.text.trim()}'
             : _unitPrice.text.trim(),
         deliveryPromise: _delivery.text.trim(),
@@ -15225,12 +15846,15 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         returnPolicy: _returnPolicy.text.trim(),
         composition: _composition.text.trim(),
         regulatoryNote: _regulatory.text.trim(),
+        compliance: _packInformation,
+        catalogueFactsRequireReview: _factsNeedReview,
         available: _stockMode == WorkspaceStockMode.availabilityOnly
             ? _available
             : stock! > 0,
         publicListing:
             _public &&
             _catalogueMatched &&
+            !_factsNeedReview &&
             (_stockMode == WorkspaceStockMode.availabilityOnly
                 ? _available
                 : stock! > 0),
@@ -15238,14 +15862,26 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         lowStockThreshold: lowStockThreshold,
       ),
     );
-    Navigator.pop(context);
+    _saved = true;
+    if (widget.onSaved != null) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      widget.session.showNotice('Saved to Store stock.');
+      widget.onSaved!();
+    } else {
+      _finish();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = widget.embeddedPage
+        ? 0.0
+        : MediaQuery.viewInsetsOf(context).bottom;
     return Material(
       color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      borderRadius: widget.embeddedPage
+          ? BorderRadius.zero
+          : const BorderRadius.vertical(top: Radius.circular(28)),
       child: Stack(
         children: [
           Padding(
@@ -15253,42 +15889,52 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               MoolSpacing.md,
               MoolSpacing.md,
               MoolSpacing.md,
-              MediaQuery.viewInsetsOf(context).bottom + 96,
+              keyboardInset + (_error == null ? 96 : 168),
             ),
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.product.title.isEmpty
-                              ? 'Add product'
-                              : 'Edit ${widget.product.title}',
-                          style: const TextStyle(
-                            color: MoolColors.navy,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
+                  if (!widget.embeddedPage)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.product.title.isEmpty
+                                ? 'Add product'
+                                : 'Edit ${widget.product.title}',
+                            style: const TextStyle(
+                              color: MoolColors.navy,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        key: const Key('work-product-close'),
-                        tooltip: 'Close product editor',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    widget.product.title.isEmpty
-                        ? 'Create the complete customer-facing catalogue record.'
-                        : '${widget.product.brand} · ${widget.product.pack} · ${widget.product.sku}',
-                    style: const TextStyle(color: MoolColors.muted),
-                  ),
+                        IconButton(
+                          key: const Key('work-product-close'),
+                          tooltip: 'Close product editor',
+                          onPressed: _finish,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  if (!widget.embeddedPage)
+                    Text(
+                      widget.product.title.isEmpty
+                          ? 'Add details, price and available stock.'
+                          : '${widget.product.brand} · ${widget.product.pack} · ${widget.product.sku}',
+                      style: const TextStyle(color: MoolColors.muted),
+                    ),
                   const SizedBox(height: MoolSpacing.sm),
+                  if (widget.embeddedPage) ...[
+                    _AccessibleWorkTextField(
+                      keyName: 'work-product-title',
+                      controller: _title,
+                      label: 'Product name',
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Container(
                     key: const Key('work-product-fast-editor'),
                     padding: const EdgeInsets.all(12),
@@ -15301,18 +15947,20 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 25,
-                              backgroundColor: const Color(0xFFDDE6FF),
-                              foregroundColor: MoolColors.navy,
-                              child: Text(
-                                _brand.text.trim().isEmpty
-                                    ? '?'
-                                    : _brand.text.trim().substring(0, 1),
-                                style: const TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                            SizedBox(
+                              width: 56,
+                              height: 56,
+                              child: BuyV2ProductPackshot(
+                                borderRadius: 0,
+                                product: widget.product
+                                    .copyWith(
+                                      title: _title.text.trim(),
+                                      brand: _brand.text.trim(),
+                                      pack: _pack.text.trim(),
+                                      variant: _variant.text.trim(),
+                                      barcode: _barcode.text.trim(),
+                                    )
+                                    .toCataloguePreviewProduct(),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -15321,10 +15969,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _title.text.trim().isEmpty
+                                    widget.embeddedPage
+                                        ? (_brand.text.trim().isEmpty
+                                              ? 'Product details'
+                                              : _brand.text.trim())
+                                        : _title.text.trim().isEmpty
                                         ? 'New product'
                                         : _title.text.trim(),
-                                    maxLines: 1,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: MoolColors.ink,
@@ -15334,8 +15986,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   Text(
                                     _pack.text.trim().isEmpty
                                         ? 'Add the customer pack or size'
-                                        : '${_pack.text.trim()} · ${_sku.text.trim()}',
-                                    maxLines: 1,
+                                        : '${_variant.text.trim()} · ${_pack.text.trim()}',
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: MoolColors.muted,
@@ -15345,36 +15997,39 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 ],
                               ),
                             ),
-                            Icon(
-                              _catalogueMatched
-                                  ? Icons.verified_rounded
-                                  : Icons.lock_outline_rounded,
-                              color: _catalogueMatched
-                                  ? const Color(0xFF08765D)
-                                  : MoolColors.muted,
-                            ),
+                            if (!widget.embeddedPage)
+                              Icon(
+                                _catalogueMatched
+                                    ? Icons.verified_rounded
+                                    : Icons.lock_outline_rounded,
+                                color: _catalogueMatched
+                                    ? const Color(0xFF08765D)
+                                    : MoolColors.muted,
+                              ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _MoneyField(
-                                keyName: 'work-product-selling-price',
-                                controller: _selling,
-                                label: 'Selling price',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _MoneyField(
-                                keyName: 'work-product-mrp',
-                                controller: _mrp,
-                                label: 'MRP',
-                              ),
-                            ),
-                          ],
+                        _ResponsiveFieldPair(
+                          minWidth: 280,
+                          first: _MoneyField(
+                            keyName: 'work-product-selling-price',
+                            controller: _selling,
+                            label: 'Selling price',
+                          ),
+                          second: _MoneyField(
+                            keyName: 'work-product-mrp',
+                            controller: _mrp,
+                            label: 'MRP',
+                          ),
                         ),
+                        if (widget.embeddedPage) ...[
+                          const SizedBox(height: 12),
+                          _MoneyField(
+                            keyName: 'work-product-purchase-price',
+                            controller: _purchase,
+                            label: 'Purchase cost',
+                          ),
+                        ],
                         const SizedBox(height: 9),
                         const Text(
                           'How do you track this product?',
@@ -15423,26 +16078,20 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                         ),
                         const SizedBox(height: 8),
                         if (_stockMode == WorkspaceStockMode.exactQuantity)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _AccessibleWorkTextField(
-                                  keyName: 'work-product-stock',
-                                  controller: _stock,
-                                  keyboardType: TextInputType.number,
-                                  label: 'Quantity available',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _AccessibleWorkTextField(
-                                  keyName: 'work-product-low-stock-threshold',
-                                  controller: _lowStockThreshold,
-                                  keyboardType: TextInputType.number,
-                                  label: 'Remind me at',
-                                ),
-                              ),
-                            ],
+                          _ResponsiveFieldPair(
+                            minWidth: 280,
+                            first: _AccessibleWorkTextField(
+                              keyName: 'work-product-stock',
+                              controller: _stock,
+                              keyboardType: TextInputType.number,
+                              label: 'Stock quantity',
+                            ),
+                            second: _AccessibleWorkTextField(
+                              keyName: 'work-product-low-stock-threshold',
+                              controller: _lowStockThreshold,
+                              keyboardType: TextInputType.number,
+                              label: 'Low-stock alert',
+                            ),
                           )
                         else
                           Material(
@@ -15459,42 +16108,58 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   setState(() => _available = value),
                             ),
                           ),
-                        Row(
-                          key: const Key('work-product-public'),
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Show to customers',
-                                    style: TextStyle(
-                                      color: MoolColors.ink,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  Text(
-                                    _catalogueMatched
-                                        ? 'Include in your customer preview. Live publication is not connected yet.'
-                                        : 'This product stays private until its details are reviewed.',
-                                    style: const TextStyle(
-                                      color: MoolColors.muted,
-                                      fontSize: 9.5,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                ],
+                        if (widget.embeddedPage && !_wasOwned)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 12),
+                            child: Text(
+                              'Store stock only · Publish separately',
+                              style: TextStyle(
+                                color: MoolColors.muted,
+                                fontSize: 12,
                               ),
                             ),
-                            Switch.adaptive(
-                              value: _catalogueMatched && _public,
-                              onChanged: _catalogueMatched
-                                  ? (value) => setState(() => _public = value)
-                                  : null,
-                            ),
-                          ],
-                        ),
+                          )
+                        else
+                          Row(
+                            key: const Key('work-product-public'),
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Show to customers',
+                                      style: TextStyle(
+                                        color: MoolColors.ink,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    Text(
+                                      _catalogueMatched && !_factsNeedReview
+                                          ? 'Include in your customer preview. Live publication is not connected yet.'
+                                          : 'This product stays private until its details are reviewed.',
+                                      style: const TextStyle(
+                                        color: MoolColors.muted,
+                                        fontSize: 9.5,
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch.adaptive(
+                                value:
+                                    _catalogueMatched &&
+                                    !_factsNeedReview &&
+                                    _public,
+                                onChanged:
+                                    _catalogueMatched && !_factsNeedReview
+                                    ? (value) => setState(() => _public = value)
+                                    : null,
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -15510,16 +16175,16 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    subtitle: const Text(
-                      'Name, pack, barcode, purchase cost and delivery',
-                    ),
+                    subtitle: const Text('Brand, pack, barcode and delivery'),
                     children: [
-                      _AccessibleWorkTextField(
-                        keyName: 'work-product-title',
-                        controller: _title,
-                        label: 'Product name',
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
+                      if (!widget.embeddedPage) ...[
+                        _AccessibleWorkTextField(
+                          keyName: 'work-product-title',
+                          controller: _title,
+                          label: 'Product name',
+                        ),
+                        const SizedBox(height: MoolSpacing.xs),
+                      ],
                       _ResponsiveFieldPair(
                         first: _AccessibleWorkTextField(
                           keyName: 'work-product-brand',
@@ -15560,11 +16225,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                         ),
                       ),
                       const SizedBox(height: MoolSpacing.xs),
-                      _MoneyField(
-                        keyName: 'work-product-purchase-price',
-                        controller: _purchase,
-                        label: 'Purchase cost — only you can see this',
-                      ),
+                      if (!widget.embeddedPage)
+                        _MoneyField(
+                          keyName: 'work-product-purchase-price',
+                          controller: _purchase,
+                          label: 'Purchase cost — only you can see this',
+                        ),
                       const SizedBox(height: MoolSpacing.xs),
                       _AccessibleWorkTextField(
                         keyName: 'work-product-delivery',
@@ -15590,7 +16256,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                       _AccessibleWorkTextField(
                         keyName: 'work-product-origin',
                         controller: _origin,
-                        label: 'Country of origin',
+                        label: 'Origin / source location',
                       ),
                       const SizedBox(height: MoolSpacing.xs),
                     ],
@@ -15638,15 +16304,107 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                       const SizedBox(height: MoolSpacing.xs),
                     ],
                   ),
-                  if (_error != null)
-                    Text(
-                      _error!,
-                      key: const Key('work-product-error'),
-                      style: const TextStyle(
-                        color: Color(0xFFB42318),
-                        fontWeight: FontWeight.w800,
+                  ExpansionTile(
+                    key: const Key('work-product-pack-information'),
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: const Text(
+                      'Pack information',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
+                    subtitle: const Text(
+                      'Manufacturer, quantity, origin and consumer care',
+                    ),
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Check against the selected pack. Changes stay private until reviewed.',
+                        ),
+                      ),
+                      _packFieldsLayout(),
+                    ],
+                  ),
+                  ExpansionTile(
+                    key: const Key('work-product-store-defaults'),
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: const Text(
+                      'Store-wide setup',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    subtitle: const Text('Set up once in Store settings'),
+                    children: const [
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'Store details, payment acceptance, delivery coverage and settlement belong in Store settings, not on each product.',
+                        ),
+                      ),
+                    ],
+                  ),
+                  ExpansionTile(
+                    key: const Key('work-product-reference'),
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: const Text(
+                      'Product reference',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Catalogue identity, photo and batch information',
+                    ),
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Catalogue reference'),
+                        subtitle: SelectableText(widget.product.canonicalId),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Product reference'),
+                        subtitle: SelectableText(widget.product.id),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Product photo'),
+                        subtitle: Text(
+                          widget.product.cataloguePhoto == null
+                              ? 'Photo not available'
+                              : widget.product.cataloguePhoto!.status ==
+                                    WorkspaceCataloguePhotoStatus.approved
+                              ? 'Catalogue photo'
+                              : 'Photo awaiting approval',
+                        ),
+                      ),
+                      if (widget.product.compliance?.manufacturedOrPackedOn
+                          case final String date)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Manufactured or packed'),
+                          subtitle: Text(date),
+                        ),
+                      if (widget.product.compliance?.bestBeforeOrUseBy
+                          case final String date)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Best before / use by'),
+                          subtitle: Text(date),
+                        ),
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'Record dates for each stock batch. Catalogue identity and approval are managed by MoolSocial.',
+                        ),
+                      ),
+                    ],
+                  ),
                   if (widget.session.workspaceCatalogueItems.any(
                     (product) => product.id == widget.product.id,
                   )) ...[
@@ -15659,7 +16417,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           widget.session.retireWorkspaceProduct(
                             widget.product.id,
                           );
-                          Navigator.pop(context);
+                          _finish();
                         },
                         icon: const Icon(Icons.remove_circle_outline_rounded),
                         label: const Text('Remove from active catalogue'),
@@ -15675,9 +16433,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
             left: 16,
             right: 16,
             bottom:
-                MediaQuery.viewInsetsOf(context).bottom +
-                MediaQuery.viewPaddingOf(context).bottom +
-                8,
+                keyboardInset + MediaQuery.viewPaddingOf(context).bottom + 8,
             child: Material(
               color: Colors.white,
               elevation: 3,
@@ -15685,23 +16441,84 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               borderRadius: BorderRadius.circular(18),
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        key: const Key('work-product-cancel'),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _error!,
+                            key: const Key('work-product-error'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFB42318),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        key: const Key('work-product-save'),
-                        onPressed: _save,
-                        icon: const Icon(Icons.check_rounded),
-                        label: const Text('Save product'),
-                      ),
+                    Row(
+                      children: [
+                        if (widget.embeddedPage &&
+                            MediaQuery.textScalerOf(context).scale(1) >= 1.5)
+                          IconButton.outlined(
+                            key: const Key('work-product-cancel'),
+                            tooltip: 'Cancel changes',
+                            onPressed: _finish,
+                            icon: const Icon(Icons.close_rounded),
+                          )
+                        else
+                          Expanded(
+                            flex: 2,
+                            child: OutlinedButton(
+                              key: const Key('work-product-cancel'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                textStyle: Theme.of(
+                                  context,
+                                ).textTheme.labelLarge?.copyWith(fontSize: 14),
+                              ),
+                              onPressed: _finish,
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3,
+                          child: widget.embeddedPage
+                              ? FilledButton(
+                                  key: const Key('work-product-save'),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                    padding: const EdgeInsets.all(8),
+                                    textStyle: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(fontSize: 14),
+                                  ),
+                                  onPressed: _save,
+                                  child: Text(
+                                    _wasOwned
+                                        ? 'Save changes'
+                                        : 'Save to Store',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              : FilledButton.icon(
+                                  key: const Key('work-product-save'),
+                                  onPressed: _save,
+                                  icon: const Icon(Icons.check_rounded),
+                                  label: const Text('Save product'),
+                                ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -23881,17 +24698,22 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface>
 }
 
 class _ResponsiveFieldPair extends StatelessWidget {
-  const _ResponsiveFieldPair({required this.first, required this.second});
+  const _ResponsiveFieldPair({
+    required this.first,
+    required this.second,
+    this.minWidth = 390,
+  });
 
   final Widget first;
   final Widget second;
+  final double minWidth;
 
   @override
   Widget build(BuildContext context) {
     final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.2;
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (largeText || constraints.maxWidth < 390) {
+        if (largeText || constraints.maxWidth < minWidth) {
           return Column(children: [first, const SizedBox(height: 8), second]);
         }
         return Row(
