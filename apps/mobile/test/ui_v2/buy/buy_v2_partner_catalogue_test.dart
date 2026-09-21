@@ -147,6 +147,30 @@ void main() {
         final info = find.byKey(const ValueKey('buy-store-info-control'));
         await tester.tap(info);
         await tester.pumpAndSettle();
+        final details = find.byKey(const ValueKey('buy-store-info-scroll'));
+        final detailsWidget = tester.widget<SingleChildScrollView>(details);
+        expect(
+          (detailsWidget.padding! as EdgeInsets).bottom,
+          greaterThanOrEqualTo(60),
+        );
+        final detailsScrollable = find
+            .descendant(of: details, matching: find.byType(Scrollable))
+            .first;
+        final detailsPosition = tester
+            .state<ScrollableState>(detailsScrollable)
+            .position;
+        detailsPosition.jumpTo(detailsPosition.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byWidget(detailsWidget.child!)).bottom,
+          lessThanOrEqualTo(752),
+        );
+        await captureR66Visual(
+          tester,
+          'store-details-safe-bottom-${profile.$1}-${profile.$2}-${profile.$3}',
+        );
+        detailsPosition.jumpTo(0);
+        await tester.pumpAndSettle();
         expect(
           find.byKey(ValueKey('buy-public-store-truth-$id')),
           findsOneWidget,

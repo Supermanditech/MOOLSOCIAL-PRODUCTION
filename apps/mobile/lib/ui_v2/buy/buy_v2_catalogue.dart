@@ -8217,6 +8217,8 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
 
   Future<void> _showStoreInfo() async {
     _searchFocus.unfocus();
+    final bottomClearance =
+        BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
     final action = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -8226,7 +8228,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         animation: widget.session,
         builder: (context, _) => SingleChildScrollView(
           key: const ValueKey('buy-store-info-scroll'),
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + bottomClearance),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

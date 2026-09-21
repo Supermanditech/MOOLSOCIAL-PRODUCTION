@@ -1,5 +1,25 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Store details Android bottom clearance
+
+Founder-reported 22 September: Store details opened from the search info button
+can be hidden by Android navigation. The filter repair did not cover this popup;
+its scroll view retained only 12px bottom padding. Launch-supporting correction:
+reuse the existing modal-inset resolver in the catalogue owner, preserving store
+data, Ask/other-store callbacks, close and scrolling. No new model or route.
+Acceptance: existing four store journeys with Android top/bottom insets, inspect
+the details scroll owner's bottom clearance and its final scrolled content edge,
+capture the actual Flutter sheet, and run scoped analysis. Redmi acceptance remains
+pending a fresh candidate; installed r66.31 does not contain this repair.
+
+Local verification complete: four existing connected store journeys passed,
+including the new measured final-content bottom edge above the 48px Android
+navigation exclusion at normal and 2x text. Scoped analysis reported no issues;
+format verification passed. Normal and 2x bottom-position screenshots inspected.
+Evidence: outputs/cursor-buy-ready-20260921/store-details-safe-r1.log and
+store-details-safe-r1/store-details-safe-bottom-*.png. These are local Flutter
+captures with Android insets, not physical Redmi acceptance.
+
 ## Store search: match Buy Home unboxed presentation
 
 Founder-selected launch-supporting Buy presentation change, 22 September 2026.
