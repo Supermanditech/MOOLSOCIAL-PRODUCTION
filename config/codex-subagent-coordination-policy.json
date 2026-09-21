@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4606,
-    "sha256": "9235EA4F6603B60434031E9C9B17759F9EA1143E314C9F3370F53636367F63CC"
+    "entryCount": 4612,
+    "sha256": "C93554198F3D46CE8AB2BC2AE03676481432C2543E284BDAA0EB76A62FAAEA37"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -39,7 +39,28 @@
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/check-approved-ui-locks.ps1",
         "docs/quality/CURSOR-BUY-READY-20260921.md",
-        "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart"
+        "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-android-checkout.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json"
       ]
     },
     {
@@ -79,7 +100,6 @@
         "docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt",
         "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart",
@@ -104,7 +124,6 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",

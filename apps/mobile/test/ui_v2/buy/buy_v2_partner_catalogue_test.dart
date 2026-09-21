@@ -31,6 +31,226 @@ class _FixtureCustomerStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
+  for (final profile in const [
+    (390.0, 1.0, false),
+    (320.0, 2.0, false),
+    (390.0, 1.0, true),
+  ]) {
+    testWidgets(
+      'Cursor storefront scoped controls and navigation ${profile.$1} ${profile.$2} reduced ${profile.$3}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(profile.$1, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final source = _StoreJourneySource(
+          BuyV2Destination.shop,
+          name: profile.$1 == 320
+              ? 'Shree Radha Krishna Supermarket and General Store Jodhpur'
+              : 'Mool Market',
+        );
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          cataloguePageSource: source,
+          initialCatalogueRegionId: 'jodhpur',
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final id = source.productIdAt(0, 0);
+        final otherId = source.productIdAt(1, 0);
+        await session.openLinkedProduct(otherId);
+        session.toggleSaved(otherId);
+        await session.openLinkedProduct(id);
+        session.toggleSaved(id);
+        final homeQuery = session.catalogueQuery().key;
+        session.openProduct(id);
+        await tester.pumpWidget(
+          _app(session, textScale: profile.$2, disableAnimations: profile.$3),
+        );
+        await tester.pumpAndSettle();
+        final action = find.byKey(ValueKey('buy-shop-seller-action-$id'));
+        await _revealProductAction(tester, id, action);
+        await tester.tap(action);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 80));
+        final nameMotion = find.byKey(
+          ValueKey('buy-store-name-motion-${source.storeIdAt(0)}'),
+        );
+        expect(nameMotion, profile.$3 ? findsNothing : findsOneWidget);
+        await tester.pumpAndSettle();
+        if (!profile.$3) {
+          final bounds = tester.getRect(nameMotion);
+          for (var cycle = 0; cycle < 2; cycle++) {
+            await tester.pump(const Duration(milliseconds: 3600));
+            await tester.pump(const Duration(milliseconds: 800));
+            for (final prefix in ['name']) {
+              final sheen = find.byKey(
+                ValueKey('buy-store-$prefix-motion-${source.storeIdAt(0)}'),
+              );
+              final builder = tester.widget<AnimatedBuilder>(
+                find
+                    .ancestor(of: sheen, matching: find.byType(AnimatedBuilder))
+                    .first,
+              );
+              final animation = builder.animation as Animation<double>;
+              expect(animation.value, allOf(greaterThan(0), lessThan(1)));
+            }
+            expect(tester.getRect(nameMotion), bounds);
+            await tester.pumpAndSettle();
+          }
+        }
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        if (!profile.$3) {
+          final builder = tester.widget<AnimatedBuilder>(
+            find
+                .ancestor(
+                  of: nameMotion,
+                  matching: find.byType(AnimatedBuilder),
+                )
+                .first,
+          );
+          final controller = builder.animation as AnimationController;
+          expect(controller.isAnimating, isFalse);
+          expect(controller.value, 1);
+        }
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(nameMotion, profile.$3 ? findsNothing : findsOneWidget);
+        await tester.pumpAndSettle();
+        final scope = 'store-shop-${source.storeIdAt(0)}';
+        expect(
+          find.byKey(const ValueKey('buy-store-catalogue-toolbar')),
+          findsOneWidget,
+        );
+        expect(source.productQueries.last.storeId, source.storeIdAt(0));
+        expect(
+          find.byKey(ValueKey('buy-public-store-truth-$id')),
+          findsNothing,
+        );
+        final info = find.byKey(const ValueKey('buy-store-info-control'));
+        await tester.tap(info);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(ValueKey('buy-public-store-truth-$id')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byTooltip('Close store details'));
+        await tester.pumpAndSettle();
+        final collect = find.byKey(
+          const ValueKey('buy-public-store-order-collection'),
+        );
+        expect(collect, findsNothing);
+        expect(find.text('Shop now\nPick up when ready'), findsNothing);
+        final storeName = tester.widget<Text>(
+          find.byKey(const ValueKey('buy-store-toolbar-name')),
+        );
+        expect(storeName.data, source.name);
+        expect(storeName.maxLines, isNull);
+        expect(storeName.softWrap, isTrue);
+        final field = find.byKey(const ValueKey('buy-store-product-search'));
+        expect(tester.widget<TextField>(field).decoration?.label, isNull);
+        await _revealPagedHeader(tester, scope, field);
+        await tester.enterText(field, 'sku 4999');
+        await tester.pumpAndSettle();
+        expect(source.productQueries.last.query, 'sku 4999');
+        expect(source.productQueries.last.storeId, source.storeIdAt(0));
+        expect(session.catalogueQuery().key, homeQuery);
+        await tester.enterText(field, '');
+        await tester.pumpAndSettle();
+        final filter = find.byKey(const ValueKey('buy-store-filter-control'));
+        await _revealPagedHeader(tester, scope, filter);
+        await tester.tap(filter);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-store-price-100')));
+        final apply = find.byKey(const ValueKey('buy-store-filters-apply'));
+        await tester.ensureVisible(apply);
+        await tester.tap(apply);
+        await tester.pumpAndSettle();
+        expect(source.productQueries.last.maximumPrice, 100);
+        expect(source.productQueries.last.storeId, source.storeIdAt(0));
+        expect(session.catalogueQuery().key, homeQuery);
+        await _revealPagedHeader(tester, scope, filter);
+        await tester.tap(filter);
+        await tester.pumpAndSettle();
+        final reset = find.text('Reset store filters');
+        await tester.ensureVisible(reset);
+        await tester.tap(reset);
+        await tester.ensureVisible(apply);
+        await tester.tap(apply);
+        await tester.pumpAndSettle();
+        final category = find.byKey(
+          const ValueKey('buy-store-category-control'),
+        );
+        await _revealPagedHeader(tester, scope, category);
+        await tester.tap(category);
+        await tester.pumpAndSettle();
+        final categoryId = session.product(id).categoryId;
+        final choice = find.byKey(ValueKey('buy-store-category-$categoryId'));
+        await tester.ensureVisible(choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        expect(source.productQueries.last.categoryId, categoryId);
+        expect(session.catalogueQuery().key, homeQuery);
+        final saved = find.byKey(const ValueKey('buy-store-saved-control'));
+        await _revealPagedHeader(tester, scope, saved);
+        await tester.tap(saved);
+        await tester.pumpAndSettle();
+        final savedList = find.byKey(
+          ValueKey('buy-store-saved-list-${source.storeIdAt(0)}'),
+        );
+        expect(savedList, findsOneWidget);
+        expect(
+          find.descendant(
+            of: savedList,
+            matching: find.byKey(ValueKey('buy-product-$otherId')),
+          ),
+          findsNothing,
+        );
+        final card = find.descendant(
+          of: savedList,
+          matching: find.byKey(ValueKey('buy-product-$id')),
+        );
+        expect(card, findsOneWidget);
+        await tester.ensureVisible(card);
+        await tester.tap(
+          find.descendant(
+            of: card,
+            matching: find.byKey(ValueKey('buy-grid-packshot-$id')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, id);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(savedList, findsOneWidget);
+        final close = find.byKey(const ValueKey('buy-paged-store-close'));
+        await tester.ensureVisible(close);
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('buy-shop-seller-sheet-$id')), findsNothing);
+        expect(session.catalogueQuery().key, homeQuery);
+        expect(session.isSaved(otherId), isTrue);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   setUpAll(() async {
     const fontPath = String.fromEnvironment('BUY_SKU_DEVANAGARI_FONT');
     if (fontPath.isEmpty) return;
@@ -394,13 +614,21 @@ void main() {
             final quantity = session.quantityFor(firstProduct.id);
             source.updatedProviderName =
                 'hanumana ram beniwal sardarpura jodhpure store regional distribution and delivery centre';
+            final pagesBeforeRefresh = source.pages.length;
             final refresh = find.byKey(
               ValueKey('buy-page-status-catalogue-${destination.name}'),
             );
             await _performCatalogueAction(tester, refresh, 'Refresh products');
             await tester.pumpAndSettle();
             expect(source.pages.length, greaterThan(1));
-            expect(source.pages.last.items.first.id, firstProduct.id);
+            final refreshedFirstPage = source.pages
+                .skip(pagesBeforeRefresh)
+                .singleWhere((page) => page.startIndex == 0);
+            expect(refreshedFirstPage.items.first.id, firstProduct.id);
+            expect(
+              refreshedFirstPage.items.first.seller,
+              source.updatedProviderName,
+            );
             final updatedCard = find.byKey(
               ValueKey('buy-product-${firstProduct.id}'),
             );
@@ -1069,6 +1297,14 @@ void main() {
               in find
                   .descendant(of: owner, matching: find.byType(RichText))
                   .evaluate()) {
+            // Icon glyphs use their explicit square constraints, not the
+            // natural line height used to verify complete product metadata.
+            var iconGlyph = false;
+            element.visitAncestorElements((ancestor) {
+              if (ancestor.widget is Icon) iconGlyph = true;
+              return !iconGlyph;
+            });
+            if (iconGlyph) continue;
             final paragraph = element.renderObject;
             if (paragraph is RenderParagraph) {
               expect(
@@ -1080,6 +1316,9 @@ void main() {
                 text: paragraph.text,
                 textDirection: paragraph.textDirection,
                 textScaler: paragraph.textScaler,
+                strutStyle: paragraph.strutStyle,
+                textHeightBehavior: paragraph.textHeightBehavior,
+                locale: paragraph.locale,
               )..layout(maxWidth: paragraph.size.width);
               expect(
                 paragraph.size.height + .1,
@@ -1403,6 +1642,13 @@ void main() {
           await tester.tap(storeAction);
           await tester.pumpAndSettle();
           Future<void> browseAll() async {
+            if (session.pagedCatalogueEnabled && shop) {
+              expect(
+                find.byKey(const ValueKey('buy-store-catalogue-toolbar')),
+                findsOneWidget,
+              );
+              return;
+            }
             final action = find.byKey(ValueKey('$prefix-view-more-$id'));
             await tester.ensureVisible(action);
             await tester.tap(action);
@@ -1493,7 +1739,16 @@ void main() {
           expect(full, findsOneWidget);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsOneWidget);
+          if (shop) {
+            expect(session.selectedProductId, id);
+            // Existing empty-cart handling changes the covered root to
+            // catalogue while retaining the open Store until Back.
+            expect(session.view, BuyV2View.catalogue);
+            expect(find.byType(BuyV2CatalogueView), findsOneWidget);
+            expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsNothing);
+          } else {
+            expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsOneWidget);
+          }
           session.openDestination(
             shop ? BuyV2Destination.wholesale : BuyV2Destination.shop,
           );
@@ -2314,6 +2569,13 @@ void main() {
           expect(firstName.hitTestable(), findsOneWidget);
           await tester.tap(firstName);
           await tester.pumpAndSettle();
+          final storefront = destination == BuyV2Destination.shop;
+          if (storefront) {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-store-info-control')),
+            );
+            await tester.pumpAndSettle();
+          }
           expect(
             tester
                 .widget<Text>(
@@ -2351,7 +2613,11 @@ void main() {
           );
           final publicScroll = find
               .descendant(
-                of: find.byKey(ValueKey('$owner-sheet-list')),
+                of: find.byKey(
+                  ValueKey(
+                    storefront ? 'buy-store-info-scroll' : '$owner-sheet-list',
+                  ),
+                ),
                 matching: find.byType(Scrollable),
               )
               .first;
@@ -2370,7 +2636,13 @@ void main() {
           await tester.tap(relatedBranch);
           await tester.pumpAndSettle();
           expect(
-            find.byKey(ValueKey('$owner-view-more-$relatedProductId')),
+            find.byKey(
+              ValueKey(
+                storefront
+                    ? '$owner-sheet-$relatedProductId'
+                    : '$owner-view-more-$relatedProductId',
+              ),
+            ),
             findsOneWidget,
           );
           expect(
@@ -2382,28 +2654,39 @@ void main() {
           final viewAll = find.byKey(
             ValueKey('$owner-view-more-$firstProductId'),
           );
-          await tester.scrollUntilVisible(
-            viewAll,
-            -100,
-            scrollable: publicScroll,
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(viewAll);
-          await tester.pumpAndSettle();
+          if (!storefront) {
+            expect(
+              find.byKey(ValueKey('$owner-sheet-$firstProductId')),
+              findsOneWidget,
+              reason: 'Back from the related branch must restore its caller',
+            );
+            tester.state<ScrollableState>(publicScroll).position.jumpTo(0);
+            await tester.pumpAndSettle();
+            expect(viewAll.hitTestable(), findsOneWidget);
+            await tester.tap(viewAll);
+            await tester.pumpAndSettle();
+          }
           final storeScope = 'store-${destination.name}-$firstStoreId';
           final range = find.byKey(ValueKey('buy-page-status-$storeScope'));
           expect(
             tester.widget<Semantics>(range).properties.label,
             '1–40 of 5,000',
           );
-          expect(source.productQueries.last.storeId, firstStoreId);
-          expect(source.productQueries.last.query, '');
-          expect(source.productQueries.last.categoryId, 'all');
+          expect(
+            session.retainedCatalogueQuery(storeScope)?.storeId,
+            firstStoreId,
+          );
+          expect(session.retainedCatalogueQuery(storeScope)?.query, '');
+          expect(session.retainedCatalogueQuery(storeScope)?.categoryId, 'all');
           await captureR66Visual(tester, 'r5-store-$profile-full');
 
           final next = find.byKey(ValueKey('buy-page-status-$storeScope'));
           await _revealPagedHeader(tester, storeScope, next);
           source.failStorePage = true;
+          // Invalidate the successfully prefetched next page through the real
+          // refresh action before simulating the failed next-page request.
+          await _performCatalogueAction(tester, next, 'Refresh products');
+          await tester.pumpAndSettle();
           await _performCatalogueAction(tester, next, 'Next products');
           await tester.pumpAndSettle();
           expect(find.text('Results could not refresh'), findsOneWidget);
@@ -2523,7 +2806,11 @@ void main() {
           await _revealPagedHeader(tester, storeScope, categoryControl);
           final searchHint = find.descendant(
             of: storeField,
-            matching: find.text(scale > 1.25 ? 'Search' : 'Search this store'),
+            matching: find.text(
+              scale > 1.25 || (storefront && size.width < 360)
+                  ? 'Search'
+                  : 'Search this store',
+            ),
           );
           expect(searchHint, findsOneWidget);
           expect(
@@ -2534,10 +2821,17 @@ void main() {
             tester.getSize(categoryControl).height,
             greaterThanOrEqualTo(44),
           );
-          expect(
-            tester.getRect(categoryControl).center.dy,
-            closeTo(tester.getRect(storeField).center.dy, .1),
-          );
+          if (storefront) {
+            expect(
+              tester.getRect(categoryControl).top,
+              greaterThanOrEqualTo(tester.getRect(storeField).bottom),
+            );
+          } else {
+            expect(
+              tester.getRect(categoryControl).center.dy,
+              closeTo(tester.getRect(storeField).center.dy, .1),
+            );
+          }
           expect(
             find.descendant(
               of: categoryControl,
@@ -2545,11 +2839,13 @@ void main() {
             ),
             findsOneWidget,
           );
+          await _revealPagedHeader(tester, storeScope, storeField);
           await tester.tap(storeField);
           await tester.pumpAndSettle();
           expect(tester.testTextInput.isVisible, isTrue);
           tester.testTextInput.hide();
           await tester.pumpAndSettle();
+          await _revealPagedHeader(tester, storeScope, categoryControl);
           await tester.tap(categoryControl);
           await tester.pumpAndSettle();
           final category = session
@@ -2629,8 +2925,10 @@ void main() {
 
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
+          if (!storefront) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+          }
           expect(session.query, 'Mool Market');
           final secondStoreId = source.storeIdAt(10);
           final secondStore = find.byKey(
@@ -2647,7 +2945,13 @@ void main() {
           await tester.pumpAndSettle();
           final secondProductId = source.productIdAt(10, 0);
           expect(
-            find.byKey(ValueKey('$owner-view-more-$secondProductId')),
+            find.byKey(
+              ValueKey(
+                storefront
+                    ? '$owner-sheet-$secondProductId'
+                    : '$owner-view-more-$secondProductId',
+              ),
+            ),
             findsOneWidget,
           );
           expect(session.product(secondProductId).storeId, secondStoreId);
@@ -3462,6 +3766,8 @@ void main() {
           ValueKey('buy-cart-product-details-$id'),
         );
         await tester.ensureVisible(cartProduct);
+        await tester.pumpAndSettle();
+        expect(cartProduct.hitTestable(), findsOneWidget);
         await tester.tap(cartProduct);
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.product);
@@ -4238,14 +4544,14 @@ class _OffersJourneyCatalogueSource implements BuyV2CataloguePageSource {
 }
 
 class _StoreJourneySource extends BuyV2DevelopmentCatalogueSource {
-  _StoreJourneySource(BuyV2Destination destination)
+  _StoreJourneySource(BuyV2Destination destination, {this.name = 'Mool Market'})
     : super(destination: destination);
+  final String name;
   bool failStorePage = false;
   final storeQueries = <BuyV2CatalogueQuery>[];
   final productQueries = <BuyV2CatalogueQuery>[];
   // The same display name deliberately identifies different Store branches.
-  BuyV2Product _named(BuyV2Product product) =>
-      product.copyWith(seller: 'Mool Market');
+  BuyV2Product _named(BuyV2Product product) => product.copyWith(seller: name);
   BuyV2CataloguePage<T> _copyPage<T>(
     BuyV2CataloguePage<dynamic> page,
     Iterable<T> items,
@@ -4276,7 +4582,7 @@ class _StoreJourneySource extends BuyV2DevelopmentCatalogueSource {
       page.items.map(
         (store) => BuyV2StoreListing(
           id: store.id,
-          name: 'Mool Market',
+          name: name,
           area: store.area,
           address: store.address,
           regionId: store.regionId,
@@ -4413,13 +4719,18 @@ ThemeData _skuFixtureTheme() {
   );
 }
 
-Widget _app(BuyV2Session session, {double textScale = 1}) => MaterialApp(
+Widget _app(
+  BuyV2Session session, {
+  double textScale = 1,
+  bool? disableAnimations,
+}) => MaterialApp(
   debugShowCheckedModeBanner: false,
   theme: _skuFixtureTheme(),
   builder: (context, child) => MediaQuery(
-    data: MediaQuery.of(
-      context,
-    ).copyWith(textScaler: TextScaler.linear(textScale)),
+    data: MediaQuery.of(context).copyWith(
+      textScaler: TextScaler.linear(textScale),
+      disableAnimations: disableAnimations,
+    ),
     child: r66VisualCaptureRoot(child!),
   ),
   home: BuyV2Screen(

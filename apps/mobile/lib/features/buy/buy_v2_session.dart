@@ -6027,11 +6027,7 @@ class BuyV2Session extends ChangeNotifier {
     final facts = productFactsFor(product);
     if (facts.stale ||
         facts.productId != product.id ||
-        facts.storeCollection?.isSupportedFor(
-              product.storeId,
-              now: catalogueNow(),
-            ) !=
-            true) {
+        product.storeId?.trim().isNotEmpty != true) {
       notice = 'Collection is unavailable at this store right now.';
       notifyListeners();
       return false;
@@ -6047,9 +6043,7 @@ class BuyV2Session extends ChangeNotifier {
     for (final id in _linesForScope(
       checkoutScope,
     ).map((line) => line.product.storeId).whereType<String>().toSet())
-      if (_pagedStores[id] case final store?)
-        if (store.collection?.isSupportedFor(id, now: catalogueNow()) == true)
-          store,
+      ?_pagedStores[id],
   ];
 
   BuyV2StoreListing? get collectionCheckoutStore =>
@@ -6078,12 +6072,8 @@ class BuyV2Session extends ChangeNotifier {
     if (collectionCheckoutStore == null) {
       return 'Choose the store where you will collect.';
     }
-    if (collectionCheckoutStore!.collection?.isSupportedFor(
-          collectionCheckoutStore!.id,
-          now: catalogueNow(),
-        ) !=
-        true) {
-      return 'Check this store’s collection availability to continue.';
+    if (!collectionCheckoutStore!.hasCollectionAddress) {
+      return 'The store’s collection address needs updating before you order.';
     }
     final quote = collectionCheckout?.quote;
     final basket = currentCollectionBasket;
@@ -6113,7 +6103,6 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final stores = collectionCheckoutStores;
-    if (selected && stores.isEmpty) return false;
     if (storeId != null && !stores.any((store) => store.id == storeId)) {
       return false;
     }

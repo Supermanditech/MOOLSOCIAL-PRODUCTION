@@ -176,6 +176,14 @@ class BuyV2StoreListing {
   final int? distanceMeters;
   final BuyV2StoreCollectionCapability? collection;
   final BuyV2Product? previewProduct;
+
+  /// Pickup is offered by every Store. Legacy opt-in capability metadata is
+  /// not an ordering gate; a real branch identity and collection address are.
+  bool get hasCollectionAddress =>
+      id.isNotEmpty &&
+      id.trim() == id &&
+      name.trim().isNotEmpty &&
+      address.trim().isNotEmpty;
 }
 
 /// Cursors belong to one query and snapshot. A previous cursor makes backward
@@ -885,8 +893,7 @@ class BuyV2CollectionBasket {
         .toString();
   }
 
-  bool collectionAvailableAt(DateTime now) =>
-      store.collection?.isSupportedFor(store.id, now: now) == true;
+  bool collectionAvailableAt(DateTime now) => store.hasCollectionAddress;
 }
 
 @immutable

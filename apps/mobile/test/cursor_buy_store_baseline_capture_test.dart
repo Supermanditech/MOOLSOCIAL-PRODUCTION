@@ -18,6 +18,8 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 // Host-only inspection of unchanged production routes; no service writes or APK.
 void main() {
+  const directory =
+      'C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/storefront-name-rail-r1';
   for (final storeScreen in [false, true]) {
     testWidgets('baseline capture ${storeScreen ? 'Visit store' : 'public Buy'}', (
       tester,
@@ -100,12 +102,50 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Visit store'), findsOneWidget);
         await tester.tap(visitStore);
+        await tester.pump();
+        for (var frame = 0; frame < 24; frame++) {
+          await tester.pump(const Duration(milliseconds: 80));
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(const ValueKey('cursor-baseline-capture')),
+          );
+          await tester.runAsync(() async {
+            await Directory('$directory/frames').create(recursive: true);
+            final image = await boundary.toImage(pixelRatio: 2);
+            try {
+              final bytes = await image.toByteData(format: ImageByteFormat.png);
+              await File(
+                '$directory/frames/${frame.toString().padLeft(3, '0')}.png',
+              ).writeAsBytes(bytes!.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+        }
         await tester.pumpAndSettle();
         expect(
           find.byKey(ValueKey('buy-shop-seller-sheet-$productId')),
           findsOneWidget,
         );
         expect(find.byType(WorkWorkspaceDashboardScreen), findsNothing);
+        final product = session.product(productId);
+        final facts = session.productFactsFor(product);
+        expect(
+          facts.storeCollection?.isSupportedFor(
+            product.storeId,
+            now: session.catalogueNow(),
+          ),
+          isTrue,
+          reason:
+              'Accepted review store collection must remain available: product=$productId store=${product.storeId} stale=${facts.stale} capabilityStore=${facts.storeCollection?.storeId} now=${session.catalogueNow()} expiry=${facts.storeCollection?.validUntil}',
+        );
+        expect(
+          find.byKey(const ValueKey('buy-public-store-order-collection')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-store-toolbar-name')),
+          findsOneWidget,
+        );
       }
       for (final element in find.byType(Image).evaluate().toList()) {
         if (!element.mounted) continue;
@@ -123,8 +163,6 @@ void main() {
       final boundary = tester.renderObject<RenderRepaintBoundary>(
         find.byKey(const ValueKey('cursor-baseline-capture')),
       );
-      const directory =
-          'C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/corrected-r5';
       await tester.runAsync(() async {
         await Directory(directory).create(recursive: true);
         final image = await boundary.toImage(pixelRatio: 2);

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "qualification_pending_full_regression_and_source_seal",
+  "buildAuthorization": "founder_requested_pending_required_gates",
+  "candidate": {
+    "id": "UAW-CURSOR-STOREFRONT-PICKUP-20260921-R1",
+    "versionName": "1.0.0-r66.31",
+    "versionCode": "2026092101",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "branch": "work/cursor-ui/buy-ready-20260921",
+    "head": "635ab9810ba8805104642f8f78512c80fe1b20f5"
+  },
+  "promotion": { "state": "forbidden_non_promotable" },
+  "localRepairValidation": {
+    "broaderTestsPassed": 633,
+    "savedTestsPassed": 4,
+    "analysis": "passed_no_issues",
+    "remainingProtectedImageComparisonsFailed": 0,
+    "referenceVersion": "cursor-storefront-pickup-20260921-r2-founder-accepted",
+    "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md",
+    "fullBuyRegressionRerun": "pending_after_accepted_reference_replay"
+  },
+  "preBuildValidation": { "state": "pending", "evidence": "docs/quality/CURSOR-BUY-READY-20260921.md" },
+  "preBuildGates": [
+    { "id": "approved-ui-locks", "state": "passed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
+    { "id": "candidate-build-foundation", "state": "passed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
+    { "id": "buy-regression-1", "state": "failed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
+    { "id": "protected-buy-source", "state": "failed", "evidence": ["docs/quality/CURSOR-BUY-READY-20260921.md"] },
+    { "id": "buy-regression-2", "state": "pending", "evidence": [] },
+    { "id": "clean-state-regression", "state": "pending", "evidence": [] }
+  ],
+  "device": { "serial": "TG8HCYTGGQT885OF", "model": "Xiaomi 23106RN0DA" },
+  "postBuildGates": { "installedChecksum": "pending", "storeTicketDefectAudit": "pending" }
+}

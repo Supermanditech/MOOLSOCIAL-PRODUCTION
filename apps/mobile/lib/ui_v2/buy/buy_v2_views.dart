@@ -7699,14 +7699,22 @@ class _CheckoutAddressStage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (session.collectionCheckoutStores.isNotEmpty ||
+        if (session.checkoutLines.any(
+              (line) =>
+                  line.product.destination == BuyV2Destination.shop ||
+                  line.product.destination == BuyV2Destination.wholesale,
+            ) ||
             session.collectionCheckoutSelected) ...[
+          Text('How would you like your order?', style: context.buyTitle),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 6,
             children: [
               ChoiceChip(
                 key: const ValueKey('buy-checkout-delivery-choice'),
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
                 label: const Text('Delivery'),
                 selected: !session.collectionCheckoutSelected,
                 onSelected: session.checkoutRequiresResolution
@@ -7715,6 +7723,8 @@ class _CheckoutAddressStage extends StatelessWidget {
               ),
               ChoiceChip(
                 key: const ValueKey('buy-checkout-collection-choice'),
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
                 label: const Text('Collect at store'),
                 selected: session.collectionCheckoutSelected,
                 onSelected: session.checkoutRequiresResolution

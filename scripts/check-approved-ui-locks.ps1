@@ -192,6 +192,10 @@ function Get-CursorAccessibilityNativeProjection {
     if ($LASTEXITCODE -ne 0) { throw 'Cursor capture requires the complete assigned baseline.' }
     & git -C $root diff --quiet $cursorReadyBaseline -- 'apps/mobile/android' 'approved-references'
     if ($LASTEXITCODE -ne 0) { throw 'Cursor capture changed native owners or approved references.' }
+    $cursorNativeExtras = @(& git -C $root ls-files --others --exclude-standard -- 'apps/mobile/android' 'approved-references')
+    if ($LASTEXITCODE -ne 0 -or $cursorNativeExtras.Count -ne 0) {
+      throw 'Cursor native projection rejects untracked native or reference owners.'
+    }
   }
   if ($requiredBranch -cin @('work/codex-ui/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919-v2', 'integration/moolsocial/counter-sale-20260919-v3', 'integration/moolsocial/counter-sale-20260919-v4', 'integration/moolsocial/counter-sale-20260919-v5')) {
     # REG4631: this ticket inherits the accepted combined native implementation.
@@ -280,6 +284,29 @@ function Get-CursorAccessibilityNativeProjection {
     }
   }
   $utf8 = [Text.UTF8Encoding]::new($false)
+  if ($requiredBranch -ceq 'work/cursor-ui/buy-ready-20260921') {
+    # REG4640: exact inherited Stock bridge composition, not a new native edit.
+    # The earlier baseline/Android equality check remains mandatory. Pin both
+    # full owners before projecting only the five known integration lines.
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
+        'aebb6246f8e040840efe029557293d202e8b3a822d53752fadac0fc2743ecb56') {
+      throw 'Cursor Stock composition rejects changed native implementation.'
+    }
+    $stockBridgePath = Join-Path $root 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
+    $stockBridge = [IO.File]::ReadAllText($stockBridgePath).Replace("`r`n", "`n")
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($stockBridge)) -cne
+        '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd') {
+      throw 'Cursor Stock composition rejects changed download bridge.'
+    }
+    foreach ($line in @(
+      '    private var storeStockDownload: StoreStockDownloadBridge? = null',
+      '        storeStockDownload?.close()',
+      '        storeStockDownload = StoreStockDownloadBridge(this, flutterEngine.dartExecutor.binaryMessenger)',
+      '        storeStockDownload = null'
+    )) {
+      $Source = $Source.Replace($line + "`n", '')
+    }
+  }
   $expectedSourceHash = if ($combined) {
     '8a4bf4853c24176662fa9dafc8dced9da3a929903c60438eeaa7731e511460c4'
   } else { 'bffb6fea0876c45bee5c5a6b96c790ee49738ee6e9f8738a836a4a04b40bd3ec' }

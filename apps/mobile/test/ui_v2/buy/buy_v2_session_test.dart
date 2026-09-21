@@ -584,6 +584,8 @@ class _CollectionPurchaseHarness
   bool wrongOperation = false;
   String paidOrderId = 'order-a';
   String quoteFault = '';
+  String legacyCollection = 'enabled';
+  bool collectionAddressAvailable = true;
   BuyV2CollectionPurchaseState outcome = BuyV2CollectionPurchaseState.paid;
   Completer<bool>? reservationGate;
   Completer<void>? placementGate;
@@ -622,13 +624,17 @@ class _CollectionPurchaseHarness
           _ => '12 Market Road',
         },
         regionId: 'jodhpur',
-        collection: BuyV2StoreCollectionCapability(
-          storeId: storeId,
-          supportsCollection: true,
-          sourceId: 'store-capability',
-          observedAt: clock.subtract(const Duration(minutes: 1)),
-          validUntil: clock.add(const Duration(minutes: 15)),
-        ),
+        collection: legacyCollection == 'missing'
+            ? null
+            : BuyV2StoreCollectionCapability(
+                storeId: storeId,
+                supportsCollection: legacyCollection != 'disabled',
+                sourceId: 'store-capability',
+                observedAt: clock.subtract(const Duration(minutes: 1)),
+                validUntil: legacyCollection == 'expired'
+                    ? clock.subtract(const Duration(seconds: 1))
+                    : clock.add(const Duration(minutes: 15)),
+              ),
       ),
       lines: [BuyV2CartLine(product: product, quantity: quantity)],
     );
@@ -863,7 +869,18 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
     return BuyV2CataloguePage(
       queryKey: query.key,
       snapshotId: 'checkout-stores',
-      items: ids.map((id) => harness.basket(storeId: id).store),
+      items: ids.map((id) {
+        final store = harness.basket(storeId: id).store;
+        if (harness.collectionAddressAvailable) return store;
+        return BuyV2StoreListing(
+          id: store.id,
+          name: store.name,
+          area: store.area,
+          address: '',
+          regionId: store.regionId,
+          collection: store.collection,
+        );
+      }),
       startIndex: 0,
       totalCount: ids.length,
     );
@@ -1678,49 +1695,90 @@ void r669SharedProductTests() {
 }
 
 void main() {
-  test('R669 review draft codec relaunch keeps cart and isolates customer', () async {
-    final preferences = _R669StringPreferences();
-    BuyV2Session make(String owner) {
-      final core = BuySession();
-      final session = BuyV2Session(core: core, customerStateStore:
-        BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: owner));
-      addTearDown(session.dispose);
-      addTearDown(core.dispose);
-      return session;
-    }
-    final session = make('draft-customer-a');
-    await session.restoreCustomerState();
-    session.addProduct('s-milk');
-    final quantity = session.quantityFor('s-milk');
-    session.retainProductReviewDraft(productId: 's-milk', rating: 4,
-      comment: 'Keep my unsent review.', ownerScope: session.reviewDraftOwnerScope);
-    session.retainProductReviewDraft(productId: 's-tomato', rating: 2,
-      comment: 'A separate product.', ownerScope: session.reviewDraftOwnerScope);
-    await Future<void>.delayed(Duration.zero);
-    final restarted = make('draft-customer-a');
-    await restarted.restoreCustomerState();
-    expect(restarted.productReviewDraft('s-milk')?.rating, 4);
-    expect(restarted.productReviewDraft('s-milk')?.comment, 'Keep my unsent review.');
-    expect(restarted.productReviewDraft('s-tomato')?.comment, 'A separate product.');
-    expect(restarted.customerReviewFor('s-milk'), isNull);
-    expect(restarted.quantityFor('s-milk'), quantity);
-    final other = make('draft-customer-b');
-    await other.restoreCustomerState();
-    expect(other.productReviewDraft('s-milk'), isNull);
-    other.retainProductReviewDraft(productId: 's-milk', rating: 5,
-      comment: 'Stale owner edit', ownerScope: 'draft-customer-a');
-    expect(other.productReviewDraft('s-milk'), isNull);
-    expect(restarted.submitProductReview(productId: 's-milk', rating: 0, comment: ''), isFalse);
-    expect(restarted.productReviewDraft('s-milk'), isNotNull);
-    expect(restarted.submitProductReview(productId: 's-milk', rating: 4, comment: 'Keep my unsent review.'), isTrue);
-    expect(restarted.productReviewDraft('s-milk'), isNull);
-    expect(restarted.productReviewDraft('s-tomato'), isNotNull);
-    await Future<void>.delayed(Duration.zero);
-    final afterSubmission = make('draft-customer-a');
-    await afterSubmission.restoreCustomerState();
-    expect(afterSubmission.productReviewDraft('s-milk'), isNull);
-    expect(afterSubmission.productReviewDraft('s-tomato'), isNotNull);
-  });
+  test(
+    'R669 review draft codec relaunch keeps cart and isolates customer',
+    () async {
+      final preferences = _R669StringPreferences();
+      BuyV2Session make(String owner) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: owner,
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        return session;
+      }
+
+      final session = make('draft-customer-a');
+      await session.restoreCustomerState();
+      session.addProduct('s-milk');
+      final quantity = session.quantityFor('s-milk');
+      session.retainProductReviewDraft(
+        productId: 's-milk',
+        rating: 4,
+        comment: 'Keep my unsent review.',
+        ownerScope: session.reviewDraftOwnerScope,
+      );
+      session.retainProductReviewDraft(
+        productId: 's-tomato',
+        rating: 2,
+        comment: 'A separate product.',
+        ownerScope: session.reviewDraftOwnerScope,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final restarted = make('draft-customer-a');
+      await restarted.restoreCustomerState();
+      expect(restarted.productReviewDraft('s-milk')?.rating, 4);
+      expect(
+        restarted.productReviewDraft('s-milk')?.comment,
+        'Keep my unsent review.',
+      );
+      expect(
+        restarted.productReviewDraft('s-tomato')?.comment,
+        'A separate product.',
+      );
+      expect(restarted.customerReviewFor('s-milk'), isNull);
+      expect(restarted.quantityFor('s-milk'), quantity);
+      final other = make('draft-customer-b');
+      await other.restoreCustomerState();
+      expect(other.productReviewDraft('s-milk'), isNull);
+      other.retainProductReviewDraft(
+        productId: 's-milk',
+        rating: 5,
+        comment: 'Stale owner edit',
+        ownerScope: 'draft-customer-a',
+      );
+      expect(other.productReviewDraft('s-milk'), isNull);
+      expect(
+        restarted.submitProductReview(
+          productId: 's-milk',
+          rating: 0,
+          comment: '',
+        ),
+        isFalse,
+      );
+      expect(restarted.productReviewDraft('s-milk'), isNotNull);
+      expect(
+        restarted.submitProductReview(
+          productId: 's-milk',
+          rating: 4,
+          comment: 'Keep my unsent review.',
+        ),
+        isTrue,
+      );
+      expect(restarted.productReviewDraft('s-milk'), isNull);
+      expect(restarted.productReviewDraft('s-tomato'), isNotNull);
+      await Future<void>.delayed(Duration.zero);
+      final afterSubmission = make('draft-customer-a');
+      await afterSubmission.restoreCustomerState();
+      expect(afterSubmission.productReviewDraft('s-milk'), isNull);
+      expect(afterSubmission.productReviewDraft('s-tomato'), isNotNull);
+    },
+  );
 
   r669SharedProductTests();
   r669ShoppingAreaTests();
@@ -2972,7 +3030,10 @@ void main() {
       expect(session.openCheckout(), isTrue);
       expect(session.choosePayment('UPI'), isTrue);
       expect(await session.refreshCommercialPaymentTerms(), isFalse);
-      expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.ready);
+      expect(
+        session.commercialPaymentTermsLoadState,
+        BuyV2CommerceLoadState.ready,
+      );
       expect(session.checkoutPaymentTermsReviewRequired, isTrue);
       for (final group in session.checkoutFulfilmentGroups) {
         expect(
@@ -2994,7 +3055,9 @@ void main() {
         final gate = Completer<BuyV2OrderPlacementResult>();
         fixture.adapter.placementGate = gate;
         final pending = session.submitOrder();
-        await fixture.adapter.placementStarted.future.timeout(const Duration(seconds: 5));
+        await fixture.adapter.placementStarted.future.timeout(
+          const Duration(seconds: 5),
+        );
         expect(fixture.adapter.placements, hasLength(1));
         expect(
           fixture.adapter.placements.single.procurementContext,
@@ -3578,9 +3641,11 @@ void main() {
         expect(find.text('NOW'), findsNothing);
         expect(
           tester.widget<Text>(estimate).data,
-          startsWith(updateUnavailable
-              ? 'Last recorded estimate (update unavailable) · '
-              : 'Last recorded estimate · '),
+          startsWith(
+            updateUnavailable
+                ? 'Last recorded estimate (update unavailable) · '
+                : 'Last recorded estimate · ',
+          ),
         );
         expect(session.selectedOrder, same(original));
       }
@@ -3627,7 +3692,10 @@ void main() {
       await tester.tap(refresh);
       await tester.pumpAndSettle();
       expect(find.text('UPDATED'), findsOneWidget);
-      expect(tester.widget<Text>(estimate).data, 'Updated estimate · Delivery in 12 min');
+      expect(
+        tester.widget<Text>(estimate).data,
+        'Updated estimate · Delivery in 12 min',
+      );
       expect(
         find.byKey(const ValueKey('buy-tracking-refresh-unavailable')),
         findsNothing,
@@ -4083,6 +4151,107 @@ void main() {
       addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     }
 
+    for (final metadata in ['missing', 'disabled', 'expired']) {
+      test('all stores pickup accepts $metadata legacy metadata', () async {
+        harness.legacyCollection = metadata;
+        final session = await checkoutSession();
+        expect(
+          session.collectionCheckoutStores.map((s) => s.id),
+          containsAll(['store-a', 'store-b', 'store-c']),
+        );
+        expect(
+          session.chooseCheckoutCollection(true, storeId: 'store-a'),
+          isTrue,
+        );
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.checkoutLines.single.product.id, 'sku-a');
+        expect(session.chooseCheckoutCollection(false), isTrue);
+        expect(session.checkoutLines, hasLength(3));
+        expect(
+          session.chooseCheckoutCollection(true, storeId: 'store-a'),
+          isTrue,
+        );
+        session.continueCheckoutFromAddress();
+        expect(await session.prepareCollectionCheckout(), isTrue);
+        expect(await session.submitOrder(), isTrue);
+        expect(harness.placements, 1);
+        expect(session.quantityFor('sku-a'), 0);
+        expect(session.quantityFor('sku-b'), 1);
+        expect(session.quantityFor('wholesale-sku'), 2);
+        expect(session.orders.where((o) => o.id == 'order-a'), hasLength(1));
+      });
+    }
+
+    for (final profile in [(390.0, 1.0), (320.0, 2.0)]) {
+      testWidgets('all stores pickup tick choice ${profile.$1} ${profile.$2}', (
+        tester,
+      ) async {
+        harness.legacyCollection = 'missing';
+        final session = await checkoutSession();
+        await mountCheckout(
+          tester,
+          session,
+          size: Size(profile.$1, 844),
+          scale: profile.$2,
+        );
+        final delivery = find.byKey(
+          const ValueKey('buy-checkout-delivery-choice'),
+        );
+        final pickup = find.byKey(
+          const ValueKey('buy-checkout-collection-choice'),
+        );
+        await tester.ensureVisible(pickup);
+        await tester.pumpAndSettle();
+        expect(tester.widget<ChoiceChip>(delivery).selected, isTrue);
+        expect(tester.widget<ChoiceChip>(delivery).showCheckmark, isTrue);
+        expect(tester.widget<ChoiceChip>(pickup).selected, isFalse);
+        await captureR66Visual(
+          tester,
+          'all-stores-delivery-${profile.$1}-${profile.$2}',
+        );
+        await tester.tap(pickup);
+        await tester.pumpAndSettle();
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(tester.widget<ChoiceChip>(pickup).selected, isTrue);
+        expect(tester.widget<ChoiceChip>(pickup).showCheckmark, isTrue);
+        expect(tester.widget<ChoiceChip>(delivery).selected, isFalse);
+        await captureR66Visual(
+          tester,
+          'all-stores-pickup-${profile.$1}-${profile.$2}',
+        );
+        await tester.ensureVisible(delivery);
+        await tester.pumpAndSettle();
+        expect(delivery.hitTestable(), findsOneWidget);
+        await tester.tap(delivery);
+        await tester.pumpAndSettle();
+        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.checkoutLines, hasLength(3));
+        expect(harness.placements, 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    test(
+      'collection browsing works but missing address blocks purchase',
+      () async {
+        harness.collectionAddressAvailable = false;
+        final session = await checkoutSession(openCheckout: false);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.collectionCheckoutStore, isNull);
+        expect(
+          session.collectionCheckoutMessage,
+          'Choose the store where you will collect.',
+        );
+        expect(await session.prepareCollectionCheckout(), isFalse);
+        expect(harness.quotes, 0);
+        expect(harness.placements, 0);
+        expect(session.quantityFor('sku-a'), 1);
+        expect(session.quantityFor('sku-b'), 1);
+      },
+    );
+
     test(
       'R669 collection discovery preserves branch and explicit delivery choice',
       () async {
@@ -4112,7 +4281,7 @@ void main() {
     );
 
     test(
-      'R669 collection discovery expiry cannot silently become delivery',
+      'pickup remains selected after legacy opt-in expiry and needs a fresh quote',
       () async {
         final session = await checkoutSession(openCheckout: false);
         expect(session.beginStoreCollection('sku-a'), isTrue);
@@ -4120,8 +4289,9 @@ void main() {
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isTrue);
         expect(session.collectionCheckoutStore!.id, 'store-a');
-        expect(session.collectionCheckoutMessage, contains('availability'));
-        expect(await session.prepareCollectionCheckout(), isFalse);
+        expect(await session.prepareCollectionCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(harness.quotes, 1);
         expect(session.quantityFor('sku-a'), 1);
         expect(harness.placements, 0);
       },
@@ -4141,19 +4311,19 @@ void main() {
     );
 
     test(
-      'R669 collection discovery refuses invalid identity and capability',
+      'collection discovery rejects unknown products but ignores legacy opt-in expiry',
       () async {
         final session = await checkoutSession(openCheckout: false);
         expect(session.beginStoreCollection('missing-sku'), isFalse);
         harness.clock = harness.clock.add(const Duration(days: 2));
-        expect(session.beginStoreCollection('sku-a'), isFalse);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
         expect(session.openCheckout(), isTrue);
-        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.collectionCheckoutSelected, isTrue);
         expect(harness.placements, 0);
       },
     );
 
-    for (final fault in ['services', 'identity', 'capability', 'quote']) {
+    for (final fault in ['services', 'identity', 'quote']) {
       testWidgets('checkout failure recovery visual $fault', (tester) async {
         final session = await checkoutSession(
           purchaseServices: fault != 'services',

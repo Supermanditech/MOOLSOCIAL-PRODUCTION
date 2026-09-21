@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/design/mool_design_system.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
+import '../../features/buy/buy_v2_search_relevance.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/buy/buy_v2_shopping_alerts.dart';
 import 'buy_v2_address_sheet_motion.dart';
@@ -22,6 +23,120 @@ import 'buy_v2_views.dart';
 
 export '../../features/buy/buy_v2_content_contracts.dart'
     show BuyV2OfferPublisherType;
+
+// Only the two public storefront labels use this recurring text treatment.
+class _StorefrontTextSheen extends StatefulWidget {
+  const _StorefrontTextSheen({
+    required this.stateKey,
+    required this.child,
+    this.phase = 0,
+    this.baseColor = BuyV2Colors.ink,
+    this.highlightColor = BuyV2Colors.muted,
+  });
+
+  final String stateKey;
+  final Widget child;
+  final double phase;
+  final Color baseColor;
+  final Color highlightColor;
+
+  @override
+  State<_StorefrontTextSheen> createState() => _StorefrontTextSheenState();
+}
+
+class _StorefrontTextSheenState extends State<_StorefrontTextSheen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController _motion;
+  Timer? _cycle;
+  bool _foreground = true;
+  bool _enabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _motion = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncMotion();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _syncMotion();
+    setState(() {});
+  }
+
+  void _syncMotion() {
+    final enabled =
+        _foreground &&
+        TickerMode.valuesOf(context).enabled &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        (ModalRoute.of(context)?.isCurrent ?? true);
+    if (_enabled == enabled) return;
+    _enabled = enabled;
+    _cycle?.cancel();
+    _cycle = null;
+    if (enabled) {
+      _motion.forward(from: 0);
+      // A brief rest between sweeps keeps the copy easy to read.
+      _cycle = Timer.periodic(const Duration(milliseconds: 3600), (_) {
+        _motion.forward(from: 0);
+      });
+    } else {
+      _motion.stop();
+      _motion.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cycle?.cancel();
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_enabled) return widget.child;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _motion,
+        child: widget.child,
+        builder: (context, child) {
+          final progress = ((_motion.value - widget.phase) / (1 - widget.phase))
+              .clamp(0.0, 1.0);
+          final center = -1.8 + 3.6 * Curves.easeInOut.transform(progress);
+          return ShaderMask(
+            key: ValueKey(widget.stateKey),
+            blendMode: BlendMode.srcIn,
+            shaderCallback: (bounds) => LinearGradient(
+              begin: Alignment(center - 0.65, -0.3),
+              end: Alignment(center + 0.65, 0.3),
+              colors: [
+                widget.baseColor,
+                Color.lerp(widget.baseColor, widget.highlightColor, 0.5)!,
+                widget.highlightColor,
+                Color.lerp(widget.baseColor, widget.highlightColor, 0.5)!,
+                widget.baseColor,
+              ],
+              stops: const [0, 0.3, 0.5, 0.7, 1],
+            ).createShader(bounds),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+}
 
 @immutable
 class BuyV2PublishedOffer {
@@ -787,6 +902,9 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
       );
       _controller = PageController(
         viewportFraction: .80,
+        // The publication identity above owns restoration, not a stale
+        // numerical PageStorage offset from an earlier offer list.
+        keepPage: false,
         initialPage: retained < 0 ? 0 : retained,
       );
       _pageKey = key;
@@ -1424,6 +1542,18 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
               ? item.product
               : item as BuyV2Product;
           widget.session.refreshProductFacts(product.id);
+        }
+        if (widget.storeContext &&
+            widget.query.destination == BuyV2Destination.shop &&
+            widget.query.storeId != null) {
+          // Product facts refresh independently of the Store capability.
+          // Reuse the exact Store lookup to restore or withdraw collection.
+          unawaited(
+            widget.session.refreshCatalogueStore(
+              widget.query.storeId!,
+              widget.query.destination,
+            ),
+          );
         }
       }
       _restoring = true;
@@ -6421,271 +6551,344 @@ Future<void> showBuyV2PartnerCatalogue(
                       namesRoute: true,
                       explicitChildNodes: true,
                       label: title,
-                      child: BuyV2VerticalScrollIndicator(
-                        child: ListView(
-                          key: ValueKey('$ownerPrefix-sheet-list'),
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                          children: [
-                            Row(
-                              key: ValueKey('$ownerPrefix-sheet-header'),
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: BuyV2Colors.softOrange,
-                                    borderRadius: BorderRadius.circular(12),
+                      child:
+                          pagedPartner &&
+                              current.destination == BuyV2Destination.shop
+                          ? _PagedFullStoreCatalogue(
+                              session: session,
+                              product: current,
+                              storefront: true,
+                              onOpenOtherStore: (other) {
+                                onStoreChanged?.call(other);
+                                unawaited(
+                                  showBuyV2PartnerCatalogue(
+                                    sheetContext,
+                                    session,
+                                    other,
+                                    onAskStore: (item) => Navigator.of(
+                                      sheetContext,
+                                    ).pop('ask-store:${item.id}'),
+                                    onOpenProduct: onOpenProduct,
+                                    onStoreChanged: onStoreChanged,
+                                    onOpenStoreCart: onOpenStoreCart,
+                                    onOpenCart: () =>
+                                        Navigator.of(sheetContext).pop('cart:'),
                                   ),
-                                  child: Icon(
-                                    brandOnly
-                                        ? Icons.sell_outlined
-                                        : Icons.storefront_outlined,
-                                    color: BuyV2Colors.navy,
-                                    size: 21,
-                                  ),
+                                );
+                              },
+                              onAskStore: onAskStore == null
+                                  ? null
+                                  : () => Navigator.of(
+                                      sheetContext,
+                                    ).pop('ask-store:${current.id}'),
+                              onOpenProduct: (product) => unawaited(
+                                openStoreProduct(sheetContext, product),
+                              ),
+                              onClose: () => Navigator.of(sheetContext).pop(),
+                            )
+                          : BuyV2VerticalScrollIndicator(
+                              child: ListView(
+                                key: ValueKey('$ownerPrefix-sheet-list'),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  10,
+                                  16,
+                                  18,
                                 ),
-                                const SizedBox(width: 9),
-                                Expanded(
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      key: canViewAll
-                                          ? ValueKey(
-                                              '$ownerPrefix-view-more-${current.id}',
-                                            )
-                                          : null,
-                                      onTap: canViewAll
-                                          ? () => unawaited(
-                                              openFullStoreCatalogue(
-                                                sheetContext,
-                                              ),
-                                            )
-                                          : null,
-                                      borderRadius: BorderRadius.circular(9),
-                                      child: ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                          minHeight: BuyV2Metrics.minimumTap,
+                                children: [
+                                  Row(
+                                    key: ValueKey('$ownerPrefix-sheet-header'),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: BuyV2Colors.softOrange,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              title,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.clip,
-                                              style: sheetContext.buyTitle
-                                                  .copyWith(
-                                                    fontSize: 14,
-                                                    height: 1.08,
-                                                  ),
+                                        child: Icon(
+                                          brandOnly
+                                              ? Icons.sell_outlined
+                                              : Icons.storefront_outlined,
+                                          color: BuyV2Colors.navy,
+                                          size: 21,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 9),
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            key: canViewAll
+                                                ? ValueKey(
+                                                    '$ownerPrefix-view-more-${current.id}',
+                                                  )
+                                                : null,
+                                            onTap: canViewAll
+                                                ? () => unawaited(
+                                                    openFullStoreCatalogue(
+                                                      sheetContext,
+                                                    ),
+                                                  )
+                                                : null,
+                                            borderRadius: BorderRadius.circular(
+                                              9,
                                             ),
-                                            const SizedBox(height: 2),
-                                            if (canViewAll)
-                                              Row(
-                                                key: ValueKey(
-                                                  '$ownerPrefix-view-more-visible-${current.id}',
-                                                ),
-                                                mainAxisSize: MainAxisSize.min,
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                minHeight:
+                                                    BuyV2Metrics.minimumTap,
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
-                                                  const Icon(
-                                                    Icons.grid_view_rounded,
-                                                    size: 13,
-                                                    color: BuyV2Colors.navy,
+                                                  Text(
+                                                    title,
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.clip,
+                                                    style: sheetContext.buyTitle
+                                                        .copyWith(
+                                                          fontSize: 14,
+                                                          height: 1.08,
+                                                        ),
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Flexible(
-                                                    child: Text(
-                                                      pagedPartner
-                                                          ? 'Browse all products'
-                                                          : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                  const SizedBox(height: 2),
+                                                  if (canViewAll)
+                                                    Row(
+                                                      key: ValueKey(
+                                                        '$ownerPrefix-view-more-visible-${current.id}',
+                                                      ),
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons
+                                                              .grid_view_rounded,
+                                                          size: 13,
+                                                          color:
+                                                              BuyV2Colors.navy,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Flexible(
+                                                          child: Text(
+                                                            pagedPartner
+                                                                ? 'Browse all products'
+                                                                : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .clip,
+                                                            style: sheetContext
+                                                                .buyMeta
+                                                                .copyWith(
+                                                                  color:
+                                                                      BuyV2Colors
+                                                                          .navy,
+                                                                  height: 1,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w900,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  else
+                                                    Text(
+                                                      detail,
+                                                      maxLines: 2,
                                                       overflow:
                                                           TextOverflow.clip,
                                                       style: sheetContext
                                                           .buyMeta
                                                           .copyWith(
-                                                            color: BuyV2Colors
-                                                                .navy,
-                                                            height: 1,
-                                                            fontWeight:
-                                                                FontWeight.w900,
+                                                            height: 1.08,
                                                           ),
                                                     ),
-                                                  ),
                                                 ],
-                                              )
-                                            else
-                                              Text(
-                                                detail,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.clip,
-                                                style: sheetContext.buyMeta
-                                                    .copyWith(height: 1.08),
                                               ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton.outlined(
-                                  key: ValueKey('$ownerPrefix-sheet-close'),
-                                  onPressed: () =>
-                                      Navigator.of(sheetContext).pop(),
-                                  tooltip: closeTooltip,
-                                  style: IconButton.styleFrom(
-                                    minimumSize: const Size.square(
-                                      BuyV2Metrics.minimumTap,
-                                    ),
-                                    side: const BorderSide(
-                                      color: BuyV2Colors.line,
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.close_rounded),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            if (publicPartner) ...[
-                              _PublicStoreTruthPanel(
-                                product: current,
-                                facts: session.productFactsFor(current),
-                                now: session.catalogueNow,
-                                trust: storeTrust,
-                                fulfilmentLabels: storeFulfilment,
-                                onOrderForCollection: () {
-                                  if (session.beginStoreCollection(
-                                    current.id,
-                                  )) {
-                                    unawaited(
-                                      openFullStoreCatalogue(sheetContext),
-                                    );
-                                  }
-                                },
-                                onAskStore: onAskStore == null
-                                    ? null
-                                    : () => Navigator.of(
-                                        sheetContext,
-                                      ).pop('ask-store:${current.id}'),
-                              ),
-                              const SizedBox(height: 8),
-                            ],
-                            if (pagedPartner)
-                              _PagedPublicStorePreview(
-                                session: session,
-                                product: current,
-                                onOpenProduct: (product) => unawaited(
-                                  openStoreProduct(sheetContext, product),
-                                ),
-                              )
-                            else if (previewProducts.isEmpty)
-                              const _PublicStoreNoProductsState()
-                            else
-                              BuyV2ProgressiveProductGrid(
-                                session: session,
-                                products: previewProducts,
-                                storageKey:
-                                    '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
-                                semanticLabel:
-                                    '${brandOnly ? current.brand : current.seller} product catalogue',
-                                laneCount: 1,
-                                storeContext: !brandOnly,
-                                onOpenProduct: (product) => unawaited(
-                                  openStoreProduct(sheetContext, product),
-                                ),
-                              ),
-                            if (otherStores.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                'Other stores',
-                                style: sheetContext.buyTitle.copyWith(
-                                  fontSize: 11.5,
-                                  height: 1.08,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Compare stores and delivery options below',
-                                style: sheetContext.buyMeta.copyWith(
-                                  fontSize: 8.5,
-                                  height: 1.08,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Column(
-                                key: ValueKey('$ownerPrefix-other-stores'),
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  for (
-                                    var index = 0;
-                                    index < otherStores.length;
-                                    index++
-                                  )
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: index == otherStores.length - 1
-                                            ? 0
-                                            : 8,
-                                      ),
-                                      child: BuyV2CinematicCardReveal(
-                                        stateKey:
-                                            '$ownerPrefix-other-store-${otherStores[index].id}-motion',
-                                        delay: Duration(
-                                          milliseconds: index * 90,
-                                        ),
-                                        child: _RelatedStoreCard(
-                                          key: ValueKey(
-                                            '$ownerPrefix-other-store-${otherStores[index].id}',
+                                            ),
                                           ),
-                                          product: otherStores[index],
-                                          branchAddress:
-                                              otherStores[index].storeId == null
-                                              ? null
-                                              : session
-                                                        .catalogueStore(
-                                                          otherStores[index]
-                                                              .storeId!,
-                                                        )
-                                                        ?.address ??
-                                                    otherStores[index].origin,
-                                          onTap: () {
-                                            onStoreChanged?.call(
-                                              otherStores[index],
-                                            );
-                                            unawaited(
-                                              showBuyV2PartnerCatalogue(
-                                                sheetContext,
-                                                session,
-                                                otherStores[index],
-                                                onAskStore: (storeProduct) =>
-                                                    Navigator.of(
-                                                      sheetContext,
-                                                    ).pop(
-                                                      'ask-store:${storeProduct.id}',
-                                                    ),
-                                                onOpenProduct: onOpenProduct,
-                                                onStoreChanged: onStoreChanged,
-                                                onOpenStoreCart:
-                                                    onOpenStoreCart,
-                                                onOpenCart: () => Navigator.of(
-                                                  sheetContext,
-                                                ).pop('cart:'),
-                                              ),
-                                            );
-                                          },
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
+                                      IconButton.outlined(
+                                        key: ValueKey(
+                                          '$ownerPrefix-sheet-close',
+                                        ),
+                                        onPressed: () =>
+                                            Navigator.of(sheetContext).pop(),
+                                        tooltip: closeTooltip,
+                                        style: IconButton.styleFrom(
+                                          minimumSize: const Size.square(
+                                            BuyV2Metrics.minimumTap,
+                                          ),
+                                          side: const BorderSide(
+                                            color: BuyV2Colors.line,
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.close_rounded),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (publicPartner) ...[
+                                    _PublicStoreTruthPanel(
+                                      product: current,
+                                      facts: session.productFactsFor(current),
+                                      now: session.catalogueNow,
+                                      trust: storeTrust,
+                                      fulfilmentLabels: storeFulfilment,
+                                      onOrderForCollection: () {
+                                        if (session.beginStoreCollection(
+                                          current.id,
+                                        )) {
+                                          unawaited(
+                                            openFullStoreCatalogue(
+                                              sheetContext,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      onAskStore: onAskStore == null
+                                          ? null
+                                          : () => Navigator.of(
+                                              sheetContext,
+                                            ).pop('ask-store:${current.id}'),
                                     ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  if (pagedPartner)
+                                    _PagedPublicStorePreview(
+                                      session: session,
+                                      product: current,
+                                      onOpenProduct: (product) => unawaited(
+                                        openStoreProduct(sheetContext, product),
+                                      ),
+                                    )
+                                  else if (previewProducts.isEmpty)
+                                    const _PublicStoreNoProductsState()
+                                  else
+                                    BuyV2ProgressiveProductGrid(
+                                      session: session,
+                                      products: previewProducts,
+                                      storageKey:
+                                          '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
+                                      semanticLabel:
+                                          '${brandOnly ? current.brand : current.seller} product catalogue',
+                                      laneCount: 1,
+                                      storeContext: !brandOnly,
+                                      onOpenProduct: (product) => unawaited(
+                                        openStoreProduct(sheetContext, product),
+                                      ),
+                                    ),
+                                  if (otherStores.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Other stores',
+                                      style: sheetContext.buyTitle.copyWith(
+                                        fontSize: 11.5,
+                                        height: 1.08,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Compare stores and delivery options below',
+                                      style: sheetContext.buyMeta.copyWith(
+                                        fontSize: 8.5,
+                                        height: 1.08,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Column(
+                                      key: ValueKey(
+                                        '$ownerPrefix-other-stores',
+                                      ),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        for (
+                                          var index = 0;
+                                          index < otherStores.length;
+                                          index++
+                                        )
+                                          Padding(
+                                            padding: EdgeInsets.only(
+                                              bottom:
+                                                  index ==
+                                                      otherStores.length - 1
+                                                  ? 0
+                                                  : 8,
+                                            ),
+                                            child: BuyV2CinematicCardReveal(
+                                              stateKey:
+                                                  '$ownerPrefix-other-store-${otherStores[index].id}-motion',
+                                              delay: Duration(
+                                                milliseconds: index * 90,
+                                              ),
+                                              child: _RelatedStoreCard(
+                                                key: ValueKey(
+                                                  '$ownerPrefix-other-store-${otherStores[index].id}',
+                                                ),
+                                                product: otherStores[index],
+                                                branchAddress:
+                                                    otherStores[index]
+                                                            .storeId ==
+                                                        null
+                                                    ? null
+                                                    : session
+                                                              .catalogueStore(
+                                                                otherStores[index]
+                                                                    .storeId!,
+                                                              )
+                                                              ?.address ??
+                                                          otherStores[index]
+                                                              .origin,
+                                                onTap: () {
+                                                  onStoreChanged?.call(
+                                                    otherStores[index],
+                                                  );
+                                                  unawaited(
+                                                    showBuyV2PartnerCatalogue(
+                                                      sheetContext,
+                                                      session,
+                                                      otherStores[index],
+                                                      onAskStore: (storeProduct) =>
+                                                          Navigator.of(
+                                                            sheetContext,
+                                                          ).pop(
+                                                            'ask-store:${storeProduct.id}',
+                                                          ),
+                                                      onOpenProduct:
+                                                          onOpenProduct,
+                                                      onStoreChanged:
+                                                          onStoreChanged,
+                                                      onOpenStoreCart:
+                                                          onOpenStoreCart,
+                                                      onOpenCart: () =>
+                                                          Navigator.of(
+                                                            sheetContext,
+                                                          ).pop('cart:'),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
                                 ],
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
+                            ),
                     ),
                   ),
                   if (session.countForDestination(current.destination) > 0)
@@ -6825,6 +7028,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
     required this.fulfilmentLabels,
     required this.onAskStore,
     required this.onOrderForCollection,
+    this.collectionActionOnly = false,
   });
 
   final BuyV2Product product;
@@ -6834,6 +7038,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
   final List<String> fulfilmentLabels;
   final VoidCallback? onAskStore;
   final VoidCallback onOrderForCollection;
+  final bool collectionActionOnly;
 
   @override
   State<_PublicStoreTruthPanel> createState() => _PublicStoreTruthPanelState();
@@ -6942,6 +7147,37 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
         BuyV2Colors.softBlue,
       ),
     };
+    if (widget.collectionActionOnly) {
+      return _showsCollection
+          ? TextButton(
+              key: const ValueKey('buy-public-store-order-collection'),
+              onPressed: widget.onOrderForCollection,
+              style: TextButton.styleFrom(
+                foregroundColor: BuyV2Colors.navy,
+                minimumSize: const Size(44, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              ),
+              child: _StorefrontTextSheen(
+                stateKey: 'buy-store-collection-motion-${product.storeId}',
+                phase: 0.18,
+                baseColor: const Color(0xFF663852),
+                highlightColor: const Color(0xFF925775),
+                child: Text(
+                  'Shop now\nPick up when ready',
+                  textAlign: TextAlign.center,
+                  style: context.buyMeta.copyWith(
+                    color: const Color(0xFF663852),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            )
+          : Text(
+              'Shop this store',
+              textAlign: TextAlign.center,
+              style: context.buyMeta,
+            );
+    }
     return Semantics(
       key: ValueKey('buy-public-store-truth-${product.id}'),
       container: true,
@@ -7555,11 +7791,17 @@ class _PagedFullStoreCatalogue extends StatefulWidget {
     required this.product,
     required this.onOpenProduct,
     required this.onClose,
+    this.storefront = false,
+    this.onAskStore,
+    this.onOpenOtherStore,
   });
   final BuyV2Session session;
   final BuyV2Product product;
   final ValueChanged<BuyV2Product> onOpenProduct;
   final VoidCallback onClose;
+  final bool storefront;
+  final VoidCallback? onAskStore;
+  final ValueChanged<BuyV2Product>? onOpenOtherStore;
 
   @override
   State<_PagedFullStoreCatalogue> createState() =>
@@ -7570,6 +7812,9 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   late TextEditingController _search;
   final _searchFocus = FocusNode();
   String _category = 'all';
+  bool _savedOnly = false;
+  int? _maximumPrice;
+  BuyV2ProductSort _sort = BuyV2ProductSort.relevance;
   String get _scope =>
       'store-${widget.product.destination.name}-${widget.product.storeId}';
 
@@ -7579,6 +7824,10 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
     final retained = widget.session.retainedCatalogueQuery(_scope);
     final sameStore = retained?.storeId == widget.product.storeId;
     _category = sameStore ? retained?.categoryId ?? 'all' : 'all';
+    _maximumPrice = sameStore ? retained?.maximumPrice : null;
+    _sort = sameStore
+        ? retained?.sort ?? BuyV2ProductSort.relevance
+        : BuyV2ProductSort.relevance;
     _search = TextEditingController(
       text: sameStore ? retained?.query ?? '' : '',
     );
@@ -7648,6 +7897,178 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
     if (choice != null) setState(() => _category = choice);
   }
 
+  Future<void> _chooseFilters() async {
+    _searchFocus.unfocus();
+    var price = _maximumPrice;
+    var sort = _sort;
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, update) => SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Store filters', style: context.buyTitle),
+                  ),
+                  IconButton(
+                    tooltip: 'Close store filters',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              Text('Price per pack', style: context.buyBody),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final limit in <int?>[null, 100, 500, 1000])
+                    ChoiceChip(
+                      key: ValueKey('buy-store-price-${limit ?? 'any'}'),
+                      label: Text(
+                        limit == null ? 'Any price' : 'Up to ₹$limit',
+                      ),
+                      selected: price == limit,
+                      onSelected: (_) => update(() => price = limit),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text('Sort products', style: context.buyBody),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final choice in const [
+                    (BuyV2ProductSort.relevance, 'Relevance'),
+                    (BuyV2ProductSort.priceLowToHigh, 'Price: low to high'),
+                    (BuyV2ProductSort.priceHighToLow, 'Price: high to low'),
+                  ])
+                    ChoiceChip(
+                      key: ValueKey('buy-store-sort-${choice.$1.name}'),
+                      label: Text(choice.$2),
+                      selected: sort == choice.$1,
+                      onSelected: (_) => update(() => sort = choice.$1),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => update(() {
+                  price = null;
+                  sort = BuyV2ProductSort.relevance;
+                }),
+                child: const Text('Reset store filters'),
+              ),
+              FilledButton(
+                key: const ValueKey('buy-store-filters-apply'),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                child: const Text('Show products'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || applied != true) return;
+    setState(() {
+      _maximumPrice = price;
+      _sort = sort;
+    });
+  }
+
+  Widget _storeInfo({bool actionOnly = false, VoidCallback? onAsk}) =>
+      _PublicStoreTruthPanel(
+        product: widget.product,
+        facts: widget.session.productFactsFor(widget.product),
+        now: widget.session.catalogueNow,
+        trust: widget.session.marketplaceTrustFor(widget.product),
+        fulfilmentLabels: _publicStoreFulfilmentLabels(widget.session, [
+          widget.product,
+        ]),
+        collectionActionOnly: actionOnly,
+        onAskStore: onAsk,
+        onOrderForCollection: () {
+          _searchFocus.unfocus();
+          widget.session.beginStoreCollection(widget.product.id);
+        },
+      );
+
+  Future<void> _showStoreInfo() async {
+    _searchFocus.unfocus();
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => AnimatedBuilder(
+        animation: widget.session,
+        builder: (context, _) => SingleChildScrollView(
+          key: const ValueKey('buy-store-info-scroll'),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Store details', style: context.buyTitle),
+                  ),
+                  IconButton(
+                    tooltip: 'Close store details',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              _storeInfo(
+                onAsk: widget.onAskStore == null
+                    ? null
+                    : () => Navigator.of(sheetContext).pop('ask'),
+              ),
+              if (widget.onOpenOtherStore != null &&
+                  widget.session
+                      .otherStorePreviewsFor(widget.product)
+                      .isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('Other stores', style: context.buyTitle),
+                for (final other in widget.session.otherStorePreviewsFor(
+                  widget.product,
+                ))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: _RelatedStoreCard(
+                      key: ValueKey('buy-store-info-other-${other.id}'),
+                      product: other,
+                      branchAddress:
+                          widget.session
+                              .catalogueStore(other.storeId!)
+                              ?.address ??
+                          other.origin,
+                      onTap: () => Navigator.of(sheetContext).pop(other.id),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'ask') {
+      widget.onAskStore?.call();
+    } else {
+      final other = widget.session.findProduct(action);
+      if (other != null) widget.onOpenOtherStore?.call(other);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
@@ -7656,25 +8077,16 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         .categoriesFor(product.destination)
         .where((value) => value.id == _category)
         .firstOrNull;
-    return BuyV2PagedProductCatalogue(
-      session: widget.session,
-      scopeKey: _scope,
-      storeContext: true,
-      query: widget.session.catalogueQuery(
-        storeId: product.storeId,
-        catalogueDestination: product.destination,
-        search: _search.text,
-        categoryId: _category,
-      ),
-      onOpenProduct: (product) {
-        _searchFocus.unfocus();
-        widget.onOpenProduct(product);
-      },
-      header: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    final saved = widget.session
+        .savedProductsFor(product.destination)
+        .where((item) => item.storeId == product.storeId)
+        .toList(growable: false);
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!widget.storefront)
             BuyV2AdaptiveIdentityRow(
               leading: const Icon(
                 Icons.storefront_outlined,
@@ -7704,44 +8116,65 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 icon: const Icon(Icons.close_rounded),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    label: 'Search this store',
-                    child: TextField(
-                      key: const ValueKey('buy-store-product-search'),
-                      controller: _search,
-                      focusNode: _searchFocus,
-                      maxLength: 80,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText:
-                            MediaQuery.textScalerOf(context).scale(1) > 1.25
-                            ? 'Search'
-                            : 'Search this store',
-                        counterText: '',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: _search.text.isEmpty
-                            ? null
-                            : IconButton(
-                                key: const ValueKey(
-                                  'buy-store-product-search-clear',
-                                ),
-                                tooltip: 'Clear store search',
-                                onPressed: () => setState(_search.clear),
-                                icon: const Icon(Icons.close_rounded),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  label: 'Search this store',
+                  child: TextField(
+                    key: const ValueKey('buy-store-product-search'),
+                    controller: _search,
+                    focusNode: _searchFocus,
+                    maxLength: 80,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText:
+                          MediaQuery.textScalerOf(context).scale(1) > 1.25 ||
+                              (widget.storefront &&
+                                  MediaQuery.sizeOf(context).width < 360)
+                          ? 'Search'
+                          : 'Search this store',
+                      counterText: '',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _search.text.isEmpty
+                          ? widget.storefront
+                                ? IconButton(
+                                    key: const ValueKey(
+                                      'buy-store-info-control',
+                                    ),
+                                    tooltip: 'Store details',
+                                    onPressed: _showStoreInfo,
+                                    icon: const Icon(
+                                      Icons.info_outline_rounded,
+                                    ),
+                                  )
+                                : null
+                          : IconButton(
+                              key: const ValueKey(
+                                'buy-store-product-search-clear',
                               ),
-                        border: const OutlineInputBorder(),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      onSubmitted: (_) => _searchFocus.unfocus(),
-                      onTapOutside: (_) => _searchFocus.unfocus(),
+                              tooltip: 'Clear store search',
+                              onPressed: () => setState(_search.clear),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      border: const OutlineInputBorder(),
                     ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _searchFocus.unfocus(),
+                    onTapOutside: (_) => _searchFocus.unfocus(),
                   ),
                 ),
-                const SizedBox(width: 8),
+              ),
+              const SizedBox(width: 8),
+              if (widget.storefront)
+                IconButton.outlined(
+                  key: const ValueKey('buy-paged-store-close'),
+                  tooltip: 'Close store',
+                  onPressed: widget.onClose,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              if (!widget.storefront)
                 Semantics(
                   selected: _category != 'all',
                   child: _CatalogueChromeAction(
@@ -7757,10 +8190,177 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                     onTap: _chooseCategory,
                   ),
                 ),
-              ],
+            ],
+          ),
+          if (widget.storefront) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: const ValueKey('buy-store-catalogue-toolbar'),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFFFFF9F2),
+                    Color(0xFFF8F8FF),
+                    Color(0xFFF5F8FF),
+                  ],
+                ),
+                border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+              ),
+              child: Row(
+                children: [
+                  _CatalogueChromeAction(
+                    key: const ValueKey('buy-store-category-control'),
+                    label:
+                        'Store categories. ${category?.label ?? 'All products'}',
+                    tooltip: 'Store categories',
+                    icon: Icons.menu_rounded,
+                    active: _category != 'all',
+                    onTap: _chooseCategory,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: _StorefrontTextSheen(
+                        stateKey: 'buy-store-name-motion-${product.storeId}',
+                        child: Text(
+                          buyV2CustomerStoreName(
+                            store?.name ?? product.seller,
+                            product.storeId,
+                          ),
+                          key: const ValueKey('buy-store-toolbar-name'),
+                          textAlign: TextAlign.center,
+                          softWrap: true,
+                          style: const TextStyle(
+                            color: BuyV2Colors.ink,
+                            fontSize: 14,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _CatalogueChromeAction(
+                    key: const ValueKey('buy-store-saved-control'),
+                    label: _savedOnly
+                        ? 'Show all store products'
+                        : 'Show saved products at this store',
+                    tooltip: 'Saved at this store',
+                    icon: _savedOnly
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    badge: '${saved.length}',
+                    active: _savedOnly,
+                    onTap: () {
+                      _searchFocus.unfocus();
+                      setState(() => _savedOnly = !_savedOnly);
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  _CatalogueChromeAction(
+                    key: const ValueKey('buy-store-filter-control'),
+                    label: 'Store filters',
+                    tooltip: 'Store filters',
+                    icon: Icons.tune_rounded,
+                    active:
+                        _maximumPrice != null ||
+                        _sort != BuyV2ProductSort.relevance,
+                    onTap: _chooseFilters,
+                  ),
+                ],
+              ),
             ),
           ],
+        ],
+      ),
+    );
+    void openProduct(BuyV2Product item) {
+      _searchFocus.unfocus();
+      widget.onOpenProduct(item);
+    }
+
+    if (_savedOnly) {
+      final products = BuyV2SearchRelevance.rankProducts(
+        saved.where(
+          (item) =>
+              (_category == 'all' || item.categoryId == _category) &&
+              (_maximumPrice == null ||
+                  widget.session.productFactsFor(item).price <= _maximumPrice!),
         ),
+        _search.text,
+      );
+      if (_sort == BuyV2ProductSort.priceLowToHigh ||
+          _sort == BuyV2ProductSort.priceHighToLow) {
+        products.sort(
+          (a, b) =>
+              (_sort == BuyV2ProductSort.priceLowToHigh ? 1 : -1) *
+              widget.session
+                  .productFactsFor(a)
+                  .price
+                  .compareTo(widget.session.productFactsFor(b).price),
+        );
+      }
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: widget.storefront
+              ? MediaQuery.viewInsetsOf(context).bottom
+              : 0,
+        ),
+        child: ListView(
+          key: ValueKey('buy-store-saved-list-${product.storeId}'),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          children: [
+            header,
+            if (products.isEmpty)
+              const _CataloguePageNotice(
+                title: 'No matching saved products',
+                detail:
+                    'Save products at this store or change your search and filters.',
+              )
+            else
+              BuyV2ProgressiveProductGrid(
+                session: widget.session,
+                products: products,
+                storageKey: '$_scope-saved',
+                semanticLabel: 'Saved products at this store',
+                laneCount: 1,
+                storeContext: true,
+                onOpenProduct: openProduct,
+              ),
+          ],
+        ),
+      );
+    }
+    final base = widget.session.catalogueQuery(
+      storeId: product.storeId,
+      catalogueDestination: product.destination,
+      search: _search.text,
+      categoryId: _category,
+    );
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: widget.storefront ? MediaQuery.viewInsetsOf(context).bottom : 0,
+      ),
+      child: BuyV2PagedProductCatalogue(
+        session: widget.session,
+        scopeKey: _scope,
+        storeContext: true,
+        query: widget.storefront
+            ? BuyV2CatalogueQuery(
+                destination: base.destination,
+                regionId: base.regionId,
+                areaScope: base.areaScope,
+                storeId: base.storeId,
+                query: base.query,
+                categoryId: base.categoryId,
+                procurementContext: base.procurementContext,
+                maximumPrice: _maximumPrice,
+                sort: _sort,
+              )
+            : base,
+        onOpenProduct: openProduct,
+        header: header,
       ),
     );
   }
@@ -12415,7 +13015,7 @@ class _ProductSaveButton extends StatelessWidget {
       session.toggleSaved(product.id);
     }
 
-    if (compactEdgeControls) {
+    if (compactEdgeControls && !(showRemoveLabel && saved)) {
       return IconButton(
         key: ValueKey('buy-save-${product.id}'),
         tooltip: saved

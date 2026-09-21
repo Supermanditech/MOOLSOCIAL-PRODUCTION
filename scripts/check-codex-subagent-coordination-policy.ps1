@@ -1041,7 +1041,7 @@ $continuationBindings = @($gitDiscipline.continuationBindings)
 Assert-Coordination ($continuationBindings.Count -eq 81) `
   'founder-authorized continuation binding inventory changed.'
 
-# Exact founder-authorized local capture admission; no application owner or APK.
+# Exact capture bootstrap, followed by founder-selected public storefront UI.
 $cursorReadyOwners = @(
   'config/codex-development-regression-registry.json',
   'config/codex-subagent-coordination-policy.json',
@@ -1049,6 +1049,30 @@ $cursorReadyOwners = @(
   'scripts/check-approved-ui-locks.ps1',
   'docs/quality/CURSOR-BUY-READY-20260921.md',
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
+)
+$cursorStorefrontOwners = @(
+  'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart',
+  # Founder explicitly authorized all-store pickup after shared scope disclosure.
+  'apps/mobile/lib/features/buy/buy_v2_session.dart',
+  'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+  'docs/quality/CURSOR-BUY-READY-20260921-APK.json',
+  'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-android-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json'
 )
 $cursorReadyBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_buy_ready_20260921' })
 Assert-Coordination ($cursorReadyBindings.Count -eq 1) 'Cursor baseline capture binding missing or duplicated.'
@@ -1076,10 +1100,13 @@ $cursorReadyAdmission = (
 )
 if ($cursorReadyAdmission) {
   Assert-Coordination ($ProductionPhase -cin @('coordination_bootstrap','task_start','implementation','pre_commit','handoff')) 'Cursor setup cannot authorize acceptance, APK or release.'
-  & git -C $root diff --quiet $cursorReadyBinding.baselineHead -- 'apps/mobile/lib' 'apps/mobile/android' 'apps/mobile/ios' 'apps/mobile/pubspec.yaml' 'apps/mobile/pubspec.lock' 'backend' 'contracts' 'packages'
-  Assert-Coordination ($LASTEXITCODE -eq 0) 'Cursor capture must preserve the complete application baseline.'
+  $cursorRuntimeChanges = @(& git -C $root diff --name-only $cursorReadyBinding.baselineHead -- 'apps/mobile/lib' 'apps/mobile/android' 'apps/mobile/ios' 'apps/mobile/pubspec.yaml' 'apps/mobile/pubspec.lock' 'backend' 'contracts' 'packages')
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'Cursor runtime preservation inventory failed.'
+  $cursorAllowedRuntime = if ($ProductionPhase -ceq 'coordination_bootstrap') { @() } else { @($cursorStorefrontOwners | Where-Object { $_.StartsWith('apps/mobile/lib/') }) }
+  Assert-Coordination (@($cursorRuntimeChanges | Where-Object { $_ -cnotin $cursorAllowedRuntime }).Count -eq 0) 'Cursor must preserve all application owners outside the exact storefront and founder-authorized pickup extension.'
+  $cursorClaimOwners = if ($ProductionPhase -ceq 'coordination_bootstrap') { $cursorReadyOwners } else { @($cursorReadyOwners) + @($cursorStorefrontOwners) }
   $cursorReadyClaim = @($policy.activeClaims | Where-Object { $_.task -ceq '/root' })
-  Assert-Coordination ($cursorReadyClaim.Count -eq 1 -and (@($cursorReadyClaim[0].owners | Sort-Object) -join '|') -ceq (@($cursorReadyOwners | Sort-Object) -join '|')) 'Cursor capture claim must contain only its exact setup and test owners.'
+  Assert-Coordination ($cursorReadyClaim.Count -eq 1 -and (@($cursorReadyClaim[0].owners | Sort-Object) -join '|') -ceq (@($cursorClaimOwners | Sort-Object) -join '|')) 'Cursor claim must contain only its exact setup and selected storefront owners.'
 }
 
 # Founder-authorized Screen 1 exception: a work checkpoint, never acceptance.
