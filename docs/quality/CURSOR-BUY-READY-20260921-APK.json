@@ -236,6 +236,12 @@
     "finalStoreProfilesPassed": 4,
     "screenshots": "C:\\GUARANTEED OUTCOME\\outputs\\cursor-buy-ready-20260921\\buy-compact-final",
     "sessionReconciliation": "frontend_requests_implemented_local_verification;current_device_replay_and_production_pickup_gateway_pending",
-    "deliveryOffersTestsPassed": 19
+    "deliveryOffersTestsPassed": 19,
+    "redmiFilterRecheck": {
+      "state": "old_installed_build_reproduced_device_fix_pending",
+      "versionName": "1.0.0-r66.31-cursorreview",
+      "defect": "REG4642",
+      "evidenceDirectory": "C:\\GUARANTEED OUTCOME\\outputs\\cursor-buy-ready-20260921\\redmi-filter-founder-20260922"
+    }
   }
 }

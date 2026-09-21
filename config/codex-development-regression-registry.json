@@ -47,6 +47,7 @@
     },
     {
       "id": "REG-20260921-4642-CURSOR-STOREFRONT-FILTER-CTA-CLIPPED",
+      "founderRedmiRecheck20260922": "Captured founder-left-open popup on Redmi TG8HCYTGGQT885OF at00:39, installed1.0.0-r66.31-cursorreview code2026092101. Show products label/action clips behind Android navigation. Evidence outputs/cursor-buy-ready-20260921/redmi-filter-founder-20260922/open-popup.png and XML with SHA256 manifest. Same REG4642; not a new duplicate defect. Source repair committedb69ce92d uses scrollable options, pinned equal-width footer and existing Android clearance; normal/enlarged host profiles passed. Device defect remains OPEN until a fresh candidate is installed and replayed; do not claim r66.31 contains the fix.",
       "repairEvidence": "Fixed locally with scrollable options and pinned action clearance. R6 focused suite31 passes; fresh Redmi validation pending.",
       "status": "open_verification",
       "appliesTo": [

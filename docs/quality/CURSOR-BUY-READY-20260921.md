@@ -1,5 +1,25 @@
 # Cursor Buy baseline capture â€” 21 September 2026
 
+## Founder Redmi recheck: filter action still clipped in installed r66.31
+
+22 September00:39: captured the popup already open on Redmi without navigating
+or changing its state. Screenshot and UI XML confirm the lower Show products
+action is clipped at the Android navigation area. Installed package readback:
+com.moolsocial.app.cursorreview,1.0.0-r66.31-cursorreview,code2026092101.
+Same defect REG4642; appended device evidence rather than duplicating registration.
+Evidence: outputs/cursor-buy-ready-20260921/redmi-filter-founder-20260922/;
+open-popup.png,open-popup.xml,evidence-manifest.json. Screenshot inspected.
+
+Implementation already exists in b69ce92d and current d2728ad8: bounded scrollable
+options, pinned equal-width Reset/Show products row, Android bottom clearance,
+compact heading/options and full enlarged-text labels. Relevant host checks passed
+in buy-compact-final.log (4 profiles), with final screenshots inspected. No new
+runtime edits or redundant test runs were needed for this identical old-build
+reproduction. Explicit status: IMPLEMENTED LOCALLY, OPEN ON REDMI. Fresh APK
+installation and physical replay remain required before closing REG4642. No new
+APK was built or installed during this read-only device capture.
+
+
 ## Session reconciliation: remaining Delivery/Offers implementations completed locally
 
 REG4634: global Delivery reads only active placed delivery records. Remove the
