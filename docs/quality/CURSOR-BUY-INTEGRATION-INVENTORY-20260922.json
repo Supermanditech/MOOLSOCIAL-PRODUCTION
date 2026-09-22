@@ -1257,5 +1257,55 @@
     "DEP-02 authentic Store projection/photos/address/Maps",
     "DEP-03 isolated zero-active Delivery rail dataset",
     "Codex integration and new full baseline"
+  ],
+  "sourceCheckpoint": {
+    "sourceCommit": "a78b1b38803b4dca6fcc7d715ee9ccc9528a4482",
+    "sourceTree": "087809d63073b6528fe59237efe5180965348136",
+    "payloadFilesVerified": 56,
+    "statusBytes": 0,
+    "statusRecords": 0,
+    "statusSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "priorApkManifestUnchanged": true
+  },
+  "sourceRemoteReadback": {
+    "sourceCommit": "a78b1b38803b4dca6fcc7d715ee9ccc9528a4482",
+    "remoteCommit": "a78b1b38803b4dca6fcc7d715ee9ccc9528a4482",
+    "remoteRef": "refs/heads/work/cursor-ui/buy-ready-20260921",
+    "equal": true,
+    "bundleSha256": "f655abb8230a4d8b616bfffcd7b100a6fe8d2f269a767629d3dd55a2b6f44418",
+    "bundlePrerequisite": "123ff42cf8179b272d33b480e8267dfa83af2de3"
+  },
+  "historicalSecretCheck": {
+    "commits": 13,
+    "uniqueBlobs": 84,
+    "textBlobsScanned": 77,
+    "findings": 0
+  },
+  "handoffCompletionCommit": {
+    "rule": "Direct child of sourceCheckpoint.sourceCommit; only selfReferenceExclusions may change",
+    "finalReceipt": "C:/GUARANTEED OUTCOME/outputs/buy-integration-handoff-20260922/final-verification.json",
+    "noAppSourceChange": true
+  },
+  "sourceGateEvidence": [
+    {
+      "file": "source-handoff.log",
+      "sha256": "3f7bbf17c3bd7d86d666a0ff687fae4da49543438940f57107593b4eb4ac0efa"
+    },
+    {
+      "file": "source-incremental-handoff.log",
+      "sha256": "a1ac66a5d0060907f00be91b9daad54b5cd20739b7a124ae981408dacc3f566c"
+    },
+    {
+      "file": "historical-admission-tests.log",
+      "sha256": "049e7cbf80fd453bdfab029c9cabab2b0970ad314d4a80ce82d41da242d53636"
+    },
+    {
+      "file": "pre-commit.log",
+      "sha256": "b4192edde57750ae5b972553c28a31961b568517b293016673d47a2caf84954e"
+    },
+    {
+      "file": "integration-coverage.log",
+      "sha256": "8707e9dc9adef2b99dff11cd2be599a68d1edf5a7808e6efc197b5d8577a3092"
+    }
   ]
 }

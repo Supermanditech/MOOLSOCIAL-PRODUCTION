@@ -5,8 +5,9 @@
 Founder explicitly requests reconciliation of ALL Cursor work after the previous
 integrated baseline, clean local Git, remote preservation and a detailed Codex
 handoff. This is a source/evidence handoff, not production or device acceptance.
-The source checkpoint and final verification receipt are recorded below after
-the authorized commit. Backend implementation has NOT started. No APK is made.
+The verified source checkpoint is `a78b1b38803b4dca6fcc7d715ee9ccc9528a4482`;
+the evidence-only completion commit is its direct child containing this record.
+Backend implementation has NOT started. No APK is made.
 
 Actor/outcome: the integration owner can preserve the complete Buy frontend and
 its Store-facing contract while combining it with Store, Counter Sale and CSV.
@@ -216,5 +217,51 @@ founder explicitly deferred an APK for this eleven-ticket batch.
 
 ## Completion record
 
-Pending authorized source commit, clean handoff gates and remote readback.
-This line is replaced only after those operations actually succeed.
+Source commit: `a78b1b38803b4dca6fcc7d715ee9ccc9528a4482`.
+Source tree: `087809d63073b6528fe59237efe5180965348136`.
+It preserves all 13 earlier Cursor commits and commits all 43 remaining changed
+files, including earlier uncommitted source/test/evidence. All 56 payload blobs
+match the inventory. The three generated/native files that had stale status
+metadata equal HEAD byte-for-byte and contain no omitted changes.
+
+Verified at the source checkpoint:
+
+- Coordination implementation, pre-commit and clean handoff: PASS; 59 exact
+  owners, registry 4616 and its original SHA binding unchanged.
+- Incremental handoff: PASS. Its r66.32 version arguments identify the historical
+  ticket only; this is not a fresh APK build authorization or source qualification.
+- All 18 required inherited tips: PASS; two rejected tips remain rejected.
+- Historical secret scan: all 13 Cursor commits, 84 unique blobs / 77 text blobs,
+  zero matches; staged and committed gate scans also passed.
+- Historical subject-admission tests: 25 positive/negative checks passed.
+- Staged whitespace: PASS. Payload fingerprints: 56/56 matched.
+- Source, tests and captures remain byte-identical to the verified pre-reconcile
+  snapshot; only the documented narrow handoff controls and documentation changed.
+- Clean status: 0 staged, 0 unstaged, 0 untracked. Empty status SHA-256:
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- Actual `origin` branch readback equals the source commit. No force push,
+  history rewrite, merge, production/main or other-worktree mutation occurred.
+
+Verified recovery artifacts:
+
+- `cursor-source-since-integration.bundle`, SHA-256
+  `f655abb8230a4d8b616bfffcd7b100a6fe8d2f269a767629d3dd55a2b6f44418`.
+  This is an incremental Git bundle containing the complete source branch since
+  `123ff42cf8179b272d33b480e8267dfa83af2de3`; that existing integrated commit is
+  the explicit prerequisite, not an omitted new change. Bundle verification passed.
+- Local raw evidence: 1,560 files, 1,301 hash-verified unique blobs; archive SHA-256
+  `bfc6ffb9784e180458b307593cdaff5fefeb316f02748858758490deff77fec6`.
+- Remote host-evidence ZIP: 62 retained files, 525,213 bytes; exact hashes and
+  per-file mapping are in the committed inventory and ZIP manifest.
+- Original r66.32 source manifest is unchanged. Prior archives and evidence are
+  preserved in place; the new archive is an additional recovery copy.
+
+The completion commit changes only this handoff and its inventory, with no source,
+test, control or asset change. The final receipt at
+`C:/GUARANTEED OUTCOME/outputs/buy-integration-handoff-20260922/final-verification.json`
+binds that commit, clean status, both handoff gate results, final bundle and exact
+remote readback after publication. Verify that receipt/remote ref before consuming
+the handoff. This does not claim `ticket_acceptance`, `ticket_close`, new device
+acceptance, production promotion or integration of Codex's unfinished Store work.
+
+Cursor is parked pending Codex's new full integrated baseline requested above.
