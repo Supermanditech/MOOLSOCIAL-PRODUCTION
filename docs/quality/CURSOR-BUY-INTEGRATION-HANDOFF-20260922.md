@@ -6,7 +6,9 @@ Founder explicitly requests reconciliation of ALL Cursor work after the previous
 integrated baseline, clean local Git, remote preservation and a detailed Codex
 handoff. This is a source/evidence handoff, not production or device acceptance.
 The verified source checkpoint is `a78b1b38803b4dca6fcc7d715ee9ccc9528a4482`;
-the evidence-only completion commit is its direct child containing this record.
+the original evidence-only completion commit is its direct child
+`a4ff1e5fde01cdfea29f1bf576bde35aa64a3b6e`. The later ticket addendum below
+does not change that source checkpoint or its historical verification receipt.
 Backend implementation has NOT started. No APK is made.
 
 Actor/outcome: the integration owner can preserve the complete Buy frontend and
@@ -265,3 +267,59 @@ the handoff. This does not claim `ticket_acceptance`, `ticket_close`, new device
 acceptance, production promotion or integration of Codex's unfinished Store work.
 
 Cursor is parked pending Codex's new full integrated baseline requested above.
+
+## Reopened ticket: CURSOR-BUY-COMPARE-SHEET-REGRESSION-20260922
+
+Status: **OPEN — previously implemented behavior reported regressed by founder**.
+Registered after the original eleven-ticket cutoff and Git handoff. This is a
+separate follow-up, not a claim that the prior eleven-ticket batch fixes it.
+Founder instruction: "register ticket - earlier this was implemented".
+The earlier implementation is founder-reported; its exact commit and where the
+behavior was lost must be traced before repair. Do not label this a new feature
+or assert an integration-loss cause without that evidence.
+
+Actor/outcome: a public Buy/Wholesale shopper opens Product details -> Compare
+prices and sees a compact, readable comparison state with an accessible retry.
+Classification: mvp_supporting; restore the previously requested compact Buy UI.
+Current authorization is registration only; no implementation or APK in this turn.
+
+Observed on Redmi at 16:50:23 local, 22 September 2026:
+
+- Installed app: `1.0.0-r66.32-cursorreview`, version code `2026092201`.
+- Product: Stone-ground wheat atta, Case of 10 x 5 kg; Compare prices is open.
+- Supplier prices are unavailable; the retry action is visible, followed by a
+  very large unused white area. The sheet does not shrink to the short content.
+- The parked source also retains `FractionallySizedBox(heightFactor: .88)` in
+  `_showBuyV2ProductComparison`, `apps/mobile/lib/ui_v2/buy/buy_v2_views.dart`.
+  This is the observed sizing cause; earlier-fix provenance remains to be traced.
+- Screenshot: `C:/GUARANTEED OUTCOME/outputs/redmi-current-screen-20260922-165023/current-screen.png`.
+  SHA-256: `ed38f866139ea95c5db17f441b30c9db4d94aacf39171d80941bc4875ad1c604`.
+  Adjacent `capture.json` records build, foreground app and assessment. No device
+  taps or navigation were performed during the capture.
+
+Expected repair scope: reuse the existing comparison sheet, controller and route.
+Size unavailable, empty and loading states to their content with safe viewport
+limits. Populated comparison results may grow and scroll. Preserve approved
+typography, touch targets, SafeArea, Android navigation clearance and retry.
+Find and reconcile the earlier implementation rather than introducing a second
+comparison UI. No backend, Store-worktree, policy or unrelated redesign work.
+
+Acceptance and child checks for the implementation ticket:
+
+1. Identify the earlier implementation/acceptance revision and record why the
+   current source and installed build do not exhibit it; preserve unrelated work.
+2. Cover unavailable/error, loading, empty, short and paged/populated results at
+   normal and enlarged text, narrow screens and Android system insets. Short
+   states must not reserve an almost-full-screen blank area or clip text/actions.
+3. Refresh, dismiss and Back retain the exact originating product, Store, filters
+   and Cart. Preserve same-SKU/pack comparison, pagination and eligibility checks.
+4. Keep supplier-provider data unavailability as the existing separate dependency.
+   The layout repair must be testable without live data and must not invent offers
+   or prices, turn a failed request into success, or mark provider completion closed.
+5. Run focused local layout/navigation tests; inspect children; replay on the next
+   authorized Redmi candidate together with the existing eleven-ticket/backend
+   obligations. Do not mark this reopened defect closed from registration alone.
+
+Handoff addition for Codex: carry this OPEN regression and its screenshot into
+the new integrated baseline/backlog. The app source, existing local test results
+and deferred provider/Redmi obligations are unchanged by this registration.
