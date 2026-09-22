@@ -5,10 +5,12 @@
 Founder explicitly requests reconciliation of ALL Cursor work after the previous
 integrated baseline, clean local Git, remote preservation and a detailed Codex
 handoff. This is a source/evidence handoff, not production or device acceptance.
-The verified source checkpoint is `a78b1b38803b4dca6fcc7d715ee9ccc9528a4482`;
+The original parked source checkpoint is `a78b1b38803b4dca6fcc7d715ee9ccc9528a4482`;
 the original evidence-only completion commit is its direct child
-`a4ff1e5fde01cdfea29f1bf576bde35aa64a3b6e`. The later ticket addendum below
-does not change that source checkpoint or its historical verification receipt.
+`a4ff1e5fde01cdfea29f1bf576bde35aa64a3b6e`. The three authorized product-control
+repairs below are a subsequent source delta. Integrate the complete branch
+including that delta, not only a78b1b38. The original inventory/receipt remains
+bound to the historical checkpoint; it is not relabelled as the later source.
 Backend implementation has NOT started. No APK is made.
 
 Actor/outcome: the integration owner can preserve the complete Buy frontend and
@@ -323,3 +325,141 @@ Acceptance and child checks for the implementation ticket:
 Handoff addition for Codex: carry this OPEN regression and its screenshot into
 the new integrated baseline/backlog. The app source, existing local test results
 and deferred provider/Redmi obligations are unchanged by this registration.
+
+## Authorized follow-up: product controls and truthful Delivery rail
+
+22 September 2026: founder explicitly reopens Buy-only frontend work for the
+three defects below after parking. Actor/outcome: a shopper can change quantity,
+reach the same Cart while scrolling product details, and see Delivery only for
+current confirmed delivery records. Classification: mvp_supporting; repair existing
+commerce controls. Reuse screen, views, session and existing focused tests. No new
+screen, backend, Store, Counter Sale, CSV, routing, policy or APK work. The separate
+Compare-sheet ticket above remains registered, not implicitly implemented here.
+
+Evidence directory: `C:/GUARANTEED OUTCOME/outputs/buy-controls-regressions-20260922-170230`.
+Initial Redmi screenshot `001-current-screen.png`, SHA-256
+`af7e3692dcb32ae2b8c309fb3913b94dd55a0ab3670e10c076a8c9d9911d87d5`.
+Installed r66.32/2026092201; starting source
+`fd87c94eff19c8c741624d20b2cf22790f9aab63`. Screenshots 002/003 record scrolling
+and the Delivery panel; existing device Cart/orders were not erased.
+
+| Ticket | Observed defect and intended correction | Status |
+| --- | --- | --- |
+| CURSOR-BUY-QUANTITY-WIDTH-20260922 | Wholesale product `− quantity +` spans the entire screen. Repaired with intrinsic width, readable quantity, 44px targets and existing MOQ/stock/amount behavior. | LOCALLY IMPLEMENTED AND TESTED; Redmi replay pending |
+| CURSOR-BUY-DELIVERY-PROVENANCE-20260922 | Main rail shows 9+; panel exposes 12 retained review orders including seed MS-240782. Active delivery now requires current provider confirmation or a fresh completed placement; history is retained. | LOCALLY IMPLEMENTED AND TESTED; Redmi replay pending |
+| CURSOR-BUY-CART-SCROLL-STABILITY-20260922 | Product scrolling moves Cart between floating summary and rail. Shop/Wholesale details now keep one fixed Cart target in the bottom rail with basket and return state preserved. | LOCALLY IMPLEMENTED AND TESTED; Redmi replay pending |
+
+Exact implementation owners: `apps/mobile/lib/ui_v2/buy/buy_v2_views.dart`,
+`buy_v2_screen.dart`, `apps/mobile/lib/features/buy/buy_v2_session.dart` and
+existing `buy_v2_post_redmi_fixes_test.dart` / `buy_v2_session_test.dart` plus
+affected focused Buy tests if a fixture requires a current placed/provider order.
+No shared model or provider schema change is proposed. Eligibility, auth and
+live order/payment completion still use the existing contract and dependencies.
+
+Local acceptance: normal/enlarged text, narrow portrait and short landscape;
+compact stepper plus/minus/edit/MOQ; stable Cart at top/middle/bottom and Back from
+Cart; no badge for no orders, samples, cached-only, completed, Care or pickup;
+badge for freshly confirmed/provider-active delivery; provider refresh/expiry of
+retained records; existing delivery and cart regression. Capture actual local
+screens. New fixes require the next authorized Redmi build for device closure.
+
+Local results and child inspection:
+
+- Ten focused new checks pass, including 320/360/390px portrait, 800x360 landscape,
+  100/140/200% text, Android insets, stepper plus/minus/edit, MOQ, Cart top/middle/
+  bottom, correct basket and exact product/scroll return. Retained-only orders
+  remain history; ready provider confirmation activates Delivery and an empty
+  current provider response removes it. New explicit review placement activates
+  its own record without activating the inherited samples.
+- Initial five-file regression: 725 passed / 53 failed. Investigation found
+  38 tracking-double failures (the double declared current order/quick state but
+  not the new current-delivery list), 10 comparison/Cart fixture failures (missing
+  explicit eligibility prevented Add) and five existing active-delivery image
+  fixtures. Focused rerun: 57/57 passed. The final Cart/comparison/reference rerun
+  after adding explicit successful-Add assertions: 17/17 passed. No test was
+  skipped, no assertion removed and no protected reference image updated.
+- Tracking doubles now explicitly declare current deliveries. The existing five
+  golden cases explicitly exercise their two-active-delivery fixture, preserving
+  the approved images. Separate new real-session tests prove samples alone do
+  not activate the rail. The comparison fixture supplies versioned, time/location-
+  bound eligibility instead of depending on absent provider data.
+- Child found in visual review: enlarged Cart count covered the cart glyph.
+  Badge text is bounded at 130% while the full count/total remains accessible.
+  All ten new checks and four native Flutter captures were repeated afterwards.
+- Analysis of all seven changed Dart owners: exit 0; zero errors/warnings and
+  eight existing style information items. No live provider or payment completion
+  is claimed. This was a frontend presentation/provenance defect, not proof that
+  the backend had an active delivery.
+- Logs: `regression-r1.log`, `regression-fixtures-r2.log`,
+  `cart-fixtures-final.log`, `controls-captures-final.log`, `analysis-r2.log` in
+  the evidence directory. Final images: `local-captures-final/`. The initial
+  20 generated failure images and their earlier tracked bytes were archived and
+  hash-verified before restoring only those generated owners to exact HEAD bytes;
+  `reference-evidence-preservation.json` records this. Nothing was deleted.
+
+Stop boundary: no new APK, backend work or implementation of the three OPEN
+registered tickets (Compare-sheet height, search Delivery fleet and compact
+order/invoice actions). All earlier
+eleven-ticket device/provider obligations continue. Carry these three repairs
+into the integrated baseline and replay them on the next authorized Redmi APK.
+
+### Registration only: Delivery fleet appears in Buy search
+
+`CURSOR-BUY-SEARCH-DELIVERY-FLEET-20260922` — OPEN, not implemented.
+Founder supplied this fourth defect during the three-control repair, then
+explicitly limited subsequent inputs to registration. Finish only the three
+already-started implementations and their local tests; stop afterwards.
+
+Current Redmi capture `004-buy-search-delivery-fleet.png` in the evidence
+directory above shows the expanded Buy search, keyboard and a truck/9+ delivery
+control next to the search completion tick. Screenshot SHA-256:
+`22a849bb4071ac832d8cfe1629f5f9746768907985c9003a4d08c27a35a62a6d`.
+Installed build remains r66.32/2026092201. No navigation was used for this capture.
+
+Expected: no delivery fleet/tracking control or expanded tracking panel anywhere
+in the Buy search surface, even when genuine deliveries are active. Preserve
+the active order and its tracking outside search. Reuse existing search state
+and delivery presentation; no backend or provider change is implied. Future
+acceptance must exercise active/no-active delivery, expanded/collapsed tracking,
+keyboard shown/hidden, query entry/results, search exit and product/Back return.
+The existing keyboard header `trailingAction` calls `_buildDeliveryControl`;
+this is the source lead for the future implementation, not a completed fix.
+
+### Registration only: compact order management and invoice actions
+
+`CURSOR-BUY-ORDER-INVOICE-ACTIONS-20260922` — OPEN, not implemented.
+Founder reports excessive screen use by Manage order / View invoice and asks
+for a decision that preserves Codex's newer invoice/consumer Downloads work.
+Current Redmi screenshot `005-offers-order-invoice-actions.png` shows order
+tracking with **Orders** selected in the bottom rail (the request called it
+Offers). Two large full-width outlined actions are stacked below Address,
+Items and Help. SHA-256:
+`fc2016ef39b6c81ed3d8d2674cbe3a4861ee8119be3d83559a6545ef48cc8dfe`.
+Installed r66.32 remains unchanged; capture used no navigation.
+
+Founder agreed to this design decision (Annotation 1); implementation remains
+unauthorized under the explicit registration-only instruction. Retain a compact
+**Invoice** action for this exact order, alongside **Manage order** in the
+existing lower action area. Use one compact icon/text row where space permits,
+with accessible wrapping at enlarged text; preserve at least 44px tap targets.
+No new top tabs, oversized full-width cards or second invoice implementation.
+Consumer-profile Downloads should remain the central document list. The
+contextual action must open the same authoritative invoice/download flow by
+order ID, not require searching the full Downloads list for a known order.
+
+Source lead: tracking actions in `buy_v2_views.dart`, keys
+`buy-tracking-manage-order-<id>` / `buy-tracking-invoice-<id>` and existing
+`_openOrderInvoice`. Retain Manage order eligibility, return/replace/refund,
+support and correct Back navigation. Preserve honest invoice-pending/error
+states. Inspect the other View invoice/Manage order placements for the same
+layout issue when this ticket is authorized; avoid unrelated redesign.
+
+Dependency: verify the exact Codex invoice-format and consumer Downloads source
+revision at integration before wiring it. The latest Codex implementation is
+reported by the founder, not verified as present in this installed APK or Cursor
+baseline. Do not fork its invoice renderer or modify Codex's checkout.
+Future checks: same-order invoice identity, visibility by availability/permission,
+view/download success/failure/retry, pending invoice, active/delivered order
+actions, normal/large text, Android insets and retained scroll/Back context.
+Standing instruction remains registration only; no application change for this
+ticket was made during the current three-defect repair.

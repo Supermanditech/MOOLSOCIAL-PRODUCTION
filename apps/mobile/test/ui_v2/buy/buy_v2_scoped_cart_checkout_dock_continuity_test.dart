@@ -18,6 +18,20 @@ import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 import 'buy_v2_product_continuity_test.dart'
     show r669ComparisonContinuitySession;
 
+// Existing reference images exercise the rail with two active deliveries.
+// Make that fixture state explicit; normal sessions no longer activate seeds.
+// The provider/placement provenance is tested in post_redmi_fixes and session.
+class _ActiveDeliveryReferenceSession extends BuyV2Session {
+  _ActiveDeliveryReferenceSession() : super(core: BuySession());
+
+  @override
+  List<BuyV2Order> get activeDeliveryOrders => orders
+      .where((order) => order.collection == null)
+      .where((order) => order.destination != BuyV2Destination.medicine)
+      .where((order) => !orderIsCompleted(order))
+      .toList(growable: false);
+}
+
 class _R5DistinctProductContent implements BuyV2ProductContentAdapter {
   const _R5DistinctProductContent();
 
@@ -479,8 +493,12 @@ void main() {
         await tester.pumpAndSettle();
         final detail = find.text(description);
         await revealR5ProductContent(tester, detail);
-        session.addProduct('s-tomato');
-        session.addProduct('w-notebook');
+        expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+        expect(
+          session.addProduct('w-notebook'),
+          isTrue,
+          reason: session.notice,
+        );
         await tester.pumpAndSettle();
         final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
         expect(cart.hitTestable(), findsOneWidget);
@@ -2334,8 +2352,10 @@ void main() {
     }
   }
 
-  BuyV2Session mixedSession() {
-    final session = BuyV2Session(core: BuySession());
+  BuyV2Session mixedSession({bool activeDeliveryReference = false}) {
+    final session = activeDeliveryReference
+        ? _ActiveDeliveryReferenceSession()
+        : BuyV2Session(core: BuySession());
     for (final destination in const [
       BuyV2Destination.shop,
       BuyV2Destination.wholesale,
@@ -3774,7 +3794,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         tester.view.physicalSize = viewport.size;
-        final session = mixedSession();
+        final session = mixedSession(activeDeliveryReference: true);
         addTearDown(session.dispose);
         session.openDestination(BuyV2Destination.medicine);
         session.openCart(scope: BuyV2CartScope.shop);

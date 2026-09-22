@@ -11,6 +11,7 @@ import 'package:moolsocial/features/buy/buy_v2_customer_copy.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
     show BuyV2ProductPackshot, buyV2DeliveryPromiseSummary;
@@ -31,7 +32,235 @@ class _EligibilityFacts implements BuyV2ProductFactsAdapter {
           );
 }
 
+class _ControlsCustomerStore implements BuyV2CustomerStateStore {
+  _ControlsCustomerStore(this.snapshot);
+  BuyV2CustomerStateSnapshot snapshot;
+  @override
+  String get ownerScope => 'controls-regression-customer';
+  @override
+  Future<BuyV2CustomerStateSnapshot> read() async => snapshot;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
+
+class _ControlsCommerce implements BuyV2CommerceAdapter {
+  BuyV2CommerceSnapshot snapshot = const BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+  );
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected controls regression provider call');
+}
+
 void main() {
+  group('Cursor product controls regressions', () {
+    test('review seeds do not imply delivery; new placement does', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.orders, isNotEmpty);
+      expect(session.activeDeliveryOrders, isEmpty);
+      expect(session.activeQuickDeliveryOrder, isNull);
+      expect(session.activeQuietDeliveryOrder, isNull);
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+      expect(
+        session.activeDeliveryOrders.map((order) => order.id),
+        session.confirmedOrders.map((order) => order.id),
+      );
+    });
+
+    test(
+      'cached delivery needs provider confirmation and can be removed',
+      () async {
+        const order = BuyV2Order(
+          id: 'cached-only-order',
+          destination: BuyV2Destination.shop,
+          title: 'Stored order',
+          itemSummary: 'One recorded item',
+          total: 100,
+          partner: 'Store',
+          partnerType: 'Retailer',
+          promise: 'Last recorded estimate',
+          destinationLabel: 'Home',
+          progress: .5,
+          status: BuyV2OrderStatus.dispatched,
+        );
+        final commerce = _ControlsCommerce();
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          commerceAdapter: commerce,
+          customerStateStore: _ControlsCustomerStore(
+            const BuyV2CustomerStateSnapshot(orders: [order]),
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCommerce();
+        await session.restoreCustomerState();
+        expect(session.orders.map((item) => item.id), contains(order.id));
+        expect(session.activeDeliveryOrders, isEmpty);
+        commerce.snapshot = const BuyV2CommerceSnapshot(
+          state: BuyV2CommerceLoadState.ready,
+          orders: [order],
+        );
+        await session.restoreCommerce();
+        expect(session.activeDeliveryOrders.map((item) => item.id), [order.id]);
+        commerce.snapshot = const BuyV2CommerceSnapshot(
+          state: BuyV2CommerceLoadState.ready,
+        );
+        await session.restoreCommerce();
+        expect(session.activeDeliveryOrders, isEmpty);
+      },
+    );
+
+    for (final profile in [
+      (size: const Size(360, 800), scale: 1.0),
+      (size: const Size(320, 568), scale: 2.0),
+      (size: const Size(390, 844), scale: 1.4),
+      (size: const Size(800, 360), scale: 1.0),
+    ]) {
+      for (final id in ['w-notebook', 's-tomato']) {
+        testWidgets(
+          'Cart stays fixed through product scroll $id ${profile.size} ${profile.scale}',
+          (tester) async {
+            tester.view.physicalSize = profile.size;
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            final product = session.product(id);
+            session.openDestination(product.destination);
+            expect(session.addProduct(id), isTrue);
+            session.openProduct(id);
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => r66VisualCaptureRoot(
+                  MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      textScaler: TextScaler.linear(profile.scale),
+                      padding: const EdgeInsets.only(top: 24, bottom: 24),
+                      viewPadding: const EdgeInsets.only(top: 24, bottom: 24),
+                    ),
+                    child: child!,
+                  ),
+                ),
+                home: BuyV2Screen(
+                  session: session,
+                  initialDestination: product.destination,
+                  initialView: BuyV2View.product,
+                  productId: id,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final cart = find.byKey(
+              const ValueKey('buy-cart-navigation-button'),
+            );
+            final delivery = find.byKey(
+              const ValueKey('buy-quick-delivery-toggle'),
+            );
+            expect(
+              delivery,
+              findsNothing,
+              reason: 'Review seeds are not placed deliveries',
+            );
+            expect(cart.hitTestable(), findsOneWidget);
+            final cartRect = tester.getRect(cart);
+            final list = find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$id')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            final position = tester.state<ScrollableState>(list).position;
+            for (final fraction in [0.5, 1.0, 0.0]) {
+              position.jumpTo(position.maxScrollExtent * fraction);
+              await tester.pumpAndSettle();
+              expect(cart.hitTestable(), findsOneWidget);
+              expect(tester.getRect(cart), cartRect);
+              expect(
+                find.byKey(const ValueKey('buy-compact-cart-indicator')),
+                findsOneWidget,
+              );
+              expect(tester.takeException(), isNull);
+            }
+            if (product.destination == BuyV2Destination.wholesale) {
+              final quantity = find.byKey(ValueKey('buy-product-quantity-$id'));
+              expect(quantity.hitTestable(), findsOneWidget);
+              expect(tester.getSize(quantity).width, lessThanOrEqualTo(190));
+              final plus = find.descendant(
+                of: quantity,
+                matching: find.byTooltip('Add one'),
+              );
+              expect(tester.getSize(plus), const Size(44, 44));
+              await tester.tap(plus);
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(id), product.minimumOrder + 1);
+              final minus = find.descendant(
+                of: quantity,
+                matching: find.byTooltip('Remove one'),
+              );
+              await tester.tap(minus);
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(id), product.minimumOrder);
+              await tester.tap(
+                find.byKey(const ValueKey('buy-product-edit-quantity')),
+              );
+              await tester.pumpAndSettle();
+              final input = find.byKey(const ValueKey('buy-quantity-input'));
+              await tester.enterText(input, '${product.minimumOrder + 2}');
+              await tester.testTextInput.receiveAction(TextInputAction.done);
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(id), product.minimumOrder + 2);
+              expect(cart.hitTestable(), findsOneWidget);
+              await captureR66Visual(
+                tester,
+                'controls-$id-${profile.size.width}-${profile.scale}',
+              );
+            }
+            final retainedQuantity = session.quantityFor(id);
+            position.jumpTo(position.maxScrollExtent / 2);
+            await tester.pumpAndSettle();
+            final retainedOffset = position.pixels;
+            await tester.tap(cart);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            expect(
+              session.cartScope,
+              product.destination == BuyV2Destination.shop
+                  ? BuyV2CartScope.shop
+                  : BuyV2CartScope.wholesale,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.selectedProductId, id);
+            expect(session.quantityFor(id), retainedQuantity);
+            expect(cart.hitTestable(), findsOneWidget);
+            expect(tester.getRect(cart), cartRect);
+            final restored = tester.state<ScrollableState>(list).position;
+            expect(restored.pixels, closeTo(retainedOffset, 1));
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+          },
+        );
+      }
+    }
+  });
+
   testWidgets(
     'pickup sign-in Android Back returns to exact checkout and preserves Cart',
     (tester) async {

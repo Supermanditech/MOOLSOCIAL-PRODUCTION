@@ -41,6 +41,32 @@ final class _R669ContinuityCommerce implements BuyV2CommerceAdapter {
       throw StateError('Unexpected comparison continuity commerce operation');
 }
 
+final class _R669ContinuityEligibility implements BuyV2ProductFactsAdapter {
+  const _R669ContinuityEligibility(this.now);
+  final DateTime now;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter()
+          .snapshotFor(product)
+          .copyWith(
+            eligibility: BuyV2OfferEligibility(
+              productId: product.id,
+              storeId: product.storeId!,
+              sourceRevision: 'comparison-continuity-eligibility-v1',
+              customerLocationKey: '||0',
+              observedAt: now.subtract(const Duration(minutes: 1)),
+              expiresAt: now.add(const Duration(hours: 1)),
+              offerClass: product.offerClass!,
+              channelEnabled: true,
+              storeReady: true,
+              fleetAvailable: true,
+              customerLocationConfirmed: true,
+              options: {BuyV2DeliveryOption.quick, BuyV2DeliveryOption.freight},
+            ),
+          );
+}
+
 final class _R669ContinuityComparison implements BuyV2ComparisonSource {
   _R669ContinuityComparison(this.products, this.now);
   final List<BuyV2Product> products;
@@ -153,6 +179,7 @@ Future<BuyV2Session> r669ComparisonContinuitySession(
     reviewDataEnabled: false,
     catalogueNow: () => now,
     comparisonSource: _R669ContinuityComparison(products, now),
+    productFactsAdapter: _R669ContinuityEligibility(now),
     productContentAdapter: productContentAdapter,
   );
   commerce.snapshot = BuyV2CommerceSnapshot(
@@ -243,7 +270,7 @@ void main() {
           addTearDown(session.dispose);
           final sourceId = offers ? 'w-oil' : 's-milk';
           final alternateId = '$sourceId-comparison';
-          session.addProduct(sourceId);
+          expect(session.addProduct(sourceId), isTrue, reason: session.notice);
           final quantity = session.quantityFor(sourceId);
           await tester.pumpWidget(app(session, textScale: scale));
           await tester.pumpAndSettle();

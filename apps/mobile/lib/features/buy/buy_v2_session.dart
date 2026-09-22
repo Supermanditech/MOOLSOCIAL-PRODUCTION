@@ -4206,6 +4206,10 @@ class BuyV2Session extends ChangeNotifier {
     ),
   ];
 
+  // Review seeds and a local history snapshot are not current delivery proof.
+  // Admit only a provider-confirmed record or a placement completed here.
+  final Set<String> _currentDeliveryOrderIds = {};
+
   final List<BuyV2Order> _orders = [
     const BuyV2Order(
       id: 'MS-240782',
@@ -4365,6 +4369,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       _orders[index] = refreshed;
+      if (!reviewDataEnabled) _currentDeliveryOrderIds.add(refreshed.id);
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
       _orderRefreshMessages[orderId] = result.customerMessage;
       notice = result.customerMessage;
@@ -4920,6 +4925,10 @@ class BuyV2Session extends ChangeNotifier {
         _orders
           ..clear()
           ..addAll(snapshot.orders);
+      }
+      if (snapshot.state == BuyV2CommerceLoadState.ready) {
+        if (!isStoreProcurement) _currentDeliveryOrderIds.clear();
+        _currentDeliveryOrderIds.addAll(snapshot.orders.map((order) => order.id));
       }
       _businessVerificationState = snapshot.businessVerificationState;
       businessVerified =
@@ -8097,15 +8106,13 @@ class BuyV2Session extends ChangeNotifier {
   /// Actual delivery records, including separate records from one purchase.
   /// Collection and Care retain their own journeys; no ETA is aggregated here.
   List<BuyV2Order> get activeDeliveryOrders => orders
+      .where((order) => _currentDeliveryOrderIds.contains(order.id))
       .where((order) => order.collection == null)
       .where((order) => order.destination != BuyV2Destination.medicine)
       .where((order) => !orderIsCompleted(order))
       .toList(growable: false);
 
-  BuyV2Order? get activeQuickDeliveryOrder => _orders
-      .where((order) => order.collection == null)
-      .where((order) => order.destination != BuyV2Destination.medicine)
-      .where((order) => order.status != BuyV2OrderStatus.delivered)
+  BuyV2Order? get activeQuickDeliveryOrder => activeDeliveryOrders
       .where((order) => order.lines.isNotEmpty)
       .where(
         (order) => order.lines.any(
@@ -8115,10 +8122,7 @@ class BuyV2Session extends ChangeNotifier {
       )
       .firstOrNull;
 
-  BuyV2Order? get activeQuietDeliveryOrder => _orders
-      .where((order) => order.collection == null)
-      .where((order) => order.destination != BuyV2Destination.medicine)
-      .where((order) => order.status != BuyV2OrderStatus.delivered)
+  BuyV2Order? get activeQuietDeliveryOrder => activeDeliveryOrders
       .where((order) => order.lines.isNotEmpty)
       .where(
         (order) => order.lines.every(
@@ -11565,6 +11569,7 @@ class BuyV2Session extends ChangeNotifier {
     required List<BuyV2CartLine> lines,
   }) {
     _orders.insertAll(0, _confirmedOrders);
+    _currentDeliveryOrderIds.addAll(_confirmedOrders.map((order) => order.id));
     _confirmedDestinations = _confirmedOrders
         .map((order) => order.destination)
         .toSet();

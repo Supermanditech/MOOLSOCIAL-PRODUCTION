@@ -2904,11 +2904,35 @@ class _WholesaleTradeActionDock extends StatelessWidget {
                     ],
                   );
                 }
-                final stacked = largeText || constraints.maxWidth < 480;
+                final compactQuantity =
+                    businessVerified && decision.canAdd && quantity > 0;
+                final actionWidth = compactQuantity
+                    ? _productQuantityWidth(context, quantity).clamp(
+                        0.0,
+                        constraints.maxWidth,
+                      )
+                    : 190.0;
+                final stacked =
+                    largeText ||
+                    constraints.maxWidth <
+                        (compactQuantity ? actionWidth + 160 : 480);
                 if (stacked) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [summary, const SizedBox(height: 8), actionGroup],
+                    children: [
+                      summary,
+                      const SizedBox(height: 8),
+                      if (compactQuantity)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: SizedBox(
+                            width: actionWidth,
+                            child: actionGroup,
+                          ),
+                        )
+                      else
+                        actionGroup,
+                    ],
                   );
                 }
                 return Row(
@@ -2916,11 +2940,8 @@ class _WholesaleTradeActionDock extends StatelessWidget {
                   children: [
                     Expanded(child: summary),
                     const SizedBox(width: 10),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 148,
-                        maxWidth: 190,
-                      ),
+                    SizedBox(
+                      width: actionWidth,
                       child: actionGroup,
                     ),
                   ],
@@ -16301,7 +16322,6 @@ class _ProductPurchaseActionRow extends StatelessWidget {
               quantity: quantity,
               minimumOrder: product.minimumOrder,
               onEdit: onEdit,
-              expand: true,
               onDecrease: onDecrease,
               onIncrease: onIncrease,
             )
@@ -16506,7 +16526,6 @@ class _CompactProductStepper extends StatelessWidget {
     required this.quantity,
     required this.minimumOrder,
     required this.onEdit,
-    this.expand = false,
     required this.onDecrease,
     required this.onIncrease,
   });
@@ -16514,16 +16533,13 @@ class _CompactProductStepper extends StatelessWidget {
   final int quantity;
   final int minimumOrder;
   final VoidCallback onEdit;
-  final bool expand;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: expand
-          ? double.infinity
-          : _productQuantityWidth(context, quantity),
+      width: _productQuantityWidth(context, quantity),
       height: 44,
       child: DecoratedBox(
         decoration: BoxDecoration(

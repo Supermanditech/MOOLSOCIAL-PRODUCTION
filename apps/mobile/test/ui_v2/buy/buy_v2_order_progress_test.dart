@@ -272,6 +272,16 @@ class _R66TrackingSession extends BuyV2Session {
   @override
   List<BuyV2Order> get orders => [order];
 
+  // This tracking double represents an explicitly current provider order.
+  // Retained review seeds in a normal session are not delivery confirmation.
+  @override
+  List<BuyV2Order> get activeDeliveryOrders =>
+      order.collection == null &&
+          order.destination != BuyV2Destination.medicine &&
+          order.status != BuyV2OrderStatus.delivered
+      ? [order]
+      : const [];
+
   @override
   List<BuyV2Order> get visibleOrders {
     final completed = order.status == BuyV2OrderStatus.delivered;

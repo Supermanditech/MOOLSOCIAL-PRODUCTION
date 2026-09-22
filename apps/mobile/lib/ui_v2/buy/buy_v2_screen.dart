@@ -1241,7 +1241,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                           ],
                           body: BuyV2CartAvoidanceScope(
                             cartVisible:
-                                !keyboardVisible && _showsMiniCart(session),
+                                !keyboardVisible &&
+                                !_pinsProductCart(session) &&
+                                _showsMiniCart(session),
                             navigationIdentity: (
                               session.view,
                               session.destination,
@@ -1297,7 +1299,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                   ),
                                 ),
                                 ?_buildDeliveryRestore(session, setState),
-                                if (!keyboardVisible && _showsMiniCart(session))
+                                if (!keyboardVisible &&
+                                    !_pinsProductCart(session) &&
+                                    _showsMiniCart(session))
                                   Positioned.fill(
                                     child: _BuyMiniCartBar(
                                       session: session,
@@ -1335,7 +1339,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             bottomNavigationBar: keyboardVisible
                 ? null
                 : widget.embeddedStore
-                ? (_miniCartParked && _showsMiniCart(session)
+                ? ((_miniCartParked || _pinsProductCart(session)) &&
+                          _showsMiniCart(session)
                       ? Padding(
                           padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
                           child: Align(
@@ -1831,7 +1836,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         ? _buildCareLocalNavigation()
         : _buildBuyLocalNavigation(session);
     final parkedCart =
-        update == null && _miniCartParked && _showsMiniCart(session)
+        update == null &&
+            (_miniCartParked || _pinsProductCart(session)) &&
+            _showsMiniCart(session)
         ? _BuyMiniCartBar(
             session: session,
             aggregate: _offersActive,
@@ -1851,7 +1858,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (parkedCart != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
-            !_miniCartParked ||
+            !(_miniCartParked || _pinsProductCart(session)) ||
             _parkedCartNavigationScrollController.positions.length != 1) {
           return;
         }
@@ -2078,6 +2085,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _openBuyDestination(destinations[nextIndex]);
     }
   }
+
+  // Product details retain one Cart target while their content scrolls.
+  // Catalogue dragging/avoidance and the separate Care journey are unchanged.
+  bool _pinsProductCart(BuyV2Session session) =>
+      session.view == BuyV2View.product &&
+      (session.activeDockDestination == BuyV2Destination.shop ||
+          session.activeDockDestination == BuyV2Destination.wholesale);
 
   bool _showsMiniCart(BuyV2Session session) =>
       (session.activeDockDestination == BuyV2Destination.medicine &&
@@ -3719,7 +3733,14 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                 onTap: activate,
                 child: Center(
                   child: Badge(
-                    label: Text(itemCount > 9 ? '9+' : '$itemCount'),
+                    label: Text(
+                      itemCount > 9 ? '9+' : '$itemCount',
+                      // The full count remains in the button's accessible name.
+                      // Keep this small badge from covering the Cart glyph.
+                      textScaler: MediaQuery.textScalerOf(
+                        context,
+                      ).clamp(maxScaleFactor: 1.3),
+                    ),
                     child: const Icon(
                       Icons.shopping_cart_outlined,
                       color: Colors.white,
