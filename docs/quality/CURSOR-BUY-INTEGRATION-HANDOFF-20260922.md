@@ -1038,3 +1038,14 @@ Current Redmi screenshot `051-founder-cart-strip.png` confirms the full-width em
 The three shared Store Cart placements are in buy_v2_catalogue.dart (Store sheet/full catalogue) and buy_v2_screen.dart (nested product). Register all shared callers and their Saved/Recent/related routes for future regression; no claim that every route variant was separately tapped. Expected correction: eliminate only redundant opaque Cart-only whitespace, preserve fixed compact Cart, product visibility/scrolling, theme continuity, accessible targets and Android/keyboard safe areas. No backend dependency. No source/test/APK change made.
 
 Full ticket and 14 fresh PNG/XML/receipt sets are archived under `r6633-cart-strip-D04/` in the existing evidence ZIP. Latest ZIP SHA-256 `c47201d6b956cf86a94112bf867a4ad1193dfd8b3356361de4729008544bc0d7`; all 588 earlier entries integrity-checked and preserved. Five Shop items / INR694 and one Saved item unchanged; device returned to public Shop Visit Store. R6633-D04 remains open alongside D01/D02/D03 and observation O01.
+
+
+### R6633-D05 — Compare prices remains functionally incomplete (23 September)
+
+Founder-current Redmi capture065: A4 ruled notebooks / Carton of120, unavailable supplier prices. Tapping Refresh yields the same state in066. **OPEN functional provider-wiring gap; registration only, no fix now.** The prior Compare ticket fixed sheet sizing, while its acceptance item4 explicitly deferred supplier data. Layout inclusion is not a missing Git commit, and local fixture success is not functional device acceptance.
+
+Read-only source trace: `_reload` in buy_v2_views.dart (~1964) returns unavailable before loading when nullable `session.comparisonSource` or query is absent. The full apps/mobile/lib tree has a BuyV2ComparisonSource interface and controller/session references, but no implementation or constructor injection. Therefore Refresh cannot fetch comparison offers in this app configuration; restoring internet cannot supply the missing adapter. Earlier completion wording must distinguish the implemented sheet layout from this unimplemented end-to-end outcome.
+
+Future acceptance: wire the existing contract to coordinated, versioned Store-origin identities/offers; same SKU/variant/pack, correct prices/stock/eligibility, pagination and stale/location rejection, genuine recovery and exact product/Cart return. Distinguish missing configuration from transient network errors so retry is truthful. Preserve compact layout and Android safety. Backend/Store provider work remains deferred; no invented live prices, new screen, policy or other-worktree work. Device left on the comparison sheet; no basket or transaction changes.
+
+Full ticket and before/after Refresh screenshots are preserved under `r6633-compare-D05/` in the evidence ZIP. Latest SHA-256 `887b6cba1d44bee296afdd80b0df9ef1054bcc2b6e26a31161f36b5eafaf165b`; all 631 previous entries preserved. No source/test/APK changes.

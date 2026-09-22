@@ -1771,12 +1771,28 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart"
       ]
+    },
+    {
+      "id": "R6633-D05",
+      "title": "Compare prices has no connected comparison provider; Refresh remains unavailable",
+      "status": "open_functional_gap_provider_dependency_register_only",
+      "report": "r6633-compare-D05/COMPARE-FUNCTIONAL-GAP-D05.md",
+      "evidence": [
+        "r6633-compare-D05/redmi/065-founder-compare-not-working.json",
+        "r6633-compare-D05/redmi/065-founder-compare-not-working.png",
+        "r6633-compare-D05/redmi/065-founder-compare-not-working.xml",
+        "r6633-compare-D05/redmi/066-compare-refresh-unavailable.json",
+        "r6633-compare-D05/redmi/066-compare-refresh-unavailable.png",
+        "r6633-compare-D05/redmi/066-compare-refresh-unavailable.xml"
+      ],
+      "previousTicket": "CURSOR-BUY-COMPARE-SHEET-REGRESSION-20260922",
+      "previousFixScope": "sheet layout only; live data not completed"
     }
   ],
   "currentEvidenceArchive": {
-    "sha256": "c47201d6b956cf86a94112bf867a4ad1193dfd8b3356361de4729008544bc0d7",
-    "bytes": 73974748,
-    "priorEntriesPreserved": 588,
-    "newEvidencePrefix": "r6633-cart-strip-D04/"
+    "sha256": "887b6cba1d44bee296afdd80b0df9ef1054bcc2b6e26a31161f36b5eafaf165b",
+    "bytes": 74348501,
+    "priorEntriesPreserved": 631,
+    "newEvidencePrefix": "r6633-compare-D05/"
   }
 }
