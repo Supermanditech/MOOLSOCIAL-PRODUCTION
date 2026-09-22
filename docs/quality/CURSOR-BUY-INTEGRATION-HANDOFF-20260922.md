@@ -11,6 +11,7 @@ the original evidence-only completion commit is its direct child
 repairs below are a subsequent source delta. Integrate the complete branch
 including that delta, not only a78b1b38. The original inventory/receipt remains
 bound to the historical checkpoint; it is not relabelled as the later source.
+Latest application source: `d9ec753b6c2f1dae9a7f9689ac6e1303b80353db`.
 Backend implementation has NOT started. No APK is made.
 
 Actor/outcome: the integration owner can preserve the complete Buy frontend and
@@ -463,3 +464,36 @@ view/download success/failure/retry, pending invoice, active/delivered order
 actions, normal/large text, Android insets and retained scroll/Back context.
 Standing instruction remains registration only; no application change for this
 ticket was made during the current three-defect repair.
+
+### Follow-up source parking and Codex handoff
+
+Exact application commit: `d9ec753b6c2f1dae9a7f9689ac6e1303b80353db`,
+subject `ui(buy-ready-20260921): repair product controls and delivery provenance`.
+It directly follows the Compare registration checkpoint
+`fd87c94eff19c8c741624d20b2cf22790f9aab63`. All earlier parked/inherited source
+checkpoints remain ancestors; no prior commit was rewritten or omitted.
+The seven tested Dart owner blobs exactly match the committed source manifest.
+No Store, Counter Sale, CSV, shared model/schema, native, backend, dependency or
+policy owner changed in this follow-up. The ninth changed file is the existing
+evidence ZIP; the eighth is this handoff.
+
+`CURSOR-BUY-INTEGRATION-EVIDENCE-20260922.zip` retains all 63 earlier entries
+byte-for-byte and adds the new captures, failed/passing logs, preservation record,
+and `product-controls-followup-20260922/followup-manifest.json`. Archive SHA-256:
+`247e99e235c7a88cb52c9c78d27735e400ee1b73163807cf7c2e79a36f898980`.
+The later invoice registration screenshot and agreed decision have their own
+`registration-addendum.json` entry. The original inventory's ZIP fingerprint
+continues to identify its original commit, not this extended archive.
+
+Codex: integrate through this latest application commit with the full earlier
+history. Carry the three OPEN registration-only tickets and all pending eleven-
+ticket/provider/next-Redmi obligations. Return an exact integrated baseline SHA
+before Cursor begins the separately authorized backend phase. Latest source
+eligibility fields/schema are unchanged; delivery provenance is internal session
+state populated through existing current snapshots, order refresh and placement.
+No new provider API is requested by these three frontend repairs.
+
+This final metadata commit contains no additional runtime changes. Local receipt
+`source-checkpoint.json` binds the tested source; `parking-verification.json` in
+the same evidence directory records final clean Git, handoff gate results,
+exact remote readback and incremental recovery bundle after the metadata commit.
