@@ -401,7 +401,7 @@ Local results and child inspection:
 Stop boundary: no new APK, backend work or implementation of the OPEN
 registered tickets (Compare-sheet height, search Delivery fleet and compact
 order/invoice actions, Medicine promotions, cross-Buy Cart movement, and product
-information organization). All earlier
+information organization, and category/search consistency). All earlier
 eleven-ticket device/provider obligations continue. Carry these three repairs
 into the integrated baseline and replay them on the next authorized Redmi APK.
 
@@ -663,3 +663,62 @@ Take actual local screens for visual approval, run focused interaction/regressio
 tests, register child defects and retain next-Redmi replay as separate acceptance.
 Coordinate with the OPEN cross-Buy Cart-position ticket so the redesigned page
 does not reintroduce moving Cart or obstruct its product actions.
+
+### Registration only: category presentation, inline search and thumbnails
+
+`CURSOR-BUY-CATEGORY-SEARCH-CONSISTENCY-20260922` — OPEN, founder-reported;
+registration only. No application implementation or APK authorized by this entry.
+Actor/outcome: a consumer can browse the appropriate category set and search
+within Shop, Wholesale or the selected public Store using consistent controls.
+Classification: mvp_supporting; presentation and interaction consistency in
+existing public catalogue journeys. Store's category-layout mismatch is reported,
+not newly reproduced or independently tested during this registration.
+
+Founder requirements:
+
+1. **Separate categories, shared presentation.** Shop, Wholesale and each Store
+   retain their own purpose-specific category data, selections and product scope.
+   Use the same full-page category picker/pop-up design across all three, including
+   title/close controls, typography, spacing, selection treatment, image placement,
+   scrolling and Android clearance. A common layout must not merge category sets
+   or inject general-home categories/SKUs into a Store. Reuse the existing approved
+   category presentation rather than developing three independent screens.
+2. **Unboxed, expanding search.** Make the Shop, Wholesale and public Store search
+   bars inline/unboxed and expand inline when tapped, matching the Buy-home search
+   interaction and visual treatment. Preserve focus/keyboard, clear and finish/
+   collapse actions, Android Back, recent/query state and result selection. Store
+   search stays within that exact Store; Wholesale and Shop retain their respective
+   channel/category/filter context. Returning from a product restores the source
+   search, query, selection and scroll position. Do not replace expansion with a
+   permanently boxed field, separate new search route or unrelated search service.
+3. **Small category photo thumbnails everywhere.** Add compact square photos to
+   public category entries wherever those categories appear across Shop, Wholesale
+   and Store. Follow the SKU photo-square treatment with a visibly smaller category
+   thumbnail, consistent fit/corner treatment and alignment. Keep category labels
+   readable and the overall selection target accessible; image size must not force
+   tiny tap targets or oversized rows. Use existing public category imagery/mapping,
+   with a compact honest fallback for missing/failed images. Do not arbitrarily
+   substitute unrelated SKU photos, invent provider content or build a separate
+   category taxonomy. Coordinate any genuinely missing shared image field with
+   Codex before changing a contract; no Store-worktree edit is included here.
+
+Reuse/relationship: inspect existing category and Store catalogue presentation in
+`apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart`, search presentation in
+`buy_v2_screen.dart`, existing sheets in `buy_v2_views.dart`, and current session
+category/search state. Exact owners must be confirmed before future implementation.
+RB007 already implements Store search expansion in the earlier local cutoff;
+compare its exact source and current route against installed r66.32 first. Carry
+forward that work and repair uncovered presentation/entry cases instead of
+reimplementing it or claiming a pre-existing fix failed solely from an older APK.
+The OPEN search Delivery-fleet ticket remains separate and must not be lost.
+
+Future acceptance: visual parity of the full-page category picker in all three
+contexts; distinct category identities and correct scoped results; short/long
+labels and sparse/large category lists; thumbnails loaded/loading/missing/broken;
+normal/enlarged text, narrow portrait and landscape; keyboard and Android system
+insets; search open/type/clear/finish/Back/product-return; selected category/filter
+and pagination retained; stale requests after Store/filter/location changes must
+not replace current results. Confirm no horizontal clipping, oversized blank
+areas, accidental global Store search or deferred Medicine exposure. Reuse current
+navigation/providers, preserve Cart and checkout state, capture actual local
+screens and inspect child defects when implementation is separately authorized.
