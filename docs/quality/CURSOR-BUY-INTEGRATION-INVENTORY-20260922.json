@@ -1307,5 +1307,455 @@
       "file": "integration-coverage.log",
       "sha256": "8707e9dc9adef2b99dff11cd2be599a68d1edf5a7808e6efc197b5d8577a3092"
     }
-  ]
+  ],
+  "r6633Qualification": {
+    "candidate": "UAW-CURSOR-BUY-R6633-20260922",
+    "sourceHead": "1650a1ddb3bf3672530c8d345d0a5c3e9f475aba",
+    "reviewSourcePin": "02369e96a293e4588cca06efad17a02bf53470a8",
+    "sourceManifestSha256": "AFCDD9532CEB895C144414C0ED7066F78813A825A27E2616CC6BB5B357ADA799",
+    "sourceInputCount": 3236,
+    "postR6632OutcomesIncluded": 22,
+    "fullBuyRuns": [
+      {
+        "log": "buy2.log",
+        "passed": 2527,
+        "skipped": 27,
+        "failed": 0
+      },
+      {
+        "log": "buy3.log",
+        "passed": 2527,
+        "skipped": 27,
+        "failed": 0
+      }
+    ],
+    "installedIdentity": {
+      "candidate": "UAW-CURSOR-BUY-R6633-20260922",
+      "device": "TG8HCYTGGQT885OF",
+      "package": "com.moolsocial.app.cursorreview",
+      "apkPath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\\apps\\mobile\\build\\review-candidates\\cursor-buy-r6633-20260922\\uaw-cursor-buy-r6633-20260922-device-review-debug.apk",
+      "versionCode": "2026092202",
+      "state": "installed_checksum_verified_device_replay_pending",
+      "apkSha256": "968933D16519BBE6AC757C10ACA39368F87A7605CFAB0CF1F6C4E28DD73E1FC7",
+      "installMode": "adb install -r; no data clear or uninstall",
+      "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+      "pulledApkPath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\\apps\\mobile\\build\\review-candidates\\cursor-buy-r6633-20260922\\installed-r66.33-base.apk",
+      "installedSha256": "968933D16519BBE6AC757C10ACA39368F87A7605CFAB0CF1F6C4E28DD73E1FC7",
+      "version": "1.0.0-r66.33-cursorreview",
+      "verifiedAt": "2026-09-22T23:19:58.5067587+05:30"
+    },
+    "evidenceArchive": {
+      "archive": "docs/quality/CURSOR-BUY-INTEGRATION-EVIDENCE-20260922.zip",
+      "sha256": "7bb5e85be9152971818f3b495c278386ae438cea59801ba2aae35d7f98d7f8ab",
+      "bytes": 68279648,
+      "priorSha256": "099f4c45e2634dce6ec6df70e32024205f081c6e681b96792bb270a3ea79794a",
+      "priorEntriesPreserved": 342,
+      "addedCandidateEvidenceFiles": 222,
+      "addedHelperFiles": 24,
+      "prefix": "r6633-qualification/",
+      "apkBytesExcluded": "APK and pulled installed copy remain retained in candidate directory; source and receipts are pushed in Git."
+    },
+    "deviceReplayState": "focused_replay_complete_open_children_and_deferred_dependencies",
+    "deviceTicketDispositions": [
+      {
+        "number": 1,
+        "ticket": "RB006",
+        "scope": "Store names in Cart and checkout",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass",
+        "evidence": [
+          "redmi/018-retained-cart.png",
+          "redmi/025-review-no-submit.png",
+          "redmi/047-cart-restore.png"
+        ],
+        "result": "Normalized current Store names visible in Cart continuation and final review; historical order names are retained history.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 2,
+        "ticket": "RB007",
+        "scope": "Expanded Store-scoped search",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass",
+        "evidence": [
+          "redmi/009-store-search-keyboard.png",
+          "redmi/010-search-finish.png",
+          "redmi/034-wholesale-store-search-stable.png"
+        ],
+        "result": "Shop and Wholesale Store search expand, scope results to current Store, and retain query after Finish. Stable-input replay verifies rice; first rapid ADB entry lost initial r during focus transition, retained as tool timing observation.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 3,
+        "ticket": "RB008",
+        "scope": "Store naming through draft and Maps handoff",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "partial_provider_deferred",
+        "evidence": [
+          "redmi/014-store-information.png",
+          "redmi/025-review-no-submit.png"
+        ],
+        "result": "Compact Store address and Maps action present; authentic Store pin and external Maps destination not accepted.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 4,
+        "ticket": "RB011",
+        "scope": "Pickup checkout retained through sign-in Back",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "partial_provider_deferred",
+        "evidence": [
+          "redmi/021-pickup-selection.png",
+          "redmi/022-pickup-signin.png",
+          "redmi/023-pickup-back.png"
+        ],
+        "result": "Pickup selection survives sign-in route Back. Review Store data resolves no collectible line: zero products, Check total, disabled Continue. Live pickup completion remains unqualified.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 5,
+        "ticket": "RB012",
+        "scope": "Unavailable-provider/payment recovery frontend",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "observed_unavailable_recovery_provider_deferred",
+        "evidence": [
+          "redmi/025-review-no-submit.png"
+        ],
+        "result": "Unconfirmed delivery prevents order placement and offers change-address/edit-basket recovery. No live payment or order submitted.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 6,
+        "ticket": "RB013",
+        "scope": "Remove pickup banners; compact Recent Add; area tick contrast",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "child_open_founder_rejected_compactness",
+        "evidence": [
+          "redmi/014-store-information.png",
+          "redmi/032-wholesale-store.png",
+          "redmi/042-recently-viewed.png"
+        ],
+        "result": "Pickup banners removed, but Recently viewed spacing requirement is incomplete. Narrower Add still consumes a separate row; R6633-D03 reopened after founder review. Earlier observed_frontend_pass was too broad and is superseded.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 7,
+        "ticket": "RB018",
+        "scope": "Compact payment-benefit cards",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "partial_device_replay",
+        "evidence": [
+          "redmi/024-payment.png",
+          "redmi/031-wholesale-product.png"
+        ],
+        "result": "Payment summary and Wholesale benefit data reached. No new on-device offer selection/discount replay; full local regression evidence retained.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 8,
+        "ticket": "RB022",
+        "scope": "Recipient-field accessibility and focus",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "not_device_replayed_host_passed",
+        "evidence": [
+          "redmi/049-work-restored.png"
+        ],
+        "result": "Saved Work address restored; recipient editing/keyboard accessibility specifically not replayed in this bounded smoke check.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 9,
+        "ticket": "RB026",
+        "scope": "Correct active-delivery estimate wording",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "child_open",
+        "evidence": [
+          "redmi/026-orders.png",
+          "redmi/027-orders-lower.png"
+        ],
+        "result": "Single-product active orders show Delivery in; mixed historical MS-NEW-03 retains Delivered in 30 min inside combined estimate. R6633-D01 remains open.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 10,
+        "ticket": "RB029",
+        "scope": "Exact Store/SKU/variant identities and missing-data handling",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "partial_provider_deferred",
+        "evidence": [
+          "redmi/007-visit-store.png",
+          "redmi/009-store-search-keyboard.png",
+          "redmi/031-wholesale-product.png",
+          "redmi/032-wholesale-store.png"
+        ],
+        "result": "Named review Store/SKU/pack distinctions and honest illustration labels observed. Authentic catalogue/photos and real variant provider remain deferred.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 11,
+        "ticket": "ELIGIBILITY-11",
+        "scope": "Explicit Quick/Scheduled/Wholesale/Bulk frontend eligibility contracts",
+        "firstSourceCommit": "a78b1b38",
+        "included": true,
+        "deviceStatus": "host_contract_pass_device_unavailable_observed",
+        "evidence": [
+          "redmi/017-wholesale.png",
+          "redmi/025-review-no-submit.png",
+          "redmi/030-offers.png"
+        ],
+        "result": "Explicit eligibility contract included since a78b1b38. Full host suites cover missing/expired/channel/offer distinctions. Device blocks unconfirmed delivery. Real Store/fleet readiness and booked slots not accepted.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 12,
+        "ticket": "CURSOR-BUY-QUANTITY-WIDTH-20260922",
+        "scope": "Compact product quantity control",
+        "firstSourceCommit": "d9ec753b",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass",
+        "evidence": [
+          "redmi/005-product-scrolled.png",
+          "redmi/018-retained-cart.png",
+          "redmi/019-retained-cart-rest.png",
+          "redmi/031-wholesale-product.png",
+          "redmi/032-wholesale-store.png"
+        ],
+        "result": "Product Add is bounded; Cart and Wholesale steppers occupy compact trailing space. No quantities changed during this replay.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 13,
+        "ticket": "CURSOR-BUY-DELIVERY-PROVENANCE-20260922",
+        "scope": "Delivery rail requires current active-order provenance",
+        "firstSourceCommit": "d9ec753b",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass",
+        "evidence": [
+          "redmi/003-r6633-startup.png",
+          "redmi/026-orders.png",
+          "redmi/030-offers.png",
+          "redmi/050-final-home.png"
+        ],
+        "result": "Historical 12-active-order cache does not expose bottom Delivery tab; six-pack Cart remains accessible.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 14,
+        "ticket": "CURSOR-BUY-CART-SCROLL-STABILITY-20260922",
+        "scope": "Stable Cart while scrolling product details",
+        "firstSourceCommit": "d9ec753b",
+        "included": true,
+        "deviceStatus": "partial_child_open",
+        "evidence": [
+          "redmi/004-shop-product.png",
+          "redmi/005-product-scrolled.png",
+          "redmi/043-product-actions.png"
+        ],
+        "result": "Root product Cart stays at same bounds after scroll. Nested Recently viewed product has no aggregate Cart for six Wholesale packs; R6633-D02 open.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 15,
+        "ticket": "CURSOR-BUY-COMPARE-SHEET-REGRESSION-20260922",
+        "scope": "Compact Compare sheet",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "observed_unavailable_state_provider_deferred",
+        "evidence": [
+          "redmi/044-compare.png"
+        ],
+        "result": "Compare opens honest unavailable-supplier response with Refresh above Android navigation. Populated comparison remains host-tested only.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 16,
+        "ticket": "CURSOR-BUY-SEARCH-DELIVERY-FLEET-20260922",
+        "scope": "Hide Delivery throughout search",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "observed_inactive_pass_active_host_only",
+        "evidence": [
+          "redmi/009-store-search-keyboard.png",
+          "redmi/034-wholesale-store-search-stable.png",
+          "redmi/038-buy-search.png"
+        ],
+        "result": "Search has no fleet UI. Active live-delivery device case not manufactured; covered by host tests only.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 17,
+        "ticket": "CURSOR-BUY-ORDER-INVOICE-ACTIONS-20260922",
+        "scope": "Compact order and invoice actions",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "not_device_replayed_host_passed",
+        "evidence": [
+          "redmi/026-orders.png",
+          "redmi/030-offers.png"
+        ],
+        "result": "Orders and Offers reached, but specific Offers Manage order/View invoice context was not reproduced. Do not close device obligation from these screenshots.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 18,
+        "ticket": "CURSOR-BUY-MVP-MEDICINE-PROMO-20260922",
+        "scope": "Remove deferred Medicine promotion",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "partial_device_replay_host_passed",
+        "evidence": [
+          "redmi/026-orders.png",
+          "redmi/028-orders-bottom.png",
+          "redmi/029-orders-end.png"
+        ],
+        "result": "Orders continuation reaches relevant product grid. Screenshots are sampled, not proof of every scroll position; explicit medicine-promo absence assertion passed in both host runs.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 19,
+        "ticket": "CURSOR-BUY-CART-POSITION-ALL-SURFACES-20260922",
+        "scope": "Fixed Cart across public Buy surfaces",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "partial_child_open",
+        "evidence": [
+          "redmi/003-r6633-startup.png",
+          "redmi/005-product-scrolled.png",
+          "redmi/017-wholesale.png",
+          "redmi/026-orders.png",
+          "redmi/030-offers.png",
+          "redmi/032-wholesale-store.png",
+          "redmi/043-product-actions.png"
+        ],
+        "result": "Cart fixed on main Shop/Wholesale/Orders/Offers and Wholesale Store; nested Recent route loses aggregate Cart access (R6633-D02).",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 20,
+        "ticket": "CURSOR-BUY-PRODUCT-INFORMATION-REDESIGN-20260922",
+        "scope": "Organized product information across public entry points",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass",
+        "evidence": [
+          "redmi/005-product-scrolled.png",
+          "redmi/031-wholesale-product.png",
+          "redmi/043-product-actions.png"
+        ],
+        "result": "Grouped product/price, Store, delivery/returns and action sections shared across root Shop, Wholesale and nested Recent product.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 21,
+        "ticket": "CURSOR-BUY-CATEGORY-SEARCH-CONSISTENCY-20260922",
+        "scope": "Shared scoped categories, expanding search and thumbnails",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass_partial_matrix",
+        "evidence": [
+          "redmi/011-store-categories.png",
+          "redmi/012-category-expanded.png",
+          "redmi/015-store-filter.png",
+          "redmi/016-store-price-filter.png",
+          "redmi/032-wholesale-store.png",
+          "redmi/034-wholesale-store-search-stable.png"
+        ],
+        "result": "Thin Store category header, thumbnails, full-height drag, Store filter safe area and Store-scoped price/search verified. Wholesale tiles/search match. Full route/large-text matrix covered locally, not exhaustively rerun on device.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      },
+      {
+        "number": 22,
+        "ticket": "CURSOR-BUY-SHOPPING-AREA-CURRENT-LOCATION-20260922",
+        "scope": "Compact current-location popup frontend",
+        "firstSourceCommit": "f4d2e116",
+        "included": true,
+        "deviceStatus": "observed_frontend_pass_google_deferred",
+        "evidence": [
+          "redmi/037-current-location-popup.png"
+        ],
+        "result": "Compact current-location popup reports unavailable without changing area; close and retry visible above Android navigation. Real Google location/map provider explicitly deferred.",
+        "hostQualification": "buy2 and buy3: 2527 passed, 27 skipped, zero failures each"
+      }
+    ],
+    "openFindings": [
+      {
+        "id": "R6633-D01",
+        "parent": "RB026",
+        "type": "confirmed_defect",
+        "status": "open_registered_not_implemented",
+        "title": "Combined historical active-order estimate still says Delivered",
+        "reproduction": "Orders > Active > scroll to MS-NEW-03 (sunflower oil and soap), status Preparing 40%.",
+        "actual": "Last recorded estimate: Delivery today by 8:00 pm \u00b7 Delivered in 30 min.",
+        "expected": "All components must retain active-order estimate wording; no completed-delivery claim.",
+        "evidence": [
+          "redmi/027-orders-lower.png",
+          "redmi/027-orders-lower.xml"
+        ],
+        "next": "Normalize each combined estimate component while preserving true delivered history; regression for multi-line historical restoration."
+      },
+      {
+        "id": "R6633-D02",
+        "parent": "CURSOR-BUY-CART-POSITION-ALL-SURFACES-20260922",
+        "type": "confirmed_defect",
+        "status": "open_registered_not_implemented",
+        "title": "Nested Recently viewed product omits aggregate Cart access",
+        "reproduction": "Keep six Wholesale packs; Shop > tools > Recently viewed > Fresh tomatoes > scroll product.",
+        "actual": "Organized nested product fills screen without Cart or bottom rail although aggregate basket contains six packs; root Shop product has All carts.",
+        "expected": "Consistent fixed access to existing aggregate Cart across public product entry routes.",
+        "evidence": [
+          "redmi/042-recently-viewed.png",
+          "redmi/043-product-actions.png",
+          "redmi/043-product-actions.xml",
+          "redmi/005-product-scrolled.png"
+        ],
+        "next": "Inspect nested product overlay Cart scope and fixed safe-area control without altering parent navigation."
+      },
+      {
+        "id": "R6633-O01",
+        "parent": "retained-data-upgrade",
+        "type": "investigation_observation",
+        "status": "open_needs_cause_verification",
+        "title": "Displayed Cart amount rises by INR 300 after update/relaunch",
+        "actual": "Before: 6 items INR 14,692; after: same six packs, three lines totaling INR 14,992 (4840+6192+3960). No quantity edit or coupon action performed.",
+        "expected": "Determine whether prior selected INR300 coupon was intentionally revalidated/reset or unintentionally lost; preserve/clearly explain valid selected benefits.",
+        "evidence": [
+          "redmi/000-preinstall-r6632-state.png",
+          "redmi/018-retained-cart.png",
+          "redmi/019-retained-cart-rest.png",
+          "redmi/024-payment.png"
+        ],
+        "next": "Reproduce coupon selection then relaunch on same build and inspect persisted benefit contract before assigning runtime cause. Not proven data loss or price change."
+      },
+      {
+        "id": "R6633-D03",
+        "parent": "RB013 / founder Recently viewed compact-popup ticket",
+        "type": "confirmed_founder_reopened_defect",
+        "status": "open_not_fully_implemented",
+        "title": "Recently viewed cards retain empty Add row and excessive sheet spacing",
+        "actual": "Add is narrower, but remains a separate trailing row under metadata. Large image/card and separate Clear row keep sheet sparse. Founder rejects this as fulfillment of compact premium layout.",
+        "expected": "Compact professional Recent sheet and cards; group thumbnail, relevant metadata and Add without an empty full-width action lane; compact header/Clear; preserve readable long text, accessible hit areas, safe insets, correct SKU/Add/navigation.",
+        "evidence": [
+          "redmi/042-recently-viewed.png",
+          "redmi/042-recently-viewed.xml"
+        ],
+        "source": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart:_RecentlyViewedProductInfoRow; metadata Column ends with Align(centerRight, add).",
+        "gitDisposition": "Partial change is in a78b1b38/f4d2e116 ancestry, included in frozen HEAD1650a1dd and checksum-verified installed r66.33. No missing commit or lost local work.",
+        "next": "Implement full compact card/sheet layout in next authorized frontend change; local geometry/long-text/keyboard tests plus founder screenshot and next Redmi replay. Do not count narrower button alone as acceptance."
+      }
+    ],
+    "remainingDependencies": [],
+    "productionQualified": false,
+    "integrationPerformed": false,
+    "finalParkingCommit": "Metadata-only child after build source; source manifest remains unchanged. See branch Git history."
+  }
 }
