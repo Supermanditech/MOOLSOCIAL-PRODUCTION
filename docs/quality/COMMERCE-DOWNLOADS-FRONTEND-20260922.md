@@ -131,5 +131,41 @@ Task root: `C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store`.
 - Initial serializer/harness/search-style failures retained in v1 evidence and
   registered in `downloadsBatchIncident20260922`. No failure is counted as a pass.
 
+## D2 Customer Statements — 23 September, founder visually approved
+
+Business-only Customer Statements is embedded in the same centre, backed by
+WorkspaceCustomerLedger. Customer Profile does not receive business statements.
+Scope changes invalidate the panel and prevent pending export dispatch. No new
+ledger, issuance system or private payment method disclosure was introduced.
+
+Individual statements retain opening/closing balances, posted debit/credit,
+running balance with Dr/Cr, unique voucher ID, status, order/reference/invoice
+IDs and original entry amount. Pending/failed rows never change balances.
+All-customer outstanding keeps receivables and customer credits separate.
+PDF/Excel/CSV reuse the shared export pipeline; approved invoice formats remain
+unchanged. Formula-safe CSV and typed Excel values are tested.
+
+Provider prerequisites: account and Store identity, valid complete ledger and
+opening balance, as-of/revision, explicit customer-universe completeness for
+all-customer totals, and dated opening coverage for period reports. Finance
+historyComplete alone is not evidence of complete customer enumeration. Live
+integration leaves these additional confirmations unset, so incomplete reports
+are disabled. Backend work remains deferred; no fabricated history or balances.
+
+Local D2 v4: 13 selected D1/D2/Stock export/entry checks passed, 10 Store download
+model/export checks passed; six-file analysis clean. Normal/enlarged/empty and
+incomplete screens inspected, actual generated PDF/XLSX rendered and inspected.
+Initial spreadsheet empty-string preview exposed shared-string index artifacts;
+blank cells now use null cells, and readback/render confirmed the correction.
+PDF non-applicable debit/credit cells use a dash, not Unavailable. A lost session
+result was not counted: the complete selected suite was rerun to a durable log.
+Evidence: task outputs/customer-statements-d2-v4 and CUSTOMER-STATEMENTS-D2-REVIEW.md.
+Founder visually approved D2. Broader checkpoint replay:75 passed,1 inherited
+skip,4 failures in DASHRAIL action navigation and enlarged R6617/LEDGER03 legacy
+statement/expense tests. Root cause remains to be diagnosed; these are not D2
+passes and are not assumed stale tests. All D1/D2 cases in that run passed.
+Approved implementation checkpoint is preservation, not clean-suite or device
+acceptance. Canonical 58-item reconciliation is in ADD-PRODUCT-SCREEN1-20260920.md.
+
 No device testing, historical reporting, backend issuance, publication/payment
 activation or Git checkpoint is implied. Preserve the now-approved screen.

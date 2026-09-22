@@ -202,6 +202,12 @@ retailer's task. Do not make the founder repeatedly discover obvious problems.
 
 ## 8. Downloads, invoices and payment results — explicit
 
+- D1 founder-approved stock statement terminology: Opening Balance, Inwards,
+  Outwards, Closing Balance. SKU rows show quantities; Reserved/Available stay
+  distinct. Show monetary totals separately as Stock Summary · Value (₹), retaining
+  per-SKU value detail in downloads. Never total unlike pack quantities or show
+  a partial valuation as a complete Store total. This is wording, not Tally integration.
+
 - **Latest:** central Reports & Downloads owns downloads; do not restore repeated
   Stock or perSKU export actions. Customer: Profile/Downloads; business: selected
   Store workspace. Reuse one feature with correct account/business boundaries.

@@ -15,6 +15,7 @@ class CommerceDownloadsScreen extends StatefulWidget {
     required this.onExit,
     this.onStockStatement,
     this.stockStatementBuilder,
+    this.customerStatementBuilder,
     this.save = saveCommerceDownloadFile,
   });
   final CommerceDownloadScope scope;
@@ -25,6 +26,7 @@ class CommerceDownloadsScreen extends StatefulWidget {
   final VoidCallback onExit;
   final VoidCallback? onStockStatement;
   final WidgetBuilder? stockStatementBuilder;
+  final WidgetBuilder? customerStatementBuilder;
   final Future<bool> Function(CommerceDownloadFile) save;
   @override
   State<CommerceDownloadsScreen> createState() =>
@@ -43,6 +45,7 @@ class _CommerceDownloadsScreenState extends State<CommerceDownloadsScreen> {
   String? _next, _error, _notice, _saving, _dateError;
   bool _loading = false, _stale = false;
   bool _stockOpen = false;
+  bool _customerOpen = false;
   int _epoch = 0;
   int _scopeEpoch = 0;
 
@@ -611,7 +614,10 @@ class _CommerceDownloadsScreenState extends State<CommerceDownloadsScreen> {
                 : () {
                     if (widget.isCurrent()) {
                       if (widget.stockStatementBuilder != null) {
-                        setState(() => _stockOpen = !_stockOpen);
+                        setState(() {
+                          _stockOpen = !_stockOpen;
+                          _customerOpen = false;
+                        });
                       } else {
                         widget.onStockStatement!();
                       }
@@ -661,7 +667,39 @@ class _CommerceDownloadsScreenState extends State<CommerceDownloadsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           children: [
-            if (enlarged) ...[
+            if (widget.scope.store != null &&
+                widget.customerStatementBuilder != null) ...[
+              owner,
+              Wrap(
+                spacing: 4,
+                children: [
+                  ?stockLink,
+                  TextButton.icon(
+                    key: const Key('downloads-customer-statements'),
+                    onPressed: _stale
+                        ? null
+                        : () {
+                            if (!widget.isCurrent()) {
+                              _scopeChanged();
+                              return;
+                            }
+                            setState(() {
+                              _customerOpen = !_customerOpen;
+                              _stockOpen = false;
+                            });
+                          },
+                    icon: const Icon(Icons.people_outline, size: 16),
+                    label: Text(
+                      _customerOpen ? 'Documents' : 'Customer statements',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (enlarged) ...[
               owner,
               if (stockLink != null)
                 Align(alignment: Alignment.centerLeft, child: stockLink),
@@ -672,7 +710,12 @@ class _CommerceDownloadsScreenState extends State<CommerceDownloadsScreen> {
                   ?stockLink,
                 ],
               ),
-            if (_stockOpen &&
+            if (_customerOpen &&
+                widget.scope.store != null &&
+                widget.customerStatementBuilder != null &&
+                !_stale)
+              widget.customerStatementBuilder!(context)
+            else if (_stockOpen &&
                 widget.scope.store != null &&
                 widget.stockStatementBuilder != null &&
                 !_stale)

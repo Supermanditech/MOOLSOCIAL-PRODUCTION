@@ -1,5 +1,139 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Latest — 58-item reconciliation, 23 September 2026
+
+Founder approved D1 stock statements and D2 Customer Statements, then directed
+reconciliation and the approved Git checkpoint. This section supersedes stale
+pending-approval statements below. No new app implementation in this audit.
+Store-to-public Buy/Wholesale integration is STANDBY for Cursor's handoff;
+no Cursor checkout change or integration is authorized here. Offers stays HELD.
+
+Counting: 35 AP items + 22 grouped Counter Sale items + one visual master = 58.
+Child splits are not extra parents. Later requests are listed separately below.
+Local means implementation and recorded host evidence, NOT device closure.
+This audit checks code ownership/test coverage and retained approval records;
+it does not repeat every past device journey or certify all screens anew.
+
+Evidence keys (task root is C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store):
+
+- A: outputs/STORE-BATCH2A-IMPLEMENTATION-NOTES.md; shared editor BATCH2A tests.
+- B: outputs/STORE-BATCH2B-IMPLEMENTATION-NOTES.md; BATCH2B scanner/scope/variant tests; latest v18 photo approval supersedes older sizes.
+- S: outputs/STORE-FRONTEND-COMPLETION-PLAN.md; approved Stock v24 and Share v27/v28, Stock unboxed/category and AP030 tests.
+- V: outputs/CSV-BATCH-B-V39-HARDENING.md; CSV A/B approved, 55 local checks.
+- C: outputs/counter-sale-oppo-defect-tickets.md and counter-sale-oppo-four-fixes-local-qualification.md; current OPPOCS/CSOPPOFIX/CSINVOICE tests.
+- C2: outputs/COUNTER-C2-REVIEW.md; approved C1/C2, 34 UI and 374 model/PDF/Downloads checks, four inherited skips.
+- D: outputs/CUSTOMER-STATEMENTS-D2-REVIEW.md; D1/D2 approved, current D1/D2/STOCK17 tests and shared renderer.
+- P: Store publication/provider contracts and tests in current Codex branch; final Cursor public contract integration remains standby.
+
+### Original grouped register — every item accounted for
+
+| ID | Requirement | Current disposition and remaining boundary |
+| --- | --- | --- |
+| AP-OPPO-001 | Exact product photos | Local renderer/editor continuity approved [A/B/C2]; production-approved media and physical-device fixtures still required. |
+| AP-OPPO-002 | Keep private stock out of shared catalogue | Local [B]; shared catalogue and Store-owned inventory remain separate. Device regression pending. |
+| AP-OPPO-003 | Editor Android/header Back | Local [B]; shared catalogue/manual/CSV return flow tested. Device regression pending. |
+| AP-OPPO-004 | Store-purpose full category sheet | Local approved [B/S]; unboxed category search. Final Cursor taxonomy adaptation standby. |
+| AP-OPPO-005 | Save/unsave shortlist | Local [B], Store-session scoped; durable cross-device shortlist backend deferred. |
+| AP-OPPO-006 | Filter behavior | Local narrowing/reset tested [B]; original generic dead-tap report was not independently reproduced. Device retest, not a claimed fixed reproduction. |
+| AP-OPPO-007 | Scan to editable review | Local exact/ambiguous/missing/error callbacks tested [B]; optical and connected hardware qualification pending. Manual fallback explained. |
+| AP-OPPO-008 | Inline catalogue search/history/copy | Local approved [B]; real session recent terms, no separate boxed search. |
+| AP-OPPO-009 | Unowned variants/large catalogue | Host variant and 5k/10k readiness tested [B]; backend/device-scale verification explicitly deferred. |
+| AP-OPPO-010 | Entry-method menu styling | Local approved [B]; shared catalogue/manual/CSV journey. |
+| AP-OPPO-011 | Catalogue visual treatment | Local approved [B], including final smaller square thumbnail treatment. |
+| AP-OPPO-012 | Compact editor identity/header | Local approved [A]. |
+| AP-OPPO-013 | Compact numeric fields/Purchase price | Local approved [A]; values retain readable labels and minimum tap areas. |
+| AP-OPPO-014 | Remove stock-mode question/chips | Local approved [A]; underlying legacy quantity mode preserved without obsolete chooser. |
+| AP-OPPO-015 | Clear compact customer visibility | Local presentation [A/P]; actual publication/mapping acceptance STANDBY, not inferred from switch. |
+| AP-OPPO-016 | All editor sections collapse | Local approved [A]; one editor for catalogue, manual and CSV. |
+| AP-OPPO-017 | Reveal validation field/clear stale errors | Local [A/V]; shared editor error focus and CSV correction tests. |
+| AP-OPPO-018 | Readable validated category | Local [A/B]; no unrestricted raw slug input. Public final taxonomy standby. |
+| AP-OPPO-019 | Dense stock/search/report placement | Local approved [S]; duplicate toolbar removed, downloads centralized. |
+| AP-OPPO-020 | Singular product count | Local [S]; removed redundant summary lane supersedes the exposed plural defect. |
+| AP-OPPO-021 | Horizontal stock scrolling | Local approved [S/D]; scroll indicators; device gesture verification pending. |
+| AP-OPPO-022 | All-invalid CSV opens attention | Local approved [V]; no misleading Save 0. |
+| AP-OPPO-023 | Correct CSV errors in shared editor | Local approved [V]; malformed columns require source repair, no guessed cells. |
+| AP-OPPO-024 | Compact CSV with understandable errors | Local approved [V]; error type/field/value/source row retained. |
+| AP-OPPO-025 | 10k review search/bulk selection | Local approved [V]; bounded lazy review and matching-only selection; device/backend capacity deferred. |
+| AP-OPPO-026 | Stock ledger/valuation frontend | D1 visually approved [D]; complete period-summary contract and exports. Not transaction-level audit certification; authoritative history/valuation deferred. |
+| AP-OPPO-027 | Historical stock ledger backend | BACKEND DEFERRED. Not closed by current snapshots or D1. |
+| AP-OPPO-028 | Truthful business approval | Local [P]; standalone read-only screen removed, details in settings; real verification/publication depends on authoritative response. |
+| AP-OPPO-029 | Preview Back destination | SUPERSEDED by founder removal of customer preview. No replacement preview required. |
+| AP-OPPO-030 | Contextual responsive rail | Shared local implementation and Stock/Share approvals [S]. Whole-surface renewed visual/device coverage is not established for every inherited destination; retain verification task. Offers excluded while held. |
+| AP-OPPO-031 | Delivery inputs validation | Local settings; founder superseded retailer-owned radius/charges with fleet ownership. Store address input remains; public location mapping standby [P]. |
+| AP-OPPO-032 | Product controls open Store defaults | Local defaults/inheritance [P]; existing settings/editor, no duplicate setup screen. |
+| AP-OPPO-033 | Counter count validation | Local Batch1; rejects invalid count rather than silent cap/default. Operational authorization/backend remains separate. |
+| AP-OPPO-034 | Hours picker current values | Local Batch1; draft/current opening-closing times initialize picker. Device regression pending. |
+| AP-OPPO-035 | Off versus timed pause | Local Batch1; appropriate pause/resume presentation. Device regression pending. |
+| CS-OPPO-001 | Search focus/filter | Local [C/C2]; historical device pass retained, new build retest required. |
+| CS-OPPO-002 | Store payment configuration ownership | Frontend existing Store-owned read-only payment use [C/P]; payment setup/verification service is not certified complete. Public terms are separate from private settlement methods. |
+| CS-OPPO-003 | Verified QR payment truth | Frontend truthful unpaid/unavailable [C]; authoritative payment verification BACKEND DEFERRED. |
+| CS-OPPO-004 | Duplicate Back-to-invoice lane | Local removed [C]. |
+| CS-OPPO-005 | Contextual receipt entry | Local inline receipt [C/C2], no small standalone receipt page. |
+| CS-OPPO-006 | Compact professional invoice | Local [C/C2]; shared approved PDF source/format. Complete post-change device visual qualification pending. |
+| CS-OPPO-007 | Direct Plus versus product details | Local [C/C2]; independent actions preserve quantities. |
+| CS-OPPO-008 | Restore Store/sale on relaunch | Local persisted draft and historical device evidence [C]; intentional app landing is not rewritten. Fresh process-death/account regression pending. |
+| CS-OPPO-009 | Fixed/percentage discount | Local [C/C2]; shared saved invoice/PDF facts, large values host-tested. |
+| CS-DEFERRED-010 | Shared Store stock in POS | Frontend uses same saved Store inventory [C2], not shared-catalogue suggestions. Real backend inventory integration/device journey remains pending. |
+| CS-OPPO-011 | Reveal UPI QR | Local [C/C2]; scrollable payment region, current device verification pending. |
+| CS-OPPO-012 | Reveal inline receipt | Local [C]; expansion/reveal tested; current device regression pending. |
+| CS-OPPO-013 | Duplicate +91 entry | Local [C]; normalized display/input tests, physical typing/paste regression pending. |
+| CS-OPPO-014 | Saved invoice Back must not discard | Local [C]; saved-invoice exit tests. |
+| CS-OPPO-015 | Receipt submit with keyboard | Local [C/C2]; accessible scroll/action layout tested; enlarged-text physical-device verification pending. |
+| CS-OPPO-016 | Preserve billing while editing phone | C1 approved; billing-owner isolation, draft persistence and validation tests [C2]. |
+| CS-OPPO-017 | Review Bill clipped controls/footer | C2 approved; compact cart, scrollable controls and visible action, no-stock recovery [C2]. |
+| CS-OPPO-018 | Invoice delivery settings | Local Batch1; compact existing settings and On/Off toggle, not a duplicate per-sale selector. Sending remains backend-dependent. |
+| CS-ENH-015 | Automatic invoice delivery | Local preference/status frontend [C]; verified recipient permission, routing, send/retry/delivery BACKEND DEFERRED. No false Sent status. |
+| CS-ENH-016 | Invoice completion/payment facts | Local [C]; saved invoice/next sale and explicit Cash/Bank receipts; received/due mapped to shared PDF. |
+| CS-FE-023 | Customer statements/outstanding | D2 approved [D]; signed-in account + selected Store isolation, no invented balances, PDF/Excel/CSV. Live coverage confirmations still absent. |
+| CS-BE-024 | Customer statement reporting backend | BACKEND DEFERRED; authoritative opening balances, complete customer set, periods, revisions and issuance. |
+| STORE-VISUAL-MASTER-001 | All-screen visual standard | Canonical guide implemented in approved batches. Cross-cutting verification remains active; not blanket approval of unshown inherited states. |
+
+### Later founder inputs — deduplicated against the original register
+
+| Input | Owner/disposition |
+| --- | --- |
+| No blank full-height rail; stable responsive position; scrollable actions | AP030/S; implemented shared component, inherited-screen verification retained. |
+| Remove duplicate +/filter/More/header strip; single inline search/category | AP019/020/030/S; approved Stock v24 supersedes earlier toolbar. |
+| Root Store arrow removed where bottom navigation owns destination | S; approved root layout, preserve necessary nested Back. |
+| All exports in Download Centre, no repeated Stock buttons/popups | S/D; Store current/period/customer reports share centre and direct formats. |
+| Tally-style stock wording, quantities versus monetary totals | AP026/D1 approved; Opening Balance/Inwards/Outwards/Closing Balance; valuation separate. |
+| One editor across catalogue/manual/CSV; complete product/variant metadata | AP012–018/V/P; frontend schema/edit reuse implemented; final public consumer mapping STANDBY. |
+| Store data once; Retail/Wholesale channels; payment terms not payment brands | P; existing settings/model implemented, public relationship eligibility integration STANDBY. |
+| Quick/Scheduled fleet eligibility and explicit Wholesale/Bulk offer classification | P; provider contracts exist; final Cursor discovery/checkout wiring STANDBY. No four arbitrary Store switches. |
+| Store address/precise Maps pin owned by Store, no duplicate public address | P; final Store-public handoff/adapter verification STANDBY. Browsing area is not Store pin. |
+| No customer preview or separate read-only Business details page | AP028/029; removed, settings retain required information. |
+| Fleet owns delivery radius/fees; active-order planning allows larger/no limit | AP031/033 and Batch1 settings amendments; no retailer fee/radius ownership restored. |
+| Small square natural product photos, compact POS cart, unboxed search | AP001/011/019 and C2; approved host renders, real assets/device qualification separate. |
+| Same approved invoice types/templates across POS, customer and business downloads | POS/Store shared renderer implemented; public Buy still uses separate native invoice payload path in this baseline. Shared public adapter is PENDING/STANDBY with Cursor, not complete from PDF approval. |
+| Consumer Profile Downloads uses signed-in account; business uses account + workspace | Existing scope and invalidation guards implemented. Consumer route still uses UnavailableCommerceDownloadSource; document ownership/source adapter PENDING. Authentication alone does not prove ownership of cached documents. |
+| Customer statements for lender/accounting use | CS-FE023/BE024; frontend approved, authoritative records/audit/lender acceptance not claimed. |
+| Offers content/fields/public mapping investigation | HELD by founder; do not implement from general approvals. |
+| Frontend supports 10,000; scale qualification after backend | AP009/025 host checks; real 10k end-to-end test explicitly deferred. |
+| Device walk-through all changes since prior OPPO build | PENDING separate candidate/build/device round; no APK in this reconciliation. |
+
+Code evidence for remaining account/public document gaps: journey_router.dart
+account/downloads passes customerStateStore.ownerScope but deliberately selects
+UnavailableCommerceDownloadSource because cached orders lack per-document owner
+proof. StoreCommerceDownloadSource validates account/Store and reuses
+WorkInvoicePdfRequest. buy_v2_invoice_downloader.dart still sends its own native
+saveInvoice payload, not the approved shared commerce PDF renderer. These facts
+are from the current Codex baseline; no claim about unintegrated Cursor changes.
+
+Conclusion: all 58 original IDs and later grouped inputs are reconciled, not all
+closed. Most frontend changes have local implementations and approval evidence;
+backend items, actual data/media, physical-device checks, inherited-screen visual
+coverage and the explicitly held public/document adapters remain separate.
+Reconciliation is not permission to implement backend or edit Cursor's tree.
+
+Checkpoint replay evidence: outputs/statement-checkpoint-reconciliation-tests.log
+ends 75 passed, one inherited skip, four failures. All D1/D2 cases pass; failures
+are DASHRAIL product/promotion navigation, R6617 statement tab scoped scrolling
+at2x (two cases), and LEDGER03 expenses at2x. Navigation/visibility versus stale
+test assumptions are not yet diagnosed. These keep AP030 and inherited statement
+surface verification OPEN; no fresh all-screen visual approval is claimed.
+The Git checkpoint preserves approved work plus this known-failure record. It
+must not be described as a release-ready, all-green or device-only checkpoint.
+
 ## C1 approved; bounded C2 — POS items and Review Bill
 
 Founder approved C1 at checkpoint aea9aae9, then confirmed that Counter Sale is

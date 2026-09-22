@@ -88,11 +88,15 @@ class StoreStockDownloadControls extends StatefulWidget {
     required this.filterDescription,
     required this.isCurrent,
     this.onCurrentPeriodChanged,
+    this.accountId,
+    this.ledger,
     this.scopeChanges,
     this.saveFile = saveStoreStockFile,
     this.generateFile = generateStoreStockFile,
   });
   final String storeId, storeName, filterDescription;
+  final String? accountId;
+  final StoreStockLedgerSnapshot? ledger;
   final List<WorkspaceCatalogueItem> filteredProducts;
   final bool Function() isCurrent;
   final Listenable? scopeChanges;
@@ -161,6 +165,41 @@ class _StoreStockDownloadControlsState
 
   String _label(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  (DateTime, DateTime)? get _range {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final from = switch (_period) {
+      StoreStockPeriod.current => null,
+      StoreStockPeriod.today => today,
+      StoreStockPeriod.week => DateTime(
+        now.year,
+        now.month,
+        now.day - today.weekday + 1,
+      ),
+      StoreStockPeriod.month => DateTime(now.year, now.month),
+      StoreStockPeriod.custom => _date(_from.text),
+    };
+    final to = _period == StoreStockPeriod.custom ? _date(_to.text) : today;
+    if (from == null || to == null || from.isAfter(to) || to.isAfter(today)) {
+      return null;
+    }
+    return (from.toUtc(), DateTime(to.year, to.month, to.day + 1).toUtc());
+  }
+
+  StoreStockLedgerSnapshot? get _ledger {
+    final report = widget.ledger, range = _range;
+    return _isCurrent &&
+            report != null &&
+            report.valid &&
+            range != null &&
+            report.accountId == widget.accountId &&
+            report.storeId == widget.storeId &&
+            report.from.toUtc() == range.$1 &&
+            report.until.toUtc() == range.$2
+        ? report
+        : null;
+  }
+
   String get _periodDescription {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -185,9 +224,11 @@ class _StoreStockDownloadControlsState
   }
 
   Future<void> _download(StoreStockExportFormat format) async {
+    final ledger = _ledger;
     if (_busy != null ||
-        _period != StoreStockPeriod.current ||
-        widget.filteredProducts.isEmpty) {
+        (_period == StoreStockPeriod.current
+            ? widget.filteredProducts.isEmpty
+            : ledger == null)) {
       return;
     }
     setState(() {
@@ -200,25 +241,34 @@ class _StoreStockDownloadControlsState
           'Your store changed. Reopen Reports & Downloads.',
         );
       }
-      final snapshot = StoreStockSnapshot(
-        storeId: widget.storeId,
-        storeName: widget.storeName,
-        scope: widget.filterDescription.isEmpty
-            ? 'All Store stock'
-            : 'Current results: ${widget.filterDescription}',
-        generatedAt: DateTime.now(),
-        products: widget.filteredProducts,
-      );
-      final bytes = await widget.generateFile(snapshot, format);
+      final snapshot = ledger == null
+          ? StoreStockSnapshot(
+              storeId: widget.storeId,
+              storeName: widget.storeName,
+              scope: widget.filterDescription.isEmpty
+                  ? 'All Store stock'
+                  : 'Current results: ${widget.filterDescription}',
+              generatedAt: DateTime.now(),
+              products: widget.filteredProducts,
+            )
+          : null;
+      final bytes = ledger == null
+          ? await widget.generateFile(snapshot!, format)
+          : await ledger.generate(format);
       if (!mounted) return;
       if (!_isCurrent) {
         throw const FormatException(
           'Your store changed. Reopen Reports & Downloads.',
         );
       }
+      if (ledger != null && !identical(ledger, _ledger)) {
+        throw const FormatException(
+          'The statement changed. Download it again.',
+        );
+      }
       final saved = await widget.saveFile(
         bytes,
-        snapshot.fileName(format),
+        ledger?.fileName(format) ?? snapshot!.fileName(format),
         format,
       );
       if (!mounted) return;
@@ -226,7 +276,7 @@ class _StoreStockDownloadControlsState
         () => _status = !_isCurrent
             ? 'Your store changed. Check the file saved for the previous store.'
             : saved
-            ? '${format.label} saved · ${snapshot.rows.length} products'
+            ? '${format.label} saved · ${ledger?.lines.length ?? snapshot!.rows.length} products'
             : 'Download cancelled. Tap a format to try again.',
       );
     } on FormatException catch (e) {
@@ -243,6 +293,7 @@ class _StoreStockDownloadControlsState
   @override
   Widget build(BuildContext context) {
     final current = _period == StoreStockPeriod.current;
+    final ledger = _ledger;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -293,7 +344,10 @@ class _StoreStockDownloadControlsState
               TextButton(
                 key: Key('work-stock-download-${format.extension}'),
                 onPressed:
-                    !current || _busy != null || widget.filteredProducts.isEmpty
+                    _busy != null ||
+                        (current
+                            ? widget.filteredProducts.isEmpty
+                            : ledger == null)
                     ? null
                     : () => _download(format),
                 style: TextButton.styleFrom(
@@ -342,7 +396,7 @@ class _StoreStockDownloadControlsState
               );
             },
           ),
-        if (!current)
+        if (!current && ledger == null)
           const Padding(
             padding: EdgeInsets.only(top: 4, bottom: 6),
             child: Text(
@@ -357,6 +411,18 @@ class _StoreStockDownloadControlsState
             key: const Key('work-stock-period-range'),
             style: const TextStyle(fontSize: 12),
           ),
+        if (ledger != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              ledger.disclosure,
+              key: const Key('work-stock-ledger-disclosure'),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          StoreStockLedgerTable(ledger: ledger),
+          StoreStockValueSummary(ledger: ledger),
+        ],
         if (_status != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -393,6 +459,679 @@ enum StoreStockExportFormat {
 
   const StoreStockExportFormat(this.label, this.extension, this.mimeType);
   final String label, extension, mimeType;
+}
+
+/// Physical stock, not reservation events or today's available-stock snapshot.
+/// The provider supplies period totals and valuation; the client only reconciles.
+class StoreStockLedgerLine {
+  const StoreStockLedgerLine({
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.opening,
+    required this.received,
+    required this.issued,
+    required this.closing,
+    required this.reserved,
+    this.openingValueMinor,
+    this.receivedValueMinor,
+    this.issuedValueMinor,
+    this.closingValueMinor,
+  });
+  final String productId, name, pack;
+  final int opening, received, issued, closing, reserved;
+  final int? openingValueMinor,
+      receivedValueMinor,
+      issuedValueMinor,
+      closingValueMinor;
+  int get available => closing - reserved;
+  bool get hasValuation => closingValueMinor != null;
+  bool get valid {
+    final quantities = [opening, received, issued, closing, reserved];
+    final values = [
+      openingValueMinor,
+      receivedValueMinor,
+      issuedValueMinor,
+      closingValueMinor,
+    ];
+    return productId.trim().isNotEmpty &&
+        name.trim().isNotEmpty &&
+        pack.trim().isNotEmpty &&
+        quantities.every((v) => v >= 0 && v <= 2147483647) &&
+        opening + received - issued == closing &&
+        reserved <= closing &&
+        (values.every((v) => v == null) ||
+            (values.every(
+                  (v) => v != null && v >= 0 && v <= 9007199254740991,
+                ) &&
+                openingValueMinor! + receivedValueMinor! - issuedValueMinor! ==
+                    closingValueMinor));
+  }
+}
+
+/// Exact, complete period response for Reports & Downloads. No local movement
+/// list is promoted to this contract and no missing balance is treated as zero.
+class StoreStockLedgerSnapshot {
+  StoreStockLedgerSnapshot({
+    required this.accountId,
+    required this.storeId,
+    required this.storeName,
+    required this.snapshotId,
+    required this.from,
+    required this.until,
+    required this.observedAt,
+    required this.complete,
+    required this.reviewOnly,
+    required List<StoreStockLedgerLine> lines,
+    this.valuationMethod,
+  }) : lines = List.unmodifiable(lines);
+  final String accountId, storeId, storeName, snapshotId;
+  final DateTime from, until, observedAt;
+  final bool complete, reviewOnly;
+  final String? valuationMethod;
+  final List<StoreStockLedgerLine> lines;
+  bool get valid =>
+      accountId.trim().isNotEmpty &&
+      storeId.trim().isNotEmpty &&
+      storeName.trim().isNotEmpty &&
+      snapshotId.trim().isNotEmpty &&
+      complete &&
+      from.isBefore(until) &&
+      !observedAt.isBefore(from) &&
+      lines.length <= 10000 &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.productId).toSet().length == lines.length &&
+      (lines.any((line) => line.hasValuation)
+          ? valuationMethod?.trim().isNotEmpty == true
+          : valuationMethod == null);
+  int? get closingValueMinor =>
+      lines.every((line) => line.hasValuation) && lines.isNotEmpty
+      ? lines.fold<int>(0, (sum, line) => sum + line.closingValueMinor!)
+      : null;
+  String get disclosure => reviewOnly
+      ? 'Test statement · not issued'
+      : 'Stock ledger · valuation ${valuationMethod ?? 'unavailable'}';
+  static const headers = [
+    'SKU',
+    'Product',
+    'Pack',
+    'Opening Balance (Quantity)',
+    'Inwards (Quantity)',
+    'Outwards (Quantity)',
+    'Closing Balance (Quantity)',
+    'Reserved',
+    'Available',
+    'Closing Balance Value (₹)',
+    'Opening Balance Value (₹)',
+    'Inwards Value (₹)',
+    'Outwards Value (₹)',
+  ];
+  List<List<Object?>> get rows => [
+    for (final line in lines)
+      [
+        line.productId,
+        line.name,
+        line.pack,
+        line.opening,
+        line.received,
+        line.issued,
+        line.closing,
+        line.reserved,
+        line.available,
+        line.closingValueMinor == null ? null : line.closingValueMinor! / 100,
+        line.openingValueMinor == null ? null : line.openingValueMinor! / 100,
+        line.receivedValueMinor == null ? null : line.receivedValueMinor! / 100,
+        line.issuedValueMinor == null ? null : line.issuedValueMinor! / 100,
+      ],
+  ];
+  String fileName(StoreStockExportFormat format) =>
+      'stock-ledger-${storeId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}'
+      '-${from.toIso8601String().substring(0, 10)}.${format.extension}';
+  Future<Uint8List> generate(StoreStockExportFormat format) async {
+    if (!valid) {
+      throw const FormatException(
+        'The stock statement is incomplete or inconsistent.',
+      );
+    }
+    final font = format == StoreStockExportFormat.pdf
+        ? await rootBundle.load('assets/fonts/Inter-Variable.ttf')
+        : null;
+    return compute(_generateStockLedgerFile, (this, format, font));
+  }
+}
+
+class StoreStockValueSummary extends StatelessWidget {
+  const StoreStockValueSummary({super.key, required this.ledger});
+  final StoreStockLedgerSnapshot ledger;
+
+  @override
+  Widget build(BuildContext context) {
+    final complete =
+        ledger.valid &&
+        ledger.lines.isNotEmpty &&
+        ledger.lines.every((line) => line.hasValuation);
+    final selectors = <(String, int? Function(StoreStockLedgerLine))>[
+      ('Opening Balance', (line) => line.openingValueMinor),
+      ('Inwards', (line) => line.receivedValueMinor),
+      ('Outwards', (line) => line.issuedValueMinor),
+      ('Closing Balance', (line) => line.closingValueMinor),
+    ];
+    return Padding(
+      key: const Key('stock-value-summary'),
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Stock Summary · Value (₹)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          for (final entry in selectors)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(entry.$1, style: const TextStyle(fontSize: 12)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      complete
+                          ? (ledger.lines.fold<int>(
+                                      0,
+                                      (sum, line) => sum + entry.$2(line)!,
+                                    ) /
+                                    100)
+                                .toStringAsFixed(2)
+                          : 'Unavailable',
+                      style: const TextStyle(fontSize: 12),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class StoreStockLedgerTable extends StatefulWidget {
+  const StoreStockLedgerTable({super.key, required this.ledger});
+  final StoreStockLedgerSnapshot ledger;
+  @override
+  State<StoreStockLedgerTable> createState() => _StoreStockLedgerTableState();
+}
+
+class _StoreStockLedgerTableState extends State<StoreStockLedgerTable> {
+  final _horizontal = ScrollController();
+  final _vertical = ScrollController();
+  @override
+  void dispose() {
+    _horizontal.dispose();
+    _vertical.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context);
+    final widths = [
+      140.0,
+      170.0,
+      72.0,
+      78.0,
+      68.0,
+      68.0,
+      78.0,
+      86.0,
+      86.0,
+      140.0,
+      140.0,
+      140.0,
+      140.0,
+    ];
+    for (var i = 0; i < widths.length; i++) {
+      if (i != 1) widths[i] *= scale.scale(1);
+    }
+    const labels = [
+      'SKU',
+      'Product',
+      'Pack',
+      'Opening Balance',
+      'Inwards',
+      'Outwards',
+      'Closing Balance',
+      'Reserved',
+      'Available',
+    ];
+    const order = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+    String cellText(Object? value, int i) => value == null
+        ? 'Unavailable'
+        : i >= 9 && value is num
+        ? value.toStringAsFixed(2)
+        : '$value';
+    double rowHeight(List<Object?> values) {
+      var height = 0.0;
+      for (final i in order) {
+        final painter = TextPainter(
+          text: TextSpan(
+            text: cellText(values[i], i),
+            style: TextStyle(
+              fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          textScaler: scale,
+          textDirection: Directionality.of(context),
+        )..layout(maxWidth: widths[i] - 16);
+        if (painter.height > height) height = painter.height;
+        painter.dispose();
+      }
+      return height + 21;
+    }
+
+    // Lead with the product, not a wide internal identifier. Export order is
+    // unchanged; the identifier stays reachable at the end of the table.
+    Widget row(List<Object?> values, {bool header = false}) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final i in order)
+          SizedBox(
+            width: widths[i],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: Text(
+                cellText(values[i], i),
+                textAlign: i >= 3 ? TextAlign.right : TextAlign.left,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: header ? Colors.white : const Color(0xff14234b),
+                  fontWeight: header ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+    if (widget.ledger.lines.isEmpty) {
+      return const Text('No stock recorded for this period.');
+    }
+    final rows = widget.ledger.rows;
+    return SizedBox(
+      key: const Key('work-stock-ledger-table'),
+      height:
+          (rowHeight(labels) +
+                  rows
+                      .take(5)
+                      .fold<double>(
+                        0,
+                        (sum, values) => sum + rowHeight(values),
+                      ) +
+                  12)
+              .clamp(80, 360)
+              .toDouble(),
+      child: Scrollbar(
+        controller: _horizontal,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _horizontal,
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: order.fold<double>(0, (sum, i) => sum + widths[i]),
+            child: Column(
+              children: [
+                ColoredBox(
+                  color: const Color(0xff080078),
+                  child: row(labels, header: true),
+                ),
+                Expanded(
+                  child: Scrollbar(
+                    controller: _vertical,
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      controller: _vertical,
+                      itemCount: rows.length,
+                      itemBuilder: (_, i) => DecoratedBox(
+                        key: ValueKey(
+                          'stock-ledger-row-${widget.ledger.lines[i].productId}',
+                        ),
+                        decoration: BoxDecoration(
+                          color: i.isOdd
+                              ? const Color(0xfff5f6fb)
+                              : Colors.white,
+                          border: const Border(
+                            bottom: BorderSide(color: Color(0xffe9edf5)),
+                          ),
+                        ),
+                        child: row(rows[i]),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<Uint8List> _generateStockLedgerFile(
+  (StoreStockLedgerSnapshot, StoreStockExportFormat, ByteData?) input,
+) async {
+  final (report, format, fontData) = input;
+  final metadata = <List<Object?>>[
+    ['Stock ledger', report.disclosure],
+    ['Store', report.storeName, 'Store ID', report.storeId],
+    [
+      'From (inclusive UTC)',
+      report.from.toUtc().toIso8601String(),
+      'Until (exclusive UTC)',
+      report.until.toUtc().toIso8601String(),
+    ],
+    [
+      'Observed at (UTC)',
+      report.observedAt.toUtc().toIso8601String(),
+      'Snapshot',
+      report.snapshotId,
+    ],
+    ['Valuation', report.valuationMethod ?? 'Unavailable'],
+  ];
+  final rows = report.rows;
+  if (format == StoreStockExportFormat.csv) {
+    String cell(Object? value) {
+      var text = value?.toString() ?? '';
+      if (value is String &&
+          RegExp(r'^[\s\u0000-\u001f]*[=+@-]').hasMatch(text)) {
+        text = "'$text";
+      }
+      return '"${text.replaceAll('"', '""')}"';
+    }
+
+    final records = [
+      [
+        'Report',
+        'Store',
+        'Store ID',
+        'Snapshot',
+        'From (UTC)',
+        'Until (UTC)',
+        'Observed (UTC)',
+        'Valuation',
+        ...StoreStockLedgerSnapshot.headers,
+      ],
+      // An empty complete report must retain its scope without inventing a SKU
+      // or a zero balance. Empty product cells distinguish this metadata record.
+      for (final row
+          in rows.isEmpty
+              ? [
+                  List<Object?>.filled(
+                    StoreStockLedgerSnapshot.headers.length,
+                    null,
+                  ),
+                ]
+              : rows)
+        [
+          report.disclosure,
+          report.storeName,
+          report.storeId,
+          report.snapshotId,
+          report.from.toUtc().toIso8601String(),
+          report.until.toUtc().toIso8601String(),
+          report.observedAt.toUtc().toIso8601String(),
+          report.valuationMethod ?? 'Unavailable',
+          ...row,
+        ],
+    ];
+    return Uint8List.fromList(
+      utf8.encode(
+        '\ufeff${records.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n',
+      ),
+    );
+  }
+  return _generateStoreTable((
+    StoreTabularReport(
+      title: 'Stock ledger',
+      disclosure: report.disclosure,
+      metadata: metadata,
+      headers: StoreStockLedgerSnapshot.headers,
+      rows: rows,
+      moneyColumns: const {9, 10, 11, 12},
+      rightAlignedColumns: const {3, 4, 5, 6, 7, 8},
+    ),
+    format,
+    fontData,
+  ));
+}
+
+/// Shared renderer only. Callers must validate account, coverage and balances
+/// before constructing a report; this does not authorize or issue a document.
+class StoreTabularReport {
+  StoreTabularReport({
+    required this.title,
+    required this.disclosure,
+    required List<List<Object?>> metadata,
+    required List<String> headers,
+    required List<List<Object?>> rows,
+    required Set<int> moneyColumns,
+    this.rightAlignedColumns = const {},
+    this.nullLabel = 'Unavailable',
+    this.dateColumns = const {},
+  }) : metadata = List.unmodifiable(
+         metadata.map((r) => List<Object?>.unmodifiable(r)),
+       ),
+       headers = List.unmodifiable(headers),
+       rows = List.unmodifiable(rows.map((r) => List<Object?>.unmodifiable(r))),
+       moneyColumns = Set.unmodifiable(moneyColumns);
+  final String title, disclosure;
+  final List<List<Object?>> metadata, rows;
+  final List<String> headers;
+  final Set<int> moneyColumns;
+  final Set<int> rightAlignedColumns;
+  final String nullLabel;
+  final Set<int> dateColumns;
+  Future<Uint8List> generate(StoreStockExportFormat format) async {
+    final font = format == StoreStockExportFormat.pdf
+        ? await rootBundle.load('assets/fonts/Inter-Variable.ttf')
+        : null;
+    return compute(_generateStoreTable, (this, format, font));
+  }
+}
+
+Future<Uint8List> _generateStoreTable(
+  (StoreTabularReport, StoreStockExportFormat, ByteData?) input,
+) async {
+  final (report, format, fontData) = input;
+  final metadata = report.metadata, rows = report.rows;
+  final headers = report.headers, moneyColumns = report.moneyColumns;
+  final headerRow = metadata.length;
+  if (format == StoreStockExportFormat.csv) {
+    String cell(Object? value) {
+      var text = value?.toString() ?? '';
+      if (value is String &&
+          RegExp(r'^[\s\u0000-\u001f]*[=+@-]').hasMatch(text)) {
+        text = "'$text";
+      }
+      return '"${text.replaceAll('"', '""')}"';
+    }
+
+    final contextHeaders = [for (final r in metadata) '${r.first}'];
+    final contextValues = [for (final r in metadata) r.skip(1).join(' · ')];
+    final records = <List<Object?>>[
+      [...contextHeaders, ...headers],
+      for (final row
+          in rows.isEmpty ? [List<Object?>.filled(headers.length, null)] : rows)
+        [...contextValues, ...row],
+    ];
+    return Uint8List.fromList(
+      utf8.encode(
+        '\ufeff${records.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n',
+      ),
+    );
+  }
+  if (format == StoreStockExportFormat.excel) {
+    final book = xls.Excel.createExcel()..rename('Sheet1', report.title);
+    final sheet = book[report.title];
+    final all = [...metadata, headers, ...rows];
+    for (var r = 0; r < all.length; r++) {
+      for (var c = 0; c < all[r].length; c++) {
+        final value = all[r][c];
+        final cell = sheet.cell(
+          xls.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r),
+        );
+        cell.value = value == null || value == ''
+            ? null
+            : value is int
+            ? xls.IntCellValue(value)
+            : value is double
+            ? xls.DoubleCellValue(value)
+            : xls.TextCellValue('$value');
+        cell.cellStyle = xls.CellStyle(
+          fontFamily: 'Arial',
+          fontSize: 10,
+          bold: r == 0 || r == headerRow,
+          fontColorHex: xls.ExcelColor.fromHexString(
+            r == headerRow ? '#FFFFFF' : '#14234B',
+          ),
+          backgroundColorHex: xls.ExcelColor.fromHexString(
+            r == headerRow ? '#080078' : '#FFFFFF',
+          ),
+          textWrapping: xls.TextWrapping.WrapText,
+          horizontalAlign: value is num
+              ? xls.HorizontalAlign.Right
+              : xls.HorizontalAlign.Left,
+          numberFormat: value is String
+              ? xls.NumFormat.standard_49
+              : xls.CustomNumericNumFormat(
+                  formatCode: r > headerRow && moneyColumns.contains(c)
+                      ? '#,##0.00'
+                      : '#,##0',
+                ),
+        );
+      }
+      final lines = all[r].asMap().entries.fold<int>(1, (maxLines, entry) {
+        final width = entry.key < 2
+            ? 34
+            : moneyColumns.contains(entry.key)
+            ? 22
+            : 17;
+        final count = '${entry.value ?? ''}'
+            .split('\n')
+            .fold<int>(
+              0,
+              (sum, part) =>
+                  sum + (part.length / (width - 3)).ceil().clamp(1, 1000),
+            );
+        return count > maxLines ? count : maxLines;
+      });
+      sheet.setRowHeight(
+        r,
+        (lines * 14 + 8).clamp(r <= headerRow ? 36 : 44, 409).toDouble(),
+      );
+    }
+    for (var c = 0; c < headers.length; c++) {
+      sheet.setColumnWidth(
+        c,
+        c < 2
+            ? 34
+            : moneyColumns.contains(c)
+            ? 22
+            : 17,
+      );
+    }
+    return Uint8List.fromList(book.encode()!);
+  }
+  final document = pw.Document();
+  final font = pw.Font.ttf(fontData!);
+  final embedded = font.getFont(pw.Context(document: document.document));
+  final text = [
+    ...metadata.expand((r) => r),
+    ...rows.expand((r) => r),
+  ].join(' ');
+  if (text.runes.any((r) => r > 32 && !embedded.isRuneSupported(r))) {
+    throw const FormatException(
+      'Some characters cannot be shown in PDF. Choose Excel or CSV to keep all details.',
+    );
+  }
+  for (var start = 0; start < (rows.isEmpty ? 1 : rows.length); start += 50) {
+    final batch = rows.skip(start).take(50);
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(24),
+        theme: pw.ThemeData.withFont(base: font, bold: font),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            for (final row in metadata)
+              pw.Text(row.join('  '), style: const pw.TextStyle(fontSize: 9)),
+            pw.SizedBox(height: 8),
+          ],
+        ),
+        footer: (c) => pw.Text(
+          'Page ${c.pageNumber} · ${report.disclosure}',
+          style: const pw.TextStyle(fontSize: 8),
+        ),
+        build: (_) => [
+          pw.TableHelper.fromTextArray(
+            headers: headers,
+            data: [
+              for (final row in batch)
+                [
+                  for (var i = 0; i < row.length; i++)
+                    row[i] == null
+                        ? report.nullLabel
+                        : report.dateColumns.contains(i) &&
+                              row[i] is String &&
+                              DateTime.tryParse(row[i] as String) != null
+                        ? (row[i] as String)
+                              .replaceFirst('T', '\n')
+                              .split('.')
+                              .first
+                              .replaceAll('Z', '')
+                        : moneyColumns.contains(i) && row[i] is num
+                        ? (row[i] as num).toStringAsFixed(2)
+                        : '${row[i]}',
+                ],
+            ],
+            border: null,
+            cellPadding: const pw.EdgeInsets.all(5),
+            headerDecoration: const pw.BoxDecoration(
+              color: PdfColor.fromInt(0xff080078),
+            ),
+            headerStyle: pw.TextStyle(
+              color: PdfColors.white,
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.3),
+              1: const pw.FlexColumnWidth(2.5),
+              if (headers.length > 9) 9: const pw.FlexColumnWidth(1.5),
+            },
+            cellAlignments: {
+              for (final i in {...moneyColumns, ...report.rightAlignedColumns})
+                i: pw.Alignment.centerRight,
+            },
+            oddRowDecoration: const pw.BoxDecoration(
+              color: PdfColor.fromInt(0xfff5f6fb),
+            ),
+          ),
+          if (rows.isEmpty) pw.Text('No records for this period.'),
+        ],
+      ),
+    );
+  }
+  return document.save();
 }
 
 /// Immutable current balances, not an accounting ledger or physical stock count.

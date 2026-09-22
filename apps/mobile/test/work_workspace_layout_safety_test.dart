@@ -28,6 +28,10 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_stock_export.dart';
+import 'package:moolsocial/features/work/work_downloads.dart';
+import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
+import 'package:moolsocial/shared/commerce/commerce_downloads_screen.dart';
+import 'commerce_downloads_test.dart' as download_test show Source;
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
@@ -12014,6 +12018,249 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test(
+    'D1 ledger reconciles physical stock without counting reservations twice',
+    () {
+      const line = StoreStockLedgerLine(
+        productId: '00123',
+        name: 'Oil',
+        pack: '1 L',
+        opening: 10,
+        received: 5,
+        issued: 3,
+        closing: 12,
+        reserved: 2,
+        openingValueMinor: 10000,
+        receivedValueMinor: 5000,
+        issuedValueMinor: 3000,
+        closingValueMinor: 12000,
+      );
+      expect(line.valid, isTrue);
+      expect(line.available, 10);
+      const bad = StoreStockLedgerLine(
+        productId: 'bad',
+        name: 'Oil',
+        pack: '1 L',
+        opening: 10,
+        received: 5,
+        issued: 3,
+        closing: 10,
+        reserved: 2,
+      );
+      expect(bad.valid, isFalse);
+      const unknown = StoreStockLedgerLine(
+        productId: 'unknown',
+        name: 'Oil',
+        pack: '1 L',
+        opening: 10,
+        received: 5,
+        issued: 3,
+        closing: 12,
+        reserved: 2,
+      );
+      expect(unknown.valid, isTrue);
+      expect(unknown.closingValueMinor, isNull);
+      StoreStockLedgerSnapshot report(
+        List<StoreStockLedgerLine> lines, {
+        bool complete = true,
+        String? method,
+      }) => StoreStockLedgerSnapshot(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'Store',
+        snapshotId: 'period-1',
+        from: DateTime.utc(2026, 9, 1),
+        until: DateTime.utc(2026, 10, 1),
+        observedAt: DateTime.utc(2026, 10, 1),
+        complete: complete,
+        reviewOnly: true,
+        lines: lines,
+        valuationMethod: method,
+      );
+      expect(report([line], method: 'Weighted average').valid, isTrue);
+      expect(report([line]).valid, isFalse);
+      expect(report([unknown], complete: false).valid, isFalse);
+      expect(report([unknown, unknown]).valid, isFalse);
+      expect(report([unknown]).closingValueMinor, isNull);
+      expect(report([]).closingValueMinor, isNull);
+      expect(report([unknown]).disclosure, contains('not issued'));
+    },
+  );
+
+  testWidgets(
+    'D1 empty CSV retains statement identity without fabricated balance',
+    (tester) async {
+      final report = StoreStockLedgerSnapshot(
+        accountId: 'account',
+        storeId: 'store-123',
+        storeName: 'Review Store',
+        snapshotId: 'empty-period',
+        from: DateTime.utc(2026, 9, 1),
+        until: DateTime.utc(2026, 10, 1),
+        observedAt: DateTime.utc(2026, 10, 1),
+        complete: true,
+        reviewOnly: true,
+        lines: [],
+      );
+      final bytes = (await tester.runAsync(
+        () => report.generate(StoreStockExportFormat.csv),
+      ))!;
+      final csv = utf8.decode(bytes);
+      expect(csv, contains('empty-period'));
+      expect(csv, contains('store-123'));
+      expect(csv, contains('Test statement'));
+      expect(csv, isNot(contains('"0"')));
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('D1 period ledger scope and compact table $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
+      final report = StoreStockLedgerSnapshot(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'Review Store',
+        snapshotId: 'today',
+        from: day.toUtc(),
+        until: DateTime(day.year, day.month, day.day + 1).toUtc(),
+        observedAt: now.toUtc(),
+        complete: true,
+        reviewOnly: true,
+        valuationMethod: 'Weighted average',
+        lines: const [
+          StoreStockLedgerLine(
+            productId: '00123',
+            name: 'Fortune Sunflower Oil',
+            pack: '1 L pouch',
+            opening: 10,
+            received: 5,
+            issued: 3,
+            closing: 12,
+            reserved: 2,
+            openingValueMinor: 10000,
+            receivedValueMinor: 5000,
+            issuedValueMinor: 3000,
+            closingValueMinor: 12000,
+          ),
+        ],
+      );
+      if (scale == 1) {
+        final csv = (await tester.runAsync(
+          () => report.generate(StoreStockExportFormat.csv),
+        ))!;
+        expect(utf8.decode(csv), contains('Opening Balance Value (₹)'));
+        expect(utf8.decode(csv), contains('Outwards Value (₹)'));
+        final excel = (await tester.runAsync(
+          () => report.generate(StoreStockExportFormat.excel),
+        ))!;
+        final sheet = xls.Excel.decodeBytes(excel)['Stock ledger'];
+        expect(
+          sheet.cell(xls.CellIndex.indexByString('A7')).value,
+          xls.TextCellValue('00123'),
+        );
+        expect(
+          sheet.cell(xls.CellIndex.indexByString('J7')).value,
+          xls.IntCellValue(120),
+        );
+        expect(
+          sheet.cell(xls.CellIndex.indexByString('K7')).value,
+          xls.IntCellValue(100),
+        );
+        expect(
+          sheet.cell(xls.CellIndex.indexByString('L7')).value,
+          xls.IntCellValue(50),
+        );
+        expect(
+          sheet.cell(xls.CellIndex.indexByString('M7')).value,
+          xls.IntCellValue(30),
+        );
+        final pdf = (await tester.runAsync(
+          () => report.generate(StoreStockExportFormat.pdf),
+        ))!;
+        expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+        const output = String.fromEnvironment('MOOL_LEDGER_EXPORT_TEST_DIR');
+        if (output.isNotEmpty) {
+          await tester.runAsync(() async {
+            await Directory(output).create(recursive: true);
+            await File('$output/stock-ledger.pdf').writeAsBytes(pdf);
+            await File('$output/stock-ledger.xlsx').writeAsBytes(excel);
+            await File('$output/stock-ledger.csv').writeAsBytes(csv);
+          });
+        }
+      }
+      Future<void> show(String account) => tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: const Size(360, 800),
+              textScaler: TextScaler.linear(scale),
+            ),
+            child: RepaintBoundary(
+              key: const Key('store-review-root'),
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Reports & Downloads')),
+                body: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: StoreStockDownloadControls(
+                      accountId: account,
+                      storeId: 'store',
+                      storeName: 'Review Store',
+                      filteredProducts: const [],
+                      filterDescription: '',
+                      isCurrent: () => true,
+                      ledger: report,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await show('account');
+      await tester.tap(find.byKey(const Key('work-stock-period-selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-stock-period-today')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-stock-ledger-table')), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('work-stock-download-pdf')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(find.text('Fortune Sunflower Oil').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'stock-ledger-d1-$scale');
+      expect(find.text('Close INR'), findsNothing);
+      expect(find.text('Stock Summary · Value (₹)'), findsOneWidget);
+      expect(find.text('120.00'), findsOneWidget);
+      await show('another-account');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-stock-ledger-table')), findsNothing);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('work-stock-download-pdf')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('STOCK17 PDF pagination and unsupported script remain truthful', (
     tester,
@@ -36941,6 +37188,286 @@ void main() {
     expect(work.workspaceInvoices, isEmpty);
     expect(tester.takeException(), isNull);
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('D2 customer statement journey and scope $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final pulse = ValueNotifier(0);
+      addTearDown(pulse.dispose);
+      var active = true, saves = 0;
+      final asOf = DateTime.utc(2026, 9, 23, 10);
+      WorkspaceCustomerLedger ledger(
+        String id,
+        String name,
+        int opening, {
+        bool entries = true,
+      }) => WorkspaceCustomerLedger(
+        accountScope: 'account',
+        workspaceId: 'store',
+        customerId: id,
+        customerName: name,
+        revision: 1,
+        asOf: asOf,
+        historyComplete: true,
+        openingBalanceMinor: opening,
+        entries: entries
+            ? [
+                WorkspaceCustomerLedgerEntry(
+                  id: 'INV-$id',
+                  operationId: 'sale-$id',
+                  invoiceId: 'INV-$id',
+                  orderId: 'ORDER-$id',
+                  sequence: 1,
+                  occurredAt: DateTime.utc(2026, 9, 22, 10),
+                  kind: WorkspaceLedgerEntryKind.invoice,
+                  state: WorkspaceLedgerPostingState.posted,
+                  amountMinor: 120000,
+                ),
+                WorkspaceCustomerLedgerEntry(
+                  id: 'REC-$id',
+                  operationId: 'receipt-$id',
+                  invoiceId: 'INV-$id',
+                  orderId: 'ORDER-$id',
+                  sequence: 2,
+                  occurredAt: DateTime.utc(2026, 9, 23, 9),
+                  kind: WorkspaceLedgerEntryKind.collection,
+                  state: WorkspaceLedgerPostingState.posted,
+                  amountMinor: 50000,
+                ),
+              ]
+            : [],
+      );
+      final customers = [
+        ledger('001', 'Rakesh Sharma', 10000),
+        ledger(
+          '002',
+          'Annapurna Provision & General Store',
+          -25000,
+          entries: false,
+        ),
+      ];
+      final source = download_test.Source(
+        (q, cursor) async => CommerceDownloadPage(queryKey: q.key, items: []),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: const Size(360, 800),
+              textScaler: TextScaler.linear(scale),
+            ),
+            child: RepaintBoundary(
+              key: const Key('store-review-root'),
+              child: CommerceDownloadsScreen(
+                scope: const CommerceDownloadScope('account', store: 'store'),
+                source: source,
+                scopeChanges: pulse,
+                isCurrent: () => active,
+                title: 'Reports & Downloads',
+                ownerLabel: 'Mahadev Fresh Mart',
+                onExit: () {},
+                customerStatementBuilder: (_) => StoreCustomerReportsPanel(
+                  accountId: 'account',
+                  storeId: 'store',
+                  storeName: 'Mahadev Fresh Mart',
+                  ledgers: customers,
+                  isCurrent: () => active,
+                  allCustomersComplete: true,
+                  saveFile: (bytes, name, format) async {
+                    saves++;
+                    return true;
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('downloads-customer-statements')));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'customer-list-$scale');
+      final search = find.byKey(const Key('customer-statement-search'));
+      expect(tester.widget<TextField>(search).decoration!.filled, isFalse);
+      expect(
+        tester.widget<TextField>(search).decoration!.enabledBorder,
+        InputBorder.none,
+      );
+      await tester.enterText(search, 'Rakesh');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('customer-statement-002')), findsNothing);
+      await tester.tap(find.byKey(const Key('customer-statement-001')));
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'customer-ledger-$scale');
+      expect(
+        find.byKey(const Key('customer-statement-unavailable')),
+        findsNothing,
+      );
+      if (scale == 1) {
+        await tester.tap(
+          find.byKey(const Key('customer-statement-download-csv')),
+        );
+        await tester.runAsync(
+          () async => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pumpAndSettle();
+        expect(saves, 1);
+      }
+      await tester.tap(find.byKey(const Key('customer-statement-period')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Today').last);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('customer-statement-unavailable')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('customer-statement-download-pdf')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await captureStoreView(tester, 'customer-period-unavailable-$scale');
+      await tester.tap(find.byKey(const Key('customer-report-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('customer-outstanding-open')));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'customer-outstanding-$scale');
+      expect(
+        find.byKey(const Key('customer-statement-unavailable')),
+        findsNothing,
+      );
+      active = false;
+      pulse.value++;
+      await tester.pumpAndSettle();
+      expect(find.byType(StoreCustomerReportsPanel), findsNothing);
+      expect(find.text('Rakesh Sharma'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'D2 empty and incomplete customer records never invent zero balances',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final incomplete = WorkspaceCustomerLedger(
+        accountScope: 'account',
+        workspaceId: 'store',
+        customerId: 'partial',
+        customerName: 'Rakesh Sharma',
+        revision: 1,
+        asOf: DateTime.utc(2026, 9, 23),
+        entries: [],
+      );
+      Future<void> show(List<WorkspaceCustomerLedger> ledgers, String key) =>
+          tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: RepaintBoundary(
+                key: const Key('store-review-root'),
+                child: Scaffold(
+                  appBar: AppBar(title: const Text('Customer statements')),
+                  body: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: StoreCustomerReportsPanel(
+                        key: ValueKey(key),
+                        accountId: 'account',
+                        storeId: 'store',
+                        storeName: 'Store',
+                        ledgers: ledgers,
+                        isCurrent: () => true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      await show([], 'empty');
+      await tester.pumpAndSettle();
+      expect(find.text('No customer ledger is available yet.'), findsOneWidget);
+      await captureStoreView(tester, 'customer-empty');
+      await tester.tap(find.byKey(const Key('customer-outstanding-open')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('customer-statement-unavailable')),
+        findsOneWidget,
+      );
+      expect(find.text('Total'), findsNothing);
+      await show([incomplete], 'partial');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('customer-statement-partial')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('customer-statement-download-csv')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('0.00'), findsNothing);
+      await captureStoreView(tester, 'customer-incomplete');
+      await tester.tap(find.byKey(const Key('customer-statement-period')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Custom dates').last);
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '31/02/2026');
+      await tester.enterText(fields.at(1), '23/09/2026');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Enter valid dates as DD/MM/YYYY, ending today or earlier.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('customer-statement-download-csv')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await show([incomplete, incomplete], 'duplicate');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('customer-statement-partial')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'D2 Store entry opens customer records without a separate workspace',
+    (tester) async {
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: liveStore(),
+      );
+      await openStoreTools(tester);
+      await tester.tap(find.byKey(const Key('work-business-downloads')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('downloads-customer-statements')));
+      await tester.pumpAndSettle();
+      expect(find.byType(StoreCustomerReportsPanel), findsOneWidget);
+      expect(find.byKey(const Key('downloads-search')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'customer-records-live-entry');
+    },
+  );
 
   testWidgets(
     'DOWNLOADS Store tools keeps stock reports inside the shared centre',

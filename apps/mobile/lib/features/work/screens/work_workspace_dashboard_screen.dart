@@ -12166,6 +12166,29 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                       title: 'Reports & Downloads',
                       ownerLabel: workspace?.name ?? 'Your Store',
                       onExit: () => Navigator.of(downloadContext).pop(),
+                      customerStatementBuilder: workspace == null
+                          ? null
+                          : (_) => AnimatedBuilder(
+                              animation: session,
+                              builder: (context, _) => StoreCustomerReportsPanel(
+                                key: ValueKey((
+                                  'customer-reports',
+                                  inventoryScope,
+                                  workspace.id,
+                                )),
+                                accountId: account ?? '',
+                                storeId: workspace.id,
+                                storeName: workspace.name,
+                                ledgers:
+                                    session.workspaceFinance?.customerLedgers ??
+                                    const [],
+                                isCurrent: () =>
+                                    current() && !session.workspaceFinanceStale,
+                                // Finance historyComplete does not certify customer
+                                // enumeration or the date of each opening balance.
+                                // Dedicated provider coverage remains deferred.
+                              ),
+                            ),
                       stockStatementBuilder: workspace == null
                           ? null
                           : (_) => AnimatedBuilder(
@@ -12196,6 +12219,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                                       workspace.id,
                                     )),
                                     storeId: workspace.id,
+                                    accountId: account,
                                     storeName: workspace.name,
                                     filteredProducts: List.of(
                                       session.workspaceCatalogueItems,
