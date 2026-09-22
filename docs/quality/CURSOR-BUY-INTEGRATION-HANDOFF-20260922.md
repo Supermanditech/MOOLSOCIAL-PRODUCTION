@@ -1049,3 +1049,16 @@ Read-only source trace: `_reload` in buy_v2_views.dart (~1964) returns unavailab
 Future acceptance: wire the existing contract to coordinated, versioned Store-origin identities/offers; same SKU/variant/pack, correct prices/stock/eligibility, pagination and stale/location rejection, genuine recovery and exact product/Cart return. Distinguish missing configuration from transient network errors so retry is truthful. Preserve compact layout and Android safety. Backend/Store provider work remains deferred; no invented live prices, new screen, policy or other-worktree work. Device left on the comparison sheet; no basket or transaction changes.
 
 Full ticket and before/after Refresh screenshots are preserved under `r6633-compare-D05/` in the evidence ZIP. Latest SHA-256 `887b6cba1d44bee296afdd80b0df9ef1054bcc2b6e26a31161f36b5eafaf165b`; all 631 previous entries preserved. No source/test/APK changes.
+
+
+### R6633-D06 — Offers and Cart journey, registration only (23 September)
+
+Founder requested inspection and full visual/technical ticket definition, explicitly no implementation. **OPEN: one parent with seven work packages**: A publisher-tab visibility/loading; B authentic MoolSocial admin/Store offer-data dependency; C compact publisher filter; D inline Saved parity and correct scope; E approved price-row Add across SKU entry routes; F compact Cart browsing actions; G premium compact Cart through final review, including keyboard/insets and state correctness. Future actual local Flutter screens remain required for founder approval after authorized implementation.
+
+Redmi captures067–081 and timed070/071 reproduce Suppliers text becoming invisible during switching, no MoolSocial review offers, oversized filter/Saved sheets, Wholesale SKU bottom Add dock and competing full-width Cart browsing controls. Read-only source inspection confirms review offer generation never emits the moolSocial publisher type; no backend/admin data was injected. Future data must come from exact Store/admin identities and the existing BuyV2PublishedCatalogueOffer mapping, with simulated transport labelled and no claim of live eligibility.
+
+Two linked child defects: **R6633-D06-D-C1**, Offers Saved uses the last Shop destination and omits the saved Wholesale item shown in Offers; **R6633-D06-G-C1**, Shop payment chooser shows a stale Purchase order reference despite that method being unavailable. Both remain OPEN. Final payment/order/provider success was not tested or claimed. Address recipient keyboard was inspected, but lower-field reachability still needs its explicit future checks.
+
+Cart restored unchanged: four products / six Shop items / ₹760. No quantity/Saved/payment selection, address save, transaction, app/test/config/policy changes, new APK or other-worktree work. Existing D03/D04/D05 remain separate linked issues. Detailed acceptance covers query freshness/pagination, accessible compact layout, product MOQ/stock/verification, exact Cart totals/routes, keyboard/Android safety, and honest provider-deferred states.
+
+Full ticket: `r6633-offers-cart-D06/OFFERS-CART-JOURNEY-D06.md` inside the evidence ZIP. Archive SHA-256 `254abfb88c033055f1159abea9ed9a30adf7da4304c2eb7598f2f7721cf44c0e`, 79,403,754 bytes; all 638 prior entries preserved, 50 new entries. Registration complete; all seven work packages and two children remain open.
