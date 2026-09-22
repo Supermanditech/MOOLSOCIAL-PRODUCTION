@@ -1757,5 +1757,26 @@
     "productionQualified": false,
     "integrationPerformed": false,
     "finalParkingCommit": "Metadata-only child after build source; source manifest remains unchanged. See branch Git history."
+  },
+  "postR6633DeviceFindings": [
+    {
+      "id": "R6633-D04",
+      "title": "Full-width empty white strip behind compact Cart",
+      "status": "open_registration_only_no_implementation",
+      "report": "r6633-cart-strip-D04/CART-WHITE-STRIP-D04.md",
+      "currentScreenshot": "r6633-cart-strip-D04/redmi/051-founder-cart-strip.png",
+      "screenshots": 14,
+      "cartPreserved": "5 Shop items INR694",
+      "ownersInspected": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart"
+      ]
+    }
+  ],
+  "currentEvidenceArchive": {
+    "sha256": "c47201d6b956cf86a94112bf867a4ad1193dfd8b3356361de4729008544bc0d7",
+    "bytes": 73974748,
+    "priorEntriesPreserved": 588,
+    "newEvidencePrefix": "r6633-cart-strip-D04/"
   }
 }

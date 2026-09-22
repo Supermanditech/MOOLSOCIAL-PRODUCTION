@@ -1027,3 +1027,14 @@ Focused Redmi replay captured 48 actual screenshots including preinstall/startup
 Google location/map API, authentic Store/public catalogue/photos, live identity/provider mapping, delivery fleet/booked slots and payment execution remain deferred. All source is included; **not all 22 tickets are device-closed**. Three confirmed children plus one investigation remain open. No new APK rebuild for these findings is implied by this evidence-only parking.
 
 Evidence ZIP SHA-256: `7bb5e85be9152971818f3b495c278386ae438cea59801ba2aae35d7f98d7f8ab` (68,279,648 bytes). All 342 prior entries verified unchanged; 222 candidate evidence files plus 24 helper files appended under `r6633-qualification/`. APK binaries remain locally retained; reproducible source, receipts, logs and screenshots are Git-backed. Final metadata commit changes only this handoff, inventory and evidence archive.
+
+
+### R6633-D04 — founder white strip behind Cart, register only
+
+Founder explicitly requests inspection and registration only; **do not implement**. OPEN, launch-supporting public Buy visual defect.
+
+Current Redmi screenshot `051-founder-cart-strip.png` confirms the full-width empty white strip behind the right-aligned Cart pill in Store search. Catalogue and nested Store product reproduce it (052/053). Retained same-APK Wholesale Store screenshot032 confirms that variant; current Wholesale basket is empty, so no new scoped Cart was fabricated. Root Shop/Wholesale/product/Orders/Offers/Saved Cart placements were inspected (055–062): their normal navigation rail has no separate Store-style blank strip. Preserve that distinction.
+
+The three shared Store Cart placements are in buy_v2_catalogue.dart (Store sheet/full catalogue) and buy_v2_screen.dart (nested product). Register all shared callers and their Saved/Recent/related routes for future regression; no claim that every route variant was separately tapped. Expected correction: eliminate only redundant opaque Cart-only whitespace, preserve fixed compact Cart, product visibility/scrolling, theme continuity, accessible targets and Android/keyboard safe areas. No backend dependency. No source/test/APK change made.
+
+Full ticket and 14 fresh PNG/XML/receipt sets are archived under `r6633-cart-strip-D04/` in the existing evidence ZIP. Latest ZIP SHA-256 `c47201d6b956cf86a94112bf867a4ad1193dfd8b3356361de4729008544bc0d7`; all 588 earlier entries integrity-checked and preserved. Five Shop items / INR694 and one Saved item unchanged; device returned to public Shop Visit Store. R6633-D04 remains open alongside D01/D02/D03 and observation O01.
