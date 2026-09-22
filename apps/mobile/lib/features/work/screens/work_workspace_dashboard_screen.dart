@@ -3959,7 +3959,12 @@ class _StoreControlDashboard extends StatelessWidget {
                 height: height,
                 child: Column(
                   children: [
-                    Offstage(offstage: keyboard, child: pulse),
+                    Flexible(
+                      fit: FlexFit.loose,
+                      child: SingleChildScrollView(
+                        child: Offstage(offstage: keyboard, child: pulse),
+                      ),
+                    ),
                     Expanded(
                       child: Flex(
                         direction: actionsBelow
@@ -5316,7 +5321,6 @@ class _IncomingOrderActivityCard extends StatelessWidget {
               color: const Color(0xFFF3F5FD),
               child: _StoreScaledPair(
                 gap: 5,
-                forceStack: MediaQuery.sizeOf(context).width < 360,
                 first: Row(
                   children: [
                     const Icon(Icons.circle, size: 5, color: MoolColors.navy),

@@ -1,5 +1,42 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## OPPO successor qualification — narrow corrections, 23 September
+
+Complete implementation was preserved and pushed at26100fbf. The first broad
+qualification cycle ended3046 passed,87 skipped,28 failed; all failures belonged
+to the Store layout suite. No APK was built from failed evidence. Original logs
+remain in the task outputs/oppo-latest-20260923-regressions-01.log.
+
+Two actual narrow layout corrections are local: incoming-order status/countdown
+uses its compact row at ordinary text sizes, eliminating9px overflow while keeping
+Accept/Reject immediately visible; the working-centre business pulse is flex-bounded/scrollable at enlarged text,
+preventing83px overflow when the available viewport shrinks to345px. Preserve
+keyboard parent identity, current data and all approved actions.
+
+Regression expectations now match approved invoice-backed registers,36px POS
+thumbnails, compact rail, empty-cart recovery, Settings visibility, removed
+preview and removed root Stock arrow. Collections/refunds remain covered through
+the existing Sales collections action, not reintroduced into the register.
+Lazy nested-list tests target content rather than the action rail and use actual
+hit-tested gesture points; no suppressed exceptions or missed-tap warnings.
+Focused evidence: ADDMAP3passed, initial layout/navigation15passed, final supplier/
+refund/finance6passed. Intermediate failures are retained in the task outputs
+oppo-r66-38-layout-reconciliation-01 through08.log, not rewritten as passes.
+
+The original outer-scroll fix was rejected by full v2:3070passed87skipped4failed
+on initial Accept/Reject visibility. Restored original card sizing and corrected
+the actual status-row stacking. All21 focused follow-up checks passed, including
+ADDMAP, all four visibility failures, refunds and finance. Empty-cart assertion
+now names the actual active total bar; helper style info was corrected.
+Paired broad qualification completed: both cycles passed3074 tests with87
+inherited skips each across55 files. Runtime and all tested-file hashes remained
+unchanged; the runner exited0. Logs: task outputs/oppo-latest-20260923-v3-
+regressions-01/02.log. Same complete inventory, two workers. Fresh full analysis
+passed with no issues (v3-analysis.log); approved UI/reference locks passed
+(v3-locks.log). This is host qualification, not device acceptance or APK
+completion. Final checkpoint/remote, resealed source manifest and verified APK
+remain required. Current Cursor checkout and backend remain untouched.
+
 ## Latest — approved accounting screens; complete-source OPPO checkpoint, 23 September
 
 Founder approved Sales Register followed by the displayed Cash/Bank Book, and
