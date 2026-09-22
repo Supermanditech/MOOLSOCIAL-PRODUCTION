@@ -147,7 +147,7 @@ function Get-MobileBoundaryViolations {
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
     # Exact r66.33 source; customer-tapped Store/resolved-area Maps launchers only.
-    if ($IntegratedReviewSourceCommit -ceq 'c1197ec99beaac064ee1cc635bff1d1aabe9ece6' -and
+    if ($IntegratedReviewSourceCommit -ceq '02369e96a293e4588cca06efad17a02bf53470a8' -and
         $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
       $mapSha = [Security.Cryptography.SHA256]::Create()
@@ -218,8 +218,8 @@ function Get-MobileBoundaryViolations {
           $soundSourceHash -ceq 'D4625A0942BFE5E8E018F55F0C35028D4EBA38F01E234E3250BEC52F07BB79DB'
         ) -or (
           # r66.33 Cart/search UI changes preserve the same local arrival cue.
-          $IntegratedReviewSourceCommit -ceq 'c1197ec99beaac064ee1cc635bff1d1aabe9ece6' -and
-          $soundSourceHash -ceq 'DB66EF9AB33AAD3E7B75D2CEA8881177E477FF726DAF2281522BE6BDD8B75B2A'
+          $IntegratedReviewSourceCommit -ceq '02369e96a293e4588cca06efad17a02bf53470a8' -and
+          $soundSourceHash -ceq 'D7A88967C967DC1FF0461AAE63B1E4888B5090D2C0CEDE0D93C28CC32F84E758'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }

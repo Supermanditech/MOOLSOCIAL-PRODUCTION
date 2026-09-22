@@ -344,7 +344,7 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
-  if ($SourceCommit -ceq 'c1197ec99beaac064ee1cc635bff1d1aabe9ece6') {
+  if ($SourceCommit -ceq '02369e96a293e4588cca06efad17a02bf53470a8') {
     # Fresh r66.33 review: exact committed source, never a moving allowance.
     $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
     if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
@@ -357,9 +357,26 @@ function Test-CursorStorefrontPickupReviewSource {
     }
     $boundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
     $expectedDelta = @(
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'
     )
     $delta = @(& git -C $root diff --name-only '3959b3c23ba09f66397b74313b8ddfb90c761442' $SourceCommit -- @boundaries)
