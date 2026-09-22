@@ -941,7 +941,7 @@ void main() {
     final bill = find.byKey(const ValueKey('buy-cart-bill-summary'));
     await showInMainCartList(tester, bill);
     expect(bill, findsOneWidget);
-    expect(find.text('Wholesale trade packs'), findsOneWidget);
+    expect(find.text('Wholesale packs'), findsOneWidget);
     expect(find.text('Bill summary'), findsOneWidget);
   });
 
@@ -955,7 +955,9 @@ void main() {
     final secondShop = BuyV2Catalogue.products.firstWhere(
       (candidate) =>
           candidate.destination == BuyV2Destination.shop &&
-          candidate.id != shop.id,
+          candidate.id != shop.id &&
+          session.fulfilmentModeFor(candidate) ==
+              session.fulfilmentModeFor(shop),
     );
     session.toggleSaved(shop.id);
     session.toggleSaved(secondShop.id);
@@ -969,6 +971,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Saved in Shop'), findsOneWidget);
+    expect(
+      session.visibleSavedProducts.map((item) => item.id),
+      containsAll([shop.id, secondShop.id]),
+    );
     expect(find.byKey(const ValueKey('buy-saved-add-all')), findsNothing);
     final grid = find.byKey(
       ValueKey(
@@ -1011,7 +1017,12 @@ void main() {
         );
         await tester.pumpAndSettle();
       }
-      expect(target.hitTestable(), findsOneWidget);
+      expect(
+        target.hitTestable(),
+        findsOneWidget,
+        reason:
+            'Target ${target.evaluate().isEmpty ? 'missing' : tester.getRect(target)}; viewport ${tester.getRect(scroll)}',
+      );
     }
 
     expect(

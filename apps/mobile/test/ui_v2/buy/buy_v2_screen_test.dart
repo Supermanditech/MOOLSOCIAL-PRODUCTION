@@ -1509,6 +1509,18 @@ void main() {
             session.addProduct('s-milk');
             session.addProduct('w-rice-50kg');
             session.openDestination(destination);
+            session.chooseCategory('all');
+            session.chooseShopSaleType(
+              buyV2CatalogueFulfilmentModeFor(session.product('s-milk')) ==
+                      BuyV2FulfilmentMode.quickLocal
+                  ? BuyV2ShopSaleType.quickDelivery
+                  : BuyV2ShopSaleType.courier,
+            );
+            session.chooseWholesaleSaleType(
+              session.savedProductsFor(BuyV2Destination.wholesale).firstWhere((product) => product.catalogueListing).minimumOrder > 2
+                  ? BuyV2WholesaleSaleType.bulk
+                  : BuyV2WholesaleSaleType.wholesale,
+            );
             session.clearNotice();
             await tester.pumpAndSettle();
             final saved = find.byKey(

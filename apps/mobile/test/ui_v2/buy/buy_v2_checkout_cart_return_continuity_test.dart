@@ -708,7 +708,7 @@ void main() {
           expect(session.notice, isNull);
           final scope = find.byKey(const ValueKey('buy-cart-scope-all'));
           expect(
-            find.descendant(of: scope, matching: find.text('Subtotal')),
+            find.descendant(of: scope, matching: find.text('All baskets')),
             findsOneWidget,
           );
           expect(

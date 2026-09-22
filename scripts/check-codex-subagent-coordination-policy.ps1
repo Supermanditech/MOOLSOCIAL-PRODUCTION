@@ -457,6 +457,34 @@ function Test-RedmiV6HistoricalEvidenceCommit([string]$Commit, [string]$Subject)
 }
 # END founder RV6 historical evidence label exception 20260914
 
+function Test-CursorBuyReadyHistoricalSubject([string]$Commit, [string]$Subject) {
+  # Preserve these exact founder-authorized commits during the 22 Sep handoff.
+  # The bootstrap has its own exact parent/subject/owner validation. This only
+  # reconciles seven subsequent labels; no future subject or safety gate changes.
+  if ($root.Replace('\','/').TrimEnd('/') -cne
+        'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921' -or
+      $AgentRole -cne 'primary' -or $AgentTask -cne '/root' -or
+      $ProductionLane -cne 'cursor_ui' -or $ProductionPhase -cne 'handoff' -or
+      $ProductionWorkId -cne 'buy-ready-20260921' -or
+      $ProductionTicketId -cne 'UAW-CURSOR-BUY-READY-20260921' -or
+      $branch -cne 'work/cursor-ui/buy-ready-20260921' -or
+      $baseCommit -cne '635ab9810ba8805104642f8f78512c80fe1b20f5') {
+    return $false
+  }
+  $historicalSubjects = @{
+    '19127ea6a7c389eeda000016af672409f2defcff' = 'feat(buy): qualify public storefront and all-store pickup choices'
+    'd5279222466211f0526c625e58b8da5dc0d78218' = 'fix(buy): reserve full Saved action clearance in SKU cards'
+    'eb7a14e9f984fa322e8a6468a97249104fe28776' = 'fix(buy): qualify exact storefront source for Redmi review'
+    '432befc4c7be1b36170588e57b2eb331c45021fc' = 'fix(buy): bind inherited arrival cue to exact review source'
+    'd278c18b9400e2950a54a443964a8e6085638cc0' = 'docs(buy): record first full pass and fresh Redmi qualification inputs'
+    'd73d609d8389101d5981c3c8929b7ac745bf059b' = 'docs(buy): seal both full regression passes for Redmi build'
+    '6ba7dc3f2b2d75be7ffdcdb3bfce6ca3090b3ed8' = 'docs(buy): record Redmi installation and Store device defects'
+  }
+  return ($Commit -cmatch '^[0-9a-f]{40}$' -and
+    $historicalSubjects.ContainsKey($Commit) -and
+    [string]$historicalSubjects[$Commit] -ceq $Subject)
+}
+
 function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
   # BEGIN founder RV6 historical evidence label call 20260914
   if (Test-RedmiV6HistoricalEvidenceCommit $Commit $Subject) { return $true }
@@ -1051,6 +1079,32 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+  'apps/mobile/lib/features/buy/buy_v2_customer_copy.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/REVIEW.md',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'docs/quality/CURSOR-BUY-POST-REDMI-FIXES-20260922.md',
+  'docs/quality/CURSOR-BUY-R6632-APK.json',
+  'docs/quality/CURSOR-BUY-R6632-DEVICE-RETEST-20260922.md',
+  'docs/quality/CURSOR-BUY-REDMI-AUDIT-20260922.md',
+  'docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md',
+  # Founder-authorized local-only 11-ticket Buy cutoff, 22 September.
+  'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+  'apps/mobile/lib/features/buy/buy_v2_models.dart',
+  'apps/mobile/lib/features/buy/buy_v2_catalogue_data.dart',
+  'docs/quality/CURSOR-BUY-LOCAL-CUTOFF-20260922.md',
+  'docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md',
+  'docs/quality/CURSOR-BUY-INTEGRATION-INVENTORY-20260922.json',
+  'docs/quality/CURSOR-BUY-INTEGRATION-EVIDENCE-20260922.zip',
   'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
   'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
@@ -1078,6 +1132,9 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  # Generated Flutter plugin path must reference this admitted worktree.
+  'apps/mobile/.flutter-plugins-dependencies',
+  'scripts/check-brand-integrity.ps1',
   'scripts/check-buy-protected-baseline.ps1',
   'scripts/check-buy-data-egress-boundary.ps1',
   'scripts/check-buy-backend-contract-boundary.ps1'
@@ -6070,6 +6127,7 @@ if ($ProductionLane -ceq 'baseline') {
         ([string]$subjectOutput[0] -cmatch $subjectPattern -or
           $r6610EvidenceAdmission -or
           (Test-StoreHistoricalAdmissionSubject $featureCommit ([string]$subjectOutput[0])) -or
+          (Test-CursorBuyReadyHistoricalSubject $featureCommit ([string]$subjectOutput[0])) -or
           (Test-R66HistoricalCommitSubject $featureCommit ([string]$subjectOutput[0])))
       ) "production feature commit subject is not atomic: $featureCommit"
     }

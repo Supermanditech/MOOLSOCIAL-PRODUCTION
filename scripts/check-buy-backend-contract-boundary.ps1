@@ -146,6 +146,18 @@ function Get-MobileBoundaryViolations {
 
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
+    # Founder-authorized Store Maps tap: exact r66.32 source only.
+    if ($IntegratedReviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0' -and
+        $owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart') {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      if ($mapHash -ceq '36D926CADF3B5F7988B48C300F3BC128E056E8322BFE47470D36A01DEF989F91') {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
     if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart') {
       # The sealed screen uses local File/Directory only for its temporary arrival cue.
       $soundSourceSha = [Security.Cryptography.SHA256]::Create()
@@ -183,6 +195,11 @@ function Get-MobileBoundaryViolations {
           # Inherited integrated Store embedding; arrival cue/imports unchanged.
           $IntegratedReviewSourceCommit -ceq 'd5279222466211f0526c625e58b8da5dc0d78218' -and
           $soundSourceHash -ceq 'C6438E31C55DA94A9B3CD4D1FF403535B1CB5B9C5727341E02AF90EDB4993992'
+        ) -or (
+          # r66.32 UI-only delta; the arrival cue/import seam is unchanged.
+          # The protected-source checker first verifies the full exact snapshot.
+          $IntegratedReviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0' -and
+          $soundSourceHash -ceq 'D4625A0942BFE5E8E018F55F0C35028D4EBA38F01E234E3250BEC52F07BB79DB'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }

@@ -83,7 +83,10 @@ void main() {
           Colors.white,
           BuyV2Colors.softBlue,
         ]);
-        expect(decoration.border, Border.all(color: BuyV2Colors.line));
+        expect(
+          (card.foregroundDecoration! as BoxDecoration).border,
+          Border.all(color: BuyV2Colors.line),
+        );
       }
       await openOffer();
       final productId = session.selectedProductId!;

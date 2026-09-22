@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "built_device_replay_complete_with_open_findings",
+  "buildAuthorization": "consumed",
+  "candidate": {
+    "id": "UAW-CURSOR-BUY-POST-REDMI-20260922-R1",
+    "versionName": "1.0.0-r66.32",
+    "versionCode": "2026092201",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "branch": "work/cursor-ui/buy-ready-20260921",
+    "head": "87bc96d4c28300146c9e2c3c3b37c7c3aacffed0"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "authorizationEvidence": "Founder: GO AHEAD WITH REDME APK; reconcile all work; narrow authority to resolve necessary APK blockers. No Store integration, production promotion, commit or push.",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md"
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-BUY-POST-REDMI-20260922-R1"
+  },
+  "premiumMotionPolicy": {
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md",
+    "disposition": "docs/quality/CURSOR-BUY-POST-REDMI-FIXES-20260922.md",
+    "state": "host_checks_passed_Redmi_pending_founder_recurring_name_exception_recorded",
+    "applied": [
+      "founder_authorized_recurring_store_name_sweeps_paused_for_reduced_motion_background_and_covered_routes"
+    ],
+    "reused": [
+      "existing_navigation_cart_and_checkout_motion"
+    ],
+    "dependencyHeld": [
+      "physical_Redmi_motion_and_accessibility",
+      "production_provider_payment_and_backend_acceptance"
+    ],
+    "inapplicable": [
+      "new_header_pickup_promotion_removed_by_founder"
+    ]
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/integration-coverage-r2.log"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/store-address-test-r2.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/corrected-targets-r3.log"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/brand-final.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/backend-final.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/egress-final.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/ui-locks-r2.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/build-foundation-r2.log"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/backend-final.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/egress-final.log"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/buy-cycle-1.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/store-address-test.log"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/build-foundation-r2.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/regression-memory.log"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/clean-support-r2.log"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/build-foundation-r2.log",
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/wrapper-profile-r2.log"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/wrapper-profile-r2.log"
+      ]
+    },
+    {
+      "id": "approved-ui-locks",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/ui-locks-r2.log"
+      ]
+    },
+    {
+      "id": "candidate-build-foundation",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/build-foundation-r2.log"
+      ]
+    },
+    {
+      "id": "protected-buy-source",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/protected-final.log"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/final-live-manifest-check.json"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/final-dart-analysis.log"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/buy-cycle-2.log"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/buy-cycle-3.log"
+      ]
+    }
+  ],
+  "postBuildGates": {
+    "artifactIdentity": "passed",
+    "installedChecksum": "passed",
+    "retainedDataLaunch": "passed: five Shop items/Rs750 and one Saved product retained; review orders present",
+    "buyDefectReplay": "completed_with_findings: 31 unique originals; 21 scoped closed, 10 carried to children/dependencies; two initial duplicates mapped; inactive rail separately unqualified",
+    "productionOrderPaymentAcceptance": "not_qualified_review_only"
+  },
+  "device": {
+    "serial": "TG8HCYTGGQT885OF",
+    "model": "Xiaomi 23106RN0DA"
+  },
+  "localRepairValidation": {
+    "fullCycle1": {
+      "passed": 2439,
+      "skipped": 27,
+      "failed": 30
+    },
+    "correctedTargetsR1": {
+      "passed": 30,
+      "failed": 8
+    },
+    "correctedTargetsR2": {
+      "passed": 4,
+      "failed": 8
+    },
+    "runtimeChangedDuringQualification": true,
+    "finalSourceReseal": "verified: 3233 inputs unchanged after Redmi replay; post-replay-source-verification.json",
+    "twoSuccessfulFullBuyCycles": "passed",
+    "correctedTargetsR3": {
+      "passed": 8,
+      "failed": 0,
+      "log": "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/corrected-targets-r3.log"
+    },
+    "originalThirtyFailures": "all_passed_in_focused_reruns_not_full_cycle_acceptance",
+    "newRuntimeScope": "Compact Store listing address and customer-initiated Google Maps entry in Store info and collection checkout.",
+    "successfulFullCycle1": {
+      "passed": 2472,
+      "skipped": 27,
+      "failed": 0,
+      "duration": "27:09",
+      "log": "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/buy-cycle-2.log"
+    },
+    "analysisDisposition": "No errors/warnings; three inherited informational brace notices retained. Dart analyze exit 0; Flutter analyze exit 1 retained, not labelled clean.",
+    "successfulFullCycle2": {
+      "passed": 2472,
+      "skipped": 27,
+      "failed": 0,
+      "duration": "26:03",
+      "log": "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/buy-cycle-3.log"
+    }
+  },
+  "storeDependencyDisposition": "Founder postponed Store integration and live-provider dependencies on 22 September; test implemented Buy fixes on Redmi. Shared pickup conflict remains deferred.",
+  "qualifiedApplicationSource": "87bc96d4c28300146c9e2c3c3b37c7c3aacffed0",
+  "source": {
+    "manifestPath": "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/source-manifest-final.txt",
+    "manifestSha256": "75D1B6F69EEE462C70C1205E37011F4F4EE9B461CF006235A50D0A2398DAE73D",
+    "fileCount": 3233
+  },
+  "artifact": {
+    "path": "apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/uaw-cursor-buy-post-redmi-20260922-r1-device-review-debug.apk",
+    "sha256": "F74ADCD10DE5A5DFA3F6A29F024484DCB8CAF294FB0682C01680EB7190F2CF8A",
+    "bytes": 215578681,
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.32-cursorreview",
+    "versionCode": 2026092201,
+    "signerSha256": "cbdfc5969ad51ed570afb1cf2fe60377e559d43f59d59e2ab66ccaf78ea9ac25",
+    "buildExitCode": 0
+  },
+  "deviceReplayReport": "docs/quality/CURSOR-BUY-R6632-DEVICE-RETEST-20260922.md",
+  "deviceReplaySummary": {
+    "uniqueOriginals": 31,
+    "closedWithinObservedScope": 21,
+    "openWithChildOrDependency": 10,
+    "initialDuplicatesMapped": 2,
+    "childDefects": 9,
+    "dependencyRecords": 3,
+    "founderStopBoundary": "Stop after original findings replayed and closed or carried with report; no new implementation."
+  }
+}

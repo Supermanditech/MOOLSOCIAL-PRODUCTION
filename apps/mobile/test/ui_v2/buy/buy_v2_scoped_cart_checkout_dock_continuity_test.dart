@@ -2170,7 +2170,8 @@ void main() {
               matching: find.byKey(ValueKey('buy-product-primary-$id')),
             );
             await tester.tap(add);
-            await tester.pump();
+            // Cart parking is reported after layout; verify its settled, tappable position.
+            await tester.pumpAndSettle();
             expect(session.quantityFor(id), product.minimumOrder);
             final cart = find.byKey(
               const ValueKey('buy-mini-cart-drag-handle'),
@@ -3796,7 +3797,12 @@ void main() {
         await expectLater(
           find.byType(BuyV2Screen),
           matchesGoldenFile(
-            'candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-${viewport.label}.png',
+            {
+                  '360x800-android-cart',
+                  '430x932-ios-cart',
+                }.contains(viewport.label)
+                ? 'candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-${viewport.label}.png'
+                : 'candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
       },

@@ -16,6 +16,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 
 class _FixtureCustomerStore implements BuyV2CustomerStateStore {
   BuyV2CustomerStateSnapshot? snapshot;
@@ -197,11 +198,25 @@ void main() {
         );
         await tester.enterText(field, 'sku 4999');
         await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-store-toolbar-name')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-store-search-finish')),
+          findsOneWidget,
+        );
         expect(source.productQueries.last.query, 'sku 4999');
         expect(source.productQueries.last.storeId, source.storeIdAt(0));
         expect(session.catalogueQuery().key, homeQuery);
         await tester.enterText(field, '');
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-store-search-finish')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-store-toolbar-name')),
+          findsOneWidget,
+        );
         final filter = find.byKey(const ValueKey('buy-store-filter-control'));
         await _revealPagedHeader(tester, scope, filter);
         await tester.tap(filter);
@@ -2428,7 +2443,7 @@ void main() {
         );
         expect(
           find.byKey(const ValueKey('buy-public-store-collection-benefit')),
-          findsOneWidget,
+          findsNothing,
         );
         await capture('store');
         await tester.tap(
@@ -2658,7 +2673,7 @@ void main() {
           );
           expect(
             find.byKey(const ValueKey('buy-public-store-collection-benefit')),
-            findsOneWidget,
+            findsNothing,
           );
           expect(
             session.partnerCatalogueFor(session.product(firstProductId)).length,
@@ -2872,6 +2887,12 @@ void main() {
           await _revealPagedHeader(tester, storeScope, clear);
           await tester.tap(clear);
           await tester.pumpAndSettle();
+          if (storefront) {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-store-search-finish')),
+            );
+            await tester.pumpAndSettle();
+          }
           final categoryControl = find.byKey(
             const ValueKey('buy-store-category-control'),
           );
@@ -2917,6 +2938,14 @@ void main() {
           expect(tester.testTextInput.isVisible, isTrue);
           tester.testTextInput.hide();
           await tester.pumpAndSettle();
+          if (storefront) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-store-search-finish')),
+              findsNothing,
+            );
+          }
           await _revealPagedHeader(tester, storeScope, categoryControl);
           await tester.tap(categoryControl);
           await tester.pumpAndSettle();
@@ -3260,132 +3289,105 @@ void main() {
   for (final size in [const Size(320, 844), const Size(640, 360)]) {
     for (final scale in [1.0, 2.0]) {
       final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
-      testWidgets('R669 collection discovery keeps the exact branch $profile', (
-        tester,
-      ) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = size;
-        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
-        addTearDown(tester.view.reset);
-        final setup = await _CollectionHeaderFixture.create(tester);
-        addTearDown(setup.dispose);
-        final session = setup.session;
-        final current = setup.products.first;
-        final other = setup.products.last;
-        session.addProduct(other.id);
-        session.toggleSaved(other.id);
-        expect(session.openProduct(current.id), isTrue);
-        await tester.pumpWidget(_app(session, textScale: scale));
-        await tester.pumpAndSettle();
-        addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-        final seller = find.byKey(
-          ValueKey('buy-shop-seller-action-${current.id}'),
-        );
-        await _revealProductAction(tester, current.id, seller);
-        await tester.ensureVisible(seller);
-        await tester.pumpAndSettle();
-        expect(seller.hitTestable(), findsOneWidget);
-        await tester.tap(seller);
-        await tester.pumpAndSettle();
-
-        final benefit = find.byKey(
-          const ValueKey('buy-public-store-collection-benefit'),
-        );
-        expect(benefit, findsOneWidget);
-        final text = find.descendant(
-          of: benefit,
-          matching: find.text('Order & Collect'),
-        );
-        expect(text, findsOneWidget);
-        final description = find.descendant(
-          of: benefit,
-          matching: find.text(
-            'Order through MoolSocial and collect from the store when ready—less time spent shopping and waiting.',
-          ),
-        );
-        final button = find.byKey(
-          const ValueKey('buy-public-store-order-collection'),
-        );
-        for (final entry in [
-          ('title', text),
-          ('description', description),
-          ('button', find.text('Order for collection')),
-        ]) {
-          await tester.ensureVisible(entry.$2);
+      testWidgets(
+        'Local cutoff checkout does not invent a missing Store address $profile',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+          addTearDown(tester.view.reset);
+          final setup = await _CollectionHeaderFixture.create(tester);
+          addTearDown(setup.dispose);
+          final session = setup.session;
+          final current = setup.products.first;
+          final other = setup.products.last;
+          session.addProduct(other.id);
+          session.toggleSaved(other.id);
+          expect(session.openProduct(current.id), isTrue);
+          await tester.pumpWidget(_app(session, textScale: scale));
           await tester.pumpAndSettle();
-          expect(entry.$2.hitTestable(), findsOneWidget);
-          final paragraph = tester.renderObject<RenderParagraph>(entry.$2);
-          final natural = TextPainter(
-            text: paragraph.text,
-            textDirection: paragraph.textDirection,
-            textScaler: paragraph.textScaler,
-          )..layout(maxWidth: paragraph.size.width);
-          expect(paragraph.didExceedMaxLines, isFalse);
-          expect(
-            paragraph.size.height + .1,
-            greaterThanOrEqualTo(natural.height),
+          addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+          final seller = find.byKey(
+            ValueKey('buy-shop-seller-action-${current.id}'),
           );
-          natural.dispose();
-          await captureR66Visual(tester, 'collect-header-$profile-${entry.$1}');
-        }
-        expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
-        final ordersBefore = session.orders.length;
-        await tester.tap(button);
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('buy-shop-seller-full-catalogue-list')),
-          findsOneWidget,
-        );
-        expect(session.quantityFor(current.id), 0);
-        expect(session.orders.length, ordersBefore);
-        await captureR66Visual(tester, 'collect-header-$profile-products');
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(benefit, findsOneWidget);
+          await _revealProductAction(tester, current.id, seller);
+          await tester.ensureVisible(seller);
+          await tester.pumpAndSettle();
+          expect(seller.hitTestable(), findsOneWidget);
+          await tester.tap(seller);
+          await tester.pumpAndSettle();
 
-        // Identical display names cannot mix different branches' products.
-        expect(
-          session.partnerCatalogueFor(current).map((product) => product.id),
-          [current.id, setup.products[1].id],
-        );
-        expect(session.product(current.id).storeId, 'collection-store-a');
-        expect(session.product(current.id).pack, '500 ml pouch');
-        expect(session.quantityFor(other.id), 1);
-        expect(session.isSaved(other.id), isTrue);
-        final close = find.byKey(const ValueKey('buy-shop-seller-sheet-close'));
-        await tester.scrollUntilVisible(
-          close,
-          -120,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-shop-seller-sheet-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.ensureVisible(close);
-        await tester.pumpAndSettle();
-        expect(close.hitTestable(), findsOneWidget);
-        await tester.tap(close);
-        await tester.pumpAndSettle();
-        expect(benefit, findsNothing);
-        expect(session.selectedProductId, current.id);
-        expect(session.product(current.id).storeId, 'collection-store-a');
-        expect(session.quantityFor(other.id), 1);
-        expect(session.isSaved(other.id), isTrue);
-        expect(session.addProduct(current.id), isTrue);
-        session.openCart();
-        expect(session.openCheckout(), isTrue);
-        expect(session.collectionCheckoutSelected, isTrue);
-        expect(session.checkoutLines.map((line) => line.product.id), [
-          current.id,
-        ]);
-        expect(session.quantityFor(other.id), 1);
-        expect(session.orders.length, ordersBefore);
-        expect(session.collectionCheckoutMessage, contains('Sign in'));
-        expect(tester.takeException(), isNull);
-      });
+          final benefit = find.byKey(
+            const ValueKey('buy-public-store-collection-benefit'),
+          );
+          expect(benefit, findsNothing);
+          expect(find.text('Order & Collect'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-public-store-order-collection')),
+            findsNothing,
+          );
+          final ordersBefore = session.orders.length;
+          expect(session.quantityFor(current.id), 0);
+          expect(session.collectionCheckoutSelected, isFalse);
+          await captureR66Visual(
+            tester,
+            'collect-header-$profile-no-promotion',
+          );
+
+          // Identical display names cannot mix different branches' products.
+          expect(
+            session.partnerCatalogueFor(current).map((product) => product.id),
+            [current.id, setup.products[1].id],
+          );
+          expect(session.product(current.id).storeId, 'collection-store-a');
+          expect(session.product(current.id).pack, '500 ml pouch');
+          expect(session.quantityFor(other.id), 1);
+          expect(session.isSaved(other.id), isTrue);
+          final close = find.byKey(
+            const ValueKey('buy-shop-seller-sheet-close'),
+          );
+          await tester.scrollUntilVisible(
+            close,
+            -120,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const ValueKey('buy-shop-seller-sheet-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(close);
+          await tester.pumpAndSettle();
+          expect(close.hitTestable(), findsOneWidget);
+          await tester.tap(close);
+          await tester.pumpAndSettle();
+          expect(benefit, findsNothing);
+          expect(session.selectedProductId, current.id);
+          expect(session.product(current.id).storeId, 'collection-store-a');
+          expect(session.quantityFor(other.id), 1);
+          expect(session.isSaved(other.id), isTrue);
+          expect(session.addProduct(current.id), isTrue);
+          session.openCart();
+          expect(session.openCheckout(), isTrue);
+          expect(session.collectionCheckoutSelected, isFalse);
+          // This legacy fixture has product identities but no Store record.
+          // Keep both branches in Cart; never manufacture a pickup address.
+          expect(session.collectionCheckoutStores, isEmpty);
+          expect(
+            session.chooseCheckoutCollection(true, storeId: current.storeId),
+            isFalse,
+          );
+          expect(session.chooseCheckoutCollection(true), isTrue);
+          expect(session.collectionCheckoutSelected, isTrue);
+          expect(session.checkoutLines, isEmpty);
+          expect(session.quantityFor(current.id), current.minimumOrder);
+          expect(session.quantityFor(other.id), 1);
+          expect(session.orders.length, ordersBefore);
+          expect(session.collectionCheckoutMessage, contains('Sign in'));
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
 
@@ -3449,7 +3451,7 @@ void main() {
   }
 
   testWidgets(
-    'R5 collection visibility updates and expires on the same Store',
+    'Local cutoff collection promotion stays absent after capability changes',
     (tester) async {
       final setup = await _CollectionHeaderFixture.create(tester);
       addTearDown(setup.dispose);
@@ -3470,7 +3472,7 @@ void main() {
       final benefit = find.byKey(
         const ValueKey('buy-public-store-collection-benefit'),
       );
-      expect(benefit, findsOneWidget);
+      expect(benefit, findsNothing);
 
       setup.facts.capability = null;
       expect(session.refreshProductFacts(current.id), isTrue);
@@ -3482,7 +3484,7 @@ void main() {
       );
       expect(session.refreshProductFacts(current.id), isTrue);
       await tester.pumpAndSettle();
-      expect(benefit, findsOneWidget);
+      expect(benefit, findsNothing);
       await tester.pump(const Duration(seconds: 6));
       await tester.pumpAndSettle();
       expect(benefit, findsNothing);
@@ -3491,40 +3493,43 @@ void main() {
     },
   );
 
-  testWidgets('R5 collection visibility withdraws after an invalid refresh', (
-    tester,
-  ) async {
-    final setup = await _CollectionHeaderFixture.create(tester);
-    addTearDown(setup.dispose);
-    final current = setup.products.first;
-    setup.session.addProduct(setup.products.last.id);
-    expect(setup.session.openProduct(current.id), isTrue);
-    await tester.pumpWidget(_app(setup.session));
-    await tester.pumpAndSettle();
-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    final seller = find.byKey(ValueKey('buy-shop-seller-action-${current.id}'));
-    await _revealProductAction(tester, current.id, seller);
-    await tester.ensureVisible(seller);
-    await tester.pumpAndSettle();
-    await tester.tap(seller);
-    await tester.pumpAndSettle();
-    final benefit = find.byKey(
-      const ValueKey('buy-public-store-collection-benefit'),
-    );
-    expect(benefit, findsOneWidget);
-    setup.facts.wrongProduct = true;
-    expect(setup.session.refreshProductFacts(current.id), isFalse);
-    await tester.pumpAndSettle();
-    expect(benefit, findsNothing);
-    expect(setup.session.quantityFor(setup.products.last.id), 1);
-    setup.facts.wrongProduct = false;
-    expect(setup.session.refreshProductFacts(current.id), isTrue);
-    await tester.pumpAndSettle();
-    expect(benefit, findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'Local cutoff invalid refresh preserves Cart without collection promotion',
+    (tester) async {
+      final setup = await _CollectionHeaderFixture.create(tester);
+      addTearDown(setup.dispose);
+      final current = setup.products.first;
+      setup.session.addProduct(setup.products.last.id);
+      expect(setup.session.openProduct(current.id), isTrue);
+      await tester.pumpWidget(_app(setup.session));
+      await tester.pumpAndSettle();
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      final seller = find.byKey(
+        ValueKey('buy-shop-seller-action-${current.id}'),
+      );
+      await _revealProductAction(tester, current.id, seller);
+      await tester.ensureVisible(seller);
+      await tester.pumpAndSettle();
+      await tester.tap(seller);
+      await tester.pumpAndSettle();
+      final benefit = find.byKey(
+        const ValueKey('buy-public-store-collection-benefit'),
+      );
+      expect(benefit, findsNothing);
+      setup.facts.wrongProduct = true;
+      expect(setup.session.refreshProductFacts(current.id), isFalse);
+      await tester.pumpAndSettle();
+      expect(benefit, findsNothing);
+      expect(setup.session.quantityFor(setup.products.last.id), 1);
+      setup.facts.wrongProduct = false;
+      expect(setup.session.refreshProductFacts(current.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(benefit, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('R5 collection visibility rechecks capability on app resume', (
+  testWidgets('Local cutoff resume does not restore collection promotion', (
     tester,
   ) async {
     var now = tester.binding.clock.now();
@@ -3544,7 +3549,7 @@ void main() {
     final benefit = find.byKey(
       const ValueKey('buy-public-store-collection-benefit'),
     );
-    expect(benefit, findsOneWidget);
+    expect(benefit, findsNothing);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     now = now.add(const Duration(hours: 2));
@@ -3575,7 +3580,7 @@ void main() {
         expect(item.destination, product.destination);
         expect(item.catalogueListing || item.id == id, isTrue);
         if (product.destination == BuyV2Destination.wholesale) {
-          expect(item.minimumOrder > 2, product.minimumOrder > 2);
+          expect(item.offerClass, product.offerClass);
         }
       }
       expect(product.catalogueListing, isFalse);
@@ -4522,7 +4527,7 @@ final class _CollectionHeaderFixture {
     final session = BuyV2Session(
       core: core,
       commerceAdapter: _CollectionHeaderCommerce(products),
-      productFactsAdapter: facts,
+      productFactsAdapter: BuyTestEligibilityFacts(delegate: facts, now: clock),
       catalogueNow: clock,
       reviewDataEnabled: false,
     );

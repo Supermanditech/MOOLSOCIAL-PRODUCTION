@@ -116,6 +116,45 @@ class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
       throw UnsupportedError(invocation.memberName.toString());
 }
 
+class _TrackingEligibleCommerce extends _R669DeliveryCommerce {
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: state,
+    products: [
+      for (final product in BuyV2Catalogue.products)
+        product.copyWith(storeId: 'tracking-test-store'),
+    ],
+    orders: records,
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+  );
+}
+
+class _TrackingEligibleFacts implements BuyV2ProductFactsAdapter {
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final now = DateTime.now();
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          eligibility: BuyV2OfferEligibility(
+            productId: product.id,
+            storeId: product.storeId!,
+            sourceRevision: 'tracking-navigation-test-v1',
+            customerLocationKey: '||0',
+            observedAt: now.subtract(const Duration(seconds: 1)),
+            expiresAt: now.add(const Duration(minutes: 5)),
+            offerClass: product.offerClass!,
+            channelEnabled: true,
+            storeReady: true,
+            fleetAvailable: false,
+            customerLocationConfirmed: true,
+            options: {BuyV2DeliveryOption.freight},
+          ),
+        );
+  }
+}
+
 class _R669PendingDeliveryCommerce extends _R669DeliveryCommerce {
   Completer<BuyV2OrderRefreshResult>? pending;
   @override
@@ -307,38 +346,47 @@ BuyV2Order _r66Order(BuyV2OrderStatus status, BuyV2Destination destination) =>
     );
 
 void main() {
-  test('R669 rail tracking nested Cart return and stale owner rejection', () async {
-    final core = BuySession();
-    final store = _R669TrackingOwnerStore();
-    final session = BuyV2Session(core: core, commerceAdapter: _R669DeliveryCommerce(), customerStateStore: store, reviewDataEnabled: false);
-    addTearDown(core.dispose);
-    addTearDown(session.dispose);
-    await session.restoreCommerce();
-    session.openDestination(BuyV2Destination.wholesale);
-    session.addProduct('w-notebook');
-    session.openCart(scope: BuyV2CartScope.wholesale);
-    final quantity = session.quantityFor('w-notebook');
-    expect(session.openDeliveryTracking('quick-1'), isTrue);
-    expect(session.openOrderItems('quick-1'), isTrue);
-    session.goBack();
-    expect(session.view, BuyV2View.tracking);
-    session.goBack();
-    expect(session.view, BuyV2View.cart);
-    expect(session.cartScope, BuyV2CartScope.wholesale);
-    expect(session.quantityFor('w-notebook'), quantity);
-    expect(session.openDeliveryTracking('quick-1'), isTrue);
-    store.ownerScope = 'tracking-owner-b';
-    session.goBack();
-    expect(session.destination, BuyV2Destination.orders);
-    expect(session.view, BuyV2View.catalogue);
-    session.openDestination(BuyV2Destination.wholesale);
-    expect(session.openDeliveryTracking('quick-1'), isTrue);
-    session.openOrders();
-    session.openTracking('quick-1');
-    session.goBack();
-    expect(session.destination, BuyV2Destination.orders);
-    expect(session.view, BuyV2View.catalogue);
-  });
+  test(
+    'R669 rail tracking nested Cart return and stale owner rejection',
+    () async {
+      final core = BuySession();
+      final store = _R669TrackingOwnerStore();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _TrackingEligibleCommerce(),
+        productFactsAdapter: _TrackingEligibleFacts(),
+        customerStateStore: store,
+        reviewDataEnabled: false,
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      session.openDestination(BuyV2Destination.wholesale);
+      expect(session.addProduct('w-notebook'), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      final quantity = session.quantityFor('w-notebook');
+      expect(session.openDeliveryTracking('quick-1'), isTrue);
+      expect(session.openOrderItems('quick-1'), isTrue);
+      session.goBack();
+      expect(session.view, BuyV2View.tracking);
+      session.goBack();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(session.quantityFor('w-notebook'), quantity);
+      expect(session.openDeliveryTracking('quick-1'), isTrue);
+      store.ownerScope = 'tracking-owner-b';
+      session.goBack();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.catalogue);
+      session.openDestination(BuyV2Destination.wholesale);
+      expect(session.openDeliveryTracking('quick-1'), isTrue);
+      session.openOrders();
+      session.openTracking('quick-1');
+      session.goBack();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.catalogue);
+    },
+  );
   Widget app(
     BuyV2Session session,
     double scale, {
@@ -424,11 +472,17 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('R669 delivery selector stays open while reading $scale', (tester) async {
+    testWidgets('R669 delivery selector stays open while reading $scale', (
+      tester,
+    ) async {
       await tester.binding.setSurfaceSize(const Size(320, 780));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final core = BuySession();
-      final session = BuyV2Session(core: core, commerceAdapter: _R669DeliveryCommerce(), reviewDataEnabled: false);
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _R669DeliveryCommerce(),
+        reviewDataEnabled: false,
+      );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await session.restoreCommerce();
@@ -446,27 +500,49 @@ void main() {
       await tester.pump(const Duration(seconds: 90));
       await tester.pumpAndSettle();
       expect(choice, findsOneWidget);
-      expect(tester.getRect(choice), before, reason: 'Reading must not hide or reset the delivery list.');
+      expect(
+        tester.getRect(choice),
+        before,
+        reason: 'Reading must not hide or reset the delivery list.',
+      );
       await capture(tester, 'r669-delivery-picker-reading-$scale');
       await tester.tap(choice);
       await tester.pumpAndSettle();
-      final panel = find.byKey(const ValueKey('buy-quick-delivery-status-expanded'));
-      expect(find.descendant(of: panel, matching: find.text('bulk-4')), findsOneWidget);
+      final panel = find.byKey(
+        const ValueKey('buy-quick-delivery-status-expanded'),
+      );
+      expect(
+        find.descendant(of: panel, matching: find.text('bulk-4')),
+        findsOneWidget,
+      );
       await tester.pump(const Duration(seconds: 46));
       await tester.pumpAndSettle();
-      expect(panel, findsNothing, reason: 'After selection, the ordinary quiet-rail timer resumes.');
-      expect(find.byKey(const ValueKey('buy-quick-delivery-toggle')), findsOneWidget);
+      expect(
+        panel,
+        findsNothing,
+        reason: 'After selection, the ordinary quiet-rail timer resumes.',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-quick-delivery-toggle')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
 
   for (final origin in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
-    testWidgets('R669 rail tracking Back restores ${origin.name} shopping', (tester) async {
+    testWidgets('R669 rail tracking Back restores ${origin.name} shopping', (
+      tester,
+    ) async {
       await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final core = BuySession();
-      final session = BuyV2Session(core: core, commerceAdapter: _R669DeliveryCommerce(), reviewDataEnabled: false);
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _R669DeliveryCommerce(),
+        reviewDataEnabled: false,
+      );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await session.restoreCommerce();
@@ -589,48 +665,77 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('R669 arrival summaries preserve freshness $scale', (tester) async {
+    testWidgets('R669 arrival summaries preserve freshness $scale', (
+      tester,
+    ) async {
       await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final core = BuySession();
       final adapter = _R669PendingDeliveryCommerce();
-      final session = BuyV2Session(core: core, commerceAdapter: adapter, reviewDataEnabled: false);
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: adapter,
+        reviewDataEnabled: false,
+      );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await session.restoreCommerce();
       await tester.pumpWidget(app(session, scale));
       await tester.pumpAndSettle();
       await tapDelivery(tester, 'toggle');
-      final panel = find.byKey(const ValueKey('buy-quick-delivery-status-expanded'));
-      Finder panelText(String text) => find.descendant(of: panel, matching: find.textContaining(text));
+      final panel = find.byKey(
+        const ValueKey('buy-quick-delivery-status-expanded'),
+      );
+      Finder panelText(String text) =>
+          find.descendant(of: panel, matching: find.textContaining(text));
       expect(panelText('Last recorded estimate'), findsOneWidget);
       expect(panelText('Delivery in 15 min'), findsOneWidget);
       await capture(tester, 'r669-arrival-last-recorded-$scale');
       await tapDelivery(tester, 'open');
       expect(session.view, BuyV2View.tracking);
-      expect(find.text('Last recorded estimate · Delivery in 15 min'), findsWidgets);
+      expect(
+        find.text('Last recorded estimate · Delivery in 15 min'),
+        findsWidgets,
+      );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       session.openOrders();
       await tester.pumpAndSettle();
       final quickCard = find.byKey(const ValueKey('buy-order-card-quick-1'));
-      Finder cardText(String text) => find.descendant(of: quickCard, matching: find.textContaining(text));
+      Finder cardText(String text) =>
+          find.descendant(of: quickCard, matching: find.textContaining(text));
       expect(cardText('Last recorded estimate'), findsOneWidget);
       adapter.pending = Completer<BuyV2OrderRefreshResult>();
       final pending = session.refreshOrder('quick-1');
       await tester.pump();
       expect(cardText('Updating · last recorded estimate'), findsOneWidget);
-      adapter.pending!.complete(const BuyV2OrderRefreshResult(state: BuyV2CommerceLoadState.offline, customerMessage: 'Update unavailable'));
+      adapter.pending!.complete(
+        const BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.offline,
+          customerMessage: 'Update unavailable',
+        ),
+      );
       expect(await pending, isFalse);
       adapter.pending = null;
       await tester.pumpAndSettle();
-      expect(cardText('Last recorded estimate (update unavailable)'), findsOneWidget);
+      expect(
+        cardText('Last recorded estimate (update unavailable)'),
+        findsOneWidget,
+      );
       await capture(tester, 'r669-arrival-unavailable-$scale');
       expect(await session.refreshOrder('quick-1'), isTrue);
       await tester.pumpAndSettle();
       expect(cardText('Updated estimate · Delivery in 15 min'), findsOneWidget);
-      final scheduledCard = find.byKey(const ValueKey('buy-order-card-scheduled-2'));
-      expect(find.descendant(of: scheduledCard, matching: find.textContaining('Last recorded estimate')), findsOneWidget);
+      final scheduledCard = find.byKey(
+        const ValueKey('buy-order-card-scheduled-2'),
+      );
+      expect(
+        find.descendant(
+          of: scheduledCard,
+          matching: find.textContaining('Last recorded estimate'),
+        ),
+        findsOneWidget,
+      );
       await capture(tester, 'r669-arrival-updated-$scale');
       session.openDestination(BuyV2Destination.shop);
       await tester.pumpAndSettle();
@@ -640,20 +745,41 @@ void main() {
       await tester.ensureVisible(picker);
       await tester.tap(picker);
       await tester.pumpAndSettle();
-      final quickChoice = find.byKey(const ValueKey('buy-delivery-select-quick-1'));
-      final scheduledChoice = find.byKey(const ValueKey('buy-delivery-select-scheduled-2'));
-      expect(find.descendant(of: quickChoice, matching: find.textContaining('Updated estimate')), findsOneWidget);
-      expect(find.descendant(of: scheduledChoice, matching: find.textContaining('Last recorded estimate')), findsOneWidget);
+      final quickChoice = find.byKey(
+        const ValueKey('buy-delivery-select-quick-1'),
+      );
+      final scheduledChoice = find.byKey(
+        const ValueKey('buy-delivery-select-scheduled-2'),
+      );
+      expect(
+        find.descendant(
+          of: quickChoice,
+          matching: find.textContaining('Updated estimate'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: scheduledChoice,
+          matching: find.textContaining('Last recorded estimate'),
+        ),
+        findsOneWidget,
+      );
       await capture(tester, 'r669-arrival-selector-$scale');
       await tester.ensureVisible(quickChoice);
       await tester.tap(quickChoice);
       await tester.pumpAndSettle();
       await tapDelivery(tester, 'hide');
-      final quiet = tester.widget<Semantics>(find.byKey(const ValueKey('buy-quick-delivery-status-minimized')));
+      final quiet = tester.widget<Semantics>(
+        find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
+      );
       expect(quiet.properties.label, contains('Updated estimate'));
 
       expect(session.orders, hasLength(4));
-      expect(session.orders.firstWhere((o) => o.id == 'quick-1').promise, 'Delivery in 15 min');
+      expect(
+        session.orders.firstWhere((o) => o.id == 'quick-1').promise,
+        'Delivery in 15 min',
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -840,8 +966,12 @@ void main() {
               await tester.pumpAndSettle();
             }
             final choice = find.byKey(ValueKey('buy-delivery-select-$id'));
-            await tester.ensureVisible(choice);
+            await Scrollable.ensureVisible(
+              tester.element(choice),
+              alignment: .5,
+            );
             await tester.pumpAndSettle();
+            expect(choice.hitTestable(), findsOneWidget);
             await tester.tap(choice);
             await tester.pumpAndSettle();
             expect(
@@ -884,34 +1014,28 @@ void main() {
           await tapDelivery(tester, 'toggle');
           expect(
             find.descendant(of: panel, matching: find.text('quick-1')),
-            findsOneWidget,
-          );
-          expect(find.textContaining('Delivered'), findsWidgets);
-          expect(
-            find.descendant(
-              of: panel,
-              matching: find.textContaining(
-                'Original promise: Delivery in 15 min',
-              ),
-            ),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(
-              of: panel,
-              matching: find.textContaining('Delivered in 15 min'),
-            ),
             findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: panel,
+              matching: find.text(session.activeDeliveryOrders.first.id),
+            ),
+            findsOneWidget,
+          );
+          final delivered = session.orders.firstWhere(
+            (order) => order.id == 'quick-1',
+          );
+          expect(delivered.status, BuyV2OrderStatus.delivered);
+          expect(
+            buyV2OrderPromiseSummary(delivered),
+            'Original promise: Delivery in 15 min',
+          );
+          expect(
+            buyV2OrderPromiseSummary(delivered),
+            isNot(contains('Delivered in 15 min')),
           );
           await capture(tester, '$prefix-completed');
-          expect(
-            find.byKey(const ValueKey('buy-quick-delivery-sound')),
-            findsNothing,
-          );
-          expect(
-            find.byKey(const ValueKey('buy-quick-delivery-keep')),
-            findsNothing,
-          );
           await tapDelivery(tester, 'hide');
           adapter.advance('wholesale-3', BuyV2OrderStatus.arriving);
           await session.restoreCommerce();

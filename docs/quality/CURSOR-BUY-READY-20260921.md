@@ -949,3 +949,34 @@ Large-text screenshot review revealed Reset taking most footer width and forcing
 22 September: implement REG4634 Delivery rail only for active placed delivery records, REG4635 theme-consistent Offers promotions, and reconcile all session requests. Launch-supporting UI correctness using existing order state, navigation, published offers and colours. Exact runtime owners: screen (delivery selection predicate only), catalogue (promo styling), session only if required by existing authoritative lifecycle. Focused existing test owners: session and promotion rail. Exclude backend/provider/native/routing contracts and unrelated worktrees. Validate zero/active/completed/retained/multiple orders, existing fulfilment exclusions, offer callbacks/return and normal/large-text captures. Cancellation not invented where order contract has no cancellation state. Production payment and new Redmi qualification remain separate evidence obligations.
 
 Current user authorization transfers only buy_v2_screen.dart ownership from the recorded retired RV6 audit task to this independent Cursor ticket, to fix its actual rail predicate; no other task owner or policy rule changes.
+
+## Current local-only batch and next-device memory (22 September)
+
+Founder added ticket 11: explicit Store-to-Buy channel/fulfilment eligibility.
+Complete scope, the ten residual findings, safe-parking requirements and mandatory
+next-Redmi/backend retest queue are in CURSOR-BUY-LOCAL-CUTOFF-20260922.md.
+No APK for this batch. Existing implementation admission rejected the newer
+scope; no new runtime implementation is claimed yet.
+
+
+## Local 11-ticket cutoff — 22 September 2026
+
+Frontend fixes and child checks completed locally; see
+`docs/quality/CURSOR-BUY-LOCAL-CUTOFF-20260922.md` for per-ticket dispositions,
+explicit eligibility schema and final test evidence. No new APK. Nine change
+tickets are locally closed; provider/data tickets 5 and 10 retain their previously
+deferred external dependencies. All 11 must be replayed on the next Redmi APK
+with backend tickets. Source remains uncommitted on the same branch/HEAD, safely
+archived with exact hashes under the workspace outputs directory. Formal handoff
+requires a clean committed tree; the existing gate was not waived. Stop here.
+
+
+## Latest: complete Git reconciliation and Codex baseline request
+
+Founder authorized preserving all Cursor work locally and remotely, a clean
+committed handoff, and requesting the next full integrated baseline from Codex.
+See CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md and its inventory for exact source,
+commit coverage, local/remote verification and recovery artifacts. This supersedes
+the earlier uncommitted cutoff state without changing app source or device claims.
+All eleven tickets and children still require next-Redmi replay with backend;
+DEP-01/02/03 remain explicit. No backend work or new APK starts from this handoff.

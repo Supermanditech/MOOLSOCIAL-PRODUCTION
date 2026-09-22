@@ -344,6 +344,37 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
+  if ($SourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0') {
+    # One founder-authorized r66.32 review snapshot, including uncommitted fixes.
+    # This is not a moving HEAD allowance or a replacement accepted baseline.
+    $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+    if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
+    if ((& git -C $root branch --show-current) -cne 'work/cursor-ui/buy-ready-20260921' -or
+        (& git -C $root rev-parse HEAD) -cne $SourceCommit) { return $false }
+    $snapshotPath = Join-Path $root 'apps/mobile/build/review-candidates/cursor-buy-post-redmi-20260922-r1/reconciliation-final.json'
+    if (-not (Test-Path -LiteralPath $snapshotPath -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $snapshotPath -Algorithm SHA256).Hash -cne
+          'C5560F3A1472B265528589A928FF17343BBDAB73288C7E32A5EE3438BE6F8D5F') { return $false }
+    $snapshot = Get-Content -Raw -LiteralPath $snapshotPath | ConvertFrom-Json
+    $snapshotOwners = @($snapshot.inputFiles | ForEach-Object { [string]$_.path } | Sort-Object -Unique)
+    $inventoryRoots = @('apps/mobile/lib','apps/mobile/assets','apps/mobile/android',
+      'apps/mobile/ios','apps/mobile/packages','apps/mobile/test',
+      'apps/mobile/pubspec.yaml','apps/mobile/pubspec.lock','backend','contracts','packages')
+    $liveOwners = @(& git -C $root ls-files --cached --others --exclude-standard -- @inventoryRoots | Sort-Object -Unique)
+    if ($LASTEXITCODE -ne 0 -or ($liveOwners -join '|') -cne ($snapshotOwners -join '|')) { return $false }
+    foreach ($entry in $snapshot.inputFiles) {
+      $ownerPath = Join-Path $root ([string]$entry.path)
+      if (-not (Test-Path -LiteralPath $ownerPath -PathType Leaf) -or
+          (Get-FileHash -LiteralPath $ownerPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne
+            [string]$entry.sha256) { return $false }
+    }
+    $protectedOwners = @($snapshotOwners | Where-Object {
+      $_.StartsWith('apps/mobile/lib/features/buy/', [StringComparison]::Ordinal) -or
+      $_.StartsWith('apps/mobile/lib/ui_v2/buy/', [StringComparison]::Ordinal) -or
+      @($explicitFiles | ForEach-Object { $_.Replace('\','/') }) -ccontains $_
+    } | Sort-Object -Unique)
+    return ($relativeFiles -join '|') -ceq ($protectedOwners -join '|')
+  }
   # Founder-authorized isolated debug review; never replaces accepted baseline.
   if ($SourceCommit -cne 'd5279222466211f0526c625e58b8da5dc0d78218') { return $false }
   $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')

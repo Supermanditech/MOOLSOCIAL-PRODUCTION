@@ -902,8 +902,15 @@ void main() {
     final session = BuyV2Session(core: core);
     addTearDown(session.dispose);
     addTearDown(core.dispose);
-    final products = session.visibleProducts.take(6).toList();
-    expect(products.length, greaterThanOrEqualTo(4));
+    final products = session.visibleProducts
+        .where(
+          (product) =>
+              buyV2CatalogueFulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        )
+        .take(8)
+        .toList();
+    expect(products.length, greaterThanOrEqualTo(6));
     for (final product in products) {
       session.toggleSaved(product.id);
     }
@@ -926,7 +933,7 @@ void main() {
           ),
         )
         .first;
-    final selected = products[3];
+    final selected = products.last;
     final image = find.descendant(
       of: find.byKey(ValueKey('buy-product-${selected.id}')),
       matching: find.byKey(ValueKey('buy-grid-packshot-${selected.id}')),

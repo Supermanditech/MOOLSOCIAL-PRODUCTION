@@ -9,6 +9,7 @@ import '../work/scan_and_pick_contract.dart';
 import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
+import 'buy_v2_customer_copy.dart';
 import 'buy_v2_models.dart';
 import 'buy_v2_order_resolution_contracts.dart';
 import 'buy_v2_search_relevance.dart';
@@ -876,7 +877,7 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
       if (query.collectionOnly && index % 4 == 3) continue;
       if (searchNames &&
           text.isNotEmpty &&
-          !'${_name(index)} ${_area(index)} ${storeIdAt(index)}'
+          !'${_name(index)} ${buyV2CustomerStoreName(_name(index), storeIdAt(index))} ${_area(index)} ${storeIdAt(index)}'
               .toLowerCase()
               .contains(text)) {
         continue;
@@ -961,23 +962,26 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
       return false;
     }
     if (query.shopSaleType != null &&
-        ((query.shopSaleType == BuyV2ShopSaleType.quickDelivery) !=
-            (fulfilment == BuyV2FulfilmentMode.quickLocal))) {
+        !base.reviewDeliveryOptions.contains(
+          query.shopSaleType == BuyV2ShopSaleType.quickDelivery
+              ? BuyV2DeliveryOption.quick
+              : BuyV2DeliveryOption.scheduled,
+        )) {
       return false;
     }
     if (query.wholesaleSaleType != null &&
+        base.offerClass != BuyV2OfferClass.wholesale &&
+        base.offerClass != BuyV2OfferClass.bulk)
+      return false;
+    if (query.wholesaleSaleType != null &&
         ((query.wholesaleSaleType == BuyV2WholesaleSaleType.bulk) !=
-            (base.minimumOrder > 2))) {
+            (base.offerClass == BuyV2OfferClass.bulk))) {
       return false;
     }
-    final pack = base.destination == BuyV2Destination.wholesale
-        ? (base.minimumOrder > 2
-              ? BuyV2PackFilter.bulk
-              : BuyV2PackFilter.standard)
-        : base.minimumOrder > 1 ||
-              RegExp(
-                r'case|carton|crate|sack|pallet|lot|trade',
-              ).hasMatch(base.pack.toLowerCase())
+    final pack =
+        RegExp(
+          r'case|carton|crate|sack|pallet|lot|trade',
+        ).hasMatch(base.pack.toLowerCase())
         ? BuyV2PackFilter.bulk
         : RegExp(
             r'pack of\s*[2-9]|[2-9]\s*[×x]',
@@ -1196,6 +1200,7 @@ class BuyV2DevelopmentPublishedCatalogueSource
     final scoped = BuyV2CatalogueQuery(
       destination: source.destination,
       regionId: query.regionId,
+      customerLocationKey: query.customerLocationKey,
       areaScope: query.areaScope,
       storeId: query.storeId,
       query: query.query,
@@ -2542,6 +2547,7 @@ class BuyV2Session extends ChangeNotifier {
   }) => BuyV2CatalogueQuery(
     destination: BuyV2Destination.shop,
     regionId: _catalogueRegionId,
+    customerLocationKey: eligibilityLocationKey,
     areaScope: _catalogueAreaScope,
     query: query,
     categoryId: categoryId,
@@ -2705,6 +2711,7 @@ class BuyV2Session extends ChangeNotifier {
       destination: value,
       procurementContext: procurementContext,
       regionId: _catalogueRegionId,
+      customerLocationKey: eligibilityLocationKey,
       areaScope: storeCatalogue
           ? BuyV2CatalogueAreaScope.allAreas
           : _catalogueAreaScope,
@@ -2789,6 +2796,21 @@ class BuyV2Session extends ChangeNotifier {
         product.minimumOrder < 1 ||
         (previous != null && previous.storeId != storeId)) {
       throw const FormatException('Catalogue listing identity mismatch');
+    }
+    if (!reviewDataEnabled && !isStoreProcurement) {
+      if (query.shopSaleType != null &&
+          !_matchesShopChannel(product, query.shopSaleType!)) {
+        throw const FormatException('Catalogue delivery eligibility mismatch');
+      }
+      final classification =
+          query.wholesaleSaleType == BuyV2WholesaleSaleType.bulk
+          ? BuyV2OfferClass.bulk
+          : BuyV2OfferClass.wholesale;
+      if (query.wholesaleSaleType != null &&
+          (product.offerClass != classification ||
+              !_availableForDiscovery(product))) {
+        throw const FormatException('Catalogue offer eligibility mismatch');
+      }
     }
     if (procurementPurchase &&
         isStoreProcurement &&
@@ -2958,6 +2980,7 @@ class BuyV2Session extends ChangeNotifier {
                 destination: offer.product.destination,
                 procurementContext: procurementContext,
                 regionId: query.regionId,
+                customerLocationKey: query.customerLocationKey,
                 storeId: query.storeId,
               ),
             );
@@ -4043,10 +4066,12 @@ class BuyV2Session extends ChangeNotifier {
   ) {
     if (ownerScope != reviewDraftOwnerScope) return;
     final draft = productReviewDraft(productId);
-    if (draft?.rating != rating || draft?.comment.trim() != comment.trim()) return;
+    if (draft?.rating != rating || draft?.comment.trim() != comment.trim())
+      return;
     _reviewDrafts.remove(productId);
     _persistCustomerState();
   }
+
   final Map<String, String> _reportedProductReasons = {};
   final Set<String> _reviewableProductIds = {};
   final Set<String> _productFeedbackBusyIds = {};
@@ -4964,19 +4989,64 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Destination.orders => 'all',
   };
 
-  BuyV2FulfilmentMode fulfilmentModeFor(BuyV2Product product) =>
-      productFactsFor(product).fulfilmentMode ??
-      buyV2CatalogueFulfilmentModeFor(product);
+  /// Selection revision prevents a stale response for an earlier selection of
+  /// the same region/place from being treated as current serviceability.
+  String get eligibilityLocationKey => isStoreProcurement
+      ? ''
+      : '${_catalogueRegionId ?? ''}|${_selectedShoppingArea?.googlePlaceId ?? ''}|$_shoppingAreaRevision';
+
+  Set<BuyV2DeliveryOption> deliveryOptionsFor(BuyV2Product product) {
+    final facts = productFactsFor(product);
+    if (facts.stale ||
+        facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
+      return const {};
+    }
+    final eligibility = facts.eligibility;
+    if (eligibility != null) {
+      return eligibility.availableFor(
+        product: product,
+        locationKey: eligibilityLocationKey,
+        now: catalogueNow(),
+        allowReviewFixture: reviewDataEnabled,
+      );
+    }
+    return reviewDataEnabled ? product.reviewDeliveryOptions : const {};
+  }
+
+  bool _matchesShopChannel(BuyV2Product product, BuyV2ShopSaleType channel) =>
+      deliveryOptionsFor(product).contains(
+        channel == BuyV2ShopSaleType.quickDelivery
+            ? BuyV2DeliveryOption.quick
+            : BuyV2DeliveryOption.scheduled,
+      );
+
+  bool supportsFulfilment(BuyV2Product product, BuyV2FulfilmentMode mode) {
+    final options = deliveryOptionsFor(product);
+    return switch (mode) {
+      BuyV2FulfilmentMode.quickLocal => options.contains(
+        BuyV2DeliveryOption.quick,
+      ),
+      BuyV2FulfilmentMode.standardCourier => options.contains(
+        BuyV2DeliveryOption.courier,
+      ),
+      BuyV2FulfilmentMode.bulkFreight => options.contains(
+        BuyV2DeliveryOption.freight,
+      ),
+    };
+  }
+
+  BuyV2FulfilmentMode fulfilmentModeFor(BuyV2Product product) {
+    final options = deliveryOptionsFor(product);
+    if (options.contains(BuyV2DeliveryOption.quick))
+      return BuyV2FulfilmentMode.quickLocal;
+    if (options.contains(BuyV2DeliveryOption.freight))
+      return BuyV2FulfilmentMode.bulkFreight;
+    return BuyV2FulfilmentMode.standardCourier;
+  }
 
   BuyV2PackFilter packFilterFor(BuyV2Product product) {
     final pack = product.pack.toLowerCase();
-    if (product.destination == BuyV2Destination.wholesale) {
-      return product.minimumOrder > 2
-          ? BuyV2PackFilter.bulk
-          : BuyV2PackFilter.standard;
-    }
-    if (product.minimumOrder > 1 ||
-        RegExp(r'case|carton|crate|sack|pallet|lot|trade').hasMatch(pack)) {
+    if (RegExp(r'case|carton|crate|sack|pallet|lot|trade').hasMatch(pack)) {
       return BuyV2PackFilter.bulk;
     }
     if (RegExp(r'pack of\s*[2-9]|[2-9]\s*[×x]').hasMatch(pack)) {
@@ -5045,11 +5115,30 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2Product> previewSavedProducts(
     BuyV2DiscoveryRefinements refinements,
-  ) => _resolveVisibleProducts(
-    limit: false,
-    refinements: refinements,
-    source: savedProductsFor(destination),
-  );
+  ) =>
+      _resolveVisibleProducts(
+            limit: false,
+            refinements: refinements,
+            source: savedProductsFor(destination),
+          )
+          .where(
+            (product) => switch (destination) {
+              BuyV2Destination.shop => _matchesShopChannel(
+                product,
+                shopSaleType,
+              ),
+              BuyV2Destination.wholesale => switch (wholesaleSaleType) {
+                BuyV2WholesaleSaleType.wholesale =>
+                  product.offerClass == BuyV2OfferClass.wholesale &&
+                      _availableForDiscovery(product),
+                BuyV2WholesaleSaleType.bulk =>
+                  product.offerClass == BuyV2OfferClass.bulk &&
+                      _availableForDiscovery(product),
+              },
+              BuyV2Destination.medicine || BuyV2Destination.orders => true,
+            },
+          )
+          .toList(growable: false);
 
   List<BuyV2Product> _resolveVisibleProducts({
     required bool limit,
@@ -5080,15 +5169,17 @@ class BuyV2Session extends ChangeNotifier {
           product.categoryId == category;
       final matchesFilter = switch (choices.filter) {
         'fast' => switch (filterDestination) {
-          BuyV2Destination.shop =>
-            fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
+          BuyV2Destination.shop => supportsFulfilment(
+            product,
+            BuyV2FulfilmentMode.quickLocal,
+          ),
           BuyV2Destination.wholesale => product.origin.toLowerCase().contains(
             'jodhpur',
           ),
           BuyV2Destination.medicine => !product.requiresPrescription,
           BuyV2Destination.orders => false,
         },
-        'today' => fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
+        'today' => supportsFulfilment(product, BuyV2FulfilmentMode.quickLocal),
         'lowest' =>
           product.badge.toLowerCase().contains('lowest') ||
               product.badge.contains('off'),
@@ -5107,12 +5198,18 @@ class BuyV2Session extends ChangeNotifier {
           product.destination == BuyV2Destination.wholesale &&
               product.minimumOrder <= 2,
         'returns' => product.returnPolicy != null,
-        'quick-local' =>
-          fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
-        'standard-courier' =>
-          fulfilmentModeFor(product) == BuyV2FulfilmentMode.standardCourier,
-        'bulk-freight' =>
-          fulfilmentModeFor(product) == BuyV2FulfilmentMode.bulkFreight,
+        'quick-local' => supportsFulfilment(
+          product,
+          BuyV2FulfilmentMode.quickLocal,
+        ),
+        'standard-courier' => supportsFulfilment(
+          product,
+          BuyV2FulfilmentMode.standardCourier,
+        ),
+        'bulk-freight' => supportsFulfilment(
+          product,
+          BuyV2FulfilmentMode.bulkFreight,
+        ),
         'rx' => product.requiresPrescription,
         'otc' => !product.requiresPrescription,
         _ => true,
@@ -5126,7 +5223,7 @@ class BuyV2Session extends ChangeNotifier {
           choices.pack == null || packFilterFor(product) == choices.pack;
       final matchesFulfilment =
           choices.fulfilmentMode == null ||
-          fulfilmentModeFor(product) == choices.fulfilmentMode;
+          supportsFulfilment(product, choices.fulfilmentMode!);
       final matchesAvailability =
           !choices.availableOnly || _availableForDiscovery(product);
       return matchesCategory &&
@@ -5196,16 +5293,14 @@ class BuyV2Session extends ChangeNotifier {
     return products
         .where((product) {
           return switch (destination) {
-            BuyV2Destination.shop => switch (shopSaleType) {
-              BuyV2ShopSaleType.quickDelivery =>
-                fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
-              BuyV2ShopSaleType.courier =>
-                fulfilmentModeFor(product) ==
-                    BuyV2FulfilmentMode.standardCourier,
-            },
+            BuyV2Destination.shop => _matchesShopChannel(product, shopSaleType),
             BuyV2Destination.wholesale => switch (wholesaleSaleType) {
-              BuyV2WholesaleSaleType.wholesale => product.minimumOrder <= 2,
-              BuyV2WholesaleSaleType.bulk => product.minimumOrder > 2,
+              BuyV2WholesaleSaleType.wholesale =>
+                product.offerClass == BuyV2OfferClass.wholesale &&
+                    _availableForDiscovery(product),
+              BuyV2WholesaleSaleType.bulk =>
+                product.offerClass == BuyV2OfferClass.bulk &&
+                    _availableForDiscovery(product),
             },
             BuyV2Destination.medicine || BuyV2Destination.orders => true,
           };
@@ -5302,10 +5397,10 @@ class BuyV2Session extends ChangeNotifier {
     }
     final key = _buyV2SavedKey(item);
     if (_savedKeys.remove(key)) {
-      notice = '${item.title} removed from Saved.';
+      notice = '${item.customerTitle} removed from Saved.';
     } else {
       _savedKeys.add(key);
-      notice = '${item.title} saved.';
+      notice = '${item.customerTitle} saved.';
     }
     _savedProductsMutationRevision += 1;
     _persistSavedProducts();
@@ -6149,6 +6244,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> prepareCollectionCheckout() async {
+    if (!_checkoutEligibilityCurrent()) return false;
     if (view != BuyV2View.checkout ||
         checkoutBusy ||
         !collectionCheckoutSelected) {
@@ -6182,6 +6278,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitCollectionPurchase() async {
+    if (!_checkoutEligibilityCurrent()) return false;
     if (_holdCheckoutForCustomerRecovery()) return false;
     if (view != BuyV2View.checkout ||
         checkoutStep != BuyV2CheckoutStep.confirm ||
@@ -7306,8 +7403,10 @@ class BuyV2Session extends ChangeNotifier {
     if (isStoreProcurement) {
       if (group.destination != BuyV2Destination.wholesale ||
           term.kind == BuyV2CommercialPaymentTermKind.regulatedCredit ||
-          term.kind == BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch ||
-          (term.kind != BuyV2CommercialPaymentTermKind.supplierCredit && term.netDays != null) ||
+          term.kind ==
+              BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch ||
+          (term.kind != BuyV2CommercialPaymentTermKind.supplierCredit &&
+              term.netDays != null) ||
           !term.acceptedPaymentMethods.contains(selectedPayment) ||
           term.acceptedPaymentMethods.any(
             (method) => !storePaymentMethods.contains(method),
@@ -7704,15 +7803,18 @@ class BuyV2Session extends ChangeNotifier {
       return value;
     }
 
-    final candidates = _catalogueProducts
-        .where(_procurementDiscoveryAllows)
-        .where(
-          (product) =>
-              product.destination == current.destination &&
-              product.catalogueListing &&
-              product.canonicalId != current.canonicalId,
-        )
-        .toList(growable: false);
+    final candidates =
+        (current.storeId == null ? _catalogueProducts : _knownCatalogueProducts)
+            .where(_procurementDiscoveryAllows)
+            .where(
+              (product) =>
+                  product.destination == current.destination &&
+                  product.catalogueListing &&
+                  (current.storeId == null ||
+                      product.isFromSameStoreAs(current)) &&
+                  product.canonicalId != current.canonicalId,
+            )
+            .toList(growable: false);
     candidates.sort((left, right) {
       final scoreOrder = score(right).compareTo(score(left));
       if (scoreOrder != 0) return scoreOrder;
@@ -7833,9 +7935,11 @@ class BuyV2Session extends ChangeNotifier {
         current.destination == BuyV2Destination.shop ||
         current.destination == BuyV2Destination.wholesale;
     if (!supportedDestination || limit <= 0) return const [];
-    if (productFactsFor(
+    final availability = productFactsFor(
       current,
-    ).orderabilityLabel.toLowerCase().contains('unavailable')) {
+    ).orderabilityLabel.toLowerCase();
+    if (availability != 'eligibility unavailable' &&
+        availability.contains('unavailable')) {
       return const [];
     }
 
@@ -7851,7 +7955,8 @@ class BuyV2Session extends ChangeNotifier {
               switch (current.destination) {
                 BuyV2Destination.shop => true,
                 BuyV2Destination.wholesale =>
-                  (product.minimumOrder > 2) == (current.minimumOrder > 2),
+                  product.offerClass != null &&
+                      product.offerClass == current.offerClass,
                 BuyV2Destination.medicine || BuyV2Destination.orders => true,
               },
         )
@@ -8049,7 +8154,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) {
-    return _productFacts.putIfAbsent(product.id, () {
+    final cached = _productFacts.putIfAbsent(product.id, () {
       final next = productFactsAdapter.snapshotFor(product);
       final facts = _validProductFacts(product, next)
           ? next
@@ -8062,6 +8167,33 @@ class BuyV2Session extends ChangeNotifier {
               clearStoreCollection: store.collection == null,
             );
     });
+    if (isStoreProcurement || product.destination == BuyV2Destination.medicine)
+      return cached;
+    final eligibility = cached.eligibility;
+    final options =
+        eligibility?.availableFor(
+          product: product,
+          locationKey: eligibilityLocationKey,
+          now: catalogueNow(),
+          allowReviewFixture: reviewDataEnabled,
+        ) ??
+        (reviewDataEnabled
+            ? product.reviewDeliveryOptions
+            : const <BuyV2DeliveryOption>{});
+    final unavailable =
+        options.isEmpty && (eligibility != null || !reviewDataEnabled);
+    final mode = options.contains(BuyV2DeliveryOption.quick)
+        ? BuyV2FulfilmentMode.quickLocal
+        : options.contains(BuyV2DeliveryOption.freight)
+        ? BuyV2FulfilmentMode.bulkFreight
+        : BuyV2FulfilmentMode.standardCourier;
+    // Store procurement above retains its separate purchaser/supplier grant.
+    return cached.copyWith(
+      fulfilmentMode: mode,
+      orderabilityLabel: unavailable
+          ? 'Eligibility unavailable'
+          : cached.orderabilityLabel,
+    );
   }
 
   bool refreshProductFacts(String productId) {
@@ -8074,9 +8206,9 @@ class BuyV2Session extends ChangeNotifier {
     final next = productFactsAdapter.snapshotFor(product);
     if (!_validProductFacts(product, next)) {
       final previous = _productFacts[product.id];
-      if (previous?.storeCollection != null) {
-        _productFacts[product.id] = previous!.copyWith(
-          clearStoreCollection: true,
+      if (previous != null) {
+        _productFacts[product.id] = previous.copyWith(
+          clearStoreCollection: true, clearEligibility: true, stale: true,
         );
       }
       notice = 'Product information could not be refreshed.';
@@ -8630,11 +8762,14 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String? get productReturnLabel => canReturnToComparedProduct
-      ? findProduct(_comparedProductOrigins.last)?.title ?? 'Previous product'
+      ? findProduct(_comparedProductOrigins.last)?.customerTitle ??
+            'Previous product'
       : canReturnToShoppingAlerts
       ? 'Shopping alerts'
       : _productReturnView == BuyV2View.orderItems
       ? 'Order items'
+      : _productReturnDestination == BuyV2Destination.orders
+      ? 'Orders'
       : null;
 
   void closeProduct() {
@@ -8767,6 +8902,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool continueCheckoutFromAddress() {
+    if (!_checkoutEligibilityCurrent()) return false;
     if (view != BuyV2View.checkout || checkoutBusy) return false;
     if (collectionCheckoutSelected) {
       if (collectionCheckoutStore == null) return false;
@@ -8901,12 +9037,16 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  ({String orderId, String? ownerScope, VoidCallback restore})? _deliveryTrackingVisit;
+  ({String orderId, String? ownerScope, VoidCallback restore})?
+  _deliveryTrackingVisit;
 
   /// A delivery-rail visit returns to its existing shopping surface once.
   bool openDeliveryTracking(String orderId) {
-    if (!procurementScopeCurrent || !_orders.any((order) => order.id == orderId)) return false;
-    if (hasShoppingHelpReturnOrigin || hasShoppingAlertReturnOrigin) return openTracking(orderId);
+    if (!procurementScopeCurrent ||
+        !_orders.any((order) => order.id == orderId))
+      return false;
+    if (hasShoppingHelpReturnOrigin || hasShoppingAlertReturnOrigin)
+      return openTracking(orderId);
     final restoreNavigation = beginStoreNavigationVisit();
     final origin = (
       ownerScope: customerStateStore?.ownerScope,
@@ -8954,7 +9094,8 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool openTracking(String orderId) {
-    if (view != BuyV2View.orderItems || _deliveryTrackingVisit?.orderId != orderId) {
+    if (view != BuyV2View.orderItems ||
+        _deliveryTrackingVisit?.orderId != orderId) {
       _deliveryTrackingVisit = null;
     }
     final previous = _navigationSurfaceIdentity;
@@ -9939,11 +10080,9 @@ class BuyV2Session extends ChangeNotifier {
   void showSavedProducts(bool value) {
     if (showingSavedProducts == value) return;
     _savedCatalogueDestination = value ? destination : null;
-    if (value) {
-      chooseCategory('all');
-    } else {
-      notifyListeners();
-    }
+    notice = null;
+    _persistProcurementBrowsing();
+    notifyListeners();
   }
 
   void chooseCategory(String id) {
@@ -10300,7 +10439,10 @@ class BuyV2Session extends ChangeNotifier {
       quantity: (current?.quantity ?? 0) + addedQuantity,
     );
     _pruneCartSelections();
-    _acknowledgeCart('${item.title} added', destination: item.destination);
+    _acknowledgeCart(
+      '${item.customerTitle} added',
+      destination: item.destination,
+    );
     _persistCustomerState();
     notifyListeners();
     return true;
@@ -10443,7 +10585,7 @@ class BuyV2Session extends ChangeNotifier {
     _cart[id] = current.copyWith(quantity: quantity);
     _pruneCartSelections();
     _acknowledgeCart(
-      '${current.product.title} · $quantity in cart',
+      '${current.product.customerTitle} · $quantity in cart',
       destination: current.product.destination,
     );
     _persistCustomerState();
@@ -10471,7 +10613,7 @@ class BuyV2Session extends ChangeNotifier {
     _cart[id] = current.copyWith(quantity: current.quantity + 1);
     _pruneCartSelections();
     _acknowledgeCart(
-      '${current.product.title} · ${current.quantity + 1} in cart',
+      '${current.product.customerTitle} · ${current.quantity + 1} in cart',
       destination: current.product.destination,
     );
     _persistCustomerState();
@@ -10487,13 +10629,13 @@ class BuyV2Session extends ChangeNotifier {
     if (current.quantity <= minimum) {
       _cart.remove(id);
       _acknowledgeCart(
-        '${current.product.title} removed',
+        '${current.product.customerTitle} removed',
         destination: current.product.destination,
       );
     } else {
       _cart[id] = current.copyWith(quantity: current.quantity - 1);
       _acknowledgeCart(
-        '${current.product.title} · ${current.quantity - 1} in cart',
+        '${current.product.customerTitle} · ${current.quantity - 1} in cart',
         destination: current.product.destination,
       );
     }
@@ -10518,7 +10660,7 @@ class BuyV2Session extends ChangeNotifier {
     final removed = _cart.remove(id);
     if (removed == null) return;
     _acknowledgeCart(
-      '${removed.product.title} removed',
+      '${removed.product.customerTitle} removed',
       destination: removed.product.destination,
     );
     if (_cart.isEmpty &&
@@ -10646,6 +10788,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (_selectedAddressId != id) _shoppingAreaRevision++;
     _selectedAddressId = id;
     notice = 'Delivering to ${selectedAddress.shortLine}';
     _persistCustomerState();
@@ -10654,6 +10797,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void addAddress(BuyV2Address address) {
+    _shoppingAreaRevision++;
     _addresses.add(address);
     _selectedAddressId = address.id;
     _invalidateAndRefreshCheckoutPricingContracts();
@@ -10671,6 +10815,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (_selectedAddressId == address.id) _shoppingAreaRevision++;
     _addresses[index] = address;
     _invalidateAndRefreshCheckoutPricingContracts();
     notice = '${address.label} address updated';
@@ -10688,6 +10833,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     final removed = _addresses.removeAt(index);
     if (_selectedAddressId == id) {
+      _shoppingAreaRevision++;
       _selectedAddressId = _addresses.firstOrNull?.id;
     }
     _invalidateAndRefreshCheckoutPricingContracts();
@@ -10752,7 +10898,20 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _checkoutEligibilityCurrent() {
+    for (final line in checkoutLines) {
+      if (!_availableForDiscovery(line.product)) {
+        notice =
+            'Availability has changed. Review your Cart before continuing.';
+        notifyListeners();
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool confirmOrder() {
+    if (!_checkoutEligibilityCurrent()) return false;
     if (isStoreProcurement && checkoutPaymentTermsReviewRequired) {
       notice = 'Supplier payment terms must be confirmed before ordering.';
       notifyListeners();
@@ -11097,6 +11256,7 @@ class BuyV2Session extends ChangeNotifier {
             !_allowProcurementLines(lines))) {
       return false;
     }
+    if (!_checkoutEligibilityCurrent()) return false;
     _checkoutIdempotencyKey ??=
         'shop-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-'
         '${_checkoutAttemptSequence++}';
@@ -11824,7 +11984,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutAvailabilityIssue = null;
     _restoreRecoveryOrigin(notify: false);
     _acknowledgeCart(
-      '${removed.product.title} removed',
+      '${removed.product.customerTitle} removed',
       destination: removed.product.destination,
     );
     _pruneCartSelections();

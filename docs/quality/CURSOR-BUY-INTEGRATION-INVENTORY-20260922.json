@@ -1,0 +1,1261 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Complete Cursor handoff; source/evidence parking, not production acceptance",
+  "branch": "work/cursor-ui/buy-ready-20260921",
+  "priorIntegration": "123ff42cf8179b272d33b480e8267dfa83af2de3",
+  "inheritedBaseline": "79d5401338881f55e65b08c0e7843cbac016fcfb",
+  "originalAssignedCheckpoint": "06432e2b946b02007d9946c562f922294f485632",
+  "preReconciliationHead": "87bc96d4c28300146c9e2c3c3b37c7c3aacffed0",
+  "priorCursorTip": "ee42be0e21f1707e1cbf2ba3ad966579f118b209",
+  "commitsAfterPriorIntegration": [
+    {
+      "commit": "b19609bac4e1dbdb0fc71ec8154f9bec179f7af6",
+      "parents": [
+        "123ff42cf8179b272d33b480e8267dfa83af2de3"
+      ],
+      "tree": "b067a56ed0638cc5356a5b1e069ca6e50ee437c9",
+      "subject": "coordination(counter-sale-20260919): admit reproduced Counter Sale corrections",
+      "owners": [
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/COUNTER-SALE-20260919.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "bfb47131adae3458ae92cc67fb8fb932a295e16c",
+      "parents": [
+        "b19609bac4e1dbdb0fc71ec8154f9bec179f7af6"
+      ],
+      "tree": "27ccf9016bfd89aa4299c815b9fa52a42aed72bd",
+      "subject": "ui(counter-sale-20260919): implement and qualify approved retailer journey",
+      "owners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_invoice_pdf.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/apk-regression-state.json",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/candidate-contract.md",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/local-validation.md",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/source-manifest.txt",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/COUNTER-SALE-20260919-incremental.json",
+        "docs/quality/COUNTER-SALE-20260919-scope.json",
+        "docs/quality/COUNTER-SALE-20260919.md",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "22245493cbcef30e30fe6b0ad9c75011e0f0ef9d",
+      "parents": [
+        "bfb47131adae3458ae92cc67fb8fb932a295e16c"
+      ],
+      "tree": "51a37f63d9ef0ef8582e9043d29962add180c0b5",
+      "subject": "ui(counter-sale-20260919): qualify exact review integration admission",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/COUNTER-SALE-20260919-incremental.json",
+        "docs/quality/COUNTER-SALE-20260919-scope.json",
+        "docs/quality/COUNTER-SALE-20260919.md",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "9b625bbfc8d0b4bd04bfef6e3432bc36971a71e5",
+      "parents": [
+        "22245493cbcef30e30fe6b0ad9c75011e0f0ef9d"
+      ],
+      "tree": "e684d0b9d36aca5c17b404f61b322177d5e32cbc",
+      "subject": "ui(counter-sale-20260919): retain handoff claim recovery evidence",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "commit": "59bf1bf79d508d1dc597e245c58e2af862412604",
+      "parents": [
+        "9b625bbfc8d0b4bd04bfef6e3432bc36971a71e5"
+      ],
+      "tree": "4ce7a7966b68fe72adbc487233e5af492485fbd5",
+      "subject": "ui(counter-sale-20260919): seal review build evidence and owned execution controls",
+      "owners": [
+        "artifacts/quality/counter-sale-r66-34-review-20260919/candidate-contract.md",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/motion-disposition.md",
+        "artifacts/quality/counter-sale-r66-34-review-20260919/prebuild-validation.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "8bfda8f862837bdc43910476a841befb750b6114",
+      "parents": [
+        "59bf1bf79d508d1dc597e245c58e2af862412604"
+      ],
+      "tree": "b9e953485ddde7e8fe1a4d17b1b9f28dbed1552e",
+      "subject": "ui(counter-sale-20260919): complete approved Counter Sale fixes and polish",
+      "owners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_invoice_pdf.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/work_invoice_pdf_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart"
+      ]
+    },
+    {
+      "commit": "feb40b85172c411025eb83fd5b3710e8c1da77ab",
+      "parents": [
+        "8bfda8f862837bdc43910476a841befb750b6114"
+      ],
+      "tree": "d266d7c012359cdaf6bd8cc91ba662d518b9f676",
+      "subject": "ui(counter-sale-20260919): bind r66.35 review to approved source",
+      "owners": [
+        "artifacts/quality/counter-sale-r66-35-review-20260920/apk-regression-state.json",
+        "artifacts/quality/counter-sale-r66-35-review-20260920/candidate-contract.md",
+        "artifacts/quality/counter-sale-r66-35-review-20260920/local-validation.md",
+        "artifacts/quality/counter-sale-r66-35-review-20260920/motion-disposition.md",
+        "artifacts/quality/counter-sale-r66-35-review-20260920/prebuild-validation.md",
+        "artifacts/quality/counter-sale-r66-35-review-20260920/source-manifest.txt",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "6e32df591dc8178aa1776c0f18c2eac0bb4efc37",
+      "parents": [
+        "feb40b85172c411025eb83fd5b3710e8c1da77ab"
+      ],
+      "tree": "3d6197c4b9cc403c41c603a58eb80ba35fa5c6bf",
+      "subject": "ui(counter-sale-20260919): correct OPPO findings and recorded invoice completion",
+      "owners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/COUNTER-SALE-20260919.md"
+      ]
+    },
+    {
+      "commit": "7601b84e5d8810237f27c852fb2aa9efbe9883dd",
+      "parents": [
+        "6e32df591dc8178aa1776c0f18c2eac0bb4efc37"
+      ],
+      "tree": "981b95fdaac181991dc7c2544375c4cf44e22302",
+      "subject": "ui(counter-sale-20260919): qualify r66.36 OPPO review successor",
+      "owners": [
+        "artifacts/quality/counter-sale-r66-36-review-20260920/apk-regression-state.json",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/candidate-contract.md",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/local-validation.md",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/motion-disposition.md",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/prebuild-validation.md",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/source-manifest.txt",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/COUNTER-SALE-20260919-scope.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "a4e9b4f04ee149f0863df9dd92b8b1703f0b94ff",
+      "parents": [
+        "7601b84e5d8810237f27c852fb2aa9efbe9883dd"
+      ],
+      "tree": "88f619af07a9dd8fec94436bd16583b00a0b34fc",
+      "subject": "ui(counter-sale-20260919): prevent inherited APK evidence admission regression",
+      "owners": [
+        "artifacts/quality/counter-sale-r66-36-review-20260920/candidate-contract.md",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/local-validation.md",
+        "artifacts/quality/counter-sale-r66-36-review-20260920/prebuild-validation.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "a425fd89445a4650533b14903d99215cfed74034",
+      "parents": [
+        "a4e9b4f04ee149f0863df9dd92b8b1703f0b94ff"
+      ],
+      "tree": "82985fdd956be403c49b8bb62c6e25f8a4af2e96",
+      "subject": "ui(counter-sale-20260919): keep receipt action visible above keyboard",
+      "owners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/COUNTER-SALE-20260919.md"
+      ]
+    },
+    {
+      "commit": "015e16e4aa018f5a8e5adca6204504fd8fb69b45",
+      "parents": [
+        "a425fd89445a4650533b14903d99215cfed74034"
+      ],
+      "tree": "660148b1d1ea64e5138c86e95d1fa98f226bbdc5",
+      "subject": "coordination(add-product-screen1-20260920): register bounded Add product entry",
+      "owners": [
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-incremental.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "3f8a1762bf89dcf800ab6bfdba262decb72ef958",
+      "parents": [
+        "015e16e4aa018f5a8e5adca6204504fd8fb69b45"
+      ],
+      "tree": "b92cc3ec5d87d73c55190bfc1c83e77fe4eaea31",
+      "subject": "ui(add-product-screen1-20260920): checkpoint approved catalogue stock and exports",
+      "owners": [
+        "apps/mobile/.dart_tool/package_config.json",
+        "apps/mobile/.dart_tool/package_graph.json",
+        "apps/mobile/.flutter-plugins-dependencies",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_stock_export.dart",
+        "apps/mobile/pubspec.lock",
+        "apps/mobile/pubspec.yaml",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "dff6c124c17dc8879fadd74930026ee7d47f33a5",
+      "parents": [
+        "3f8a1762bf89dcf800ab6bfdba262decb72ef958"
+      ],
+      "tree": "b0f9e5ee04acdda51a0af5582777a118700151a3",
+      "subject": "ui(add-product-screen1-20260920): save stock exports directly to Android Downloads",
+      "owners": [
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt",
+        "apps/mobile/lib/features/work/work_stock_export.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "06432e2b946b02007d9946c562f922294f485632",
+      "parents": [
+        "dff6c124c17dc8879fadd74930026ee7d47f33a5"
+      ],
+      "tree": "b472bcc432ee76d33fba5578435a96228f9c8018",
+      "subject": "ui(add-product-screen1-20260920): checkpoint mapped CSV import and field review",
+      "owners": [
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt",
+        "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_stock_export.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+      ]
+    },
+    {
+      "commit": "79d5401338881f55e65b08c0e7843cbac016fcfb",
+      "parents": [
+        "06432e2b946b02007d9946c562f922294f485632"
+      ],
+      "tree": "7da6340c98777de2c8a19dcd179281a2d602bb36",
+      "subject": "ui(add-product-screen1-20260920): preserve CSV catalogue facts and approved review checkpoint",
+      "owners": [
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+      ]
+    },
+    {
+      "commit": "635ab9810ba8805104642f8f78512c80fe1b20f5",
+      "parents": [
+        "79d5401338881f55e65b08c0e7843cbac016fcfb"
+      ],
+      "tree": "2826e143a6bceef3e3be6ba00990ae60c44413ef",
+      "subject": "coordination(buy-ready-20260921): admit independent baseline capture",
+      "owners": [
+        "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "19127ea6a7c389eeda000016af672409f2defcff",
+      "parents": [
+        "635ab9810ba8805104642f8f78512c80fe1b20f5"
+      ],
+      "tree": "b236dfa0551b2651cb4c4ebfac6eb1802fd16755",
+      "subject": "feat(buy): qualify public storefront and all-store pickup choices",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-android-checkout.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "d5279222466211f0526c625e58b8da5dc0d78218",
+      "parents": [
+        "19127ea6a7c389eeda000016af672409f2defcff"
+      ],
+      "tree": "a3ff65ff28becbab70d0c8e043ff46845a0d60e3",
+      "subject": "fix(buy): reserve full Saved action clearance in SKU cards",
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "eb7a14e9f984fa322e8a6468a97249104fe28776",
+      "parents": [
+        "d5279222466211f0526c625e58b8da5dc0d78218"
+      ],
+      "tree": "f1e36262d96214fda4bdd2ec7e806fe6871ed4ac",
+      "subject": "fix(buy): qualify exact storefront source for Redmi review",
+      "owners": [
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "scripts/check-buy-data-egress-boundary.ps1",
+        "scripts/check-buy-protected-baseline.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "432befc4c7be1b36170588e57b2eb331c45021fc",
+      "parents": [
+        "eb7a14e9f984fa322e8a6468a97249104fe28776"
+      ],
+      "tree": "3e849742a8a9f9f918730798ffab6b78b50039b5",
+      "subject": "fix(buy): bind inherited arrival cue to exact review source",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "scripts/check-buy-backend-contract-boundary.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "d278c18b9400e2950a54a443964a8e6085638cc0",
+      "parents": [
+        "432befc4c7be1b36170588e57b2eb331c45021fc"
+      ],
+      "tree": "e5784fd1ed81a0c069afa06693075210ee56cb32",
+      "subject": "docs(buy): record first full pass and fresh Redmi qualification inputs",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "commit": "d73d609d8389101d5981c3c8929b7ac745bf059b",
+      "parents": [
+        "d278c18b9400e2950a54a443964a8e6085638cc0"
+      ],
+      "tree": "c7e8134c3cd9df1a2fd1fb49f38291005b3645de",
+      "subject": "docs(buy): seal both full regression passes for Redmi build",
+      "owners": [
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "commit": "6ba7dc3f2b2d75be7ffdcdb3bfce6ca3090b3ed8",
+      "parents": [
+        "d73d609d8389101d5981c3c8929b7ac745bf059b"
+      ],
+      "tree": "8e9fe0f894905210005478bd8c4c7f8a5d2b28bc",
+      "subject": "docs(buy): record Redmi installation and Store device defects",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "commit": "b69ce92db8aa20eb5d9f0898c79691a8f00c4e74",
+      "parents": [
+        "6ba7dc3f2b2d75be7ffdcdb3bfce6ca3090b3ed8"
+      ],
+      "tree": "45eb2fe474e14202b092bb358fbbe605ab737a7b",
+      "subject": "ui(buy-ready-20260921): repair store discovery and compact Buy controls",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "commit": "d2728ad85432f3c08e0443299e81cfbc4bb0b9da",
+      "parents": [
+        "b69ce92db8aa20eb5d9f0898c79691a8f00c4e74"
+      ],
+      "tree": "96e1c5ea2b7f33856d545c77f566e6f176964f97",
+      "subject": "ui(buy-ready-20260921): hide inactive delivery rail and align Offers theme",
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "commit": "4c79cfe1ca2f142948fd9d36cd2274e5a7568dd2",
+      "parents": [
+        "d2728ad85432f3c08e0443299e81cfbc4bb0b9da"
+      ],
+      "tree": "51914ef9b9cf68147f3f06bd47649627513e9e95",
+      "subject": "ui(buy-ready-20260921): record Redmi filter overlap recheck",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "commit": "9c8ac6ba6ac665587323869e72dbcb74debb17d6",
+      "parents": [
+        "4c79cfe1ca2f142948fd9d36cd2274e5a7568dd2"
+      ],
+      "tree": "9529652c6d24bd1e52b659f5d8e21e77c9ebf8d0",
+      "subject": "ui(buy-ready-20260921): match store search to unboxed Buy Home",
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    },
+    {
+      "commit": "87bc96d4c28300146c9e2c3c3b37c7c3aacffed0",
+      "parents": [
+        "9c8ac6ba6ac665587323869e72dbcb74debb17d6"
+      ],
+      "tree": "42d6c27f5f34c3c1db95fea8df461d8ca72b6518",
+      "subject": "ui(buy-ready-20260921): protect store details from Android navigation",
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "docs/quality/CURSOR-BUY-READY-20260921.md"
+      ]
+    }
+  ],
+  "cursorCommitsAfterInheritedBaseline": [
+    "635ab9810ba8805104642f8f78512c80fe1b20f5",
+    "19127ea6a7c389eeda000016af672409f2defcff",
+    "d5279222466211f0526c625e58b8da5dc0d78218",
+    "eb7a14e9f984fa322e8a6468a97249104fe28776",
+    "432befc4c7be1b36170588e57b2eb331c45021fc",
+    "d278c18b9400e2950a54a443964a8e6085638cc0",
+    "d73d609d8389101d5981c3c8929b7ac745bf059b",
+    "6ba7dc3f2b2d75be7ffdcdb3bfce6ca3090b3ed8",
+    "b69ce92db8aa20eb5d9f0898c79691a8f00c4e74",
+    "d2728ad85432f3c08e0443299e81cfbc4bb0b9da",
+    "4c79cfe1ca2f142948fd9d36cd2274e5a7568dd2",
+    "9c8ac6ba6ac665587323869e72dbcb74debb17d6",
+    "87bc96d4c28300146c9e2c3c3b37c7c3aacffed0"
+  ],
+  "initialDirtySnapshot": {
+    "branch": "work/cursor-ui/buy-ready-20260921",
+    "head": "87bc96d4c28300146c9e2c3c3b37c7c3aacffed0",
+    "baseline": "79d5401338881f55e65b08c0e7843cbac016fcfb",
+    "files": [
+      {
+        "path": "apps/mobile/.flutter-plugins-dependencies",
+        "bytes": 30594,
+        "sha256": "410a214a883473fcd19f15620db21ae490fd4456e1cf0896e197443ac671f4f5"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "bytes": 82814,
+        "sha256": "2809cc44dffab078da8285a4386dacabf4b8956d4686ba1ce4658727aee5af48"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
+        "bytes": 2864,
+        "sha256": "7a9084a4008bc95965a744389eb9010d635a7c536f3ce8897a43b4cf1d8e245b"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "bytes": 53788,
+        "sha256": "e67b6790b089d8872caf7f7af62071cfa5855b54ea8ef6bbdaa8d1d64d1d428e"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "bytes": 439060,
+        "sha256": "e83b1a2819db3ba722356c9bcabd0c88bfc90b354ff360636187f931dda8e219"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "bytes": 536489,
+        "sha256": "83773b6d1b8291ac9cf305b8216e86b9981adeac0da55503c124d2a5bc059abc"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+        "bytes": 18331,
+        "sha256": "977ebea9baa04205e67887c777b21dcd2286663d27dc57b0d264b0d499c80fb2"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "bytes": 93626,
+        "sha256": "4d22e1c642fdb6ba2b01e33d50e990a61d8c589a60e201a0f02df5f0258af227"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "bytes": 161703,
+        "sha256": "eb9b1fc49a3c3ae76ac5f118b979b74bc836efeab3882c7d00c3e58f27c932c2"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "bytes": 2464,
+        "sha256": "c34e73685d19b003418508e65bd38c3d8739d813148f962b0abe40c427386850"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "bytes": 768341,
+        "sha256": "0c9a86eaad5dfb5f0d5a8e08337de5b853017c291811e7d8a97b0cc5c365be6f"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+        "bytes": 53539,
+        "sha256": "df1179586b022a165d892a222f6687f72b32116709a533199b76f730144a4e0c"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "bytes": 87923,
+        "sha256": "8d7a2a6f7a083249d8a2740af185b2bd566d8a4013180e32d819e4d97aa3a5ed"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart",
+        "bytes": 49159,
+        "sha256": "44d141d82d89776113ed91e724621454ff649d0bfa6cb0b4700f0ddf051601e0"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
+        "bytes": 85365,
+        "sha256": "8ab47909a63ba99fdde65340e90f290983e2447acfd489083d3e34be5c2d5478"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "bytes": 194266,
+        "sha256": "36072f727f75422d84ba136e35520807ac5c8e389b30aa0db3327bb2b1998b14"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart",
+        "bytes": 22302,
+        "sha256": "9f70df9984a5588fe6a598a7a167bed0ce50ac55a92c3345eb75448d0d23331d"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
+        "bytes": 50246,
+        "sha256": "ebe801df99ed5ced49b167cb3596af3efc84b6f39a8dcc53a0a09c621ae6bf0f"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+        "bytes": 7990,
+        "sha256": "bea5f33e8ea0a79fcd008306ca74c6ca887e36b627f076858e3b512e43e837b7"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "bytes": 147685,
+        "sha256": "7495ec85563839ff93c7577f65da0afcb817b5f97d97fdd03e9905bd91f7bf50"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "bytes": 446588,
+        "sha256": "4d3f05884700b1bec43bff815e5716fd6a94eed19135bfe446123811ae84fd1c"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "bytes": 420932,
+        "sha256": "741be1d88541f23f9baedfd97459ac1fd7f52cb13ba75f171aa523b1e5b4029a"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+        "bytes": 50272,
+        "sha256": "c68b94ccf023bbe44f238550c280eef05c2f843be301f1947da397549005b3a2"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "bytes": 2694,
+        "sha256": "6019de52cab9892140ac50e7e89c8a26bb5703d98ba93b236fbf5a0f367f16a9"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/REVIEW.md",
+        "bytes": 460,
+        "sha256": "63de61a06cccaee2df763728c28aa0ad3b647f197d951cb6932022a8e8904393"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "bytes": 63056,
+        "sha256": "e775e3faa655d9d93313c14d8ab8c95a39b99c51083304fa922314453500c041"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        "bytes": 85658,
+        "sha256": "6b14b41633a557bd09f9234e57aca8f2d992c302edd1b4ec93ccf760c42de2da"
+      },
+      {
+        "path": "config/codex-subagent-coordination-policy.json",
+        "bytes": 127001,
+        "sha256": "6c52c650d3ee73fbebd9b3be5965f3d84a1b515ca694dfae69bc8ce45c521905"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-LOCAL-CUTOFF-20260922.md",
+        "bytes": 18697,
+        "sha256": "047a3a54681eef6c27034467ad78b942a1ee4d659fae01649a5a5173f4e536f7"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-POST-REDMI-FIXES-20260922.md",
+        "bytes": 11991,
+        "sha256": "1819a358c64aafd088ea74f06f21cc835920a2ae1f6aa7c373388d9f0fe40027"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-R6632-APK.json",
+        "bytes": 9959,
+        "sha256": "bbd9d09a2cbc7c71becf877bfd874a2de5b47a88a89dab92fe07e29594c662b5"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-R6632-DEVICE-RETEST-20260922.md",
+        "bytes": 17456,
+        "sha256": "cfb30a60c81fa2de640fa46d8663bcab7c579350d3db756e0c87f6704c89c76c"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "bytes": 67583,
+        "sha256": "eab8a4016cc24af58eac42cb2eb850ca1940dc5287905e0fdb431696cb14424d"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-REDMI-AUDIT-20260922.md",
+        "bytes": 56248,
+        "sha256": "b6212ead8372d7df5fe96c089e60cbb1723f140c7e286198fd9ef23246d337a6"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md",
+        "bytes": 14348,
+        "sha256": "948f015a45473360da59c14f3d460a667f884701643fa2ba66052947c3eb2b59"
+      },
+      {
+        "path": "scripts/check-brand-integrity.ps1",
+        "bytes": 57904,
+        "sha256": "81d6347b51efd31e1337660e148eafdb01cab84e613271eb4e6880c646653ee5"
+      },
+      {
+        "path": "scripts/check-buy-backend-contract-boundary.ps1",
+        "bytes": 21142,
+        "sha256": "3e606af9d42f99e7bacf9defb2d96fd6f462eba5a07cbdad0836319cecd60566"
+      },
+      {
+        "path": "scripts/check-buy-data-egress-boundary.ps1",
+        "bytes": 12972,
+        "sha256": "68de42c8541c3e9c955a6767152ce73ea2bee96a138aac7cb38c0a5300bd9ff8"
+      },
+      {
+        "path": "scripts/check-buy-protected-baseline.ps1",
+        "bytes": 24761,
+        "sha256": "87a5f742161f6141767e6c5c57cbda5b346e744c3ac5aeb58460db0a21d071f3"
+      },
+      {
+        "path": "scripts/check-codex-subagent-coordination-policy.ps1",
+        "bytes": 430076,
+        "sha256": "89167ac04c0f8bbdd355c3ffbdb66e9bec19d116ad8120266e95fe14bccc1ebc"
+      }
+    ],
+    "status": {
+      "bytes": 2349,
+      "records": 41,
+      "sha256": "9c38fb2336f945eac041c1bde17a7497d4f968d8cd449743a201a7d93dfd5152"
+    }
+  },
+  "payloadFiles": [
+    {
+      "path": "apps/mobile/.flutter-plugins-dependencies",
+      "bytes": 30594,
+      "sha256": "410a214a883473fcd19f15620db21ae490fd4456e1cf0896e197443ac671f4f5",
+      "gitBlob": "c1f43571c6c9dde032701d1429802ed5fbde927e"
+    },
+    {
+      "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+      "bytes": 82814,
+      "sha256": "2809cc44dffab078da8285a4386dacabf4b8956d4686ba1ce4658727aee5af48",
+      "gitBlob": "7923697c835a3317f9ffd489c8cc63f84da0d59e"
+    },
+    {
+      "path": "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
+      "bytes": 2864,
+      "sha256": "7a9084a4008bc95965a744389eb9010d635a7c536f3ce8897a43b4cf1d8e245b",
+      "gitBlob": "2021868955bc82fe0aed08f123fee2399a569363"
+    },
+    {
+      "path": "apps/mobile/lib/features/buy/buy_v2_models.dart",
+      "bytes": 53788,
+      "sha256": "e67b6790b089d8872caf7f7af62071cfa5855b54ea8ef6bbdaa8d1d64d1d428e",
+      "gitBlob": "3ce80522c2b7ed8e3422dbea50bd7d33a5370e36"
+    },
+    {
+      "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "bytes": 439060,
+      "sha256": "e83b1a2819db3ba722356c9bcabd0c88bfc90b354ff360636187f931dda8e219",
+      "gitBlob": "e32c9eae0713dad1f84d1dece4da5b77e147c146"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+      "bytes": 536489,
+      "sha256": "83773b6d1b8291ac9cf305b8216e86b9981adeac0da55503c124d2a5bc059abc",
+      "gitBlob": "13226b14762d1fe28c6e4df52b15122c38cfcd3c"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+      "bytes": 18331,
+      "sha256": "977ebea9baa04205e67887c777b21dcd2286663d27dc57b0d264b0d499c80fb2",
+      "gitBlob": "7c75feabc6b1409aff09c8b3bd066cf3d40c5b0b"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+      "bytes": 93626,
+      "sha256": "4d22e1c642fdb6ba2b01e33d50e990a61d8c589a60e201a0f02df5f0258af227",
+      "gitBlob": "20bbda86effc567dc6b308627ba1d6ba4f833803"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+      "bytes": 161703,
+      "sha256": "eb9b1fc49a3c3ae76ac5f118b979b74bc836efeab3882c7d00c3e58f27c932c2",
+      "gitBlob": "738878353a3e8b276cd9384badfb1c273034d5cb"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+      "bytes": 2464,
+      "sha256": "c34e73685d19b003418508e65bd38c3d8739d813148f962b0abe40c427386850",
+      "gitBlob": "7ff4e1052ea9e305518c4adaf5e0c360a4bf8a05"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "bytes": 768341,
+      "sha256": "0c9a86eaad5dfb5f0d5a8e08337de5b853017c291811e7d8a97b0cc5c365be6f",
+      "gitBlob": "9fceb719a6e89e2a086b0f4eb466ae992eba3614"
+    },
+    {
+      "path": "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart",
+      "bytes": 7364,
+      "sha256": "611c4d5d2f7ebeab54a8173e20520234a8b2b11331dd03d8c6eb187df573d1a2",
+      "gitBlob": "fbea835a915fbffef48c6b85114857eb641efaba"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+      "bytes": 53539,
+      "sha256": "df1179586b022a165d892a222f6687f72b32116709a533199b76f730144a4e0c",
+      "gitBlob": "da63bc9995845725e1c851b9dad0251e6ac16680"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+      "bytes": 87923,
+      "sha256": "8d7a2a6f7a083249d8a2740af185b2bd566d8a4013180e32d819e4d97aa3a5ed",
+      "gitBlob": "e313e7e608fd361bd93567a762547db395ccbdfc"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart",
+      "bytes": 49159,
+      "sha256": "44d141d82d89776113ed91e724621454ff649d0bfa6cb0b4700f0ddf051601e0",
+      "gitBlob": "25622f65560842d29e7c965f7a2d4a4d058468d4"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
+      "bytes": 85365,
+      "sha256": "8ab47909a63ba99fdde65340e90f290983e2447acfd489083d3e34be5c2d5478",
+      "gitBlob": "c48cff4d08ece592d4d60a77571ffe1faeab6495"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+      "bytes": 194266,
+      "sha256": "36072f727f75422d84ba136e35520807ac5c8e389b30aa0db3327bb2b1998b14",
+      "gitBlob": "c41a770e875813dec66a0a9e2af8379928273568"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart",
+      "bytes": 22302,
+      "sha256": "9f70df9984a5588fe6a598a7a167bed0ce50ac55a92c3345eb75448d0d23331d",
+      "gitBlob": "316d33c979fee59732fb4dc0d7fcf544ba2d12b5"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
+      "bytes": 50246,
+      "sha256": "ebe801df99ed5ced49b167cb3596af3efc84b6f39a8dcc53a0a09c621ae6bf0f",
+      "gitBlob": "58f7357097e8a46545c17783868bf1c777ba3dd4"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+      "bytes": 7990,
+      "sha256": "bea5f33e8ea0a79fcd008306ca74c6ca887e36b627f076858e3b512e43e837b7",
+      "gitBlob": "1017a5fa674d538521c67ef0d084a38979cd6256"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+      "bytes": 147685,
+      "sha256": "7495ec85563839ff93c7577f65da0afcb817b5f97d97fdd03e9905bd91f7bf50",
+      "gitBlob": "85dc00db13bf6da4ff6f7c6647c4ecae2e723bc1"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+      "bytes": 446588,
+      "sha256": "4d3f05884700b1bec43bff815e5716fd6a94eed19135bfe446123811ae84fd1c",
+      "gitBlob": "636e150141158164b7a438a7360c3fce06678b7b"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+      "bytes": 420932,
+      "sha256": "741be1d88541f23f9baedfd97459ac1fd7f52cb13ba75f171aa523b1e5b4029a",
+      "gitBlob": "219875862ea6b7498e62fc85af46797a4f2d79cc"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+      "bytes": 50272,
+      "sha256": "c68b94ccf023bbe44f238550c280eef05c2f843be301f1947da397549005b3a2",
+      "gitBlob": "0ab0c305b797738e561e9ecf679d7471e1b40576"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+      "bytes": 2694,
+      "sha256": "6019de52cab9892140ac50e7e89c8a26bb5703d98ba93b236fbf5a0f367f16a9",
+      "gitBlob": "04707646485ff11f82346edb088809d7b26d798e"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/REVIEW.md",
+      "bytes": 460,
+      "sha256": "63de61a06cccaee2df763728c28aa0ad3b647f197d951cb6932022a8e8904393",
+      "gitBlob": "b21b1c18dcca139459d873e3da403a6995b3b647"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+      "bytes": 63056,
+      "sha256": "e775e3faa655d9d93313c14d8ab8c95a39b99c51083304fa922314453500c041",
+      "gitBlob": "8205b8fe774eecc55b6272cc0834cdcb66afbeb4"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+      "bytes": 85658,
+      "sha256": "6b14b41633a557bd09f9234e57aca8f2d992c302edd1b4ec93ccf760c42de2da",
+      "gitBlob": "a844cfd382a011eb8d3cdf2da97f420745e53587"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json",
+      "bytes": 4029,
+      "sha256": "b9bcb1c8fc11d4dadd2e77a9ff9ea074822d271bc98d147e15faf7abe30f89bf",
+      "gitBlob": "b0ff010a521eb3248cb13403564a23fd21a8cca5"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
+      "bytes": 46973,
+      "sha256": "192dbd99c1aa1406464eb36335ab31210a81f66aa5026cf5efc418e3a927bb64",
+      "gitBlob": "ecbcb543c78d63ae51fcf61ffdf9738812a989b1"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png",
+      "bytes": 50076,
+      "sha256": "ecfe9a750d97e9fa6d47c2dae05596e03e746f900d97caae07386b4f00b24f53",
+      "gitBlob": "c20801ea5d6d3321d3ed67958b48c2747823f804"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png",
+      "bytes": 61384,
+      "sha256": "b09f63645bdc296425acc4960133f59f05f633a1c5ce3eb925d3351de02db034",
+      "gitBlob": "34a9bb07998972a64a51c0f8812230b33339b2bd"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png",
+      "bytes": 64346,
+      "sha256": "097239cf706ccbbfc5dbd1e9cbd5b2a2c708b765ac0c8329bbdbe3e98201a60e",
+      "gitBlob": "233a7ba00d9f1ac85338a7cb61e87b906a9da7c5"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
+      "bytes": 68140,
+      "sha256": "48acf24d8f00c2b54dba4f4eb683b74c45f495d87385cfda089e3dc1ac0937cf",
+      "gitBlob": "d3f1d19063a0747266ae37fab5b1fd3a91c174e3"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png",
+      "bytes": 46973,
+      "sha256": "192dbd99c1aa1406464eb36335ab31210a81f66aa5026cf5efc418e3a927bb64",
+      "gitBlob": "ecbcb543c78d63ae51fcf61ffdf9738812a989b1"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-android-checkout.png",
+      "bytes": 50076,
+      "sha256": "ecfe9a750d97e9fa6d47c2dae05596e03e746f900d97caae07386b4f00b24f53",
+      "gitBlob": "c20801ea5d6d3321d3ed67958b48c2747823f804"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+      "bytes": 63037,
+      "sha256": "315d34dfe2cb7e504f05cffbea0452f8cc4a7c597555c325351852411eac5ce1",
+      "gitBlob": "e0a01984b89d0c273da3165abada82a538222604"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png",
+      "bytes": 64346,
+      "sha256": "097239cf706ccbbfc5dbd1e9cbd5b2a2c708b765ac0c8329bbdbe3e98201a60e",
+      "gitBlob": "233a7ba00d9f1ac85338a7cb61e87b906a9da7c5"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+      "bytes": 85704,
+      "sha256": "57b59ebae4c1d97974f10d86abeff5e4d61b65fc6f0d598cff8ebb94d8cfead6",
+      "gitBlob": "6c888b72cda892c4368969fd003b511e8efdc139"
+    },
+    {
+      "path": "config/codex-development-regression-registry.json",
+      "bytes": 6297245,
+      "sha256": "1843def6fb4bdfa6c05204c3704bde13df0bc33e97ce7c251cc85a11056d3b9e",
+      "gitBlob": "18ddd5a1ea5fbd604cc38cb5ab77ccb91ca7c2f7"
+    },
+    {
+      "path": "config/codex-subagent-coordination-policy.json",
+      "bytes": 127207,
+      "sha256": "1819ea4e9e1cfac81d65f763dbec78d2119135c38e3e93ef8520126e4880068e",
+      "gitBlob": "0669be1c3b1440fc1186b3a4086c18fd4d9fffbb"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-INTEGRATION-EVIDENCE-20260922.zip",
+      "bytes": 525213,
+      "sha256": "085dbcd4fcfa098142aa756372cdee312b3612bc0e0f407c4ff135d0a3427df3",
+      "gitBlob": "6957155a05a29021b2b73f7ddae67e13254df8d6"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-LOCAL-CUTOFF-20260922.md",
+      "bytes": 19170,
+      "sha256": "3ef6bfda009ab016d5ca65a44a7437bf83f509fa0cdc0c41c45ce22e70c97811",
+      "gitBlob": "adb22f6eee970b72c0fd882c8516770ce321fb09"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-POST-REDMI-FIXES-20260922.md",
+      "bytes": 11991,
+      "sha256": "1819a358c64aafd088ea74f06f21cc835920a2ae1f6aa7c373388d9f0fe40027",
+      "gitBlob": "01705579bd363ddce6aaf7d4669182389b6fa52d"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-R6632-APK.json",
+      "bytes": 9959,
+      "sha256": "bbd9d09a2cbc7c71becf877bfd874a2de5b47a88a89dab92fe07e29594c662b5",
+      "gitBlob": "64c48a70b0a842670ab9bf748487a5a5ce5de196"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-R6632-DEVICE-RETEST-20260922.md",
+      "bytes": 17456,
+      "sha256": "cfb30a60c81fa2de640fa46d8663bcab7c579350d3db756e0c87f6704c89c76c",
+      "gitBlob": "ac112369b6891dc4c56d4deb0bf8264725ffee54"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-READY-20260921-APK.json",
+      "bytes": 8115,
+      "sha256": "b5c37660883a6b51626002c57536e438dc5bdbc7b911d5ca432091e62921f06d",
+      "gitBlob": "d1e5274d56802707cfa00387883932ccf976d0d4"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-READY-20260921.md",
+      "bytes": 68218,
+      "sha256": "f15531b0e60d1f02ba0030f52e6291d65a5059c459c0c1fd0084682869c8139e",
+      "gitBlob": "22d3fd2123e44be3d323780f78b8d966bd440872"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-REDMI-AUDIT-20260922.md",
+      "bytes": 56248,
+      "sha256": "b6212ead8372d7df5fe96c089e60cbb1723f140c7e286198fd9ef23246d337a6",
+      "gitBlob": "34a528943df878ccc1ee8ea06195475d5bd3eb2c"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md",
+      "bytes": 14348,
+      "sha256": "948f015a45473360da59c14f3d460a667f884701643fa2ba66052947c3eb2b59",
+      "gitBlob": "8fbd3816dcf68d6038f10cfc0a83737174faa983"
+    },
+    {
+      "path": "scripts/check-approved-ui-locks.ps1",
+      "bytes": 27426,
+      "sha256": "2d063e071807129ac5db286b19e32b38cc9f4f740155f2d0f5e70c406922ef1c",
+      "gitBlob": "59fac9c57bd8c6fada9cf260d2ebf26007587d62"
+    },
+    {
+      "path": "scripts/check-brand-integrity.ps1",
+      "bytes": 57904,
+      "sha256": "81d6347b51efd31e1337660e148eafdb01cab84e613271eb4e6880c646653ee5",
+      "gitBlob": "5d2b96728af1c9ce9f766984216eb473a64d67e9"
+    },
+    {
+      "path": "scripts/check-buy-backend-contract-boundary.ps1",
+      "bytes": 21142,
+      "sha256": "3e606af9d42f99e7bacf9defb2d96fd6f462eba5a07cbdad0836319cecd60566",
+      "gitBlob": "9f3c3c93b935811c644b78c9598875aef59ed888"
+    },
+    {
+      "path": "scripts/check-buy-data-egress-boundary.ps1",
+      "bytes": 12972,
+      "sha256": "68de42c8541c3e9c955a6767152ce73ea2bee96a138aac7cb38c0a5300bd9ff8",
+      "gitBlob": "ca5339388dbb17fab6150f01527442759c9a5b30"
+    },
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "bytes": 24761,
+      "sha256": "87a5f742161f6141767e6c5c57cbda5b346e744c3ac5aeb58460db0a21d071f3",
+      "gitBlob": "f1ec7c15cb1caac194e8976c7001fd4582cdb79f"
+    },
+    {
+      "path": "scripts/check-codex-subagent-coordination-policy.ps1",
+      "bytes": 432205,
+      "sha256": "d0eb8b975fd9a900de10831057bccf7dc1793e20e7b62aa2f18d079741304354",
+      "gitBlob": "c3e7eec509842d85fafd9d4906ff3ff1724ac93d"
+    }
+  ],
+  "selfReferenceExclusions": [
+    "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+    "docs/quality/CURSOR-BUY-INTEGRATION-INVENTORY-20260922.json"
+  ],
+  "excludedFileVerification": "Handoff and inventory are bound by the final Git commit and remote readback, never by a circular self hash.",
+  "protectedPathsEqualToInheritedBaseline": [
+    "apps/mobile/lib/features/work",
+    "apps/mobile/lib/ui_v2/work",
+    "apps/mobile/android",
+    "apps/mobile/ios",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/pubspec.lock",
+    "backend",
+    "contracts",
+    "packages"
+  ],
+  "runtimeChangesBuyOnly": [
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+  ],
+  "requiredIntegratedCoverage": {
+    "schemaVersion": 1,
+    "gateId": "MOOLSOCIAL-APPROVED-INTEGRATION-COMMIT-COVERAGE-20260901",
+    "baseline": {
+      "branch": "integration/moolsocial/codex-r6197-cursor-r6179-v1-20260831",
+      "commit": "ae021c0d711c2ff6bebcc9fe0ee664a8f0a9e235"
+    },
+    "approvedTips": [
+      {
+        "id": "codex-phase1-post",
+        "agent": "codex",
+        "branch": "work/codex-ui/phase1-post-r6167-v1-20260831",
+        "commit": "aaf5444713e2f5aa3952c5e66ce3199d3725c2f9"
+      },
+      {
+        "id": "cursor-buy-next-cycle",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/buy-next-cycle-v1-20260831",
+        "commit": "c7b77687d1671f23f95e603772dbd436a0ccd270"
+      },
+      {
+        "id": "cursor-buy-help-unification",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/buy-mvp-help-unification-v1-20260831",
+        "commit": "9be29fd6d9b9ada335dec4a3bd495e65fb7def5a"
+      },
+      {
+        "id": "cursor-gst-store-recovery",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/shop-gst-store-recovery-v1-20260831",
+        "commit": "caddfac595cd835ce5ebf22a0a8819b41c6f0575"
+      },
+      {
+        "id": "cursor-store-card-clarity",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/shop-store-card-clarity-v1-20260831",
+        "commit": "06d88307b30804788cb82282b34c4af49e2fd595"
+      },
+      {
+        "id": "cursor-shop-mvp",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/shop-mvp-go-live-v1-20260829",
+        "commit": "f513ecc78de2a6b72223f25bdd18203387e13be0"
+      },
+      {
+        "id": "cursor-shop-contract",
+        "agent": "cursor",
+        "branch": "work/codex-backend/shop-mvp-commerce-adapters-v1-20260829",
+        "commit": "b52b6473090ea1060cf64983fd44040a696eb4e3"
+      },
+      {
+        "id": "codex-chat-final",
+        "agent": "codex",
+        "branch": "work/codex-chat/chat-final-integrated-qualification-v1-20260829",
+        "commit": "cb59c6265b27a2954d59e42ffba0ecb60a9e3001"
+      },
+      {
+        "id": "codex-chat-group",
+        "agent": "codex",
+        "branch": "work/codex-chat/chat-group-membership-service-v1-20260829",
+        "commit": "8ac00e87299d9f73d868c45c2c0aca62adc510ad"
+      },
+      {
+        "id": "codex-chat-media-voice",
+        "agent": "codex",
+        "branch": "work/codex-chat/chat-media-voice-delivery-v1-20260829",
+        "commit": "2bd1234f6b038f737176adb830fff00f6d89c00c"
+      },
+      {
+        "id": "codex-chat-presence",
+        "agent": "codex",
+        "branch": "work/codex-chat/chat-call-presence-service-v1-20260829",
+        "commit": "b68cbf19b456a8fa3d9608acd54a7dd432d25b67"
+      },
+      {
+        "id": "codex-chat-privacy",
+        "agent": "codex",
+        "branch": "work/codex-chat/chat-privacy-safety-service-v1-20260829",
+        "commit": "6680f0c40264aa4dce330c52c382b70dd5b9ff8d"
+      },
+      {
+        "id": "codex-workspace-order",
+        "agent": "codex",
+        "branch": "work/codex-workspace/retailer-order-lifecycle-v1-20260829",
+        "commit": "62fb05c4cf4e27dc47e1a1eb4d0db69672f183ce"
+      },
+      {
+        "id": "codex-workspace-catalogue",
+        "agent": "codex",
+        "branch": "work/codex-workspace/retailer-catalogue-availability-v1-20260829",
+        "commit": "ae0e6d3e0b563bf2c4a2a706aaeae5ebe21fa3a2"
+      },
+      {
+        "id": "codex-workspace-onboarding",
+        "agent": "codex",
+        "branch": "work/codex-workspace/retailer-onboarding-documents-v1-20260829",
+        "commit": "8738899b8dee58592e0605105c34757aca5d336e"
+      },
+      {
+        "id": "codex-workspace-identification",
+        "agent": "codex",
+        "branch": "work/codex-workspace/business-identification-v1-20260829",
+        "commit": "70e413e53efb6daddb01413020a76cbd42b2b1d3"
+      },
+      {
+        "id": "codex-shop-product-correction",
+        "agent": "codex",
+        "branch": "work/codex-ui/shop-product-experience-correction-v1-20260901",
+        "commit": "78ed25a5ff48a4b75686a61630bfdaca02f2d173"
+      },
+      {
+        "id": "codex-social-create-composer",
+        "agent": "codex",
+        "branch": "work/codex-ui/social-create-composer-contextual-layout-v1-20260831",
+        "commit": "3461c9af55f43a7469ad4c0fb10240ac0ffcdf3e"
+      }
+    ],
+    "rejectedTips": [
+      {
+        "id": "cursor-rejected-store-interaction",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/shop-store-interaction-repair-v1-20260831",
+        "commit": "59f63db15d2aeb970dcfc5b4d39eaf312ca76168"
+      },
+      {
+        "id": "cursor-rejected-product-discovery",
+        "agent": "cursor",
+        "branch": "work/cursor-ui/shop-product-discovery-depth-v1-20260831",
+        "commit": "0df24cc11f06ec5032a0f6def454c03b41c09e30"
+      }
+    ]
+  },
+  "sourceUnchangedDuringReconciliation": true,
+  "remoteEvidence": {
+    "path": "docs/quality/CURSOR-BUY-INTEGRATION-EVIDENCE-20260922.zip",
+    "files": 62,
+    "bytes": 525213,
+    "sha256": "085dbcd4fcfa098142aa756372cdee312b3612bc0e0f407c4ff135d0a3427df3"
+  },
+  "localRawEvidence": {
+    "manifest": "C:/GUARANTEED OUTCOME/outputs/buy-integration-handoff-20260922/preserved-local-evidence-manifest.json",
+    "manifestSha256": "da4233400f57a3733be0b702a59d6229a110cba48f12acadce54530d88e5bcbc",
+    "archive": "C:\\GUARANTEED OUTCOME\\outputs\\buy-integration-handoff-20260922\\preserved-local-evidence.zip",
+    "archiveSha256": "bfc6ffb9784e180458b307593cdaff5fefeb316f02748858758490deff77fec6",
+    "files": 1560,
+    "uniqueBlobs": 1301,
+    "remoteDisposition": "Raw APK/device evidence remains in local hash-verified archive; host evidence/manifests and source are committed to origin. No publishing of raw customer/device data."
+  },
+  "pendingAcceptance": [
+    "next Redmi replay of all eleven tickets and children with backend",
+    "DEP-01 live provider/auth/payment/order",
+    "DEP-02 authentic Store projection/photos/address/Maps",
+    "DEP-03 isolated zero-active Delivery rail dataset",
+    "Codex integration and new full baseline"
+  ]
+}

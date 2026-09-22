@@ -78,6 +78,7 @@ class BuyV2CatalogueQuery {
   BuyV2CatalogueQuery({
     required this.destination,
     required this.regionId,
+    this.customerLocationKey = '',
     this.areaScope = BuyV2CatalogueAreaScope.regional,
     this.storeId,
     this.query = '',
@@ -99,6 +100,7 @@ class BuyV2CatalogueQuery {
 
   final BuyV2Destination destination;
   final String? regionId;
+  final String customerLocationKey;
   final BuyV2CatalogueAreaScope areaScope;
   final String? storeId;
   final String query;
@@ -118,9 +120,10 @@ class BuyV2CatalogueQuery {
   final BuyV2ProcurementContext? procurementContext;
 
   String get key => jsonEncode([
-    procurementContext == null ? 2 : 3,
+    customerLocationKey.isNotEmpty ? 4 : (procurementContext == null ? 2 : 3),
     destination.name,
     regionId,
+    if (customerLocationKey.isNotEmpty) customerLocationKey,
     areaScope.name,
     storeId,
     query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
@@ -330,14 +333,148 @@ class BuyV2StoreCollectionCapability {
   );
 }
 
-BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
-  if (product.destination == BuyV2Destination.wholesale) {
-    return BuyV2FulfilmentMode.bulkFreight;
+/// Public provider contract v1. Never derive these grants from display copy,
+/// MOQ, Store switches alone, or the transport used for a different service.
+
+@immutable
+class BuyV2OfferEligibility {
+  BuyV2OfferEligibility({
+    required this.productId,
+    required this.storeId,
+    required this.sourceRevision,
+    required this.customerLocationKey,
+    required this.observedAt,
+    required this.expiresAt,
+    required this.offerClass,
+    required this.channelEnabled,
+    required this.storeReady,
+    required this.fleetAvailable,
+    required this.customerLocationConfirmed,
+    required Set<BuyV2DeliveryOption> options,
+    this.scheduledSlotId,
+    this.scheduledStart,
+    this.scheduledEnd,
+    this.reviewFixture = false,
+  }) : options = Set.unmodifiable(options);
+
+  static const schemaVersion = 1;
+  final String productId, storeId, sourceRevision, customerLocationKey;
+  final DateTime observedAt, expiresAt;
+  final BuyV2OfferClass offerClass;
+  final bool channelEnabled, storeReady, fleetAvailable, reviewFixture;
+  final bool customerLocationConfirmed;
+  final Set<BuyV2DeliveryOption> options;
+  final String? scheduledSlotId;
+  final DateTime? scheduledStart, scheduledEnd;
+
+  Set<BuyV2DeliveryOption> availableFor({
+    required BuyV2Product product,
+    required String locationKey,
+    required DateTime now,
+    bool allowReviewFixture = false,
+  }) {
+    if ((reviewFixture && !allowReviewFixture) ||
+        product.id != productId ||
+        product.storeId != storeId ||
+        storeId.trim().isEmpty ||
+        sourceRevision.trim().isEmpty ||
+        customerLocationKey.isEmpty ||
+        locationKey != customerLocationKey ||
+        product.offerClass != offerClass ||
+        !channelEnabled ||
+        !storeReady ||
+        observedAt.isAfter(now) ||
+        !expiresAt.isAfter(observedAt) ||
+        !now.isBefore(expiresAt))
+      return const {};
+    return Set.unmodifiable(
+      options.where(
+        (option) => switch (option) {
+          BuyV2DeliveryOption.quick =>
+            fleetAvailable && customerLocationConfirmed,
+          BuyV2DeliveryOption.scheduled =>
+            fleetAvailable &&
+                customerLocationConfirmed &&
+                scheduledSlotId?.trim().isNotEmpty == true &&
+                scheduledStart != null &&
+                scheduledEnd != null &&
+                scheduledStart!.isAfter(now) &&
+                scheduledEnd!.isAfter(scheduledStart!),
+          _ => true,
+        },
+      ),
+    );
   }
-  final promise = product.deliveryPromise.toLowerCase();
-  if (product.destination == BuyV2Destination.shop &&
-      RegExp(r'\d+\s*(?:min|minute)').hasMatch(promise)) {
+
+  Map<String, Object?> toJson() => {
+    'schemaVersion': schemaVersion,
+    'productId': productId,
+    'storeId': storeId,
+    'sourceRevision': sourceRevision,
+    'customerLocationKey': customerLocationKey,
+    'observedAt': observedAt.toUtc().toIso8601String(),
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
+    'offerClass': offerClass.name,
+    'channelEnabled': channelEnabled,
+    'storeReady': storeReady,
+    'fleetAvailable': fleetAvailable,
+    'customerLocationConfirmed': customerLocationConfirmed,
+    'options': options.map((option) => option.name).toList()..sort(),
+    'scheduledSlotId': scheduledSlotId,
+    'scheduledStart': scheduledStart?.toUtc().toIso8601String(),
+    'scheduledEnd': scheduledEnd?.toUtc().toIso8601String(),
+    'reviewFixture': reviewFixture,
+  };
+
+  /// An incomplete/unknown payload provides no eligibility; callers must not
+  /// replace it with a permissive default or manufacture provider evidence.
+  static BuyV2OfferEligibility? fromJson(Map<String, dynamic> json) {
+    try {
+      if (json['schemaVersion'] != schemaVersion) return null;
+      DateTime date(Object? value) {
+        final text = value as String;
+        if (!text.endsWith('Z')) throw const FormatException('UTC required');
+        return DateTime.parse(text);
+      }
+
+      return BuyV2OfferEligibility(
+        productId: json['productId'] as String,
+        storeId: json['storeId'] as String,
+        sourceRevision: json['sourceRevision'] as String,
+        customerLocationKey: json['customerLocationKey'] as String,
+        observedAt: date(json['observedAt']),
+        expiresAt: date(json['expiresAt']),
+        offerClass: BuyV2OfferClass.values.byName(json['offerClass'] as String),
+        channelEnabled: json['channelEnabled'] as bool,
+        storeReady: json['storeReady'] as bool,
+        fleetAvailable: json['fleetAvailable'] as bool,
+        customerLocationConfirmed: json['customerLocationConfirmed'] as bool,
+        options: (json['options'] as List)
+            .map((value) => BuyV2DeliveryOption.values.byName(value as String))
+            .toSet(),
+        scheduledSlotId: json['scheduledSlotId'] as String?,
+        scheduledStart: json['scheduledStart'] == null
+            ? null
+            : date(json['scheduledStart']),
+        scheduledEnd: json['scheduledEnd'] == null
+            ? null
+            : date(json['scheduledEnd']),
+        reviewFixture: json['reviewFixture'] as bool? ?? false,
+      );
+    } on Object {
+      return null;
+    }
+  }
+}
+
+BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
+  // Legacy display grouping for review fixtures. Eligibility is a separate,
+  // location-bound provider contract and must be checked before ordering.
+  if (product.reviewDeliveryOptions.contains(BuyV2DeliveryOption.quick)) {
     return BuyV2FulfilmentMode.quickLocal;
+  }
+  if (product.reviewDeliveryOptions.contains(BuyV2DeliveryOption.freight)) {
+    return BuyV2FulfilmentMode.bulkFreight;
   }
   return BuyV2FulfilmentMode.standardCourier;
 }
@@ -356,6 +493,7 @@ class BuyV2ProductFactsSnapshot {
     this.deliveryProviderName,
     this.deliveryServiceLevel,
     this.fulfilmentMode,
+    this.eligibility,
     this.storeOperatingState = BuyV2StoreOperatingState.unknown,
     this.storeCollection,
     this.nextOpeningLabel,
@@ -379,6 +517,7 @@ class BuyV2ProductFactsSnapshot {
   final String? deliveryProviderName;
   final String? deliveryServiceLevel;
   final BuyV2FulfilmentMode? fulfilmentMode;
+  final BuyV2OfferEligibility? eligibility;
   final BuyV2StoreOperatingState storeOperatingState;
   final BuyV2StoreCollectionCapability? storeCollection;
   final String? nextOpeningLabel;
@@ -400,6 +539,8 @@ class BuyV2ProductFactsSnapshot {
     String? deliveryProviderName,
     String? deliveryServiceLevel,
     BuyV2FulfilmentMode? fulfilmentMode,
+    BuyV2OfferEligibility? eligibility,
+    bool clearEligibility = false,
     BuyV2StoreOperatingState? storeOperatingState,
     BuyV2StoreCollectionCapability? storeCollection,
     bool clearStoreCollection = false,
@@ -421,6 +562,7 @@ class BuyV2ProductFactsSnapshot {
       deliveryProviderName: deliveryProviderName ?? this.deliveryProviderName,
       deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
       fulfilmentMode: fulfilmentMode ?? this.fulfilmentMode,
+      eligibility: clearEligibility ? null : eligibility ?? this.eligibility,
       storeOperatingState: storeOperatingState ?? this.storeOperatingState,
       storeCollection: clearStoreCollection
           ? null
@@ -447,6 +589,7 @@ class BuyV2ProductFactsSnapshot {
         other.deliveryProviderName == deliveryProviderName &&
         other.deliveryServiceLevel == deliveryServiceLevel &&
         other.fulfilmentMode == fulfilmentMode &&
+        other.eligibility == eligibility &&
         other.storeOperatingState == storeOperatingState &&
         other.storeCollection == storeCollection &&
         other.nextOpeningLabel == nextOpeningLabel &&
@@ -470,6 +613,7 @@ class BuyV2ProductFactsSnapshot {
     deliveryServiceLevel,
     fulfilmentMode,
     storeOperatingState,
+    eligibility,
     storeCollection,
     nextOpeningLabel,
     orderCutoffLabel,

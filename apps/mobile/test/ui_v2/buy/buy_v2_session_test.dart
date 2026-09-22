@@ -19,7 +19,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 import 'buy_v2_discovery_refinement_test.dart'
-    show R669BrandCommerce, r669BrandedSession;
+    show R669BrandCommerce, r669BrandedSession, BuyTestEligibilityFacts;
 
 final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
   _R669ProcurementCommerce(this.snapshot);
@@ -119,6 +119,9 @@ final class _R669OrderReadyFacts implements BuyV2ProductFactsAdapter {
           .copyWith(
             promisedByLabel: '11 September, 2–4 PM',
             sourceId: 'r669-order-ready-fixture',
+            eligibility: const BuyTestEligibilityFacts()
+                .snapshotFor(product)
+                .eligibility,
           );
 }
 
@@ -357,9 +360,9 @@ _openProductionCheckout({
   BuyV2BusinessVerificationState businessVerificationState =
       BuyV2BusinessVerificationState.unavailable,
 }) async {
-  final product = BuyV2Catalogue.products.firstWhere(
-    (candidate) => candidate.destination == BuyV2Destination.shop,
-  );
+  final product = BuyV2Catalogue.products
+      .firstWhere((candidate) => candidate.destination == BuyV2Destination.shop)
+      .copyWith(storeId: 'test-checkout-store');
   const address = BuyV2Address(
     id: 'server-home',
     kind: BuyV2AddressKind.home,
@@ -426,8 +429,9 @@ _openProductionCheckout({
   );
   final session = BuyV2Session(
     core: BuySession(),
-    productFactsAdapter:
-        factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
+    productFactsAdapter: BuyTestEligibilityFacts(
+      delegate: factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
+    ),
     commerceAdapter: adapter,
     customerStateStore: customerStateStore,
     reviewDataEnabled: false,
@@ -5681,6 +5685,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5725,6 +5732,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5752,6 +5762,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
           customerStateStore: store,
@@ -5769,6 +5782,9 @@ void main() {
         final nextCore = BuySession();
         final next = BuyV2Session(
           core: nextCore,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: _PagingRecoverySource(),
           customerStateStore: store,
@@ -5794,6 +5810,7 @@ void main() {
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
+        productFactsAdapter: const BuyTestEligibilityFacts(locationKey: '||0'),
         reviewDataEnabled: false,
         cataloguePageSource: source,
       );
@@ -5827,6 +5844,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5850,6 +5870,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5891,6 +5914,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5921,6 +5947,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -8413,9 +8442,11 @@ void main() {
     test(
       'authoritative commerce snapshot and order result own production success',
       () async {
-        final product = BuyV2Catalogue.products.firstWhere(
-          (candidate) => candidate.destination == BuyV2Destination.shop,
-        );
+        final product = BuyV2Catalogue.products
+            .firstWhere(
+              (candidate) => candidate.destination == BuyV2Destination.shop,
+            )
+            .copyWith(storeId: 'test-checkout-store');
         const address = BuyV2Address(
           id: 'server-home',
           kind: BuyV2AddressKind.home,
@@ -8462,6 +8493,7 @@ void main() {
         final production = BuyV2Session(
           core: BuySession(),
           commerceAdapter: adapter,
+          productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
 
@@ -8486,10 +8518,12 @@ void main() {
           core: BuySession(),
           customerStateStore: store,
           commerceAdapter: R669BrandCommerce(),
+          productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
         await first.restoreCommerce();
         final product = first.visibleProducts.first;
+        final brand = first.discoveryBrands.first;
         first.addProduct(product.id);
         first.toggleSaved(product.id);
         first.addAddress(
@@ -8506,7 +8540,8 @@ void main() {
           ),
         );
         first.choosePayment('Paytm');
-        final brand = first.discoveryBrands.first;
+        expect(first.deliveryOptionsFor(product), isEmpty);
+        expect(first.quantityFor(product.id), product.minimumOrder);
         first.toggleDiscoveryBrand(brand);
         first.chooseMaximumProductPrice(500);
         first.choosePackFilter(BuyV2PackFilter.standard);
@@ -8519,6 +8554,7 @@ void main() {
           core: BuySession(),
           customerStateStore: store,
           commerceAdapter: R669BrandCommerce(),
+          productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
         await restored.restoreCommerce();

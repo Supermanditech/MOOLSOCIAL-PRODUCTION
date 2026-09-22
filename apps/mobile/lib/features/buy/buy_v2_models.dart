@@ -388,6 +388,10 @@ class BuyV2ProductMediaAsset {
   final BuyV2ProductMediaBinding? binding;
 }
 
+enum BuyV2OfferClass { retail, wholesale, bulk }
+
+enum BuyV2DeliveryOption { quick, scheduled, courier, freight, collection }
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -417,6 +421,8 @@ class BuyV2Product {
     this.composition,
     this.regulatoryNote,
     this.minimumOrder = 1,
+    this.offerClass,
+    this.reviewDeliveryOptions = const {},
     this.returnPolicy,
     this.purchaseProtection,
     this.compliance,
@@ -458,6 +464,12 @@ class BuyV2Product {
   final String? composition;
   final String? regulatoryNote;
   final int minimumOrder;
+
+  /// Explicit public offer classification, independent of MOQ and freight.
+  final BuyV2OfferClass? offerClass;
+
+  /// Screenbook fixtures only, never authoritative provider eligibility.
+  final Set<BuyV2DeliveryOption> reviewDeliveryOptions;
   final String? returnPolicy;
   final BuyV2PurchaseProtection? purchaseProtection;
   final BuyV2ProductCompliance? compliance;
@@ -485,6 +497,8 @@ class BuyV2Product {
     String? sellerType,
     String? confirmedOn,
     int? minimumOrder,
+    BuyV2OfferClass? offerClass,
+    Set<BuyV2DeliveryOption>? reviewDeliveryOptions,
     bool? catalogueListing,
     BuyV2PurchaseProtection? purchaseProtection,
     BuyV2ProductCompliance? compliance,
@@ -517,6 +531,8 @@ class BuyV2Product {
     composition: composition,
     regulatoryNote: regulatoryNote,
     minimumOrder: minimumOrder ?? this.minimumOrder,
+    offerClass: offerClass ?? this.offerClass,
+    reviewDeliveryOptions: reviewDeliveryOptions ?? this.reviewDeliveryOptions,
     returnPolicy: returnPolicy,
     purchaseProtection: purchaseProtection ?? this.purchaseProtection,
     compliance: compliance ?? this.compliance,
@@ -1239,6 +1255,18 @@ abstract final class BuyV2Catalogue {
       visualKind: _visualKind(
         wholesale ? seed.wholesaleCategory : seed.shopCategory,
       ),
+      reviewDeliveryOptions: wholesale
+          ? const {BuyV2DeliveryOption.freight}
+          : _reviewQuickProducts.contains(seed.id)
+          ? const {BuyV2DeliveryOption.quick}
+          : const {BuyV2DeliveryOption.scheduled, BuyV2DeliveryOption.courier},
+      // Existing review fixtures only; Store/provider projections must supply
+      // their own explicit classification. Quantity never grants a channel.
+      offerClass: !wholesale
+          ? BuyV2OfferClass.retail
+          : seed.id == 'rice'
+          ? BuyV2OfferClass.bulk
+          : BuyV2OfferClass.wholesale,
       minimumOrder: wholesale ? _minimumOrder(seed.id) : 1,
       returnPolicy: _returnPolicy(seed, wholesale: wholesale),
       freightIncluded: wholesale,
@@ -1333,6 +1361,53 @@ abstract final class BuyV2Catalogue {
     }
     return 'Jodhpur';
   }
+
+  // Explicit legacy screenbook scenarios. No runtime display-text inference.
+  // These do not grant production eligibility or assert fleet/slot availability.
+  static const _reviewQuickProducts = {
+    'tomato',
+    'rice',
+    'soap',
+    'onion',
+    'bread',
+    'chicken',
+    'turmeric',
+    'poha',
+    'noodles',
+    'biscuits',
+    'tea',
+    'peas',
+    'toothpaste',
+    'face-wash',
+    'toilet-cleaner',
+    'dishwash',
+    'baby-wipes',
+    'protein',
+    'cat-food',
+    'paper-cups',
+    'price-labels',
+    'banana',
+    'curd',
+    'fish-fillet',
+    'toor-dal',
+    'mustard-oil',
+    'red-chilli',
+    'corn-flakes',
+    'ketchup',
+    'potato-chips',
+    'coffee',
+    'frozen-fries',
+    'toothbrush',
+    'moisturizer',
+    'garbage-bags',
+    'fabric-conditioner',
+    'baby-lotion',
+    'glucose',
+    'dog-treats',
+    'tissues',
+    'barcode-labels',
+    'printer-paper',
+  };
 
   static int _minimumOrder(String canonicalId) => switch (canonicalId) {
     'rice' => 4,

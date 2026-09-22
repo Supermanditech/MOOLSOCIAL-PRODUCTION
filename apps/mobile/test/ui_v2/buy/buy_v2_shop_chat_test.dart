@@ -430,7 +430,8 @@ void main() {
     expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
     expect(uri.queryParameters['draft'], contains(product.seller));
     expect(uri.queryParameters['draft'], contains(product.title));
-    expect(uri.queryParameters['draft'], contains('SKU: ${product.id}'));
+    expect(uri.queryParameters['draft'], isNot(contains('SKU:')));
+    expect(uri.queryParameters['skuId'], product.id);
     expect(uri.queryParameters['draft'], contains('Quantity: 3'));
     expect(uri.queryParameters['draft'], contains('Price:'));
     final snapshot =
@@ -1183,7 +1184,7 @@ void main() {
       expect(field, findsOneWidget);
       final draft = tester.widget<TextField>(field).controller?.text ?? '';
       expect(draft, contains(product.seller));
-      expect(draft, contains('SKU: ${product.id}'));
+      expect(draft, isNot(contains('SKU:')));
       expect(draft, contains('Quantity: ${product.minimumOrder}'));
       expect(draft, contains('Price:'));
 
