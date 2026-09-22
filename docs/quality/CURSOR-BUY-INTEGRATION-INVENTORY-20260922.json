@@ -2193,5 +2193,16 @@
     "messagesSent": 0,
     "ordersOrCancellationsSubmitted": 0,
     "sourceChanged": false
+  },
+  "liveGoogleMapDeliveryRequirement20260923": {
+    "id": "R6633-D10-C2",
+    "parent": "R6633-D10",
+    "status": "open_registered_only",
+    "classification": "mvp_required",
+    "phase": "later_delivery_provider_backend_integration",
+    "requiredBeforeGoLive": true,
+    "currentDeviceLiveMapVerified": false,
+    "blocksCurrentFrontendAudit": false,
+    "report": "CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
   }
 }
