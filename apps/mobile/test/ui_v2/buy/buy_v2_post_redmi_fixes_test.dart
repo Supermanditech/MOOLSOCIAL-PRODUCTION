@@ -33,6 +33,27 @@ class _EligibilityFacts implements BuyV2ProductFactsAdapter {
           );
 }
 
+class _OrganizedProductFacts implements BuyV2ProductFactsAdapter {
+  bool closed = false;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter()
+          .snapshotFor(product)
+          .copyWith(
+            sourceId: 'organized-product-test',
+            storeOperatingState: closed
+                ? BuyV2StoreOperatingState.closed
+                : BuyV2StoreOperatingState.open,
+            nextOpeningLabel: 'Opens tomorrow at 9 am',
+            deliveryFeeLabel: 'Confirmed at checkout',
+            orderCutoffLabel: 'Order before 14:30 for packing today',
+            dispatchPromise: 'Dispatched after Store packing confirmation',
+            deliveryProviderName:
+                'Test local delivery provider serving this Store',
+            deliveryServiceLevel: 'Confirmed at checkout',
+          );
+}
+
 class _ControlsCustomerStore implements BuyV2CustomerStateStore {
   _ControlsCustomerStore(this.snapshot);
   BuyV2CustomerStateSnapshot snapshot;
@@ -107,6 +128,75 @@ Widget _eightApp(
 
 void main() {
   group('Cursor eight tickets', () {
+    testWidgets(
+      'organized provider facts remain distinct at large text and closed Store blocks Add',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final facts = _OrganizedProductFacts();
+        final session = BuyV2Session(core: core, productFactsAdapter: facts);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.openProduct('s-tomato');
+        await tester.pumpWidget(_eightApp(session, scale: 2));
+        await tester.pumpAndSettle();
+        final information = find.byKey(
+          const ValueKey('buy-automatic-fulfilment-s-tomato'),
+        );
+        final scroll = find
+            .descendant(
+              of: find.byKey(const PageStorageKey('buy-product-s-tomato')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(information, 250, scrollable: scroll);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: information,
+            matching: find.text('Confirmed at checkout'),
+          ),
+          findsNWidgets(2),
+        );
+        for (final value in [
+          'Order before 14:30 for packing today',
+          'Dispatched after Store packing confirmation',
+          'Test local delivery provider serving this Store',
+        ]) {
+          expect(
+            find.descendant(of: information, matching: find.text(value)),
+            findsOneWidget,
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'organized-provider-long-text');
+        facts.closed = true;
+        session.refreshProductFacts('s-tomato');
+        await tester.pumpAndSettle();
+        expect(session.addProduct('s-tomato'), isFalse);
+        expect(session.quantityFor('s-tomato'), 0);
+        expect(
+          find.byKey(const ValueKey('buy-product-primary-s-tomato')),
+          findsNothing,
+        );
+        final store = find.byKey(
+          const ValueKey('buy-product-hero-store-s-tomato'),
+        );
+        await tester.scrollUntilVisible(store, -250, scrollable: scroll);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: store,
+            matching: find.text('Closed · Opens tomorrow at 9 am'),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
     for (final destination in [
       BuyV2Destination.shop,
       BuyV2Destination.wholesale,
@@ -371,6 +461,63 @@ void main() {
           await tester.pumpWidget(const SizedBox.shrink());
         },
       );
+      for (final productId in ['s-tomato', 'w-rice']) {
+        testWidgets('organized product information $productId $scale', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 844);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          session.openDestination(
+            productId.startsWith('w-')
+                ? BuyV2Destination.wholesale
+                : BuyV2Destination.shop,
+          );
+          session.openProduct(productId);
+          await tester.pumpWidget(_eightApp(session, scale: scale));
+          await tester.pumpAndSettle();
+          final store = find.byKey(
+            ValueKey('buy-product-hero-store-$productId'),
+          );
+          await tester.ensureVisible(store);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(of: store, matching: find.text('Open for orders')),
+            findsOneWidget,
+          );
+          expect(find.text('Fulfillment arranged by MoolSocial'), findsNothing);
+          final information = find.byKey(
+            ValueKey('buy-automatic-fulfilment-$productId'),
+          );
+          await tester.ensureVisible(information);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: information,
+              matching: find.text('Delivery & returns'),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: information, matching: find.text('Deliver to')),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: information,
+              matching: find.text('Open for orders'),
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'organized-product-$productId-$scale');
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
       testWidgets('compact Compare unavailable and product Add $scale', (
         tester,
       ) async {
