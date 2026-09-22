@@ -401,7 +401,8 @@ Local results and child inspection:
 Stop boundary: no new APK, backend work or implementation of the OPEN
 registered tickets (Compare-sheet height, search Delivery fleet and compact
 order/invoice actions, Medicine promotions, cross-Buy Cart movement, and product
-information organization, and category/search consistency). All earlier
+information organization, category/search consistency, and the current-location
+Shopping area popup). All earlier
 eleven-ticket device/provider obligations continue. Carry these three repairs
 into the integrated baseline and replay them on the next authorized Redmi APK.
 
@@ -722,3 +723,67 @@ not replace current results. Confirm no horizontal clipping, oversized blank
 areas, accidental global Store search or deferred Medicine exposure. Reuse current
 navigation/providers, preserve Cart and checkout state, capture actual local
 screens and inspect child defects when implementation is separately authorized.
+
+### Registration only: compact Shopping area popup with current-location map
+
+`CURSOR-BUY-SHOPPING-AREA-CURRENT-LOCATION-20260922` — OPEN;
+registration only under the standing instruction. No application change or APK.
+Founder clarifies that the top location icon represents the customer's current
+shopping location. Replace the existing Shopping area popup content and manual
+area-choice screen with a compact Google Map/pin popup that automatically centers
+on where the customer is presently located when opened.
+
+Actor/outcome: a consumer can establish the current shopping location directly
+from the top location control without selecting a predefined area list.
+Classification: mvp_supporting; location selection supports the existing scoped
+catalogue and fulfilment eligibility. The requested design replaces the current
+popup; do not layer a second manual-area interface beside it.
+
+Future implementation requirements:
+
+1. Reuse the top location entry and existing shopping-location state. Show a
+   compact map with a clearly visible current-location pin, concise resolved
+   location label if available, and minimal apply/close controls. Automatically
+   request a fresh foreground position when opened with permission, then center
+   the map. Do not require typing or choosing an area before showing the location.
+2. Respect the OS foreground-location permission flow. Explain loading, denied
+   permission, disabled location services, timeout, approximate/low-accuracy
+   position and map/network failure truthfully, with a suitable retry/settings
+   action. Do not claim an old saved address, default city or invented coordinate
+   is the customer's present position. Do not introduce background tracking.
+3. On applying a valid location, reuse the existing catalogue-area/provider
+   mapping and location-bound eligibility refresh. Prevent stale location or
+   search responses from replacing newer results; preserve pagination rules and
+   Store/channel scope. A map pin alone does not prove delivery serviceability,
+   Store readiness or fleet availability.
+4. Keep this browsing location distinct from a Store's physical address, a
+   Google Maps route to the Store and the customer's confirmed checkout delivery
+   address. Do not silently overwrite checkout addresses or an existing order.
+   Dismiss/Back without applying must preserve the prior selected shopping area.
+5. Remove the old manual-area content from this entry and reclaim blank space.
+   Use compact brand-consistent styling, a useful map viewport and accessible
+   controls. Do not add extra tabs, decorative panels or a large empty sheet.
+6. Explicitly verify keyboard and Android-hidden-content defects after the
+   future implementation. Opening from focused search must handle its keyboard;
+   map, pin, close and apply controls must remain reachable above keyboard/system
+   navigation insets. Test Android Back, permission/settings return, repeated
+   open/close, narrow/short screens, landscape and enlarged text. Do not treat
+   keyboard absence in the default map state as sufficient coverage.
+
+Reuse/dependencies: inspect `showBuyV2CatalogueArea`, the top location handler in
+`buy_v2_screen.dart`, current location/map adapters and the shopping-area source
+in `buy_v2_session.dart`. Confirm the existing Google Maps/current-position
+capability before implementation; actual GPS, permission, map credentials and
+location-to-catalogue mapping must work for runtime acceptance. If a capability
+or shared contract is missing, register and coordinate that exact dependency
+instead of substituting a screenshot/sample pin or claiming live integration.
+No native configuration, new dependency, backend, Store-worktree or policy change
+is performed or implicitly authorized by this registration.
+
+Future evidence: real current-location centering on Redmi with permission,
+denied/offline/services-disabled recovery, fresh versus stale position, apply
+and cancel behavior, correctly refreshed scoped catalogue/eligibility, preserved
+Cart/checkout state, and local keyboard/inset/layout/navigation tests. Inspect
+and register child defects; visual approval is separate from technical/device
+acceptance. Existing manual-area behavior remains installed until this ticket
+receives implementation authorization and a later authorized APK is qualified.
