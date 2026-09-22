@@ -214,6 +214,9 @@ retailer's task. Do not make the founder repeatedly discover obvious problems.
 - Invoice layouts follow the founder's three PDF references recorded in
   STORE-INVOICE-FORMAT-REFERENCES-20260922.md. Use applicable document types and
   payer/payee ownership, not one misleading generic invoice for every relationship.
+- Counter Sale is POS: its direct retailer-to-customer invoice reuses the approved
+  Download Centre seller/order format and shared renderer, not a separate POS PDF
+  design. Changing the billing UI must not fork that document implementation.
 - Sending/sharing outcomes should state who/where only after success. Keep invoice
   history; do not create an empty full screen for an amount or offer redundant save
   prompts. Do not send messages or record payments simply to demonstrate a design.

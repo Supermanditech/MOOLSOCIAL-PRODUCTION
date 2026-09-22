@@ -26128,7 +26128,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
         )
         .toList(growable: false);
-    final cart = Material(
+    Widget cart({List<Widget> trailing = const []}) => Material(
       key: const Key('work-order-review-summary'),
       color: Colors.white,
       child: CustomScrollView(
@@ -26207,23 +26207,34 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                   decoration: const BoxDecoration(
                     border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: Row(
                     children: [
-                      _StoreMoneyLine(
-                        leading: Text(
-                          product.title,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        value:
-                            '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${product.pack} · $quantity × ₹${_formatStoreAmount(product.sellingPrice)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: MoolColors.muted,
+                      StoreProductThumbnail(product: product, extent: 36),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _StoreMoneyLine(
+                              leading: Text(
+                                product.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              alignAmountToEnd: true,
+                              value:
+                                  '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${product.pack} · $quantity × ₹${_formatStoreAmount(product.sellingPrice)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MoolColors.muted,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -26232,6 +26243,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               }, childCount: products.length),
             ),
           ),
+          ...trailing,
         ],
       ),
     );
@@ -26355,27 +26367,49 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ),
       ),
     );
-    return LayoutBuilder(
-      builder: (context, constraints) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: cart),
-          // Checkout grows only as needed; products own all remaining height.
-          // Stable scroll subtrees retain the discount IME during resizing.
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: constraints.maxHeight * .40),
-            child: SingleChildScrollView(
-              key: const Key('work-sale-central-review'),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: checkout(constraints.maxHeight * .40),
-            ),
+    final continuousReview =
+        products.length <= 3 ||
+        (MediaQuery.sizeOf(context).width < 600 &&
+            MediaQuery.textScalerOf(context).scale(14) > 18.2);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) => continuousReview
+                ? KeyedSubtree(
+                    key: const Key('work-sale-central-review'),
+                    child: cart(
+                      trailing: [
+                        SliverToBoxAdapter(
+                          child: checkout(constraints.maxHeight),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Expanded(child: cart()),
+                      // Allocate after measuring the action at its natural height.
+                      // Payment/recovery controls scroll without covering the footer;
+                      // stable subtrees retain discount focus when the IME resizes us.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: constraints.maxHeight * .65,
+                        ),
+                        child: SingleChildScrollView(
+                          key: const Key('work-sale-central-review'),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          child: checkout(constraints.maxHeight * .65),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: constraints.maxHeight * .25),
-            child: SingleChildScrollView(child: action),
-          ),
-        ],
-      ),
+        ),
+        action,
+      ],
     );
   }
 
@@ -26795,22 +26829,16 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               textInputAction: TextInputAction.search,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
-                hintText: 'Search products',
+                hintText: MediaQuery.textScalerOf(context).scale(13) > 17
+                    ? 'Search'
+                    : 'Search Store stock',
                 isDense: true,
-                filled: true,
-                fillColor: _counterSaleTint,
+                filled: false,
                 prefixIcon: const Icon(Icons.search_rounded, size: 21),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _counterSalePrimary),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: _counterSalePrimary),
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 suffixIcon: Row(
@@ -26853,13 +26881,31 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         customerControls,
       ],
     );
+    final hasStoreStock = widget.session.workspaceCatalogueItems.isNotEmpty;
     final emptyProducts = Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (query.isEmpty) ...[
+            if (!hasStoreStock) ...[
+              const Icon(
+                Icons.shopping_cart_outlined,
+                size: 32,
+                color: MoolColors.navy,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'No stock yet',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Add products to your Store to start billing.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: MoolColors.muted, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: widget.onOpenCatalogue,
                 icon: const Icon(Icons.add_rounded),
@@ -26867,13 +26913,14 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               ),
               const SizedBox(height: 8),
             ],
-            Text(
-              query.isNotEmpty
-                  ? 'No products match your search'
-                  : 'Start with your store catalogue.',
-              style: const TextStyle(color: MoolColors.muted, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
+            if (hasStoreStock)
+              Text(
+                query.isNotEmpty
+                    ? 'No products match your search'
+                    : 'Add products to Store stock to start billing.',
+                style: const TextStyle(color: MoolColors.muted, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
           ],
         ),
       ),
@@ -26980,7 +27027,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             // Keep the same editable/scroll subtree when the keyboard resizes
             // this surface. Replacing it detaches Search's native IME connection.
             final scaledLine = MediaQuery.textScalerOf(context).scale(14);
-            final pinBillAction = constraints.maxHeight >= scaledLine * 5 + 100;
+            final pinBillAction =
+                hasStoreStock && constraints.maxHeight >= scaledLine * 5 + 100;
             final scroll = CustomScrollView(
               key: const Key('work-sale-short-scroll'),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -27007,7 +27055,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     ),
                   ),
                 if (error != null) SliverToBoxAdapter(child: error),
-                if (!pinBillAction) SliverToBoxAdapter(child: total),
+                if (hasStoreStock && !pinBillAction)
+                  SliverToBoxAdapter(child: total),
               ],
             );
             return Column(
@@ -27453,6 +27502,107 @@ class _SaleProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
+    final facts = Text(
+      '${product.pack} · ${!product.available
+          ? 'Unavailable'
+          : product.stockMode == WorkspaceStockMode.availabilityOnly
+          ? 'Available'
+          : '${product.stock} in stock'}',
+      style: const TextStyle(
+        color: MoolColors.muted,
+        fontSize: 12,
+        height: 1.3,
+      ),
+    );
+    final price = '₹${_formatStoreAmount(product.sellingPrice)}';
+    const priceStyle = TextStyle(
+      color: MoolColors.navy,
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+    );
+    Widget identity({bool includePrice = false}) => InkWell(
+      key: Key('work-sale-product-open-${product.id}'),
+      onTap: onOpen,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Row(
+          children: [
+            StoreProductThumbnail(product: product, extent: 36),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    product.title,
+                    style: const TextStyle(
+                      color: MoolColors.ink,
+                      fontSize: 14,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  facts,
+                  if (includePrice) _StoreMoneyText(price, style: priceStyle),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    final quantityControls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: Key('work-order-reduce-${product.id}'),
+          tooltip: 'Reduce ${product.title}',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: quantity == 0
+              ? null
+              : () => session.adjustWorkspaceOrderQuantity(product.id, -1),
+          icon: const Icon(Icons.remove_rounded, size: 20),
+        ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 26),
+          child: Semantics(
+            liveRegion: false,
+            label: '${product.title}, $quantity selected',
+            child: Text(
+              '$quantity',
+              softWrap: false,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        IconButton(
+          key: Key('work-order-add-${product.id}'),
+          tooltip: 'Add ${product.title} to bill',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed:
+              product.canSellAtCounter &&
+                  (product.stockMode == WorkspaceStockMode.availabilityOnly
+                      ? quantity < 99
+                      : product.stock > quantity)
+              ? () => session.adjustWorkspaceOrderQuantity(product.id, 1)
+              : null,
+          style: IconButton.styleFrom(
+            disabledForegroundColor: const Color(0xFF68758A),
+            disabledBackgroundColor: const Color(0xFFE6EAF1),
+            foregroundColor: quantity > 0 ? Colors.white : _counterSalePrimary,
+            backgroundColor: quantity > 0
+                ? _counterSalePrimary
+                : _counterSaleTint,
+          ),
+          icon: const Icon(Icons.add_rounded, size: 20),
+        ),
+      ],
+    );
     return Container(
       key: Key('work-sale-product-${product.id}'),
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -27460,112 +27610,38 @@ class _SaleProductTile extends StatelessWidget {
         color: quantity > 0 ? _counterSaleTint : Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _StoreMoneyLine(
-            leading: InkWell(
-              key: Key('work-sale-product-open-${product.id}'),
-              onTap: onOpen,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    StoreProductThumbnail(product: product, extent: 40),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        product.title,
-                        style: const TextStyle(
-                          color: MoolColors.ink,
-                          fontSize: 14,
-                          height: 1.25,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Keep full names and amounts readable rather than shrinking text.
+          // Enlarged text and unusually wide amounts use the full row width.
+          final stacked =
+              MediaQuery.textScalerOf(context).scale(14) > 18.2 ||
+              constraints.maxWidth < 300 ||
+              price.length > 11;
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StoreMoneyLine(
+                  leading: identity(),
+                  value: price,
+                  style: priceStyle,
                 ),
-              ),
-            ),
-            value: '₹${_formatStoreAmount(product.sellingPrice)}',
-            style: const TextStyle(
-              color: MoolColors.navy,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: quantityControls,
+                ),
+              ],
+            );
+          }
+          return Row(
             children: [
-              Expanded(
-                child: Text(
-                  '${product.pack} · ${!product.available
-                      ? 'Unavailable'
-                      : product.stockMode == WorkspaceStockMode.availabilityOnly
-                      ? 'Available'
-                      : '${product.stock} in stock'}',
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 12,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                key: Key('work-order-reduce-${product.id}'),
-                tooltip: 'Reduce ${product.title}',
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                onPressed: quantity == 0
-                    ? null
-                    : () =>
-                          session.adjustWorkspaceOrderQuantity(product.id, -1),
-                icon: const Icon(Icons.remove_rounded, size: 20),
-              ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 26),
-                child: Semantics(
-                  liveRegion: false,
-                  label: '${product.title}, $quantity selected',
-                  child: Text(
-                    '$quantity',
-                    softWrap: false,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                key: Key('work-order-add-${product.id}'),
-                tooltip: 'Add ${product.title} to bill',
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                onPressed:
-                    product.canSellAtCounter &&
-                        (product.stockMode ==
-                                WorkspaceStockMode.availabilityOnly
-                            ? quantity < 99
-                            : product.stock > quantity)
-                    ? () => session.adjustWorkspaceOrderQuantity(product.id, 1)
-                    : null,
-                style: IconButton.styleFrom(
-                  disabledForegroundColor: const Color(0xFF68758A),
-                  disabledBackgroundColor: const Color(0xFFE6EAF1),
-                  foregroundColor: quantity > 0
-                      ? Colors.white
-                      : _counterSalePrimary,
-                  backgroundColor: quantity > 0
-                      ? _counterSalePrimary
-                      : _counterSaleTint,
-                ),
-                icon: const Icon(Icons.add_rounded, size: 20),
-              ),
+              Expanded(child: identity(includePrice: true)),
+              const SizedBox(width: 6),
+              quantityControls,
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -27786,6 +27862,7 @@ class _CounterBillDiscountEditor extends StatefulWidget {
 
 class _CounterBillDiscountEditorState
     extends State<_CounterBillDiscountEditor> {
+  final _errorAnchor = GlobalKey();
   late String kind = widget.initial.isEmpty
       ? 'percentage'
       : widget.initial.kind;
@@ -27795,6 +27872,21 @@ class _CounterBillDiscountEditorState
         : '${widget.initial.value ~/ 100}.${(widget.initial.value % 100).toString().padLeft(2, '0')}',
   );
   String? error;
+  void _revealError() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _errorAnchor.currentContext;
+      if (!mounted || error == null || target == null) return;
+      Scrollable.ensureVisible(target, alignment: 1);
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Repeat after a keyboard/text-scale resize without replacing the input.
+    if (error != null) _revealError();
+  }
+
   @override
   void dispose() {
     input.dispose();
@@ -27822,6 +27914,7 @@ class _CounterBillDiscountEditorState
     );
     if (discount == null) {
       widget.onInvalid();
+      _revealError();
     } else {
       widget.onApply(discount);
     }
@@ -27839,6 +27932,12 @@ class _CounterBillDiscountEditorState
             key: const Key('work-counter-discount-value'),
             controller: input,
             enabled: widget.enabled,
+            scrollPadding: EdgeInsets.fromLTRB(
+              20,
+              24,
+              20,
+              MediaQuery.textScalerOf(context).scale(12) * 3 + 24,
+            ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.done,
             onSubmitted: (_) {
@@ -27919,10 +28018,14 @@ class _CounterBillDiscountEditorState
         },
       ),
       if (error != null)
-        Text(
-          error!,
-          key: const Key('work-counter-discount-input-error'),
-          style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
+        Semantics(
+          key: _errorAnchor,
+          liveRegion: true,
+          child: Text(
+            error!,
+            key: const Key('work-counter-discount-input-error'),
+            style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
+          ),
         ),
       const SizedBox(height: 6),
     ],

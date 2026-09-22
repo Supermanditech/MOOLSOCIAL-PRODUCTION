@@ -15077,10 +15077,12 @@ void main() {
         tester,
         'counter-compact-fifty-review-top-$caseId',
       );
-      final itemScroll = find.descendant(
-        of: find.byKey(const Key('work-review-items-list')),
-        matching: find.byType(Scrollable),
-      );
+      final itemScroll = find
+          .descendant(
+            of: find.byKey(const Key('work-review-items-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
       final lastReviewItem = find.byKey(
         ValueKey('work-review-item-${products.last.id}'),
       );
@@ -15113,7 +15115,16 @@ void main() {
       expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
       expectFullTitleFits(reviewSummary, products.first.title);
       expect(work.workspaceOrderTotal, expectedTotal);
-      await tester.ensureVisible(reviewTotal);
+      if (scale > 1.3) {
+        await tester.scrollUntilVisible(
+          reviewTotal,
+          300,
+          scrollable: itemScroll,
+          maxScrolls: 100,
+        );
+      } else {
+        await tester.ensureVisible(reviewTotal);
+      }
       await tester.pumpAndSettle();
       await captureStoreView(
         tester,
@@ -29157,6 +29168,223 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
+
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    testWidgets('CS017 empty stock recovery $display', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      work.workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      await openCounterSaleFromSales(tester);
+      await enterSaleCustomer(tester, '9000091630', name: 'Rakesh Sharma');
+      expect(find.text('No stock yet'), findsOneWidget);
+      expect(find.byKey(const Key('work-sale-total-bar')), findsNothing);
+      expect(find.byKey(const Key('work-order-review')), findsNothing);
+      final add = find.widgetWithText(OutlinedButton, 'Add products');
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'cs017-empty-stock-${display.scale}');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets(
+      'CS017 compact stock and fully visible review actions $display',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final media = await installCataloguePhotoClient(tester);
+        const imageDir = String.fromEnvironment(
+          'MOOL_CATALOGUE_TEST_IMAGE_DIR',
+        );
+        const files = [
+          'sunflower-oil-1l-test.png',
+          'whole-wheat-atta-1kg-test.png',
+          'iodised-salt-1kg-test.png',
+        ];
+        work.workspaceCatalogueItems.clear();
+        for (var i = 0; i < 3; i++) {
+          final product = workspaceMasterCatalogue[i];
+          final bytes = imageDir.isEmpty
+              ? media.client.bytes
+              : (await tester.runAsync(
+                  () => File('$imageDir/${files[i]}').readAsBytes(),
+                ))!;
+          final size = (await tester.runAsync(() async {
+            final codec = await ui.instantiateImageCodec(bytes);
+            final frame = await codec.getNextFrame();
+            final result = (frame.image.width, frame.image.height);
+            frame.image.dispose();
+            codec.dispose();
+            return result;
+          }))!;
+          final uri = Uri.parse(
+            'https://example.invalid/cs017/${product.id}.png',
+          );
+          media.client.responses[uri] = bytes;
+          work.workspaceCatalogueItems.add(
+            product.copyWith(
+              stock: 24,
+              cataloguePhoto: WorkspaceCataloguePhoto(
+                assetId: 'cs017-${product.id}',
+                revision: 'v1',
+                source: uri.toString(),
+                publisherWorkspaceId: 'test-moolsocial-catalogue',
+                canonicalId: product.canonicalId,
+                brand: product.brand,
+                variant: product.variant,
+                pack: product.pack,
+                barcode: product.barcode,
+                status: WorkspaceCataloguePhotoStatus.testOnly,
+                file: BuyV2MediaFileMetadata(
+                  mimeType: 'image/png',
+                  byteLength: bytes.length,
+                  width: size.$1,
+                  height: size.$2,
+                  normalized: true,
+                  frameCount: 1,
+                ),
+              ),
+            ),
+          );
+        }
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9000091630', name: 'Rakesh Sharma');
+        final search = find.byKey(const Key('work-counter-product-search'));
+        final decoration = tester.widget<TextField>(search).decoration!;
+        expect(decoration.filled, isFalse);
+        expect(decoration.enabledBorder, InputBorder.none);
+        expect(decoration.focusedBorder, isA<UnderlineInputBorder>());
+        final tile = find.byKey(const Key('work-sale-product-oil-fortune-1l'));
+        final thumb = tester.widget<StoreProductThumbnail>(
+          find.descendant(
+            of: tile,
+            matching: find.byType(StoreProductThumbnail),
+          ),
+        );
+        expect(thumb.extent, 36);
+        expect(thumb.product.id, 'oil-fortune-1l');
+        if (display.scale == 1) {
+          expect(tester.getSize(tile).height, lessThanOrEqualTo(90));
+        }
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(
+                find.descendant(of: tile, matching: find.byType(RawImage)),
+              )
+              .any((image) => image.image != null),
+        );
+        await captureStoreView(tester, 'cs017-stock-${display.scale}');
+        await tester.enterText(search, 'Fortune');
+        await tester.pumpAndSettle();
+        final add = find.byKey(const Key('work-order-add-oil-fortune-1l'));
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        expect(add.hitTestable(), findsOneWidget);
+        await addCounterProduct(tester, add);
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        await tester.scrollUntilVisible(
+          search,
+          -200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('work-sale-short-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, 'Fortune');
+        await tester.tap(find.byKey(const Key('work-counter-search-clear')));
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'cs017-selected-stock-${display.scale}');
+        await reveal(tester, find.byKey(const Key('work-order-review')));
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        final save = find.byKey(const Key('work-order-save'));
+        final viewport = find.byKey(const Key('work-sale-central-review'));
+        void expectActionVisible(double keyboard) {
+          final rect = tester.getRect(save);
+          expect(save.hitTestable(), findsOneWidget);
+          expect(rect.top, greaterThanOrEqualTo(0));
+          expect(rect.bottom, lessThanOrEqualTo(display.height - keyboard));
+          expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
+          expect(tester.getRect(viewport).bottom, lessThanOrEqualTo(rect.top));
+        }
+
+        expectActionVisible(0);
+        await captureStoreView(tester, 'cs017-review-${display.scale}');
+        final discount = find.byKey(const Key('work-counter-discount-value'));
+        await reveal(tester, discount);
+        await tester.enterText(discount, '100');
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+        expectActionVisible(240);
+        expect(tester.widget<FilledButton>(save).onPressed, isNull);
+        final errorRect = tester.getRect(
+          find.byKey(const Key('work-counter-discount-input-error')),
+        );
+        expect(
+          errorRect.top,
+          greaterThanOrEqualTo(tester.getRect(viewport).top),
+        );
+        expect(
+          errorRect.bottom,
+          lessThanOrEqualTo(tester.getRect(viewport).bottom),
+        );
+        await captureStoreView(
+          tester,
+          'cs017-discount-keyboard-${display.scale}',
+        );
+        await tester.enterText(discount, '10');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        tester.view.viewInsets = FakeViewPadding.zero;
+        await tester.pumpAndSettle();
+        final upi = find.byKey(const Key('work-sale-payment-upi'));
+        await reveal(tester, upi);
+        await tester.tap(upi);
+        await tester.pumpAndSettle();
+        final refresh = find.byKey(const Key('work-sale-upi-refresh'));
+        await tester.ensureVisible(refresh);
+        await tester.pumpAndSettle();
+        expectActionVisible(0);
+        final refreshRect = tester.getRect(refresh);
+        expect(
+          refreshRect.top,
+          greaterThanOrEqualTo(tester.getRect(viewport).top),
+        );
+        expect(
+          refreshRect.bottom,
+          lessThanOrEqualTo(tester.getRect(viewport).bottom),
+        );
+        expect(refresh.hitTestable(), findsOneWidget);
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        await captureStoreView(tester, 'cs017-upi-recovery-${display.scale}');
+        expect(tester.takeException(), isNull);
+        media.restore();
+      },
+    );
+  }
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(

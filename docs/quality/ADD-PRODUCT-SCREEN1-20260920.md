@@ -1,5 +1,37 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## C1 approved; bounded C2 — POS items and Review Bill
+
+Founder approved C1 at checkpoint aea9aae9, then confirmed that Counter Sale is
+POS and must reuse the approved Download Centre invoice format. Both existing
+entry points already use WorkInvoicePdfRequest/WorkInvoicePdfSource and the
+shared commerce renderer. Preserve seller/customer identity, item snapshots,
+payment truth and PREVIEW/NOT ISSUED boundaries; no new invoice template.
+
+C2 changes only the existing dashboard presentation and focused tests:
+36dp shared Store thumbnails on Add Items and Review Bill, with compact
+identity/stock/price/quantity rows;
+unboxed search retaining clear/camera/hardware scanner; natural-height Create
+invoice footer; scrollable payment/recovery controls. Enlarged mobile Review
+Bill uses one lazy scroll instead of squeezing two scroll areas above the IME.
+Short carts also group products and totals together, avoiding an empty gap.
+Invalid discount guidance scrolls fully into view, preserving the input/IME.
+No-stock state has one Add products recovery and no useless zero-bill footer.
+The mode follows width/text scale, not keyboard height, preserving input state.
+Normal text retains the independently scrollable many-item cart.
+
+Final v6:34 connected UI checks pass, including normal/narrow/enlarged text,
+decoded exact-SKU test photos, no stock,50-item carts, long names, crore values,
+keyboard validation, payment/recovery visibility, search/scans and C1 retention.
+374 model/PDF/Download Centre checks passed with4 inherited skips. Analysis and
+diff check clean. Actual renders inspected; v1-v5 failed evidence retained and
+registered. C2 visual approval and OPPO remain pending; no all58/backend/Cursor
+integration claim. Current source uses the approved common POS/download PDF;
+no backend document issuance or live payment/message was performed.
+Evidence: task outputs/COUNTER-C2-REVIEW.md, counter-c2-v6-tests.log,
+counter-c2-v6-analysis.log, counter-c2-regression.log; images in
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/counter-c2-v6.
+
 ## Next bounded batch C1 — CS-OPPO-016 customer correction
 
 Completed prior frontend checkpoint: d99b6c0f9c40da5b88f2a479371ae9589d9ec263,
