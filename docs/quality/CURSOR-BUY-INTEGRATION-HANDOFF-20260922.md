@@ -400,7 +400,8 @@ Local results and child inspection:
 
 Stop boundary: no new APK, backend work or implementation of the OPEN
 registered tickets (Compare-sheet height, search Delivery fleet and compact
-order/invoice actions, Medicine promotions, and cross-Buy Cart movement). All earlier
+order/invoice actions, Medicine promotions, cross-Buy Cart movement, and product
+information organization). All earlier
 eleven-ticket device/provider obligations continue. Carry these three repairs
 into the integrated baseline and replay them on the next authorized Redmi APK.
 
@@ -585,3 +586,80 @@ Inspect Cart/checkout's own actions for duplicates without adding a floating Car
 to screens that already own the Cart journey. Verify no hidden auto-drag or
 reposition callbacks keep moving the control after the fixed design is applied.
 Register any uncovered child issue; preserve routing, amounts and checkout wiring.
+
+### Registration only: compact, organized public product information
+
+`CURSOR-BUY-PRODUCT-INFORMATION-REDESIGN-20260922` — OPEN, founder-reported;
+registration only. No application implementation or new APK authorized by this
+entry. Actor/outcome: a consumer opening an SKU from Shop, Wholesale or Visit
+Store can quickly understand the product, price/pack and applicable purchase
+terms using only information intended for that public audience. Classification:
+mvp_supporting; improve the existing product-information journey.
+
+Founder requirements (a–i), retained in full:
+
+1. Categorize and reorder all text into a clear hierarchy: product identity and
+   selected variant; price/pack/quantity; key product facts/specifications; relevant
+   fulfilment and purchase terms; concise seller identity and Store access.
+   Use existing public fields and condition sections on the actual product data.
+2. Highlight decision-critical information with restrained typography and accent
+   treatment. Avoid making every label equally prominent or relying on colour
+   alone to express availability or other meaningful state.
+3. Remove exact repetition and repeated meaning across titles, badges, facts,
+   descriptions and terms. Preserve distinct facts: pack price versus unit price,
+   MOQ versus pack size or quantity tiers, variant identity and required terms
+   must not be mistaken for duplicates. Do not rewrite provider facts inaccurately.
+4. Use compact, subtle label/value rows or a responsive tabular arrangement.
+   Adapt to short/long provider text, missing optional fields, number of facts and
+   available width. Allow useful wrapping/expansion without clipping information,
+   oversized blank rows, tiny text or forced equal-height empty sections.
+5. Repair the **+ Add** action's largely empty full-width lane. Place the existing
+   Add/quantity control compactly with the purchase summary where appropriate;
+   retain accessible tap targets, prices/totals, stock/MOQ validation and Cart
+   updates. The earlier compact-stepper repair does not close this Add-lane issue.
+6. Make the complete page compact, professional and premium, including spacing,
+   information density, alignment and the relationship between image and text.
+   Keep important purchase information and actions easy to find.
+7. Polish text colours, surfaces and gradients within the approved MoolSocial
+   brand. Use light/ restrained accents; do not clutter the page with large solid
+   colour blocks or a collection of competing highlighted cards.
+8. Apply the same information organization wherever this product page is wired:
+   Shop/Buy, Wholesale, public Store/supplier pages, search, categories/filters,
+   Saved, Offers and existing related/compared/order-to-product entry paths.
+   Retain the correct Store/SKU/variant and channel-specific meaning on each path.
+   Do not activate deferred Medicine/Care or add new journeys to obtain coverage.
+9. Add, remove, retain or relocate information between product and Store pages
+   according to its purpose. Keep product-specific facts and relevant purchase
+   terms on the product page; centralize general Store information on its existing
+   page with concise context/link here. Preserve access to all applicable public
+   information supplied by Store instead of deleting it solely to save space.
+
+Data boundary: use the existing Store-to-public mapping and provider contracts.
+Only publish fields explicitly intended for the consumer/current permitted
+channel; never dump the Store record or expose private stock operations, internal
+notes, purchasing costs or account data. Preserve authoritative field values and
+their SKU/variant/Store identity. Do not invent information to fill a section.
+Omit empty optional presentation; keep honest unavailable/loading/error states
+and existing ordering restrictions for missing critical data. Any missing shared
+public field requires coordination with Codex, not an unrelated Store-worktree
+edit, parallel backend or invented Buy-only fixture contract.
+
+Reuse assessment: existing `BuyV2ProductView`, purchase-action/quantity owners in
+`apps/mobile/lib/ui_v2/buy/buy_v2_views.dart`, product-entry/return wiring in
+`buy_v2_screen.dart`, and existing public product content/facts/session contracts.
+Reuse public Store pages for Store-level information. No separate product screen,
+new navigation framework, backend, shared-schema edit or policy work is included.
+Record the precise implementation owners and public-field mapping before a future
+authorized implementation. Current registration changes only this MD.
+
+Acceptance for that future implementation: normal/large text and narrow/landscape
+screens; short/long product, variant and Store names; dense and sparse public
+metadata; long prices, units, descriptions and terms; genuine missing provider
+data; image fit; contrast/brand consistency; Android/keyboard clearance; compact
+Add, quantity editing and totals; correct selected variant, basket, checkout,
+originating Store/filter/search and scroll/Back return. Review every existing
+entry path for duplicate meaning, blank lanes and inconsistent presentation.
+Take actual local screens for visual approval, run focused interaction/regression
+tests, register child defects and retain next-Redmi replay as separate acceptance.
+Coordinate with the OPEN cross-Buy Cart-position ticket so the redesigned page
+does not reintroduce moving Cart or obstruct its product actions.
