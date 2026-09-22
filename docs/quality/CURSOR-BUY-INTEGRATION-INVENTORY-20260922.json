@@ -1913,13 +1913,69 @@
       "operativeRequirements": "r6633-platform-delivery-correction/PLATFORM-ASSIGNED-DELIVERY-CORRECTION-20260923.md",
       "buyerChoosesDeliveryService": false,
       "buyerChoosesDeliveryTime": false
+    },
+    {
+      "id": "R6633-D11",
+      "title": "Online payment handoff unavailable after final review",
+      "status": "open_device_reproduced_registered_only",
+      "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+      "implementation": "none",
+      "classification": "mvp_required",
+      "children": []
+    },
+    {
+      "id": "R6633-D12",
+      "title": "Locked payment choices and contradictory cancellation recovery",
+      "status": "open_device_reproduced_registered_only",
+      "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+      "implementation": "none",
+      "classification": "mvp_required",
+      "children": [
+        "R6633-D12-C1"
+      ]
+    },
+    {
+      "id": "R6633-D13",
+      "title": "Dispatch promise incorrectly labelled as arrival",
+      "status": "open_device_reproduced_registered_only",
+      "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+      "implementation": "none",
+      "classification": "mvp_required",
+      "children": []
+    },
+    {
+      "id": "R6633-D14",
+      "title": "New Add and Edit basket return to recommendations instead of items",
+      "status": "open_device_reproduced_registered_only",
+      "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+      "implementation": "none",
+      "classification": "mvp_supporting",
+      "children": []
+    },
+    {
+      "id": "R6633-D15",
+      "title": "Required purchase-order reference offscreen without focus on validation",
+      "status": "open_device_reproduced_registered_only",
+      "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+      "implementation": "none",
+      "classification": "mvp_required",
+      "children": []
+    },
+    {
+      "id": "R6633-D16",
+      "title": "Store/product display names change after order placement",
+      "status": "open_device_reproduced_registered_only",
+      "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+      "implementation": "none",
+      "classification": "mvp_required",
+      "children": []
     }
   ],
   "currentEvidenceArchive": {
-    "sha256": "e10bce97ca96eec54ae7baf8db70529f566c282be3cc9a59257c57d96e28ce3a",
-    "bytes": 84180608,
-    "priorEntriesPreserved": 749,
-    "newEvidencePrefix": "r6633-platform-delivery-correction/"
+    "sha256": "b70a51f7a7a06593d7e36e40074976dc12f7a3777f47c53ae306d59517093563",
+    "bytes": 101158738,
+    "priorEntriesPreserved": 750,
+    "newEvidencePrefix": "r6633-add-checkout-replay-D11-D16/"
   },
   "checkoutDeliveryAudit20260923": {
     "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
@@ -2025,5 +2081,34 @@
     "orderTiming": "assigned schedule and live/provider status after order",
     "report": "r6633-platform-delivery-correction/PLATFORM-ASSIGNED-DELIVERY-CORRECTION-20260923.md",
     "implementation": "none"
+  },
+  "addCheckoutDeviceReplay20260923": {
+    "report": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-D11-D16.md",
+    "manifest": "r6633-add-checkout-replay-D11-D16/ADD-CART-CHECKOUT-REPLAY-MANIFEST.json",
+    "newTickets": [
+      "R6633-D11",
+      "R6633-D12",
+      "R6633-D13",
+      "R6633-D14",
+      "R6633-D15",
+      "R6633-D16"
+    ],
+    "linkedExisting": [
+      "R6633-D07",
+      "R6633-D09",
+      "R6633-D10",
+      "R6633-D06-G",
+      "R6633-D06-G-C1",
+      "R6633-D04"
+    ],
+    "routeStateChecks": 30,
+    "captureRange": "103-183",
+    "excludedPrivatePickerCaptures": [
+      "132",
+      "133"
+    ],
+    "localFixtureOrder": "BUY-NEW-05 / MS-NEW-10 / INR37 / COD fixture only",
+    "finalBasket": "Original Wholesale onions 2 packs / INR1550 / Paytm / no offer / empty PO reference",
+    "liveAcceptance": false
   }
 }
