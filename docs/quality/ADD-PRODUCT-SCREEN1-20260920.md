@@ -1,5 +1,85 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Latest — approved accounting screens; complete-source OPPO checkpoint, 23 September
+
+Founder approved Sales Register followed by the displayed Cash/Bank Book, and
+authorized reconciliation, Git preservation/push and one latest OPPO review APK.
+Stop after APK verification: no installation, device journey, backend or Cursor
+integration. Standing authority covers only narrow blockers to this workflow;
+no governance/policy project, new feature batch or closure claims.
+
+Current accounting replay v4 passed16 selected checks, including invoice-backed
+Sales, expense/cash records, independent period/book scrolling, enlarged text,
+and approved D1/D2. Focused analysis clean. Corrected unsupported selector glyph
+with a native icon. All opening/running balances require complete supplied data;
+purchase order records are not represented as posted purchase vouchers.
+Purchase-record deeper verification and review-only expense-action coverage remain
+open; package the complete implementation without pretending those are accepted.
+
+Reconciliation: current branch descends from the previous integrated Cursor/Store
+baseline123ff42cf8179b272d33b480e8267dfa83af2de3. Counter Sale a425fd89 and all
+subsequent Add Product/CSV/native downloads/settings/editor/public-provider/
+Downloads/POS/D1/D2 checkpoints through c7e94e38 are ancestors. Current pending
+implementation is dashboard + layout tests, with registry/policy-binding and
+this evidence document. No untracked files or stashes found in the active source.
+Older Counter Sale, catalogue, Store/Buy fix and contract Codex checkouts are
+clean and their tips are ancestors. Separate baseline-qualification commits
+681cb974/7d30b7a5 have zero apps/mobile changes; preserved on their original Git
+branch, not omitted feature code. Cursor buy-ready-20260921 remains excluded.
+
+OPPO read-only identity: connected2b3e0f71, installed1.0.0-r66.37-runtime/code
+2026092101. Successor planned1.0.0-r66.38/code2026092301, runtime review only.
+Full inherited regression inventory plus all subsequently changed test files is
+running twice with the existing protected-reference exclusion. Retain original
+logs and skips; a running or historical test is not a new pass. Complete source
+manifest, clean exact remote checkpoint and actual APK hash/version verification
+must precede completion. Backend/public adapter dependencies remain as reconciled
+below, not all58 closure or production/device acceptance.
+
+## Latest — accounting register redesign, review pending
+
+Founder rejected the activity-card statement after the technical header fix.
+That screen is NOT approved. Official TallyHelp ledger-vouchers and Sales
+Register distinguish an account ledger from a voucher register; use terminology,
+not an integration/compliance claim. Current Sales Register is invoice-backed,
+with Date/Particulars/Voucher Type/Voucher No./Amount, chronological order and
+recorded total. No order-only row becomes a fictitious voucher or balance.
+Invoice details remain reachable. True customer balances stay in scoped D2.
+
+v3 selected21 tests pass: invoice register/scroll/total at1x/2x, POS invoice
+drill-down/local dates, D1/D2/Downloads and Back navigation. Analysis clean;
+normal/enlarged/sideways renders inspected. Initial v1/v2 failures retained.
+Full original statement/expense regression is not yet reconciled with the new
+invoice-based presentation. Purchase and expense table paths are implemented
+but not fully qualified; Money/account-book presentation still needs completion.
+Do not claim whole accounting request, all58 or device readiness complete.
+Await founder review of Sales first. Task evidence outputs/accounting-register-v3.log,
+renders in external accounting-register-v3. No commit, backend or Cursor change.
+Sources: https://help.tallysolutions.com/ledger-vouchers/ and
+https://help.tallysolutions.com/article/Tally.ERP9/Reports/Display_Registers_Ledgers/Sales_Register_Sales_Day_Book.htm
+
+## Latest — navigation/statement reconciliation fixes, 23 September
+
+Founder authorized fixes for all four reconciliation failures. Statement/Sales
+header now wraps title, period and applicable action within available width,
+instead of horizontally hiding the primary period control at enlarged text.
+Normal Store statement layout stays unchanged. Tests assert period bounds and
+hitability plus independent book/period offsets. No pointer-warning suppression.
+
+DASHRAIL had outdated expectations, not a new app Back defect: approved manual
+Back returns to catalogue, next Back returns to Store stock. Test now asserts
+each destination, then uses Store home before promotion. Store/account parameter
+and unchanged inventory/order/balance assertions remain. No navigation rewrite.
+
+Final v2 combined replay83 passed,1 inherited skip,zero failures. All four former
+failures pass; D1/D2/Downloads/POS and home-action regressions included. Two-file
+analysis and diff check clean. Normal/enlarged actual renders inspected. Evidence:
+task outputs/statement-navigation-fix-v2.log and STATEMENT-NAVIGATION-FIX-REVIEW.md.
+Initial v1 exposed the additional stale home-rail assertion, retained in registry.
+Await founder visual approval of wrapping header. No device-production acceptance,
+new sign-in, backend, public adapter, Cursor, APK or financial mutation. Previous
+checkpoint c7e94e38 remains pushed; this follow-up is not yet committed.
+
 ## Latest — 58-item reconciliation, 23 September 2026
 
 Founder approved D1 stock statements and D2 Customer Statements, then directed

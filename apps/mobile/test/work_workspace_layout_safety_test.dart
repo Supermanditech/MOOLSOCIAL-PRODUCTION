@@ -13598,6 +13598,73 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('REGISTER01 invoice register excludes unbilled orders $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      work.workspaceInvoices.clear();
+      final now = DateTime.now();
+      for (var i = 1; i <= 30; i++) {
+        work.workspaceInvoices.add(
+          WorkspaceCustomerInvoice(
+            id: 'INV-$i',
+            orderId: 'ORDER-$i',
+            customer: 'Customer $i',
+            items: 'Grocery',
+            amount: 100,
+            remainderPaise: 25,
+            payment: 'Cash',
+            issuedAt: now,
+          ),
+        );
+      }
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      final open = find.byKey(const Key('work-pulse-sales'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      expect(find.text('Sales Register'), findsOneWidget);
+      expect(find.byKey(const Key('work-voucher-register')), findsOneWidget);
+      expect(find.text('Voucher No.'), findsOneWidget);
+      expect(find.text('Opening Balance'), findsNothing);
+      expect(find.text('Closing Balance'), findsNothing);
+      final horizontal = find.descendant(
+        of: find.byKey(const Key('work-voucher-register')),
+        matching: find.byWidgetPredicate(
+          (w) => w is Scrollable && w.axisDirection == AxisDirection.right,
+        ),
+      );
+      await captureStoreView(tester, 'sales-register-$scale');
+      await tester.drag(horizontal, const Offset(-650, 0));
+      await tester.pumpAndSettle();
+      expect(
+        tester.state<ScrollableState>(horizontal).position.pixels,
+        greaterThan(0),
+      );
+      await captureStoreView(tester, 'sales-register-columns-$scale');
+      for (var i = 0; i < 35 && find.text('3,007.50').evaluate().isEmpty; i++) {
+        final area = tester.getRect(
+          find.byKey(const Key('work-voucher-register')),
+        );
+        await tester.dragFrom(
+          Offset(150, area.top + 90),
+          const Offset(0, -250),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('3,007.50'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(work.workspaceInvoices, hasLength(30));
+    });
+  }
+
   testWidgets('DASHRAIL product and promotion reuse scoped destinations', (
     tester,
   ) async {
@@ -13626,8 +13693,16 @@ void main() {
     expect(find.byType(BottomSheet), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
+    expect(find.byKey(const Key('work-product-fast-editor')), findsNothing);
+    expect(find.byKey(const Key('work-catalogue-grid')), findsOneWidget);
     await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
+    expect(
+      find.byKey(const Key('work-dashboard-catalogue-screen')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-store-home')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
     action = find.byKey(const Key('work-quick-promote-store'));
@@ -13853,7 +13928,12 @@ void main() {
     await tester.pumpAndSettle();
     final row = find.byKey(const ValueKey('work-sales-invoice-LOCAL-DATE'));
     expect(
-      find.descendant(of: row, matching: find.text('$date · ₹56')),
+      find.descendant(
+        of: row,
+        matching: find.text(
+          '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}',
+        ),
+      ),
       findsOneWidget,
     );
     await tester.tap(row);
@@ -33622,6 +33702,18 @@ void main() {
           final before = work.workspaceOrders
               .map((o) => (o.id, o.stage, o.amount))
               .toList();
+          work.workspaceInvoices.addAll([
+            for (var i = 0; i < 80; i++)
+              WorkspaceCustomerInvoice(
+                id: 'INV-SCROLL-${i.toString().padLeft(3, '0')}',
+                orderId: 'SCROLL-${i.toString().padLeft(3, '0')}',
+                customer: 'Customer $i',
+                items: 'Recorded items',
+                amount: 100,
+                payment: 'Cash',
+                issuedAt: now,
+              ),
+          ]);
           await mount(
             tester,
             route: '/app/work/workspace/dashboard',
@@ -33634,7 +33726,13 @@ void main() {
           await tester.pumpAndSettle();
           Finder ledgerScroll() => find
               .descendant(
-                of: find.byKey(const Key('work-store-statement')),
+                of:
+                    find
+                        .byKey(const Key('work-voucher-register'))
+                        .evaluate()
+                        .isNotEmpty
+                    ? find.byKey(const Key('work-voucher-register'))
+                    : find.byKey(const Key('work-store-statement')),
                 matching: find.byWidgetPredicate(
                   (w) =>
                       w is Scrollable && w.axisDirection == AxisDirection.down,
@@ -33643,7 +33741,7 @@ void main() {
               .first;
           double offset() =>
               tester.state<ScrollableState>(ledgerScroll()).position.pixels;
-          await tester.drag(ledgerScroll(), const Offset(0, -700));
+          await tester.dragFrom(const Offset(130, 350), const Offset(0, -700));
           await tester.pumpAndSettle();
           final salesOffset = offset();
           expect(salesOffset, greaterThan(200));
@@ -33660,36 +33758,15 @@ void main() {
             expect(offset(), closeTo(salesOffset, 1));
           }
           await captureStoreView(tester, 'statement-return-$confirmed-$scale');
-          if (confirmed) {
-            final details = find.byType(ExpansionTile).first;
-            final detailKey = tester.widget<ExpansionTile>(details).key!;
-            final header = find.descendant(
-              of: find.byKey(detailKey),
-              matching: find.text('Order details'),
-            );
-            await reveal(tester, header);
-            await tester.tap(header);
-            await tester.pumpAndSettle();
-            final element = tester.element(find.byKey(detailKey));
-            expect(PageStorage.of(element).readState(element), isTrue);
-            await tester.tap(find.byKey(const Key('work-statement-expenses')));
-            await tester.pumpAndSettle();
-            await tester.tap(find.byKey(const Key('work-statement-sales')));
-            await tester.pumpAndSettle();
-            await reveal(tester, header);
-            final restored = tester.element(find.byKey(detailKey));
-            expect(PageStorage.of(restored).readState(restored), isTrue);
-            // Collapse and return to the exact offset used by period/Back checks.
-            await tester.tap(header);
-            await tester.pumpAndSettle();
-            expect(PageStorage.of(restored).readState(restored), isFalse);
-            tester
-                .state<ScrollableState>(ledgerScroll())
-                .position
-                .jumpTo(salesOffset);
-            await tester.pumpAndSettle();
-          }
-          await tester.tap(find.byKey(const Key('work-statement-period')));
+          // Invoice drill-down is covered by COUNTERD01; the register no longer embeds payment cards.
+          final periodButton = find.byKey(const Key('work-statement-period'));
+          final periodBounds = tester.getRect(periodButton);
+          final logicalWidth =
+              tester.view.physicalSize.width / tester.view.devicePixelRatio;
+          expect(periodBounds.left, greaterThanOrEqualTo(0));
+          expect(periodBounds.right, lessThanOrEqualTo(logicalWidth));
+          expect(periodButton.hitTestable(), findsOneWidget);
+          await tester.tap(periodButton);
           await tester.pumpAndSettle();
           await tester.tap(find.text('Week').last);
           await tester.pumpAndSettle();
@@ -33698,7 +33775,7 @@ void main() {
             0,
             reason: 'A different period starts at its own position',
           );
-          await tester.drag(ledgerScroll(), const Offset(0, -350));
+          await tester.dragFrom(const Offset(130, 350), const Offset(0, -350));
           await tester.pumpAndSettle();
           final weekOffset = offset();
           expect(weekOffset, greaterThan(100));
@@ -33722,7 +33799,7 @@ void main() {
             before,
           );
           expect(work.workspaceStockMovements, isEmpty);
-          expect(work.workspaceInvoices, isEmpty);
+          expect(work.workspaceInvoices, hasLength(80));
           expect(work.workspaceSettlementRequested, 0);
           final originalStore = work.activeWorkspace!;
           work.activateWorkspace(
@@ -33833,7 +33910,8 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Expenses'));
         await tester.pumpAndSettle();
-        expect(find.text('Recorded expenses ₹12.30'), findsOneWidget);
+        expect(find.text('Expense Register'), findsOneWidget);
+        expect(find.text('12.30'), findsWidgets);
         await captureStoreView(tester, 'ledger03-expenses-summary-$scale');
         await reveal(tester, find.text('Local transport'));
         expect(find.text('Local transport'), findsOneWidget);
@@ -33974,29 +34052,13 @@ void main() {
           ),
           isFalse,
         );
+        expect(find.textContaining('Test cash register'), findsOneWidget);
         await captureStoreView(tester, 'ledger03-money-summary-$scale');
-        await reveal(tester, find.text('Local transport'));
-        expect(find.text('Local transport'), findsOneWidget);
-        await captureStoreView(tester, 'ledger03-money-expense-$scale');
-        final registerTile = find.byKey(
-          const ValueKey('work-register-test-cash-register'),
-        );
-        await tester.scrollUntilVisible(
-          registerTile,
-          -220,
-          scrollable: find.descendant(
-            of: find.byKey(const Key('work-money-statement')),
-            matching: find.byType(Scrollable),
-          ),
-        );
-        final registerTitle = find.text('Test cash register');
-        await tester.ensureVisible(registerTitle);
+        final closing = find.text(reviewEnabled ? '62.70 Dr' : '87.70 Dr');
+        await tester.ensureVisible(closing.first);
         await tester.pumpAndSettle();
-        expect(registerTitle.hitTestable(), findsOneWidget);
-        await tester.tap(registerTitle);
-        await tester.pumpAndSettle();
-        await reveal(tester, find.text('Closing book balance'));
-        expect(find.text(reviewEnabled ? '₹62.70' : '₹87.70'), findsOneWidget);
+        expect(closing, findsWidgets);
+        expect(find.text('100 Dr'), findsOneWidget);
         await captureStoreView(tester, 'ledger03-register-closing-$scale');
         final expensesTab = find.byKey(const Key('work-statement-expenses'));
         await tester.ensureVisible(expensesTab);
@@ -34005,28 +34067,26 @@ void main() {
         await tester.ensureVisible(moneyTab);
         await tester.tap(moneyTab);
         await tester.pumpAndSettle();
-        await reveal(tester, find.text('Closing book balance'));
-        expect(find.text(reviewEnabled ? '₹62.70' : '₹87.70'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('work-statement-period')));
+        expect(closing, findsWidgets);
+        final period = find.byKey(const Key('work-statement-period'));
+        await tester.ensureVisible(period);
+        await tester.pumpAndSettle();
+        await tester.tap(period);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Week').last);
         await tester.pumpAndSettle();
-        await reveal(tester, registerTitle);
-        expect(registerTitle.hitTestable(), findsOneWidget);
-        await tester.tap(registerTitle);
-        await tester.pumpAndSettle();
         final incomplete = find.text(
-          'Opening and complete movement history are needed for this period.',
+          'Opening balance or complete history unavailable.',
         );
-        await reveal(tester, incomplete);
         expect(incomplete, findsOneWidget);
+        expect(closing, findsNothing);
+        await captureStoreView(tester, 'ledger03-incomplete-$scale');
         await tester.ensureVisible(expensesTab);
         await tester.tap(expensesTab);
         await tester.pumpAndSettle();
         await tester.ensureVisible(moneyTab);
         await tester.tap(moneyTab);
         await tester.pumpAndSettle();
-        await reveal(tester, incomplete);
         expect(incomplete, findsOneWidget);
         expect(tester.takeException(), isNull);
       },

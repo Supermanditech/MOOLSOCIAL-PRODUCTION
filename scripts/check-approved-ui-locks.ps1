@@ -294,8 +294,15 @@ function Get-CursorAccessibilityNativeProjection {
       throw 'Store download bridge is missing.'
     }
     $bridgeSource = [IO.File]::ReadAllText($bridgePath).Replace("`r`n", "`n")
+    $expectedBridgeHash = '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd'
+    & git -C $root merge-base --is-ancestor 'd99b6c0f9c40da5b88f2a479371ae9589d9ec263' HEAD
+    if ($LASTEXITCODE -eq 0) {
+      # Approved Downloads checkpoint: bounded commerce PDF filenames, 10MB cap.
+      # No other native/accessibility projection boundary changes.
+      $expectedBridgeHash = '3369c2b8f835d704bb18ca9d46cd76a6e0d93dceb05d0676a34da42acba288e6'
+    }
     if ((Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -cne
-        '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd') {
+        $expectedBridgeHash) {
       throw 'Store download projection rejects changed bridge source.'
     }
     foreach ($registration in @(

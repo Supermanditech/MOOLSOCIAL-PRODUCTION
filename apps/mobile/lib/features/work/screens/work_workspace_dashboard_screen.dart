@@ -11052,9 +11052,12 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         ],
       );
     }
-    final records = statement
-        ? session.filteredWorkspacePurchases
-        : session.workspacePurchases;
+    final records =
+        (statement
+                ? session.filteredWorkspacePurchases
+                : session.workspacePurchases)
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     if (!session.workspacePurchasesConnected) {
       return ListView(
         primary: false,
@@ -11067,6 +11070,45 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 'Supplier orders for this Store will appear here when available.',
           ),
         ],
+      );
+    }
+    if (statement) {
+      return _StoreVoucherRegister(
+        identity: ('purchases', storeId, session.workspaceMoneyPeriod),
+        headers: const [
+          'Order date',
+          'Particulars',
+          'Reference type',
+          'Invoice reference',
+          'Amount (₹)',
+        ],
+        rows: [
+          for (final record in records)
+            [
+              _registerDate(record.createdAt),
+              record.supplierName,
+              'Purchase order',
+              record.invoiceReference ?? 'Unavailable',
+              _formatStoreMinorAmount(record.amountMinor),
+            ],
+        ],
+        rowKeys: [
+          for (final record in records)
+            ValueKey('work-purchase-${record.shipmentId}'),
+        ],
+        amountColumns: const {4},
+        total: _formatStoreMinorAmount(
+          records.fold<int>(0, (sum, record) => sum + record.amountMinor),
+        ),
+        notice: 'Linked purchase orders · not posted purchase vouchers',
+        empty: session.workspacePurchasesComplete
+            ? 'No linked purchases in this period.'
+            : 'Complete purchase history unavailable.',
+        onOpen: (index) {
+          if (session.activeWorkspace?.id == storeId) {
+            session.selectWorkspacePurchase(records[index].shipmentId);
+          }
+        },
       );
     }
     return ListView.builder(
@@ -11268,13 +11310,15 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Widget _compactInvoices(WorkSession session) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final start = switch (_invoicePeriod) {
-      'Week' => today.subtract(const Duration(days: 6)),
-      'Month' => DateTime(now.year, now.month),
-      'Year' => DateTime(now.year),
-      'Custom range' => _invoiceRange?.start ?? today,
-      _ => today,
-    };
+    final start = !widget.salesOnly
+        ? session.workspaceMoneyPeriodStart
+        : switch (_invoicePeriod) {
+            'Week' => today.subtract(const Duration(days: 6)),
+            'Month' => DateTime(now.year, now.month),
+            'Year' => DateTime(now.year),
+            'Custom range' => _invoiceRange?.start ?? today,
+            _ => today,
+          };
     final end = _invoicePeriod == 'Custom range' && _invoiceRange != null
         ? DateTime(
             _invoiceRange!.end.year,
@@ -11286,61 +11330,52 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         session.workspaceInvoices
             .where(
               (invoice) =>
-                  !invoice.issuedAt.isBefore(start) &&
+                  (start == null || !invoice.issuedAt.isBefore(start)) &&
                   invoice.issuedAt.isBefore(end),
             )
             .toList()
-          ..sort((a, b) => b.issuedAt.compareTo(a.issuedAt));
-    return Column(
-      children: [
-        Expanded(
-          child: invoices.isEmpty
-              ? const Center(child: Text('No invoices in this period.'))
-              : ListView.separated(
-                  key: const ValueKey('work-finance-payments'),
-                  itemCount: invoices.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final invoice = invoices[index];
-                    final issued = invoice.issuedAt.toLocal();
-                    return ListTile(
-                      key: ValueKey('work-sales-invoice-${invoice.id}'),
-                      title: Text(
-                        invoice.customer,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            invoice.id,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          Text(
-                            '${issued.day}/${issued.month}/${issued.year} · ₹${_formatStoreMinorAmount(invoice.payableMinor)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      isThreeLine: true,
-                      onTap: () => setState(() {
-                        _selectedInvoice = invoice;
-                        _invoiceStoreScope = session.activeWorkspace?.id;
-                        _invoiceAccountScope =
-                            session.workspaceFinance?.accountScope;
-                      }),
-                    );
-                  },
-                ),
-        ),
+          ..sort((a, b) {
+            final date = a.issuedAt.compareTo(b.issuedAt);
+            return date == 0 ? a.id.compareTo(b.id) : date;
+          });
+    return _StoreVoucherRegister(
+      identity: (
+        'sales',
+        session.workspaceStockHistoryScope()?.key,
+        widget.salesOnly ? _invoicePeriod : session.workspaceMoneyPeriod,
+      ),
+      headers: const [
+        'Date',
+        'Particulars',
+        'Voucher Type',
+        'Voucher No.',
+        'Amount (₹)',
       ],
+      rows: [
+        for (final invoice in invoices)
+          [
+            _registerDate(invoice.issuedAt),
+            invoice.customer,
+            'Sales',
+            invoice.id,
+            _formatStoreMinorAmount(invoice.payableMinor),
+          ],
+      ],
+      rowKeys: [
+        for (final invoice in invoices)
+          ValueKey('work-sales-invoice-${invoice.id}'),
+      ],
+      amountColumns: const {4},
+      total: _formatStoreMinorAmount(
+        invoices.fold<int>(0, (sum, invoice) => sum + invoice.payableMinor),
+      ),
+      notice: 'Recorded invoices only · not a customer balance statement',
+      empty: 'No recorded invoices in this period.',
+      onOpen: (index) => setState(() {
+        _selectedInvoice = invoices[index];
+        _invoiceStoreScope = session.activeWorkspace?.id;
+        _invoiceAccountScope = session.workspaceFinance?.accountScope;
+      }),
     );
   }
 
@@ -11361,10 +11396,15 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         );
       }
     }
-    final orders = session.filteredWorkspaceMoneyOrders;
     final largeText = MediaQuery.textScalerOf(context).scale(14) > 21;
     final titleText = Text(
-      widget.salesOnly ? 'Sales' : 'Store statement',
+      widget.salesOnly || _book == 'Sales'
+          ? 'Sales Register'
+          : _book == 'Purchases'
+          ? 'Purchase records'
+          : _book == 'Expenses'
+          ? 'Expense Register'
+          : 'Cash / Bank Book',
       style: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w800,
@@ -11455,12 +11495,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
             child: largeText || widget.salesOnly
-                ? SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
+                ? Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         title,
-                        const SizedBox(width: 8),
                         periodControl,
                         if (widget.salesOnly && largeText)
                           TextButton.icon(
@@ -11536,7 +11577,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               _book,
               session.workspaceFinanceUsesLegacyReview,
             )),
-            child: widget.salesOnly && !_showSalesFinance
+            child:
+                (widget.salesOnly && !_showSalesFinance) ||
+                    (!widget.salesOnly && _book == 'Sales')
                 ? _compactInvoices(session)
                 : _book == 'Purchases'
                 ? _StorePurchasesSurface(session: session, statement: true)
@@ -11549,6 +11592,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                     session: session,
                     statement: true,
                   )
+                : !widget.salesOnly && _book == 'Expenses'
+                ? _StoreExpensesSurface(session: session, register: true)
                 : !session.workspaceFinanceUsesLegacyReview
                 ? _StoreFinanceSurface(
                     session: session,
@@ -11560,111 +11605,14 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                           session.workspaceFinance?.accountScope;
                     }),
                   )
-                : ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      if (_book == 'Sales') ...[
-                        if (orders.isNotEmpty)
-                          const Text(
-                            'Customer purchases',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: MoolColors.muted,
-                            ),
-                          ),
-                        if (orders.isNotEmpty) const SizedBox(height: 8),
-                        if (orders.isEmpty)
-                          const _DeskEmpty(
-                            icon: Icons.receipt_long_outlined,
-                            title: 'No sales in this period',
-                            detail:
-                                'Recorded customer purchases will appear here.',
-                          ),
-                        for (final order in orders) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: _StoreMoneyLine(
-                              value:
-                                  '₹${_formatStoreMinorAmount(order.payableMinor)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: MoolColors.navy,
-                                fontWeight: FontWeight.w800,
-                              ),
-                              leading: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF0F3FF),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      '${order.createdAt.day}\n${order.createdAt.month}',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: MoolColors.navy,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          order.customer,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${order.id} · ${order.payment}\n${session.workspaceOrderStageLabel(order)}',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            height: 1.4,
-                                            color: MoolColors.muted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const Divider(height: 1),
-                        ],
-                      ] else
-                        _DeskEmpty(
-                          icon: _book == 'Purchases'
-                              ? Icons.local_shipping_outlined
-                              : Icons.receipt_outlined,
-                          title: _book == 'Purchases'
-                              ? 'No purchases linked to this store'
-                              : 'No recorded expenses',
-                          detail: _book == 'Purchases'
-                              ? 'Supplier invoices and incoming deliveries will appear when linked to this business. Personal purchases stay separate.'
-                              : 'Business expenses will appear here when recorded.',
-                        ),
-                    ],
-                  ),
+                : _StoreExpensesSurface(session: session),
           ),
         ),
       ],
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final minimumHeight = largeText ? 320.0 : 240.0;
+        final minimumHeight = largeText ? 480.0 : 240.0;
         if (constraints.maxHeight >= minimumHeight) {
           return content;
         }
@@ -11672,6 +11620,170 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           child: SizedBox(height: minimumHeight, child: content),
         );
       },
+    );
+  }
+}
+
+String _registerDate(DateTime value) {
+  final date = value.toLocal();
+  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+}
+
+// Register totals are sums of recorded vouchers, never inferred ledger balances.
+class _StoreVoucherRegister extends StatefulWidget {
+  const _StoreVoucherRegister({
+    required this.identity,
+    required this.headers,
+    required this.rows,
+    required this.total,
+    required this.notice,
+    required this.empty,
+    this.rowKeys = const [],
+    this.amountColumns = const {},
+    this.onOpen,
+    this.footer,
+  });
+  final Object identity;
+  final List<String> headers;
+  final List<List<String>> rows;
+  final List<Key> rowKeys;
+  final String total, notice, empty;
+  final Set<int> amountColumns;
+  final ValueChanged<int>? onOpen;
+  final List<String>? footer;
+  @override
+  State<_StoreVoucherRegister> createState() => _StoreVoucherRegisterState();
+}
+
+class _StoreVoucherRegisterState extends State<_StoreVoucherRegister> {
+  final horizontal = ScrollController();
+  @override
+  void dispose() {
+    horizontal.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    final widths = [
+      for (var i = 0; i < widget.headers.length; i++)
+        (i == 0
+                ? 100.0
+                : i == 1
+                ? 180.0
+                : 150.0) *
+            scale,
+    ];
+    Widget row(List<String> cells, {bool heading = false, Key? entryKey}) =>
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < cells.length; i++)
+              SizedBox(
+                key: i == 0 ? entryKey : null,
+                width: widths[i],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
+                  child: Text(
+                    cells[i],
+                    textAlign: widget.amountColumns.contains(i)
+                        ? TextAlign.right
+                        : TextAlign.left,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: MoolColors.navy,
+                      fontWeight: heading ? FontWeight.w700 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+    return Column(
+      key: const Key('work-voucher-register'),
+      children: [
+        Expanded(
+          child: Scrollbar(
+            controller: horizontal,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: horizontal,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: widths.fold<double>(0, (a, b) => a + b),
+                child: ListView.builder(
+                  key: PageStorageKey(('voucher-register', widget.identity)),
+                  itemCount: widget.rows.length + 2,
+                  itemBuilder: (_, position) {
+                    if (position == 0) {
+                      return ColoredBox(
+                        color: const Color(0xFFF0F3FF),
+                        child: row(widget.headers, heading: true),
+                      );
+                    }
+                    if (position == widget.rows.length + 1) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.rows.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(widget.empty),
+                            ),
+                          const Divider(height: 1),
+                          row(
+                            widget.footer ??
+                                [
+                                  for (
+                                    var i = 0;
+                                    i < widget.headers.length;
+                                    i++
+                                  )
+                                    i == 1
+                                        ? 'Recorded total'
+                                        : i == widget.headers.length - 1
+                                        ? widget.total
+                                        : '',
+                                ],
+                            heading: true,
+                          ),
+                        ],
+                      );
+                    }
+                    final index = position - 1;
+                    return Material(
+                      color: index.isEven
+                          ? Colors.white
+                          : const Color(0xFFF8F9FC),
+                      child: InkWell(
+                        onTap: widget.onOpen == null
+                            ? null
+                            : () => widget.onOpen!(index),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: Tooltip(
+                            message: widget.notice,
+                            child: row(
+                              widget.rows[index],
+                              entryKey: index < widget.rowKeys.length
+                                  ? widget.rowKeys[index]
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -21841,15 +21953,209 @@ class _StoreExpensesSurface extends StatefulWidget {
     super.key,
     required this.session,
     this.statement = false,
+    this.register = false,
   });
   final WorkSession session;
   final bool statement;
+  final bool register;
   @override
   State<_StoreExpensesSurface> createState() => _StoreExpensesSurfaceState();
 }
 
 class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
   bool loading = true, recovered = false;
+  String? _registerId;
+
+  Widget _moneyBook(BuildContext context) {
+    final session = widget.session;
+    if (loading || !recovered) {
+      return ListView(
+        children: [
+          Text(
+            loading
+                ? 'Opening saved money records…'
+                : 'Money records are unavailable.',
+          ),
+          if (!loading)
+            TextButton(
+              onPressed: recover,
+              child: const Text('Retry opening records'),
+            ),
+        ],
+      );
+    }
+    final registers = session.workspaceMoneyRegisters;
+    final selected = _registerId == ''
+        ? null
+        : registers
+              .where((r) => _registerId == null || r.registerId == _registerId)
+              .firstOrNull;
+    final rows = <List<String>>[];
+    final keys = <Key>[];
+    var debit = 0, credit = 0;
+    String balanceText(int? minor) => minor == null
+        ? 'Unavailable'
+        : '${_formatStoreMinorAmount(minor.abs())}${minor == 0
+              ? ''
+              : minor > 0
+              ? ' Dr'
+              : ' Cr'}';
+    int? closing;
+    var unavailable = false;
+    if (selected != null) {
+      final now = DateTime.now();
+      final end = selected.asOf.isBefore(now) ? selected.asOf : now;
+      final start = session.workspaceMoneyPeriodStart ?? selected.openingAt;
+      final balances = session.workspaceFinanceStale
+          ? null
+          : selected.balances(start, end);
+      int? running = balances?.openingMinor;
+      unavailable = balances == null;
+      rows.add(['', 'Opening Balance', '', '', '', '', balanceText(running)]);
+      keys.add(const ValueKey('money-book-opening'));
+      for (final entry in selected.entries.where(
+        (e) => !e.occurredAt.isBefore(start) && e.occurredAt.isBefore(end),
+      )) {
+        if (entry.deltaMinor > 0) {
+          debit += entry.deltaMinor;
+        } else {
+          credit -= entry.deltaMinor;
+        }
+        if (running != null) running += entry.deltaMinor;
+        rows.add([
+          _registerDate(entry.occurredAt),
+          entry.reference,
+          'Movement',
+          entry.id,
+          entry.deltaMinor > 0 ? _formatStoreMinorAmount(entry.deltaMinor) : '',
+          entry.deltaMinor < 0
+              ? _formatStoreMinorAmount(-entry.deltaMinor)
+              : '',
+          balanceText(running),
+        ]);
+        keys.add(ValueKey('money-book-entry-${entry.id}'));
+      }
+      closing = balances?.closingMinor;
+      rows.add(['', 'Closing Balance', '', '', '', '', balanceText(closing)]);
+      keys.add(const ValueKey('money-book-closing'));
+    } else {
+      unavailable = true;
+      final statement = session.workspaceMoneyStatement;
+      for (final entry
+          in statement?.entries ?? <WorkspaceMoneyStatementEntry>[]) {
+        if (entry.posted && !entry.transfer) {
+          if (entry.incoming) {
+            debit += entry.amountMinor;
+          } else {
+            credit += entry.amountMinor;
+          }
+        }
+        rows.add([
+          _registerDate(entry.occurredAt),
+          entry.party,
+          entry.label,
+          entry.reference,
+          entry.incoming ? _formatStoreMinorAmount(entry.amountMinor) : '',
+          !entry.incoming ? _formatStoreMinorAmount(entry.amountMinor) : '',
+          entry.status,
+        ]);
+        keys.add(ValueKey('work-money-entry-${entry.id}'));
+      }
+    }
+    return Column(
+      key: const Key('work-money-statement'),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: PopupMenuButton<String>(
+            key: const Key('work-money-book-selector'),
+            onSelected: (id) => setState(() => _registerId = id),
+            itemBuilder: (_) => [
+              for (final r in registers)
+                PopupMenuItem(value: r.registerId, child: Text(r.label)),
+              const PopupMenuItem(value: '', child: Text('Recorded movements')),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      selected?.label ?? 'Recorded movements',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.expand_more, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (unavailable)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              selected == null
+                  ? 'Select a supplied cash/bank account for balances.'
+                  : 'Opening balance or complete history unavailable.',
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        Expanded(
+          child: _StoreVoucherRegister(
+            identity: (
+              'money',
+              session.workspaceStockHistoryScope()?.key,
+              selected?.registerId,
+              session.workspaceMoneyPeriod,
+            ),
+            headers: selected == null
+                ? const [
+                    'Date',
+                    'Particulars',
+                    'Entry Type',
+                    'Reference',
+                    'Money in (₹)',
+                    'Money out (₹)',
+                    'Status',
+                  ]
+                : const [
+                    'Date',
+                    'Particulars',
+                    'Entry Type',
+                    'Reference ID',
+                    'Debit (₹)',
+                    'Credit (₹)',
+                    'Balance (₹)',
+                  ],
+            rows: rows,
+            rowKeys: keys,
+            amountColumns: const {4, 5, 6},
+            total: '',
+            footer: [
+              '',
+              'Recorded total',
+              '',
+              '',
+              _formatStoreMinorAmount(debit),
+              _formatStoreMinorAmount(credit),
+              selected == null ? '' : balanceText(closing),
+            ],
+            notice: selected == null
+                ? 'Posted movements only in totals; pending entries and transfers excluded.'
+                : 'Book balance, not a verified bank balance. Movement type is supplied without an inferred voucher classification.',
+            empty: 'No records in this period.',
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -21868,96 +22174,49 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.statement) {
-      final statement = recovered
-          ? widget.session.workspaceMoneyStatement
-          : null;
-      return ListView.builder(
-        key: const Key('work-money-statement'),
-        padding: const EdgeInsets.all(16),
-        itemCount: 1 + (statement?.entries.length ?? 0),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Money activity',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                if (loading)
-                  const Text('Opening saved money records…')
-                else if (statement == null) ...[
-                  const Text('Money records are unavailable.'),
-                  TextButton(
-                    onPressed: recover,
-                    child: const Text('Retry opening records'),
-                  ),
-                ] else ...[
-                  _MoneyDestinationLine(
-                    label: 'Recorded money in',
-                    value: _purchaseAmount(statement.recordedInMinor),
-                  ),
-                  _MoneyDestinationLine(
-                    label: 'Recorded money out',
-                    value: _purchaseAmount(statement.recordedOutMinor),
-                  ),
-                  const Text(
-                    'Available records for this period. Pending entries and settlement transfers are excluded from these subtotals.',
-                  ),
-                  if (widget.session.workspaceMoneyRegisters.isEmpty)
-                    const Text(
-                      'Cash/bank opening and closing balances are unavailable without their account history.',
-                    ),
-                  for (final register in widget.session.workspaceMoneyRegisters)
-                    _StoreMoneyRegisterSummary(
-                      key: ValueKey('work-register-${register.registerId}'),
-                      register: register,
-                      start: widget.session.workspaceMoneyPeriodStart,
-                      period: widget.session.workspaceMoneyPeriod,
-                      stale: widget.session.workspaceFinanceStale,
-                    ),
-                  if (statement.entries.isEmpty)
-                    const Text('No money activity recorded for this period.'),
-                ],
-              ],
-            );
-          }
-          final entry = statement!.entries[index - 1];
-          return Padding(
-            key: ValueKey('work-money-entry-${entry.id}'),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Divider(),
-                _MoneyDestinationLine(
-                  label: entry.label,
-                  value: _purchaseAmount(entry.amountMinor),
-                ),
-                Text(
-                  entry.party,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Text('${entry.status} · ${entry.method}'),
-                Text(entry.reference),
-                Text(
-                  MaterialLocalizations.of(
-                    context,
-                  ).formatShortDate(entry.occurredAt.toLocal()),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    }
+    if (widget.statement) return _moneyBook(context);
     final start = widget.session.workspaceMoneyPeriodStart;
     final expenses = widget.session.workspaceExpenses
         .where(
           (expense) => start == null || !expense.occurredAt.isBefore(start),
         )
         .toList();
+    if (recovered && widget.register) {
+      return _StoreVoucherRegister(
+        identity: (
+          'expenses',
+          widget.session.workspaceStockHistoryScope()?.key,
+          widget.session.workspaceMoneyPeriod,
+        ),
+        headers: const [
+          'Date',
+          'Particulars',
+          'Voucher Type',
+          'Reference',
+          'Amount (₹)',
+        ],
+        rows: [
+          for (final expense in expenses)
+            [
+              _registerDate(expense.occurredAt),
+              expense.category,
+              'Expense',
+              expense.reference,
+              _formatStoreMinorAmount(expense.amountMinor),
+            ],
+        ],
+        rowKeys: [
+          for (final expense in expenses)
+            ValueKey('work-expense-${expense.operationId}'),
+        ],
+        amountColumns: const {4},
+        total: _formatStoreMinorAmount(
+          expenses.fold<int>(0, (sum, expense) => sum + expense.amountMinor),
+        ),
+        notice: 'Recorded expenses · not a cash or bank balance',
+        empty: 'No expense entries recorded for this period.',
+      );
+    }
     return ListView(
       key: const Key('work-finance-expenses'),
       padding: const EdgeInsets.all(16),
@@ -22017,63 +22276,6 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
                 ],
               ),
             ),
-        ],
-      ],
-    );
-  }
-}
-
-class _StoreMoneyRegisterSummary extends StatelessWidget {
-  const _StoreMoneyRegisterSummary({
-    super.key,
-    required this.register,
-    required this.start,
-    required this.period,
-    required this.stale,
-  });
-  final WorkspaceMoneyRegisterSnapshot register;
-  final DateTime? start;
-  final String period;
-  final bool stale;
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final end = register.asOf.isBefore(now) ? register.asOf : now;
-    final balance = stale
-        ? null
-        : register.balances(start ?? register.openingAt, end);
-    return ExpansionTile(
-      key: PageStorageKey((
-        'money-register-expanded',
-        register.accountScope,
-        register.workspaceId,
-        register.registerId,
-        period,
-      )),
-      title: Text(register.label),
-      subtitle: Text(
-        'Reported through ${MaterialLocalizations.of(context).formatShortDate(end.toLocal())} '
-        '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end.toLocal()))}',
-      ),
-      children: [
-        if (balance == null)
-          const Text(
-            'Opening and complete movement history are needed for this period.',
-          )
-        else ...[
-          for (final fact in <(String, int)>[
-            ('Opening balance', balance.openingMinor),
-            ('Money in', balance.inMinor),
-            ('Money out', balance.outMinor),
-            ('Closing book balance', balance.closingMinor),
-          ])
-            _MoneyDestinationLine(
-              label: fact.$1,
-              value: _purchaseAmount(fact.$2),
-            ),
-          const Text(
-            'Recorded register balance; a cash count or bank statement is separate confirmation.',
-          ),
         ],
       ],
     );
