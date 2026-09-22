@@ -1066,6 +1066,8 @@ Full ticket: `r6633-offers-cart-D06/OFFERS-CART-JOURNEY-D06.md` inside the evide
 
 ### R6633-D07–D10 — Authenticated checkout and customer delivery audit (23 September)
 
+**Delivery wording/choice correction:** the founder subsequently rejected the service/time chooser described below. The platform-assigned delivery correction at the end of this handoff is authoritative for D08/D09/D10 and D06-G; original observations remain historical evidence.
+
 **Four new OPEN tickets, registration only:** D07 remove redundant checkout sign-in by connecting the authoritative app identity; D08 consumer delivery wording and explicit service/slot eligibility; D09 delivery selection, stable fulfilment grouping and complete compact review; D10 live order/delivery updates for consumer, Wholesale, retailer procurement and bulk buyers. **D06-G extended** to require compact premium polish from Cart through address/collection, payment, review and tracking; this is not an extra duplicate ticket.
 
 Current Redmi082 confirms the collection sign-in notice/button. The review harness deliberately starts Buy without normal account entry, and no collectionIdentity injection was found in runtime lib; reaching that review Cart is not authentication evidence. Future fix must reuse real app identity, remove normal-session duplicate login, distinguish provider unavailability from expiry, and preserve authorization/account isolation. No auth bypass.
@@ -1077,3 +1079,16 @@ Device095–098 reaches delivery review with six items/₹760; delivery remains 
 All actors have a documented acceptance matrix, including live/stale/offline/reconnect/slot/quantity/address/payment and multi-delivery recovery. Actual local Flutter screens are required after later implementation for founder approval. No application/test/policy changes, data injection, APK, payment/order submission or provider workspace edits. Basket preserved and original five-item collection/payment choice restored in102; Pine Labs was preselected before inspection.
 
 Full report and fresh device evidence: `r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md` inside the evidence ZIP. SHA-256 `cd260c05d34acee1440d35801ff4f8b10a46ebf7fcb38fe1124c0d4d077bf178`; 84,177,530 bytes; all 688 existing entries preserved plus 61 new entries. All four tickets and two source children remain OPEN.
+
+
+### Founder correction — platform-assigned MoolSocial delivery (23 September)
+
+**Annotation1: customers do not choose a delivery service or time slot.** Supplier/Store and logistics partners follow MoolSocial's delivery algorithm; it assigns the service, timing and subsequent updates. This supersedes the earlier Express / Choose a delivery time / Standard proposal, D09's suggested customer chooser, and the slot-picker preview requirement. Absence of that chooser is not a defect.
+
+Professional platform labels proposed for the registered design: **MoolSocial Quick Delivery** for eligible small biker orders; **MoolSocial Scheduled Delivery** for Wholesale/bulk; **MoolSocial Courier Delivery** for remote parcels, which are also scheduled. Courier service and assigned timing must coexist. No invented thresholds, promised minutes or local assignment algorithm.
+
+Product descriptions show the existing intended Store/supplier-backed delivery type and estimate. Cart/checkout show the platform-assigned service, timing and charges compactly, without delivery-service/time selectors. After placement, all buyers see the actual live/scheduled/courier progress, assigned date/window and freshness updates from the order/Store/logistics source. D08-C1 now concerns assigned schedule separate from transport, including courier; D09-C1 stable shipment identity remains open. D06-G full compact premium polish and D07 auth work remain required. Existing Store collection scope is preserved; no new pickup rule is inferred.
+
+Updated D08/D09/D10 requirements and future preview/test matrix; no additional ticket count. No implementation, provider/algorithm work, APK, device interaction or tests in this documentation correction.
+
+Operative report: `r6633-platform-delivery-correction/PLATFORM-ASSIGNED-DELIVERY-CORRECTION-20260923.md` in the evidence ZIP. Latest SHA-256 `e10bce97ca96eec54ae7baf8db70529f566c282be3cc9a59257c57d96e28ce3a`; 749 prior entries preserved plus one correction. Earlier audit reports are retained for observations but their rejected chooser/copy requirements are superseded.
