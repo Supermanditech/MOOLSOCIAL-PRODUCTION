@@ -1972,10 +1972,10 @@
     }
   ],
   "currentEvidenceArchive": {
-    "sha256": "9dbc8698a4520de9a409c48860e65943a9a07d8f9336e3e721d16e9030c32419",
-    "bytes": 101164838,
-    "priorEntriesPreserved": 988,
-    "newEvidencePrefix": "r6633-frontend-journey-visual/"
+    "sha256": "aad49c930dbacc5e9c4de5df80e0bb66904f710871177da72889eb76acdd281a",
+    "bytes": 104224714,
+    "priorEntriesPreserved": 989,
+    "newEvidencePrefix": "r6633-po-order-visual-followup/"
   },
   "checkoutDeliveryAudit20260923": {
     "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
@@ -2176,6 +2176,22 @@
     "authoritativeVerificationRequired": true,
     "backendDependency": "MoolSocial PO issuance and buyer/order validation contract",
     "status": "registered_only_not_implemented",
-    "operativeRecord": "CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#founder-correction--only-moolsocial-issued-purchase-orders-23-september"
+    "operativeRecord": "CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#r6633-d17--moolsocial-generated-buyer-po-and-connected-wholesalebulk-journey",
+    "resolvedWorkflow": "Generate from reviewed basket on behalf of actual buyer; PO is not a payment method",
+    "parentTicket": "R6633-D17"
+  },
+  "orderFrontendAuditContinuation20260923": {
+    "newParent": "R6633-D17",
+    "children": ["R6633-D17-C1", "R6633-D17-C2", "R6633-D06-G-V07-C1", "R6633-D06-G-V07-C2", "R6633-D06-G-V07-C3"],
+    "status": "open_registered_only",
+    "captureRange": "184-200",
+    "evidencePrefix": "r6633-po-order-visual-followup/",
+    "completionStateRendered": false,
+    "completionFrontendAcceptanceRegistered": true,
+    "keyboardComposerVisible": true,
+    "chatBackReturnPassed": true,
+    "messagesSent": 0,
+    "ordersOrCancellationsSubmitted": 0,
+    "sourceChanged": false
   }
 }
