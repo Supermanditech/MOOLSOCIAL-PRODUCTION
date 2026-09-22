@@ -2,6 +2,20 @@
 
 ## Current disposition
 
+Latest founder request: reconcile every Cursor ticket and all local/Git work after
+the installed Redmi APK before the next candidate. Reconciliation from clean
+`5f2b4428a093de2eb9d7ae3f8f47b8c2c117eb4a` identifies **22 post-r66.32 frontend
+tickets: 11 initial fixes/contracts + 3 product controls + 8 latest tickets**.
+Child fixes are retained under their parent tickets, not counted twice. Approved
+application source is `0a224e546b7c570cf2ba7772cf25e2c030ffee98`; all later commits
+are retained. Use the COMPLETE clean branch for the next candidate, not only the
+latest eight-ticket source commit. See the latest reconciliation record below
+and `next-redmi-reconciliation/apk-inclusion-manifest.json` in the evidence ZIP.
+Git preservation/inclusion is verified; no fresh APK qualification, build or
+installation is claimed. Google/provider and test-maintenance deferrals remain.
+
+Historical eight-ticket implementation assessment follows:
+
 22 September, latest founder authorization: implement the eight OPEN follow-up
 tickets below, locally test connected journeys, register impacted-code/child
 defects and retest, then show actual local Flutter screens for founder approval.
@@ -49,7 +63,8 @@ the original evidence-only completion commit is its direct child
 repairs below are a subsequent source delta. Integrate the complete branch
 including that delta, not only a78b1b38. The original inventory/receipt remains
 bound to the historical checkpoint; it is not relabelled as the later source.
-Latest application source: `f4d2e116bb1a42f10d588ac82e36cd23065d6523`.
+Latest application source: `0a224e546b7c570cf2ba7772cf25e2c030ffee98`.
+The eight-ticket source `f4d2e116bb1a42f10d588ac82e36cd23065d6523` remains an ancestor.
 The d9ec753b product-control source remains preserved in its ancestry.
 Backend implementation has NOT started. No APK is made.
 
@@ -947,3 +962,17 @@ This supersedes the preceding stop/block disposition for the current frontend ba
 The four-file legacy assertion patch is a separate DEFERRED TEST-MAINTENANCE / INTEGRATION HANDOFF item, not a Google/backend defect. Its exact verified patch, fingerprints and 23-pass/one-existing-skip evidence remain preserved; it is still unapplied to the repository originals. Carry it forward for the appropriate file owners before full-suite/integration qualification. It does not block further authorized frontend work under this founder decision. No policy or ownership edits are authorized or needed by this deferral.
 
 Current bounded frontend batch: implemented, locally checked and screens presented; product layout founder-approved and verified across public entry routes. Frontend batch can be closed with these explicit carry-forward dependencies. No live-provider/full-suite/device/integration acceptance is claimed. Preserve the approved application revision `0a224e54`, all prior commits, the next-Redmi testing obligations and the latest evidence archive. Backend/API work and APK remain deferred; integration remains postponed. Continue with founder-authorized frontend scope without repeatedly stopping on these deferred items.
+
+### Next Redmi APK — full ticket and source reconciliation
+
+Bounded actor/outcome: Cursor preserves the complete Buy frontend for a future device-review candidate. Classification: mvp_supporting. Reuse the current worktree/branch, APK source manifest, ticket registers, existing Git checks and handoff/evidence owners. This task inventories and preserves; no feature, backend/API integration, APK build, other-worktree edit or policy change. Reconciliation does not reuse consumed r66.32 build authority or claim new release qualification.
+
+Baseline was verified directly on Redmi `TG8HCYTGGQT885OF`: package `com.moolsocial.app.cursorreview`, version `1.0.0-r66.32-cursorreview`, code `2026092201`. Installed APK SHA-256 equals both the retained local APK and its record: `f74adcd10de5a5dfa3f6a29f024484dcb8caf294fb0682c01680eb7190f2cf8a`. APK Git label is `87bc96d4c28300146c9e2c3c3b37c7c3aacffed0`; its actual 3,233-file source manifest was also verified, SHA-256 `75d1b6f69eee462c70c1205e37011f4f4ee9b461cf006235a50d0a2398dae73d`. Comparing against this manifest prevents counting pre-APK local changes as new work merely because they were committed later.
+
+**22 ticket outcomes since that APK:** the 11 rows in the local cutoff, the three quantity/Delivery-provenance/product-Cart controls, and the eight rows in the latest frontend batch. The exact numbered list and implementation-commit mapping are in `APK-INCLUSION-REPORT.md` and `apk-inclusion-manifest.json` under `C:/GUARANTEED OUTCOME/outputs/buy-next-redmi-reconciliation-20260922`, and under `next-redmi-reconciliation/` in the evidence ZIP. Provider-related tickets count their implemented/verified frontend portion only; live provider completion is not claimed. Later Store search/Wholesale SKU/category/header/product-polish child work is included under these parents, not silently omitted or double-counted.
+
+Preservation results at `5f2b4428`: 16 post-APK work commits, including four runtime-source commits (`a78b1b38`, `d9ec753b`, `f4d2e116`, `0a224e54`); all parents and exact changed-owner lists retained. All 18 required integrated tips plus the previous integration, inherited/assigned checkpoints, prior Cursor tip and APK label remain ancestors. Git connectivity passed. Local branch equals origin; zero staged/unstaged/untracked records. All 3,233 candidate inputs exist, are tracked and match their Git blobs (accounting for Git text line endings); no ignored source/assets under lib/assets. No committed input or required baseline tip is missing.
+
+Relative to the actual APK manifest: 3,215 input files unchanged; 18 changed. Nine are substantive Buy runtime files, eight are focused test files, and the generated Android plugin registrant is line-ending-only (the exact APK hash is reproduced from current bytes using CRLF). Native, Store/Counter Sale, backend, shared packages/contracts and dependency Git trees are unchanged. The evidence archive's 337 pre-reconciliation entries were integrity-checked and preserved. Pending four-file test maintenance remains archived as an unapplied patch with 23 passing candidate tests; it is not an omitted application source change.
+
+The next APK must include the entire branch at its final clean remotely verified reconciliation HEAD and all exact input fingerprints from this manifest. Metadata-only reconciliation commits do not change the qualified application input set; recompute and verify it when the fresh candidate is prepared. Create a unique next candidate/version and run its required fresh gates before any build/install; r66.32 authorization is consumed. Replay all 22 post-APK outcomes and their children on the new APK. Current result is **Git-safe and source-reconciled, not yet a qualified/built new APK**. Google API/location/map, live Store/provider mapping and legacy-test maintenance remain explicitly deferred as instructed. No new app or device test run was necessary for this documentation/inventory task; no application source changed.
