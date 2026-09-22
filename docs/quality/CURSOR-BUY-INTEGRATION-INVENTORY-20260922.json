@@ -1860,12 +1860,137 @@
       "implementation": "none",
       "localFounderPreview": "future_after_implementation",
       "basketBeforeAndAfter": "4 products / 6 Shop items / INR760"
+    },
+    {
+      "id": "R6633-D07",
+      "title": "Connect authenticated checkout identity; remove redundant sign-in",
+      "status": "open_registered_only",
+      "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
+      "relatedVisualTicket": "R6633-D06-G",
+      "implementation": "none",
+      "providerAcceptance": "pending_not_claimed",
+      "children": []
+    },
+    {
+      "id": "R6633-D08",
+      "title": "Customer delivery wording and explicit service/slot capabilities",
+      "status": "open_registered_only",
+      "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
+      "relatedVisualTicket": "R6633-D06-G",
+      "implementation": "none",
+      "providerAcceptance": "pending_not_claimed",
+      "children": [
+        "R6633-D08-C1"
+      ]
+    },
+    {
+      "id": "R6633-D09",
+      "title": "Delivery choice, authoritative grouping and complete order review",
+      "status": "open_registered_only",
+      "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
+      "relatedVisualTicket": "R6633-D06-G",
+      "implementation": "none",
+      "providerAcceptance": "pending_not_claimed",
+      "children": [
+        "R6633-D09-C1"
+      ]
+    },
+    {
+      "id": "R6633-D10",
+      "title": "Live order/delivery journey for consumer, Wholesale, retailer and bulk buyers",
+      "status": "open_registered_only",
+      "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
+      "relatedVisualTicket": "R6633-D06-G",
+      "implementation": "none",
+      "providerAcceptance": "pending_not_claimed",
+      "children": []
     }
   ],
   "currentEvidenceArchive": {
-    "sha256": "254abfb88c033055f1159abea9ed9a30adf7da4304c2eb7598f2f7721cf44c0e",
-    "bytes": 79403754,
-    "priorEntriesPreserved": 638,
-    "newEvidencePrefix": "r6633-offers-cart-D06/"
+    "sha256": "cd260c05d34acee1440d35801ff4f8b10a46ebf7fcb38fe1124c0d4d077bf178",
+    "bytes": 84177530,
+    "priorEntriesPreserved": 688,
+    "newEvidencePrefix": "r6633-checkout-delivery-D07-D10/"
+  },
+  "checkoutDeliveryAudit20260923": {
+    "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
+    "newTickets": [
+      "R6633-D07",
+      "R6633-D08",
+      "R6633-D09",
+      "R6633-D10"
+    ],
+    "extendedTicket": "R6633-D06-G",
+    "evidence": [
+      "r6633-checkout-delivery-D07-D10/redmi/082-founder-cart-signin.json",
+      "r6633-checkout-delivery-D07-D10/redmi/082-founder-cart-signin.png",
+      "r6633-checkout-delivery-D07-D10/redmi/082-founder-cart-signin.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/083-collection-store-stage.json",
+      "r6633-checkout-delivery-D07-D10/redmi/083-collection-store-stage.png",
+      "r6633-checkout-delivery-D07-D10/redmi/083-collection-store-stage.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/085-orders-delivery-audit.json",
+      "r6633-checkout-delivery-D07-D10/redmi/085-orders-delivery-audit.png",
+      "r6633-checkout-delivery-D07-D10/redmi/085-orders-delivery-audit.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/086-orders-top-audit.json",
+      "r6633-checkout-delivery-D07-D10/redmi/086-orders-top-audit.png",
+      "r6633-checkout-delivery-D07-D10/redmi/086-orders-top-audit.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/087-orders-header.json",
+      "r6633-checkout-delivery-D07-D10/redmi/087-orders-header.png",
+      "r6633-checkout-delivery-D07-D10/redmi/087-orders-header.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/088-retail-tracking-top.json",
+      "r6633-checkout-delivery-D07-D10/redmi/088-retail-tracking-top.png",
+      "r6633-checkout-delivery-D07-D10/redmi/088-retail-tracking-top.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/089-retail-tracking-actions.json",
+      "r6633-checkout-delivery-D07-D10/redmi/089-retail-tracking-actions.png",
+      "r6633-checkout-delivery-D07-D10/redmi/089-retail-tracking-actions.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/090-multi-delivery-orders.json",
+      "r6633-checkout-delivery-D07-D10/redmi/090-multi-delivery-orders.png",
+      "r6633-checkout-delivery-D07-D10/redmi/090-multi-delivery-orders.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/091-wholesale-tracking.json",
+      "r6633-checkout-delivery-D07-D10/redmi/091-wholesale-tracking.png",
+      "r6633-checkout-delivery-D07-D10/redmi/091-wholesale-tracking.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/092-orders-return.json",
+      "r6633-checkout-delivery-D07-D10/redmi/092-orders-return.png",
+      "r6633-checkout-delivery-D07-D10/redmi/092-orders-return.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/093-cart-checkout-audit.json",
+      "r6633-checkout-delivery-D07-D10/redmi/093-cart-checkout-audit.png",
+      "r6633-checkout-delivery-D07-D10/redmi/093-cart-checkout-audit.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/094-checkout-reentry.json",
+      "r6633-checkout-delivery-D07-D10/redmi/094-checkout-reentry.png",
+      "r6633-checkout-delivery-D07-D10/redmi/094-checkout-reentry.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/095-delivery-address-stage.json",
+      "r6633-checkout-delivery-D07-D10/redmi/095-delivery-address-stage.png",
+      "r6633-checkout-delivery-D07-D10/redmi/095-delivery-address-stage.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/096-delivery-payment-stage.json",
+      "r6633-checkout-delivery-D07-D10/redmi/096-delivery-payment-stage.png",
+      "r6633-checkout-delivery-D07-D10/redmi/096-delivery-payment-stage.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/097-delivery-review-stage.json",
+      "r6633-checkout-delivery-D07-D10/redmi/097-delivery-review-stage.png",
+      "r6633-checkout-delivery-D07-D10/redmi/097-delivery-review-stage.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/098-delivery-review-shipments.json",
+      "r6633-checkout-delivery-D07-D10/redmi/098-delivery-review-shipments.png",
+      "r6633-checkout-delivery-D07-D10/redmi/098-delivery-review-shipments.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/099-checkout-restore-choice.json",
+      "r6633-checkout-delivery-D07-D10/redmi/099-checkout-restore-choice.png",
+      "r6633-checkout-delivery-D07-D10/redmi/099-checkout-restore-choice.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/100-address-return.json",
+      "r6633-checkout-delivery-D07-D10/redmi/100-address-return.png",
+      "r6633-checkout-delivery-D07-D10/redmi/100-address-return.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/101-collection-restored.json",
+      "r6633-checkout-delivery-D07-D10/redmi/101-collection-restored.png",
+      "r6633-checkout-delivery-D07-D10/redmi/101-collection-restored.xml",
+      "r6633-checkout-delivery-D07-D10/redmi/102-collection-payment-restored.json",
+      "r6633-checkout-delivery-D07-D10/redmi/102-collection-payment-restored.png",
+      "r6633-checkout-delivery-D07-D10/redmi/102-collection-payment-restored.xml"
+    ],
+    "deviceCoverage": "collection; retail Cart through blocked final review; existing Retail/Wholesale tracking",
+    "notDeviceAccepted": [
+      "live_bulk",
+      "retailer_procurement_checkout",
+      "provider_payments",
+      "live_delivery",
+      "auth_expiry"
+    ],
+    "basketPreserved": "4 products / 6 Shop items / INR760; original 5-item collection/payment choice restored"
   }
 }
