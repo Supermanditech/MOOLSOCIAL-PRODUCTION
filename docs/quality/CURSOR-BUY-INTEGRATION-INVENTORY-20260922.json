@@ -2165,5 +2165,17 @@
     "newDeviceRun": false,
     "implementation": false,
     "sourceCheckpoint": "51b69ea1e44a1095feaa070f5ce0d2202c258049"
+  },
+  "moolSocialIssuedPurchaseOrderRequirement20260923": {
+    "tickets": [
+      "R6633-D15",
+      "R6633-D06-G-V04"
+    ],
+    "issuer": "MoolSocial",
+    "freeTextIsAuthorization": false,
+    "authoritativeVerificationRequired": true,
+    "backendDependency": "MoolSocial PO issuance and buyer/order validation contract",
+    "status": "registered_only_not_implemented",
+    "operativeRecord": "CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#founder-correction--only-moolsocial-issued-purchase-orders-23-september"
   }
 }
