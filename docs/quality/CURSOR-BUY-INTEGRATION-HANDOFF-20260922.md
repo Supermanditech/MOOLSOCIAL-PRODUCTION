@@ -398,9 +398,9 @@ Local results and child inspection:
   hash-verified before restoring only those generated owners to exact HEAD bytes;
   `reference-evidence-preservation.json` records this. Nothing was deleted.
 
-Stop boundary: no new APK, backend work or implementation of the four OPEN
+Stop boundary: no new APK, backend work or implementation of the OPEN
 registered tickets (Compare-sheet height, search Delivery fleet and compact
-order/invoice actions, and Medicine promotions). All earlier
+order/invoice actions, Medicine promotions, and cross-Buy Cart movement). All earlier
 eleven-ticket device/provider obligations continue. Carry these three repairs
 into the integrated baseline and replay them on the next authorized Redmi APK.
 
@@ -551,3 +551,37 @@ screen, remove its deferred Medicine call to action without an empty spacer,
 check normal/enlarged text and narrow/landscape layouts, and verify existing
 consumer Buy/Store actions and scroll/Back behavior. Retain registration-only
 status until the founder separately authorizes implementation.
+
+### Registration only: predictable Cart position across the full Buy module
+
+`CURSOR-BUY-CART-POSITION-ALL-SURFACES-20260922` — OPEN, founder-reported.
+Founder reports that the moving Cart is not controllable. Proposed choices are
+(A) a fixed position or (B) a fixed default position with movement only when the
+customer explicitly drags it. Coverage must include Buy/Shop, Wholesale, Offers
+and Orders rather than only one product page.
+
+Recommended design: option A, one fixed Cart position in the existing lower
+navigation/action area wherever a Cart entry is appropriate. Eliminate automatic
+floating/repositioning while scrolling, changing content or opening overlays.
+Reuse the existing Cart target and scope resolution; do not introduce another
+Cart or a new gesture/state subsystem. No implementation of this new ticket is
+authorized under the standing registration-only instruction. Option B is a
+recorded alternative, not permission to add draggable behavior by default.
+
+Relationship to the completed three-defect batch: source commit d9ec753b fixes
+the Cart position on Shop/Wholesale product details, with local top/middle/bottom
+and return tests. It intentionally leaves catalogue dragging/avoidance intact.
+That narrower repair does not close this wider ticket, and the installed Redmi
+r66.32 does not contain it. Do not count an older installed observation as proof
+that the parked source fix regressed.
+
+Future audit/acceptance: catalogue, category/filter/search and results, Saved,
+Visit Store, product details, Offers, Orders and nested order/product return;
+Shop/Wholesale and aggregate Cart scope; empty/single/mixed baskets and quantity
+changes; active/no-active Delivery; scroll top/middle/bottom, keyboard, overlays,
+orientation, enlarged text and Android insets. The Cart must remain reachable,
+must not obscure SKU actions, and must preserve basket, scroll and Back context.
+Inspect Cart/checkout's own actions for duplicates without adding a floating Cart
+to screens that already own the Cart journey. Verify no hidden auto-drag or
+reposition callbacks keep moving the control after the fixed design is applied.
+Register any uncovered child issue; preserve routing, amounts and checkout wiring.
