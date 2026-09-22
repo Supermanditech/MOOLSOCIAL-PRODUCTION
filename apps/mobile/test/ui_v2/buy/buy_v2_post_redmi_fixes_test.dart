@@ -128,6 +128,95 @@ Widget _eightApp(
 
 void main() {
   group('Cursor eight tickets', () {
+    for (final id in ['s-tomato', 'w-rice']) {
+      for (final entry in ['search', 'saved', 'recent']) {
+        testWidgets('approved product layout from $entry $id', (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          final product = session.product(id);
+          session.openDestination(product.destination);
+          session.openProduct(id);
+          session.closeProduct();
+          if (!session.isSaved(id)) session.toggleSaved(id);
+          if (product.destination == BuyV2Destination.wholesale) {
+            session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+          }
+          await tester.pumpWidget(_eightApp(session));
+          await tester.pumpAndSettle();
+          Finder tile;
+          if (entry == 'search') {
+            await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('buy-search-field')),
+              product.customerTitle,
+            );
+            await tester.pumpAndSettle();
+            tile = find.byKey(ValueKey('buy-product-$id'));
+          } else if (entry == 'saved') {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-saved-products-button')),
+            );
+            await tester.pumpAndSettle();
+            tile = find.byKey(ValueKey('buy-product-$id'));
+          } else {
+            final context = tester.element(find.byType(BuyV2Screen));
+            unawaited(showBuyV2RecentlyViewed(context, session));
+            await tester.pumpAndSettle();
+            tile = find.byKey(
+              ValueKey('buy-settings-recently-viewed-product-$id'),
+            );
+          }
+          await tester.ensureVisible(tile);
+          await tester.tap(tile);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, id);
+          expect(session.view, BuyV2View.product);
+          final hero = find.byKey(ValueKey('buy-product-purchase-hero-$id'));
+          await tester.ensureVisible(hero);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: hero,
+              matching: find.byKey(ValueKey('buy-product-hero-store-$id')),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: hero,
+              matching: find.text('Delivery & returns'),
+            ),
+            findsNothing,
+          );
+          final details = find.byKey(ValueKey('buy-automatic-fulfilment-$id'));
+          await tester.ensureVisible(details);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: details,
+              matching: find.text('Delivery & returns'),
+            ),
+            findsOneWidget,
+          );
+          final action = find.byKey(ValueKey('buy-product-primary-$id'));
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          expect(action.hitTestable(), findsOneWidget);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          await captureR66Visual(tester, 'approved-product-$entry-$id');
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
     testWidgets(
       'organized provider facts remain distinct at large text and closed Store blocks Add',
       (tester) async {

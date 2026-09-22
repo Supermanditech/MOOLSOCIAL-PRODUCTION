@@ -85,6 +85,47 @@ void main() {
             tester,
             'eight-store-${destination.name}-$scale',
           );
+          final storeTile = find.byKey(ValueKey('buy-grid-packshot-$id'));
+          await tester.ensureVisible(storeTile);
+          await tester.pumpAndSettle();
+          await tester.tapAt(
+            Alignment(-.5, .55).withinRect(tester.getRect(storeTile)),
+          );
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, id);
+          expect(session.view, BuyV2View.product);
+          final hero = find
+              .byKey(ValueKey('buy-product-purchase-hero-$id'))
+              .last;
+          await tester.ensureVisible(hero);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: hero,
+              matching: find.byKey(ValueKey('buy-product-hero-store-$id')),
+            ),
+            findsOneWidget,
+          );
+          final details = find
+              .byKey(ValueKey('buy-automatic-fulfilment-$id'))
+              .last;
+          await tester.ensureVisible(details);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: details,
+              matching: find.text('Delivery & returns'),
+            ),
+            findsOneWidget,
+          );
+          await captureR66Visual(
+            tester,
+            'approved-store-product-${destination.name}-$scale',
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await _revealPagedHeader(tester, scope, field);
+          expect(field.hitTestable(), findsOneWidget);
           await tester.tap(field);
           await tester.enterText(field, 'sku 4999');
           await tester.pumpAndSettle();
