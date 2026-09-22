@@ -18,6 +18,18 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual;
 
+// These protected checkout images explicitly include two current deliveries.
+// Ordinary seed history remains inactive; provenance is tested independently.
+class _CheckoutActiveDeliveryReferenceSession extends BuyV2Session {
+  _CheckoutActiveDeliveryReferenceSession() : super(core: BuySession());
+  @override
+  List<BuyV2Order> get activeDeliveryOrders => orders
+      .where((order) => order.collection == null)
+      .where((order) => order.destination != BuyV2Destination.medicine)
+      .where((order) => !orderIsCompleted(order))
+      .toList(growable: false);
+}
+
 class _R66OrderCustomerStore implements BuyV2CustomerStateStore {
   @override
   String get ownerScope => 'r66-order-group-customer';
@@ -481,12 +493,15 @@ void main() {
       );
 
   BuyV2Session mixedSession({
+    bool activeDeliveryReference = false,
     BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
   }) {
-    final session = BuyV2Session(
-      core: BuySession(),
-      gstInvoiceProfileStore: gstInvoiceProfileStore,
-    );
+    final session = activeDeliveryReference
+        ? _CheckoutActiveDeliveryReferenceSession()
+        : BuyV2Session(
+            core: BuySession(),
+            gstInvoiceProfileStore: gstInvoiceProfileStore,
+          );
     for (final destination in const [
       BuyV2Destination.shop,
       BuyV2Destination.wholesale,
@@ -2374,7 +2389,8 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         tester.view.physicalSize = viewport.size;
-        final session = mixedSession();
+        final session = mixedSession(activeDeliveryReference: true);
+        expect(session.activeDeliveryOrders, hasLength(2));
         addTearDown(session.dispose);
         session.openCart(scope: BuyV2CartScope.shop);
         expect(session.openCheckout(), isTrue);

@@ -2,6 +2,44 @@
 
 ## Current disposition
 
+22 September, latest founder authorization: implement the eight OPEN follow-up
+tickets below, locally test connected journeys, register impacted-code/child
+defects and retest, then show actual local Flutter screens for founder approval.
+This supersedes their earlier registration-only status for this bounded batch.
+Integration is explicitly postponed while Codex is busy. No APK, backend,
+unrelated module, other-worktree or policy changes belong to this batch.
+Starting checkpoint: `757640edd252f61bdd03e3c05d43bf56b525834a`, clean and remote-exact.
+Application source at start remains d9ec753b; prior fixes/evidence are preserved.
+
+Execution assessment: mvp_supporting; consumer Buy discovery, product decisions,
+order/invoice access and scoped location controls. Reuse existing Buy views,
+catalogue, screen, design helpers and session/provider contracts; no separate
+screen stack or parallel Store catalogue. Implementation owners are the existing
+claimed Buy UI files and focused Buy test owners. Shared models, native setup,
+provider deployment and Codex-owned invoice/profile implementation are excluded.
+Reuse `_openOrderInvoice` and existing downloads wiring rather than fork them.
+Sequence: compact Compare/orders/promotions and fixed Cart/search presentation;
+product hierarchy; category/search consistency; location popup; focused journey
+tests, child inspection/corrections and rerun; actual local captures for review.
+
+Initial dependency `CHILD-8-MAP-PROVIDER`: this baseline exposes
+`BuyV2ShoppingAreaSource.locate/resolve` but supplies no production implementation
+and no embedded Google Maps dependency/component. Its area value has a Google
+place ID/label, not a current GPS coordinate or map controller. Reuse the existing
+interface for the compact current-location UI and truthful failure/retry states;
+record any remaining actual map/provider integration separately. Do not draw a
+fake map, show sample coordinates as current, or claim live location acceptance.
+No provider/permission/native change is silently authorized by a local mock test.
+Check this dependency while completing independent UI work; it must remain
+visible in the final ticket disposition if unresolved.
+
+Validation: reuse focused production-widget/session tests for Shop, Wholesale,
+Offers, Orders, Store and nested product/Cart returns, normal/large text, short/
+long content, Android/keyboard insets and missing/failed provider states. Capture
+real Flutter renders, explicitly distinguish fixtures from live provider proof,
+retain failed logs and register any child before retry. No approved reference
+image is overwritten and founder visual approval remains pending.
+
 Founder explicitly requests reconciliation of ALL Cursor work after the previous
 integrated baseline, clean local Git, remote preservation and a detailed Codex
 handoff. This is a source/evidence handoff, not production or device acceptance.
@@ -787,3 +825,59 @@ Cart/checkout state, and local keyboard/inset/layout/navigation tests. Inspect
 and register child defects; visual approval is separate from technical/device
 acceptance. Existing manual-area behavior remains installed until this ticket
 receives implementation authorization and a later authorized APK is qualified.
+
+
+### Founder additions during the eight-ticket implementation — 22 September 2026
+- CHILD-7-STORE-SEARCH-EXPANSION: Visit Store search must expand horizontally when focused/typing, not merely hide its toolbar. Hide the redundant outside close/info chrome while typing, keep an inline Back action, preserve query and Store scope; verify keyboard and Android Back.
+- CHILD-7-WHOLESALE-STOREFRONT: Wholesale Visit Store still takes the legacy supplier-preview branch even with a paged Store provider. Use the same Store catalogue and home-style SKU tiles for both public channels; preserve Wholesale prices, MOQ, filtering, save, product navigation and scoped Cart. No Store-provider or Codex-worktree edits.
+Both are authorized additions to the current frontend/local-test batch; integration and APK remain postponed.
+
+Founder clarification (Annotation 1): CHILD-7-STORE-SEARCH-EXPANSION applies to every applicable newly implemented public Store entry in Buy/Shop and Wholesale, including alternate full-catalogue routes. Verify focus, typed query, clear, finish, keyboard dismissal and back navigation with exact Store/channel scope; do not limit the fix to a single entry screen.
+
+Founder visual refinement: category popup header must be thinner so categories start higher; support dragging upward to full screen. Applied to the shared Shop, Wholesale and Store picker, preserving safe insets, scroll and category scope.
+
+### Local implementation checks and child findings (in progress)
+- CHILD-7-SAVED-SEARCH-BACK: Saved-at-Store branch omitted the normal search PopScope; Android Back could dismiss the Store instead of finish search. Fixed in the shared saved branch; targeted regression pending.
+- CHILD-7-CATEGORY-KEYBOARD: shared category grid needs explicit keyboard clearance after draggable expansion. Added bottom clearance and focus-to-full-height; keyboard/large-text verification pending.
+- Visual review: duplicated product rating/return summary, fallback pack facts and empty benefit panel took unnecessary space. Removed only already-present fallback/identical summary content; explicit manufacturer, quantity, legal/public metadata and failure/retry remain.
+- Preserved failed local evidence: store-r1 exposed an incorrect Wholesale test selector (supplier-action vs actual store-action); focused-r3 caught a duplicate modal argument inserted into the wrong similarly named helper and was corrected; focused-r4 invoice test used a historical seed with no order lines and the wrong page key. The corrected test uses an actual locally confirmed review order with line records and the existing invoice-page identity. No runtime invoice guard was weakened.
+- Focused-r2: 11 tests passed before subsequent visual refinements. This is intermediate evidence, not final acceptance.
+
+CHILD-6-ADD-LANE: final screenshot showed compact Add still in a mostly blank hero row. Move the existing Shop Add/quantity control beside the price when width/text size allows, with wrapping at large text. Existing eligibility and cart callbacks remain authoritative; Wholesale retains its dedicated compact trade dock.
+
+CHILD-TEST-CHECKOUT-DELIVERY-FIXTURE: broader run passed 119 functional checks and failed five immutable checkout images. Visual comparison identifies the inherited inactive-seed Delivery rail change, not a Cart/check-out defect from this batch. The protected fixture now explicitly provides its two current deliveries, following the existing scoped-Cart reference-fixture pattern; ordinary sessions and provenance guards are unchanged. Twenty generated diagnostic images were hash-preserved externally before restoring exact pre-run tracked evidence. Original golden images are unchanged. Exact pass/fail logs remain retained.
+
+CHILD-TEST-WHOLESALE-ROUTE: two RV6 assertions still expected the superseded supplier preview underneath the full Store. Updated the expected Back destination to the direct Store route used by both channels, retaining quantity, Store scope, empty-cart and destination-change assertions. Fresh-source behavior passed through the journey before the outdated final route assertion.
+
+
+## Eight-ticket frontend batch — local review checkpoint
+
+Latest implementation supersedes historical OPEN/registration-only labels for this batch. Founder visual approval, integration and fresh-device acceptance are still pending; no APK or backend work was performed.
+
+| Ticket | Local disposition |
+| --- | --- |
+| Compare sheet regression | Content-sized short/error sheet, capped and scrollable for populated results; unavailable and populated/nested-return checks pass. |
+| Delivery fleet in search | Hidden throughout public search even with a current delivery; restores after search without losing order state. |
+| Order/invoice actions | Compact wrapping inline actions with 44px targets; exact-order invoice and resolution routes verified. Existing invoice implementation reused. |
+| Medicine promotion | Removed only the deferred Medicine card from public Orders continuation; relevant Shop/Wholesale cards remain. |
+| Cart position | Fixed rail Cart on public catalogue/product/Orders/Offers paths; scope, quantity, product return, large text and landscape continuity verified. |
+| Product information | Larger readable adaptive fact rows; conservative duplicate/empty-content removal; explicit public compliance retained; compact Add beside price where it fits; Wholesale trade dock preserved. |
+| Categories/search consistency | Shared thumbnail grid and thin draggable popup across Shop/Wholesale/Store; drag to full height, keyboard clearance, independent selection; Store search expands horizontally on focus, including saved mode. Wholesale paged Visit Store now uses the same home-style SKU tiles. |
+| Shopping location | Compact automatic locate/retry/confirm UI through existing provider interface; selected place opens its Google Maps pin externally. Manual area lists removed. Live current location and embedded Google Map remain dependent on CHILD-8-MAP-PROVIDER; do not close live-map acceptance. |
+
+### Child inspection and validation
+
+In-scope children resolved and retested: saved-Store search Back, category keyboard clearance, Wholesale route parity, Store search width, thin/draggable category header, product Add empty lane, repeated/fallback product facts, and explicit historical reference fixture state. No remaining observed frontend child failure in the exercised checks. This does not claim exhaustive Buy/backend/device acceptance.
+
+- `focused-r5.log`: 13/13 focused checks passed before the final Add-lane refinement.
+- `regression-r1.log`: 119 functional checks passed; five inherited active-delivery reference fixture failures subsequently corrected without changing any reference images.
+- `store-regression-r1.log`: 18 passed; two assertions still expected the removed Wholesale preview route. Corrected only that expected destination and retested all four affected RV6 journeys.
+- `final-validation-r1.log`: **38/38 passed** on final runtime source, covering two root category journeys, 13 targeted cases, 10 product-control checks, four RV6 Store continuation cases, four populated Compare/Offers returns, and five unchanged checkout image comparisons.
+- `analyze-final.log`: seven changed Dart source/test owners, **no issues**.
+- `git diff --check`: passed. Historical reference files unchanged; 20 generated failure diagnostics preserved with hashes before exact pre-test restoration.
+
+Actual local review screens and every failed/passing log are in:
+`C:/GUARANTEED OUTCOME/outputs/buy-eight-ticket-local-review-20260922`.
+`review.html` links the final unedited Flutter renders. `captures-final` includes normal/200% text, Store/Wholesale parity, expanded search, category keyboard and drag behavior, product/Cart, order/invoice, comparison and provider-failure states. Test catalogue artwork is explicitly labelled Illustration; fixture data is not a production Store handoff or live location proof.
+
+No shared model/schema, Store, Counter Sale, CSV, native/dependency, backend or policy owner changed. Retain all prior integration ancestry and pending next-Redmi obligations. Codex integration remains postponed; request/verify its exact new baseline before backend work starts.

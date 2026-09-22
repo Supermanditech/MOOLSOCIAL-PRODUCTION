@@ -6,8 +6,8 @@ import 'package:flutter/semantics.dart'
     show CustomSemanticsAction, OrdinalSortKey;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/design/mool_design_system.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_search_relevance.dart';
@@ -2411,369 +2411,239 @@ Future<void> showBuyV2CatalogueArea(
   BuildContext context,
   BuyV2Session session,
 ) async {
-  var search = '';
-  var national = session.catalogueAreaScope == BuyV2CatalogueAreaScope.national;
-  var request = 0;
-  var loading = false;
-  var locating = false;
-  var results = <BuyV2ShoppingArea>[];
-  String? failure;
-  Timer? debounce;
-  final areaScroll = ScrollController();
-  final searchController = TextEditingController();
-  ModalRoute<void>? areaRoute;
-  try {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setState) {
-          areaRoute ??= ModalRoute.of<void>(context);
-          void revealFailure(int generation) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!context.mounted ||
-                  generation != request ||
-                  failure == null ||
-                  !areaScroll.hasClients) {
-                return;
-              }
-              areaScroll.jumpTo(0);
-            });
-          }
+  FocusManager.instance.primaryFocus?.unfocus();
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    builder: (_) => _CurrentShoppingAreaSheet(session: session),
+  );
+}
 
-          Future<void> lookup({bool currentLocation = false}) async {
-            debounce?.cancel();
-            final generation = ++request;
-            setState(() {
-              loading = true;
-              locating = currentLocation;
-              failure = null;
-              results = [];
-            });
-            try {
-              final found = currentLocation
-                  ? await session.locateShoppingArea()
-                  : await session.searchShoppingAreas(search);
-              if (!context.mounted || generation != request) return;
-              setState(() {
-                loading = false;
-                results = found;
-              });
-            } on Object catch (error) {
-              if (!context.mounted || generation != request) return;
-              setState(() {
-                loading = false;
-                failure = switch (error) {
-                  BuyV2ShoppingAreaFailure.permissionDenied =>
-                    'Location access is off. Search by locality or PIN code.',
-                  BuyV2ShoppingAreaFailure.offline =>
-                    'Areas could not load. Check your connection and try again.',
-                  _ =>
-                    'Area search is unavailable right now. Try again shortly.',
-                };
-              });
-              revealFailure(generation);
-            }
-          }
+class _CurrentShoppingAreaSheet extends StatefulWidget {
+  const _CurrentShoppingAreaSheet({required this.session});
+  final BuyV2Session session;
+  @override
+  State<_CurrentShoppingAreaSheet> createState() =>
+      _CurrentShoppingAreaSheetState();
+}
 
-          final areas = session.catalogueAreaChoices.entries
-              .where(
-                (entry) =>
-                    entry.value.toLowerCase().contains(search.toLowerCase()),
-              )
-              .toList(growable: false);
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: FractionallySizedBox(
-              heightFactor: .9,
-              child: BuyV2VerticalScrollIndicator(
-                child: ListView(
-                  key: const ValueKey('buy-catalogue-area-list'),
-                  controller: areaScroll,
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    8,
-                    12,
-                    16 +
-                        BuyV2AddressSheetMotion.resolveBottomSafeInset(context),
+class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
+  bool _loading = true;
+  bool _openingMap = false;
+  int _request = 0;
+  BuyV2ShoppingArea? _area;
+  String? _failure;
+  @override
+  void initState() {
+    super.initState();
+    _locate();
+  }
+
+  Future<void> _locate() async {
+    final request = ++_request;
+    setState(() {
+      _loading = true;
+      _area = null;
+      _failure = null;
+    });
+    try {
+      final areas = await widget.session.locateShoppingArea();
+      if (!mounted || request != _request) return;
+      setState(() {
+        _loading = false;
+        _area = areas.firstOrNull;
+        if (_area == null) {
+          _failure = 'Your location could not be confirmed. Try again.';
+        }
+      });
+    } on Object catch (error) {
+      if (!mounted || request != _request) return;
+      setState(() {
+        _loading = false;
+        _failure = switch (error) {
+          BuyV2ShoppingAreaFailure.permissionDenied =>
+            'Location access is off. Allow location access in your device settings, then try again.',
+          BuyV2ShoppingAreaFailure.offline =>
+            'Could not find your location. Check your connection and try again.',
+          _ =>
+            'Current location is unavailable right now. Your shopping area has not changed.',
+        };
+      });
+    }
+  }
+
+  Future<void> _openMap() async {
+    final area = _area;
+    if (area == null || _openingMap) return;
+    setState(() => _openingMap = true);
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        Uri.https('www.google.com', '/maps/search/', {
+          'api': '1',
+          'query': area.label,
+          'query_place_id': area.googlePlaceId,
+        }),
+        mode: LaunchMode.externalApplication,
+      ).timeout(const Duration(seconds: 15));
+    } on Object {
+      opened = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _openingMap = false;
+      if (!opened) _failure = 'Could not open Google Maps. Please try again.';
+    });
+  }
+
+  void _confirm() {
+    final area = _area;
+    if (area == null) return;
+    if (widget.session.chooseShoppingArea(
+      area,
+      BuyV2CatalogueAreaScope.regional,
+    )) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _area = null;
+        _failure = 'Your location changed. Locate again to refresh it.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight:
+            (MediaQuery.sizeOf(context).height -
+                MediaQuery.viewInsetsOf(context).bottom) *
+            .85,
+      ),
+      child: SingleChildScrollView(
+        key: const ValueKey('buy-catalogue-area-list'),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          12 + BuyV2AddressSheetMotion.resolveBottomSafeInset(context),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Your shopping location',
+                    style: context.buyTitle.copyWith(fontSize: 16),
                   ),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
+                ),
+                IconButton(
+                  tooltip: 'Close shopping location',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Row(
                   children: [
-                    if (failure != null)
-                      Semantics(
-                        liveRegion: true,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                failure!,
-                                key: const ValueKey('buy-area-lookup-failure'),
-                              ),
-                              TextButton(
-                                key: const ValueKey('buy-area-lookup-retry'),
-                                onPressed: () =>
-                                    lookup(currentLocation: locating),
-                                child: const Text('Try again'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Shopping area',
-                            style: context.buyTitle.copyWith(fontSize: 16),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Close shopping area',
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
+                    SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    Text(
-                      'Current area: ${session.catalogueAreaLabel}',
-                      key: const ValueKey('buy-area-selection-summary'),
-                      style: context.buyMeta,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      key: const ValueKey('buy-catalogue-area-search'),
-                      controller: searchController,
-                      maxLength: 80,
-                      decoration: const InputDecoration(
-                        hintText: 'Locality, city or PIN code',
-                        counterText: '',
-                      ),
-                      onChanged: (value) {
-                        debounce?.cancel();
-                        request++;
-                        setState(() {
-                          search = value.trim();
-                          results = [];
-                          failure = null;
-                          loading = false;
-                          locating = false;
-                        });
-                        if (search.length >= 2) {
-                          debounce = Timer(
-                            const Duration(milliseconds: 350),
-                            () {
-                              if (context.mounted) unawaited(lookup());
-                            },
-                          );
-                        }
-                      },
-                      onSubmitted: (_) {
-                        if (search.length >= 2) unawaited(lookup());
-                      },
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        key: const ValueKey('buy-catalogue-current-area'),
-                        onPressed: loading
-                            ? null
-                            : () => lookup(currentLocation: true),
-                        icon: const Icon(Icons.my_location_rounded),
-                        label: const Text('Use current location'),
-                      ),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('In this area'),
-                          checkmarkColor: Colors.white,
-                          selected: !national,
-                          onSelected: (_) => setState(() => national = false),
-                        ),
-                        ChoiceChip(
-                          label: const Text('National delivery'),
-                          checkmarkColor: Colors.white,
-                          selected: national,
-                          onSelected: (_) => setState(() => national = true),
-                        ),
-                      ],
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 6),
-                      child: Text(
-                        'Delivery availability is checked for your address.',
-                      ),
-                    ),
-                    if (loading)
-                      const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    if (results.isNotEmpty)
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: BuyV2Colors.line),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            for (final area in results)
-                              ListTile(
-                                dense: true,
-                                minTileHeight: 48,
-                                titleTextStyle: const TextStyle(
-                                  color: BuyV2Colors.ink,
-                                  fontSize: 13,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                key: ValueKey(
-                                  'buy-google-area-${area.googlePlaceId}',
-                                ),
-                                title: Text(area.label),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (area.postalCode case final pin?)
-                                      Text(pin),
-                                    const Padding(
-                                      padding: EdgeInsets.only(
-                                        top: 5,
-                                        bottom: 5,
-                                      ),
-                                      child: Text(
-                                        'Google Maps',
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400,
-                                          fontStyle: FontStyle.normal,
-                                          color: Color(0xff5e5e5e),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                onTap: () {
-                                  if (session.chooseShoppingArea(
-                                    area,
-                                    national
-                                        ? BuyV2CatalogueAreaScope.national
-                                        : BuyV2CatalogueAreaScope.regional,
-                                  )) {
-                                    Navigator.of(context).pop();
-                                  } else {
-                                    setState(
-                                      () => failure =
-                                          'This area could not be selected. Search again.',
-                                    );
-                                    revealFailure(request);
-                                  }
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
-                    ListTile(
-                      dense: true,
-                      minTileHeight: 48,
-                      titleTextStyle: const TextStyle(
-                        color: BuyV2Colors.ink,
-                        fontSize: 13,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      key: const ValueKey('buy-catalogue-any-area'),
-                      title: const Text('Any area'),
-                      selected:
-                          session.catalogueAreaScope ==
-                          BuyV2CatalogueAreaScope.allAreas,
-                      trailing:
-                          session.catalogueAreaScope ==
-                              BuyV2CatalogueAreaScope.allAreas
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: BuyV2Colors.navy,
-                            )
-                          : null,
-                      subtitle: const Text('Find stores in other areas.'),
-                      onTap: () {
-                        session.chooseCatalogueArea(
-                          null,
-                          BuyV2CatalogueAreaScope.allAreas,
-                        );
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    for (final area in areas)
-                      ListTile(
-                        dense: true,
-                        minTileHeight: 48,
-                        titleTextStyle: const TextStyle(
-                          color: BuyV2Colors.ink,
-                          fontSize: 13,
-                          height: 1.2,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        key: ValueKey('buy-catalogue-area-${area.key}'),
-                        title: Text(area.value),
-                        selected:
-                            session.catalogueAreaScope !=
-                                BuyV2CatalogueAreaScope.allAreas &&
-                            session.catalogueRegionId == area.key,
-                        trailing:
-                            session.catalogueAreaScope !=
-                                    BuyV2CatalogueAreaScope.allAreas &&
-                                session.catalogueRegionId == area.key
-                            ? const Icon(
-                                Icons.check_circle,
-                                color: BuyV2Colors.navy,
-                              )
-                            : null,
-                        onTap: () {
-                          session.chooseCatalogueArea(
-                            area.key,
-                            national
-                                ? BuyV2CatalogueAreaScope.national
-                                : BuyV2CatalogueAreaScope.regional,
-                          );
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    if (areas.isEmpty &&
-                        results.isEmpty &&
-                        !loading &&
-                        failure == null)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'No matching areas. You can still browse stores in any area.',
-                        ),
-                      ),
+                    SizedBox(width: 12),
+                    Expanded(child: Text('Finding your current location...')),
                   ],
                 ),
               ),
-            ),
-          );
-        },
+            if (_area case final area?) ...[
+              Container(
+                key: const ValueKey('buy-current-location-result'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF8F8FF), Color(0xFFFFF9F2)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: BuyV2Colors.line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      area.label,
+                      style: context.buyBody.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    TextButton.icon(
+                      key: const ValueKey('buy-current-location-map'),
+                      onPressed: _openingMap ? null : _openMap,
+                      icon: const Icon(Icons.map_outlined, size: 18),
+                      label: const Text('View pin in Google Maps'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                key: const ValueKey('buy-current-location-confirm'),
+                onPressed: _confirm,
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('Use this location'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Find nearby products and stores. Your checkout address stays separate.',
+                style: context.buyMeta,
+              ),
+            ],
+            if (_failure != null)
+              Semantics(
+                liveRegion: true,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    _failure!,
+                    key: const ValueKey('buy-area-lookup-failure'),
+                    style: context.buyBody.copyWith(fontSize: 12, height: 1.35),
+                  ),
+                ),
+              ),
+            if (!_loading)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('buy-area-lookup-retry'),
+                  onPressed: _locate,
+                  icon: const Icon(Icons.my_location_rounded, size: 18),
+                  label: Text(
+                    _area == null ? 'Try again' : 'Refresh current location',
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
-    );
-  } finally {
-    request++;
-    debounce?.cancel();
-    // The modal result completes before its closing animation removes fields.
-    await areaRoute?.completed;
-    areaScroll.dispose();
-    searchController.dispose();
-  }
+    ),
+  );
 }
 
 typedef BuyV2ProductVisit =
@@ -4356,9 +4226,19 @@ class _CatalogueOwnedFeature extends StatelessWidget {
 }
 
 class _CatalogueCategorySheet extends StatefulWidget {
-  const _CatalogueCategorySheet({required this.session});
+  const _CatalogueCategorySheet({
+    required this.session,
+    this.categories,
+    this.selectedCategoryId,
+    this.title,
+    this.onSelected,
+  });
 
   final BuyV2Session session;
+  final List<BuyV2Category>? categories;
+  final String? selectedCategoryId;
+  final String? title;
+  final ValueChanged<String>? onSelected;
 
   @override
   State<_CatalogueCategorySheet> createState() =>
@@ -4369,6 +4249,7 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _searchFocus = FocusNode(debugLabel: 'buy-category-search');
   String _query = '';
+  final _sheetController = DraggableScrollableController();
 
   @override
   void initState() {
@@ -4377,6 +4258,13 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
   }
 
   void _handleSearchFocusChanged() {
+    if (_searchFocus.hasFocus && _sheetController.isAttached) {
+      _sheetController.animateTo(
+        1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    }
     if (mounted) {
       setState(() {});
     }
@@ -4400,6 +4288,7 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
   void dispose() {
     _searchFocus.removeListener(_handleSearchFocusChanged);
     _searchFocus.dispose();
+    _sheetController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -4408,7 +4297,7 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final query = _query.trim().toLowerCase();
-    final categories = session.categories
+    final categories = (widget.categories ?? session.categories)
         .where(
           (category) =>
               query.isEmpty || category.label.toLowerCase().contains(query),
@@ -4420,18 +4309,23 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
       scopesRoute: true,
       namesRoute: true,
       explicitChildNodes: true,
-      label: '${session.destination.label} categories',
+      label: widget.title ?? '${session.destination.label} categories',
       child: KeyedSubtree(
         key: const ValueKey('buy-category-sheet-layout-owner'),
-        child: FractionallySizedBox(
-          heightFactor: MediaQuery.sizeOf(context).height < 480
-              ? 1
-              : BuyV2CategorySheetPolicy.heightFactorFor(context),
-          child: Padding(
+        child: DraggableScrollableSheet(
+          key: const ValueKey('buy-category-draggable-sheet'),
+          controller: _sheetController,
+          initialChildSize: MediaQuery.sizeOf(context).height < 480 ? 1 : .72,
+          minChildSize: .5,
+          maxChildSize: 1,
+          snap: true,
+          snapSizes: const [.72, 1],
+          expand: false,
+          builder: (context, categoryScroll) => Padding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.sizeOf(context).height < 480
-                  ? 8
-                  : MoolMetrics.compactTapTarget,
+              bottom: MediaQuery.viewInsetsOf(context).bottom > 0
+                  ? MediaQuery.viewInsetsOf(context).bottom
+                  : BuyV2AddressSheetMotion.resolveBottomSafeInset(context),
             ),
             child: ClipRRect(
               key: const ValueKey('buy-category-sheet-surface'),
@@ -4453,22 +4347,46 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                     ),
                     child: Column(
                       children: [
-                        const SizedBox(height: 8),
-                        Container(
-                          width: 36,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: BuyV2Colors.line,
-                            borderRadius: BorderRadius.circular(99),
+                        GestureDetector(
+                          key: const ValueKey('buy-category-drag-handle'),
+                          behavior: HitTestBehavior.opaque,
+                          onVerticalDragUpdate: (details) {
+                            if (_sheetController.isAttached) {
+                              _sheetController.jumpTo(
+                                (_sheetController.size -
+                                        details.delta.dy /
+                                            MediaQuery.sizeOf(context).height)
+                                    .clamp(.5, 1),
+                              );
+                            }
+                          },
+                          onDoubleTap: () => _sheetController.animateTo(
+                            1,
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                          ),
+                          child: SizedBox(
+                            height: 16,
+                            width: double.infinity,
+                            child: Center(
+                              child: Container(
+                                width: 36,
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  color: BuyV2Colors.line,
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
+                          padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
                           child: Row(
                             children: [
                               Container(
-                                width: 36,
-                                height: 36,
+                                width: 26,
+                                height: 26,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: BuyV2Colors.softOrange,
@@ -4486,7 +4404,8 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${session.destination.label} categories',
+                                      widget.title ??
+                                          '${session.destination.label} categories',
                                       key: const ValueKey(
                                         'buy-category-sheet-title',
                                       ),
@@ -4500,18 +4419,8 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: BuyV2Colors.navy,
-                                        fontSize: 15,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const Text(
-                                      'Choose one to update products',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: BuyV2Colors.muted,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
@@ -4572,18 +4481,8 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                   fontWeight: FontWeight.w700,
                                 ),
                                 decoration: InputDecoration(
-                                  label: const ExcludeSemantics(
-                                    child: Text('Category search'),
-                                  ),
                                   hint: const ExcludeSemantics(
                                     child: Text('Find a category'),
-                                  ),
-                                  floatingLabelBehavior:
-                                      FloatingLabelBehavior.always,
-                                  labelStyle: const TextStyle(
-                                    color: BuyV2Colors.navy,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
                                   ),
                                   hintStyle: const TextStyle(
                                     color: BuyV2Colors.muted,
@@ -4611,31 +4510,14 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                             size: 18,
                                           ),
                                         ),
-                                  filled: true,
-                                  fillColor: Colors.white,
+                                  filled: false,
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(
                                     vertical: 10,
                                   ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: BuyV2Colors.line,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: BuyV2Colors.line,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: BuyV2Colors.orange,
-                                      width: 1.5,
-                                    ),
-                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
                                 ),
                               ),
                             ),
@@ -4660,8 +4542,11 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                           ? 2
                                           : 3;
                                       return GridView.builder(
-                                        key: const ValueKey(
-                                          'buy-category-grid',
+                                        controller: categoryScroll,
+                                        key: ValueKey(
+                                          widget.onSelected == null
+                                              ? 'buy-category-grid'
+                                              : 'buy-store-category-list',
                                         ),
                                         padding: const EdgeInsets.fromLTRB(
                                           12,
@@ -4673,7 +4558,7 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                             SliverGridDelegateWithFixedCrossAxisCount(
                                               crossAxisCount: columns,
                                               mainAxisExtent:
-                                                  84 +
+                                                  94 +
                                                   (labelSize - 10).clamp(
                                                         0,
                                                         double.infinity,
@@ -4687,7 +4572,8 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                           final category = categories[index];
                                           final selected =
                                               category.id ==
-                                              session.selectedCategoryId;
+                                              (widget.selectedCategoryId ??
+                                                  session.selectedCategoryId);
                                           return Semantics(
                                             key: ValueKey(
                                               'buy-category-semantics-${category.id}',
@@ -4713,10 +4599,17 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                               ),
                                               child: InkWell(
                                                 key: ValueKey(
-                                                  'buy-category-${category.id}',
+                                                  '${widget.onSelected == null ? 'buy-category' : 'buy-store-category'}-${category.id}',
                                                 ),
                                                 onTap: () async {
                                                   HapticFeedback.selectionClick();
+                                                  if (widget.onSelected !=
+                                                      null) {
+                                                    widget.onSelected!(
+                                                      category.id,
+                                                    );
+                                                    return;
+                                                  }
                                                   final routeCompleted =
                                                       ModalRoute.of(
                                                         context,
@@ -4750,38 +4643,12 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                                           mainAxisSize:
                                                               MainAxisSize.min,
                                                           children: [
-                                                            Container(
-                                                              width: 28,
-                                                              height: 28,
-                                                              alignment:
-                                                                  Alignment
-                                                                      .center,
-                                                              decoration: BoxDecoration(
-                                                                color: selected
-                                                                    ? Colors
-                                                                          .white
-                                                                    : BuyV2Colors
-                                                                          .softBlue,
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      10,
-                                                                    ),
+                                                            BuyV2CategoryThumbnail(
+                                                              key: ValueKey(
+                                                                'buy-category-thumbnail-${category.id}',
                                                               ),
-                                                              child: Icon(
-                                                                buyV2CategoryIconFor(
-                                                                  category.id,
-                                                                ),
-                                                                key: ValueKey(
-                                                                  'buy-category-icon-'
-                                                                  '${category.id}',
-                                                                ),
-                                                                color: selected
-                                                                    ? BuyV2Colors
-                                                                          .green
-                                                                    : BuyV2Colors
-                                                                          .navy,
-                                                                size: 16,
-                                                              ),
+                                                              category:
+                                                                  category,
                                                             ),
                                                             const SizedBox(
                                                               height: 5,
@@ -6615,9 +6482,7 @@ Future<void> showBuyV2PartnerCatalogue(
                       namesRoute: true,
                       explicitChildNodes: true,
                       label: title,
-                      child:
-                          pagedPartner &&
-                              current.destination == BuyV2Destination.shop
+                      child: pagedPartner
                           ? _PagedFullStoreCatalogue(
                               session: session,
                               product: current,
@@ -7873,68 +7738,18 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
-      builder: (sheetContext) => FractionallySizedBox(
-        heightFactor: .8,
-        child: BuyV2VerticalScrollIndicator(
-          child: ListView(
-            key: const ValueKey('buy-store-category-list'),
-            padding: EdgeInsets.fromLTRB(
-              12,
-              8,
-              12,
-              16 + BuyV2AddressSheetMotion.resolveBottomSafeInset(sheetContext),
-            ),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Store categories',
-                      style: context.buyTitle.copyWith(fontSize: 16),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close store categories',
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              ListTile(
-                dense: true,
-                minTileHeight: 48,
-                titleTextStyle: const TextStyle(
-                  color: BuyV2Colors.ink,
-                  fontSize: 13,
-                  height: 1.2,
-                  fontWeight: FontWeight.w600,
-                ),
-                key: const ValueKey('buy-store-category-all'),
-                selected: _category == 'all',
-                title: const Text('All products'),
-                onTap: () => Navigator.of(sheetContext).pop('all'),
-              ),
-              for (final category in categories.where(
-                (value) => value.id != 'all',
-              ))
-                ListTile(
-                  dense: true,
-                  minTileHeight: 48,
-                  titleTextStyle: const TextStyle(
-                    color: BuyV2Colors.ink,
-                    fontSize: 13,
-                    height: 1.2,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  key: ValueKey('buy-store-category-${category.id}'),
-                  selected: _category == category.id,
-                  title: Text(category.label),
-                  onTap: () => Navigator.of(sheetContext).pop(category.id),
-                ),
-            ],
-          ),
-        ),
+      showDragHandle: false,
+      constraints: const BoxConstraints(
+        maxWidth: BuyV2CategorySheetPolicy.maxWidth,
+      ),
+      sheetAnimationStyle: BuyV2CategorySheetPolicy.resolve(context),
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _CatalogueCategorySheet(
+        session: widget.session,
+        categories: categories,
+        selectedCategoryId: _category,
+        title: 'Store categories',
+        onSelected: (id) => Navigator.of(sheetContext).pop(id),
       ),
     );
     if (!mounted) return;
@@ -8260,7 +8075,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!widget.storefront)
+          if (!widget.storefront && !_searching)
             BuyV2AdaptiveIdentityRow(
               leading: const Icon(
                 Icons.storefront_outlined,
@@ -8320,17 +8135,27 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: BuyV2Colors.navy,
-                        size: 21,
-                      ),
+                      prefixIcon: _searching
+                          ? IconButton(
+                              key: const ValueKey('buy-store-search-finish'),
+                              tooltip: 'Finish store search',
+                              onPressed: _finishStoreSearch,
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                size: 21,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.search_rounded,
+                              color: BuyV2Colors.navy,
+                              size: 21,
+                            ),
                       prefixIconConstraints: const BoxConstraints(
                         minWidth: 42,
                         minHeight: 46,
                       ),
                       suffixIcon: _search.text.isEmpty
-                          ? widget.storefront
+                          ? widget.storefront && !_searching
                                 ? IconButton(
                                     key: const ValueKey(
                                       'buy-store-info-control',
@@ -8367,7 +8192,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (widget.storefront)
+              if (widget.storefront && !_searching)
                 IconButton.outlined(
                   key: ValueKey(
                     _searching
@@ -8380,7 +8205,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                     _searching ? Icons.check_rounded : Icons.close_rounded,
                   ),
                 ),
-              if (!widget.storefront)
+              if (!widget.storefront && !_searching)
                 Semantics(
                   selected: _category != 'all',
                   child: _CatalogueChromeAction(
@@ -8511,35 +8336,41 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                   .compareTo(widget.session.productFactsFor(b).price),
         );
       }
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: widget.storefront
-              ? MediaQuery.viewInsetsOf(context).bottom
-              : 0,
-        ),
-        child: ListView(
-          key: ValueKey('buy-store-saved-list-${product.storeId}'),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          children: [
-            header,
-            if (products.isEmpty)
-              const _CataloguePageNotice(
-                title: 'No matching saved products',
-                detail:
-                    'Save products at this store or change your search and filters.',
-              )
-            else
-              BuyV2ProgressiveProductGrid(
-                session: widget.session,
-                products: products,
-                storageKey: '$_scope-saved',
-                semanticLabel: 'Saved products at this store',
-                laneCount: 1,
-                storeContext: true,
-                onOpenProduct: openProduct,
-              ),
-            ?moreStores,
-          ],
+      return PopScope(
+        canPop: !_searching,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop && _searching) _finishStoreSearch();
+        },
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: widget.storefront
+                ? MediaQuery.viewInsetsOf(context).bottom
+                : 0,
+          ),
+          child: ListView(
+            key: ValueKey('buy-store-saved-list-${product.storeId}'),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              header,
+              if (products.isEmpty)
+                const _CataloguePageNotice(
+                  title: 'No matching saved products',
+                  detail:
+                      'Save products at this store or change your search and filters.',
+                )
+              else
+                BuyV2ProgressiveProductGrid(
+                  session: widget.session,
+                  products: products,
+                  storageKey: '$_scope-saved',
+                  semanticLabel: 'Saved products at this store',
+                  laneCount: 1,
+                  storeContext: true,
+                  onOpenProduct: openProduct,
+                ),
+              ?moreStores,
+            ],
+          ),
         ),
       );
     }

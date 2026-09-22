@@ -32,6 +32,191 @@ class _FixtureCustomerStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'Cursor eight tickets Store parity ${destination.name} $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 844);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final source = _StoreJourneySource(destination);
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: true,
+            cataloguePageSource: source,
+            initialCatalogueRegionId: 'jodhpur',
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          final id = source.productIdAt(0, 0);
+          await session.openLinkedProduct(id);
+          session.openProduct(id);
+          await tester.pumpWidget(
+            _app(session, textScale: scale, disableAnimations: true),
+          );
+          await tester.pumpAndSettle();
+          final action = find.byKey(
+            ValueKey(
+              destination == BuyV2Destination.shop
+                  ? 'buy-shop-seller-action-$id'
+                  : 'buy-wholesale-store-action-$id',
+            ),
+          );
+          await _revealProductAction(tester, id, action);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          final scope = 'store-${destination.name}-${source.storeIdAt(0)}';
+          final field = find.byKey(const ValueKey('buy-store-product-search'));
+          expect(field.hitTestable(), findsOneWidget);
+          final width = tester.getSize(field).width;
+          final decoration = tester.widget<TextField>(field).decoration!;
+          expect(decoration.border, InputBorder.none);
+          expect(
+            find.byKey(ValueKey('buy-paged-vertical-grid-$scope')),
+            findsOneWidget,
+          );
+          await captureR66Visual(
+            tester,
+            'eight-store-${destination.name}-$scale',
+          );
+          await tester.tap(field);
+          await tester.enterText(field, 'sku 4999');
+          await tester.pumpAndSettle();
+          expect(tester.getSize(field).width, greaterThan(width + 30));
+          expect(
+            find.byKey(const ValueKey('buy-store-info-control')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-store-catalogue-toolbar')),
+            findsNothing,
+          );
+          expect(
+            session.retainedCatalogueQuery(scope)?.storeId,
+            source.storeIdAt(0),
+          );
+          expect(
+            session.retainedCatalogueQuery(scope)?.destination,
+            destination,
+          );
+          expect(session.retainedCatalogueQuery(scope)?.query, 'sku 4999');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 290);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(field).bottom, lessThan(844 - 290));
+          await captureR66Visual(
+            tester,
+            'eight-store-search-${destination.name}-$scale',
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-store-product-search-clear')),
+          );
+          tester.view.resetViewInsets();
+          tester.testTextInput.hide();
+          await tester.tap(
+            find.byKey(const ValueKey('buy-store-search-finish')),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.getSize(field).width, closeTo(width, .1));
+          await tester.tap(
+            find.byKey(const ValueKey('buy-store-category-control')),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-category-sheet-surface')),
+            findsOneWidget,
+          );
+          expect(find.byType(BuyV2CategoryThumbnail), findsWidgets);
+          await captureR66Visual(
+            tester,
+            'eight-store-categories-${destination.name}-$scale',
+          );
+          final surface = find.byKey(
+            const ValueKey('buy-category-sheet-surface'),
+          );
+          final before = tester.getRect(surface);
+          await tester.drag(
+            find.byKey(const ValueKey('buy-category-drag-handle')),
+            const Offset(0, -360),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.getRect(surface).top, lessThan(before.top - 100));
+          expect(tester.getRect(surface).top, lessThanOrEqualTo(30));
+          expect(find.text('Choose one to update products'), findsNothing);
+          expect(find.text('Category search'), findsNothing);
+          final categorySearch = find.byKey(
+            const ValueKey('buy-category-search'),
+          );
+          await tester.tap(categorySearch);
+          await tester.enterText(categorySearch, 'no-such-category');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 290);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-category-empty')),
+            findsOneWidget,
+          );
+          expect(tester.getRect(categorySearch).bottom, lessThan(554));
+          expect(tester.getRect(surface).bottom, lessThanOrEqualTo(554));
+          await tester.tap(
+            find.byKey(const ValueKey('buy-category-search-clear')),
+          );
+          tester.view.resetViewInsets();
+          tester.testTextInput.hide();
+          tester.widget<TextField>(categorySearch).focusNode!.unfocus();
+          await tester.pumpAndSettle();
+
+          await captureR66Visual(
+            tester,
+            'eight-store-categories-full-${destination.name}-$scale',
+          );
+
+          final category = session
+              .categoriesFor(destination)
+              .firstWhere((c) => c.id != 'all');
+          await tester.tap(
+            find.byKey(ValueKey('buy-store-category-${category.id}')),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            session.retainedCatalogueQuery(scope)?.categoryId,
+            category.id,
+          );
+          expect(session.selectedCategoryId, 'all');
+          await _revealPagedHeader(
+            tester,
+            scope,
+            find.byKey(const ValueKey('buy-store-saved-control')),
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-store-saved-control')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(field);
+          await tester.enterText(field, 'rice');
+          await tester.pumpAndSettle();
+          expect(tester.getSize(field).width, greaterThan(width + 30));
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(field, findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('buy-store-search-finish')),
+            findsNothing,
+          );
+
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
   for (final profile in const [
     (360.0, 1.0, false),
     (390.0, 1.0, false),
@@ -1729,7 +1914,7 @@ void main() {
           await tester.tap(storeAction);
           await tester.pumpAndSettle();
           Future<void> browseAll() async {
-            if (session.pagedCatalogueEnabled && shop) {
+            if (session.pagedCatalogueEnabled) {
               expect(
                 find.byKey(const ValueKey('buy-store-catalogue-toolbar')),
                 findsOneWidget,
@@ -1826,16 +2011,12 @@ void main() {
           expect(full, findsOneWidget);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          if (shop) {
-            expect(session.selectedProductId, id);
-            // Existing empty-cart handling changes the covered root to
-            // catalogue while retaining the open Store until Back.
-            expect(session.view, BuyV2View.catalogue);
-            expect(find.byType(BuyV2CatalogueView), findsOneWidget);
-            expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsNothing);
-          } else {
-            expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsOneWidget);
-          }
+          expect(session.selectedProductId, id);
+          // Both public channels now use the direct Store catalogue route.
+          // Removing its last cart line leaves the covered root catalogue.
+          expect(session.view, BuyV2View.catalogue);
+          expect(find.byType(BuyV2CatalogueView), findsOneWidget);
+          expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsNothing);
           session.openDestination(
             shop ? BuyV2Destination.wholesale : BuyV2Destination.shop,
           );
@@ -2656,7 +2837,9 @@ void main() {
           expect(firstName.hitTestable(), findsOneWidget);
           await tester.tap(firstName);
           await tester.pumpAndSettle();
-          final storefront = destination == BuyV2Destination.shop;
+          final storefront =
+              destination == BuyV2Destination.shop ||
+              destination == BuyV2Destination.wholesale;
           if (storefront) {
             await tester.tap(
               find.byKey(const ValueKey('buy-store-info-control')),

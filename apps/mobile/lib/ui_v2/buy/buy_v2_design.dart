@@ -2053,7 +2053,11 @@ class BuyV2ProductPackshot extends StatelessWidget {
       );
     }
 
-    final categoryId = product.categoryId.toLowerCase();
+    return categoryMedia(product.categoryId);
+  }
+
+  static BuyV2ProductMediaSource? categoryMedia(String id) {
+    final categoryId = id.toLowerCase();
     final categorySource = switch (categoryId) {
       'fruits-vegetables' => (categoryAtlasAPath, 0),
       'dairy-bakery' => (categoryAtlasAPath, 1),
@@ -2098,6 +2102,72 @@ class BuyV2ProductPackshot extends StatelessWidget {
       );
     }
     return null;
+  }
+}
+
+/// Existing category artwork, never presented as a supplier product photograph.
+class BuyV2CategoryThumbnail extends StatelessWidget {
+  const BuyV2CategoryThumbnail({
+    super.key,
+    required this.category,
+    this.size = 36,
+  });
+  final BuyV2Category category;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = BuyV2ProductPackshot.categoryMedia(category.id);
+    final fallback = Icon(
+      category.id == 'all' ? Icons.apps_rounded : Icons.category_outlined,
+      color: BuyV2Colors.navy,
+      size: 20,
+    );
+    return Semantics(
+      image: true,
+      label: '${category.label} category illustration',
+      excludeSemantics: true,
+      child: SizedBox.square(
+        dimension: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(9),
+          child: ColoredBox(
+            color: BuyV2Colors.softBlue,
+            child: source == null
+                ? fallback
+                : Stack(
+                    clipBehavior: Clip.hardEdge,
+                    children: [
+                      Positioned(
+                        left:
+                            -source.sourceRect.left *
+                            size /
+                            source.sourceRect.width,
+                        top:
+                            -source.sourceRect.top *
+                            size /
+                            source.sourceRect.height,
+                        width:
+                            source.atlasSize.width *
+                            size /
+                            source.sourceRect.width,
+                        height:
+                            source.atlasSize.height *
+                            size /
+                            source.sourceRect.height,
+                        child: Image.asset(
+                          source.assetPath,
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, _, _) =>
+                              SizedBox.square(dimension: size, child: fallback),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

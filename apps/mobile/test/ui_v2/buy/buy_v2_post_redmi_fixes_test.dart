@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -57,7 +58,381 @@ class _ControlsCommerce implements BuyV2CommerceAdapter {
       throw StateError('Unexpected controls regression provider call');
 }
 
+class _EightLocationSource implements BuyV2ShoppingAreaSource {
+  Object? failure;
+  int calls = 0;
+  Completer<BuyV2ShoppingArea?>? pending;
+  static const area = BuyV2ShoppingArea(
+    regionId: 'jodhpur',
+    googlePlaceId: 'test-place-current',
+    label: 'Current location test locality, Jodhpur',
+    countryCode: 'IN',
+  );
+  @override
+  Future<BuyV2ShoppingArea?> locate() async {
+    calls++;
+    if (pending != null) return pending!.future;
+    if (failure != null) throw failure!;
+    return area;
+  }
+
+  @override
+  Future<List<BuyV2ShoppingArea>> search(String query) async =>
+      throw StateError('Manual search removed');
+  @override
+  Future<BuyV2ShoppingArea?> resolve(String id) async => area;
+}
+
+Widget _eightApp(
+  BuyV2Session session, {
+  double scale = 1,
+  bool offers = false,
+}) => MaterialApp(
+  debugShowCheckedModeBanner: false,
+  theme: MoolTheme.light(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(
+      context,
+    ).copyWith(textScaler: TextScaler.linear(scale), disableAnimations: true),
+    child: r66VisualCaptureRoot(child!),
+  ),
+  home: BuyV2Screen(
+    session: session,
+    initialDestination: session.destination,
+    initialView: session.view,
+    productId: session.selectedProductId,
+    initialOffersActive: offers,
+  ),
+);
+
 void main() {
+  group('Cursor eight tickets', () {
+    for (final destination in [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+    ]) {
+      testWidgets('root categories drag select scoped ${destination.name}', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.openDestination(destination);
+        await tester.pumpWidget(_eightApp(session));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-category-picker')));
+        await tester.pumpAndSettle();
+        final surface = find.byKey(
+          const ValueKey('buy-category-sheet-surface'),
+        );
+        final initialTop = tester.getRect(surface).top;
+        await tester.drag(
+          find.byKey(const ValueKey('buy-category-grid')),
+          const Offset(0, -440),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(surface).top, lessThan(initialTop - 100));
+        final category = session.categories.firstWhere((c) => c.id != 'all');
+        final choice = find.byKey(ValueKey('buy-category-${category.id}'));
+        await tester.ensureVisible(choice);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'eight-categories-${destination.name}');
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        expect(session.selectedCategoryId, category.id);
+        expect(session.destination, destination);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'compact order actions invoice identity and MVP promotions $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 844);
+          tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          expect(session.addProduct('s-tomato'), isTrue);
+          session.openCart(scope: BuyV2CartScope.shop);
+          expect(session.openCheckout(), isTrue);
+          expect(session.confirmOrder(), isTrue);
+          final order = session.confirmedOrders.single;
+          expect(session.openTracking(order.id), isTrue);
+          await tester.pumpWidget(_eightApp(session, scale: scale));
+          await tester.pumpAndSettle();
+          final row = find.byKey(
+            ValueKey('buy-tracking-secondary-actions-${order.id}'),
+          );
+          final scroll = find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-tracking-${order.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(row, 200, scrollable: scroll);
+          await tester.pumpAndSettle();
+          final manage = find.byKey(
+            ValueKey('buy-tracking-manage-order-${order.id}'),
+          );
+          final invoice = find.byKey(
+            ValueKey('buy-tracking-invoice-${order.id}'),
+          );
+          expect(tester.getSize(manage).height, greaterThanOrEqualTo(44));
+          expect(tester.getSize(invoice).height, greaterThanOrEqualTo(44));
+          if (scale == 1) {
+            expect(
+              tester.getRect(manage).center.dy,
+              closeTo(tester.getRect(invoice).center.dy, 1),
+            );
+            expect(tester.getSize(row).height, lessThanOrEqualTo(52));
+          }
+          await captureR66Visual(tester, 'eight-order-actions-$scale');
+          await tester.tap(invoice);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('buy-invoice-page-${order.id}')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(manage);
+          await tester.pumpAndSettle();
+          await tester.tap(manage);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-order-resolution-sheet')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          session.openDestination(BuyV2Destination.orders);
+          await tester.pumpAndSettle();
+          final promotions = find.byKey(
+            const ValueKey('buy-orders-promotions'),
+          );
+          await tester.scrollUntilVisible(
+            promotions,
+            260,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-orders')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          await tester.drag(promotions, const Offset(-600, 0));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-promotion-orders-medicine')),
+            findsNothing,
+          );
+          expect(find.text('Medicine and wellness'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-promotion-orders-wholesale')),
+            findsOneWidget,
+          );
+          await captureR66Visual(tester, 'eight-orders-promos-$scale');
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+
+    for (final destination in [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+      BuyV2Destination.orders,
+    ]) {
+      testWidgets('fixed Cart and hidden search delivery ${destination.name}', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.openCart(scope: BuyV2CartScope.shop);
+        expect(session.openCheckout(), isTrue);
+        expect(session.confirmOrder(), isTrue);
+        expect(session.activeDeliveryOrders, isNotEmpty);
+        session.openDestination(destination);
+        expect(
+          session.addProduct(
+            destination == BuyV2Destination.wholesale ? 'w-rice' : 's-tomato',
+          ),
+          isTrue,
+        );
+        await tester.pumpWidget(_eightApp(session));
+        await tester.pumpAndSettle();
+        final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
+        expect(cart.hitTestable(), findsOneWidget);
+        final bounds = tester.getRect(cart);
+        await tester.drag(cart, const Offset(-140, -150));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(cart), bounds);
+        if (destination != BuyV2Destination.orders) {
+          final active = find.byKey(
+            const ValueKey('buy-quick-delivery-toggle'),
+          );
+          expect(active, findsOneWidget);
+          await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+          await tester.pumpAndSettle();
+          expect(active, findsNothing);
+          await tester.enterText(
+            find.byKey(const ValueKey('buy-search-field')),
+            'rice',
+          );
+          tester.view.viewInsets = const FakeViewPadding(bottom: 290);
+          await tester.pumpAndSettle();
+          expect(active, findsNothing);
+          expect(session.activeDeliveryOrders, isNotEmpty);
+          await captureR66Visual(tester, 'eight-search-${destination.name}');
+          tester.view.resetViewInsets();
+          tester.testTextInput.hide();
+          await tester.tap(find.byKey(const ValueKey('buy-search-close')));
+          await tester.pumpAndSettle();
+          expect(active, findsOneWidget);
+          expect(cart.hitTestable(), findsOneWidget);
+        }
+        await captureR66Visual(tester, 'eight-fixed-cart-${destination.name}');
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'location auto locate retry confirmation and stale result $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 700);
+          tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final source = _EightLocationSource()
+            ..failure = BuyV2ShoppingAreaFailure.permissionDenied;
+          final session = BuyV2Session(core: core, shoppingAreaSource: source);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await tester.pumpWidget(_eightApp(session, scale: scale));
+          await tester.pumpAndSettle();
+          final context = tester.element(find.byType(BuyV2Screen));
+          unawaited(showBuyV2CatalogueArea(context, session));
+          await tester.pumpAndSettle();
+          expect(source.calls, 1);
+          expect(find.byType(TextField), findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-area-lookup-failure')),
+            findsOneWidget,
+          );
+          await captureR66Visual(tester, 'eight-location-permission-$scale');
+          source.failure = null;
+          await tester.tap(find.byKey(const ValueKey('buy-area-lookup-retry')));
+          await tester.pumpAndSettle();
+          final address = session.selectedAddressOrNull;
+          expect(source.calls, 2);
+          expect(find.text(_EightLocationSource.area.label), findsOneWidget);
+          final confirm = find.byKey(
+            const ValueKey('buy-current-location-confirm'),
+          );
+          await tester.ensureVisible(confirm);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(confirm).bottom, lessThanOrEqualTo(666));
+          await captureR66Visual(tester, 'eight-location-confirm-$scale');
+          await tester.tap(confirm);
+          await tester.pumpAndSettle();
+          expect(
+            session.shoppingGooglePlaceId,
+            _EightLocationSource.area.googlePlaceId,
+          );
+          expect(session.selectedAddressOrNull, address);
+          source.pending = Completer<BuyV2ShoppingArea?>();
+          unawaited(showBuyV2CatalogueArea(context, session));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.tap(find.byTooltip('Close shopping location'));
+          await tester.pump();
+          source.pending!.complete(_EightLocationSource.area);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+      testWidgets('compact Compare unavailable and product Add $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.openProduct('s-tomato');
+        await tester.pumpWidget(_eightApp(session, scale: scale));
+        await tester.pumpAndSettle();
+        final add = find.byKey(const ValueKey('buy-product-primary-s-tomato'));
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        expect(tester.getSize(add).width, lessThan(scale == 1 ? 240 : 290));
+        if (scale == 1) {
+          final price = find.byKey(
+            const ValueKey('buy-product-hero-price-s-tomato'),
+          );
+          expect(
+            (tester.getRect(price).center.dy - tester.getRect(add).center.dy)
+                .abs(),
+            lessThan(35),
+          );
+        }
+        await captureR66Visual(tester, 'eight-product-details-$scale');
+        final productList = find
+            .descendant(
+              of: find.byKey(const PageStorageKey('buy-product-s-tomato')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        tester.state<ScrollableState>(productList).position.jumpTo(0);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'eight-product-$scale');
+        final compare = find.byKey(
+          const ValueKey('buy-product-action-compare-s-tomato'),
+        );
+        final scroll = find
+            .descendant(
+              of: find.byKey(const PageStorageKey('buy-product-s-tomato')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(compare, 240, scrollable: scroll);
+        await tester.pumpAndSettle();
+        await tester.tap(compare);
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(
+          const ValueKey('buy-product-comparison-sheet'),
+        );
+        expect(sheet, findsOneWidget);
+        expect(tester.getSize(sheet).height, lessThan(650));
+        await captureR66Visual(tester, 'eight-compare-$scale');
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  });
+
   group('Cursor product controls regressions', () {
     test('review seeds do not imply delivery; new placement does', () {
       final core = BuySession();

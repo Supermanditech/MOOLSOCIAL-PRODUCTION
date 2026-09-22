@@ -1223,9 +1223,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                   _searchOpen = value;
                                   _searchAutofocus = value;
                                 }),
-                                onLocation: () => session.pagedCatalogueEnabled
-                                    ? showBuyV2CatalogueArea(context, session)
-                                    : showBuyV2AddressSheet(context, session),
+                                onLocation: () =>
+                                    session.destination ==
+                                        BuyV2Destination.medicine
+                                    ? showBuyV2AddressSheet(context, session)
+                                    : showBuyV2CatalogueArea(context, session),
                                 onAccount: _openBuyProfile,
                                 trailingAction: keyboardVisible
                                     ? _buildDeliveryControl(session, setState)
@@ -1242,7 +1244,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                           body: BuyV2CartAvoidanceScope(
                             cartVisible:
                                 !keyboardVisible &&
-                                !_pinsProductCart(session) &&
+                                !_usesFixedCart(session) &&
                                 _showsMiniCart(session),
                             navigationIdentity: (
                               session.view,
@@ -1300,7 +1302,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                 ),
                                 ?_buildDeliveryRestore(session, setState),
                                 if (!keyboardVisible &&
-                                    !_pinsProductCart(session) &&
+                                    !_usesFixedCart(session) &&
                                     _showsMiniCart(session))
                                   Positioned.fill(
                                     child: _BuyMiniCartBar(
@@ -1339,7 +1341,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             bottomNavigationBar: keyboardVisible
                 ? null
                 : widget.embeddedStore
-                ? ((_miniCartParked || _pinsProductCart(session)) &&
+                ? ((_miniCartParked || _usesFixedCart(session)) &&
                           _showsMiniCart(session)
                       ? Padding(
                           padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
@@ -1534,6 +1536,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Widget? _buildDeliveryControl(BuyV2Session session, StateSetter update) {
+    if (_searchOpen && session.view == BuyV2View.catalogue) return null;
     final order = _deliveryOrder;
     if (order == null ||
         session.view == BuyV2View.tracking ||
@@ -1625,6 +1628,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Widget? _buildDeliveryRestore(BuyV2Session session, StateSetter update) {
+    if (_searchOpen && session.view == BuyV2View.catalogue) return null;
     final order = _deliveryOrder;
     if (order == null ||
         session.view == BuyV2View.tracking ||
@@ -1837,7 +1841,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         : _buildBuyLocalNavigation(session);
     final parkedCart =
         update == null &&
-            (_miniCartParked || _pinsProductCart(session)) &&
+            (_miniCartParked || _usesFixedCart(session)) &&
             _showsMiniCart(session)
         ? _BuyMiniCartBar(
             session: session,
@@ -1858,7 +1862,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (parkedCart != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
-            !(_miniCartParked || _pinsProductCart(session)) ||
+            !(_miniCartParked || _usesFixedCart(session)) ||
             _parkedCartNavigationScrollController.positions.length != 1) {
           return;
         }
@@ -2086,12 +2090,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
   }
 
-  // Product details retain one Cart target while their content scrolls.
-  // Catalogue dragging/avoidance and the separate Care journey are unchanged.
-  bool _pinsProductCart(BuyV2Session session) =>
-      session.view == BuyV2View.product &&
-      (session.activeDockDestination == BuyV2Destination.shop ||
-          session.activeDockDestination == BuyV2Destination.wholesale);
+  // Public Buy retains one Cart target in the rail. Content never moves it.
+  // Care keeps its separately owned presentation.
+  bool _usesFixedCart(BuyV2Session session) =>
+      _showsMiniCart(session) &&
+      (session.activeDockDestination != BuyV2Destination.medicine ||
+          _offersActive);
 
   bool _showsMiniCart(BuyV2Session session) =>
       (session.activeDockDestination == BuyV2Destination.medicine &&
@@ -2803,9 +2807,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       ),
       BuyV2View.cart => BuyV2CartView(
         session: session,
-        storeLabel: cartStoreAnchor == null
-            ? null
-            : cartStoreAnchor.customerSeller(cartStoreAnchor.seller),
+        storeLabel: cartStoreAnchor?.customerSeller(cartStoreAnchor.seller),
         onBrowseStore: cartStoreAnchor == null
             ? null
             : () => _openPartnerCatalogue(cartStoreAnchor),
