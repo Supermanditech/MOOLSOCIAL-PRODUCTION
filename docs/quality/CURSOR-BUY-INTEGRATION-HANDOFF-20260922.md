@@ -398,9 +398,9 @@ Local results and child inspection:
   hash-verified before restoring only those generated owners to exact HEAD bytes;
   `reference-evidence-preservation.json` records this. Nothing was deleted.
 
-Stop boundary: no new APK, backend work or implementation of the three OPEN
+Stop boundary: no new APK, backend work or implementation of the four OPEN
 registered tickets (Compare-sheet height, search Delivery fleet and compact
-order/invoice actions). All earlier
+order/invoice actions, and Medicine promotions). All earlier
 eleven-ticket device/provider obligations continue. Carry these three repairs
 into the integrated baseline and replay them on the next authorized Redmi APK.
 
@@ -486,7 +486,7 @@ The later invoice registration screenshot and agreed decision have their own
 continues to identify its original commit, not this extended archive.
 
 Codex: integrate through this latest application commit with the full earlier
-history. Carry the three OPEN registration-only tickets and all pending eleven-
+history. Carry the OPEN registration-only tickets below and all pending eleven-
 ticket/provider/next-Redmi obligations. Return an exact integrated baseline SHA
 before Cursor begins the separately authorized backend phase. Latest source
 eligibility fields/schema are unchanged; delivery provenance is internal session
@@ -497,3 +497,57 @@ This final metadata commit contains no additional runtime changes. Local receipt
 `source-checkpoint.json` binds the tested source; `parking-verification.json` in
 the same evidence directory records final clean Git, handoff gate results,
 exact remote readback and incremental recovery bundle after the metadata commit.
+
+### Registration only: remove deferred Medicine promotions from public Buy
+
+`CURSOR-BUY-MVP-MEDICINE-PROMO-20260922` — OPEN, reproduced on Redmi.
+No implementation started.
+Founder requests removal of lower Medicine promotion tiles, or replacement with
+a relevant consumer promotion, consistent with the launch scope.
+
+Verified authority: central production `AGENTS.md`, Git commit
+`745664fcfe0bdd9049065d7eb0644425462bcfe6`
+(`docs(launch-scope): record bounded Buy Store and shared delivery launch`),
+20 September decision. Buy, Retailer/Grocery Store and the supporting Bulk/Biker
+delivery workspaces are included; Care/Medicine transactional exposure is
+deferred and its source/evidence must be preserved. This ticket removes public
+promotion/entry affordances; it does not delete the deferred module or rewrite
+the launch decision. Broader route/backend exposure controls remain their own
+existing launch obligation.
+
+Design decision: remove these lower Medicine promotions and collapse the vacated
+space. Do not invent replacement offers or add a new promotional subsystem.
+Only reuse an already-wired, launch-relevant consumer Buy/Store promotion if its
+content and availability are verified. Preserve products, store navigation,
+scroll continuity, Android clearance and brand styling.
+
+Capture attempt after power/network recovery: `006-medicine-promotion.png`
+actually shows Android Home, not the reported promotion. SHA-256
+`36df3ac3b757eb81910e7c929bd22bd77e5fd88bda2afe25b7a20a4a7d242de5`.
+One tap on the visible Cursor Review launcher icon resumed a noodles product
+detail screen; `007-review-app-after-resume.png`, SHA-256
+`c635b7173a3d06b0a5600590d1ca54df05c0ed1bacde8c74b2eb408805a51d57`.
+Neither image proves the Medicine promotion. Founder has been asked to display
+the exact screen. Do not mislabel these captures as a reproduced defect.
+
+Founder subsequently displayed the target and requested capture (Annotation 1).
+`008-medicine-promotion-target.png` now proves the lower **Medicine and Wellness**
+promotion, subtitle **Browse the licensed pharmacy catalogue**, next to another
+promotion beneath the SKU grid. Orders is selected and the header reads Search
+orders or ID; preserve this observed context without inferring its full entry
+journey. Capture used no taps or navigation. SHA-256:
+`3527bc6892cc8d2a29069f8ae21a4a78b3ed829289ffafaa602b8ace72724de8`.
+This is the target defect evidence; earlier 006/007 remain labelled capture
+attempts only. Requested disposition remains remove the Medicine promotion and
+collapse the space, without a speculative replacement or module deletion.
+The exact subtitle is present in `buy_v2_views.dart` in the lower promotion
+owner. The existing evidence ZIP now additionally preserves capture 008 and
+`medicine-promotion-confirmed.json`; its extended SHA-256 is
+`b1730d10bf1cb7ae2a8234bf31975e4a730a3def7c8fc63543da202820bc4b50`.
+The earlier ZIP fingerprint above remains the fingerprint at source commit d9ec753b.
+
+Future acceptance: identify the exact lower promotion owner from the target
+screen, remove its deferred Medicine call to action without an empty spacer,
+check normal/enlarged text and narrow/landscape layouts, and verify existing
+consumer Buy/Store actions and scroll/Back behavior. Retain registration-only
+status until the founder separately authorizes implementation.
