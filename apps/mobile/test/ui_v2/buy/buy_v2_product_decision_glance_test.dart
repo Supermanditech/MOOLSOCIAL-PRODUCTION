@@ -175,24 +175,41 @@ void main() {
         final details = find.byKey(ValueKey('buy-automatic-fulfilment-$id'));
         await tester.scrollUntilVisible(details, 180, scrollable: scroll);
         await tester.pumpAndSettle();
-        for (final label in [
-          'Freight',
-          'Tax invoice',
-          'Seller',
-          'Delivery mode',
-        ]) {
+        for (final label in ['Delivery', 'Method', 'Deliver to']) {
           expect(
             find.descendant(of: details, matching: find.text(label)),
             findsOneWidget,
           );
         }
+        final terms = find.byKey(
+          ValueKey('buy-wholesale-commercial-terms-$id'),
+        );
+        await tester.scrollUntilVisible(terms, 180, scrollable: scroll);
+        await tester.pumpAndSettle();
+        for (final label in ['Freight', 'Tax invoice']) {
+          expect(
+            find.descendant(of: terms, matching: find.text(label)),
+            findsOneWidget,
+          );
+        }
+        final store = find.byKey(ValueKey('buy-product-hero-store-$id'));
+        await tester.scrollUntilVisible(store, -180, scrollable: scroll);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: store,
+            matching: find.textContaining(
+              product.customerSeller(session.productFactsFor(product).partner),
+            ),
+          ),
+          findsOneWidget,
+        );
         for (final repeated in [
           'Unit economics',
           'Trade pack',
           'Minimum total',
           'Stock',
           'Availability',
-          'Delivery',
         ]) {
           expect(
             find.descendant(of: details, matching: find.text(repeated)),
@@ -295,7 +312,7 @@ void main() {
       }
 
       for (final value in [
-        'Fulfilment arranged by MoolSocial',
+        'Delivery & returns',
         'Order by 14:30',
         'Delivery fee ₹19',
         'Dispatched after packing',
@@ -445,7 +462,10 @@ void main() {
       );
       expect(find.text(buyV2Money(product.price)), findsOneWidget);
       expect(
-        find.text(session.productFactsFor(product).orderabilityLabel),
+        find.descendant(
+          of: summary,
+          matching: find.byKey(ValueKey('buy-product-primary-${product.id}')),
+        ),
         findsOneWidget,
       );
       expect(
@@ -454,6 +474,13 @@ void main() {
       );
       expect(
         find.descendant(of: summary, matching: find.text(buyerPromise)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+          matching: find.text(buyerPromise),
+        ),
         findsOneWidget,
       );
       expect(find.text('Automatic Mool Partner assignment'), findsNothing);

@@ -212,8 +212,10 @@ void main() {
     );
     expect(
       find.descendant(
-        of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
-        matching: find.text('Seller'),
+        of: find.byKey(ValueKey('buy-product-hero-store-${product.id}')),
+        matching: find.textContaining(
+          product.customerSeller(session.productFactsFor(product).partner),
+        ),
       ),
       findsOneWidget,
     );

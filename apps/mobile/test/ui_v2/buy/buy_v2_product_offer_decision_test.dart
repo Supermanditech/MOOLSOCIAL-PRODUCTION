@@ -131,19 +131,19 @@ void main() {
       buyV2ProductOfferDecisionContractVersion,
       'buy-product-offer-decision-v1',
     );
-    expect(find.text('Delivery details'), findsOneWidget);
+    expect(find.text('Delivery & returns'), findsOneWidget);
     expect(find.text('Quick local delivery'), findsOneWidget);
     if (product.mrp case final mrp?) {
-      expect(
-        find.textContaining('List price ${buyV2Money(mrp)}'),
-        findsOneWidget,
-      );
+      expect(find.text(buyV2Money(mrp)), findsOneWidget);
     }
     await revealProductHero(tester, product.id);
     expect(find.text('${product.pack} · ${product.unitPrice}'), findsWidgets);
     expect(find.text(product.composition ?? product.variant), findsWidgets);
     expect(find.textContaining(buyV2Money(product.price)), findsWidgets);
-    expect(find.text('Available to add'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      findsOneWidget,
+    );
     expect(
       find.text(buyV2BuyerDeliveryPromise(factsFor(product))),
       findsWidgets,
@@ -313,7 +313,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(adapter.requestsFor(product.id), 2);
     await revealProductHero(tester, product.id);
-    expect(find.text('Available to add'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      findsOneWidget,
+    );
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     await revealAdd(tester, product.id);
     await tester.tap(add);
@@ -322,33 +325,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('catalogue recovery cannot bypass a stale offer decision', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(tester.view.reset);
-    final core = BuySession();
-    final adapter = _SequencedFactsAdapter(
-      (product, _) => factsFor(product, stale: true),
-    );
-    final session = BuyV2Session(core: core, productFactsAdapter: adapter);
-    addTearDown(session.dispose);
-    addTearDown(core.dispose);
-    final product = session.visibleProducts.first;
+  testWidgets(
+    'stale catalogue exclusion and direct product route cannot bypass offer decision',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final adapter = _SequencedFactsAdapter(
+        (product, _) => factsFor(product, stale: true),
+      );
+      final session = BuyV2Session(core: core, productFactsAdapter: adapter);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final product = session.visibleProducts.first;
 
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
-    final review = find.byKey(ValueKey('buy-review-offer-${product.id}'));
-    expect(review, findsOneWidget);
-    expect(find.byKey(ValueKey('buy-add-${product.id}')), findsNothing);
-    await tester.tap(review);
-    await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.product);
-    expect(session.cartLines, isEmpty);
-    expect(find.text('Check current availability'), findsWidgets);
-    expect(tester.takeException(), isNull);
-  });
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey('buy-product-depth-${product.id}')),
+        findsNothing,
+      );
+      expect(find.byKey(ValueKey('buy-add-${product.id}')), findsNothing);
+      expect(session.addProduct(product.id), isFalse);
+      expect(session.cartLines, isEmpty);
+      expect(session.openProduct(product.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.product);
+      expect(session.cartLines, isEmpty);
+      expect(find.text('Check current availability'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('product offer decision stays usable at 320 and 140 percent', (
     tester,
@@ -368,7 +376,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await openProductDecision(tester, session, product.id);
-    expect(find.text('Delivery details'), findsOneWidget);
+    expect(find.text('Delivery & returns'), findsOneWidget);
     await revealProductHero(tester, product.id);
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     await revealAdd(tester, product.id);

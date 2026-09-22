@@ -105,7 +105,7 @@ void main() {
     expect(session.sellerContinuationsFor(shopOil, limit: 0), isEmpty);
   });
 
-  testWidgets('Shop exposes automatic fulfilment without seller continuation', (
+  testWidgets('Shop groups delivery facts and exposes Store continuation', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -134,9 +134,10 @@ void main() {
     expect(automatic, findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
-      findsNothing,
+      findsOneWidget,
     );
-    expect(find.text('Fulfilment arranged by MoolSocial'), findsOneWidget);
+    expect(find.text('Delivery & returns'), findsOneWidget);
+    expect(find.text('Fulfilment arranged by MoolSocial'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
