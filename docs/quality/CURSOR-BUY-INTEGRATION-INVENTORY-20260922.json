@@ -1972,10 +1972,10 @@
     }
   ],
   "currentEvidenceArchive": {
-    "sha256": "b70a51f7a7a06593d7e36e40074976dc12f7a3777f47c53ae306d59517093563",
-    "bytes": 101158738,
-    "priorEntriesPreserved": 750,
-    "newEvidencePrefix": "r6633-add-checkout-replay-D11-D16/"
+    "sha256": "9dbc8698a4520de9a409c48860e65943a9a07d8f9336e3e721d16e9030c32419",
+    "bytes": 101164838,
+    "priorEntriesPreserved": 988,
+    "newEvidencePrefix": "r6633-frontend-journey-visual/"
   },
   "checkoutDeliveryAudit20260923": {
     "report": "r6633-checkout-delivery-D07-D10/CART-CHECKOUT-DELIVERY-AUDIT-D07-D10.md",
@@ -2110,5 +2110,60 @@
     "localFixtureOrder": "BUY-NEW-05 / MS-NEW-10 / INR37 / COD fixture only",
     "finalBasket": "Original Wholesale onions 2 packs / INR1550 / Paytm / no offer / empty PO reference",
     "liveAcceptance": false
+  },
+  "frontendVisualJourneyScope20260923": {
+    "parent": "R6633-D06-G",
+    "report": "r6633-frontend-journey-visual/FRONTEND-CART-JOURNEY-VISUAL-TICKETS-20260923.md",
+    "children": [
+      {
+        "id": "R6633-D06-G-V01",
+        "title": "Product selection and Cart entry",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V02",
+        "title": "Compact Cart items and bill",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V03",
+        "title": "Address and collection form",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V04",
+        "title": "Payment fields and recovery",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V05",
+        "title": "Final review hierarchy",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V06",
+        "title": "Confirmation next action",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V07",
+        "title": "Tracking and invoice actions",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V08",
+        "title": "Brand and responsive typography",
+        "status": "open_registration_only"
+      },
+      {
+        "id": "R6633-D06-G-V09",
+        "title": "Keyboard Android and edit continuity",
+        "status": "open_registration_only"
+      }
+    ],
+    "providersBlockFrontendQualification": false,
+    "newDeviceRun": false,
+    "implementation": false,
+    "sourceCheckpoint": "51b69ea1e44a1095feaa070f5ce0d2202c258049"
   }
 }
