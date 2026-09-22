@@ -1276,7 +1276,7 @@ void main() {
             expect(session.openProduct(product.id), isTrue);
             await tester.pumpAndSettle();
             final hero = find.byKey(
-              ValueKey('buy-product-hero-delivery-${product.id}'),
+              ValueKey('buy-automatic-fulfilment-${product.id}'),
             );
             await tester.scrollUntilVisible(
               hero,
@@ -1289,7 +1289,15 @@ void main() {
                   .first,
             );
             await tester.pumpAndSettle();
-            expect(artworkWithin(hero), findsOneWidget);
+            expect(
+              find.descendant(
+                of: hero,
+                matching: find.text(
+                  buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product)),
+                ),
+              ),
+              findsOneWidget,
+            );
             await capture(tester, 'r669-delivery-$profile-product');
             expect(session.addProduct(product.id), isTrue);
             session.openCart(

@@ -971,6 +971,7 @@ Future<BuyV2Session> _openOrderSearchFixture({
 final class _R669ShoppingAreas implements BuyV2ShoppingAreaSource {
   List<BuyV2ShoppingArea> areas = [];
   Object? failure;
+  Completer<BuyV2ShoppingArea?>? pendingLocation;
   final queries = <String>[];
   final pending = <String, Completer<List<BuyV2ShoppingArea>>>{};
   @override
@@ -983,7 +984,9 @@ final class _R669ShoppingAreas implements BuyV2ShoppingAreaSource {
   @override
   Future<BuyV2ShoppingArea?> locate() async {
     if (failure case final error?) throw error;
-    return areas.firstOrNull;
+    return pendingLocation == null
+        ? areas.firstOrNull
+        : await pendingLocation!.future;
   }
 
   @override
@@ -1218,18 +1221,97 @@ void r669ShoppingAreaTests() {
     );
     for (final size in [const Size(320, 568), const Size(568, 320)]) {
       for (final scale in [1.0, 2.0]) {
-        testWidgets('area failure visible without scrolling $size $scale', (
-          tester,
-        ) async {
+        testWidgets(
+          'area failure and retry remain reachable with insets $size $scale',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.reset);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final session = makeSession(null);
+            final originalRegion = session.catalogueRegionId;
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (_, child) => r66VisualCaptureRoot(child!),
+                home: Scaffold(
+                  body: Builder(
+                    builder: (context) => TextButton(
+                      onPressed: () => showBuyV2CatalogueArea(context, session),
+                      child: const Text('Choose shopping area'),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.tap(find.text('Choose shopping area'));
+            await tester.pumpAndSettle();
+            final failure = find.byKey(
+              const ValueKey('buy-area-lookup-failure'),
+            );
+            final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
+            final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
+            final scroll = find
+                .descendant(of: list, matching: find.byType(Scrollable))
+                .first;
+            expect(
+              find.byKey(const ValueKey('buy-catalogue-area-search')),
+              findsNothing,
+            );
+            for (final inset in [0.0, 120.0]) {
+              tester.view.viewInsets = FakeViewPadding(bottom: inset);
+              await tester.pumpAndSettle();
+              await tester.scrollUntilVisible(failure, 80, scrollable: scroll);
+              await Scrollable.ensureVisible(
+                tester.element(failure),
+                alignment: .4,
+              );
+              await tester.pumpAndSettle();
+              expect(failure.hitTestable(), findsOneWidget);
+              await tester.scrollUntilVisible(retry, 80, scrollable: scroll);
+              await tester.pumpAndSettle();
+              expect(retry.hitTestable(), findsOneWidget);
+              expect(
+                tester.getRect(retry).bottom,
+                lessThanOrEqualTo(size.height - inset),
+              );
+              await captureR66Visual(
+                tester,
+                'r669-area-failure-${size.width}-$scale-$inset',
+              );
+              await tester.tap(retry);
+              await tester.pumpAndSettle();
+              expect(failure, findsOneWidget);
+              expect(session.catalogueRegionId, originalRegion);
+            }
+            tester.view.viewInsets = const FakeViewPadding();
+            await tester.pumpAndSettle();
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(find.text('Shopping area'), findsNothing);
+            expect(session.catalogueRegionId, originalRegion);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'current location inset retry confirmation and late Back $scale',
+        (tester) async {
           tester.view.devicePixelRatio = 1;
-          tester.view.physicalSize = size;
+          tester.view.physicalSize = const Size(320, 568);
           tester.platformDispatcher.textScaleFactorTestValue = scale;
           addTearDown(tester.view.reset);
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          final session = makeSession(null);
-          final originalRegion = session.catalogueRegionId;
+          final source = _R669ShoppingAreas()..areas = [area];
+          final session = makeSession(source);
           await tester.pumpWidget(
             MaterialApp(
+              debugShowCheckedModeBanner: false,
               theme: MoolTheme.light(),
               builder: (_, child) => r66VisualCaptureRoot(child!),
               home: Scaffold(
@@ -1244,189 +1326,78 @@ void r669ShoppingAreaTests() {
           );
           await tester.tap(find.text('Choose shopping area'));
           await tester.pumpAndSettle();
-          final locate = find.byKey(
-            const ValueKey('buy-catalogue-current-area'),
+          expect(source.queries, isEmpty);
+          expect(
+            find.byKey(const ValueKey('buy-catalogue-area-search')),
+            findsNothing,
           );
-          await tester.ensureVisible(locate);
-          await tester.tap(locate);
-          await tester.pumpAndSettle();
-          final failure = find.byKey(const ValueKey('buy-area-lookup-failure'));
+          final result = find.byKey(
+            const ValueKey('buy-current-location-result'),
+          );
+          final confirm = find.byKey(
+            const ValueKey('buy-current-location-confirm'),
+          );
           final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
-          final visible = tester.getRect(list);
-          final message = tester.getRect(failure);
-          expect(message.top, greaterThanOrEqualTo(visible.top));
-          expect(message.bottom, lessThanOrEqualTo(visible.bottom));
-          final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
-          expect(retry.hitTestable(), findsOneWidget);
-          await captureR66Visual(
-            tester,
-            'r669-area-failure-${size.width.toInt()}-$scale',
-          );
-          await tester.tap(retry);
-          await tester.pumpAndSettle();
-          expect(failure.hitTestable(), findsOneWidget);
-          expect(session.catalogueRegionId, originalRegion);
-          final search = find.byKey(
-            const ValueKey('buy-catalogue-area-search'),
-          );
-          await tester.ensureVisible(search);
-          await tester.enterText(search, '221005');
-          tester.view.viewInsets = const FakeViewPadding(bottom: 120);
-          await tester.pump(const Duration(milliseconds: 400));
-          await tester.pumpAndSettle();
-          final keyboardViewport = tester.getRect(list);
-          final keyboardMessage = tester.getRect(failure);
+          Future<void> reveal(Finder target) async {
+            await tester.scrollUntilVisible(
+              target,
+              100,
+              scrollable: find
+                  .descendant(of: list, matching: find.byType(Scrollable))
+                  .first,
+            );
+            await Scrollable.ensureVisible(
+              tester.element(target),
+              alignment: .4,
+            );
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+          }
+
+          expect(result, findsOneWidget);
           expect(
-            keyboardMessage.top,
-            greaterThanOrEqualTo(keyboardViewport.top),
+            find.descendant(of: result, matching: find.text(area.label)),
+            findsOneWidget,
           );
           expect(
-            keyboardMessage.bottom,
-            lessThanOrEqualTo(keyboardViewport.bottom),
+            find.byKey(const ValueKey('buy-current-location-map')),
+            findsOneWidget,
           );
-          expect(retry.hitTestable(), findsOneWidget);
-          await captureR66Visual(
-            tester,
-            'r669-area-failure-keyboard-${size.width.toInt()}-$scale',
-          );
-          await tester.scrollUntilVisible(
-            search,
-            100,
-            scrollable: find
-                .descendant(of: list, matching: find.byType(Scrollable))
-                .first,
-          );
+          tester.view.viewInsets = const FakeViewPadding(bottom: 230);
           await tester.pumpAndSettle();
-          expect(find.text('221005'), findsOneWidget);
+          await reveal(confirm);
+          expect(tester.getRect(confirm).bottom, lessThanOrEqualTo(568 - 230));
+          await captureR66Visual(tester, 'r669-current-location-inset-$scale');
+          await tester.tap(confirm);
           tester.view.viewInsets = const FakeViewPadding();
           await tester.pumpAndSettle();
+          expect(session.catalogueRegionId, area.regionId);
+          expect(list, findsNothing);
+          source.failure = BuyV2ShoppingAreaFailure.permissionDenied;
+          await tester.tap(find.text('Choose shopping area'));
+          await tester.pumpAndSettle();
+          final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
+          await reveal(retry);
+          expect(session.catalogueRegionId, area.regionId);
+          source.failure = null;
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(result, findsOneWidget);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(find.text('Shopping area'), findsNothing);
-          expect(session.catalogueRegionId, originalRegion);
-          expect(tester.takeException(), isNull);
-        });
-      }
-    }
-    for (final scale in [1.0, 2.0]) {
-      testWidgets('sheet search keyboard retry selection and Back $scale', (
-        tester,
-      ) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(320, 568);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(tester.view.reset);
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final source = _R669ShoppingAreas()..areas = [area];
-        final session = makeSession(source);
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: MoolTheme.light(),
-            builder: (_, child) => r66VisualCaptureRoot(child!),
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => TextButton(
-                  onPressed: () => showBuyV2CatalogueArea(context, session),
-                  child: const Text('Choose shopping area'),
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.tap(find.text('Choose shopping area'));
-        await tester.pumpAndSettle();
-        final search = find.byKey(const ValueKey('buy-catalogue-area-search'));
-        await tester.enterText(search, '221005');
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.pumpAndSettle();
-        expect(source.queries, ['221005']);
-        await captureR66Visual(tester, 'r669-location-search-$scale');
-        await tester.scrollUntilVisible(
-          find.text('Google Maps'),
-          140,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('Google Maps'), findsOneWidget);
-        final result = find.byKey(
-          ValueKey('buy-google-area-${area.googlePlaceId}'),
-        );
-        Future<void> revealResult() async {
-          final scrollable = find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first;
-          await tester.scrollUntilVisible(
-            find.text('Shopping area'),
-            -180,
-            scrollable: scrollable,
-          );
-          await tester.scrollUntilVisible(result, 100, scrollable: scrollable);
+          source.pendingLocation = Completer<BuyV2ShoppingArea?>();
+          await tester.tap(find.text('Choose shopping area'));
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('Finding your current location...'), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pump(const Duration(milliseconds: 500));
+          source.pendingLocation!.complete(area);
           await tester.pumpAndSettle();
-        }
-
-        tester.view.viewInsets = const FakeViewPadding(bottom: 230);
-        await tester.pumpAndSettle();
-        await revealResult();
-        expect(tester.takeException(), isNull);
-        await captureR66Visual(tester, 'r669-location-keyboard-$scale');
-        tester.view.viewInsets = const FakeViewPadding();
-        await tester.pumpAndSettle();
-        await revealResult();
-        await tester.tap(result);
-        await tester.pumpAndSettle();
-        expect(session.catalogueRegionId, area.regionId);
-        expect(find.text('Shopping area'), findsNothing);
-        await tester.tap(find.text('Choose shopping area'));
-        await tester.pumpAndSettle();
-        source.failure = BuyV2ShoppingAreaFailure.permissionDenied;
-        final locate = find.byKey(const ValueKey('buy-catalogue-current-area'));
-        await tester.ensureVisible(locate);
-        await tester.tap(locate);
-        await tester.pumpAndSettle();
-        final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
-        await tester.ensureVisible(retry);
-        await tester.pumpAndSettle();
-        await captureR66Visual(tester, 'r669-location-permission-$scale');
-        expect(session.catalogueRegionId, area.regionId);
-        source.failure = null;
-        await tester.tap(retry);
-        await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-          find.text('Google Maps'),
-          120,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        expect(find.text('Google Maps'), findsOneWidget);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(session.catalogueRegionId, area.regionId);
-        source.pending['700001'] = Completer<List<BuyV2ShoppingArea>>();
-        await tester.tap(find.text('Choose shopping area'));
-        await tester.pumpAndSettle();
-        await tester.enterText(search, '700001');
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.binding.handlePopRoute();
-        await tester.pump(const Duration(milliseconds: 500));
-        source.pending['700001']!.complete([area]);
-        await tester.pumpAndSettle();
-        expect(find.text('Shopping area'), findsNothing);
-        expect(session.catalogueRegionId, area.regionId);
-        expect(tester.takeException(), isNull);
-      });
+          expect(list, findsNothing);
+          expect(session.catalogueRegionId, area.regionId);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   });
 }

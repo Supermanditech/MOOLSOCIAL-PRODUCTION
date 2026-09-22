@@ -627,8 +627,8 @@ void main() {
             expect(cart.hitTestable(), findsOneWidget);
             expect(
               find.byKey(const ValueKey('buy-cart-navigation-button')),
-              findsNothing,
-              reason: 'The seeded empty page has free space for the Cart.',
+              findsOneWidget,
+              reason: 'Public Buy keeps Cart fixed in its navigation rail.',
             );
             await tester.drag(
               cart,
@@ -655,12 +655,9 @@ void main() {
               await tester.pump();
               expect(
                 (tester.getTopLeft(cart) - displayedBeforeDrag).distance,
-                inInclusiveRange(
-                  5,
-                  firstDelta.distance + nextDelta.distance + 1,
-                ),
+                closeTo(0, .01),
                 reason:
-                    'Cart must follow the new finger movement from its displayed position.',
+                    'The fixed Cart must not move with content or gestures.',
               );
             } finally {
               await nextDrag.up();
@@ -1328,6 +1325,13 @@ void main() {
           }
 
           await revealClear(-140);
+          await Scrollable.ensureVisible(
+            tester.element(heading),
+            alignment: .4,
+          );
+          await tester.pumpAndSettle();
+          expect(heading.hitTestable(), findsOneWidget);
+          expect(clear.hitTestable(), findsOneWidget);
           final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
           for (final target in [heading, clear]) {
             expect(
@@ -1831,6 +1835,8 @@ void main() {
         final expanded = find.byKey(
           const ValueKey('buy-quick-delivery-status-expanded'),
         );
+        await Scrollable.ensureVisible(tester.element(toggle), alignment: 1);
+        await tester.pumpAndSettle();
         expect(toggle.hitTestable(), findsOneWidget);
         expect(tester.getSize(toggle).width, lessThanOrEqualTo(48));
         expect(tester.getSize(toggle).height, lessThanOrEqualTo(48));
@@ -1841,6 +1847,9 @@ void main() {
           tester.getRect(toggle).top,
           greaterThanOrEqualTo(contentRect.bottom),
         );
+        await Scrollable.ensureVisible(tester.element(toggle), alignment: 1);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
         expect(expanded, findsOneWidget);
@@ -1862,6 +1871,9 @@ void main() {
           reason: 'Order choices and parked Cart must not shrink the viewport',
         );
         await capture(tester, 'r664-order-expanded-$size-$scale');
+        await Scrollable.ensureVisible(tester.element(toggle), alignment: 1);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
         expect(expanded, findsNothing);
@@ -1870,6 +1882,9 @@ void main() {
           contentRect,
           reason: 'Collapsing choices restores the original usable area',
         );
+        await Scrollable.ensureVisible(tester.element(toggle), alignment: 1);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
         final choices = find.byKey(
@@ -1896,6 +1911,9 @@ void main() {
           contentRect,
           reason: 'Automatic collapse also releases temporary Cart parking',
         );
+        await Scrollable.ensureVisible(tester.element(toggle), alignment: 1);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
         Future<void> revealChoice(Finder target) async {
@@ -1936,6 +1954,9 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         await revealDeliveryRailControl(tester, toggle);
+        await Scrollable.ensureVisible(tester.element(toggle), alignment: 1);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
         expect(tester.widget<IconButton>(sound).isSelected, isTrue);
@@ -2056,54 +2077,40 @@ void main() {
   }
 
   for (final size in [const Size(320, 800), const Size(800, 360)]) {
-    testWidgets('R664 order choices remain reachable with keyboard $size', (
-      tester,
-    ) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final core = BuySession();
-      final session = _R66StoreStatusSession(core: core, quiet: false);
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      await tester.pumpWidget(app(session, size: size, textScale: 2));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-search-control')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-search-field')), findsOneWidget);
-      tester.view.viewInsets = FakeViewPadding(
-        bottom: size.height > size.width ? 300 : 140,
-      );
-      await tester.pumpAndSettle();
-      final toggle = find.byKey(const ValueKey('buy-quick-delivery-toggle'));
-      expect(toggle.hitTestable(), findsOneWidget);
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
-      final choices = find.byKey(
-        const ValueKey('buy-quick-delivery-choices-scroll'),
-      );
-      final rect = tester.getRect(choices);
-      await capture(tester, 'r664-order-keyboard-header-$size');
-      expect(
-        rect.bottom,
-        lessThanOrEqualTo(size.height - tester.view.viewInsets.bottom),
-      );
-      final hide = find.byKey(const ValueKey('buy-quick-delivery-hide'));
-      final scroll = tester.state<ScrollableState>(
-        find.descendant(of: choices, matching: find.byType(Scrollable)).first,
-      );
-      await scroll.position.ensureVisible(tester.renderObject(hide));
-      await tester.pumpAndSettle();
-      expect(hide.hitTestable(), findsOneWidget);
-      await capture(tester, 'r664-order-keyboard-actions-$size');
-      await tester.tap(hide);
-      await tester.pumpAndSettle();
-      expect(choices, findsNothing);
-      expect(session.view, BuyV2View.catalogue);
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump(const Duration(seconds: 46));
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'R664 search hides delivery controls even with an active order and keyboard $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = _R66StoreStatusSession(core: core, quiet: false);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(app(session, size: size, textScale: 2));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-search-field')), findsOneWidget);
+        tester.view.viewInsets = FakeViewPadding(
+          bottom: size.height > size.width ? 300 : 140,
+        );
+        await tester.pumpAndSettle();
+        final toggle = find.byKey(const ValueKey('buy-quick-delivery-toggle'));
+        expect(toggle, findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-quick-delivery-choices-scroll')),
+          findsNothing,
+        );
+        expect(session.activeDeliveryOrders, isNotEmpty);
+        expect(find.byKey(const ValueKey('buy-search-field')), findsOneWidget);
+        await capture(tester, 'r664-active-delivery-hidden-in-search-$size');
+        expect(session.view, BuyV2View.catalogue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(seconds: 46));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final mixed in [false, true]) {
@@ -2948,7 +2955,7 @@ void main() {
           if (isShop) {
             expectCartClearOf(
               tester,
-              find.byKey(ValueKey('buy-product-benefits-ready-${product.id}')),
+              find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
             );
           }
           await capture(tester, '$lane-root-origin-$scale', store: true);
@@ -3213,7 +3220,7 @@ void main() {
           if (isShop) {
             expectCartClearOf(
               tester,
-              find.byKey(ValueKey('buy-product-benefits-ready-${product.id}')),
+              find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
             );
           }
           await capture(tester, '$lane-root-restored-$scale', store: true);

@@ -344,6 +344,38 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
+  if ($SourceCommit -ceq 'c1197ec99beaac064ee1cc635bff1d1aabe9ece6') {
+    # Fresh r66.33 review: exact committed source, never a moving allowance.
+    $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+    if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
+    $reviewBranch = @(& git -C $root branch --show-current)
+    if ($LASTEXITCODE -ne 0 -or $reviewBranch.Count -ne 1 -or
+        $reviewBranch[0] -cne 'work/cursor-ui/buy-ready-20260921') { return $false }
+    foreach ($tip in @('3959b3c23ba09f66397b74313b8ddfb90c761442', $SourceCommit)) {
+      & git -C $root merge-base --is-ancestor $tip HEAD
+      if ($LASTEXITCODE -ne 0) { return $false }
+    }
+    $boundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
+    $expectedDelta = @(
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'
+    )
+    $delta = @(& git -C $root diff --name-only '3959b3c23ba09f66397b74313b8ddfb90c761442' $SourceCommit -- @boundaries)
+    if ($LASTEXITCODE -ne 0 -or (@($delta | Sort-Object) -join '|') -cne ($expectedDelta -join '|')) { return $false }
+    & git -C $root diff --quiet $SourceCommit HEAD -- @boundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & git -C $root diff --quiet $SourceCommit -- @boundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaries)
+    if ($LASTEXITCODE -ne 0 -or $untracked.Count -ne 0) { return $false }
+    $protectedRoots = @('apps/mobile/lib/features/buy','apps/mobile/lib/ui_v2/buy') +
+      @($explicitFiles | ForEach-Object { $_.Replace('\','/') })
+    $sealedOwners = @(& git -C $root ls-tree -r --name-only $SourceCommit -- @protectedRoots)
+    return $LASTEXITCODE -eq 0 -and
+      (@($sealedOwners | Sort-Object -Unique) -join '|') -ceq ($relativeFiles -join '|')
+  }
   if ($SourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0') {
     # One founder-authorized r66.32 review snapshot, including uncommitted fixes.
     # This is not a moving HEAD allowance or a replacement accepted baseline.

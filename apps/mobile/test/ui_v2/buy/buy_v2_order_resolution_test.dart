@@ -1225,7 +1225,11 @@ void _collectionOrdersReadabilityCases() {
           of: rail,
           matching: find.byType(Scrollable),
         );
-        for (final destination in ['shop', 'wholesale', 'medicine']) {
+        expect(
+          find.byKey(const ValueKey('buy-promotion-orders-medicine')),
+          findsNothing,
+        );
+        for (final destination in ['shop', 'wholesale']) {
           final card = find.byKey(
             ValueKey('buy-promotion-orders-$destination'),
           );

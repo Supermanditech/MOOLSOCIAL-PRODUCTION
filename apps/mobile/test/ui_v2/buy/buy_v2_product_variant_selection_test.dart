@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'buy_v2_qualified_provider_fixture.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -929,6 +931,9 @@ void main() {
           final core = BuySession();
           final session = BuyV2Session(
             core: core,
+            productFactsAdapter: QualifiedTestProductFacts(
+              suppliedProducts.map((p) => p.id).toSet(),
+            ),
             commerceAdapter: _MediaCommerce(
               suppliedProducts.first,
               otherProducts: [suppliedProducts.last],
@@ -1780,12 +1785,33 @@ void main() {
         );
         await tester.ensureVisible(add);
         await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('buy-product-hero-delivery-s-milk-500ml')),
-          findsOneWidget,
+        final delivery = find.byKey(
+          const ValueKey('buy-automatic-fulfilment-s-milk-500ml'),
         );
-        expect(find.textContaining('Standard/courier delivery'), findsWidgets);
+        final productScroll = find
+            .descendant(
+              of: find.byKey(const PageStorageKey('buy-product-s-milk-500ml')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          delivery,
+          120,
+          scrollable: productScroll,
+        );
+        expect(delivery, findsOneWidget);
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('Standard/courier delivery'),
+          ),
+          findsWidgets,
+        );
         expect(find.text('Quick local choice'), findsNothing);
+        await tester.scrollUntilVisible(add, -120, scrollable: productScroll);
+        await Scrollable.ensureVisible(tester.element(add), alignment: .4);
+        await tester.pumpAndSettle();
+        expect(add.hitTestable(), findsOneWidget);
         await tester.tap(add);
         await tester.pumpAndSettle();
         expect(session.quantityFor('s-milk-500ml'), 1);

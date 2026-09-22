@@ -1224,8 +1224,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                   _searchAutofocus = value;
                                 }),
                                 onLocation: () =>
-                                    session.destination ==
-                                        BuyV2Destination.medicine
+                                    session.isStoreProcurement ||
+                                        session.destination ==
+                                            BuyV2Destination.medicine
                                     ? showBuyV2AddressSheet(context, session)
                                     : showBuyV2CatalogueArea(context, session),
                                 onAccount: _openBuyProfile,

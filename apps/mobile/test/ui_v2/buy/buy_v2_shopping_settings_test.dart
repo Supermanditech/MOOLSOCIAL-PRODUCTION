@@ -541,8 +541,12 @@ void main() {
                       : 'buy-settings-recently-viewed-product-$productId',
                 ),
               );
-              await tester.ensureVisible(open);
+              await Scrollable.ensureVisible(
+                tester.element(open),
+                alignment: .4,
+              );
               await tester.pumpAndSettle();
+              expect(open.hitTestable(), findsOneWidget);
               expectCollectionText(tester, open);
               expect(
                 find.descendant(of: open, matching: find.text(product.title)),
@@ -688,8 +692,12 @@ void main() {
               }
               await tester.tap(entry);
               await tester.pumpAndSettle();
-              await tester.ensureVisible(open);
+              await Scrollable.ensureVisible(
+                tester.element(open),
+                alignment: .4,
+              );
               await tester.pumpAndSettle();
+              expect(open.hitTestable(), findsOneWidget);
               expect(tester.getSize(open).height, greaterThanOrEqualTo(44));
               await tester.tap(open);
               await tester.pumpAndSettle();

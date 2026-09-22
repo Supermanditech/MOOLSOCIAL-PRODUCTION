@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'buy_v2_qualified_provider_fixture.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,7 +83,18 @@ final class _R669ReviewCommerce implements BuyV2CommerceAdapter {
     await refreshGate?.future;
     return BuyV2CommerceSnapshot(
       state: state,
-      products: BuyV2Catalogue.allProducts,
+      // This review test's background basket has an explicit simulated
+      // listing identity; a missing Store id must never receive eligibility.
+      products: BuyV2Catalogue.allProducts
+          .map(
+            (p) => p.id == 'w-notebook'
+                ? p.copyWith(
+                    storeId: 'simulated-review-notebook-store',
+                    offerClass: BuyV2OfferClass.wholesale,
+                  )
+                : p,
+          )
+          .toList(),
       businessVerified: true,
       businessVerificationState: BuyV2BusinessVerificationState.verified,
       productReportsAvailable: true,
@@ -133,6 +146,7 @@ Future<BuyV2Session> _mountR669Review(
   final session = BuyV2Session(
     core: core,
     commerceAdapter: adapter,
+    productFactsAdapter: const QualifiedTestProductFacts({'w-notebook'}),
     reviewDataEnabled: false,
   );
   addTearDown(core.dispose);

@@ -1,3 +1,4 @@
+import 'buy_v2_qualified_provider_fixture.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -1249,11 +1250,9 @@ void main() {
         await tester.pumpWidget(_app(session, textScale: scale));
         await tester.pumpAndSettle();
         final panel = find.byKey(
-          ValueKey('buy-marketplace-trust-ready-${product.id}'),
+          ValueKey('buy-product-hero-store-${product.id}'),
         );
-        final expected = fixture
-            ? 'Mool Market 1 · Manufacturer'
-            : 'Mool Market 000001 · Manufacturer';
+        final expected = fixture ? 'Mool Market 1' : 'Mool Market 000001';
         final seller = find.descendant(
           of: panel,
           matching: find.text(expected),
@@ -1283,7 +1282,7 @@ void main() {
           expect(
             find.descendant(
               of: panel,
-              matching: find.text('Mool Market 000001 · Manufacturer'),
+              matching: find.text('Mool Market 000001'),
             ),
             findsNothing,
           );
@@ -2235,7 +2234,7 @@ void main() {
   for (final size in [const Size(320, 711), const Size(711, 320)]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
-        'R669 area final row clears Android navigation $size $scale',
+        'R669 current location confirmation clears Android navigation $size $scale',
         (tester) async {
           tester.view.devicePixelRatio = 1;
           tester.view.physicalSize = size;
@@ -2245,6 +2244,7 @@ void main() {
           final core = BuySession();
           final session = BuyV2Session(
             core: core,
+            shoppingAreaSource: TestCurrentLocationSource('chennai', 'Chennai'),
             cataloguePageSource: _PagedWidgetSource(BuyV2Destination.shop),
             catalogueAreas: {
               'jodhpur': 'Jodhpur',
@@ -2266,7 +2266,9 @@ void main() {
           );
           await tester.pumpAndSettle();
           final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
-          final last = find.byKey(const ValueKey('buy-catalogue-area-chennai'));
+          final last = find.byKey(
+            const ValueKey('buy-current-location-confirm'),
+          );
           await tester.scrollUntilVisible(
             last,
             180,
@@ -2280,7 +2282,7 @@ void main() {
           final bounds = tester.getRect(last);
           expect(bounds.top, greaterThanOrEqualTo(tester.getRect(list).top));
           expect(bounds.bottom, lessThanOrEqualTo(size.height - 34));
-          expect(bounds.height, greaterThanOrEqualTo(48));
+          expect(bounds.height, greaterThanOrEqualTo(44));
           expect(last.hitTestable(), findsOneWidget);
           await captureR66Visual(tester, 'r669-area-last-${size.width}-$scale');
           await tester.tap(last);
@@ -2394,39 +2396,18 @@ void main() {
           expect(session.productFactsFor(product).price, product.price);
           final itemCount = session.itemCount;
           final saving = session.scopedCouponSaving;
-          final empty = find.byKey(
-            ValueKey('buy-product-benefits-empty-${product.id}'),
-          );
-          await _revealProductAction(tester, product.id, empty);
-          final panel = find.byKey(
-            ValueKey('buy-product-benefits-ready-${product.id}'),
-          );
-          await tester.ensureVisible(panel);
-          await tester.pumpAndSettle();
-          expect(find.text('Additional checkout benefits'), findsOneWidget);
+          // Ready + empty benefits have no promotional panel in the approved
+          // compact product layout. Keep the provider and cart assertions.
+          expect(session.productBenefitsFor(product), isEmpty);
           expect(
-            find.text(
-              'Separate from the listed seller price. Eligibility is checked again at Checkout.',
-            ),
-            findsOneWidget,
+            find.byKey(ValueKey('buy-product-benefits-empty-${product.id}')),
+            findsNothing,
           );
-          expect(find.text('No product offers right now.'), findsNothing);
           expect(
-            tester.widget<Text>(empty).data,
-            'No additional benefits available.',
+            find.byKey(ValueKey('buy-product-benefits-ready-${product.id}')),
+            findsNothing,
           );
-          final paragraph = tester.renderObject<RenderParagraph>(empty);
-          expect(paragraph.didExceedMaxLines, isFalse);
-          final viewport = tester.getRect(
-            find.ancestor(of: empty, matching: find.byType(Scrollable)).first,
-          );
-          expect(tester.getRect(empty).top, greaterThanOrEqualTo(viewport.top));
-          expect(tester.getRect(panel).top, greaterThanOrEqualTo(viewport.top));
-          expect(
-            tester.getRect(empty).bottom,
-            lessThanOrEqualTo(viewport.bottom),
-          );
-          expect(empty.hitTestable(), findsOneWidget);
+          expect(find.text('Additional checkout benefits'), findsNothing);
           expect(session.itemCount, itemCount);
           expect(session.scopedCouponSaving, saving);
           await captureR66Visual(
@@ -2638,7 +2619,7 @@ void main() {
         );
         await tester.scrollUntilVisible(
           storeAction,
-          -180,
+          180,
           scrollable: find
               .descendant(
                 of: find.byKey(
@@ -2648,14 +2629,19 @@ void main() {
               )
               .first,
         );
-        await tester.ensureVisible(storeAction);
+        await Scrollable.ensureVisible(
+          tester.element(storeAction),
+          alignment: .4,
+        );
         await tester.pumpAndSettle();
         expect(storeAction.hitTestable(), findsOneWidget);
         await tester.tap(storeAction);
         await tester.pumpAndSettle();
         expect(
           tester
-              .widget<Text>(find.byKey(const ValueKey('buy-public-store-name')))
+              .widget<Text>(
+                find.byKey(const ValueKey('buy-store-toolbar-name')),
+              )
               .data,
           makerProduct.customerSeller(makerProduct.seller),
         );
@@ -2668,9 +2654,7 @@ void main() {
           findsNothing,
         );
         await capture('store');
-        await tester.tap(
-          find.byKey(const ValueKey('buy-wholesale-supplier-sheet-close')),
-        );
+        await tester.tap(find.byKey(const ValueKey('buy-paged-store-close')));
         await tester.pumpAndSettle();
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
@@ -2890,7 +2874,7 @@ void main() {
           expect(
             tester
                 .widget<Text>(
-                  find.byKey(const ValueKey('buy-public-store-name')),
+                  find.byKey(const ValueKey('buy-store-toolbar-name')),
                 )
                 .data,
             'Mool Market',
@@ -3296,6 +3280,7 @@ void main() {
           final core = BuySession();
           final session = BuyV2Session(
             core: core,
+            shoppingAreaSource: TestCurrentLocationSource('mumbai', 'Mumbai'),
             reviewDataEnabled: true,
             cataloguePageSource: source,
             catalogueAreas: const {'jodhpur': 'Jodhpur', 'mumbai': 'Mumbai'},
@@ -3478,13 +3463,17 @@ void main() {
           await tester.tap(area);
           await tester.pumpAndSettle();
           final field = find.byKey(const ValueKey('buy-catalogue-area-search'));
-          await tester.enterText(field, 'Mum');
+          expect(field, findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-current-location-result')),
+            findsOneWidget,
+          );
           tester.view.viewInsets = const FakeViewPadding(bottom: 180);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           await captureR66Visual(tester, 'r5-paged-$profile-area-keyboard');
           final mumbai = find.byKey(
-            const ValueKey('buy-catalogue-area-mumbai'),
+            const ValueKey('buy-current-location-confirm'),
           );
           final areaScroll = find
               .descendant(

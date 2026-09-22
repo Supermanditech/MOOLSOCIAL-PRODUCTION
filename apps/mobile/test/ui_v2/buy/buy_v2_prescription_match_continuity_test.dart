@@ -144,9 +144,20 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey('buy-product-primary-m-telmisartan-40')),
+    final add = find.byKey(
+      const ValueKey('buy-product-primary-m-telmisartan-40'),
     );
+    final productScroll = find
+        .descendant(
+          of: find.byKey(const PageStorageKey('buy-product-m-telmisartan-40')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(add, 160, scrollable: productScroll);
+    await Scrollable.ensureVisible(tester.element(add), alignment: .4);
+    await tester.pumpAndSettle();
+    expect(add.hitTestable(), findsOneWidget);
+    await tester.tap(add);
     await tester.pumpAndSettle();
     expect(session.pendingPrescriptionProductId, 'm-telmisartan-40');
     await tester.tap(

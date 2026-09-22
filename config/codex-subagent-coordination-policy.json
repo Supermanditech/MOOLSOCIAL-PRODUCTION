@@ -96,7 +96,17 @@
         "docs/quality/CURSOR-BUY-REDMI-AUDIT-20260922.md",
         "docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md",
         "scripts/check-brand-integrity.ps1",
-        "apps/mobile/.flutter-plugins-dependencies"
+        "apps/mobile/.flutter-plugins-dependencies",
+        "apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart"
       ]
     },
     {
@@ -154,13 +164,10 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart",
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
         "apps/mobile/test/app/ui_review_language_store_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",

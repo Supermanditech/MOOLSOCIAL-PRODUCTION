@@ -251,14 +251,15 @@ void main() {
       final field = tester.widget<TextField>(
         find.byKey(const ValueKey('buy-category-search')),
       );
-      expect(field.decoration?.label, isA<ExcludeSemantics>());
-      expect(field.decoration?.hint, isA<ExcludeSemantics>());
-      expect(find.text('Category search'), findsOneWidget);
-      expect(find.text('Find a category'), findsOneWidget);
-      expect(
-        field.decoration?.floatingLabelBehavior,
-        FloatingLabelBehavior.always,
+      expect(field.decoration?.label, isNull);
+      final searchNode = tester.getSemantics(
+        find.byKey(const ValueKey('buy-category-search-semantics')),
       );
+      expect(searchNode.label, 'Category search');
+      expect(searchNode.hint, 'Find a category');
+      expect(field.decoration?.hint, isA<ExcludeSemantics>());
+      expect(find.text('Category search'), findsNothing);
+      expect(find.text('Find a category'), findsOneWidget);
       final selectedNode = tester.getSemantics(
         find.byKey(const ValueKey('buy-category-semantics-all')),
       );

@@ -1136,6 +1136,17 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  # Exact Buy regression owners needed to qualify the approved layouts.
+  'apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart',
   # Generated Flutter plugin path must reference this admitted worktree.
   'apps/mobile/.flutter-plugins-dependencies',
   'scripts/check-brand-integrity.ps1',

@@ -53,7 +53,7 @@ void main() {
         );
         expect(
           find.descendant(
-            of: hero,
+            of: find.byKey(ValueKey('buy-automatic-fulfilment-$productId')),
             matching: find.textContaining(
               'Delivery time confirmed at checkout',
             ),
@@ -67,17 +67,16 @@ void main() {
         final compliance = find.byKey(
           ValueKey('buy-product-compliance-$productId'),
         );
-        await tester.scrollUntilVisible(
-          compliance,
-          220,
-          scrollable: find
-              .descendant(
-                of: find.byKey(PageStorageKey('buy-product-$productId')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
+        expect(product.compliance, isNull);
+        expect(product.mrp, isNull);
+        expect(compliance, findsNothing);
+        expect(
+          find.descendant(
+            of: hero,
+            matching: find.textContaining(product.pack),
+          ),
+          findsWidgets,
         );
-        expect(compliance, findsOneWidget);
         expect(find.text('Buy now'), findsNothing);
         expect(tester.takeException(), isNull);
 

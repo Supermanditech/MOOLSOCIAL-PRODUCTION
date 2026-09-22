@@ -142,7 +142,10 @@ void main() {
           find.byKey(const ValueKey('buy-product-action-bar')),
           findsNothing,
         );
-        expect(tester.getSize(slot), const Size(148, 44));
+        expect(
+          tester.getSize(slot),
+          Size(destination == BuyV2Destination.shop ? 88 : 148, 44),
+        );
         expect(tester.getSize(shell), const Size(88, 44));
         expect(tester.getTopRight(shell), tester.getTopRight(slot));
         expect(tester.getSize(primary).height, greaterThanOrEqualTo(44));
@@ -268,11 +271,14 @@ void main() {
       matching: find.byTooltip('Add one'),
     );
     expect(slotSizeBefore.height, 44);
-    expect(slotSizeBefore.width, greaterThanOrEqualTo(120));
-    expect(tester.getSize(slot), slotSizeBefore);
-    expect(tester.getTopLeft(slot), slotOriginBefore);
-    expect(tester.getSize(stepper).width, slotSizeBefore.width);
-    expect(tester.getSize(stepper).height, 44);
+    expect(slotSizeBefore.width, 88);
+    expect(tester.getSize(slot).width, inInclusiveRange(120, 170));
+    expect(tester.getSize(slot).height, slotSizeBefore.height);
+    expect(
+      tester.getTopRight(slot),
+      slotOriginBefore + Offset(slotSizeBefore.width, 0),
+    );
+    expect(tester.getSize(stepper), tester.getSize(slot));
     expect(tester.getCenter(stepper), tester.getCenter(slot));
     expect(incomingTransition.position.value, Offset.zero);
     expect(tester.getSize(remove), const Size(44, 44));

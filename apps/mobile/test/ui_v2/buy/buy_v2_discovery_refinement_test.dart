@@ -256,6 +256,16 @@ void main() {
           final boundary = find.byKey(
             const ValueKey('buy-category-sheet-repaint-boundary'),
           );
+          // The approved sheet expands first; then its content scrolls.
+          await tester.drag(
+            find.byKey(const ValueKey('buy-category-drag-handle')),
+            const Offset(0, -800),
+          );
+          await tester.pumpAndSettle();
+          final sheet = tester.widget<DraggableScrollableSheet>(
+            find.byType(DraggableScrollableSheet),
+          );
+          expect(sheet.controller!.size, closeTo(sheet.maxChildSize, .01));
           final top = await readScrollBall(
             tester,
             boundary,
