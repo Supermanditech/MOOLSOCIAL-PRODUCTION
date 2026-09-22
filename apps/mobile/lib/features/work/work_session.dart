@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
 
 import 'work_models.dart';
+import 'work_publication.dart';
 import 'work_services.dart';
 import 'scan_and_pick_contract.dart';
 
@@ -411,6 +413,11 @@ class _StoreOperationalData {
   String workspacePayoutBankName = '';
   String workspacePayoutAccountEnding = '';
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
+  WorkspaceProductDefaults productDefaults = const WorkspaceProductDefaults();
+  WorkspaceStorePublicationDetails publicationDetails =
+      const WorkspaceStorePublicationDetails();
+  final Set<String> catalogueShortlist = {};
+  final List<String> catalogueSearchHistory = [];
   final List<WorkspaceStockMovement> workspaceStockMovements = [];
   int stockMovementSequence = 0;
   _StockHistoryState? stockHistory;
@@ -5402,6 +5409,94 @@ class WorkSession extends ChangeNotifier {
       _storeData.workspacePayoutAccountEnding = value;
   List<WorkspaceCatalogueItem> get workspaceCatalogueItems =>
       _storeData.workspaceCatalogueItems;
+  WorkspaceProductDefaults get workspaceProductDefaults =>
+      _storeData.productDefaults;
+  WorkspaceStorePublicationDetails get workspacePublicationDetails =>
+      _storeData.publicationDetails;
+
+  /// Store-owned projection for publication adapters. This getter is not a live
+  /// catalogue registration or an acknowledgement that the Store is public.
+  BuyV2StoreListing? get workspacePublicStoreDetails {
+    final workspace = activeWorkspace;
+    if (workspace == null || workspace.id.trim().isEmpty) return null;
+    return workspacePublicationDetails.toPublicStore(
+      id: workspace.id,
+      name: workspace.name,
+      area: workspace.area,
+    );
+  }
+
+  bool saveWorkspacePublicationDetails(
+    WorkspaceStorePublicationDetails details, {
+    String? expectedStoreId,
+  }) {
+    final current = activeWorkspace?.id ?? workspaceId;
+    if (current?.trim().isNotEmpty != true ||
+        expectedStoreId != null && current != expectedStoreId ||
+        details.inputErrors.isNotEmpty) {
+      return false;
+    }
+    // Snapshot immutable selections; later edits to a caller's Set cannot change
+    // another Store's accepted methods or saved return rules.
+    _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson(
+      details.toJson(),
+    );
+    _persistOperationalState('publicationDetails');
+    notifyListeners();
+    return true;
+  }
+
+  bool saveWorkspaceProductDefaults(WorkspaceProductDefaults value) {
+    if ((activeWorkspace?.id ?? workspaceId)?.trim().isNotEmpty != true ||
+        !value.valid) {
+      showError(
+        'Choose your Store and enter a low-stock count from 0 to 999999999.',
+      );
+      return false;
+    }
+    _storeData.productDefaults = value;
+    // The inline editor owns its compact confirmation; avoid a duplicate banner.
+    clearMessages();
+    _persistOperationalState('productDefaults');
+    return true;
+  }
+
+  /// Customer preference only; the backend must authorise and quote these terms
+  /// for the authenticated buyer. Never match by display name or auto-grant credit.
+  bool saveWorkspaceCustomerPaymentTerms({
+    required String expectedStoreId,
+    required String customerId,
+    required List<WorkspacePaymentTerm>? terms,
+  }) {
+    if ((activeWorkspace?.id ?? workspaceId) != expectedStoreId ||
+        !workspaceCustomerBook.any((c) => c.id == customerId)) {
+      return false;
+    }
+    final current = workspacePublicationDetails;
+    final overrides = Map<String, List<WorkspacePaymentTerm>>.of(
+      current.customerPaymentTerms,
+    );
+    if (terms == null) {
+      overrides.remove(customerId);
+    } else {
+      overrides[customerId] = terms;
+    }
+    try {
+      return saveWorkspacePublicationDetails(
+        WorkspaceStorePublicationDetails.fromJson({
+          ...current.toJson(),
+          'customerPaymentTerms': {
+            for (final e in overrides.entries)
+              e.key: e.value.map((t) => t.toJson()).toList(),
+          },
+        }),
+        expectedStoreId: expectedStoreId,
+      );
+    } on FormatException {
+      return false;
+    }
+  }
+
   List<WorkspaceStockMovement> get workspaceStockMovements =>
       _storeData.workspaceStockMovements;
 
@@ -5545,6 +5640,16 @@ class WorkSession extends ChangeNotifier {
 
   Map<String, int> get workspaceOrderQuantities =>
       _storeData.workspaceOrderQuantities;
+  Set<String> get workspaceCatalogueShortlist => _storeData.catalogueShortlist;
+  List<String> get workspaceCatalogueSearchHistory =>
+      _storeData.catalogueSearchHistory;
+  // Frontend browsing state is Store-scoped and survives route changes. A
+  // dedicated durable shortlist adapter is deferred; never overwrite inventory
+  // through the legacy whole-Store save merely because a bookmark was tapped.
+  void notifyWorkspaceCatalogueBrowsingChanged() {
+    notifyListeners();
+  }
+
   List<WorkspaceOrderRecord> get workspaceOrders => _storeData.workspaceOrders;
   Set<String> get workspacePackedProductIds =>
       _storeData.workspacePackedProductIds;
@@ -5830,6 +5935,13 @@ class WorkSession extends ChangeNotifier {
 
   int get workspacePublishedProductCount =>
       workspaceCatalogueItems.where((product) => product.published).length;
+
+  WorkspacePublicationReport get workspacePublicationReport =>
+      WorkspacePublicationContract.inspect(
+        store: activeWorkspace,
+        products: workspaceCatalogueItems,
+        details: workspacePublicationDetails,
+      );
 
   int reservedWorkspaceUnitsFor(String productId) => workspaceOrders
       .where(
@@ -6613,6 +6725,8 @@ class WorkSession extends ChangeNotifier {
   }
 
   Map<String, Object?> _operationalState() => {
+    'productDefaults': workspaceProductDefaults.toJson(),
+    'publicationDetails': workspacePublicationDetails.toJson(),
     'storeState': workspaceStoreState.name,
     'acceptingOrders': workspaceAcceptingOrders,
     'visibleToCustomers': workspaceVisibleToCustomers,
@@ -6629,6 +6743,11 @@ class WorkSession extends ChangeNotifier {
         {
           'id': product.id,
           'canonicalId': product.canonicalId,
+          if (product.packMeasure != null)
+            'packMeasure': product.packMeasure!.toJson(),
+          if (product.wholesaleOffer != null)
+            'wholesaleOffer': product.wholesaleOffer!.toJson(),
+          'retailEnabled': product.retailEnabled,
           'categoryId': product.categoryId,
           'brand': product.brand,
           'title': product.title,
@@ -6641,6 +6760,7 @@ class WorkSession extends ChangeNotifier {
           if (product.compliance != null)
             'compliance': product.compliance!.toJson(),
           'composition': product.composition,
+          if (!product.content.isEmpty) 'content': product.content.toJson(),
           'regulatoryNote': product.regulatoryNote,
           'requiresPrescription': product.requiresPrescription,
           'visualLabel': product.visualLabel,
@@ -6733,6 +6853,7 @@ class WorkSession extends ChangeNotifier {
           'discountMinor': invoice.discountMinor,
           'billingDetails': invoice.billingDetails.toJson(),
           'sellerName': invoice.sellerName,
+          if (invoice.seller != null) 'seller': invoice.seller!.toJson(),
           'payment': invoice.payment,
           'issuedAt': invoice.issuedAt.toUtc().toIso8601String(),
           'sharedChannels': invoice.sharedChannels.toList(growable: false),
@@ -6972,11 +7093,21 @@ class WorkSession extends ChangeNotifier {
         .where((invoice) => invoice.orderId == order.id)
         .firstOrNull;
     if (existing != null) return existing;
+    final sellerStoreId = activeWorkspace?.id ?? workspaceId;
+    final sellerDetails = workspacePublicationDetails;
     final invoice = WorkspaceCustomerInvoice(
       id: 'INV-${order.id}',
       orderId: order.id,
       customer: order.customer,
       sellerName: activeWorkspace?.name ?? workName,
+      seller: sellerStoreId?.trim().isNotEmpty == true
+          ? WorkspaceInvoiceSeller(
+              storeId: sellerStoreId!,
+              legalName: sellerDetails.legalName.trim(),
+              storeAddress: sellerDetails.address.trim(),
+              billingAddress: sellerDetails.billingAddress.trim(),
+            )
+          : null,
       billingDetails: order.billingDetails,
       items: order.items,
       amount: order.amount,
@@ -7045,7 +7176,13 @@ class WorkSession extends ChangeNotifier {
     _persistOperationalState('invoice-shared');
   }
 
-  void setWorkspaceVisibility(bool visible) {
+  bool setWorkspaceVisibility(bool visible) {
+    if (visible && !workspacePublicationReport.ready) {
+      showError(
+        'Store not published. Check Publication requirements in Store settings.',
+      );
+      return false;
+    }
     workspaceVisibleToCustomers = visible;
     workspaceLastUpdatedAt = DateTime.now();
     _recordWorkspaceActivity(
@@ -7059,6 +7196,7 @@ class WorkSession extends ChangeNotifier {
           : 'Your store is hidden from customer discovery.',
     );
     _persistOperationalState('visibility');
+    return true;
   }
 
   void setWorkspaceDashboardState(
@@ -7909,13 +8047,69 @@ class WorkSession extends ChangeNotifier {
     }
     showNotice(
       product.publicListing
-          ? '${product.title} is ready for store publishing.'
+          ? '${product.title} saved. Publication checks are still required.'
           : '${product.title} saved for store use only.',
     );
     _persistOperationalState('catalogue-updated');
   }
 
-  void importWorkspaceProducts(List<WorkspaceCatalogueItem> products) {
+  void importWorkspaceProducts(
+    List<WorkspaceCatalogueItem> products, {
+    bool addOnly = false,
+  }) {
+    if (addOnly) {
+      // Validate the complete local batch before recording any inventory or
+      // movement. CSV Add products must never act as an implicit stock update.
+      final ids = workspaceCatalogueItems.map((p) => p.id).toSet();
+      final skus = workspaceCatalogueItems
+          .map((p) => p.sku.trim().toLowerCase())
+          .toSet();
+      final barcodes = workspaceCatalogueItems
+          .map((p) => p.barcode.trim())
+          .where((b) => b.isNotEmpty)
+          .toSet();
+      final identities = workspaceCatalogueItems
+          .map(WorkspaceProductImport.identity)
+          .toSet();
+      for (final product in products) {
+        final issue = validateWorkspaceProductValues(
+          title: product.title.trim(),
+          brand: product.brand.trim(),
+          pack: product.pack.trim(),
+          category: product.categoryId.trim(),
+          sku: product.sku.trim(),
+          purchase: product.purchasePrice,
+          selling: product.sellingPrice,
+          stock: product.stock,
+          mrp: product.mrp,
+          lowStockThreshold: product.lowStockThreshold,
+          minimumOrder: product.minimumOrder,
+          delivery: product.deliveryPromise.trim(),
+        );
+        if (issue != null) throw FormatException('${product.sku}: $issue');
+        if (product.id.trim().isEmpty || product.publicListing) {
+          throw const FormatException(
+            'Imported products need an identity and must be saved privately first.',
+          );
+        }
+        final sku = product.sku.trim().toLowerCase();
+        final barcode = product.barcode.trim();
+        final identity = WorkspaceProductImport.identity(product);
+        if (ids.contains(product.id) ||
+            skus.contains(sku) ||
+            (barcode.isNotEmpty && barcodes.contains(barcode)) ||
+            identities.contains(identity)) {
+          throw FormatException(
+            '${product.sku}: product already exists in Store stock or this batch. '
+            'No products were saved. Review the import again.',
+          );
+        }
+        ids.add(product.id);
+        skus.add(sku);
+        if (barcode.isNotEmpty) barcodes.add(barcode);
+        identities.add(identity);
+      }
+    }
     final byId = <String, int>{};
     final bySku = <String, int>{};
     for (var i = 0; i < workspaceCatalogueItems.length; i++) {
@@ -10253,6 +10447,12 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> finishRetailerSetup() async {
+    if (retailerPublishAfterSetup && !workspacePublicationReport.ready) {
+      showError(
+        'Store not published. Complete Publication requirements, or save setup without publishing.',
+      );
+      return false;
+    }
     if (!retailerProductAdded) {
       errorMessage = 'Add at least one product from the verified catalogue.';
       notifyListeners();

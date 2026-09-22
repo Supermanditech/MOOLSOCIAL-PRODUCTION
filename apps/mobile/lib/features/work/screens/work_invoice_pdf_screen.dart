@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../shared/commerce/commerce_downloads.dart';
 import '../work_document_preview.dart';
 import '../work_invoice_pdf.dart';
 
@@ -16,20 +16,23 @@ abstract interface class WorkInvoicePdfActions {
 }
 
 class NativeWorkInvoicePdfActions implements WorkInvoicePdfActions {
-  const NativeWorkInvoicePdfActions();
+  const NativeWorkInvoicePdfActions({required this.scope});
+  final CommerceDownloadScope scope;
   @override
   Future<WorkPdfActionResult> save(WorkInvoicePdfDocument document) async {
-    final path = await FilePicker.saveFile(
-      dialogTitle: 'Save invoice',
-      fileName: document.fileName,
-      mimeType: 'application/pdf',
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-      bytes: document.bytes,
+    final saved = await saveCommerceDownloadFile(
+      CommerceDownloadFile(
+        scope: scope,
+        id: document.identity,
+        bytes: document.bytes,
+        fileName: commerceDownloadName(
+          document.fileName.replaceFirst(RegExp(r'\.pdf$'), ''),
+        ),
+      ),
     );
-    return path == null
-        ? WorkPdfActionResult.cancelled
-        : WorkPdfActionResult.completed;
+    return saved
+        ? WorkPdfActionResult.completed
+        : WorkPdfActionResult.cancelled;
   }
 
   @override
@@ -60,20 +63,28 @@ class WorkInvoicePdfScreen extends StatefulWidget {
     required this.source,
     required this.isCurrent,
     required this.scopeChanges,
-    this.actions = const NativeWorkInvoicePdfActions(),
+    this.actions,
     this.renderPage,
   });
   final WorkInvoicePdfRequest request;
   final WorkInvoicePdfSource source;
   final bool Function() isCurrent;
   final Listenable scopeChanges;
-  final WorkInvoicePdfActions actions;
+  final WorkInvoicePdfActions? actions;
   final Future<WorkPdfPage> Function(WorkInvoicePdfDocument, int)? renderPage;
   @override
   State<WorkInvoicePdfScreen> createState() => _WorkInvoicePdfScreenState();
 }
 
 class _WorkInvoicePdfScreenState extends State<WorkInvoicePdfScreen> {
+  WorkInvoicePdfActions get _actions =>
+      widget.actions ??
+      NativeWorkInvoicePdfActions(
+        scope: CommerceDownloadScope(
+          widget.request.accountId,
+          store: widget.request.storeId,
+        ),
+      );
   WorkPdfPreview _renderer = WorkPdfPreview();
   WorkInvoicePdfDocument? _document;
   WorkPdfPage? _page;
@@ -202,11 +213,11 @@ class _WorkInvoicePdfScreenState extends State<WorkInvoicePdfScreen> {
     try {
       final box = context.findRenderObject() as RenderBox;
       final result = share
-          ? await widget.actions.share(
+          ? await _actions.share(
               document,
               box.localToGlobal(Offset.zero) & box.size,
             )
-          : await widget.actions.save(document);
+          : await _actions.save(document);
       if (!_valid(epoch)) return;
       setState(() {
         _notice = switch (result) {
@@ -218,10 +229,12 @@ class _WorkInvoicePdfScreenState extends State<WorkInvoicePdfScreen> {
             'The action could not be confirmed. You can try again.',
         };
       });
-    } catch (_) {
+    } catch (error) {
       if (!_valid(epoch)) return;
       setState(() {
-        _notice = share
+        _notice = !share && error is FormatException
+            ? error.message
+            : share
             ? 'Could not share the PDF. Please try again.'
             : 'Could not save the PDF. Please try again.';
       });

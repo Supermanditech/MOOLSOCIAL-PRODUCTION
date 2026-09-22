@@ -104,8 +104,10 @@ class StoreStockDownloadBridge(context: Context, messenger: BinaryMessenger) {
 
     companion object {
         fun validPayload(name: String, mime: String, bytes: ByteArray): Boolean {
+            val commercePdf = Regex("""^commerce-document-[A-Za-z0-9-]{1,128}\.pdf$""").matches(name)
             if ((!Regex("""^stock-snapshot-[0-9]{14,20}\.(pdf|xlsx|csv)$""").matches(name) &&
-                name != "store-products-template.csv") ||
+                name != "store-products-template.csv" && !commercePdf) ||
+                (commercePdf && bytes.size > 10 * 1024 * 1024) ||
                 bytes.size !in 1..(64 * 1024 * 1024)
             ) return false
             return when (name.substringAfterLast('.')) {

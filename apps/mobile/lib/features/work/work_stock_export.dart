@@ -197,7 +197,7 @@ class _StoreStockDownloadControlsState
     try {
       if (!_isCurrent) {
         throw const FormatException(
-          'Your store changed. Reopen Stock to download.',
+          'Your store changed. Reopen Reports & Downloads.',
         );
       }
       final snapshot = StoreStockSnapshot(
@@ -213,7 +213,7 @@ class _StoreStockDownloadControlsState
       if (!mounted) return;
       if (!_isCurrent) {
         throw const FormatException(
-          'Your store changed. Reopen Stock to download.',
+          'Your store changed. Reopen Reports & Downloads.',
         );
       }
       final saved = await widget.saveFile(
@@ -246,32 +246,66 @@ class _StoreStockDownloadControlsState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final period in StoreStockPeriod.values)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
+        Wrap(
+          spacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            PopupMenuButton<StoreStockPeriod>(
+              key: const Key('work-stock-period-selector'),
+              tooltip: 'Statement period',
+              enabled: _busy == null,
+              initialValue: _period,
+              onSelected: (period) {
+                setState(() {
+                  _period = period;
+                  _status = null;
+                });
+                widget.onCurrentPeriodChanged?.call(
+                  period == StoreStockPeriod.current,
+                );
+              },
+              itemBuilder: (_) => [
+                for (final period in StoreStockPeriod.values)
+                  PopupMenuItem(
                     key: Key('work-stock-period-${period.name}'),
-                    label: Text(_labels[period.index]),
-                    selected: period == _period,
-                    onSelected: _busy != null
-                        ? null
-                        : (_) {
-                            setState(() {
-                              _period = period;
-                              _status = null;
-                            });
-                            widget.onCurrentPeriodChanged?.call(
-                              period == StoreStockPeriod.current,
-                            );
-                          },
+                    value: period,
+                    child: Text(_labels[period.index]),
                   ),
+              ],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      current ? 'Current' : _labels[_period.index],
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Icon(Icons.expand_more_rounded, size: 18),
+                  ],
                 ),
-            ],
-          ),
+              ),
+            ),
+            for (final format in StoreStockExportFormat.values)
+              TextButton(
+                key: Key('work-stock-download-${format.extension}'),
+                onPressed:
+                    !current || _busy != null || widget.filteredProducts.isEmpty
+                    ? null
+                    : () => _download(format),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
+                child: Text(
+                  _busy == format ? 'Preparing…' : format.label,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+          ],
         ),
         if (_period == StoreStockPeriod.custom)
           LayoutBuilder(
@@ -309,27 +343,20 @@ class _StoreStockDownloadControlsState
             },
           ),
         if (!current)
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 6),
+            child: Text(
+              'Historical stock statements are unavailable. Current stock is not used for past dates.',
+              key: Key('work-stock-history-unavailable'),
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        if (!current)
           Text(
             _periodDescription,
             key: const Key('work-stock-period-range'),
             style: const TextStyle(fontSize: 12),
           ),
-        Wrap(
-          spacing: 2,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const Icon(Icons.download_outlined, size: 18),
-            for (final format in StoreStockExportFormat.values)
-              TextButton(
-                key: Key('work-stock-download-${format.extension}'),
-                onPressed:
-                    !current || _busy != null || widget.filteredProducts.isEmpty
-                    ? null
-                    : () => _download(format),
-                child: Text(_busy == format ? 'Preparing…' : format.label),
-              ),
-          ],
-        ),
         if (_status != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),

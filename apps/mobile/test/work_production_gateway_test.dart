@@ -965,13 +965,20 @@ void main() {
         work.saveRetailerProduct(quantity: 10, buyPrice: 40, sellPrice: 50);
         work.setRetailerFulfilment(homeDelivery: true, storeCollection: false);
         work.setRetailerPublishAfterSetup(publish);
+        if (publish) {
+          expect(await work.finishRetailerSetup(), isFalse);
+          expect(gateway.setupCalls, 0);
+          expect(work.workspaceVisibleToCustomers, isFalse);
+          expect(work.errorMessage, contains('not published'));
+          work.setRetailerPublishAfterSetup(false);
+        }
         expect(await work.finishRetailerSetup(), isFalse);
         expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
         expect(work.workspaceVisibleToCustomers, isFalse);
         expect(await work.finishRetailerSetup(), isTrue);
-        expect(work.workspaceCatalogueItems.single.publicListing, publish);
-        expect(work.workspaceVisibleToCustomers, publish);
-        expect(work.workspaceAcceptingOrders, publish);
+        expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
+        expect(work.workspaceVisibleToCustomers, isFalse);
+        expect(work.workspaceAcceptingOrders, isFalse);
       },
     );
   }

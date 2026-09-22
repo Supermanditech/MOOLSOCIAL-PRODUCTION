@@ -1,5 +1,175 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Git preservation checkpoint — founder authorized 22 September
+
+Founder requested Git discipline for accumulated work before continuing. Exact
+Codex branch/worktree retained; Cursor checkout and production/main untouched.
+Audit found50 changed files, all within the existing primary claim, plus two
+earlier local commits not yet on origin. Preserve these as a scoped frontend
+checkpoint, not final ticket/device acceptance. Source, tests, provider fixture,
+visual memory and these durable status notes belong in the checkpoint; external
+screenshots/logs remain retained in the task evidence folder, not silently deleted.
+
+Broader replay exposed exported Store handoff JSON missing newer business/channel
+and payment-term metadata. Regenerated only the synthetic test fixture from the
+actual Store projection; exact equality/privacy assertions remain. Initial719
+passes/4 existing skips/1 failure retained in git-checkpoint-20260922-tests.log.
+Final replay:720 passed/4 pre-existing skips; all36 changed Dart owners analyze
+clean. Matching v2/analysis logs retained. CSV v39 separately55/55 passed with
+normal/enlarged renders inspected. Skips are not counted as tested acceptance.
+
+Completed local batches covered: shared catalogue/editor, compact settings and
+Store navigation/stock, invoice formats, Reports & Downloads, Store/provider
+contracts and CSV A/B hardening. No claim all58 complete: next is Counter Sale
+(CS016 customer editing, CS017 Review controls and remaining compact item/invoice
+work), then stock/customer statements and remaining provider/document adapters.
+Offers held; backend, Cursor integration and fresh OPPO acceptance deferred.
+
+## Latest — Batch B visually approved; AP023/AP024 safety hardening
+
+Founder approved displayed v36 screens. Duplicate errors now distinguish live
+Store inventory from another CSV row; correction retains the original conflicting
+row number. Malformed column counts retain all positional cells including extras,
+with expected/found counts and file repair guidance, never guessed mapping/Edit.
+CSV uses an add-only WorkSession guard that validates the complete local batch
+before inventory/movement mutation; invalid values, duplicate identities and
+publicly-listed inputs are rejected. Legacy intentional updates are unchanged.
+Final v39:55 local checks passed, including atomic local rejection and normal/2x
+error renders; seven-file analysis/diff check clean. Actual renders inspected.
+Task evidence: outputs/CSV-BATCH-B-V39-HARDENING.md and v39 test/analysis logs.
+No backend transaction/device qualification is claimed. Existing AP023/AP024,
+not new tickets; approved layout preserved. Backend/Cursor/Git/APK/OPPO deferred.
+Next bounded batch after technical completion: remaining Counter Sale.
+
+## Current checkpoint — Batch A approved; AP023 Batch B local review
+
+Founder approved the v33 BatchA presentation and authorized next scope. AP023
+now retains complete current/original CSV values and opens the existing shared
+product editor for correction. Raw values remain raw (including invalid numbers);
+the presentation seed is not inventory and its temporary IDs are not shown as
+catalogue references. Apply invokes the full importer against live Store stock
+and other ready rows. Original row number/source evidence are retained; valid
+corrections return selected to Ready. Final batch Save alone mutates private stock.
+Malformed column structure stays file-level repair rather than guessed mapping.
+
+v34 ten focused checks passed. v35 broad43-pass/3-failure evidence retained:
+old29-column count and Store-guide copy assertions migrated to existing41-field
+schema and current ownership wording, preserving exclusion guards. Forensic2x
+error-label issue fixed through whole-field reveal/caret padding and geometry
+test. Corrected cells enforce the same4000-character limit as source CSV.
+v36:50 combined local tests passed; five-owner analysis and diff check clean.
+Entry/error/ready normal/enlarged Flutter renders inspected; founder approval
+of BatchB pending. Host tests are not OPPO/backend capacity or all58 acceptance.
+
+Changed owners this batch: work_models.dart, store_add_product_sheet.dart,
+work_workspace_dashboard_screen.dart, work_product_content_test.dart and
+work_workspace_layout_safety_test.dart, plus this status and regression records.
+Branch work/codex-ui/add-product-screen1-20260920; HEAD e9243d4644749c4fe805052b41b4a225f41e5d91 unchanged.
+Task evidence: outputs/CSV-BATCH-B-V36-REVIEW.md; store-csv-v36-tests.log;
+store-csv-v36-analysis.log. Screens: external POST-UI-AUDIT-20260905/store-csv-v36.
+Next after approval: remaining Counter Sale batch. No Git commit/push, APK,
+OPPO, backend or Cursor changes. Offers remains held.
+
+## Current local batch — CSV A (AP-OPPO-022/024/025)
+
+Founder authorized remaining frontend work in approval-sized batches. Reuse
+the existing import screen/schema/shared editor/save callback; no new backend
+or public implementation. Entry guide collapses; all-invalid selects attention
+without Save0; unboxed search/bulk selection preserves hidden selections; exact
+row/error and raw-value diagnostics remain accessible without repeated bands.
+Private inventory/publication and account/Store guards stay intact.
+
+Local search now treats CSV row references separately from product text, after
+the10k fixture caught Product9999 also matching an unrelated CSV row9999. Normal
+and enlarged selected-chip contrast is explicitly covered. Failed v29–32 logs
+and renders retained. v33:22 focused local checks passed; scoped analysis and
+diff check clean; actual entry/ready/error and narrow2x renders inspected.
+Founder approval pending. Evidence in the task's ACTIVE-WORK-RECORD.md and
+outputs/CSV-BATCH-A-V33-REVIEW.md. Host fixtures are not OPPO acceptance or proof
+of full provider/public/backend mapping.
+
+AP023 invalid-row correction is the next distinct batch: the current editor
+requires a validated product, so do not coerce invalid raw fields into ready
+records. Following batches: remaining Counter Sale, ledger/customer statements,
+Codex-owned provider/public/document readiness, then original58/later-input
+reconciliation. Cursor integration/backend/OPPO/Git/Offers remain deferred or
+held as previously directed. Existing approved designs are not reopened.
+
+## Latest amendment — remove static sharing banner
+
+Founder confirmed that a published Store should have a public share link and
+rejected the fixed prerequisite line. Removed the banner and its container.
+Share entries are disabled/dimmed until an authoritative Store-scoped public-link
+adapter exists; neither saved setup nor local visibility is proof. No backend,
+URL invention, publication or messaging added. Preserve other approved layout.
+v28 focused checks/captures: task outputs/store-share-v28-tests.log and external
+POST-UI-AUDIT store-share-v28. v27 approval below is historical and superseded
+only for the banner/Share availability treatment. CSV review remains next.
+
+## Current founder checkpoint — Stock v24 visually approved
+
+Founder approved Stock v24, then requested one durable consolidated visual guide
+and continuation. Before every subsequent screen read
+[STORE-VISUAL-MASTER-001](STORE-VISUAL-MASTER-001.md), now linked from mandatory
+design memory. It supplements existing rules, distinguishes inference and marks
+superseded decisions; no new screen/reference or policy authority is inferred.
+Share v27 now keeps the unavailable message inline at its origin and recovers
+through Store Settings without restarting onboarding.23 focused checks pass;
+scoped analysis clean. Enlarged home content/notice scroll while actions remain
+reachable. Founder explicitly approved the presented Share v27 screen (task
+outputs/STORE-SHARE-V27-REVIEW.md). Preserve approved states; no unshown-state or
+all58 acceptance inferred. CSV review is next; Offers/backend held.
+Stock37 checks and local visual approval do not substitute for later OPPO/Git.
+
+## Latest founder amendment: remove whole Stock strip — v22
+
+Final v24 additionally removes root Stock header Back and releases its name
+spacing. Back remains for direct-filter/search/alert/nested returns; native
+system Back and editor discard guards unchanged.37 focused local checks pass,
+scoped analysis/diff clean. Evidence: task outputs/store-stock-v24-tests.log,
+outputs/STOCK-V24-REVIEW.md and external POST-UI-AUDIT store-stock-v24 images.
+Stock v24 founder approval is recorded above; no Git checkpoint/APK/backend/Cursor work this pass.
+
+This supersedes the prior retention of Stock +. Stock has no secondary
+heading/count/action toolbar or swipe-hint text row. Category is an isolated
+icon within its borderless search row, with the statement table immediately
+below. Add products stays on Store home's existing rail; catalogue/manual/CSV
+still share their existing editor and saved inventory. Do not restore + on
+Stock as a duplicate shortcut. Downloads remain central.
+
+The existing Store category component reuses Cursor3d837cb5's latest category
+tile layout/artwork treatment via bundled atlas/crop primitives; Store opens
+full-screen rather than the buyer's draggable partial sheet. Stock-only data,
+search/clear and selection remain independent of the Buy session. Filter is
+inside this window, retaining low/out/public/private/brand functionality.
+No Cursor source edits/merge or production backend work. Catalogue mode keeps
+its approved toolbar. Local screenshots require founder review; OPPO pending.
+
+## Store rail correction and action audit — 22 September 2026
+
+Founder approved responsive rails: fixed predictable location, never automatic
+empty-space seeking. Shared contextual rails and Store home action edge now put
+actions below content at width below360dp, or text scale above1.3 below600dp;
+otherwise they remain right-side vertical scrolling rails. Bottom actions are
+54dp high and horizontally scrollable; working content does not sit underneath.
+Live updates/typing do not select a different rail orientation. Existing keyboard
+hiding and guarded transaction navigation remain. Horizontal rails are compact
+action labels; live group progress/detail stays on the destination, with semantic
+descriptions retained. v19 loaded-group regression exposed an unbounded progress
+indicator; retained log and registry note precede the v20 correction/replay.
+
+Store home already has Add products, wired to the same catalogue/manual/CSV
+journey. Stock's rail is procurement (Buy stock, Track purchases, Group buying),
+not Add Product. Its + is a contextual shortcut to the same product journey on
+a different screen. Keep +, Category and Filter: none is duplicated within
+Stock. Do not remove catalogue/CSV reachability or implement a second journey.
+Offers remains held; no backend/Cursor/APK/commit authority added by this change.
+Final v20:34 combined local checks pass and scoped Dart analysis is clean.
+Evidence: task outputs/store-context-rail-v20-tests.log and external
+MOOLSOCIAL-POST-UI-AUDIT-20260905/store-context-rail-v20 renders. These are local
+fixtures, not OPPO qualification or backend capacity acceptance. Source remains
+uncommitted on work/codex-ui/add-product-screen1-20260920 at e9243d46.
+
 ## Current bounded OPPO successor authority — 21 September 2026
 
 Founder explicitly authorised one successor OPPO review APK and physical testing

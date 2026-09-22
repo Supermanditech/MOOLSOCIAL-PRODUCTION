@@ -1,5 +1,16 @@
 # MoolSocial product design memory
 
+## Supplemental founder preferences — 22 September 2026
+
+Before new authorized screen work, also read
+[STORE-VISUAL-MASTER-001](../quality/STORE-VISUAL-MASTER-001.md). It consolidates
+recent founder visual/interaction decisions and explicitly separates binding
+screen decisions from inferred defaults. Apply its general preferences only
+within the current screen's authority. It does not unlock accepted references,
+replace brand/accessibility/security rules, authorize cross-owner changes or
+override an approved screen with a general preference. Older history below is
+preserved; explicit later decisions supersede it only for their stated scope.
+
 Status: **mandatory for the complete application**
 
 Last confirmed by the product owner: 20 July 2026

@@ -533,6 +533,65 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  test('CSV37 add-only rejects entire batch without overwriting stock', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterSecureStorage.setMockInitialValues({});
+    final work = WorkSession(gateway: ReviewWorkGateway());
+    addTearDown(work.dispose);
+    final rows = WorkspaceProductImport.parse(
+      'title,brand,pack,purchasePrice,sellingPrice,stock,sku,barcode\n'
+      'Rice,Local,1 kg,40,50,4,RICE01,000001\n'
+      'Tea,Local,1 kg,40,50,3,TEA01,000002\n'
+      'Coffee,Local,1 kg,40,50,2,COFFEE01,000003',
+      catalogue: const [],
+      owned: const [],
+    ).rows;
+    final rice = rows.first.product!,
+        tea = rows[1].product!,
+        coffee = rows.last.product!;
+    work.workspaceCatalogueItems
+      ..clear()
+      ..add(rice);
+    final movements = List.of(work.workspaceStockMovements);
+    for (final duplicate in [
+      rice.copyWith(title: tea.title, sku: tea.sku, barcode: tea.barcode),
+      tea.copyWith(sku: ' rice01 '),
+      tea.copyWith(barcode: rice.barcode),
+      tea.copyWith(
+        title: rice.title,
+        brand: rice.brand,
+        pack: rice.pack,
+        variant: rice.variant,
+      ),
+      tea.copyWith(stock: -1),
+      tea.copyWith(publicListing: true),
+    ]) {
+      expect(
+        () => work.importWorkspaceProducts([coffee, duplicate], addOnly: true),
+        throwsFormatException,
+      );
+      expect(work.workspaceCatalogueItems, [rice]);
+      expect(work.workspaceStockMovements, movements);
+    }
+    work.workspaceCatalogueItems.clear();
+    expect(
+      () => work.importWorkspaceProducts([
+        tea,
+        coffee.copyWith(sku: tea.sku),
+      ], addOnly: true),
+      throwsFormatException,
+    );
+    expect(work.workspaceCatalogueItems, isEmpty);
+    expect(work.workspaceStockMovements, movements);
+    work.importWorkspaceProducts([rice, tea], addOnly: true);
+    expect(work.workspaceCatalogueItems, [rice, tea]);
+    expect(work.workspaceCatalogueItems.every((p) => !p.publicListing), isTrue);
+    // Intentional legacy update callers retain their previous behaviour.
+    work.importWorkspaceProducts([rice.copyWith(stock: 9)]);
+    expect(work.workspaceCatalogueItems, hasLength(2));
+    expect(work.workspaceCatalogueItems.first.stock, 9);
+  });
+
   group('COUNTERRELAUNCH review Store recovery', () {
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();
@@ -5622,11 +5681,45 @@ void main() {
           restored.workspaceOrderBillingDetails.toJson(),
           details.toJson(),
         );
+        const seller = WorkspaceStorePublicationDetails(
+          legalName: 'Original legal business',
+          street: '42 Market Road',
+          city: 'Jaipur',
+          state: 'Rajasthan',
+          pinCode: '302001',
+          billingAddress: 'Original billing address',
+        );
+        expect(restored.saveWorkspacePublicationDetails(seller), isTrue);
         final result = await restored.submitWorkspaceCounterBill();
         expect(result?.invoice, isNotNull);
         final invoice = result!.invoice!;
         expect(invoice.billingDetails.toJson(), details.toJson());
         expect(invoice.sellerName, _commandStore.name);
+        expect(invoice.seller!.storeId, _commandStore.id);
+        expect(invoice.seller!.legalName, seller.legalName);
+        expect(invoice.seller!.storeAddress, seller.address);
+        expect(invoice.seller!.billingAddress, seller.billingAddress);
+        expect(
+          restored.saveWorkspacePublicationDetails(
+            const WorkspaceStorePublicationDetails(
+              legalName: 'Changed later',
+              billingAddress: 'Changed address',
+            ),
+          ),
+          isTrue,
+        );
+        expect(invoice.seller!.legalName, seller.legalName);
+        expect(invoice.seller!.billingAddress, seller.billingAddress);
+        expect(
+          WorkspaceCustomerInvoice.fromLedgerJson(
+            invoice.toLedgerJson(),
+          ).seller!.toJson(),
+          invoice.seller!.toJson(),
+        );
+        expect(
+          invoice.copyWith(sharedChannels: {'Chat'}).seller,
+          same(invoice.seller),
+        );
         final savedFileName = invoice.pdfFileName;
         expect(savedFileName, contains('_Test-business_INV-'));
         expect(savedFileName, isNot(contains(invoice.customer)));
@@ -11596,40 +11689,46 @@ void main() {
   });
 
   for (final publicListing in [false, true]) {
-    test('counter inventory sale preserves public listing $publicListing', () {
-      final session = liveSession();
-      final product = _product(
-        stock: 10,
-      ).copyWith(publicListing: publicListing);
-      session.addOrUpdateWorkspaceProduct(product);
-      session.prepareWorkspaceOrder(
-        source: 'Counter',
-        fulfilment: 'At the shop',
-      );
-      expect(product.canSellAtCounter, isTrue);
-      expect(product.published, publicListing);
-      session.adjustWorkspaceOrderQuantity(product.id, 2);
-      expect(session.workspaceOrderQuantities[product.id], 2);
-      session.saveWorkspaceOrderDraft(
-        customer: '9829012321',
-        source: 'Counter',
-        fulfilment: 'At the shop',
-        payment: 'Cash',
-        address: '',
-      );
-      final invoice = session.completeWorkspaceCounterSale();
-      expect(invoice, isNotNull);
-      expect(invoice!.amount, 550);
-      final remaining = session.workspaceCatalogueItems.single;
-      expect(remaining.stock, 8);
-      expect(remaining.publicListing, publicListing);
-      expect(remaining.published, publicListing);
-      expect(
-        remaining.toBuyPublicProduct(storeName: 'Store').catalogueListing,
-        publicListing,
-      );
-      expect(session.workspaceSettlementBalance, 0);
-    });
+    test(
+      'counter inventory sale preserves listing intent without bypassing publication $publicListing',
+      () {
+        final session = liveSession();
+        final product = _product(
+          stock: 10,
+        ).copyWith(publicListing: publicListing);
+        session.addOrUpdateWorkspaceProduct(product);
+        session.prepareWorkspaceOrder(
+          source: 'Counter',
+          fulfilment: 'At the shop',
+        );
+        expect(product.canSellAtCounter, isTrue);
+        // This fixture lacks approved media/public facts. Listing intent is not
+        // publication authority, before OR after a private Counter Sale.
+        expect(product.publicListing, publicListing);
+        expect(product.published, isFalse);
+        session.adjustWorkspaceOrderQuantity(product.id, 2);
+        expect(session.workspaceOrderQuantities[product.id], 2);
+        session.saveWorkspaceOrderDraft(
+          customer: '9829012321',
+          source: 'Counter',
+          fulfilment: 'At the shop',
+          payment: 'Cash',
+          address: '',
+        );
+        final invoice = session.completeWorkspaceCounterSale();
+        expect(invoice, isNotNull);
+        expect(invoice!.amount, 550);
+        final remaining = session.workspaceCatalogueItems.single;
+        expect(remaining.stock, 8);
+        expect(remaining.publicListing, publicListing);
+        expect(remaining.published, isFalse);
+        expect(
+          remaining.toBuyPublicProduct(storeName: 'Store').catalogueListing,
+          isFalse,
+        );
+        expect(session.workspaceSettlementBalance, 0);
+      },
+    );
   }
 
   for (final stockMode in WorkspaceStockMode.values) {

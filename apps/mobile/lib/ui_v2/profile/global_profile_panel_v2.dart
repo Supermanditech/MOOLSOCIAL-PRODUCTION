@@ -671,6 +671,13 @@ class _PersonalAccountSection extends StatelessWidget {
     title: 'Account settings',
     items: [
       const _ProfileDestination(
+        id: 'downloads',
+        title: 'Downloads',
+        detail: 'Purchase invoices and order documents',
+        icon: Icons.download_outlined,
+        route: '/app/account/downloads',
+      ),
+      const _ProfileDestination(
         id: 'identity',
         title: 'Personal profile',
         detail: 'Identity and contact',

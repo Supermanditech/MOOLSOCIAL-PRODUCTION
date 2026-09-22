@@ -2916,6 +2916,46 @@ if ($ProductionLane -ceq 'baseline') {
         $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
         $effectiveOwner -ceq 'apps/mobile/lib/features/journey01/journey_router.dart'
       )
+      # Exact already-founder-approved Store/provider/PDF/Downloads continuation.
+      # No other Profile/Buy owner or Cursor checkout is admitted by this list.
+      $addProductApprovedFrontendOwner = (
+        $hasContinuationBinding -and
+        $selectedContinuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+        $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+        $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
+        $effectiveOwner -cin @(
+          'config/codex-development-regression-registry.json',
+          'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
+          'apps/mobile/lib/shared/commerce/commerce_downloads.dart',
+          'apps/mobile/lib/shared/commerce/commerce_downloads_screen.dart',
+          'apps/mobile/lib/shared/commerce/commerce_invoice_document.dart',
+          'apps/mobile/lib/shared/commerce/commerce_invoice_pdf.dart',
+          'apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart',
+          'apps/mobile/test/work_invoice_pdf_test.dart',
+          'apps/mobile/test/commerce_downloads_test.dart',
+          'apps/mobile/test/commerce_invoice_pdf_test.dart',
+          'apps/mobile/test/fixtures/store_public_handoff_v1.dart',
+          'apps/mobile/test/store_product_thumbnail_test.dart',
+          'apps/mobile/test/store_settings_widgets_test.dart',
+          'apps/mobile/test/store_selling_channels_test.dart',
+          'apps/mobile/test/work_downloads_test.dart',
+          'apps/mobile/test/work_product_content_test.dart',
+          'apps/mobile/test/work_public_handoff_test.dart',
+          'apps/mobile/test/work_publication_test.dart',
+          'apps/mobile/test/work_store_publication_settings_test.dart',
+          'docs/quality/COMMERCE-DOWNLOADS-FRONTEND-20260922.md',
+          'docs/quality/STORE-VISUAL-MASTER-001.md',
+          'docs/design/APPLE-INSPIRED-PRODUCT-DESIGN-MEMORY.md',
+          'docs/quality/CURSOR-STORE-PUBLIC-DATA-HANDOFF-20260922.md',
+          'docs/quality/STORE-INVOICE-FORMAT-REFERENCES-20260922.md',
+          'docs/quality/STORE-PUBLIC-FILTER-ELIGIBILITY-HANDOFF-20260922.md',
+          'docs/quality/STORE-PUBLICATION-FRONTEND-20260922.md',
+          'docs/quality/store-public-field-register-v1.json',
+          'docs/quality/store-public-test-handoff-v1.json'
+        )
+      )
       # Exact successor may verify inherited owners; integration phases still
       # forbid direct source commits and require the sealed complete apps tree.
       $storeAddProductInheritedOwner = $storeAddProductIntegration -and
@@ -2942,7 +2982,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -2955,7 +2995,7 @@ if ($ProductionLane -ceq 'baseline') {
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
           $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
-          $addProductPhotoRouteOwner -or
+          $addProductPhotoRouteOwner -or $addProductApprovedFrontendOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or

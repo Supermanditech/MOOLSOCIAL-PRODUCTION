@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/commerce/commerce_downloads.dart';
+import '../../shared/commerce/commerce_downloads_screen.dart';
 
 import '../book/book_session.dart';
 import '../book/screens/book_home_screen.dart';
@@ -11,6 +13,7 @@ import '../book/screens/doctor_screens.dart';
 import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
+import '../work/work_publication.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../buy/buy_v2_session.dart';
@@ -125,13 +128,13 @@ import 'screens/universal_shell.dart';
 final class _WorkspacePublicBuyCommerceAdapter implements BuyV2CommerceAdapter {
   const _WorkspacePublicBuyCommerceAdapter(this.product);
 
-  final BuyV2Product product;
+  final BuyV2Product? product;
 
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
-    products: [product],
-    paymentMethods: const {'UPI'},
+    products: [?product],
+    paymentMethods: const {},
   );
 
   @override
@@ -208,6 +211,7 @@ final class _WorkspacePublicBuySession extends BuyV2Session {
   _WorkspacePublicBuySession({
     required super.core,
     required BuyV2CommerceAdapter commerceAdapter,
+    super.productContentAdapter,
   }) : super(commerceAdapter: commerceAdapter, reviewDataEnabled: false);
 
   VoidCallback? directProductExit;
@@ -257,6 +261,18 @@ GoRouter createJourneyRouter(
   String? workspacePublicBuySignature;
   Future<void>? workspacePublicBuyRestore;
   BuyV2Session resolveWorkspacePublicBuySession(String productId) {
+    if (!workSession.workspaceVisibleToCustomers ||
+        !workSession.workspacePublicationReport.ready) {
+      workspacePublicBuySession?.dispose();
+      final blocked = _WorkspacePublicBuySession(
+        core: buySession,
+        commerceAdapter: const _WorkspacePublicBuyCommerceAdapter(null),
+      );
+      workspacePublicBuySession = blocked;
+      workspacePublicBuySignature = null;
+      workspacePublicBuyRestore = blocked.restoreCommerce();
+      return blocked;
+    }
     final product = workSession.workspaceCatalogueItems
         .where((item) => item.id == productId && item.published)
         .firstOrNull;
@@ -279,6 +295,7 @@ GoRouter createJourneyRouter(
       product.categoryId,
       product.origin,
       product.composition,
+      product.content.toJson(),
       product.regulatoryNote,
       product.requiresPrescription,
       product.visualLabel,
@@ -291,6 +308,10 @@ GoRouter createJourneyRouter(
       product.publicListing,
       product.catalogueFactsRequireReview,
       product.cataloguePhoto?.toJson(),
+      product.packMeasure?.toJson(),
+      product.wholesaleOffer?.toJson(),
+      product.retailEnabled,
+      workSession.workspacePublicationDetails.toJson(),
       workSession.activeWorkspace?.name ?? workSession.workName,
     ]);
     if (workspacePublicBuySession != null &&
@@ -302,10 +323,16 @@ GoRouter createJourneyRouter(
       storeName: workSession.activeWorkspace?.name ?? workSession.workName,
       storeId: storeId,
       confirmedOn: 'Updated by Store',
+      storeDetails: workSession.workspacePublicationDetails,
     );
     final next = _WorkspacePublicBuySession(
       core: buySession,
       commerceAdapter: _WorkspacePublicBuyCommerceAdapter(publicProduct),
+      productContentAdapter: WorkspacePublicContentAdapter(
+        storeId: storeId!,
+        item: product,
+        sourceId: 'store:$storeId:sku:${product.id}',
+      ),
     );
     workspacePublicBuySession = next;
     workspacePublicBuySignature = signature;
@@ -1643,6 +1670,26 @@ GoRouter createJourneyRouter(
         path: '/app/activity',
         builder: (context, state) =>
             SharedHubScreen(session: sharedSession, screen: 157),
+      ),
+      GoRoute(
+        path: '/app/account/downloads',
+        builder: (context, state) {
+          final owner = buyV2Session.customerStateStore?.ownerScope;
+          // The current public order cache has no per-document owner proof.
+          // Never turn that cache into a customer document feed.
+          return CommerceDownloadsScreen(
+            scope: CommerceDownloadScope(owner ?? ''),
+            source: const UnavailableCommerceDownloadSource(),
+            scopeChanges: Listenable.merge([session, buyV2Session]),
+            isCurrent: () =>
+                session.isAuthenticated &&
+                buyV2Session.customerStateStore?.ownerScope == owner,
+            title: 'Downloads',
+            ownerLabel: 'Your purchase documents',
+            onExit: () =>
+                context.canPop() ? context.pop() : context.go('/app/buy'),
+          );
+        },
       ),
       GoRoute(
         path: '/app/account/identity',

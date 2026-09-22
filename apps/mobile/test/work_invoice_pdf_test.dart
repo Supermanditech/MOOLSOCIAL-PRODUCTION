@@ -17,6 +17,14 @@ WorkInvoicePdfRequest request({int count = 2}) => WorkInvoicePdfRequest(
     orderId: 'order-review',
     customer: '9000000000',
     sellerName: 'Annapurna Stores',
+    seller: const WorkspaceInvoiceSeller(
+      storeId: 'review-store',
+      legalName: 'Annapurna Grocery and Household Supplies Private Limited',
+      storeAddress:
+          '42 Market Road, Near Central Market, Jaipur, Rajasthan, 302001',
+      billingAddress:
+          'Unit 12, First Floor, Wholesale Market Complex, Civil Lines, Jaipur, Rajasthan, 302006',
+    ),
     billingDetails: const WorkspaceBillingDetails(
       business: true,
       businessName: 'Sunrise Cafe',
@@ -129,6 +137,66 @@ Future<void> tap(WidgetTester tester, String key) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('SELLER-SNAPSHOT codec, legacy absence and private field exclusion', () {
+    final invoice = request().invoice;
+    final restored = WorkspaceCustomerInvoice.fromLedgerJson(
+      invoice.toLedgerJson(),
+    );
+    expect(restored.seller!.toJson(), invoice.seller!.toJson());
+    expect(
+      restored.copyWith(sharedChannels: {'Chat'}).seller,
+      same(restored.seller),
+    );
+    expect(restored.seller!.invoiceAddress, invoice.seller!.billingAddress);
+    expect(
+      restored.seller!.toJson().keys,
+      unorderedEquals([
+        'storeId',
+        'legalName',
+        'storeAddress',
+        'billingAddress',
+      ]),
+    );
+    final legacy = invoice.toLedgerJson()..remove('seller');
+    expect(WorkspaceCustomerInvoice.fromLedgerJson(legacy).seller, isNull);
+    expect(
+      const WorkspaceInvoiceSeller(
+        storeId: 's',
+        storeAddress: 'Store address',
+      ).invoiceAddress,
+      'Store address',
+    );
+    expect(const WorkspaceInvoiceSeller(storeId: 's').detailLines, isEmpty);
+    for (final data in [
+      <String, Object?>{},
+      {...invoice.seller!.toJson(), 'storeId': ''},
+      {...invoice.seller!.toJson(), 'legalName': 12},
+      {
+        ...invoice.seller!.toJson(),
+        'billingAddress': List.filled(2001, 'x').join(),
+      },
+    ]) {
+      expect(
+        () => WorkspaceInvoiceSeller.fromJson(data),
+        throwsFormatException,
+      );
+    }
+  });
+  test('SELLER-SNAPSHOT PDF refuses another Store identity', () async {
+    final base = request();
+    await expectLater(
+      const LocalReviewWorkInvoicePdfSource().load(
+        WorkInvoicePdfRequest(
+          accountId: base.accountId,
+          storeId: 'other-store',
+          invoice: base.invoice,
+          items: base.items,
+          paymentStatus: base.paymentStatus,
+        ),
+      ),
+      throwsA(isA<WorkInvoicePdfException>()),
+    );
+  });
   test(
     'COUNTERDISCOUNT PDF accepts precise bill and rejects mismatched lines',
     () async {

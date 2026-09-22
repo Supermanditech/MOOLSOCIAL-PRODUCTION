@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
+import 'work_publication_data.dart';
+export 'work_publication_data.dart';
 
 enum WorkspaceIssueTarget { customerOrder, supplierShipment }
 
@@ -3993,12 +3995,64 @@ class WorkspacePackingLine {
   final bool packed;
 }
 
+/// Store-owned details frozen at issue time, not verified tax registration or
+/// publication authority. Absent on historical invoices; never backfill them.
+class WorkspaceInvoiceSeller {
+  const WorkspaceInvoiceSeller({
+    required this.storeId,
+    this.legalName = '',
+    this.storeAddress = '',
+    this.billingAddress = '',
+  });
+
+  final String storeId, legalName, storeAddress, billingAddress;
+  String get invoiceAddress =>
+      billingAddress.isNotEmpty ? billingAddress : storeAddress;
+  List<String> get detailLines => [
+    if (legalName.isNotEmpty) 'Legal name: $legalName',
+    if (invoiceAddress.isNotEmpty) 'Seller address: $invoiceAddress',
+  ];
+  bool get valid =>
+      storeId.trim().isNotEmpty &&
+      storeId.length <= 500 &&
+      legalName.length <= 2000 &&
+      storeAddress.length <= 6500 &&
+      billingAddress.length <= 2000;
+
+  Map<String, Object?> toJson() => {
+    'storeId': storeId,
+    'legalName': legalName,
+    'storeAddress': storeAddress,
+    'billingAddress': billingAddress,
+  };
+  factory WorkspaceInvoiceSeller.fromJson(Object? value) {
+    if (value is! Map) throw const FormatException('Invalid invoice seller.');
+    String field(String key) {
+      final text = value[key];
+      if (text is! String) {
+        throw const FormatException('Invalid invoice seller.');
+      }
+      return text;
+    }
+
+    final result = WorkspaceInvoiceSeller(
+      storeId: field('storeId'),
+      legalName: field('legalName'),
+      storeAddress: field('storeAddress'),
+      billingAddress: field('billingAddress'),
+    );
+    if (!result.valid) throw const FormatException('Invalid invoice seller.');
+    return result;
+  }
+}
+
 class WorkspaceCustomerInvoice {
   const WorkspaceCustomerInvoice({
     required this.id,
     required this.orderId,
     required this.customer,
     this.sellerName = '',
+    this.seller,
     this.billingDetails = const WorkspaceBillingDetails(),
     required this.items,
     required this.amount,
@@ -4017,6 +4071,7 @@ class WorkspaceCustomerInvoice {
 
   /// Seller identity at issue time; never substitute a later Store rename.
   final String sellerName;
+  final WorkspaceInvoiceSeller? seller;
   final String items;
   final int amount;
   final int remainderPaise, discountMinor;
@@ -4070,6 +4125,7 @@ class WorkspaceCustomerInvoice {
     'orderId': orderId,
     'customer': customer,
     'sellerName': sellerName,
+    if (seller != null) 'seller': seller!.toJson(),
     'billingDetails': billingDetails.toJson(),
     'items': items,
     'amount': amount,
@@ -4087,6 +4143,9 @@ class WorkspaceCustomerInvoice {
       orderId: map['orderId'] as String,
       customer: map['customer'] as String,
       sellerName: map['sellerName'] as String? ?? '',
+      seller: map['seller'] == null
+          ? null
+          : WorkspaceInvoiceSeller.fromJson(map['seller']),
       billingDetails: WorkspaceBillingDetails.fromJson(map['billingDetails']),
       items: map['items'] as String,
       amount: map['amount'] as int,
@@ -4113,6 +4172,7 @@ class WorkspaceCustomerInvoice {
         orderId: orderId,
         customer: customer,
         sellerName: sellerName,
+        seller: seller,
         billingDetails: billingDetails,
         items: items,
         amount: amount,
@@ -4150,6 +4210,31 @@ class WorkspaceStoreOffer {
 }
 
 enum WorkspaceStockMode { availabilityOnly, exactQuantity }
+
+/// Store-owned defaults for NEW records only. Listing is retailer intent, not
+/// publication authority. CSV drafts always remain private until reviewed.
+class WorkspaceProductDefaults {
+  const WorkspaceProductDefaults({
+    this.stockMode = WorkspaceStockMode.exactQuantity,
+    this.lowStockThreshold = 5,
+    this.customerListingRequested = false,
+  });
+  final WorkspaceStockMode stockMode;
+  final int lowStockThreshold;
+  final bool customerListingRequested;
+  bool get valid => lowStockThreshold >= 0 && lowStockThreshold <= 999999999;
+  WorkspaceCatalogueItem applyToNew(WorkspaceCatalogueItem product) =>
+      product.copyWith(
+        stockMode: stockMode,
+        lowStockThreshold: lowStockThreshold,
+        publicListing: customerListingRequested,
+      );
+  Map<String, Object?> toJson() => {
+    'stockMode': stockMode.name,
+    'lowStockThreshold': lowStockThreshold,
+    'customerListingRequested': customerListingRequested,
+  };
+}
 
 /// Confirmed cumulative returned packs for one exact supplier shipment.
 /// A return confirmation is not a credit note, refund or payment instruction.
@@ -4767,6 +4852,13 @@ class WorkspaceCataloguePhoto {
   }
 }
 
+enum WorkspaceProductImportIssueKind {
+  invalidValue,
+  duplicateInStore,
+  duplicateInFile,
+  malformedColumns,
+}
+
 /// One row of a file review. Blocked rows never become inventory implicitly.
 class WorkspaceProductImportRow {
   const WorkspaceProductImportRow(
@@ -4779,6 +4871,13 @@ class WorkspaceProductImportRow {
     this.variant = '',
     this.pack = '',
     this.sku = '',
+    this.rawValues = const {},
+    this.sourceValues = const {},
+    this.canCorrect = false,
+    this.issueKind,
+    this.relatedRowNumber,
+    this.sourceCells = const [],
+    this.sourceHeaders = const [],
   });
   final int number;
   final String title;
@@ -4787,6 +4886,15 @@ class WorkspaceProductImportRow {
   final bool matched;
   final Map<String, String> issueValues;
   final String variant, pack, sku;
+
+  /// Current inputs and original source evidence; neither is sellable stock.
+  final Map<String, String> rawValues, sourceValues;
+  final bool canCorrect;
+  final WorkspaceProductImportIssueKind? issueKind;
+  final int? relatedRowNumber;
+
+  /// Positional evidence for malformed CSV rows; never guessed product fields.
+  final List<String> sourceCells, sourceHeaders;
 }
 
 class WorkspaceProductImport {
@@ -4814,6 +4922,7 @@ class WorkspaceProductImport {
   };
   static final columns = Set<String>.unmodifiable({
     ...requiredColumns,
+    ...WorkspaceSellingInputs.labels.keys,
     'sku',
     'barcode',
     'canonicalId',
@@ -4832,11 +4941,13 @@ class WorkspaceProductImport {
     'visualLabel',
     'composition',
     'regulatoryNote',
+    ...WorkspaceProductContent.labels.keys,
     ...packFieldLabels.keys,
   });
   // One schema owns the download headings and the retailer's column guide.
   // Identity/approval metadata and publication requests are not template inputs.
   static const templateLabels = {
+    ...WorkspaceSellingInputs.labels,
     'title': 'Product name',
     'brand': 'Brand or maker',
     'pack': 'Pack size',
@@ -4858,9 +4969,61 @@ class WorkspaceProductImport {
     'origin': 'Product origin',
     'composition': 'Ingredients or composition',
     'regulatoryNote': 'Product regulatory note',
+    ...WorkspaceProductContent.labels,
     ...packFieldLabels,
   };
   static String get csvTemplate => '\uFEFF${templateLabels.keys.join(',')}\r\n';
+
+  /// Reuse the complete importer, including exact-pack matching and duplicate
+  /// checks. Corrected rows keep their original CSV row and source evidence.
+  static WorkspaceProductImportRow revalidateRow(
+    WorkspaceProductImportRow original,
+    Map<String, String> values, {
+    required List<WorkspaceCatalogueItem> catalogue,
+    required List<WorkspaceCatalogueItem> owned,
+    List<WorkspaceProductImportRow> readyRows = const [],
+    WorkspaceProductDefaults defaults = const WorkspaceProductDefaults(),
+  }) {
+    if (!original.canCorrect) {
+      throw const FormatException(
+        'Correct this row in the file and import again.',
+      );
+    }
+    for (final entry in values.entries) {
+      if (entry.value.length > 4000) {
+        throw FormatException(
+          '${entry.key}: Keep this value within 4,000 characters.',
+        );
+      }
+    }
+    final result = parse(
+      jsonEncode([values]),
+      json: true,
+      catalogue: catalogue,
+      owned: owned,
+      readyRows: readyRows,
+      defaults: defaults,
+    ).rows.single;
+    return WorkspaceProductImportRow(
+      original.number,
+      result.title,
+      result.product,
+      result.issue,
+      result.matched,
+      issueValues: result.issueValues,
+      variant: result.variant,
+      pack: result.pack,
+      sku: result.sku,
+      rawValues: result.rawValues,
+      sourceValues: original.sourceValues,
+      canCorrect: true,
+      issueKind: result.issueKind,
+      relatedRowNumber: result.relatedRowNumber,
+      sourceCells: original.sourceCells,
+      sourceHeaders: original.sourceHeaders,
+    );
+  }
+
   static String identity(WorkspaceCatalogueItem p) => jsonEncode([
     p.brand.toLowerCase().trim(),
     p.title.toLowerCase().trim(),
@@ -4879,7 +5042,7 @@ class WorkspaceProductImport {
     var quoted = false, endedQuote = false;
     void endCell() {
       row.add(cell.toString().trim());
-      if (row.length > 50) {
+      if (row.length > columns.length) {
         throw const FormatException(
           'Too many columns. Use the listed product columns.',
         );
@@ -4923,8 +5086,8 @@ class WorkspaceProductImport {
       } else if (c == '"' && cell.isEmpty && !endedQuote) {
         quoted = true;
       } else if (c == '"' || (endedQuote && c.trim().isNotEmpty)) {
-        throw const FormatException(
-          'Check the quotation marks in your CSV file.',
+        throw FormatException(
+          'CSV row $recordNumber: check the quotation marks. No products were saved.',
         );
       } else if (!endedQuote) {
         cell.write(c);
@@ -4936,8 +5099,8 @@ class WorkspaceProductImport {
       }
     }
     if (quoted) {
-      throw const FormatException(
-        'A quoted cell is not closed. Check your CSV file.',
+      throw FormatException(
+        'CSV row $recordNumber: a quoted cell is not closed. Fix the file and import again; no products were saved.',
       );
     }
     if (cell.isNotEmpty || row.isNotEmpty || endedQuote) endRow();
@@ -4949,6 +5112,8 @@ class WorkspaceProductImport {
     bool json = false,
     required List<WorkspaceCatalogueItem> catalogue,
     required List<WorkspaceCatalogueItem> owned,
+    List<WorkspaceProductImportRow> readyRows = const [],
+    WorkspaceProductDefaults defaults = const WorkspaceProductDefaults(),
   }) {
     if (text.length > 10 * 1024 * 1024) {
       throw const FormatException('Choose a file smaller than 10 MB.');
@@ -4956,6 +5121,8 @@ class WorkspaceProductImport {
     final records = <Map<String, String>>[];
     final rowNumbers = <int>[];
     final malformed = <int>{};
+    final sourceCells = <List<String>>[];
+    var sourceHeaders = const <String>[];
     if (json) {
       final decoded = jsonDecode(text);
       if (decoded is! List || decoded.isEmpty || decoded.length > 10000) {
@@ -4981,6 +5148,7 @@ class WorkspaceProductImport {
         );
       }
       final headers = table.first;
+      sourceHeaders = List.unmodifiable(headers);
       if (headers.toSet().length != headers.length ||
           headers.any((h) => h.isEmpty)) {
         throw const FormatException('Use a unique name for every column.');
@@ -4991,6 +5159,7 @@ class WorkspaceProductImport {
         );
       }
       for (final values in table.skip(1)) {
+        sourceCells.add(List.unmodifiable(values));
         if (values.length != headers.length) malformed.add(records.length);
         records.add({
           for (var i = 0; i < headers.length; i++)
@@ -5021,6 +5190,22 @@ class WorkspaceProductImport {
         .toSet();
     final identities = owned.map(identity).toSet();
     final ownedIds = owned.map((p) => p.id).toSet();
+    final batchSkus = <String, int>{};
+    final batchBarcodes = <String, int>{};
+    final batchIdentities = <String, int>{};
+    final batchIds = <String, int>{};
+    void indexReady(WorkspaceCatalogueItem product, int row) {
+      batchSkus.putIfAbsent(product.sku.toLowerCase().trim(), () => row);
+      if (product.barcode.isNotEmpty) {
+        batchBarcodes.putIfAbsent(product.barcode, () => row);
+      }
+      batchIdentities.putIfAbsent(identity(product), () => row);
+      batchIds.putIfAbsent(product.id, () => row);
+    }
+
+    for (final row in readyRows) {
+      if (row.product case final product?) indexReady(product, row.number);
+    }
     final stamp = DateTime.now().microsecondsSinceEpoch;
     final result = <WorkspaceProductImportRow>[];
     for (var index = 0; index < records.length; index++) {
@@ -5030,6 +5215,9 @@ class WorkspaceProductImport {
       WorkspaceProductImportRow blocked(
         String issue, {
         List<String> fields = const [],
+        WorkspaceProductImportIssueKind kind =
+            WorkspaceProductImportIssueKind.invalidValue,
+        int? relatedRow,
       }) => WorkspaceProductImportRow(
         rowNumbers[index],
         title.isEmpty ? 'Unnamed product' : title,
@@ -5042,9 +5230,21 @@ class WorkspaceProductImport {
         variant: value('variant'),
         pack: value('pack'),
         sku: value('sku'),
+        rawValues: Map.unmodifiable(r),
+        sourceValues: Map.unmodifiable(r),
+        canCorrect: !malformed.contains(index),
+        issueKind: kind,
+        relatedRowNumber: relatedRow,
+        sourceCells: json ? const [] : sourceCells[index],
+        sourceHeaders: sourceHeaders,
       );
       if (malformed.contains(index)) {
-        result.add(blocked('Column count does not match the headings.'));
+        result.add(
+          blocked(
+            'Column count does not match the headings: expected ${sourceHeaders.length}, found ${sourceCells[index].length}. Fix this row in the CSV and import again.',
+            kind: WorkspaceProductImportIssueKind.malformedColumns,
+          ),
+        );
         continue;
       }
       final purchase = int.tryParse(value('purchasePrice'));
@@ -5055,7 +5255,7 @@ class WorkspaceProductImport {
           ? 1
           : int.tryParse(value('minimumOrder'));
       final low = value('lowStockThreshold').isEmpty
-          ? 5
+          ? defaults.lowStockThreshold
           : int.tryParse(value('lowStockThreshold'));
       final error = workspaceProductValuesIssue(
         title: title,
@@ -5172,23 +5372,42 @@ class WorkspaceProductImport {
       final sku = value('sku').isNotEmpty
           ? value('sku')
           : matched?.sku ?? 'SKU-$stamp-$index';
-      if (ownedIds.contains(id) ||
+      final inStore =
+          ownedIds.contains(id) ||
           skus.contains(sku.toLowerCase()) ||
           (barcode.isNotEmpty && barcodes.contains(barcode)) ||
-          identities.contains(exactKey)) {
+          identities.contains(exactKey);
+      final duplicateRow =
+          batchIds[id] ??
+          batchSkus[sku.toLowerCase()] ??
+          (barcode.isEmpty ? null : batchBarcodes[barcode]) ??
+          batchIdentities[exactKey];
+      if (inStore || duplicateRow != null) {
         result.add(
           blocked(
-            'Already in Store stock or repeated in this file. Edit the saved product instead.',
-            fields: skus.contains(sku.toLowerCase())
+            inStore
+                ? 'Already in Store stock. Update the saved product from Store stock; this import will not overwrite it.'
+                : 'Repeated product: matches CSV row $duplicateRow. Keep one row for this SKU and pack, or correct its identity.',
+            kind: inStore
+                ? WorkspaceProductImportIssueKind.duplicateInStore
+                : WorkspaceProductImportIssueKind.duplicateInFile,
+            relatedRow: inStore ? null : duplicateRow,
+            fields:
+                (skus.contains(sku.toLowerCase()) ||
+                    batchSkus.containsKey(sku.toLowerCase()))
                 ? ['sku']
-                : barcode.isNotEmpty && barcodes.contains(barcode)
+                : barcode.isNotEmpty &&
+                      (barcodes.contains(barcode) ||
+                          batchBarcodes.containsKey(barcode))
                 ? ['barcode']
                 : ['title', 'brand', 'variant', 'pack'],
           ),
         );
         continue;
       }
-      final mode = value('stockMode').toLowerCase() == 'availabilityonly'
+      final mode = value('stockMode').isEmpty
+          ? defaults.stockMode
+          : value('stockMode').toLowerCase() == 'availabilityonly'
           ? WorkspaceStockMode.availabilityOnly
           : WorkspaceStockMode.exactQuantity;
       final base =
@@ -5238,7 +5457,45 @@ class WorkspaceProductImport {
             value(entry.key).isNotEmpty &&
             value(entry.key) != (entry.value ?? '').trim(),
       );
+      WorkspaceProductContent content;
+      try {
+        content = WorkspaceProductContent.parse(
+          r,
+          existing: base.content,
+          preserveBlank: true,
+        );
+      } on FormatException catch (error) {
+        result.add(
+          blocked(error.message, fields: [error.message.split(':').first]),
+        );
+        continue;
+      }
+      final contentChanged =
+          jsonEncode(content.toJson()) != jsonEncode(base.content.toJson());
+      WorkspaceSellingInputs sellingDetails;
+      try {
+        sellingDetails = WorkspaceSellingInputs.parse(
+          r,
+          existingMeasure: base.packMeasure,
+          existingWholesale: base.wholesaleOffer,
+          existingRetailEnabled: base.retailEnabled,
+        );
+      } on FormatException catch (error) {
+        final field = error.message.split(':').first;
+        result.add(
+          blocked(
+            error.message,
+            fields: WorkspaceSellingInputs.labels.containsKey(field)
+                ? [field]
+                : [],
+          ),
+        );
+        continue;
+      }
       final product = base.copyWith(
+        packMeasure: sellingDetails.measure,
+        wholesaleOffer: sellingDetails.wholesale,
+        retailEnabled: sellingDetails.retailEnabled,
         sku: sku,
         visualLabel: value('visualLabel').isEmpty
             ? base.visualLabel
@@ -5279,11 +5536,26 @@ class WorkspaceProductImport {
         regulatoryNote: value('regulatoryNote').isEmpty
             ? base.regulatoryNote
             : value('regulatoryNote'),
+        content: content,
         catalogueFactsRequireReview:
             base.catalogueFactsRequireReview ||
+            jsonEncode(sellingDetails.measure?.toJson()) !=
+                jsonEncode(base.packMeasure?.toJson()) ||
             packFactsChanged ||
-            catalogueFactsChanged,
+            catalogueFactsChanged ||
+            contentChanged,
       );
+      if (product.wholesaleOffer?.enabled == true &&
+          product.mrp != null &&
+          product.wholesaleOffer!.priceRupees > product.mrp!) {
+        result.add(
+          blocked(
+            'Wholesale price cannot exceed the pack MRP.',
+            fields: ['wholesalePrice', 'mrp'],
+          ),
+        );
+        continue;
+      }
       if (product.mrp != null && product.mrp! < selling) {
         result.add(
           blocked(
@@ -5297,10 +5569,7 @@ class WorkspaceProductImport {
         );
         continue;
       }
-      skus.add(sku.toLowerCase());
-      if (barcode.isNotEmpty) barcodes.add(barcode);
-      identities.add(exactKey);
-      ownedIds.add(id);
+      indexReady(product, rowNumbers[index]);
       result.add(
         WorkspaceProductImportRow(
           rowNumbers[index],
@@ -5308,6 +5577,11 @@ class WorkspaceProductImport {
           product,
           null,
           matched != null,
+          rawValues: Map.unmodifiable(r),
+          sourceValues: Map.unmodifiable(r),
+          canCorrect: true,
+          sourceCells: json ? const [] : sourceCells[index],
+          sourceHeaders: sourceHeaders,
         ),
       );
     }
@@ -5424,6 +5698,10 @@ class WorkspaceCatalogueItem {
     this.lowStockThreshold = 5,
     this.cataloguePhoto,
     this.catalogueFactsRequireReview = false,
+    this.packMeasure,
+    this.wholesaleOffer,
+    this.retailEnabled = true,
+    this.content = const WorkspaceProductContent(),
   });
 
   final String id;
@@ -5455,6 +5733,35 @@ class WorkspaceCatalogueItem {
   final WorkspaceStockMode stockMode;
   final int lowStockThreshold;
   final WorkspaceCataloguePhoto? cataloguePhoto;
+  final WorkspacePackMeasure? packMeasure;
+  final WorkspaceWholesaleOffer? wholesaleOffer;
+  final bool retailEnabled;
+  final WorkspaceProductContent content;
+
+  /// Projection only; callers still need publication authority and a content
+  /// source revision. Does not create a preview route or publish the product.
+  BuyV2ProductContentSnapshot toBuyPublicContent({
+    required String storeId,
+    required String sourceId,
+  }) {
+    if (storeId.trim().isEmpty || sourceId.trim().isEmpty) {
+      throw ArgumentError('A Store identity and content source are required.');
+    }
+    final validated = WorkspaceProductContent.parse(content.inputValues);
+    return BuyV2ProductContentSnapshot(
+      productId: id,
+      state: BuyV2ProductContentState.ready,
+      sourceId: sourceId,
+      description: validated.description.isEmpty ? null : validated.description,
+      media: toBuyPublicProduct(storeName: '', storeId: storeId).mediaAssets,
+      highlights: validated.highlights,
+      specifications: List.unmodifiable(
+        validated.specifications.entries.map(
+          (e) => BuyV2ProductSpecification(label: e.key, value: e.value),
+        ),
+      ),
+    );
+  }
 
   /// Local fail-closed hold; only a future authoritative review may clear it.
   final bool catalogueFactsRequireReview;
@@ -5493,15 +5800,40 @@ class WorkspaceCatalogueItem {
 
   bool get published =>
       publicListing &&
+      customerProductFieldsComplete &&
       !catalogueFactsRequireReview &&
       _photoAllowsPublication &&
       available &&
       (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
 
-  // Existing photo-less catalogue records retain their prior eligibility. The
-  // future catalogue migration must enforce mandatory photos server-side too.
+  bool get customerProductFieldsComplete =>
+      customerFieldsCompleteFor(BuyV2Destination.shop);
+
+  bool customerFieldsCompleteFor(BuyV2Destination channel) =>
+      [
+        id,
+        canonicalId,
+        title,
+        brand,
+        pack,
+        categoryId,
+        if (packMeasure?.valid != true) unitPrice,
+        deliveryPromise,
+        origin,
+      ].every((value) => value.trim().isNotEmpty) &&
+      (channel == BuyV2Destination.shop
+          ? sellingPrice > 0 &&
+                sellingPrice <= 999999999 &&
+                minimumOrder > 0 &&
+                (mrp == null || mrp! >= sellingPrice)
+          : channel == BuyV2Destination.wholesale &&
+                wholesaleOffer?.enabled == true &&
+                wholesaleOffer!.valid &&
+                (mrp == null || mrp! >= wholesaleOffer!.priceRupees));
+
+  // A legacy photo-less record may remain private stock, never a public listing.
   bool get _photoAllowsPublication =>
-      cataloguePhoto == null ||
+      cataloguePhoto != null &&
       (cataloguePhoto!.status == WorkspaceCataloguePhotoStatus.approved &&
           toCataloguePreviewProduct().mediaAssets.isNotEmpty);
 
@@ -5515,22 +5847,43 @@ class WorkspaceCatalogueItem {
     String? storeId,
     String badge = 'Store price',
     String confirmedOn = 'Updated by store',
+    BuyV2Destination channel = BuyV2Destination.shop,
+    WorkspaceStorePublicationDetails? storeDetails,
   }) {
+    final wholesale = channel == BuyV2Destination.wholesale;
+    if (channel != BuyV2Destination.shop && !wholesale) {
+      throw ArgumentError.value(
+        channel,
+        'channel',
+        'Unsupported Store selling channel',
+      );
+    }
+    final offer = wholesaleOffer;
+    if (wholesale && (offer == null || !offer.valid || !offer.enabled)) {
+      throw StateError('Wholesale is not enabled with valid selling terms.');
+    }
+    final channelPrice = wholesale ? offer!.priceRupees : sellingPrice;
+    final channelMinimum = wholesale ? offer!.minimumPacks : minimumOrder;
     final product = BuyV2Product(
       id: id,
       storeId: storeId,
       canonicalId: canonicalId,
-      destination: BuyV2Destination.shop,
+      destination: channel,
       categoryId: categoryId,
       brand: brand,
       title: title,
       variant: variant,
       pack: pack,
-      price: sellingPrice,
-      unitPrice: unitPrice,
+      price: channelPrice,
+      unitPrice:
+          packMeasure?.valid == true &&
+              channelPrice >= 0 &&
+              channelPrice <= 999999999
+          ? packMeasure!.pricePerUnit(channelPrice)
+          : unitPrice,
       badge: badge,
       seller: storeName,
-      sellerType: 'Store',
+      sellerType: storeDetails?.publicSellerType ?? 'Store',
       deliveryPromise: deliveryPromise,
       origin: origin,
       confirmedOn: confirmedOn,
@@ -5541,12 +5894,14 @@ class WorkspaceCatalogueItem {
       composition: composition,
       regulatoryNote: regulatoryNote,
       compliance: compliance?.toBuyPublicCompliance(),
-      minimumOrder: minimumOrder,
-      returnPolicy: returnPolicy,
-      catalogueListing:
-          publicListing &&
-          !catalogueFactsRequireReview &&
-          cataloguePhoto == null,
+      minimumOrder: channelMinimum,
+      returnPolicy: returnPolicy?.trim().isNotEmpty == true
+          ? returnPolicy
+          : storeDetails?.returnSummary.trim().isNotEmpty == true
+          ? storeDetails!.returnSummary.trim()
+          : returnPolicy,
+      purchaseProtection: storeDetails?.protectionFor(returnPolicy),
+      catalogueListing: false,
     );
     final photo = cataloguePhoto;
     if (photo == null ||
@@ -5561,7 +5916,13 @@ class WorkspaceCatalogueItem {
     return BuyV2SupplierMediaPolicy.publicationMessage(product, asset) == null
         ? product.copyWith(
             mediaAssets: [asset],
-            catalogueListing: publicListing && !catalogueFactsRequireReview,
+            catalogueListing:
+                publicListing &&
+                (storeDetails?.channelEnabled(channel) ?? true) &&
+                (wholesale || retailEnabled) &&
+                (!wholesale || offer?.saleType != null) &&
+                customerFieldsCompleteFor(channel) &&
+                !catalogueFactsRequireReview,
           )
         : product;
   }
@@ -5576,10 +5937,11 @@ class WorkspaceCatalogueItem {
     String? orderCutoffLabel,
     String? deliveryFeeLabel,
   }) {
-    final product = toBuyPublicProduct(storeName: storeName);
     final orderable =
         storeVisible &&
         publicListing &&
+        customerProductFieldsComplete &&
+        !catalogueFactsRequireReview &&
         _photoAllowsPublication &&
         available &&
         (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0) &&
@@ -5591,14 +5953,21 @@ class WorkspaceCatalogueItem {
       partner: storeName,
       orderabilityLabel: orderable
           ? 'Available to order'
-          : !storeVisible || !publicListing || !_photoAllowsPublication
+          : !storeVisible ||
+                !publicListing ||
+                !customerProductFieldsComplete ||
+                catalogueFactsRequireReview ||
+                !_photoAllowsPublication
           ? 'Not listed for customers'
           : !available ||
                 (stockMode == WorkspaceStockMode.exactQuantity && stock <= 0)
           ? 'Out of stock'
           : 'Store is not accepting orders',
       sourceId: sourceId,
-      fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
+      // The Store supplies readiness, not fleet eligibility. Cursor's public
+      // adapter must consume the authoritative serviceability contract; never
+      // infer Quick/courier/freight from retailer-authored delivery text.
+      fulfilmentMode: null,
       storeOperatingState: acceptingOrders
           ? BuyV2StoreOperatingState.open
           : BuyV2StoreOperatingState.closed,
@@ -5610,6 +5979,7 @@ class WorkspaceCatalogueItem {
   }
 
   WorkspaceCatalogueItem copyWith({
+    WorkspaceProductContent? content,
     String? canonicalId,
     String? categoryId,
     String? brand,
@@ -5640,8 +6010,14 @@ class WorkspaceCatalogueItem {
     WorkspaceCataloguePhoto? cataloguePhoto,
     bool clearCataloguePhoto = false,
     bool? catalogueFactsRequireReview,
+    WorkspacePackMeasure? packMeasure,
+    WorkspaceWholesaleOffer? wholesaleOffer,
+    bool? retailEnabled,
+    bool clearPackMeasure = false,
+    bool clearWholesaleOffer = false,
   }) => WorkspaceCatalogueItem(
     id: id,
+    content: content ?? this.content,
     canonicalId: canonicalId ?? this.canonicalId,
     categoryId: categoryId ?? this.categoryId,
     brand: brand ?? this.brand,
@@ -5674,6 +6050,11 @@ class WorkspaceCatalogueItem {
         : cataloguePhoto ?? this.cataloguePhoto,
     catalogueFactsRequireReview:
         catalogueFactsRequireReview ?? this.catalogueFactsRequireReview,
+    packMeasure: clearPackMeasure ? null : packMeasure ?? this.packMeasure,
+    wholesaleOffer: clearWholesaleOffer
+        ? null
+        : wholesaleOffer ?? this.wholesaleOffer,
+    retailEnabled: retailEnabled ?? this.retailEnabled,
   );
 }
 

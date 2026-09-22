@@ -131,12 +131,14 @@ class StoreSettingsInput {
     this.prefix,
     this.suffix,
     this.helper,
+    this.maxLines = 1,
   });
   final String id, label;
   final TextEditingController controller;
   final String? Function(String?) validate;
   final bool numeric, fullWidth;
   final String? prefix, suffix, helper;
+  final int maxLines;
 
   static String? requiredText(String? value) =>
       value == null || value.trim().isEmpty ? 'Enter this detail.' : null;
@@ -170,12 +172,14 @@ class StoreSettingsForm extends StatefulWidget {
     this.leading,
     this.trailing,
     this.embedded = false,
+    this.pairAtWidth = 290,
     super.key,
   });
   final String title, detail, saveKey, saveLabel;
   final List<StoreSettingsInput> fields;
   final Widget? leading, trailing;
   final bool embedded;
+  final double pairAtWidth;
   final VoidCallback onSave;
 
   @override
@@ -184,12 +188,17 @@ class StoreSettingsForm extends StatefulWidget {
 
 class _StoreSettingsFormState extends State<StoreSettingsForm> {
   final _form = GlobalKey<FormState>();
+  // Embedded forms scroll with their parent. Never share an ExpansionTile's
+  // PageStorage identifier (its bool is not a double scroll offset).
+  final _embeddedScroll = ScrollController(keepScrollOffset: false);
+  final _formStorage = PageStorageBucket();
   final _focus = <String, FocusNode>{};
   final _keys = <String, GlobalKey>{};
   bool _attempted = false;
 
   @override
   void dispose() {
+    _embeddedScroll.dispose();
     for (final node in _focus.values) {
       node.dispose();
     }
@@ -221,94 +230,100 @@ class _StoreSettingsFormState extends State<StoreSettingsForm> {
 
   @override
   Widget build(BuildContext context) => StoreSettingsStyle(
-    child: Builder(
-      builder: (context) => Form(
-        key: _form,
-        autovalidateMode: _attempted
-            ? AutovalidateMode.onUserInteraction
-            : AutovalidateMode.disabled,
-        child: ListView(
-          shrinkWrap: widget.embedded,
-          primary: !widget.embedded,
-          physics: widget.embedded
-              ? const NeverScrollableScrollPhysics()
-              : null,
-          padding: const EdgeInsets.all(12),
-          children: [
-            if (!widget.embedded)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    if (widget.detail.isNotEmpty)
+    child: PageStorage(
+      bucket: _formStorage,
+      child: Builder(
+        builder: (context) => Form(
+          key: _form,
+          autovalidateMode: _attempted
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
+          child: ListView(
+            controller: widget.embedded ? _embeddedScroll : null,
+            shrinkWrap: widget.embedded,
+            primary: !widget.embedded,
+            physics: widget.embedded
+                ? const NeverScrollableScrollPhysics()
+                : null,
+            padding: const EdgeInsets.all(12),
+            children: [
+              if (!widget.embedded)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        widget.detail,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                  ],
+                      if (widget.detail.isNotEmpty)
+                        Text(
+                          widget.detail,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            if (widget.leading != null) widget.leading!,
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final paired =
-                    constraints.maxWidth >= 290 &&
-                    MediaQuery.textScalerOf(context).scale(14) <= 19;
-                return Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final field in widget.fields)
-                      SizedBox(
-                        width: paired && !field.fullWidth
-                            ? (constraints.maxWidth - 8) / 2
-                            : constraints.maxWidth,
-                        child: Container(
-                          key: _keys.putIfAbsent(field.id, () => GlobalKey()),
-                          child: TextFormField(
-                            key: Key(field.id),
-                            controller: field.controller,
-                            focusNode: _focus.putIfAbsent(
-                              field.id,
-                              () => FocusNode(),
-                            ),
-                            keyboardType: field.numeric
-                                ? TextInputType.number
-                                : TextInputType.text,
-                            textInputAction: TextInputAction.next,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            validator: field.validate,
-                            decoration: InputDecoration(
-                              labelText: field.label,
-                              prefixText: field.prefix,
-                              suffixText: field.suffix,
-                              helperText: field.helper,
-                              helperMaxLines: 2,
+              if (widget.leading != null) widget.leading!,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final paired =
+                      constraints.maxWidth >= widget.pairAtWidth &&
+                      MediaQuery.textScalerOf(context).scale(14) <= 19;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final field in widget.fields)
+                        SizedBox(
+                          width: paired && !field.fullWidth
+                              ? (constraints.maxWidth - 8) / 2
+                              : constraints.maxWidth,
+                          child: Container(
+                            key: _keys.putIfAbsent(field.id, () => GlobalKey()),
+                            child: TextFormField(
+                              key: Key(field.id),
+                              controller: field.controller,
+                              minLines: 1,
+                              maxLines: field.maxLines,
+                              focusNode: _focus.putIfAbsent(
+                                field.id,
+                                () => FocusNode(),
+                              ),
+                              keyboardType: field.numeric
+                                  ? TextInputType.number
+                                  : TextInputType.text,
+                              textInputAction: TextInputAction.next,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                              validator: field.validate,
+                              decoration: InputDecoration(
+                                labelText: field.label,
+                                prefixText: field.prefix,
+                                suffixText: field.suffix,
+                                helperText: field.helper,
+                                helperMaxLines: 2,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                );
-              },
-            ),
-            if (widget.trailing != null) ...[
+                    ],
+                  );
+                },
+              ),
+              if (widget.trailing != null) ...[
+                const SizedBox(height: 8),
+                widget.trailing!,
+              ],
               const SizedBox(height: 8),
-              widget.trailing!,
+              FilledButton.icon(
+                key: Key(widget.saveKey),
+                onPressed: _save,
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: Text(widget.saveLabel),
+              ),
             ],
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              key: Key(widget.saveKey),
-              onPressed: _save,
-              icon: const Icon(Icons.check_rounded, size: 18),
-              label: Text(widget.saveLabel),
-            ),
-          ],
+          ),
         ),
       ),
     ),

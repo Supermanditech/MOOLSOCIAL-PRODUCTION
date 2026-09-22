@@ -87,6 +87,7 @@ void main() {
             expect(routes, isEmpty);
             await capture('initial');
             for (final destination in const <(String, String)>[
+              ('downloads', '/app/account/downloads'),
               ('identity', '/app/account/identity'),
               ('preferences', '/app/account/workspaces/preferences'),
               ('security', '/app/account/security'),
