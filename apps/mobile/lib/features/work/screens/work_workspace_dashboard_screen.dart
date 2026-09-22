@@ -26525,12 +26525,17 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Widget _customerPanel() => _StoreSaleCustomerSheet(
+    key: ValueKey(_currentDraftIdentity),
     initialValue:
         _customerInput ?? widget.session.counterCustomerInput ?? _customer.text,
     recentCustomers: _recentCustomers,
     billingDetails: widget.session.workspaceOrderBillingDetails,
-    onBillingChanged: (details) =>
-        widget.session.updateWorkspaceCounterDetails(billingDetails: details),
+    billingCustomer: widget.session.workspaceOrderBillingCustomer,
+    onBillingChanged: (details, mobile) =>
+        widget.session.updateWorkspaceCounterDetails(
+          billingDetails: details,
+          billingCustomer: mobile ?? '',
+        ),
     onClose: () {
       if (_storedCounterCustomerMobile(_customer.text) == null) {
         widget.onExit();
@@ -27085,18 +27090,21 @@ class _RecentCounterCustomer {
 
 class _StoreSaleCustomerSheet extends StatefulWidget {
   const _StoreSaleCustomerSheet({
+    super.key,
     required this.initialValue,
     required this.recentCustomers,
     this.onDraftChanged,
     this.onConfirmed,
     this.onClose,
     this.billingDetails = const WorkspaceBillingDetails(),
+    this.billingCustomer = '',
     this.onBillingChanged,
   });
   final ValueChanged<String>? onConfirmed;
   final VoidCallback? onClose;
   final WorkspaceBillingDetails billingDetails;
-  final ValueChanged<WorkspaceBillingDetails>? onBillingChanged;
+  final String billingCustomer;
+  final void Function(WorkspaceBillingDetails, String?)? onBillingChanged;
   final String initialValue;
   final List<_RecentCounterCustomer> recentCustomers;
   final ValueChanged<String>? onDraftChanged;
@@ -27128,23 +27136,65 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
     text: widget.billingDetails.address,
   );
   bool _applyingRecent = false;
+  late String? _billingMobile =
+      normalizeWorkspaceMobile(widget.billingCustomer) ??
+      _storedCounterCustomerMobile(widget.initialValue);
+  final _customerDrafts = <String, (WorkspaceBillingDetails, bool)>{};
+
+  WorkspaceBillingDetails get _currentBilling => WorkspaceBillingDetails(
+    business: _business,
+    name: _name.text,
+    businessName: _businessName.text,
+    gst: _gst.text,
+    address: _billingAddress.text,
+  );
+
+  void _cacheBilling() {
+    if (_billingMobile case final mobile?) {
+      _customerDrafts[mobile] = (_currentBilling, _businessExpanded);
+    }
+  }
+
+  void _applyBilling(WorkspaceBillingDetails details, bool expanded) {
+    _applyingRecent = true;
+    _name.text = details.name;
+    _businessName.text = details.businessName;
+    _gst.text = details.gst;
+    _billingAddress.text = details.address;
+    _business = details.business;
+    _businessExpanded = expanded;
+    _applyingRecent = false;
+  }
+
+  void _switchBillingTo(String next) {
+    if (next == _billingMobile) return;
+    _cacheBilling();
+    final hadOwner = _billingMobile != null;
+    _billingMobile = next;
+    final saved = _customerDrafts[next];
+    if (hadOwner || saved != null) {
+      setState(
+        () => _applyBilling(
+          saved?.$1 ?? const WorkspaceBillingDetails(),
+          saved?.$2 ?? false,
+        ),
+      );
+    }
+    _rememberBilling();
+  }
+
   void _rememberBilling() {
     if (_applyingRecent) return;
-    widget.onBillingChanged?.call(
-      WorkspaceBillingDetails(
-        business: _business,
-        name: _name.text,
-        businessName: _businessName.text,
-        gst: _gst.text,
-        address: _billingAddress.text,
-      ),
-    );
+    _cacheBilling();
+    widget.onBillingChanged?.call(_currentBilling, _billingMobile);
   }
 
   void _selectRecent(_RecentCounterCustomer customer) {
     final mobile = customer.mobile;
     if (mobile == null) return;
     final details = customer.billingDetails;
+    _cacheBilling();
+    _billingMobile = mobile;
     _applyingRecent = true;
     _controller.text = mobile;
     _name.text = details.name;
@@ -27188,19 +27238,13 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
         setState(() => _error = null);
       }
       if (_lastDraft != _controller.text) {
-        final original = _storedCounterCustomerMobile(_lastDraft);
-        if (original != null &&
-            normalizeWorkspaceMobile(_controller.text) != original) {
-          for (final controller in [
-            _name,
-            _businessName,
-            _gst,
-            _billingAddress,
-          ]) {
-            controller.clear();
-          }
-          _business = false;
-          _businessExpanded = false;
+        final next = normalizeWorkspaceMobile(_controller.text);
+        if (next != null && next != _billingMobile) {
+          // A partially typed number is not a customer switch. A different
+          // complete number must never inherit another customer's billing facts.
+          _switchBillingTo(next);
+        } else if (next == null && _billingMobile != null) {
+          // Bind legacy valid drafts before saving their first partial edit.
           _rememberBilling();
         }
         _lastDraft = _controller.text;
@@ -27224,6 +27268,7 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
       setState(() => _error = 'Enter a valid 10-digit customer mobile number.');
       return;
     }
+    _switchBillingTo(value);
     FocusManager.instance.primaryFocus?.unfocus();
     _complete(value);
   }

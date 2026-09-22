@@ -6684,6 +6684,55 @@ void main() {
       });
     }
 
+    test(
+      'CS016 incomplete phone retains billing owner across storage restart',
+      () async {
+        final source = draft().toJson();
+        final legacy = Map<String, Object?>.from(source)
+          ..remove('billingCustomer');
+        expect(WorkspaceCounterDraft.fromJson(legacy), isNotNull);
+        final pending = WorkspaceCounterDraft.fromJson({
+          ...source,
+          'customer': '900009163',
+          'billingCustomer': '9000091630',
+          'billingDetails': const WorkspaceBillingDetails(
+            name: 'Customer A',
+            business: true,
+            businessName: 'A Grocery',
+            gst: '08ABCDE1234F1Z5',
+            address: '12 Market Road',
+          ).toJson(),
+        });
+        expect(pending, isNotNull);
+        final storage = _OrderJournalStorage();
+        final first = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        await first.save(pending!, expectedRevision: null);
+        final restarted = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        final restored = (await restarted.read('account-A', 'store-A'))!;
+        expect(restored.customer, '900009163');
+        expect(restored.billingCustomer, '9000091630');
+        expect(
+          restored.billingDetails.toJson(),
+          pending.billingDetails.toJson(),
+        );
+        for (final invalid in [false, 123, '900009163', 'not a phone']) {
+          expect(
+            WorkspaceCounterDraft.fromJson({
+              ...source,
+              'billingCustomer': invalid,
+            }),
+            isNull,
+          );
+        }
+      },
+    );
+
     test('retains exact snapshot through a new storage instance', () async {
       final storage = _OrderJournalStorage();
       final first = SecureWorkCounterDraftStore(

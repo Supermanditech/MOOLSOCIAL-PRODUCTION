@@ -1,5 +1,26 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Next bounded batch C1 — CS-OPPO-016 customer correction
+
+Completed prior frontend checkpoint: d99b6c0f9c40da5b88f2a479371ae9589d9ec263,
+pushed and read back exactly; zero tracked/untracked dirt before starting C1.
+
+C1 preserves customer name/business/GST/address and expansion while a phone edit
+is incomplete. A complete different mobile gets its own blank billing details;
+returning to a previously edited number restores that form-local draft. The
+existing encrypted bill draft now retains the billing-owner mobile separately
+from partial phone input, with backward-compatible decoding. Submission rejects
+an explicit owner/customer mismatch. Store/account form keys isolate cached edits.
+No additional screen or redesign, backend, invoice issuance or payment action.
+
+Model/storage/contract replay618 passed with4 pre-existing skips. Final focused
+connected v3:9 passed; v2 customer/keyboard/Back/storage checks7 passed,
+two older inventory expectations needed visibility-intent versus publication and
+out-of-stock correction. Both failed evidence runs retained. Analysis clean.
+Normal/2x actual customer-form renders inspected. No OPPO acceptance inferred.
+Next C2: CS017 Review Bill controls and remaining compact Add Items/invoice work;
+do not claim all Counter Sale or all58 complete from this bounded fix.
+
 ## Git preservation checkpoint — founder authorized 22 September
 
 Founder requested Git discipline for accumulated work before continuing. Exact

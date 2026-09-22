@@ -389,6 +389,7 @@ class _StoreOperationalData {
   String workspaceOrderAddress = '';
   WorkspaceBillingDetails workspaceOrderBillingDetails =
       const WorkspaceBillingDetails();
+  String workspaceOrderBillingCustomer = '';
   WorkspaceBillDiscount counterDiscount = const WorkspaceBillDiscount.none();
   String workspaceOrderStage = 'No order';
   int workspaceOrderExtraMinutes = 0;
@@ -879,6 +880,7 @@ class WorkSession extends ChangeNotifier {
       currentWorkspaceOrderId,
       workspaceOrderCustomer,
       workspaceOrderBillingDetails.toJson(),
+      workspaceOrderBillingCustomer,
       workspaceCounterDiscount.toJson(),
       for (final id in ids)
         [
@@ -1005,6 +1007,7 @@ class WorkSession extends ChangeNotifier {
           workspaceOrderPayment = record.payment;
           workspaceOrderAddress = record.address;
           workspaceOrderBillingDetails = record.billingDetails;
+          _storeData.workspaceOrderBillingCustomer = record.billingCustomer;
           _storeData.counterDiscount = record.discount;
           workspaceOrderNeedsDelivery = record.fulfilment != 'At the shop';
           workspaceOrderQuantities
@@ -1073,6 +1076,7 @@ class WorkSession extends ChangeNotifier {
       stage: stage,
       customer: counterCustomerInput ?? workspaceOrderCustomer,
       billingDetails: workspaceOrderBillingDetails,
+      billingCustomer: workspaceOrderBillingCustomer,
       discount: workspaceCounterDiscount,
       source: workspaceOrderSource,
       fulfilment: workspaceOrderFulfilment,
@@ -1096,6 +1100,7 @@ class WorkSession extends ChangeNotifier {
     stage: stage ?? draft.stage,
     customer: draft.customer,
     billingDetails: draft.billingDetails,
+    billingCustomer: draft.billingCustomer,
     discount: draft.discount,
     source: draft.source,
     fulfilment: draft.fulfilment,
@@ -1157,6 +1162,7 @@ class WorkSession extends ChangeNotifier {
   void updateWorkspaceCounterDetails({
     String? customer,
     WorkspaceBillingDetails? billingDetails,
+    String? billingCustomer,
     String? source,
     String? fulfilment,
     String? payment,
@@ -1166,10 +1172,13 @@ class WorkSession extends ChangeNotifier {
         !_canEditCounterOrder(allowCompletedInvoice: false)) {
       return;
     }
-    if (billingDetails != null) workspaceOrderBillingDetails = billingDetails;
     if (customer != null) {
       workspaceOrderCustomer = customer;
       _counterRecovery?.customerInput = customer;
+    }
+    if (billingDetails != null) workspaceOrderBillingDetails = billingDetails;
+    if (billingCustomer != null) {
+      _storeData.workspaceOrderBillingCustomer = billingCustomer;
     }
     if (source != null) workspaceOrderSource = source;
     if (fulfilment != null) workspaceOrderFulfilment = fulfilment;
@@ -1281,6 +1290,9 @@ class WorkSession extends ChangeNotifier {
     if ((counterCustomerInput != null &&
             counterCustomerInput != workspaceOrderCustomer) ||
         workspaceCustomerMobile(workspaceOrderCustomer) == null ||
+        (workspaceOrderBillingCustomer.isNotEmpty &&
+            workspaceCustomerMobile(workspaceOrderCustomer) !=
+                workspaceOrderBillingCustomer) ||
         workspaceOrderQuantities.isEmpty ||
         workspaceCounterPayableMinor <= 0 ||
         workspaceCounterDiscountError != null ||
@@ -5320,8 +5332,14 @@ class WorkSession extends ChangeNotifier {
       _storeData.workspaceOrderPayment = value;
   WorkspaceBillingDetails get workspaceOrderBillingDetails =>
       _storeData.workspaceOrderBillingDetails;
-  set workspaceOrderBillingDetails(WorkspaceBillingDetails value) =>
-      _storeData.workspaceOrderBillingDetails = value;
+  String get workspaceOrderBillingCustomer =>
+      _storeData.workspaceOrderBillingCustomer;
+  set workspaceOrderBillingDetails(WorkspaceBillingDetails value) {
+    _storeData.workspaceOrderBillingDetails = value;
+    _storeData.workspaceOrderBillingCustomer =
+        workspaceCustomerMobile(workspaceOrderCustomer) ?? '';
+  }
+
   String get workspaceOrderAddress => _storeData.workspaceOrderAddress;
   set workspaceOrderAddress(String value) =>
       _storeData.workspaceOrderAddress = value;

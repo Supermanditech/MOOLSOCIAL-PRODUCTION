@@ -15321,9 +15321,15 @@ void main() {
         );
         expect(
           work.workspaceCatalogueItems
-              .where((p) => p.published)
+              .where((p) => p.publicListing)
               .map((p) => p.id),
-          [publicProduct.id],
+          [publicProduct.id, emptyProduct.id],
+        );
+        expect(
+          work.workspaceCatalogueItems.where((p) => p.published),
+          isEmpty,
+          reason:
+              'Visibility intent cannot publish an incomplete Store fixture.',
         );
         expect(work.workspaceInvoices, isEmpty);
         expect(tester.takeException(), isNull);
@@ -29151,6 +29157,106 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'CS016 phone correction preserves owned billing and separates customers $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        const original = WorkspaceBillingDetails(
+          name: 'Customer A',
+          business: true,
+          businessName: 'A Grocery',
+          gst: '08ABCDE1234F1Z5',
+          address: '12 Market Road',
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 806),
+          textScale: scale,
+        );
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9000091630', name: 'Customer A');
+        await openSaleCustomer(tester);
+        await tester.pumpAndSettle();
+        final business = find.byKey(const Key('work-sale-business-details'));
+        await reveal(tester, business);
+        await tester.tap(business);
+        await tester.pumpAndSettle();
+        for (final field in {
+          'work-sale-business-name': original.businessName,
+          'work-sale-business-gst': original.gst,
+          'work-sale-billing-address': original.address,
+        }.entries) {
+          final target = find.byKey(Key(field.key));
+          await reveal(tester, target);
+          await tester.enterText(target, field.value);
+          await tester.pumpAndSettle();
+        }
+        expect(work.workspaceOrderBillingDetails.toJson(), original.toJson());
+        final phone = find.byKey(const Key('work-order-customer'));
+        Future<void> typePhone(String value) async {
+          await reveal(tester, phone);
+          await tester.enterText(phone, value);
+          await tester.pumpAndSettle();
+        }
+
+        await typePhone('900009163');
+        expect(work.workspaceOrderBillingDetails.toJson(), original.toJson());
+        expect(work.workspaceOrderBillingCustomer, '9000091630');
+        expect(
+          find.byKey(const Key('work-sale-business-name')),
+          findsOneWidget,
+        );
+        await work.saveWorkspaceCounterDraft();
+        expect(work.retainedCounterDraft!.billingCustomer, '9000091630');
+        expect(work.retainedCounterDraft!.customer, '900009163');
+        final confirm = find.byKey(const Key('work-sale-customer-confirm'));
+        await reveal(tester, confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-sale-customer-error')),
+          findsOneWidget,
+        );
+        expect(work.workspaceOrderBillingDetails.toJson(), original.toJson());
+        await typePhone('+91 90000 91630');
+        expect(work.workspaceOrderBillingDetails.toJson(), original.toJson());
+        await captureStoreView(tester, 'cs016-restored-customer-$scale');
+        await typePhone('9000091631');
+        expect(work.workspaceOrderBillingDetails.name, isEmpty);
+        expect(work.workspaceOrderBillingDetails.businessName, isEmpty);
+        expect(work.workspaceOrderBillingDetails.gst, isEmpty);
+        expect(work.workspaceOrderBillingDetails.address, isEmpty);
+        expect(work.workspaceOrderBillingCustomer, '9000091631');
+        await typePhone('9000091630');
+        expect(work.workspaceOrderBillingDetails.toJson(), original.toJson());
+        expect(
+          find.byKey(const Key('work-sale-business-name')),
+          findsOneWidget,
+        );
+        await reveal(tester, confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        await openSaleCustomer(tester);
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderBillingDetails.toJson(), original.toJson());
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const Key('work-sale-customer-name')),
+              )
+              .controller!
+              .text,
+          'Customer A',
+        );
+        expect(work.workspaceInvoices, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final (width, height, scale) in [
     (412.0, 915.0, 1.0),

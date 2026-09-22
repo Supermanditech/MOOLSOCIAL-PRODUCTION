@@ -3451,6 +3451,7 @@ class WorkspaceCounterDraft {
     required this.stage,
     required this.customer,
     this.billingDetails = const WorkspaceBillingDetails(),
+    this.billingCustomer = '',
     required this.source,
     required this.fulfilment,
     required this.payment,
@@ -3461,6 +3462,9 @@ class WorkspaceCounterDraft {
   }) : lines = List.unmodifiable(lines);
 
   final WorkspaceBillingDetails billingDetails;
+
+  /// Owner of retained billing input while the phone field is incomplete.
+  final String billingCustomer;
   final WorkspaceBillDiscount discount;
   final String account,
       store,
@@ -3477,6 +3481,8 @@ class WorkspaceCounterDraft {
 
   bool get valid =>
       account.trim().isNotEmpty &&
+      (billingCustomer.isEmpty ||
+          normalizeWorkspaceMobile(billingCustomer) != null) &&
       store.trim().isNotEmpty &&
       id.trim().isNotEmpty &&
       revision > 0 &&
@@ -3525,6 +3531,7 @@ class WorkspaceCounterDraft {
     'stage': stage.name,
     'customer': customer,
     'billingDetails': billingDetails.toJson(),
+    'billingCustomer': billingCustomer,
     'discount': discount.toJson(),
     'source': source,
     'fulfilment': fulfilment,
@@ -3596,6 +3603,10 @@ class WorkspaceCounterDraft {
     }
     WorkspaceBillingDetails billing;
     WorkspaceBillDiscount discount;
+    if (value['billingCustomer'] != null &&
+        value['billingCustomer'] is! String) {
+      return null;
+    }
     try {
       billing = WorkspaceBillingDetails.fromJson(value['billingDetails']);
       discount = WorkspaceBillDiscount.fromJson(value['discount']);
@@ -3610,6 +3621,7 @@ class WorkspaceCounterDraft {
       stage: stage,
       customer: value['customer'] as String,
       billingDetails: billing,
+      billingCustomer: value['billingCustomer'] as String? ?? '',
       discount: discount,
       source: value['source'] as String,
       fulfilment: value['fulfilment'] as String,
