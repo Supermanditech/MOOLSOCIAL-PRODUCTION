@@ -90,7 +90,7 @@ function Test-SealedBuyEgressClipboardAction {
   if ($redmiReviewQualified) {
     $branchAllowed = $true
     $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
-    if ($IntegratedReviewSourceCommit -ceq 'd029c18596fcb8e1fcd944c0ca57bc53ab250b55') {
+    if ($IntegratedReviewSourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef') {
       $overlayCommit = $IntegratedReviewSourceCommit
     }
     if ($IntegratedReviewSourceCommit -cin @('87bc96d4c28300146c9e2c3c3b37c7c3aacffed0', 'd5279222466211f0526c625e58b8da5dc0d78218', '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d', '11b6562e7bf382afeb11e1801a0a390477fcae8f', '3c30ba11521db6bb1a1ec6995b181a81df1a6b34', '4221158fead95a89047e3408aaeb11c9a12dd135', '41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab', 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957', '1880614bb499a47993df86ebed6599926414fc50')) {
@@ -124,7 +124,7 @@ function Get-BuyDataEgressViolations {
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
     # Exact r66.34 source; customer-tapped Store/resolved-area Maps actions only.
-    if ($IntegratedReviewSourceCommit -ceq 'd029c18596fcb8e1fcd944c0ca57bc53ab250b55' -and
+    if ($IntegratedReviewSourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef' -and
         $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
       $mapSha = [Security.Cryptography.SHA256]::Create()

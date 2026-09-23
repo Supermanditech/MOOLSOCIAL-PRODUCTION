@@ -344,7 +344,7 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
-  if ($SourceCommit -ceq 'd029c18596fcb8e1fcd944c0ca57bc53ab250b55') {
+  if ($SourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef') {
     # Fresh r66.34 review: exact committed source, never a moving allowance.
     $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
     if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
