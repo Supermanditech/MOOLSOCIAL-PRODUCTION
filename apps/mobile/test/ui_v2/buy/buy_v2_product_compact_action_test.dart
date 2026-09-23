@@ -71,54 +71,6 @@ void main() {
         await tester.pumpWidget(app(session, product));
         await tester.pumpAndSettle();
 
-        if (destination == BuyV2Destination.wholesale) {
-          final dock = find.byKey(
-            ValueKey('buy-wholesale-action-dock-${product.id}'),
-          );
-          final primary = find.byKey(
-            ValueKey('buy-product-primary-${product.id}'),
-          );
-          expect(dock, findsOneWidget);
-          expect(
-            find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
-            findsNothing,
-          );
-          expect(tester.getSize(primary).height, greaterThanOrEqualTo(50));
-          expect(
-            find.descendant(
-              of: primary,
-              matching: find.byIcon(Icons.add_shopping_cart_rounded),
-            ),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(of: primary, matching: find.text('Add to Cart')),
-            findsOneWidget,
-          );
-          final wholesaleActionLabel =
-              'Add minimum order of ${product.minimumOrder} packs of '
-              '${product.title} to Cart for '
-              '${buyV2Money(product.price * product.minimumOrder)}. '
-              '${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · '
-              '${buyV2BuyerDeliveryPromise(session.productFactsFor(product))}';
-          final semanticAction = find.byWidgetPredicate(
-            (widget) =>
-                widget is Semantics &&
-                widget.properties.label == wholesaleActionLabel,
-            description: 'Wholesale minimum-order action semantics',
-          );
-          expect(semanticAction, findsOneWidget);
-          expect(
-            tester
-                .getSemantics(semanticAction)
-                .getSemanticsData()
-                .hasAction(SemanticsAction.tap),
-            isTrue,
-          );
-          expect(tester.takeException(), isNull);
-          continue;
-        }
-
         final panel = find.byKey(
           ValueKey('buy-product-inline-action-${product.id}'),
         );
@@ -144,13 +96,13 @@ void main() {
         );
         expect(
           tester.getSize(slot),
-          Size(destination == BuyV2Destination.shop ? 88 : 148, 44),
+          Size(destination == BuyV2Destination.medicine ? 148 : 88, 44),
         );
         expect(tester.getSize(shell), const Size(88, 44));
         expect(tester.getTopRight(shell), tester.getTopRight(slot));
         expect(tester.getSize(primary).height, greaterThanOrEqualTo(44));
         expect(find.descendant(of: panel, matching: shell), findsOneWidget);
-        final actionOwner = destination == BuyV2Destination.shop
+        final actionOwner = destination != BuyV2Destination.medicine
             ? find.byKey(ValueKey('buy-product-purchase-hero-${product.id}'))
             : find.byKey(ValueKey('buy-product-title-reveal-${product.id}'));
         expect(
@@ -376,31 +328,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      if (product.destination == BuyV2Destination.wholesale) {
-        final dock = find.byKey(
-          ValueKey('buy-wholesale-action-dock-${product.id}'),
-        );
-        final primary = find.byKey(
-          ValueKey('buy-product-primary-${product.id}'),
-        );
-        expect(dock, findsOneWidget);
-        expect(primary, findsOneWidget);
-        expect(tester.getSize(primary).height, greaterThanOrEqualTo(50));
-        expect(
-          tester.getSemantics(primary).label,
-          'Add minimum order of ${product.minimumOrder} packs of '
-          '${product.title} to Cart for '
-          '${buyV2Money(product.price * product.minimumOrder)}',
-        );
-        tester.semantics.tap(
-          find.semantics.byLabel(tester.getSemantics(primary).label),
-        );
-        await tester.pumpAndSettle();
-        expect(session.quantityFor(product.id), product.minimumOrder);
-        expect(tester.takeException(), isNull);
-        return;
-      }
-
       final panel = find.byKey(
         ValueKey('buy-product-inline-action-${product.id}'),
       );
@@ -429,7 +356,9 @@ void main() {
       );
       expect(
         tester.getSemantics(primary).label,
-        'Add ${product.title} to cart',
+        product.destination == BuyV2Destination.wholesale
+            ? 'Add minimum order of ${product.minimumOrder} packs of ${product.title} to Cart for ${buyV2Money(product.price * product.minimumOrder)}. ${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · ${buyV2BuyerDeliveryPromise(session.productFactsFor(product))}'
+            : 'Add ${product.title} to cart',
       );
       final semantics = tester.getSemantics(primary);
       expect(
@@ -437,10 +366,10 @@ void main() {
         isTrue,
       );
       tester.semantics.tap(
-        find.semantics.byLabel('Add ${product.title} to cart'),
+        find.semantics.byLabel(tester.getSemantics(primary).label),
       );
       await tester.pumpAndSettle();
-      expect(session.quantityFor(product.id), 1);
+      expect(session.quantityFor(product.id), product.minimumOrder);
       expect(tester.binding.transientCallbackCount, 0);
       expect(tester.takeException(), isNull);
     },

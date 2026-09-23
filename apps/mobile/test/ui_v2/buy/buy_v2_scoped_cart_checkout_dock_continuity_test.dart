@@ -1407,7 +1407,7 @@ void main() {
       expect(note, findsOneWidget);
       final paragraph = tester.renderObject<RenderParagraph>(note);
       expect(paragraph.didExceedMaxLines, isFalse);
-      final review = find.widgetWithText(FilledButton, 'Review order');
+      final review = find.widgetWithText(FilledButton, 'Checkout');
       expect(review.hitTestable(), findsOneWidget);
       expect(tester.getRect(note).overlaps(tester.getRect(review)), isFalse);
       await capture(tester, 'r664-wholesale-footer-$width');
@@ -2026,7 +2026,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.showCheckoutStep(BuyV2CheckoutStep.confirm), isTrue);
       await tester.pumpAndSettle();
-      final arrives = find.text('Arrives');
+      final arrives = find.text('Timing');
       await tester.ensureVisible(arrives);
       await tester.pumpAndSettle();
       expectWordsFit(tester, arrives);
@@ -2657,7 +2657,7 @@ void main() {
                   matching: find.byType(Scrollable),
                 )
                 .first;
-            final review = find.widgetWithText(FilledButton, 'Review order');
+            final review = find.widgetWithText(FilledButton, 'Checkout');
             await tester.scrollUntilVisible(
               review,
               180,
@@ -3076,7 +3076,7 @@ void main() {
             findsNothing,
           );
           expect(
-            find.widgetWithText(FilledButton, 'Review order').hitTestable(),
+            find.widgetWithText(FilledButton, 'Checkout').hitTestable(),
             findsOneWidget,
           );
           tester.view.resetViewInsets();
@@ -3117,7 +3117,7 @@ void main() {
         expect(find.text('Your products are unchanged.'), findsOneWidget);
         session.clearNotice();
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.checkout);
         expect(
@@ -3255,7 +3255,18 @@ void main() {
         final continueStore = find.byKey(
           const ValueKey('buy-cart-continue-store'),
         );
-        await tester.ensureVisible(continueStore);
+        await tester.scrollUntilVisible(
+          continueStore,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(
+                  PageStorageKey('buy-cart-${session.cartScope.name}'),
+                ),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(continueStore);
         await tester.pumpAndSettle();
@@ -3824,12 +3835,7 @@ void main() {
         await expectLater(
           find.byType(BuyV2Screen),
           matchesGoldenFile(
-            {
-                  '360x800-android-cart',
-                  '430x932-ios-cart',
-                }.contains(viewport.label)
-                ? 'candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-${viewport.label}.png'
-                : 'candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-${viewport.label}.png',
+            'candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
       },

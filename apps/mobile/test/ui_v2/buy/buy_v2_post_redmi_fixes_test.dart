@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -127,6 +126,80 @@ Widget _eightApp(
 );
 
 void main() {
+  group('r6634 registered replay corrections', () {
+    test(
+      'new Add reveals basket while in-Cart quantity edits retain position',
+      () {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.rememberCartScrollOffset(BuyV2CartScope.all, 900);
+        session.rememberCartScrollOffset(BuyV2CartScope.shop, 750);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.cartScrollOffsetFor(BuyV2CartScope.all), 0);
+        expect(session.cartScrollOffsetFor(BuyV2CartScope.shop), 0);
+        session.openCart();
+        session.rememberCartScrollOffset(BuyV2CartScope.all, 125);
+        session.increase('s-tomato');
+        expect(session.cartScrollOffsetFor(BuyV2CartScope.all), 125);
+      },
+    );
+    for (final state in [
+      BuyV2CheckoutSubmissionState.cancelled,
+      BuyV2CheckoutSubmissionState.failed,
+      BuyV2CheckoutSubmissionState.unavailable,
+    ]) {
+      test('terminal $state allows another method without changing basket', () {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.addProduct('s-tomato');
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        session.checkoutSubmissionState = state;
+        expect(session.choosePayment('Paytm'), isTrue);
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.idle,
+        );
+        expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.confirmedPurchaseId, isNull);
+      });
+    }
+    for (final state in [
+      BuyV2CheckoutSubmissionState.paymentPending,
+      BuyV2CheckoutSubmissionState.paymentUnknown,
+      BuyV2CheckoutSubmissionState.paymentActionRequired,
+    ]) {
+      test('unresolved $state still prevents payment and basket mutation', () {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.addProduct('s-tomato');
+        session.checkoutSubmissionState = state;
+        expect(session.choosePayment('Paytm'), isFalse);
+        expect(session.addProduct('w-notebook'), isFalse);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.quantityFor('w-notebook'), 0);
+        expect(session.checkoutSubmissionState, state);
+      });
+    }
+    test(
+      'combined active delivery estimate never claims completed delivery',
+      () {
+        expect(
+          buyV2DeliveryPromiseSummary(
+            promise: 'Delivered in 30 min · Delivered by 8 pm',
+          ),
+          'Delivery in 30 min · Delivery by 8 pm',
+        );
+      },
+    );
+  });
   group('Cursor eight tickets', () {
     for (final id in ['s-tomato', 'w-rice']) {
       for (final entry in ['search', 'saved', 'recent']) {
@@ -205,7 +278,16 @@ void main() {
             findsOneWidget,
           );
           final action = find.byKey(ValueKey('buy-product-primary-$id'));
-          await tester.ensureVisible(action);
+          await tester.scrollUntilVisible(
+            action,
+            -180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$id')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
           await tester.pumpAndSettle();
           expect(action.hitTestable(), findsOneWidget);
           await tester.tap(action);
@@ -811,6 +893,8 @@ void main() {
             }
             if (product.destination == BuyV2Destination.wholesale) {
               final quantity = find.byKey(ValueKey('buy-product-quantity-$id'));
+              await tester.scrollUntilVisible(quantity, 120, scrollable: list);
+              await tester.pumpAndSettle();
               expect(quantity.hitTestable(), findsOneWidget);
               expect(tester.getSize(quantity).width, lessThanOrEqualTo(190));
               final plus = find.descendant(
@@ -873,7 +957,7 @@ void main() {
   });
 
   testWidgets(
-    'pickup sign-in Android Back returns to exact checkout and preserves Cart',
+    'collection removes redundant sign-in but retains identity validation and Cart',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -911,31 +995,13 @@ void main() {
       final signIn = find.byKey(
         const ValueKey('buy-checkout-collection-sign-in'),
       );
-      await tester.ensureVisible(signIn);
-      await tester.tap(signIn);
-      await tester.pumpAndSettle();
-      final security = find.byKey(const Key('global-security-v2'));
-      final uri = GoRouterState.of(tester.element(security)).uri;
-      expect(
-        Uri.parse(uri.queryParameters['return']!).queryParameters['view'],
-        'checkout',
-      );
-      await tester.tap(find.byKey(const Key('global-security-sign-in')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(security, findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      expect(signIn, findsNothing);
+      expect(session.continueCheckoutFromAddress(), isFalse);
       expect(session.view, BuyV2View.checkout);
       expect(session.checkoutScope, BuyV2CartScope.shop);
       expect(session.collectionCheckoutSelected, isTrue);
       expect(session.quantityFor('s-tomato'), 1);
-      expect(
-        find.byKey(const ValueKey('buy-checkout-collection-sign-in')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('screen03-login-v5')), findsNothing);
       expect(journey.isAuthenticated, isFalse);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());

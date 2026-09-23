@@ -4515,7 +4515,7 @@ void main() {
         final expectedMessage = switch (fault) {
           'services' =>
             'Store collection is unavailable right now. Your Cart has not changed.',
-          'identity' => 'Sign in to place a store collection order.',
+          'identity' => 'Your account could not be verified for collection. Your Cart is saved.',
           'capability' =>
             'Check this store’s collection availability to continue.',
           _ =>
@@ -4671,7 +4671,7 @@ void main() {
 
           final cartReview = find.descendant(
             of: find.byKey(const ValueKey('buy-cart-action-bar')),
-            matching: find.widgetWithText(FilledButton, 'Review order'),
+            matching: find.widgetWithText(FilledButton, 'Checkout'),
           );
           if (cartReview.evaluate().isEmpty) {
             final cartScroll = find
@@ -8299,21 +8299,21 @@ void main() {
 
     test('unsupported payment identifiers fail closed', () {
       session.chooseAddress('work');
-      expect(session.choosePayment('Purchase order'), isTrue);
+      expect(session.choosePayment('Paytm'), isTrue);
 
+      expect(session.choosePayment('Purchase order'), isFalse);
       expect(session.choosePayment('Card<script>'), isFalse);
       expect(session.choosePayment('UPI'), isFalse);
       expect(session.choosePayment('Bank transfer'), isFalse);
 
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Purchase order');
+      expect(session.selectedPayment, 'Paytm');
       expect(session.notice, 'This payment method is not available.');
       expect(BuyV2Session.paymentMethods, {
         'PhonePe',
         'Paytm',
         'Pine Labs',
         'Cash on Delivery',
-        'Purchase order',
       });
     });
 
@@ -8619,17 +8619,18 @@ void main() {
             expect(session.openCheckout(), isTrue);
             expect(session.continueCheckoutFromAddress(), isTrue);
             expect(
-              session.choosePayment(
-                wholesale ? 'Purchase order' : 'Cash on Delivery',
-              ),
+              session.choosePayment(wholesale ? 'Paytm' : 'Cash on Delivery'),
               isTrue,
             );
-            if (wholesale) session.purchaseOrderReference = 'R66-LOCAL-PO';
             expect(session.continueCheckoutFromPayment(), isTrue);
             final groups = session.checkoutFulfilmentGroups;
             expect(groups, hasLength(wholesale ? 1 : 2));
             final total = session.checkoutPayableTotal;
-            expect(await session.submitOrder(), isTrue);
+            // This test isolates retained local order identities, not live payment settlement.
+            expect(
+              wholesale ? session.confirmOrder() : await session.submitOrder(),
+              isTrue,
+            );
             final purchaseId = session.confirmedPurchaseId!;
             expect(
               purchases.containsKey(purchaseId),

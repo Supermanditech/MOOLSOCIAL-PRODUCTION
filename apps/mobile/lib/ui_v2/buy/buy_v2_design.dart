@@ -649,7 +649,10 @@ String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
 }
 
 String buyV2BuyerDeliveryPromiseSource(String value) {
-  final source = value.trim();
+  final source = value.trim().replaceAll(
+    RegExp(r'\bdelivered(?=\s+(?:in|within|by)\b)', caseSensitive: false),
+    'Delivery',
+  );
   final normalized = source.toLowerCase();
   if (normalized.startsWith('delivered ')) {
     return source.replaceFirst(
@@ -768,16 +771,16 @@ String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
     };
 
 String buyV2FulfilmentModeLabel(BuyV2FulfilmentMode mode) => switch (mode) {
-  BuyV2FulfilmentMode.quickLocal => 'Quick local delivery',
-  BuyV2FulfilmentMode.standardCourier => 'Standard/courier delivery',
-  BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+  BuyV2FulfilmentMode.quickLocal => 'MoolSocial Quick Delivery',
+  BuyV2FulfilmentMode.standardCourier => 'MoolSocial Courier Delivery',
+  BuyV2FulfilmentMode.bulkFreight => 'MoolSocial Scheduled Delivery',
 };
 
 String buyV2CompactFulfilmentModeLabel(BuyV2FulfilmentMode mode) =>
     switch (mode) {
-      BuyV2FulfilmentMode.quickLocal => 'Quick local',
+      BuyV2FulfilmentMode.quickLocal => 'Quick delivery',
       BuyV2FulfilmentMode.standardCourier => 'Courier',
-      BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+      BuyV2FulfilmentMode.bulkFreight => 'Scheduled delivery',
     };
 
 const buyV2ProductOfferDecisionContractVersion =

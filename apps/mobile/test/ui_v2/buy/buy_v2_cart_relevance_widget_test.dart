@@ -290,11 +290,11 @@ void main() {
             );
             expect(tester.getRect(amount).left, greaterThanOrEqualTo(bar.left));
             expect(tester.getRect(amount).right, lessThanOrEqualTo(bar.right));
-            final review = find.widgetWithText(FilledButton, 'Review order');
+            final review = find.widgetWithText(FilledButton, 'Checkout');
             expect(tester.getSize(review).height, greaterThanOrEqualTo(44));
             final label = find.descendant(
               of: review,
-              matching: find.text('Review order'),
+              matching: find.text('Checkout'),
             );
             expect(
               tester.getSize(review).height,

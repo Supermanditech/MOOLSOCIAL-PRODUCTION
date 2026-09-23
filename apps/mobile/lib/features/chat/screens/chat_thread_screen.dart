@@ -765,6 +765,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             ? widget.returnRoute
             : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
         final entryContext = ChatEntryContext.resolve(widget.returnRoute);
+        final orderConversation =
+            widget.session.commerceContext(thread.id)?.contextName ==
+            'supplier-order';
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),
           session: widget.session,
@@ -772,6 +775,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           subtitle: thread.subtitle,
           returnRoute: backRoute,
           showContentBack: true,
+          compactOrderHeader: orderConversation,
           titleIcon: _threadIconFor(thread.type),
           titleAccent: entryContext.accent,
           onTitleTap: () =>
@@ -788,7 +792,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 onPressed: () => unawaited(_openMessageSearch()),
                 icon: const Icon(Icons.search_rounded),
               ),
-              if (thread.id != 'workspace-support' ||
+              if ((!orderConversation && thread.id != 'workspace-support') ||
                   widget.session.callServiceAvailable) ...[
                 IconButton(
                   key: const Key('chat-thread-video'),
@@ -1899,6 +1903,7 @@ class _ThreadBody extends StatelessWidget {
         if (messages.isEmpty) {
           return _ThreadEmptyState(
             title: thread.title,
+            compactOrder: commerceContext?.contextName == 'supplier-order',
             message:
                 commerceContext?.emptyMessage ??
                 'Send your first message to ${thread.title}.',
@@ -1929,27 +1934,35 @@ class _ThreadBody extends StatelessWidget {
 }
 
 class _ThreadEmptyState extends StatelessWidget {
-  const _ThreadEmptyState({required this.title, required this.message});
+  const _ThreadEmptyState({
+    required this.title,
+    required this.message,
+    this.compactOrder = false,
+  });
 
   final String title;
   final String message;
+  final bool compactOrder;
 
   @override
   Widget build(BuildContext context) => Padding(
     key: const Key('chat-thread-empty-state'),
-    padding: const EdgeInsets.symmetric(vertical: MoolSpacing.lg),
+    padding: EdgeInsets.symmetric(
+      vertical: compactOrder ? MoolSpacing.sm : MoolSpacing.lg,
+    ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.forum_outlined, size: 38, color: MoolColors.muted),
+        if (!compactOrder)
+          const Icon(Icons.forum_outlined, size: 38, color: MoolColors.muted),
         const SizedBox(height: MoolSpacing.sm),
         Text(
-          'No messages with $title yet',
+          compactOrder ? 'No messages yet' : 'No messages with $title yet',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: MoolColors.navy,
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
+            fontSize: compactOrder ? 14 : 17,
+            fontWeight: compactOrder ? FontWeight.w700 : FontWeight.w900,
           ),
         ),
         const SizedBox(height: MoolSpacing.xs),

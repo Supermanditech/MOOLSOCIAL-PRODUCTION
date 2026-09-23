@@ -194,12 +194,12 @@ void main() {
     // A stale or restored client selection cannot bypass the visible guard.
     session.selectedPayment = 'Purchase order';
     expect(await session.submitOrder(), isFalse);
-    expect(session.notice, BuyV2Session.purchaseOrderEligibilityMessage);
+    expect(session.notice, 'Choose an available payment method to continue.');
     expect(session.confirmedPurchaseId, isNull);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('wholesale-only Checkout shows and permits Purchase order', (
+  testWidgets('Wholesale keeps Purchase order separate from payment', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -214,11 +214,18 @@ void main() {
     await openSheet(tester, session);
     expect(
       find.byKey(const ValueKey('buy-payment-Purchase order')),
-      findsOneWidget,
+      findsNothing,
     );
-    await tester.tap(find.byKey(const ValueKey('buy-payment-Purchase order')));
-    await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'Purchase order');
+    expect(session.choosePayment('Purchase order'), isFalse);
+    expect(session.selectedPayment, 'PhonePe');
+    expect(
+      find.byKey(const ValueKey('buy-purchase-order-reference')),
+      findsNothing,
+    );
+    session.selectedPayment = 'Purchase order';
+    session.purchaseOrderReference = 'LEGACY-PO';
+    expect(await session.submitOrder(), isFalse);
+    expect(session.confirmedPurchaseId, isNull);
   });
 
   testWidgets('every payment method clears the OPPO navigation inset', (

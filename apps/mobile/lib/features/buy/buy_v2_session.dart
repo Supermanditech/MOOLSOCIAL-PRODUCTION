@@ -971,8 +971,9 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     }
     if (query.wholesaleSaleType != null &&
         base.offerClass != BuyV2OfferClass.wholesale &&
-        base.offerClass != BuyV2OfferClass.bulk)
+        base.offerClass != BuyV2OfferClass.bulk) {
       return false;
+    }
     if (query.wholesaleSaleType != null &&
         ((query.wholesaleSaleType == BuyV2WholesaleSaleType.bulk) !=
             (base.offerClass == BuyV2OfferClass.bulk))) {
@@ -3719,7 +3720,6 @@ class BuyV2Session extends ChangeNotifier {
     'Paytm',
     'Pine Labs',
     'Cash on Delivery',
-    'Purchase order',
   };
 
   static const Set<String> storePaymentMethods = {
@@ -3729,7 +3729,6 @@ class BuyV2Session extends ChangeNotifier {
     'NEFT',
     'RTGS',
     'Cash',
-    'Purchase order',
   };
 
   Set<String> get supportedPaymentMethods =>
@@ -4066,8 +4065,9 @@ class BuyV2Session extends ChangeNotifier {
   ) {
     if (ownerScope != reviewDraftOwnerScope) return;
     final draft = productReviewDraft(productId);
-    if (draft?.rating != rating || draft?.comment.trim() != comment.trim())
+    if (draft?.rating != rating || draft?.comment.trim() != comment.trim()) {
       return;
+    }
     _reviewDrafts.remove(productId);
     _persistCustomerState();
   }
@@ -4928,7 +4928,9 @@ class BuyV2Session extends ChangeNotifier {
       }
       if (snapshot.state == BuyV2CommerceLoadState.ready) {
         if (!isStoreProcurement) _currentDeliveryOrderIds.clear();
-        _currentDeliveryOrderIds.addAll(snapshot.orders.map((order) => order.id));
+        _currentDeliveryOrderIds.addAll(
+          snapshot.orders.map((order) => order.id),
+        );
       }
       _businessVerificationState = snapshot.businessVerificationState;
       businessVerified =
@@ -5046,10 +5048,12 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2FulfilmentMode fulfilmentModeFor(BuyV2Product product) {
     final options = deliveryOptionsFor(product);
-    if (options.contains(BuyV2DeliveryOption.quick))
+    if (options.contains(BuyV2DeliveryOption.quick)) {
       return BuyV2FulfilmentMode.quickLocal;
-    if (options.contains(BuyV2DeliveryOption.freight))
+    }
+    if (options.contains(BuyV2DeliveryOption.freight)) {
       return BuyV2FulfilmentMode.bulkFreight;
+    }
     return BuyV2FulfilmentMode.standardCourier;
   }
 
@@ -6181,7 +6185,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!collectionCheckoutSelected) return null;
     if (collectionCheckout?.message case final value?) return value;
     if (collectionIdentity?.value == null) {
-      return 'Sign in to place a store collection order.';
+      return 'Your account could not be verified for collection. Your Cart is saved.';
     }
     if (collectionCheckout?.available != true) {
       return 'Store collection is unavailable right now. Your Cart has not changed.';
@@ -6497,7 +6501,7 @@ class BuyV2Session extends ChangeNotifier {
       final promise = facts.deliveryPromise.trim().toLowerCase();
       final promisedBy = facts.promisedByLabel?.trim().toLowerCase() ?? '';
       final key =
-          '${product.destination.name}|${product.seller}|'
+          '${product.destination.name}|${product.storeId ?? product.seller}|'
           '${mode.name}|$promise|$promisedBy';
       grouped.putIfAbsent(key, () => []).add(line);
     }
@@ -6532,7 +6536,7 @@ class BuyV2Session extends ChangeNotifier {
                 ..sort();
           return BuyV2FulfilmentGroup(
             groupKey:
-                '${firstProduct.destination.name}|${firstProduct.seller}|'
+                '${firstProduct.destination.name}|${firstProduct.storeId ?? firstProduct.seller}|'
                 '${fulfilmentModeFor(firstProduct).name}|${stableProductIds.join(',')}',
             destination: firstProduct.destination,
             partner: firstProduct.seller,
@@ -8171,8 +8175,10 @@ class BuyV2Session extends ChangeNotifier {
               clearStoreCollection: store.collection == null,
             );
     });
-    if (isStoreProcurement || product.destination == BuyV2Destination.medicine)
+    if (isStoreProcurement ||
+        product.destination == BuyV2Destination.medicine) {
       return cached;
+    }
     final eligibility = cached.eligibility;
     final options =
         eligibility?.availableFor(
@@ -8212,7 +8218,9 @@ class BuyV2Session extends ChangeNotifier {
       final previous = _productFacts[product.id];
       if (previous != null) {
         _productFacts[product.id] = previous.copyWith(
-          clearStoreCollection: true, clearEligibility: true, stale: true,
+          clearStoreCollection: true,
+          clearEligibility: true,
+          stale: true,
         );
       }
       notice = 'Product information could not be refreshed.';
@@ -9047,10 +9055,12 @@ class BuyV2Session extends ChangeNotifier {
   /// A delivery-rail visit returns to its existing shopping surface once.
   bool openDeliveryTracking(String orderId) {
     if (!procurementScopeCurrent ||
-        !_orders.any((order) => order.id == orderId))
+        !_orders.any((order) => order.id == orderId)) {
       return false;
-    if (hasShoppingHelpReturnOrigin || hasShoppingAlertReturnOrigin)
+    }
+    if (hasShoppingHelpReturnOrigin || hasShoppingAlertReturnOrigin) {
       return openTracking(orderId);
+    }
     final restoreNavigation = beginStoreNavigationVisit();
     final origin = (
       ownerScope: customerStateStore?.ownerScope,
@@ -10442,6 +10452,17 @@ class BuyV2Session extends ChangeNotifier {
       product: item,
       quantity: (current?.quantity ?? 0) + addedQuantity,
     );
+    // A fresh addition from discovery should reveal the basket, not a saved
+    // recommendation offset. In-cart edits retain their current viewport.
+    if (view != BuyV2View.cart) {
+      _cartScrollOffsets.remove(BuyV2CartScope.all);
+      _cartScrollOffsets.remove(switch (item.destination) {
+        BuyV2Destination.shop => BuyV2CartScope.shop,
+        BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+        BuyV2Destination.medicine => BuyV2CartScope.medicine,
+        BuyV2Destination.orders => BuyV2CartScope.all,
+      });
+    }
     _pruneCartSelections();
     _acknowledgeCart(
       '${item.customerTitle} added',
@@ -10859,6 +10880,13 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (view == BuyV2View.checkout &&
+        (checkoutSubmissionState == BuyV2CheckoutSubmissionState.cancelled ||
+            checkoutSubmissionState == BuyV2CheckoutSubmissionState.failed ||
+            checkoutSubmissionState ==
+                BuyV2CheckoutSubmissionState.unavailable)) {
+      retryCheckoutPayment();
+    }
     if (collectionCheckoutSelected) {
       selectedPayment = value;
       notice = null;
@@ -11016,6 +11044,13 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (!checkoutRequiresResolution &&
+        (selectedPayment == 'Purchase order' ||
+            !availablePaymentMethods.contains(selectedPayment))) {
+      notice = 'Choose an available payment method to continue.';
+      notifyListeners();
+      return Future<bool>.value(false);
+    }
     if (isStoreProcurement && !commercialPaymentTermsEnabled) {
       notice = 'Supplier payment terms are unavailable. Your cart is retained.';
       notifyListeners();

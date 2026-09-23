@@ -1507,7 +1507,9 @@ void main() {
         expect(selected.price, offers ? 1580 : 3200);
         expect(selected.seller, source.seller);
         expect(session.quantityFor(sourceId), 0);
-        final label = find.text('Minimum 1 pack · ${selected.pack} each');
+        final label = find.text(
+          'Minimum 1 pack · ${buyV2Money(selected.price)}',
+        );
         expect(label, findsOneWidget);
         expect(
           tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
@@ -1523,7 +1525,7 @@ void main() {
         expect(addLabel, findsOneWidget);
         expect(find.textContaining(RegExp(r'\b1 packs\b')), findsNothing);
         await capturePack(tester, 'r5-pack-$offers-$scale-minimum');
-        final trade = find.text('Minimum order 1 pack');
+        final trade = label;
         await tester.scrollUntilVisible(
           trade,
           160,
@@ -1568,7 +1570,16 @@ void main() {
         );
         await capturePack(tester, 'r5-pack-$offers-$scale-trade');
         final add = find.byKey(ValueKey('buy-product-primary-$selectedId'));
-        await tester.ensureVisible(add);
+        await tester.scrollUntilVisible(
+          add,
+          -160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$selectedId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         expect(add.hitTestable(), findsOneWidget);
         await tester.tap(add);
@@ -1578,7 +1589,14 @@ void main() {
           session.totalForDestination(BuyV2Destination.wholesale),
           selected.price,
         );
-        expect(find.text('1 pack in Cart'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is Semantics &&
+                w.properties.label == 'Edit quantity, 1 pack in Cart',
+          ),
+          findsOneWidget,
+        );
         await capturePack(tester, 'r5-pack-$offers-$scale-one-in-cart');
         final stepper = find.byKey(
           ValueKey('buy-product-quantity-$selectedId'),
@@ -1588,7 +1606,14 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(session.quantityFor(selectedId), 2);
-        expect(find.text('2 packs in Cart'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is Semantics &&
+                w.properties.label == 'Edit quantity, 2 packs in Cart',
+          ),
+          findsOneWidget,
+        );
         expect(
           session.totalForDestination(BuyV2Destination.wholesale),
           selected.price * 2,
@@ -1803,7 +1828,7 @@ void main() {
         expect(
           find.descendant(
             of: delivery,
-            matching: find.textContaining('Standard/courier delivery'),
+            matching: find.textContaining('MoolSocial Courier Delivery'),
           ),
           findsWidgets,
         );

@@ -86,7 +86,7 @@ void main() {
       find.text('Freight included · GST invoice at checkout'),
       findsOneWidget,
     );
-    expect(find.text('Review order'), findsOneWidget);
+    expect(find.text('Checkout'), findsOneWidget);
 
     final facts = find.byKey(
       ValueKey('buy-wholesale-cart-line-facts-${product.id}'),
@@ -201,7 +201,7 @@ void main() {
     expect(session.cartScope, BuyV2CartScope.wholesale);
     expect(session.quantityFor(product.id), product.minimumOrder);
 
-    await tester.tap(find.text('Review order'));
+    await tester.tap(find.text('Checkout'));
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.checkout);
     expect(find.text('Receiving address'), findsOneWidget);
@@ -256,7 +256,7 @@ void main() {
 
       final actionBar = find.byKey(const ValueKey('buy-cart-action-bar'));
       expect(actionBar, findsOneWidget, reason: '${viewport.size} action');
-      expect(find.text('Review order'), findsOneWidget);
+      expect(find.text('Checkout'), findsOneWidget);
       expect(
         tester.getBottomRight(actionBar).dy,
         lessThanOrEqualTo(viewport.size.height - viewport.safe.bottom),

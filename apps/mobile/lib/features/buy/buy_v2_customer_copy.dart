@@ -73,3 +73,12 @@ extension BuyV2CustomerGroupCopy on BuyV2FulfilmentGroup {
         : partner;
   }
 }
+
+extension BuyV2CustomerOrderCopy on BuyV2Order {
+  String get customerPartner {
+    final ids = lines.map((line) => line.product.storeId).toSet();
+    return ids.length == 1
+        ? buyV2CustomerStoreName(partner, ids.single)
+        : partner;
+  }
+}

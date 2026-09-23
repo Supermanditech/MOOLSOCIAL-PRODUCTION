@@ -168,7 +168,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Review order'));
+    await tester.tap(find.text('Checkout'));
     await tester.pumpAndSettle();
     expect(session.continueCheckoutFromAddress(), isTrue);
     expect(session.continueCheckoutFromPayment(), isTrue);

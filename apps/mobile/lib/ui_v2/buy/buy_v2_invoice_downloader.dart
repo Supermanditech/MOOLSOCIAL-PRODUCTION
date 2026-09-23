@@ -4,6 +4,7 @@ import 'buy_v2_design.dart' show buyV2HistoricalOrderEstimate;
 import 'package:flutter/services.dart';
 
 import '../../features/buy/buy_v2_models.dart';
+import '../../features/buy/buy_v2_customer_copy.dart';
 import 'buy_v2_invoice.dart';
 
 const _invoiceChannel = MethodChannel('com.moolsocial.app/invoice');
@@ -85,7 +86,7 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
         'Correction: ${_invoiceText(value)}',
     ],
     'Order type: ${_destinationLabel(order.destination)}',
-    'Seller: ${_invoiceText(order.partner)}',
+    'Seller: ${_invoiceText(order.customerPartner)}',
     'Seller role: ${_invoiceText(order.partnerType)}',
     if (order.buyerName case final value?) 'Buyer: ${_invoiceText(value)}',
     if (order.buyerType case final value?) 'Buyer role: ${_invoiceText(value)}',
@@ -115,7 +116,7 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     '',
     'Items placed',
     for (final line in order.lines)
-      '${line.quantity} x ${_invoiceText(line.product.title)} '
+      '${line.quantity} x ${_invoiceText(line.product.customerTitle)} '
           '(${_invoiceText(line.product.pack)}) - INR ${line.total}',
     if (order.taxInvoiceDetails case final taxInvoice?) ...[
       '',

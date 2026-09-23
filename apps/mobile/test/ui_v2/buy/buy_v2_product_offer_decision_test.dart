@@ -132,7 +132,7 @@ void main() {
       'buy-product-offer-decision-v1',
     );
     expect(find.text('Delivery & returns'), findsOneWidget);
-    expect(find.text('Quick local delivery'), findsOneWidget);
+    expect(find.text('MoolSocial Quick Delivery'), findsOneWidget);
     if (product.mrp case final mrp?) {
       expect(find.text(buyV2Money(mrp)), findsOneWidget);
     }

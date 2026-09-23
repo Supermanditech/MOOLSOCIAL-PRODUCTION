@@ -991,7 +991,18 @@ void main() {
         );
         await tester.pumpAndSettle();
         final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
-        await tester.ensureVisible(edit);
+        await tester.scrollUntilVisible(
+          edit,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-product-w-rice')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(edit.hitTestable(), findsOneWidget);
         await tester.tap(edit);
         await tester.pumpAndSettle();
         final input = find.byKey(const ValueKey('buy-quantity-input'));

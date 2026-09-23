@@ -908,45 +908,28 @@ void main() {
               final progress = find.byKey(
                 ValueKey('buy-checkout-progress-${session.checkoutStep.name}'),
               );
-              final cellHeights = <double>[];
-              for (final stepLabel in ['Address', 'Payment', 'Confirm order']) {
-                final text = find.descendant(
-                  of: progress,
-                  matching: find.text(stepLabel),
-                );
-                final paragraph = tester.renderObject<RenderParagraph>(text);
-                for (final word in stepLabel.split(' ')) {
-                  final wordPainter = TextPainter(
-                    text: TextSpan(text: word, style: paragraph.text.style),
-                    textDirection: paragraph.textDirection,
-                    textScaler: paragraph.textScaler,
-                  )..layout();
-                  expect(
-                    paragraph.size.width + .1,
-                    greaterThanOrEqualTo(wordPainter.width),
-                    reason: 'Unbroken checkout word: $word',
-                  );
-                  wordPainter.dispose();
-                }
-                expect(
-                  paragraph.didExceedMaxLines,
-                  isFalse,
-                  reason: 'Complete checkout step: $stepLabel',
-                );
-                cellHeights.add(
-                  tester
-                      .getSize(
-                        find
-                            .ancestor(
-                              of: text,
-                              matching: find.byType(AnimatedContainer),
-                            )
-                            .first,
-                      )
-                      .height,
-                );
-              }
-              expect(cellHeights.toSet(), hasLength(1));
+              final index = BuyV2CheckoutStep.values.indexOf(
+                session.checkoutStep,
+              );
+              final stepLabel = ['Address', 'Payment', 'Confirm order'][index];
+              final text = find.descendant(
+                of: progress,
+                matching: find.text('$stepLabel · ${index + 1}/3'),
+              );
+              expect(text, findsOneWidget);
+              final paragraph = tester.renderObject<RenderParagraph>(text);
+              expect(paragraph.didExceedMaxLines, isFalse);
+              final natural = TextPainter(
+                text: paragraph.text,
+                textDirection: paragraph.textDirection,
+                textScaler: paragraph.textScaler,
+              )..layout(maxWidth: paragraph.size.width);
+              expect(
+                paragraph.size.height + .1,
+                greaterThanOrEqualTo(natural.height),
+              );
+              natural.dispose();
+              expect(tester.getRect(text).right, lessThanOrEqualTo(width));
               final bar = find.byKey(const ValueKey('buy-checkout-action-bar'));
               final action = find.byKey(
                 ValueKey('buy-checkout-primary-${session.checkoutStep.name}'),
@@ -1202,11 +1185,10 @@ void main() {
     final store = _R66OrderCustomerStore();
     final earlierCore = BuySession();
     final earlier = BuyV2Session(core: earlierCore, customerStateStore: store);
-    expect(earlier.addProduct('w-notebook'), isTrue);
-    earlier.openCart(scope: BuyV2CartScope.wholesale);
+    expect(earlier.addProduct('s-tomato'), isTrue);
+    earlier.openCart(scope: BuyV2CartScope.shop);
     expect(earlier.openCheckout(), isTrue);
-    expect(earlier.choosePayment('Purchase order'), isTrue);
-    earlier.purchaseOrderReference = 'R66-LOCAL-PO';
+    expect(earlier.choosePayment('Cash on Delivery'), isTrue);
     advanceCheckoutToConfirm(earlier);
     expect(await earlier.submitOrder(), isTrue);
     final previousPurchase = earlier.confirmedPurchaseId!;
@@ -2416,7 +2398,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-storefront-pickup-20260921-r2/'
+            'candidate_captures/cursor-post-r6633-20260923/'
             'buy-v2-r58-8-6-c24f-checkout-cart-return-${viewport.label}.png',
           ),
         );

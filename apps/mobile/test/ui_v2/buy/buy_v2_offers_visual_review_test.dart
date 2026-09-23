@@ -455,10 +455,12 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('buy-saved-products-info-sheet')),
-            findsOneWidget,
+            findsNothing,
           );
-          await tester.binding.handlePopRoute();
+          expect(find.text('No saved offers on this page'), findsOneWidget);
+          await tester.tap(find.byKey(const ValueKey('buy-offers-saved')));
           await tester.pumpAndSettle();
+          expect(find.text('No saved offers on this page'), findsNothing);
         }
         expect(tester.takeException(), isNull);
       });

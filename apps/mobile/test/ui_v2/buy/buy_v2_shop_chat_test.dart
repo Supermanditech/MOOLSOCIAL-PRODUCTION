@@ -57,7 +57,10 @@ void main() {
         ),
       );
       expect(uri.queryParameters['delivery'], summary);
-      expect(uri.queryParameters['draft'], contains('Delivery: $summary'));
+      expect(
+        uri.queryParameters['draft'],
+        'Hello, I need help with order ${freshnessOrder.id}.',
+      );
       expect(uri.queryParameters['orderId'], freshnessOrder.id);
       expect(uri.queryParameters['return'], contains('order=RV6-D003'));
       final thread = BuyV2ShopChatThreadFactory.fromOrder(
@@ -387,11 +390,11 @@ void main() {
     expect(orderLine['lineTotal'], product.price * 3);
     expect(orderLine['returnPolicy'], product.returnPolicy);
     expect(uri.queryParameters['paymentTerms'], 'Pay now');
-    expect(uri.queryParameters['draft'], contains('SKU ${product.id}'));
-    expect(uri.queryParameters['draft'], contains('Quantity 3'));
-    expect(uri.queryParameters['draft'], contains('Items: ${product.title}'));
-    expect(uri.queryParameters['draft'], contains('Order total:'));
-    expect(uri.queryParameters['draft'], contains('Payment terms: Pay now'));
+    expect(
+      uri.queryParameters['draft'],
+      'Hello, I need help with order ${order.id}.',
+    );
+    expect(uri.queryParameters['draft'], isNot(contains('Order total:')));
     expect(uri.queryParameters['adminVisible'], 'true');
     expect(uri.queryParameters['escalationReason'], 'supplier-non-response');
     expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
@@ -1272,13 +1275,7 @@ void main() {
             .widget<TextField>(find.byKey(const Key('chat-message-field')))
             .controller
             ?.text;
-        expect(orderDraft, contains('Help with order PO-240783'));
-        expect(orderDraft, contains('Marwar Foods Distribution'));
-        expect(orderDraft, contains('Items:'));
-        expect(
-          orderDraft,
-          contains('Last recorded estimate (update unavailable)'),
-        );
+        expect(orderDraft, 'Hello, I need help with order PO-240783.');
         final expand = find.byKey(const Key('chat-commerce-context-expand'));
         await tester.ensureVisible(expand);
         await tester.tap(expand);

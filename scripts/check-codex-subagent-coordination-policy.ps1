@@ -1079,6 +1079,10 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+  'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
+  'apps/mobile/lib/features/chat/widgets/chat_widgets.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart',
   'apps/mobile/lib/features/buy/buy_v2_customer_copy.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart',
@@ -1136,6 +1140,23 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-320x568-android-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart',
   # Exact Buy regression owners needed to qualify the approved layouts.
   'apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart',

@@ -2483,9 +2483,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                         ).pop(false),
                                                   ) ??
                                                   (showingProduct
-                                                      ? Column(
+                                                      ? Stack(
                                                           children: [
-                                                            Expanded(
+                                                            Positioned.fill(
                                                               child: BuyV2ProductView(
                                                                 session:
                                                                     session,
@@ -2524,31 +2524,43 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                                         .wholesaleTradeDecisionAdapter,
                                                               ),
                                                             ),
-                                                            if (session.countForDestination(
-                                                                  product
-                                                                      .destination,
-                                                                ) >
+                                                            if (session
+                                                                    .itemCount >
                                                                 0)
-                                                              BuyV2StoreCartBar(
-                                                                session:
-                                                                    session,
-                                                                destination: product
-                                                                    .destination,
-                                                                onOpenCart: () => session.openCart(
-                                                                  scope: switch (product
-                                                                      .destination) {
-                                                                    BuyV2Destination
-                                                                        .wholesale =>
-                                                                      BuyV2CartScope
-                                                                          .wholesale,
-                                                                    BuyV2Destination
-                                                                        .medicine =>
-                                                                      BuyV2CartScope
-                                                                          .medicine,
-                                                                    _ =>
-                                                                      BuyV2CartScope
-                                                                          .shop,
-                                                                  },
+                                                              Positioned(
+                                                                left: 0,
+                                                                right: 0,
+                                                                bottom: 0,
+                                                                child: BuyV2StoreCartBar(
+                                                                  session:
+                                                                      session,
+                                                                  destination:
+                                                                      product
+                                                                          .destination,
+                                                                  aggregate:
+                                                                      session.countForDestination(
+                                                                        product
+                                                                            .destination,
+                                                                      ) ==
+                                                                      0,
+                                                                  onOpenCart: () => session.openCart(
+                                                                    scope:
+                                                                        session.countForDestination(
+                                                                              product.destination,
+                                                                            ) ==
+                                                                            0
+                                                                        ? BuyV2CartScope
+                                                                              .all
+                                                                        : switch (product
+                                                                              .destination) {
+                                                                            BuyV2Destination.wholesale =>
+                                                                              BuyV2CartScope.wholesale,
+                                                                            BuyV2Destination.medicine =>
+                                                                              BuyV2CartScope.medicine,
+                                                                            _ =>
+                                                                              BuyV2CartScope.shop,
+                                                                          },
+                                                                  ),
                                                                 ),
                                                               ),
                                                           ],

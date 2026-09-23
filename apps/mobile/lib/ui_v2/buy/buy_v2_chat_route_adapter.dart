@@ -328,25 +328,9 @@ class BuyV2ChatRouteAdapter {
       buyV2SharedProductUri(product).toString();
 
   String _orderHelpDraft(BuyV2Order order, {String? deliverySummary}) {
-    return [
-      'Hello ${order.partner},',
-      'Help with order ${order.id}.',
-      if (_clean(order.purchaseId) case final purchaseId?)
-        'Purchase: $purchaseId',
-      'Items: ${order.itemSummary}',
-      for (final line in order.lines)
-        '${line.product.title} · SKU ${line.product.id} · '
-            'Quantity ${line.quantity} · '
-            '${buyV2Money(line.product.price * line.quantity)}',
-      if (order.lines.isEmpty && order.productIds.isNotEmpty)
-        'Product references: ${order.productIds.join(', ')}',
-      'Order total: ${buyV2Money(order.total)}',
-      'Delivery: ${deliverySummary ?? buyV2OrderEstimateSummary(order)}',
-      if (_clean(order.paymentMethod) case final paymentMethod?)
-        'Payment: $paymentMethod',
-      if (_clean(order.paymentTermLabel) case final paymentTerms?)
-        'Payment terms: $paymentTerms',
-    ].join('\n');
+    // Structured order facts already travel with the conversation context.
+    // Keep the editable message short rather than duplicating that document.
+    return 'Hello, I need help with order ${order.id}.';
   }
 
   String? _clean(String? value) {

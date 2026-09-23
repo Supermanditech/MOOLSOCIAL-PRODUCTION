@@ -109,7 +109,7 @@ void main() {
         isTrue,
       );
       expect(session.chooseAddress('work'), isTrue);
-      expect(session.choosePayment('Purchase order'), isTrue);
+      expect(session.choosePayment('Paytm'), isTrue);
 
       final itemCount = session.itemCount;
       final cartTotal = session.cartTotal;
@@ -159,7 +159,7 @@ void main() {
       expect(session.customerReviewFor(product.id)?.comment, review?.comment);
       expect(session.hasReportedProduct(product.id), isTrue);
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Purchase order');
+      expect(session.selectedPayment, 'Paytm');
     });
 
     test('checkout views are immutable and confirmation is single-use', () {

@@ -1845,7 +1845,20 @@ void main() {
           final continueStore = find.byKey(
             const ValueKey('buy-cart-continue-store'),
           );
-          await tester.ensureVisible(continueStore);
+          await tester.scrollUntilVisible(
+            continueStore,
+            160,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(
+                    PageStorageKey('buy-cart-${session.cartScope.name}'),
+                  ),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(continueStore.hitTestable(), findsOneWidget);
           await tester.tap(continueStore);
           await tester.pumpAndSettle();
           await browseAll();
@@ -1992,7 +2005,20 @@ void main() {
           final continueStore = find.byKey(
             const ValueKey('buy-cart-continue-store'),
           );
-          await tester.ensureVisible(continueStore);
+          await tester.scrollUntilVisible(
+            continueStore,
+            160,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(
+                    PageStorageKey('buy-cart-${session.cartScope.name}'),
+                  ),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(continueStore.hitTestable(), findsOneWidget);
           await tester.tap(continueStore);
           await tester.pumpAndSettle();
           await browseAll();
@@ -3597,7 +3623,10 @@ void main() {
           expect(session.quantityFor(current.id), current.minimumOrder);
           expect(session.quantityFor(other.id), 1);
           expect(session.orders.length, ordersBefore);
-          expect(session.collectionCheckoutMessage, contains('Sign in'));
+          expect(
+            session.collectionCheckoutMessage,
+            contains('account could not be verified'),
+          );
           expect(tester.takeException(), isNull);
         },
       );
@@ -4065,7 +4094,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
-        await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.checkout);
         await tester.tap(

@@ -328,6 +328,7 @@ class BuyV2OffersView extends StatefulWidget {
 }
 
 class _BuyV2OffersViewState extends State<BuyV2OffersView> {
+  bool _savedOnly = false;
   BuyV2PublishedOffersSnapshot? _snapshot;
   var _requestSequence = 0;
   BuyV2OfferPublisherType? get _publisher =>
@@ -420,6 +421,7 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
     final resolved = allResolved
         .where(
           (entry) =>
+              (!_savedOnly || session.isSaved(entry.product.id)) &&
               (_publisher == null || entry.offer.publisherType == _publisher) &&
               (session.finiteOffersCategoryId == 'all' ||
                   entry.product.categoryId == session.finiteOffersCategoryId),
@@ -437,6 +439,8 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
             child: _OffersCategoryControl(
               session: session,
               categoryId: session.finiteOffersCategoryId,
+              savedOnly: _savedOnly,
+              onSaved: () => setState(() => _savedOnly = !_savedOnly),
               publisher: _publisher,
               moolSocial: _mool,
               onSourceChanged: (value) => setState(() {
@@ -535,6 +539,7 @@ class _PagedPublishedOffersView extends StatefulWidget {
 
 class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
   static const _scope = 'published-offers';
+  bool _savedOnly = false;
   String _category = 'all';
   BuyV2OfferPublisherType? _publisher;
   bool get _mool => widget.session.featuredOffersMoolSocial;
@@ -575,6 +580,7 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
     return BuyV2PagedProductCatalogue(
       session: session,
       scopeKey: _scope,
+      savedOnly: _savedOnly,
       query: session.catalogueOffersQuery(
         categoryId: _category,
         publisher: _publisher,
@@ -585,6 +591,8 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
       header: _OffersCategoryControl(
         session: session,
         categoryId: _category,
+        savedOnly: _savedOnly,
+        onSaved: () => setState(() => _savedOnly = !_savedOnly),
         onTap: _chooseCategory,
         publisher: _publisher,
         moolSocial: _mool,
@@ -735,24 +743,25 @@ Future<({BuyV2OfferPublisherType? publisher})?> _chooseOfferPublisher(
             style: context.buyTitle.copyWith(fontSize: 16),
           ),
         ),
-        for (final publisher in [null, ...BuyV2OfferPublisherType.values])
-          ListTile(
-            dense: true,
-            minTileHeight: 48,
-            titleTextStyle: const TextStyle(
-              color: BuyV2Colors.ink,
-              fontSize: 13,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-            ),
-            key: ValueKey('buy-offer-filter-${publisher?.name ?? 'all'}'),
-            title: Text(_offerPublisherLabel(publisher)),
-            selected: selected == publisher,
-            trailing: selected == publisher
-                ? const Icon(Icons.check_rounded)
-                : null,
-            onTap: () => Navigator.pop(context, (publisher: publisher)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            children: [
+              for (final publisher in [null, ...BuyV2OfferPublisherType.values])
+                ChoiceChip(
+                  key: ValueKey('buy-offer-filter-${publisher?.name ?? 'all'}'),
+                  label: Text(_offerPublisherLabel(publisher)),
+                  selected: selected == publisher,
+                  showCheckmark: true,
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                  onSelected: (_) =>
+                      Navigator.pop(context, (publisher: publisher)),
+                ),
+            ],
           ),
+        ),
       ],
     ),
   ),
@@ -767,6 +776,8 @@ class _OffersCategoryControl extends StatelessWidget {
     this.publisher,
     required this.moolSocial,
     required this.onSourceChanged,
+    required this.savedOnly,
+    required this.onSaved,
   });
   final BuyV2Session session;
   final String categoryId;
@@ -775,6 +786,8 @@ class _OffersCategoryControl extends StatelessWidget {
   final BuyV2OfferPublisherType? publisher;
   final bool moolSocial;
   final ValueChanged<bool> onSourceChanged;
+  final bool savedOnly;
+  final VoidCallback onSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -828,6 +841,7 @@ class _OffersCategoryControl extends StatelessWidget {
                           ),
                           onPressed: () => onSourceChanged(mool),
                           style: TextButton.styleFrom(
+                            animationDuration: Duration.zero,
                             backgroundColor: moolSocial == mool
                                 ? BuyV2Colors.navy
                                 : Colors.transparent,
@@ -860,11 +874,14 @@ class _OffersCategoryControl extends StatelessWidget {
             const SizedBox(width: 5),
             _CompactCatalogueAction(
               key: const ValueKey('buy-offers-saved'),
-              icon: Icons.bookmark_border_rounded,
-              label: 'Show Saved products',
-              badge: '${session.savedCountFor(session.destination)}',
-              active: false,
-              onTap: () => showBuyV2SavedProducts(context, session),
+              icon: savedOnly
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: savedOnly ? 'Show all offers' : 'Show Saved offers',
+              badge:
+                  '${session.savedCountFor(BuyV2Destination.shop) + session.savedCountFor(BuyV2Destination.wholesale)}',
+              active: savedOnly,
+              onTap: onSaved,
             ),
             const SizedBox(width: 5),
             _CatalogueChromeAction(
@@ -1390,6 +1407,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.toolbarBuilder,
     this.includeStoreSearch = false,
     this.onResetFilters,
+    this.savedOnly = false,
   });
 
   final BuyV2Session session;
@@ -1407,6 +1425,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final Widget Function(int? total, bool loading)? toolbarBuilder;
   final bool includeStoreSearch;
   final VoidCallback? onResetFilters;
+  final bool savedOnly;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
@@ -1699,12 +1718,17 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
               known.price == offer.product.price &&
               known.pack == offer.product.pack;
         });
-    final products = !publicationCurrent
+    final unfilteredProducts = !publicationCurrent
         ? const <BuyV2Product>[]
         : widget.publishedOffers
         ? offers.map((offer) => offer.product).toList(growable: false)
         : page?.items.cast<BuyV2Product>().toList(growable: false) ??
               const <BuyV2Product>[];
+    final products = widget.savedOnly
+        ? unfilteredProducts
+              .where((product) => widget.session.isSaved(product.id))
+              .toList(growable: false)
+        : unfilteredProducts;
     final needsArea =
         widget.query.storeId == null &&
         widget.query.areaScope != BuyV2CatalogueAreaScope.allAreas &&
@@ -1714,7 +1738,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       compactStore: widget.session.isStoreProcurement,
       noun: widget.publishedOffers ? 'offers' : 'products',
       start: publicationCurrent ? page?.startIndex : null,
-      count: products.length,
+      count: unfilteredProducts.length,
       total: publicationCurrent ? page?.totalCount : null,
       loading: loading,
       showRange: !widget.controlsAfterProducts,
@@ -1766,7 +1790,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
             controller: _vertical,
             physics: const AlwaysScrollableScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(bottom: widget.storeContext ? 104 : 12),
             children: [
               if (widget.header != null) widget.header!,
               if (loading || storeLoading)
@@ -1777,7 +1801,16 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
               if (publicationCurrent &&
                   offers.isNotEmpty &&
                   widget.publicationFacts != null)
-                widget.publicationFacts!(offers),
+                widget.publicationFacts!(
+                  widget.savedOnly
+                      ? offers
+                            .where(
+                              (offer) =>
+                                  widget.session.isSaved(offer.product.id),
+                            )
+                            .toList(growable: false)
+                      : offers,
+                ),
               if (needsArea)
                 _CataloguePageNotice(
                   title: 'Where are you shopping?',
@@ -1802,10 +1835,14 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                 )
               else if (!loading && products.isEmpty && message == null)
                 _CataloguePageNotice(
-                  title: widget.publishedOffers
+                  title: widget.savedOnly
+                      ? 'No saved offers on this page'
+                      : widget.publishedOffers
                       ? 'No matching offers'
                       : 'No matching products',
-                  detail: widget.query.maximumPrice != null
+                  detail: widget.savedOnly
+                      ? 'Browse the next page or show all offers.'
+                      : widget.query.maximumPrice != null
                       ? 'Your price filter is limiting these results.'
                       : widget.showAreaControl
                       ? 'Try another search, category or area.'
@@ -6472,9 +6509,9 @@ Future<void> showBuyV2PartnerCatalogue(
             heightFactor: 1,
             child: SafeArea(
               top: false,
-              child: Column(
+              child: Stack(
                 children: [
-                  Expanded(
+                  Positioned.fill(
                     child: Semantics(
                       key: ValueKey('$ownerPrefix-sheet-${current.id}'),
                       container: true,
@@ -6522,7 +6559,7 @@ Future<void> showBuyV2PartnerCatalogue(
                                   16,
                                   10,
                                   16,
-                                  18,
+                                  104,
                                 ),
                                 children: [
                                   Row(
@@ -6822,15 +6859,21 @@ Future<void> showBuyV2PartnerCatalogue(
                     ),
                   ),
                   if (session.countForDestination(current.destination) > 0)
-                    BuyV2FiniteIncomingTransition(
-                      key: const ValueKey('buy-store-cart-entrance-motion'),
-                      stateKey: '$ownerPrefix-store-cart-${session.itemCount}',
-                      child: BuyV2StoreCartBar(
-                        session: session,
-                        destination: current.destination,
-                        onOpenCart: onOpenStoreCart == null
-                            ? () => Navigator.of(sheetContext).pop('cart:')
-                            : () => onOpenStoreCart(current),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: BuyV2FiniteIncomingTransition(
+                        key: const ValueKey('buy-store-cart-entrance-motion'),
+                        stateKey:
+                            '$ownerPrefix-store-cart-${session.itemCount}',
+                        child: BuyV2StoreCartBar(
+                          session: session,
+                          destination: current.destination,
+                          onOpenCart: onOpenStoreCart == null
+                              ? () => Navigator.of(sheetContext).pop('cart:')
+                              : () => onOpenStoreCart(current),
+                        ),
                       ),
                     ),
                 ],
@@ -7371,16 +7414,22 @@ class BuyV2StoreCartBar extends StatelessWidget {
     required this.session,
     required this.destination,
     required this.onOpenCart,
+    this.aggregate = false,
   });
 
   final BuyV2Session session;
   final BuyV2Destination destination;
   final VoidCallback onOpenCart;
+  final bool aggregate;
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = session.countForDestination(destination);
-    final total = session.totalForDestination(destination);
+    final itemCount = aggregate
+        ? session.itemCount
+        : session.countForDestination(destination);
+    final total = aggregate
+        ? session.cartTotal
+        : session.totalForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final acknowledgement = session.cartAcknowledgementForDestination(
       destination,
@@ -8349,6 +8398,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
           ),
           child: ListView(
             key: ValueKey('buy-store-saved-list-${product.storeId}'),
+            padding: const EdgeInsets.only(bottom: 104),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             children: [
               header,
@@ -8464,9 +8514,9 @@ Future<String?> _showBuyV2FullStoreCatalogue(
           heightFactor: .98,
           child: SafeArea(
             top: false,
-            child: Column(
+            child: Stack(
               children: [
-                Expanded(
+                Positioned.fill(
                   child:
                       session.pagedCatalogueEnabled && current.storeId != null
                       ? _PagedFullStoreCatalogue(
@@ -8478,7 +8528,7 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                         )
                       : ListView(
                           key: ValueKey('$ownerPrefix-full-catalogue-list'),
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 104),
                           children: [
                             BuyV2AdaptiveIdentityRow(
                               spacing: 10,
@@ -8547,15 +8597,20 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                         ),
                 ),
                 if (session.countForDestination(current.destination) > 0)
-                  BuyV2FiniteIncomingTransition(
-                    stateKey:
-                        '$ownerPrefix-full-catalogue-cart-${session.itemCount}',
-                    child: BuyV2StoreCartBar(
-                      session: session,
-                      destination: current.destination,
-                      onOpenCart:
-                          onOpenCart ??
-                          () => Navigator.of(sheetContext).pop('cart:'),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: BuyV2FiniteIncomingTransition(
+                      stateKey:
+                          '$ownerPrefix-full-catalogue-cart-${session.itemCount}',
+                      child: BuyV2StoreCartBar(
+                        session: session,
+                        destination: current.destination,
+                        onOpenCart:
+                            onOpenCart ??
+                            () => Navigator.of(sheetContext).pop('cart:'),
+                      ),
                     ),
                   ),
               ],
@@ -8999,33 +9054,46 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _BuyV2InfoSheetHeader(
-                    icon: Icons.history_rounded,
-                    title: 'Recently viewed',
-                    detail:
-                        '${destination.label} · ${products.length} $productLabel',
-                    onClose: onClose,
-                  ),
-                  if (products.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        key: const ValueKey('buy-recently-viewed-sheet-clear'),
-                        onPressed: onClear,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(44, 36),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Recently viewed',
+                              style: context.buyTitle.copyWith(fontSize: 16),
+                            ),
+                            Text(
+                              '${destination.label} · ${products.length} $productLabel',
+                              style: context.buyMeta,
+                            ),
+                          ],
                         ),
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 17,
-                        ),
-                        label: const Text('Clear'),
                       ),
-                    ),
-                  ] else
-                    const SizedBox(height: 14),
+                      if (products.isNotEmpty)
+                        IconButton(
+                          key: const ValueKey(
+                            'buy-recently-viewed-sheet-clear',
+                          ),
+                          tooltip: 'Clear recently viewed',
+                          onPressed: onClear,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                          ),
+                        ),
+                      IconButton(
+                        key: const ValueKey(
+                          'buy-info-sheet-close-Recently viewed',
+                        ),
+                        tooltip: 'Close Recently viewed',
+                        onPressed: onClose,
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: AnimatedSwitcher(
                       key: const ValueKey(
@@ -9210,7 +9278,7 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                     children: [
                       SizedBox.square(
                         dimension:
-                            88.0 *
+                            60.0 *
                             MediaQuery.textScalerOf(
                               context,
                             ).scale(1).clamp(1.0, 1.5),
@@ -9261,8 +9329,6 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Align(alignment: Alignment.centerRight, child: add),
                           ],
                         ),
                       ),
@@ -9270,7 +9336,23 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                   ),
                 ),
               );
-              return details;
+              if (MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    details,
+                    Align(alignment: Alignment.centerRight, child: add),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: details),
+                  const SizedBox(width: 6),
+                  add,
+                ],
+              );
             },
           ),
         ),

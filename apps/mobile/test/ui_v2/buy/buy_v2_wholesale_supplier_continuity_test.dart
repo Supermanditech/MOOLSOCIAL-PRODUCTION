@@ -188,10 +188,16 @@ void main() {
       find.byKey(const ValueKey('buy-wholesale-open-workspace')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('buy-wholesale-verify-business-w-oil')),
-      findsOneWidget,
+    final inlineVerification = find.byKey(
+      const ValueKey('buy-wholesale-verify-business-w-oil'),
     );
+    await tester.scrollUntilVisible(
+      inlineVerification,
+      -180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(inlineVerification.hitTestable(), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-product-primary-w-oil')),
       findsNothing,

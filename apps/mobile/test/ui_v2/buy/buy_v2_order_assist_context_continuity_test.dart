@@ -97,9 +97,16 @@ void main() {
     await tester.scrollUntilVisible(
       help,
       240,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    expect(help, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(help), alignment: .3);
+    await tester.pumpAndSettle();
+    expect(help.hitTestable(), findsOneWidget);
     await tester.tap(help);
     await tester.pumpAndSettle();
     expect(chatOpens, 1);

@@ -444,7 +444,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     label: 'Order type',
                     value: order.destination.label,
                   ),
-                  _InvoiceFact(label: 'Seller', value: order.partner),
+                  _InvoiceFact(label: 'Seller', value: order.customerPartner),
                   _InvoiceFact(label: 'Seller role', value: order.partnerType),
                   if (order.buyerName case final buyer?)
                     _InvoiceFact(label: 'Buyer', value: buyer),
@@ -708,7 +708,7 @@ class _InvoiceLine extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(line.product.title, style: context.buyBody),
+                    Text(line.product.customerTitle, style: context.buyBody),
                     Text(
                       '${line.product.pack} · ${buyV2Money(line.product.price)} each',
                       style: context.buyMeta.copyWith(fontSize: 8),

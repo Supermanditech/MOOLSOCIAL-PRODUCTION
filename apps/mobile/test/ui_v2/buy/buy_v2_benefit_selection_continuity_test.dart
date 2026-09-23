@@ -127,11 +127,17 @@ void main() {
       session.addProduct('s-tomato');
       expect(session.setCartQuantity('s-tomato', '12'), isTrue);
       session.openCart(scope: BuyV2CartScope.shop);
-      await tester.pumpWidget(app(session, textScale: scale, reducedMotion: true));
+      await tester.pumpWidget(
+        app(session, textScale: scale, reducedMotion: true),
+      );
       await tester.pumpAndSettle();
       final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
-      await tester.scrollUntilVisible(coupons, 300,
-          scrollable: find.byType(Scrollable).first, maxScrolls: 30);
+      await tester.scrollUntilVisible(
+        coupons,
+        300,
+        scrollable: find.byType(Scrollable).first,
+        maxScrolls: 30,
+      );
       await tester.pumpAndSettle();
       await tester.tap(coupons);
       await tester.pumpAndSettle();
@@ -247,7 +253,7 @@ void main() {
         natural.dispose();
       }
       expect(session.scopedPayableTotal, 3180);
-      await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.checkout);
       await tester.tap(

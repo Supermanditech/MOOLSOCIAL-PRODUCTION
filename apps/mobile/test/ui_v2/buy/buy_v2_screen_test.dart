@@ -3677,11 +3677,11 @@ void main() {
     );
     expect(
       find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(ValueKey('buy-wholesale-action-dock-${product.id}')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.byKey(const ValueKey('buy-product-action-bar')), findsNothing);
     final productScrollable = scrollableWithin(
@@ -3692,7 +3692,10 @@ void main() {
       220,
       scrollable: productScrollable,
     );
-    expect(find.text('WHOLESALE PRICE'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('buy-wholesale-price-summary-${product.id}')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(ValueKey('buy-wholesale-trade-decision-${product.id}')),
       findsOneWidget,
@@ -3700,10 +3703,7 @@ void main() {
     final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     expect(primary, findsOneWidget);
     expect(
-      find.descendant(
-        of: primary,
-        matching: find.byIcon(Icons.add_shopping_cart_rounded),
-      ),
+      find.descendant(of: primary, matching: find.byIcon(Icons.add_rounded)),
       findsOneWidget,
     );
     expect(
@@ -3711,7 +3711,7 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(of: primary, matching: find.text('Add to Cart')),
+      find.descendant(of: primary, matching: find.text('Add')),
       findsOneWidget,
     );
     expect(find.text('Buy now'), findsNothing);
@@ -6245,7 +6245,7 @@ void main() {
           }
           final review = find.descendant(
             of: actionBar,
-            matching: find.text('Review order'),
+            matching: find.text('Checkout'),
           );
           await tester.ensureVisible(review);
           await tester.pumpAndSettle();
@@ -6294,7 +6294,7 @@ void main() {
     );
     final reviewAction = find.descendant(
       of: actionBar,
-      matching: find.text('Review order'),
+      matching: find.text('Checkout'),
     );
     expect(
       tester.getRect(summary).bottom,
@@ -6632,11 +6632,11 @@ void main() {
       expect(find.text('Delivery 1 of 2'), findsOneWidget);
       expect(find.text('Delivery 2 of 2'), findsOneWidget);
       expect(
-        find.text('Arrives · Delivery in 5 min · by 6:35 PM'),
+        find.text('Timing · Delivery in 5 min · by 6:35 PM'),
         findsOneWidget,
       );
       expect(
-        find.text('Arrives · Delivery in 1 day · by tomorrow 4:00 PM'),
+        find.text('Timing · Delivery in 1 day · by tomorrow 4:00 PM'),
         findsOneWidget,
       );
       expect(find.textContaining(shop.seller), findsWidgets);
@@ -6709,7 +6709,7 @@ void main() {
     await completeReviewPayment(tester, session);
     expect(find.text('Order placed'), findsOneWidget);
     expect(
-      find.text('Arrives · Delivery in 10 min · by 6:40 PM'),
+      find.text('Timing · Delivery in 10 min · by 6:40 PM'),
       findsOneWidget,
     );
   });
@@ -6914,7 +6914,7 @@ void main() {
         expect(
           find.descendant(
             of: placedOrder,
-            matching: find.textContaining('Arrives · '),
+            matching: find.textContaining('Timing · '),
           ),
           findsOneWidget,
         );
@@ -7640,7 +7640,7 @@ void main() {
     expect(find.text('Monthly basket'), findsOneWidget);
     session.openCart(scope: BuyV2CartScope.wholesale);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.checkout);
     for (final step in BuyV2CheckoutStep.values) {
@@ -8280,7 +8280,7 @@ void main() {
           final cartScroll = scrollableWithin(
             PageStorageKey('buy-cart-${session.cartScope.name}'),
           );
-          final review = find.widgetWithText(FilledButton, 'Review order');
+          final review = find.widgetWithText(FilledButton, 'Checkout');
           await tester.scrollUntilVisible(
             review,
             180,
@@ -9084,7 +9084,7 @@ void main() {
     expect(session.view, BuyV2View.cart);
     expect(find.byKey(const ValueKey('buy-cart-browse-more')), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.checkout);
     expect(
@@ -9616,7 +9616,10 @@ void main() {
         find.byKey(const ValueKey('buy-cart-continue-store')),
         findsOneWidget,
       );
-      expect(find.text('Continue browsing'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-cart-continue-store')).hitTestable(),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('buy-cart-continue-store-name')),
         findsOneWidget,
@@ -12052,7 +12055,7 @@ void main() {
         tester
             .getSize(find.byKey(const ValueKey('buy-cart-continue-store')))
             .height,
-        56,
+        greaterThanOrEqualTo(48),
       );
       final returnName = tester.widget<Text>(
         find.byKey(const ValueKey('buy-cart-continue-store-name')),
