@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:async';
+import 'buy_v2_screen_test.dart' show r66VisualCaptureRoot, captureR66Visual;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -214,7 +216,7 @@ void main() {
             textScaler: TextScaler.linear(textScale),
             disableAnimations: reducedMotion,
           ),
-          child: child!,
+          child: r66VisualCaptureRoot(child!),
         ),
         home: BuyV2Screen(
           session: session,
@@ -226,6 +228,129 @@ void main() {
         ),
       ),
     );
+  }
+
+  for (var route = 0; route < 4; route++) {
+    for (var state = 0; state < 4; state++) {
+      final destination = route != 1
+          ? BuyV2Destination.shop
+          : BuyV2Destination.wholesale;
+      final routeName = [
+        'Shop Visit Store',
+        'Wholesale Visit Store',
+        'Recent product',
+        'Offers product',
+      ][route];
+      final stateName = [
+        'opposite basket only',
+        'same basket',
+        'mixed baskets',
+        'last content scrolled',
+      ][state];
+      testWidgets('R6634 C01-${route * 4 + state + 1} $routeName $stateName', (
+        tester,
+      ) async {
+        const size = Size(320, 844);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final product = session.product(route != 1 ? 's-tomato' : 'w-rice');
+        final other = session.product(route != 1 ? 'w-tomato' : 's-tomato');
+        if (state != 1) expect(session.addProduct(other.id), isTrue);
+        if (state == 1 || state == 2) {
+          expect(session.addProduct(product.id), isTrue);
+        }
+        final retained = session.itemCount;
+        session.openDestination(destination);
+        session.openProduct(product.id);
+        await tester.pumpWidget(app(session, size: size));
+        await tester.pumpAndSettle();
+        if (route >= 2) {
+          session.closeProduct();
+          await tester.pumpAndSettle();
+          if (route == 2) {
+            unawaited(
+              showBuyV2RecentlyViewed(
+                tester.element(find.byType(BuyV2Screen)),
+                session,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final tile = find.byKey(
+              ValueKey('buy-settings-recently-viewed-product-${product.id}'),
+            );
+            await tester.ensureVisible(tile);
+            await tester.tap(tile);
+          } else {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-local-tab-offers')),
+            );
+            await tester.pumpAndSettle();
+            final tile = find.byKey(ValueKey('buy-product-${product.id}'));
+            await tester.scrollUntilVisible(
+              tile,
+              120,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const PageStorageKey('buy-offers')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.tap(
+              find
+                  .descendant(
+                    of: tile,
+                    matching: find.text(product.customerTitle),
+                  )
+                  .first,
+            );
+          }
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, product.id);
+          expect(session.view, BuyV2View.product);
+        }
+        final action = find.byKey(
+          ValueKey(
+            '${route != 1 ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${product.id}',
+          ),
+        );
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        final store = find.byKey(
+          ValueKey(
+            '${route != 1 ? 'buy-shop-seller' : 'buy-wholesale-supplier'}-sheet-${product.id}',
+          ),
+        );
+        expect(store, findsOneWidget);
+        if (state == 3) {
+          await tester.drag(
+            find.descendant(of: store, matching: find.byType(Scrollable)).first,
+            const Offset(0, -900),
+          );
+          await tester.pumpAndSettle();
+        }
+        final bar = find.byKey(const ValueKey('buy-store-cart-bar'));
+        expect(bar.hitTestable(), findsOneWidget);
+        if (state == 0) await captureR66Visual(tester, 'r6634-c01-$route');
+        final scope = state == 0 || state == 3
+            ? BuyV2CartScope.all
+            : route != 1
+            ? BuyV2CartScope.shop
+            : BuyV2CartScope.wholesale;
+        await tester.tap(bar);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.cartScope, scope);
+        expect(session.itemCount, retained);
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   Future<void> capture(

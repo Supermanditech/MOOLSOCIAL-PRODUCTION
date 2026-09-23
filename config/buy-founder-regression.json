@@ -1,20 +1,26 @@
 {
   "schemaVersion": 1,
   "baseline": "aa1300df51b4971475af761757b269a128f44aa3",
-  "selected": [],
+  "selected": [
+    "R6634-C01",
+    "R6634-C02",
+    "R6634-C03",
+    "R6634-C04",
+    "R6634-C05"
+  ],
   "historicalRecords": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
   "rule": "Preserve scenarios and evidence permanently. Name exact regression tests and select authorized ticket before implementation. Gate setup does not authorize application edits.",
   "tickets": [
     {
       "id": "R6634-C01",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D02"
       ],
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+        "sha256": "ea603a5a24a8ea3586ee6aa1bd709c5ff877cf09eec3e446ca59b5752c4bd572"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -28,8 +34,12 @@
           "state": "opposite basket only",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-1 Shop Visit Store opposite basket only",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -38,8 +48,12 @@
           "state": "same basket",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-2 Shop Visit Store same basket",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -48,8 +62,12 @@
           "state": "mixed baskets",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-3 Shop Visit Store mixed baskets",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -58,8 +76,12 @@
           "state": "last content scrolled",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-4 Shop Visit Store last content scrolled",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -68,8 +90,12 @@
           "state": "opposite basket only",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-5 Wholesale Visit Store opposite basket only",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -78,8 +104,12 @@
           "state": "same basket",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-6 Wholesale Visit Store same basket",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -88,8 +118,12 @@
           "state": "mixed baskets",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-7 Wholesale Visit Store mixed baskets",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -98,8 +132,12 @@
           "state": "last content scrolled",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-8 Wholesale Visit Store last content scrolled",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -108,8 +146,12 @@
           "state": "opposite basket only",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-9 Recent product opposite basket only",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -118,8 +160,12 @@
           "state": "same basket",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-10 Recent product same basket",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -128,8 +174,12 @@
           "state": "mixed baskets",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-11 Recent product mixed baskets",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -138,8 +188,12 @@
           "state": "last content scrolled",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-12 Recent product last content scrolled",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -148,8 +202,12 @@
           "state": "opposite basket only",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-13 Offers product opposite basket only",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -158,8 +216,12 @@
           "state": "same basket",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-14 Offers product same basket",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -168,8 +230,12 @@
           "state": "mixed baskets",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-15 Offers product mixed baskets",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -178,8 +244,12 @@
           "state": "last content scrolled",
           "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C01-16 Offers product last content scrolled",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         }
       ],
@@ -189,7 +259,7 @@
     },
     {
       "id": "R6634-C02",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D16",
         "R6633-D17-C2"
@@ -197,13 +267,15 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+        "sha256": "ea603a5a24a8ea3586ee6aa1bd709c5ff877cf09eec3e446ca59b5752c4bd572"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+        "apps/mobile/lib/features/chat/widgets/chat_widgets.dart"
       ],
       "cases": [
         {
@@ -212,8 +284,12 @@
           "state": "normal",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-1 new Orders normal",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -222,8 +298,12 @@
           "state": "long name",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-2 new Orders long name",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -232,8 +312,12 @@
           "state": "200 percent with keyboard",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-3 new Orders 200 percent with keyboard",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -242,8 +326,12 @@
           "state": "normal",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-4 retained Orders normal",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -252,8 +340,12 @@
           "state": "long name",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-5 retained Orders long name",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -262,8 +354,12 @@
           "state": "200 percent with keyboard",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-6 retained Orders 200 percent with keyboard",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -272,8 +368,12 @@
           "state": "normal",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-7 supplier chat normal",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -282,8 +382,12 @@
           "state": "long name",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-8 supplier chat long name",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -292,8 +396,12 @@
           "state": "200 percent with keyboard",
           "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C02-9 supplier chat 200 percent with keyboard",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         }
       ],
@@ -303,14 +411,14 @@
     },
     {
       "id": "R6634-C03",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D06-G-V05"
       ],
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+        "sha256": "ea603a5a24a8ea3586ee6aa1bd709c5ff877cf09eec3e446ca59b5752c4bd572"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -323,8 +431,12 @@
           "state": "single item",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-1 Wholesale review single item",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -333,8 +445,12 @@
           "state": "multiple Stores and packs",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-2 Wholesale review multiple Stores and packs",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -343,8 +459,12 @@
           "state": "long text 200 percent",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-3 Wholesale review long text 200 percent",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -353,8 +473,12 @@
           "state": "single item",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-4 Bulk review single item",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -363,8 +487,12 @@
           "state": "multiple Stores and packs",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-5 Bulk review multiple Stores and packs",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -373,8 +501,12 @@
           "state": "long text 200 percent",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-6 Bulk review long text 200 percent",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -383,8 +515,12 @@
           "state": "single item",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-7 Offers Wholesale review single item",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -393,8 +529,12 @@
           "state": "multiple Stores and packs",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-8 Offers Wholesale review multiple Stores and packs",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -403,8 +543,12 @@
           "state": "long text 200 percent",
           "expected": "One compact organized trade item table without duplicate facts.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C03-9 Offers Wholesale review long text 200 percent",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         }
       ],
@@ -414,7 +558,7 @@
     },
     {
       "id": "R6634-C04",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D06-G-V07",
         "R6633-D06-G-V07-C1"
@@ -422,7 +566,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+        "sha256": "ea603a5a24a8ea3586ee6aa1bd709c5ff877cf09eec3e446ca59b5752c4bd572"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -435,8 +579,12 @@
           "state": "missing payment",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-1 active tracking missing payment",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -445,8 +593,12 @@
           "state": "paid",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-2 active tracking paid",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -455,8 +607,12 @@
           "state": "balance due",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-3 active tracking balance due",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -465,8 +621,12 @@
           "state": "long text 200 percent",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-4 active tracking long text 200 percent",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -475,8 +635,12 @@
           "state": "missing payment",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-5 delivered tracking missing payment",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -485,8 +649,12 @@
           "state": "paid",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-6 delivered tracking paid",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -495,8 +663,12 @@
           "state": "balance due",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-7 delivered tracking balance due",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -505,8 +677,12 @@
           "state": "long text 200 percent",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-8 delivered tracking long text 200 percent",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -515,8 +691,12 @@
           "state": "missing payment",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-9 Orders history missing payment",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -525,8 +705,12 @@
           "state": "paid",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-10 Orders history paid",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -535,8 +719,12 @@
           "state": "balance due",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-11 Orders history balance due",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -545,8 +733,12 @@
           "state": "long text 200 percent",
           "expected": "One status summary and meaningful payment facts; no empty Payment group.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C04-12 Orders history long text 200 percent",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         }
       ],
@@ -556,7 +748,7 @@
     },
     {
       "id": "R6634-C05",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D14",
         "R6633-D06-G-V03",
@@ -567,12 +759,13 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+        "sha256": "ea603a5a24a8ea3586ee6aa1bd709c5ff877cf09eec3e446ca59b5752c4bd572"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart"
       ],
       "cases": [
         {
@@ -581,8 +774,12 @@
           "state": "normal Android",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-1 Bulk cart review normal Android",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -591,8 +788,12 @@
           "state": "200 percent text",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-2 Bulk cart review 200 percent text",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -601,8 +802,12 @@
           "state": "keyboard cancel back",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-3 Bulk cart review keyboard cancel back",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -611,8 +816,12 @@
           "state": "normal Android",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-4 address last field validation normal Android",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -621,8 +830,12 @@
           "state": "200 percent text",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-5 address last field validation 200 percent text",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -631,8 +844,12 @@
           "state": "keyboard cancel back",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-6 address last field validation keyboard cancel back",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -641,8 +858,12 @@
           "state": "normal Android",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-7 Edit basket scrolled normal Android",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -651,8 +872,12 @@
           "state": "200 percent text",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-8 Edit basket scrolled 200 percent text",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -661,8 +886,12 @@
           "state": "keyboard cancel back",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-9 Edit basket scrolled keyboard cancel back",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -671,8 +900,12 @@
           "state": "normal Android",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-10 Offers rapid switching normal Android",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -681,8 +914,12 @@
           "state": "200 percent text",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-11 Offers rapid switching 200 percent text",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -691,8 +928,12 @@
           "state": "keyboard cancel back",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-12 Offers rapid switching keyboard cancel back",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -700,9 +941,13 @@
           "route": "collected receipt",
           "state": "normal Android",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+          "testName": "R6634 C05-13 collected receipt normal Android",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -710,9 +955,13 @@
           "route": "collected receipt",
           "state": "200 percent text",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+          "testName": "R6634 C05-14 collected receipt 200 percent text",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -720,9 +969,13 @@
           "route": "collected receipt",
           "state": "keyboard cancel back",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+          "testName": "R6634 C05-15 collected receipt keyboard cancel back",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -731,8 +984,12 @@
           "state": "normal Android",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-16 partial problem receipt normal Android",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -741,8 +998,12 @@
           "state": "200 percent text",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-17 partial problem receipt 200 percent text",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         },
         {
@@ -751,13 +1012,20 @@
           "state": "keyboard cancel back",
           "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-          "testName": null,
-          "local": null,
+          "testName": "R6634 C05-18 partial problem receipt keyboard cancel back",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/children-64-final-machine.jsonl",
+            "sha256": "7cdb155e76c2f9b9ca08175583b890ed8813851afdd0f1b93490510b027ac59c",
+            "sourceSha256": "a59838acb52c4de37a59310df4f8c976fbc67a4d3b9adf61dfcaa28b7f20d970"
+          },
           "device": null
         }
       ],
       "children": [],
-      "dependencies": [],
+      "dependencies": [
+        "Physical Redmi acceptance matrix remains pending; this batch is local qualification only.",
+        "Itemised partial-receipt backend/provider outcome remains deferred. Existing correlated receipt and delivery-problem report UI were tested with labelled local fixtures; no real delivery was claimed."
+      ],
       "founderApproval": null
     }
   ]

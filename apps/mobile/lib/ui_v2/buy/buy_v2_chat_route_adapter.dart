@@ -87,7 +87,7 @@ class BuyV2ChatRouteAdapter {
             destination: order.destination,
             supplier: order.partner,
           ),
-          'supplier': order.partner,
+          'supplier': order.customerPartner,
           'supplierType': order.partnerType,
           'orderId': order.id,
           'purchaseId': ?_clean(order.purchaseId),

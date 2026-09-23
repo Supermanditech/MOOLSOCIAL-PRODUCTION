@@ -6858,7 +6858,7 @@ Future<void> showBuyV2PartnerCatalogue(
                             ),
                     ),
                   ),
-                  if (session.countForDestination(current.destination) > 0)
+                  if (session.itemCount > 0)
                     Positioned(
                       left: 0,
                       right: 0,
@@ -6870,6 +6870,11 @@ Future<void> showBuyV2PartnerCatalogue(
                         child: BuyV2StoreCartBar(
                           session: session,
                           destination: current.destination,
+                          aggregate:
+                              session.countForDestination(
+                                current.destination,
+                              ) ==
+                              0,
                           onOpenCart: onOpenStoreCart == null
                               ? () => Navigator.of(sheetContext).pop('cart:')
                               : () => onOpenStoreCart(current),
@@ -8596,7 +8601,7 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                           ],
                         ),
                 ),
-                if (session.countForDestination(current.destination) > 0)
+                if (session.itemCount > 0)
                   Positioned(
                     left: 0,
                     right: 0,
@@ -8607,6 +8612,9 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                       child: BuyV2StoreCartBar(
                         session: session,
                         destination: current.destination,
+                        aggregate:
+                            session.countForDestination(current.destination) ==
+                            0,
                         onOpenCart:
                             onOpenCart ??
                             () => Navigator.of(sheetContext).pop('cart:'),

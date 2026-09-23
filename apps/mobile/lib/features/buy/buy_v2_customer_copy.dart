@@ -76,7 +76,18 @@ extension BuyV2CustomerGroupCopy on BuyV2FulfilmentGroup {
 
 extension BuyV2CustomerOrderCopy on BuyV2Order {
   String get customerPartner {
-    final ids = lines.map((line) => line.product.storeId).toSet();
+    // Retained orders may predate line snapshots. Recover only a complete,
+    // matching generated Store identity from every persisted SKU identifier.
+    // Never normalize real supplier names from their spelling alone.
+    final ids = lines.isNotEmpty
+        ? lines.map((line) => line.product.storeId).toSet()
+        : productIds
+              .map(
+                (id) => RegExp(
+                  r'^(buy-catalogue-dev-v1-(?:shop|wholesale|medicine)-store-[0-9]{6})-sku-[0-9]{4}$',
+                ).firstMatch(id)?.group(1),
+              )
+              .toSet();
     return ids.length == 1
         ? buyV2CustomerStoreName(partner, ids.single)
         : partner;

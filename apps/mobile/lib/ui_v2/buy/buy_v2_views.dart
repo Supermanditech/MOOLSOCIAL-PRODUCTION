@@ -8371,10 +8371,6 @@ class _CheckoutConfirmStage extends StatelessWidget {
             ),
             shipmentNumber: index + 1,
           ),
-          if (groups[index].destination == BuyV2Destination.wholesale) ...[
-            const SizedBox(height: 5),
-            _WholesaleCheckoutReceivingLines(group: groups[index]),
-          ],
           const SizedBox(height: 8),
         ],
         _CheckoutCard(
@@ -11809,41 +11805,46 @@ class BuyV2TrackingView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        _DecisionPanel(
-          title: 'Payment',
-          children: [
-            if (order.paymentMethod case final paymentMethod?)
-              _DecisionRow(
-                icon: Icons.account_balance_wallet_outlined,
-                label: 'Payment method',
-                value: paymentMethod,
-              ),
-            if (order.purchaseOrderReference case final reference?)
-              _DecisionRow(
-                icon: Icons.receipt_long_outlined,
-                label: 'Purchase order',
-                value: reference,
-              ),
-            if (order.paymentTermLabel case final paymentTerm?)
-              _DecisionRow(
-                icon: Icons.account_balance_wallet_outlined,
-                label: 'Payment term',
-                value: paymentTerm,
-              ),
-            if (order.amountPaidNow case final paidNow?)
-              _DecisionRow(
-                icon: Icons.payments_outlined,
-                label: 'Paid now',
-                value: buyV2Money(paidNow),
-              ),
-            if (order.paymentStatusLabel case final paymentStatus?)
-              _DecisionRow(
-                icon: Icons.verified_outlined,
-                label: 'Payment status',
-                value: paymentStatus,
-              ),
-          ],
-        ),
+        if (order.paymentMethod != null ||
+            order.purchaseOrderReference != null ||
+            order.paymentTermLabel != null ||
+            order.amountPaidNow != null ||
+            order.paymentStatusLabel != null)
+          _DecisionPanel(
+            title: 'Payment',
+            children: [
+              if (order.paymentMethod case final paymentMethod?)
+                _DecisionRow(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Payment method',
+                  value: paymentMethod,
+                ),
+              if (order.purchaseOrderReference case final reference?)
+                _DecisionRow(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Purchase order',
+                  value: reference,
+                ),
+              if (order.paymentTermLabel case final paymentTerm?)
+                _DecisionRow(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Payment term',
+                  value: paymentTerm,
+                ),
+              if (order.amountPaidNow case final paidNow?)
+                _DecisionRow(
+                  icon: Icons.payments_outlined,
+                  label: 'Paid now',
+                  value: buyV2Money(paidNow),
+                ),
+              if (order.paymentStatusLabel case final paymentStatus?)
+                _DecisionRow(
+                  icon: Icons.verified_outlined,
+                  label: 'Payment status',
+                  value: paymentStatus,
+                ),
+            ],
+          ),
         if (order.balanceDue > 0 ||
             session.balancePaymentFor(order.id)?.state ==
                 BuyV2BalancePaymentState.paid) ...[
@@ -19000,32 +19001,35 @@ class _CheckoutDeliverySummaryCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 5),
             child: Divider(height: 1),
           ),
+          if (group.destination == BuyV2Destination.wholesale)
+            _WholesaleCheckoutReceivingLines(group: group),
           for (final line in group.lines) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${line.quantity}× ${line.product.customerTitle}',
-                      style: context.buyMeta.copyWith(
-                        color: BuyV2Colors.ink,
-                        fontWeight: FontWeight.w700,
+            if (group.destination != BuyV2Destination.wholesale)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${line.quantity}× ${line.product.customerTitle}',
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    buyV2Money(line.total),
-                    style: context.buyMeta.copyWith(
-                      color: BuyV2Colors.navy,
-                      fontWeight: FontWeight.w900,
+                    const SizedBox(width: 8),
+                    Text(
+                      buyV2Money(line.total),
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             if (_purchaseProtectionLines(line.product) case final protections
                 when protections.isNotEmpty)
               Padding(
@@ -19325,27 +19329,29 @@ class _OrderCard extends StatelessWidget {
                       child: Text(amount, style: amountStyle),
                     ),
                   const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _trackingStatusLabel(order.status),
+                  ExcludeSemantics(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _trackingStatusLabel(order.status),
+                            style: const TextStyle(
+                              color: BuyV2Colors.green,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${(order.progress * 100).round()}%',
                           style: const TextStyle(
-                            color: BuyV2Colors.green,
+                            color: BuyV2Colors.navy,
                             fontSize: 8,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                      ),
-                      Text(
-                        '${(order.progress * 100).round()}%',
-                        style: const TextStyle(
-                          color: BuyV2Colors.navy,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   Text(
                     buyV2OrderArrivalSummary(session, order),

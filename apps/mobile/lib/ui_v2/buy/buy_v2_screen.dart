@@ -2324,12 +2324,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           unawaited(_openStoreProduct(store, cartEntry: true));
         },
         onOpenCart: () => widget.session.openCart(
-          scope: switch (product.destination) {
-            BuyV2Destination.shop ||
-            BuyV2Destination.orders => BuyV2CartScope.shop,
-            BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
-            BuyV2Destination.medicine => BuyV2CartScope.medicine,
-          },
+          scope: session.countForDestination(product.destination) == 0
+              ? BuyV2CartScope.all
+              : switch (product.destination) {
+                  BuyV2Destination.shop ||
+                  BuyV2Destination.orders => BuyV2CartScope.shop,
+                  BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+                  BuyV2Destination.medicine => BuyV2CartScope.medicine,
+                },
         ),
       ).whenComplete(() {
         _partnerCatalogueDepth--;
@@ -2377,11 +2379,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     if (cartEntry) {
       session.openCart(
-        scope: switch (product.destination) {
-          BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
-          BuyV2Destination.medicine => BuyV2CartScope.medicine,
-          _ => BuyV2CartScope.shop,
-        },
+        scope: session.countForDestination(product.destination) == 0
+            ? BuyV2CartScope.all
+            : switch (product.destination) {
+                BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+                BuyV2Destination.medicine => BuyV2CartScope.medicine,
+                _ => BuyV2CartScope.shop,
+              },
       );
     }
     final generation = _storeNavigationGeneration;

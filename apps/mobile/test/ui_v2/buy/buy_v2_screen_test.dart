@@ -30,6 +30,17 @@ import 'package:moolsocial/ui_v2/profile/global_help_support_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 
+class _R6634TrackingSession extends BuyV2Session {
+  _R6634TrackingSession(this.fixture) : super(core: BuySession());
+  final BuyV2Order fixture;
+  @override
+  BuyV2Order? get selectedOrderOrNull => fixture;
+  @override
+  List<BuyV2Order> get visibleOrders => [fixture];
+  @override
+  List<BuyV2Order> get orders => [fixture];
+}
+
 class _InvoiceRecoverySession extends BuyV2Session {
   _InvoiceRecoverySession({this.missingConfirmation = false})
     : super(core: BuySession()) {
@@ -7869,6 +7880,121 @@ void main() {
             expect(tester.takeException(), isNull);
           }
           await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
+  for (var route = 0; route < 3; route++) {
+    for (var scenario = 0; scenario < 4; scenario++) {
+      final routeName = [
+        'active tracking',
+        'delivered tracking',
+        'Orders history',
+      ][route];
+      final stateName = [
+        'missing payment',
+        'paid',
+        'balance due',
+        'long text 200 percent',
+      ][scenario];
+      testWidgets(
+        'R6634 C04-${route * 4 + scenario + 1} $routeName $stateName',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 844);
+          addTearDown(tester.view.reset);
+          final order = BuyV2Order(
+            id: 'R6634-TRACK',
+            destination: BuyV2Destination.shop,
+            title: 'Shop order',
+            itemSummary: '1 product',
+            total: 100,
+            partner: scenario == 3
+                ? 'Sardarpura Family Grocery and Household Supplies'
+                : 'Store',
+            partnerType: 'Retailer',
+            promise: 'Delivery in 20 min',
+            destinationLabel: 'Jodhpur',
+            progress: route == 1 ? 1 : .4,
+            status: route == 1
+                ? BuyV2OrderStatus.delivered
+                : BuyV2OrderStatus.preparing,
+            paymentMethod: scenario == 0 ? null : 'UPI',
+            amountPaidNow: scenario == 0
+                ? null
+                : scenario == 2
+                ? 40
+                : 100,
+            balanceDue: scenario == 2 ? 60 : 0,
+            paymentStatusLabel: scenario == 0
+                ? null
+                : scenario == 2
+                ? 'Part paid'
+                : 'Paid',
+          );
+          final session = _R6634TrackingSession(order);
+          addTearDown(session.dispose);
+          final semantics = tester.ensureSemantics();
+          try {
+            await tester.pumpWidget(
+              MaterialApp(
+                builder: (context, child) => r66VisualCaptureRoot(child!),
+                theme: MoolTheme.light(),
+                home: MediaQuery(
+                  data: MediaQueryData(
+                    textScaler: TextScaler.linear(scenario == 3 ? 2 : 1),
+                    padding: const EdgeInsets.only(bottom: 24),
+                  ),
+                  child: Scaffold(
+                    body: route == 2
+                        ? BuyV2OrdersView(
+                            session: session,
+                            onOpenOrderHelp: (_) {},
+                          )
+                        : BuyV2TrackingView(
+                            session: session,
+                            onOpenOrderHelp: (_) {},
+                          ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            if (route == 2) {
+              final card = find.byKey(
+                const ValueKey('buy-order-card-R6634-TRACK'),
+              );
+              expect(card, findsOneWidget);
+              final label = tester.getSemantics(card).label;
+              expect('Preparing your order'.allMatches(label).length, 1);
+            } else {
+              final payment = find.text('Payment');
+              if (scenario == 0) {
+                expect(payment, findsNothing);
+              } else {
+                await tester.scrollUntilVisible(
+                  payment,
+                  180,
+                  scrollable: find.byType(Scrollable).first,
+                );
+                expect(payment, findsOneWidget);
+                expect(find.text('Payment method'), findsOneWidget);
+              }
+              if (scenario == 2) {
+                expect(find.text('Upcoming balance'), findsOneWidget);
+              }
+            }
+            await captureR66Visual(tester, 'r6634-c04-$route-$scenario');
+            await tester.drag(
+              find.byType(Scrollable).first,
+              const Offset(0, -600),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          } finally {
+            semantics.dispose();
+          }
         },
       );
     }

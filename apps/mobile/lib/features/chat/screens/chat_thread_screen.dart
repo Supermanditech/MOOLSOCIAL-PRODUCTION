@@ -765,14 +765,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             ? widget.returnRoute
             : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
         final entryContext = ChatEntryContext.resolve(widget.returnRoute);
-        final orderConversation =
-            widget.session.commerceContext(thread.id)?.contextName ==
-            'supplier-order';
+        final orderContext = widget.session.commerceContext(thread.id);
+        final orderConversation = orderContext?.contextName == 'supplier-order';
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),
           session: widget.session,
           title: thread.title,
-          subtitle: thread.subtitle,
+          subtitle: orderConversation && orderContext?.orderId != null
+              ? 'Order ${orderContext!.orderId}'
+              : thread.subtitle,
           returnRoute: backRoute,
           showContentBack: true,
           compactOrderHeader: orderConversation,

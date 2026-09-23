@@ -6,6 +6,25 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'buy_v2_screen_test.dart' show r66VisualCaptureRoot, captureR66Visual;
+
+class _R6634LongTradeSession extends BuyV2Session {
+  _R6634LongTradeSession() : super(core: BuySession());
+  @override
+  List<BuyV2CartLine> get checkoutLines => super.checkoutLines
+      .map(
+        (line) => line.copyWith(
+          product: line.product.copyWith(
+            title:
+                'Premium harvest selection for restaurants and family grocery stores',
+            seller: 'Sardarpura Family Grocery and Household Supplies',
+            pack:
+                'Individually sealed trade packs with supplier quantity information',
+          ),
+        ),
+      )
+      .toList(growable: false);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +45,7 @@ void main() {
         viewPadding: safeArea,
         disableAnimations: true,
       ),
-      child: child!,
+      child: r66VisualCaptureRoot(child!),
     ),
     home: BuyV2Screen(
       session: session,
@@ -49,6 +68,114 @@ void main() {
     expect(session.continueCheckoutFromAddress(), isTrue);
     expect(session.continueCheckoutFromPayment(), isTrue);
     return session;
+  }
+
+  for (var route = 0; route < 3; route++) {
+    for (var scenario = 0; scenario < 3; scenario++) {
+      final routeName = [
+        'Wholesale review',
+        'Bulk review',
+        'Offers Wholesale review',
+      ][route];
+      final stateName = [
+        'single item',
+        'multiple Stores and packs',
+        'long text 200 percent',
+      ][scenario];
+      testWidgets(
+        'R6634 C03-${route * 3 + scenario + 1} $routeName $stateName',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 844);
+          addTearDown(tester.view.reset);
+          final session = scenario == 2
+              ? _R6634LongTradeSession()
+              : BuyV2Session(core: BuySession());
+          addTearDown(session.dispose);
+          session.openDestination(BuyV2Destination.wholesale);
+          if (route == 1) {
+            session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+          }
+          await tester.pumpWidget(
+            app(session, textScale: scenario == 2 ? 2 : 1),
+          );
+          await tester.pumpAndSettle();
+          if (route == 2) {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-local-tab-offers')),
+            );
+            await tester.pumpAndSettle();
+          }
+          final primary = route == 1 ? 'w-rice' : 'w-onion';
+          if (route == 1) {
+            expect(session.product(primary).offerClass, BuyV2OfferClass.bulk);
+          }
+          final ids = scenario == 1 ? [primary, 'w-notebook'] : [primary];
+          for (final id in ids) {
+            expect(session.addProduct(id), isTrue);
+          }
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          expect(session.openCheckout(), isTrue);
+          expect(session.continueCheckoutFromAddress(), isTrue);
+          expect(session.continueCheckoutFromPayment(), isTrue);
+          await tester.pumpAndSettle();
+          if (scenario == 1) {
+            expect(session.checkoutFulfilmentGroups.length, greaterThan(1));
+          }
+          if (scenario == 2) {
+            expect(
+              session.checkoutLines.first.product.title,
+              contains('restaurants'),
+            );
+          }
+          await captureR66Visual(tester, 'r6634-c03-$route-$scenario');
+          for (final group in session.checkoutFulfilmentGroups) {
+            final shipment = find.byKey(
+              ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+            );
+            expect(shipment, findsOneWidget);
+            expect(
+              find.descendant(
+                of: shipment,
+                matching: find.byKey(
+                  ValueKey(
+                    'buy-wholesale-checkout-receiving-lines-${group.key}',
+                  ),
+                ),
+              ),
+              findsOneWidget,
+            );
+            for (final line in group.lines) {
+              final row = find.byKey(
+                ValueKey(
+                  'buy-wholesale-checkout-receiving-line-${line.product.id}',
+                ),
+              );
+              expect(
+                find.descendant(of: shipment, matching: row),
+                findsOneWidget,
+              );
+              expect(
+                find.text('${line.quantity}× ${line.product.title}'),
+                findsNothing,
+              );
+              expect(
+                find.descendant(
+                  of: row,
+                  matching: find.text(buyV2Money(line.total)),
+                ),
+                findsOneWidget,
+              );
+              await tester.ensureVisible(row);
+              await tester.pumpAndSettle();
+              expect(tester.takeException(), isNull);
+            }
+          }
+          expect(session.checkoutLines.length, ids.length);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   testWidgets('one Wholesale product at MOQ is one product and two packs', (

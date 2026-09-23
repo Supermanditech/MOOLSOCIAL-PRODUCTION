@@ -486,6 +486,277 @@ void main() {
     );
   }
 
+  for (var route = 0; route < 6; route++) {
+    if (route == 4) {
+      continue;
+    } // Collection uses the existing correlated gateway harness.
+    for (var state = 0; state < 3; state++) {
+      final routeName = [
+        'Bulk cart review',
+        'address last field validation',
+        'Edit basket scrolled',
+        'Offers rapid switching',
+        'collected receipt',
+        'partial problem receipt',
+      ][route];
+      final stateName = [
+        'normal Android',
+        '200 percent text',
+        'keyboard cancel back',
+      ][state];
+      testWidgets('R6634 C05-${route * 3 + state + 1} $routeName $stateName', (
+        tester,
+      ) async {
+        const size = Size(320, 844);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final adapter = _DeliveryExceptionAdapter()
+          ..snapshot = const BuyV2DeliveryExceptionSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            customerMessage:
+                'Test provider: delivery receipt available for review.',
+            exceptionId: 'test-partial-receipt',
+            kind: BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+            headline: 'Delivery marked complete',
+            detail:
+                'Check all purchased items. Report a delivery problem if items are missing.',
+            proofReference: 'TEST-RECEIPT-1',
+          );
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          deliveryExceptionAdapter: adapter,
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        if (route == 5) {
+          expect(session.openTracking(session.orders.first.id), isTrue);
+        } else {
+          session.openDestination(BuyV2Destination.wholesale);
+          session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+          expect(session.product('w-rice').offerClass, BuyV2OfferClass.bulk);
+          expect(session.addProduct('w-rice'), isTrue);
+          if (route == 2) {
+            for (final id in [
+              'w-onion',
+              'w-potato',
+              'w-notebook',
+              'w-tomato',
+            ]) {
+              expect(session.addProduct(id), isTrue);
+            }
+          }
+          session.openCart(scope: BuyV2CartScope.wholesale);
+        }
+        final count = session.itemCount;
+        await tester.pumpWidget(
+          app(
+            session,
+            size: size,
+            textScale: state == 1 ? 2 : 1,
+            safeArea: const EdgeInsets.symmetric(vertical: 24),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> reveal(Finder target, {Finder? scroll}) async {
+          await tester.scrollUntilVisible(
+            target,
+            140,
+            maxScrolls: 60,
+            scrollable: scroll ?? find.byType(Scrollable).first,
+          );
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(target).bottom,
+            lessThanOrEqualTo(size.height - 24),
+          );
+        }
+
+        if (route == 0 || route == 2) {
+          if (route == 2) {
+            await tester.drag(
+              find.byType(Scrollable).first,
+              const Offset(0, -500),
+            );
+            await tester.pumpAndSettle();
+          }
+          final checkout = find.text('Checkout');
+          await reveal(checkout);
+          await tester.tap(checkout);
+          await tester.pumpAndSettle();
+          for (final step in ['address', 'payment']) {
+            final next = find.byKey(ValueKey('buy-checkout-primary-$step'));
+            await reveal(next);
+            await tester.tap(next);
+            await tester.pumpAndSettle();
+          }
+          expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+          expect(session.checkoutItemCount, count);
+          final edit = find.text('Edit basket');
+          await reveal(edit);
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.cartScope, BuyV2CartScope.wholesale);
+          expect(session.itemCount, count);
+          if (state == 2) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.itemCount, count);
+          }
+        } else if (route == 1) {
+          final before = session.addresses.length;
+          showBuyV2AddressSheet(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          );
+          await tester.pumpAndSettle();
+          final add = find.byKey(const ValueKey('buy-address-add'));
+          await reveal(
+            add,
+            scroll: find
+                .descendant(
+                  of: find.byKey(const ValueKey('buy-address-sheet-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          final form = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-address-add-form-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          for (final entry in {
+            'recipient': 'Meera Sharma',
+            'phone': '9876543210',
+            'line': '12 Market Road',
+            'area': 'Jodhpur',
+            'pin': '12',
+            'landmark': 'Near market gate',
+          }.entries) {
+            final field = find.byKey(ValueKey('buy-address-add-${entry.key}'));
+            await reveal(field, scroll: form);
+            await tester.enterText(field, entry.value);
+            await tester.pumpAndSettle();
+          }
+          if (state == 2) {
+            expect(tester.testTextInput.isVisible, isTrue);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                safeArea: const EdgeInsets.symmetric(vertical: 24),
+                viewInsets: const EdgeInsets.only(bottom: 280),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final last = find.byKey(const ValueKey('buy-address-add-landmark'));
+            await reveal(last, scroll: form);
+            expect(tester.getRect(last).bottom, lessThanOrEqualTo(564));
+            tester.testTextInput.hide();
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                safeArea: const EdgeInsets.symmetric(vertical: 24),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+          final submit = find.byKey(const ValueKey('buy-address-add-submit'));
+          await reveal(submit, scroll: form);
+          await tester.tap(submit);
+          await tester.pumpAndSettle();
+          expect(session.addresses.length, before);
+          expect(find.text('Enter a valid 6-digit PIN code.'), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.addresses.length, before);
+          expect(session.itemCount, count);
+        } else if (route == 3) {
+          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+          await tester.pumpAndSettle();
+          for (var n = 0; n < 8; n++) {
+            final mool = n.isEven;
+            final target = find.byKey(
+              ValueKey('buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}'),
+            );
+            expect(target.hitTestable(), findsOneWidget);
+            await tester.tap(target);
+            await tester.pump(const Duration(milliseconds: 16));
+            expect(session.featuredOffersMoolSocial, mool);
+            for (final key in ['moolsocial', 'suppliers']) {
+              final button = find.byKey(ValueKey('buy-offer-group-$key'));
+              expect(button.hitTestable(), findsOneWidget);
+              final texts = find.descendant(
+                of: button,
+                matching: find.byType(Text),
+              );
+              for (final element in texts.evaluate()) {
+                expect(
+                  tester
+                      .renderObject<RenderParagraph>(
+                        find.byWidget(element.widget),
+                      )
+                      .didExceedMaxLines,
+                  isFalse,
+                );
+              }
+            }
+          }
+          await tester.pumpAndSettle();
+          expect(session.featuredOffersMoolSocial, isFalse);
+          expect(
+            find.byKey(const ValueKey('buy-product-s-tomato')),
+            findsOneWidget,
+          );
+          if (state == 2) {
+            await tester.tap(find.byKey(const ValueKey('buy-offers-filter')));
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-offer-filter-all')),
+              findsOneWidget,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.itemCount, count);
+          }
+        } else {
+          final orderId = session.selectedOrderId;
+          final dispute = find.byKey(
+            const ValueKey('buy-delivery-dispute-proof'),
+          );
+          await reveal(dispute);
+          await tester.tap(dispute);
+          await tester.pumpAndSettle();
+          expect(adapter.disputeCalls, 1);
+          expect(session.selectedOrderId, orderId);
+          expect(
+            find.text('Proof of delivery is under review'),
+            findsOneWidget,
+          );
+          expect(find.text('Proof reference · TEST-RECEIPT-1'), findsOneWidget);
+          // A disputed receipt is not a claim that missing items were delivered.
+          expect(
+            find.byKey(const ValueKey('buy-delivery-dispute-proof')),
+            findsNothing,
+          );
+          if (state == 2) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(adapter.disputeCalls, 1);
+          }
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   BuyV2Product productFor(BuyV2Destination destination) =>
       BuyV2Catalogue.products.firstWhere(
         (product) =>

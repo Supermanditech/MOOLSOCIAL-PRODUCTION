@@ -25,6 +25,45 @@ void main() {
   _collectionWidgetCases();
   _collectionCameraCases();
   _collectionOrdersReadabilityCases();
+  for (var state = 0; state < 3; state++) {
+    final stateName = [
+      'normal Android',
+      '200 percent text',
+      'keyboard cancel back',
+    ][state];
+    testWidgets('R6634 C05-${13 + state} collected receipt $stateName', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final h = (await tester.runAsync(_CollectionHarness.create))!;
+      h.gateway.respond = (r) async =>
+          _collectionReply(r, state: ScanPickState.collected);
+      await tester.pumpWidget(
+        _collectionTestApp(h, state == 1 ? 2 : 1, onCamera: (_) {}),
+      );
+      await tester.pumpAndSettle();
+      await h.session.refreshOrder('collection-1');
+      await tester.pumpAndSettle();
+      expect(h.session.collectionStatusLabelFor('collection-1'), 'Collected');
+      expect(h.session.orderIsCompleted(h.session.orders.single), isTrue);
+      await _collectionWholeText(tester, 'collection-receipt-A');
+      expect(find.byKey(const ValueKey('buy-collection-scan')), findsNothing);
+      expect(find.text('I received my order'), findsNothing);
+      if (state == 2) {
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(h.session.view, BuyV2View.catalogue);
+        expect(
+          h.session.collectionSnapshotFor('collection-1')!.receipt!.id,
+          'collection-receipt-A',
+        );
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+  }
 
   for (final kind in [
     BuyV2OrderResolutionKind.returnItems,
