@@ -1,3 +1,7 @@
+import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
+import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'dart:async';
 import 'buy_v2_screen_test.dart' show r66VisualCaptureRoot, captureR66Visual;
@@ -228,6 +232,130 @@ void main() {
         ),
       ),
     );
+  }
+
+  for (final entry in [
+    'shop',
+    'wholesale',
+    'offers',
+    'store',
+    'pushed cart',
+    'pushed offers cart',
+  ]) {
+    for (final mode in ['settled tap', 'rapid tap', 'pending return']) {
+      testWidgets('R6634 C06 $entry $mode', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final journey = JourneySession(
+          store: MemoryJourneyStore(
+            snapshot: const JourneySnapshot(
+              languageCode: 'en',
+              areaMode: 'manual',
+              areaLabel: 'Sardarpura',
+              setupComplete: true,
+            ),
+          ),
+          otpGateway: ReviewOtpGateway(signedIn: true),
+        );
+        final core = BuySession();
+        addTearDown(journey.dispose);
+        addTearDown(core.dispose);
+        await journey.start();
+        await tester.pumpWidget(
+          MoolSocialApp(
+            session: journey,
+            buySession: core,
+            initialLocation: entry.startsWith('pushed')
+                ? '/app/mool'
+                : '/app/buy?sub=${entry == 'store' ? 'shop' : entry}',
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (entry.startsWith('pushed')) {
+          final context = tester.element(find.byType(Scaffold).first);
+          GoRouter.of(context).push(
+            '/app/buy?sub=${entry == 'pushed offers cart' ? 'offers' : 'shop'}&view=cart',
+          );
+          await tester.pumpAndSettle();
+        }
+        final screen = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen));
+        final session = screen.session;
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.addProduct('w-onion'), isTrue);
+        if (entry == 'store') {
+          session.openProduct('s-tomato');
+          await tester.pumpAndSettle();
+          final visit = find.byKey(
+            const ValueKey('buy-shop-seller-action-s-tomato'),
+          );
+          await tester.ensureVisible(visit);
+          await tester.tap(visit);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+          await tester.pumpAndSettle();
+        } else {
+          session.openCart(
+            scope: entry == 'wholesale'
+                ? BuyV2CartScope.wholesale
+                : BuyV2CartScope.all,
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(session.view, BuyV2View.cart);
+        final quantities = session.cartLines
+            .map((l) => '${l.product.id}:${l.quantity}')
+            .toSet();
+        if (mode == 'pending return') {
+          expect(session.openCheckout(), isTrue);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find
+                .byKey(const ValueKey('buy-checkout-return-cart'))
+                .hitTestable()
+                .last,
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(session.view, BuyV2View.cart);
+        }
+        final offers = find
+            .byKey(const ValueKey('buy-local-tab-offers'))
+            .hitTestable()
+            .last;
+        expect(offers, findsOneWidget);
+        await tester.tap(offers);
+        if (mode == 'rapid tap') {
+          await tester.pump(const Duration(milliseconds: 16));
+          final again = find
+              .byKey(const ValueKey('buy-local-tab-offers'))
+              .hitTestable()
+              .last;
+          await tester.tap(again);
+        }
+        await tester.pumpAndSettle();
+        expect(find.byKey(const PageStorageKey('buy-offers')), findsOneWidget);
+        expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+        expect(
+          GoRouterState.of(
+            tester.element(find.byType(BuyV2Screen)),
+          ).uri.toString(),
+          '/app/buy?sub=offers',
+        );
+        expect(session.itemCount, 3);
+        session.openCart(
+          scope: entry == 'wholesale'
+              ? BuyV2CartScope.wholesale
+              : entry == 'store'
+              ? BuyV2CartScope.shop
+              : BuyV2CartScope.all,
+        );
+        expect(
+          session.cartLines.map((l) => '${l.product.id}:${l.quantity}').toSet(),
+          quantities,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   for (var route = 0; route < 4; route++) {
