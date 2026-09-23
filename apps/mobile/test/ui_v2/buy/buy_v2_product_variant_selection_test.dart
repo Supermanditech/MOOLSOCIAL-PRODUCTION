@@ -629,14 +629,22 @@ void main() {
                       ),
                   ];
                   if (scale == 1) {
+                    final columns =
+                        width == 320 ||
+                            (destination == BuyV2Destination.wholesale &&
+                                width == 360)
+                        ? 2
+                        : 3;
                     expect(
                       frames[1].left,
                       greaterThanOrEqualTo(frames[0].right),
                     );
-                    expect(
-                      frames[2].left,
-                      greaterThanOrEqualTo(frames[1].right),
-                    );
+                    if (columns == 3) {
+                      expect(
+                        frames[2].left,
+                        greaterThanOrEqualTo(frames[1].right),
+                      );
+                    }
                     final cards = [
                       for (final product in products)
                         tester.getRect(
@@ -645,7 +653,13 @@ void main() {
                           ),
                         ),
                     ];
-                    expect(cards.map((rect) => rect.top).toSet(), hasLength(1));
+                    expect(cards[1].top, closeTo(cards[0].top, .1));
+                    if (columns == 2) {
+                      expect(cards[2].left, closeTo(cards[0].left, .1));
+                      expect(cards[2].top, closeTo(cards[0].bottom + 10, .1));
+                    } else {
+                      expect(cards[2].top, closeTo(cards[0].top, .1));
+                    }
                     for (var i = 0; i < cards.length; i++) {
                       expect(frames[i].top, greaterThanOrEqualTo(cards[i].top));
                       expect(

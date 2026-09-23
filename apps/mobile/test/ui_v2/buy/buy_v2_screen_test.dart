@@ -9613,10 +9613,21 @@ void main() {
         const ValueKey('buy-shop-seller-sheet-s-eggs'),
       );
       expect(storeSheet, findsOneWidget);
-      expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: storeSheet,
+          matching: find.text('Safe Protein Store'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('MoolSocial Fulfilment Store'), findsNothing);
       expect(find.textContaining('Address confirmed'), findsOneWidget);
       final storeTruth = find.byKey(
         const ValueKey('buy-public-store-truth-s-eggs'),
+      );
+      expect(
+        tester.widget<Semantics>(storeTruth).properties.label,
+        contains('MoolSocial Fulfilment Store. Safe Protein Store.'),
       );
       expect(
         find.descendant(of: storeTruth, matching: find.text('Open')),
@@ -9635,7 +9646,7 @@ void main() {
       expect(find.text('Quick'), findsWidgets);
       final askStore = find.byKey(const ValueKey('buy-public-store-ask'));
       expect(askStore, findsOneWidget);
-      expect(tester.getSize(askStore), const Size(78, 44));
+      expect(tester.getSize(askStore), const Size(62, 44));
       expect(
         tester
             .getSize(find.byKey(const ValueKey('buy-public-store-ask-visible')))
@@ -11343,10 +11354,13 @@ void main() {
       );
       expect(tester.widget<Text>(priceText).style!.color, BuyV2Colors.ink);
       final relatedDecoration = relatedCard.decoration! as BoxDecoration;
-      expect(relatedDecoration.gradient, isNull);
-      expect(relatedDecoration.color, Colors.white);
-      expect(relatedDecoration.border, isNotNull);
-      expect(relatedDecoration.boxShadow, isNotEmpty);
+      expect(relatedDecoration.gradient, isA<LinearGradient>());
+      expect(relatedDecoration.gradient!.colors, [
+        BuyV2Colors.softOrange,
+        BuyV2Colors.softBlue,
+      ]);
+      expect(relatedDecoration.border, isNull);
+      expect(relatedDecoration.boxShadow, isNull);
       expect(
         tester
             .widget<Container>(
@@ -11795,7 +11809,16 @@ void main() {
     await tester.tap(storeAction);
     await tester.pumpAndSettle();
 
-    expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.text('MoolSocial Fulfilment Store'), findsNothing);
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('buy-public-store-truth-s-eggs')),
+          )
+          .properties
+          .label,
+      contains('MoolSocial Fulfilment Store. Safe Protein Store.'),
+    );
     expect(find.text('Closed · Opens tomorrow at 8:00 am'), findsOneWidget);
     final storeSheet = find.byKey(
       const ValueKey('buy-shop-seller-sheet-s-eggs'),
@@ -11853,7 +11876,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Safe Protein Store'), findsWidgets);
-    expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.text('MoolSocial Fulfilment Store'), findsNothing);
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('buy-public-store-truth-s-eggs')),
+          )
+          .properties
+          .label,
+      contains('MoolSocial Fulfilment Store. Safe Protein Store.'),
+    );
     expect(find.text('Open'), findsNothing);
     await tester.tap(
       find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')),
@@ -11927,7 +11959,11 @@ void main() {
     final ask = find.byKey(const ValueKey('buy-public-store-ask'));
     await tester.scrollUntilVisible(ask, 160, scrollable: sheetScroll);
     expect(tester.getSize(ask).height, greaterThanOrEqualTo(44));
-    expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.text('MoolSocial Fulfilment Store'), findsNothing);
+    expect(
+      tester.widget<Semantics>(truth).properties.label,
+      contains('MoolSocial Fulfilment Store. Safe Protein Store.'),
+    );
     expect(find.textContaining('Address confirmed'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -12116,10 +12152,14 @@ void main() {
         const ValueKey('buy-wholesale-supplier-sheet-w-rice'),
       );
       expect(supplierSheet, findsOneWidget);
-      expect(find.text('MoolSocial Fulfilment Partner'), findsOneWidget);
+      expect(find.text('MoolSocial Fulfilment Partner'), findsNothing);
       expect(find.textContaining('Wholesaler'), findsWidgets);
       final supplierTruth = find.byKey(
         const ValueKey('buy-public-store-truth-w-rice'),
+      );
+      expect(
+        tester.widget<Semantics>(supplierTruth).properties.label,
+        startsWith('MoolSocial Fulfilment Partner. '),
       );
       expect(
         find.descendant(of: supplierTruth, matching: find.text('Open')),

@@ -3576,17 +3576,27 @@ class _BuySearchBand extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                IconButton(
-                  key: const ValueKey('buy-open-account'),
-                  tooltip: 'Your MoolSocial profile',
-                  onPressed: onAccount,
-                  icon: const Icon(Icons.account_circle_outlined, size: 22),
-                  color: BuyV2Colors.navy,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 44,
-                    height: 44,
+                Tooltip(
+                  message: 'Open your MoolSocial profile',
+                  excludeFromSemantics: true,
+                  child: Semantics(
+                    label: 'Open your MoolSocial profile',
+                    child: IconButton(
+                      key: const ValueKey('buy-open-account'),
+                      onPressed: onAccount,
+                      style: IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.standard,
+                      ),
+                      icon: const Icon(Icons.account_circle_outlined, size: 22),
+                      color: BuyV2Colors.navy,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 44,
+                        height: 44,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
                   ),
-                  padding: EdgeInsets.zero,
                 ),
               ],
               ?trailingAction,

@@ -977,7 +977,7 @@ void main() {
   }
 
   testWidgets(
-    'phone widths keep three readable product cards with all products reachable',
+    'phone widths adapt columns for readable inline price and Add with all products reachable',
     (tester) async {
       for (final size in const [
         Size(320, 700),
@@ -1001,7 +1001,11 @@ void main() {
         final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
         expect(firstCard, findsOneWidget, reason: '$size first card');
         final firstRect = tester.getRect(firstCard);
-        expect(firstRect.width, closeTo((size.width - 34) / 3, .1));
+        final columns = size.width == 320 ? 2 : 3;
+        expect(
+          firstRect.width,
+          closeTo((size.width - 20 - (columns - 1) * 7) / columns, .1),
+        );
         final secondRect = tester.getRect(
           find.byKey(ValueKey('buy-product-${products[1].id}')),
         );
@@ -1009,12 +1013,17 @@ void main() {
           find.byKey(ValueKey('buy-product-${products[2].id}')),
         );
         final nextRow = tester.getRect(
-          find.byKey(ValueKey('buy-product-${products[3].id}')),
+          find.byKey(ValueKey('buy-product-${products[columns].id}')),
         );
         expect(secondRect.top, closeTo(firstRect.top, .1));
-        expect(thirdRect.top, closeTo(firstRect.top, .1));
+        if (columns == 3) {
+          expect(thirdRect.top, closeTo(firstRect.top, .1));
+          expect(thirdRect.left, greaterThanOrEqualTo(secondRect.right));
+        } else {
+          expect(thirdRect.top, greaterThan(firstRect.bottom));
+          expect(thirdRect.left, closeTo(firstRect.left, .1));
+        }
         expect(secondRect.left, greaterThanOrEqualTo(firstRect.right));
-        expect(thirdRect.left, greaterThanOrEqualTo(secondRect.right));
         expect(nextRow.top, greaterThan(firstRect.bottom));
         for (final product in products) {
           final card = find.byKey(ValueKey('buy-product-${product.id}'));

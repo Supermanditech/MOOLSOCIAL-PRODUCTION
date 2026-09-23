@@ -1079,6 +1079,7 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+  'apps/mobile/test/ui_v2/buy/buy_v2_shared_sku_fit_test.dart',
         'apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart',
         'apps/mobile/lib/app/moolsocial_app.dart',
         'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart',
@@ -1165,6 +1166,10 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'scripts/test-public-auth-sideload-build-controls.ps1',
   'scripts/check-buy-founder-regression.py',
   'scripts/test-buy-founder-regression.py',
   'config/buy-founder-regression.json',

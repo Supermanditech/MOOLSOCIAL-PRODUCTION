@@ -986,7 +986,10 @@ void main() {
           tester.view.physicalSize = const Size(360, 800);
           addTearDown(tester.view.reset);
           final core = BuySession();
-          final source = _PagedWidgetSource(destination);
+          final source = _PagedWidgetSource(
+            destination,
+            contrastingPagePrices: true,
+          );
           final session = BuyV2Session(
             core: core,
             reviewDataEnabled: true,
@@ -1046,8 +1049,70 @@ void main() {
             tester.getRect(topGrid).top - tester.getRect(scroll).top,
             closeTo(6, 1),
           );
+          double? previewWidth;
+          String? previewId;
+          if (scale == 1) {
+            final firstPage = source.pages.firstWhere((p) => p.startIndex == 0);
+            final nextPage = source.pages.lastWhere((p) => p.startIndex == 40);
+            List<Rect> cards(Finder grid, Iterable<BuyV2Product> items) => [
+              for (final product in items.take(3))
+                tester.getRect(
+                  find.descendant(
+                    of: grid,
+                    matching: find.byKey(ValueKey('buy-product-${product.id}')),
+                  ),
+                ),
+            ];
+            final currentRects = cards(topGrid, firstPage.items);
+            for (final rect in currentRects) {
+              expect(rect.top, closeTo(currentRects.first.top, 1));
+            }
+            final viewport = tester.getRect(scroll);
+            final gesture = await tester.startGesture(
+              Offset(280, viewport.top + 230),
+            );
+            await gesture.moveBy(const Offset(-30, 0));
+            await tester.pump();
+            await gesture.moveBy(const Offset(-120, 0));
+            await tester.pump();
+            final incoming = find.byKey(const ValueKey('buy-incoming-grid'));
+            expect(incoming, findsOneWidget);
+            final previewRects = cards(incoming, nextPage.items);
+            expect(previewRects[1].top, closeTo(previewRects[0].top, 1));
+            expect(previewRects[2].top, greaterThan(previewRects[0].top));
+            expect(previewRects[0].width, greaterThan(currentRects[0].width));
+            previewId = nextPage.items.first.id;
+            previewWidth = previewRects.first.width;
+            final highlight = find.descendant(
+              of: incoming,
+              matching: find.byKey(ValueKey('buy-price-highlight-$previewId')),
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: highlight, matching: find.byType(RichText)),
+            );
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(boxes, isNotEmpty);
+            for (final box in boxes) {
+              expect(box.top, closeTo(boxes.first.top, .1));
+            }
+            await gesture.cancel();
+            await tester.pumpAndSettle();
+          }
           await _performCatalogueAction(tester, status, 'Next products');
           await expectStart(40);
+          if (previewWidth != null) {
+            expect(
+              tester
+                  .getSize(find.byKey(ValueKey('buy-product-$previewId')))
+                  .width,
+              closeTo(previewWidth, .1),
+            );
+          }
           await _performCatalogueAction(tester, status, 'Previous products');
           await expectStart(0);
           final beforePull = source.requests.length;
@@ -1442,11 +1507,17 @@ void main() {
                 )
                 .toList();
             expect(rects[1].top, closeTo(rects[0].top, 1));
-            expect(rects[2].top, closeTo(rects[0].top, 1));
             expect(rects[1].left, greaterThan(rects[0].right));
-            expect(rects[2].left, greaterThan(rects[1].right));
-            expect(rects[2].right, lessThanOrEqualTo(width));
-            expect(rects[3].top, greaterThan(rects[0].bottom));
+            final columns =
+                destination == BuyV2Destination.wholesale || width == 320
+                ? 2
+                : 3;
+            if (columns == 3) {
+              expect(rects[2].top, closeTo(rects[0].top, 1));
+              expect(rects[2].left, greaterThan(rects[1].right));
+            }
+            expect(rects[columns - 1].right, lessThanOrEqualTo(width));
+            expect(rects[columns].top, closeTo(rects[0].bottom + 10, 1));
           }
           expect(cardRect.contains(tester.getRect(title).topLeft), isTrue);
           expect(cardRect.contains(tester.getRect(title).bottomRight), isTrue);
@@ -1906,6 +1977,10 @@ void main() {
             matching: find.byKey(ValueKey('buy-add-$id')),
           );
           await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
           await tester.tap(add);
           await tester.pumpAndSettle();
           expect(session.quantityFor(id), product.minimumOrder);
@@ -4990,11 +5065,13 @@ class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
   _PagedWidgetSource(
     BuyV2Destination destination, {
     this.longMetadata = false,
+    this.contrastingPagePrices = false,
     this.providerMetadata = false,
     super.providerCount = 40,
     super.skusPerStore = 5000,
   }) : super(destination: destination);
   final bool longMetadata;
+  final bool contrastingPagePrices;
   final bool providerMetadata;
   String? updatedProviderName;
   bool failNext = false;
@@ -5016,6 +5093,20 @@ class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
       cursor: cursor,
       pageSize: pageSize,
     );
+    if (contrastingPagePrices) {
+      page = BuyV2CataloguePage(
+        queryKey: page.queryKey,
+        snapshotId: page.snapshotId,
+        startIndex: page.startIndex,
+        totalCount: page.totalCount,
+        previousCursor: page.previousCursor,
+        nextCursor: page.nextCursor,
+        items: page.items.map(
+          (product) =>
+              product.copyWith(price: page.startIndex == 0 ? 1 : 12345),
+        ),
+      );
+    }
     if (longMetadata) {
       page = BuyV2CataloguePage(
         queryKey: page.queryKey,

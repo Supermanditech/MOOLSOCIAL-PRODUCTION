@@ -19,6 +19,14 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+class _ComparisonUnavailableSession extends BuyV2Session {
+  _ComparisonUnavailableSession({required super.core})
+    : super(reviewDataEnabled: true);
+
+  @override
+  BuyV2ComparisonSource? get comparisonSource => null;
+}
+
 class _EligibilityFacts implements BuyV2ProductFactsAdapter {
   BuyV2OfferEligibility? eligibility;
   bool invalid = false;
@@ -696,7 +704,8 @@ void main() {
         tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 844);
         addTearDown(tester.view.reset);
         final core = BuySession();
-        final session = BuyV2Session(core: core);
+        final session = _ComparisonUnavailableSession(core: core);
+        expect(session.comparisonSource, isNull);
         addTearDown(session.dispose);
         addTearDown(core.dispose);
         session.openProduct('s-tomato');

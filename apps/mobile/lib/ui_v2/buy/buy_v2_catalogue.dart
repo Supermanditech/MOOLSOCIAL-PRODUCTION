@@ -1860,22 +1860,22 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                   products: products,
                   builder: (context, constraints, quantityWidth) {
                     final scale = MediaQuery.textScalerOf(context).scale(1);
-                    final layout = _resolveCompactProductGridLayout(
-                      context: context,
-                      session: widget.session,
-                      products: products,
-                      constraints: constraints,
-                      accessibleText: scale > 1.25,
-                      textScale: scale,
-                      cartQuantityWidth: quantityWidth,
-                      denseStore: widget.storeContext,
-                      storeProcurement: widget.session.isStoreProcurement,
-                      scrollIndicatorInset: true,
-                    );
                     Widget grid(
                       List<BuyV2Product> items, {
                       bool preview = false,
                     }) {
+                      final layout = _resolveCompactProductGridLayout(
+                        context: context,
+                        session: widget.session,
+                        products: items,
+                        constraints: constraints,
+                        accessibleText: scale > 1.25,
+                        textScale: scale,
+                        cartQuantityWidth: quantityWidth,
+                        denseStore: widget.storeContext,
+                        storeProcurement: widget.session.isStoreProcurement,
+                        scrollIndicatorInset: true,
+                      );
                       return Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -10414,6 +10414,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     this.vertical = true,
     this.productSupplement,
     this.productCardBuilder,
+    this.inlinePriceAction = true,
     this.beforeCartChange,
     this.initialAddQuantity,
     this.beforeSave,
@@ -10436,6 +10437,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
   final bool vertical;
   final Widget Function(BuyV2Product)? productSupplement;
   final Widget Function(BuyV2Product)? productCardBuilder;
+  final bool inlinePriceAction;
   final Future<bool> Function(BuyV2Product, int)? beforeCartChange;
   final int? initialAddQuantity;
   final bool Function(BuyV2Product)? beforeSave;
@@ -10458,6 +10460,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           denseStore: storeContext,
           savedContext: savedContext,
           cartQuantityWidth: quantityWidth,
+          inlinePriceAction: inlinePriceAction,
         );
         if (vertical) {
           final rowHeights = _productGridRowHeights(
@@ -10570,12 +10573,13 @@ _resolveCompactProductGridLayout({
   bool scrollIndicatorInset = false,
   bool storeProcurement = false,
   double cartQuantityWidth = 0,
+  bool inlinePriceAction = true,
 }) {
   // Founder review: three complete cards across normal phone layouts.
   // Enlarged text retains the measured adaptive layout for readable facts.
   final viewportWidth = constraints.maxWidth + (scrollIndicatorInset ? 8 : 0);
   final minimumWidth = textScale > 1.6 ? 260.0 : 134.0;
-  final columns = storeProcurement && textScale <= 1.25
+  var columns = storeProcurement && textScale <= 1.25
       ? (viewportWidth < 340
             ? 1
             : viewportWidth < 600
@@ -10584,7 +10588,31 @@ _resolveCompactProductGridLayout({
       : textScale <= 1.25 && viewportWidth >= 300 && viewportWidth <= 600
       ? 3
       : ((viewportWidth - 20 + 7) / (minimumWidth + 7)).floor().clamp(1, 4);
-  final cardWidth = (constraints.maxWidth - 20 - ((columns - 1) * 7)) / columns;
+  double widthFor(int count) =>
+      (constraints.maxWidth - 20 - ((count - 1) * 7)) / count;
+  final minimumPriceWidths = [
+    for (final product in products)
+      buyV2ValueTextSize(
+        context,
+        _productGlanceFields(session, product, denseStore)[2].text,
+        _productGlanceFields(
+          session,
+          product,
+          denseStore,
+        )[2].style.copyWith(fontSize: 12),
+      ).width,
+  ];
+  // Reserve the inline Add target even after adding, so quantity changes do
+  // not move neighbouring cards. Keep the price on one readable line.
+  while (columns > 1) {
+    final width = widthFor(columns);
+    final priceWidth = inlinePriceAction
+        ? width - 22 - _compactGlanceActionWidth(width) - 4
+        : width - 26;
+    if (minimumPriceWidths.every((price) => price <= priceWidth)) break;
+    columns--;
+  }
+  final cardWidth = widthFor(columns);
   var tileHeight = 0.0;
   for (final product in products) {
     final height = _productGlanceCardHeight(
@@ -10783,7 +10811,7 @@ double _productGlanceCardHeight(
                   ? _readableGlancePriceStyle(
                       context,
                       field,
-                      cardWidth - 20 - reserve,
+                      cardWidth - 22 - reserve,
                     )
                   : field.style,
             ),
@@ -10791,7 +10819,7 @@ double _productGlanceCardHeight(
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
         )..layout(
-          maxWidth: (cardWidth - (index == 2 ? 20 : 16) - reserve).clamp(
+          maxWidth: (cardWidth - (index == 2 ? 22 : 16) - reserve).clamp(
             1,
             double.infinity,
           ),
@@ -11557,6 +11585,7 @@ class _FeaturedProductRail extends StatelessWidget {
           products: products,
           storageKey: 'buy-featured-${session.destination.name}',
           semanticLabel: title,
+          inlinePriceAction: false,
           productCardBuilder: (product) =>
               _FeaturedProductCard(session: session, product: product),
         ),

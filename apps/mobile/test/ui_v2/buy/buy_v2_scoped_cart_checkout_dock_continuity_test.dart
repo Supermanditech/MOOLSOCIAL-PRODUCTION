@@ -2815,6 +2815,10 @@ void main() {
             tester.getTopLeft(card).dy + state.position.pixels,
             closeTo(cardTop + offset, .1),
           );
+          // The approved Add is beside price, above the removed stepper row.
+          // First prove scroll continuity above, then reveal its new position.
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
           expect(add.hitTestable(), findsOneWidget);
           expect(
             find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
@@ -4094,10 +4098,13 @@ void main() {
         await tester.pumpAndSettle();
         await settleVisibleImages(tester);
         expectConnectedOwner(tester, session, BuyV2Destination.shop);
+        final referenceVersion = viewport.checkout
+            ? 'cursor-post-r6633-20260923'
+            : 'cursor-r6635-approved-unboxed-save-20260923';
         await expectLater(
           find.byType(BuyV2Screen),
           matchesGoldenFile(
-            'candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-${viewport.label}.png',
+            'candidate_captures/$referenceVersion/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
       },

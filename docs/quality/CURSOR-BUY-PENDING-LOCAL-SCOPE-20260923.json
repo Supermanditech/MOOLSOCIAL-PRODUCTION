@@ -28,7 +28,7 @@
       "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
     ],
     "testAndEvidencePlan": [
-      "Run all 250 selected scenarios across 20 ticket entries against one current source fingerprint; retain the original 19-entry visual approval separately.",
+      "Run all 388 selected scenarios across 20 ticket entries against one current source fingerprint; retain the original 19-entry visual approval separately.",
       "Run focused affected-owner tests, audit shared callers, register every child defect before retry and verify its fix plus parent regression.",
       "Capture standard/narrow enlarged-text native screens for founder approval; no approval implied by technical checks."
     ]
@@ -118,7 +118,7 @@
         "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
       ],
       "manifestPath": "config/buy-founder-regression.json",
-      "manifestSha256": "6e4b3358a99590d9df018d933a485972959b1667cfe06ed57ca32749a0a05474",
+      "manifestSha256": "4340709bc084061d68a1c96904d866967b450d156bb65744d5d1c23188292380",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,

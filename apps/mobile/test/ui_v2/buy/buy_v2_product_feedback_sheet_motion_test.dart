@@ -469,13 +469,22 @@ void main() {
         comment,
         'Fresh sealed pack.\nDelivery matched the promise.',
       );
-      await tester.tap(
-        find.byKey(ValueKey('buy-review-rating-${product().id}-5')),
-      );
       await tester.pumpAndSettle();
+      final rating = find.byKey(
+        ValueKey('buy-review-rating-${product().id}-5'),
+      );
+      await tester.ensureVisible(rating);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IconButton>(rating).onPressed, isNotNull);
+      expect(rating.hitTestable(), findsOneWidget);
+      await tester.tap(rating);
+      await tester.pumpAndSettle();
+      expect(session.productReviewDraft(product().id)?.rating, 5);
       final submit = find.byKey(ValueKey('buy-submit-review-${product().id}'));
       await tester.ensureVisible(submit);
       await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(submit).onPressed, isNotNull);
+      expect(submit.hitTestable(), findsOneWidget);
       final keyboardTop = 800 - keyboard.bottom;
       expect(tester.getRect(comment).bottom, lessThanOrEqualTo(keyboardTop));
       expect(tester.getRect(submit).height, greaterThanOrEqualTo(44));

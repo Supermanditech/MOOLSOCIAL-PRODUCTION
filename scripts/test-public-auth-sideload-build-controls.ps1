@@ -494,8 +494,9 @@ Assert-SideloadControl (
 ) 'Google-only or full-social founder Dev readiness does not fail closed.'
 
 # Each native exit-code read must immediately follow its named native command.
-# STOREBACK01 adds a fifth native invocation; PowerShell gates must still use $?.
+# Include the native Buy evidence checker; PowerShell gates must still use $?.
 $nativeExitCheckPatterns = @(
+  '& python -B \(Join-Path \$repositoryRoot ''scripts/check-buy-founder-regression.py''\) --root \$repositoryRoot --phase build\s+if \(\$LASTEXITCODE',
   '\$branch = git -C \$repositoryRoot branch --show-current\s+if \(\$LASTEXITCODE',
   '\$accessToken = \(& \$gcloudSource auth print-access-token --quiet\)\.Trim\(\)\s+if \(\$LASTEXITCODE',
   '& flutter pub get --enforce-lockfile\s+if \(\$LASTEXITCODE',

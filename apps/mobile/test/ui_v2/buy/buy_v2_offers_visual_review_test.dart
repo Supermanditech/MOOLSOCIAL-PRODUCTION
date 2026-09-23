@@ -293,7 +293,12 @@ void main() {
           for (final rect in firstRects) {
             expect(rect.height, greaterThan(70));
             expect(rect.height, closeTo(rect.width, 1));
-            expect(rect.top, closeTo(firstRects.first.top, 1));
+          }
+          expect(firstRects[1].top, closeTo(firstRects.first.top, 1));
+          if (size.width <= 390) {
+            expect(firstRects[2].top, greaterThan(firstRects.first.bottom));
+          } else {
+            expect(firstRects[2].top, closeTo(firstRects.first.top, 1));
           }
         }
         final ids = orderedPackshots
@@ -305,15 +310,37 @@ void main() {
             )
             .toList();
         for (final id in ids) {
-          final card = tester.getRect(find.byKey(ValueKey('buy-product-$id')));
+          final cardFinder = find.byKey(ValueKey('buy-product-$id'));
+          final card = tester.getRect(cardFinder);
           final action = tester.getRect(
             find.byKey(ValueKey('buy-add-shell-$id')),
           );
+          final price = tester.getRect(
+            find.byKey(ValueKey('buy-price-highlight-$id')),
+          );
+          final priceRow = tester.getRect(
+            find.byKey(ValueKey('buy-price-action-row-$id')),
+          );
+          expect(action.left, greaterThanOrEqualTo(price.right));
+          expect(action.center.dy, closeTo(priceRow.center.dy, .1));
+          expect(action.height, 44);
+          final textBottoms = find
+              .descendant(of: cardFinder, matching: find.byType(Text))
+              .evaluate()
+              .map((e) {
+                final box = e.renderObject! as RenderBox;
+                return box.localToGlobal(Offset(0, box.size.height)).dy;
+              });
+          final contentBottom = textBottoms.fold<double>(
+            action.bottom,
+            (bottom, next) => next > bottom ? next : bottom,
+          );
           expect(
-            card.bottom - action.bottom,
-            inInclusiveRange(0, 4),
+            card.bottom - contentBottom,
+            // Two pixels of line padding, two of body padding and the border.
+            inInclusiveRange(0, 5),
             reason:
-                'SKU card must end at its own action, without row-height filler',
+                'SKU card must end at its last detail, without row-height filler',
           );
         }
         final gridCards = find

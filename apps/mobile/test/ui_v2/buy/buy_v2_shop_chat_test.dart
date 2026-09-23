@@ -827,6 +827,13 @@ void main() {
       final profile = find.byKey(const ValueKey('buy-open-account'));
       final chatAction = find.byKey(const ValueKey('mool-global-chat-tap'));
       expect(tester.getSize(profile), const Size(44, 44));
+      expect(profile.hitTestable(), findsOneWidget);
+      expect(find.byTooltip('Open your MoolSocial profile'), findsOneWidget);
+      await tester.longPress(profile);
+      await tester.pumpAndSettle();
+      expect(find.text('Open your MoolSocial profile'), findsOneWidget);
+      Tooltip.dismissAllToolTips();
+      await tester.pumpAndSettle();
       expect(tester.getSize(chatAction).width, greaterThanOrEqualTo(44));
       await tester.tap(profile);
       await tester.pumpAndSettle();

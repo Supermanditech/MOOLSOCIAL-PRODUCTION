@@ -10973,7 +10973,7 @@
         "gate",
         "c21"
       ],
-      "mistake": "The first C21G checker run assigned the hostQualification object to $host, colliding case-insensitively with PowerShell's read-only $Host automatic variable after C21B–F had passed.",
+      "mistake": "The first C21G checker run assigned the hostQualification object to $host, colliding case-insensitively with PowerShell's read-only $Host automatic variable after C21Bâ€“F had passed.",
       "rootCause": "A concise domain variable name reused a shell-owned automatic variable despite the workspace rule to avoid common system names.",
       "prevention": "Use a task-specific name such as $hostQualificationContract and parser/run-test all new PowerShell gates before citing them. Failed runs do not qualify the gate.",
       "gates": [
@@ -13610,7 +13610,7 @@
         "copy",
         "c24"
       ],
-      "mistake": "The installed Home repeats MoolSocial, Home, Your Mool and 'Products, services and your place—ready when you are' and retains decorative cat/arrival content, while destination chrome labels the central launcher only 'Mool' and some top surfaces repeat MoolSocial branding.",
+      "mistake": "The installed Home repeats MoolSocial, Home, Your Mool and 'Products, services and your placeâ€”ready when you are' and retains decorative cat/arrival content, while destination chrome labels the central launcher only 'Mool' and some top surfaces repeat MoolSocial branding.",
       "rootCause": "Brand reinforcement, welcome copy and navigation identity were implemented by separate header, arrival and launcher owners without one space-budget or single-focal-brand contract.",
       "prevention": "The central launcher is named MoolSocial and becomes the sole persistent brand/navigation focal point. Home removes the redundant named copy, Home icon/pill, decorative cat/arrival content and scrolling header; feature headers remove redundant MoolSocial wordmarks without altering truthful product/service copy.",
       "gates": [
@@ -13681,7 +13681,7 @@
         "c24"
       ],
       "mistake": "The first shared-catalogue consolidation derived `personalMoolRootActions` from each family's first subaction and retained older private family routes, which would change Social/Buy main defaults to query routes and leave Eat/Ride/Book/Work defaults inconsistent.",
-      "rootCause": "Two historical route meanings—main-action default landing and old C23 main-family button route—were collapsed without first freezing which contract survives the new in-place family-selection model.",
+      "rootCause": "Two historical route meaningsâ€”main-action default landing and old C23 main-family button routeâ€”were collapsed without first freezing which contract survives the new in-place family-selection model.",
       "prevention": "The shared family `route` is the accepted personal main-action default from `personalMoolRootActions`; the compatibility projection derives from that explicit field, never from `actions.first`. C24B2 main-family taps select in place and do not consume a route.",
       "gates": [
         "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
@@ -14221,7 +14221,7 @@
         "eat",
         "c24"
       ],
-      "mistake": "The first Book Table OPPO-class capture placed `Kitchen open · instant confirmation` in a compact non-flexible metadata row beside the trailing selection icon, producing a visible RenderFlex overflow stripe across the selected card.",
+      "mistake": "The first Book Table OPPO-class capture placed `Kitchen open Â· instant confirmation` in a compact non-flexible metadata row beside the trailing selection icon, producing a visible RenderFlex overflow stripe across the selected card.",
       "rootCause": "Sentence-length availability copy was assigned to the shared short-metadata slot, whose icon-label row is intended for compact rating, distance and price values.",
       "prevention": "Sentence-length service status belongs in the wrapping card subtitle; metadata rows remain compact. Both Eat entry captures and the 320px/1.4-text test must render without exception before qualification.",
       "gates": [
@@ -15010,7 +15010,7 @@
       ],
       "mistake": "The C24D booking CTA supplied a local `FilledButton.styleFrom(textStyle:)` without `fontFamily: 'Inter'`; the replacement ButtonStyle no longer inherited the themed family and the retained widget capture rendered its label as Ahem glyph blocks.",
       "rootCause": "The local text style was treated as a partial merge even though the button style resolves it as the full state property, dropping the brand font owned by `MoolTheme.filledButtonTheme`.",
-      "prevention": "Any local button text-style override supplies the canonical Inter family together with size and weight; the C24D visual capture must render the complete `Book <vehicle> · <fare>` label legibly.",
+      "prevention": "Any local button text-style override supplies the canonical Inter family together with size and weight; the C24D visual capture must render the complete `Book <vehicle> Â· <fare>` label legibly.",
       "gates": [
         "apps/mobile/test/ui_v2/ride/ride_destination_home_c24d_test.dart",
         "apps/mobile/lib/features/ride/screens/ride_booking_screen.dart",
@@ -15611,7 +15611,7 @@
         "truthful_price",
         "c24"
       ],
-      "mistake": "The first C24E Salon focused test guessed Facial at ₹599, while the existing BookSession truth owner sets Facial to ₹499.",
+      "mistake": "The first C24E Salon focused test guessed Facial at â‚¹599, while the existing BookSession truth owner sets Facial to â‚¹499.",
       "rootCause": "The new UI assertion was written from memory without reading the exact retained price switch before binding the expected session and provider copy.",
       "prevention": "Price assertions derive from the existing BookSession selection outcome and verify the same exact amount in session state, provider semantics and fixed review CTA; no reference-screen amount is imported into production truth.",
       "gates": [
@@ -15831,7 +15831,7 @@
         "source_contract",
         "c24"
       ],
-      "mistake": "The first C24F machine gate required `contains('₹649')` and `contains('confirmed only at checkout')`, while the focused test stores both values in a truth-literal loop and calls `contains(truth)`.",
+      "mistake": "The first C24F machine gate required `contains('â‚¹649')` and `contains('confirmed only at checkout')`, while the focused test stores both values in a truth-literal loop and calls `contains(truth)`.",
       "rootCause": "The gate reconstructed the semantic assertion form instead of binding the formatter-stable literal list and the shared loop assertion actually present in the final test.",
       "prevention": "Machine gates separately require the exact truth literals and `contains(truth)` when tests use a data-driven assertion loop; conceptual per-value matcher syntax is never invented.",
       "gates": [
@@ -17387,7 +17387,7 @@
       ],
       "mistake": "The C25F selection audit attempted to read the inferred path config/mvp-scope-manifest.json, which does not exist.",
       "rootCause": "A generic scope-manifest filename was guessed instead of following the exact selected ticket manifestPath stored in the active scope-gate record.",
-      "prevention": "Use the scope-gate state’s exact manifestPath or enumerate config files before reading. The selected ticket JSON is the sealed manifest; do not infer a generic manifest path.",
+      "prevention": "Use the scope-gate stateâ€™s exact manifestPath or enumerate config files before reading. The selected ticket JSON is the sealed manifest; do not infer a generic manifest path.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1"
       ],
@@ -35503,7 +35503,7 @@
         "unicode_copy",
         "c30t"
       ],
-      "mistake": "The Feed navigation command embedded the exact UI copy We couldn’t refresh your Feed inside a single-quoted PowerShell literal. The curly apostrophe was parsed as a quote boundary in this command path, producing a parser error before the script or any device action began.",
+      "mistake": "The Feed navigation command embedded the exact UI copy We couldnâ€™t refresh your Feed inside a single-quoted PowerShell literal. The curly apostrophe was parsed as a quote boundary in this command path, producing a parser error before the script or any device action began.",
       "rootCause": "User-visible typographic copy was interpolated directly into shell syntax instead of using an ASCII-safe structural predicate.",
       "prevention": "Do not embed typographic apostrophes or copied rich text in PowerShell single-quoted predicates. Use an ASCII-safe anchored regex or match stable neighboring semantics, require exactly one result, and keep the full Unicode copy only in evidence files written with apply_patch.",
       "gates": [
@@ -36529,7 +36529,7 @@
         "success_marker",
         "c30t"
       ],
-      "mistake": "C30T qualification cycle 1 completed backend verification with exit code zero, 503 passed and 0 failed, but rejected the log because it required the legacy '# pass 503' reporter line while the active Node reporter emits 'ℹ pass 503'.",
+      "mistake": "C30T qualification cycle 1 completed backend verification with exit code zero, 503 passed and 0 failed, but rejected the log because it required the legacy '# pass 503' reporter line while the active Node reporter emits 'â„¹ pass 503'.",
       "rootCause": "The qualifier pinned a reporter decoration instead of the exact semantic pass and fail summary values.",
       "prevention": "Keep the mandatory zero process exit code, then require an anchored summary line ending in 'pass 503' and a separate anchored summary line ending in 'fail 0', allowing only non-alphanumeric reporter decoration before each label.",
       "gates": [
@@ -40410,7 +40410,7 @@
         "c30t"
       ],
       "mistake": "After restoring the first protected test, check-approved-ui-locks exposed a second checksum mismatch in apps/mobile/test/platform_configuration_test.dart.",
-      "rootCause": "Release-platform assertions were added to another test file shared with the immutable Screens 01–03 checkpoint without isolating successor coverage before deployment preflight.",
+      "rootCause": "Release-platform assertions were added to another test file shared with the immutable Screens 01â€“03 checkpoint without isolating successor coverage before deployment preflight.",
       "prevention": "Classify and move only the successor platform assertions into a C30T-owned test, restore the protected file to its exact accepted checksum, and repeat the approved UI lock until every protected owner passes without modifying its manifest.",
       "gates": [
         "scripts/check-approved-ui-locks.ps1",
@@ -55852,7 +55852,7 @@
         "tooling",
         "failure_handling"
       ],
-      "mistake": "C33M cycle-one static stage passed seven gates, then the qualified C33L FIX1 Screen 04 safe-boot gate rejected because its lifecycle accepts only FIX1, the C33L parent or FIX2—not the valid selected C33M successor.",
+      "mistake": "C33M cycle-one static stage passed seven gates, then the qualified C33L FIX1 Screen 04 safe-boot gate rejected because its lifecycle accepts only FIX1, the C33L parent or FIX2â€”not the valid selected C33M successor.",
       "rootCause": "The earlier FIX2 compatibility repair encoded one historical parent ID instead of a generic exact qualified-successor binding, so the product-safety prevention was not reusable by later release parents.",
       "prevention": "Create and select the exact C33M FIX2 ticket, preserve FIX1/FIX2/C33L modes, and add generic successor replay only when current and selected identities agree and the prior qualified FIX1/FIX2 assessments pin exact hashes, states and evidence. Add dual-host active, C33L, FIX2, C33M-successor and negative fixtures before resealing.",
       "gates": [
@@ -74129,7 +74129,7 @@
       ],
       "mistake": "After issuing the authorized r60.82 cold start, the readback command assigned adb pidof output to $pid, but PowerShell variable names are case-insensitive and $PID is reserved and read-only, so the readback stopped before a retained result.",
       "rootCause": "The existing REG-20260821-3061 prevention for reserved PowerShell process identifiers was not applied when composing the new inline device readback.",
-      "prevention": "Never declare pid, PID or other automatic-variable names in PowerShell; use a task-specific name such as $moolAppProcessId, statically scan inline device commands for reserved assignments before execution, and after this recurrence do not repeat the device mutation—read back the already-running state only.",
+      "prevention": "Never declare pid, PID or other automatic-variable names in PowerShell; use a task-specific name such as $moolAppProcessId, statically scan inline device commands for reserved assignments before execution, and after this recurrence do not repeat the device mutationâ€”read back the already-running state only.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
@@ -91327,7 +91327,7 @@
       ],
       "mistake": "After restoring the two tracked `.dart_tool` files, the coordination gate found that `flutter pub get` had also modified tracked `apps/mobile/.flutter-plugins-dependencies` outside the Buy owner claim.",
       "rootCause": "The generated-metadata restoration inventory covered package_config and package_graph but omitted Flutter's separate plugin dependency manifest.",
-      "prevention": "After every post-cleanup `pub get`, restore and verify all three tracked generated owners—package_config, package_graph and `.flutter-plugins-dependencies`—before the coordination gate.",
+      "prevention": "After every post-cleanup `pub get`, restore and verify all three tracked generated ownersâ€”package_config, package_graph and `.flutter-plugins-dependencies`â€”before the coordination gate.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
@@ -91677,7 +91677,7 @@
       ],
       "mistake": "The first combined payment-views patch failed before apply_patch because the large JavaScript string was not parsed as valid tool input.",
       "rootCause": "Several unrelated payment, address and copy hunks were placed into one large embedded patch string, increasing delimiter and Unicode parsing risk.",
-      "prevention": "Patch the single views owner through small bounded operations—Cart/address continuation, Checkout copy, payment choices and provider sheet separately—and read back each before the next.",
+      "prevention": "Patch the single views owner through small bounded operationsâ€”Cart/address continuation, Checkout copy, payment choices and provider sheet separatelyâ€”and read back each before the next.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1"
       ],
@@ -92337,7 +92337,7 @@
         "buy",
         "implementation"
       ],
-      "mistake": "The second full Buy screen replay passed 98 of 99 tests but one updated assertion expected two confirmation lines containing Delivery · Delivered even though the Wholesale order truthfully uses supplier-schedule wording.",
+      "mistake": "The second full Buy screen replay passed 98 of 99 tests but one updated assertion expected two confirmation lines containing Delivery Â· Delivered even though the Wholesale order truthfully uses supplier-schedule wording.",
       "rootCause": "The replacement assertion generalized the Shop delivery-prefix shape to a mixed Shop and Wholesale purchase instead of checking each authoritative order promise.",
       "prevention": "Assert every confirmed order's actual promise text independently and avoid count oracles that assume all fulfilment families share one wording prefix.",
       "gates": [
@@ -92709,7 +92709,7 @@
         "implementation",
         "ui_ux"
       ],
-      "mistake": "The r64.12 Redmi cancelled-payment state rendered the fixed CTA as `Choose payment ag…` instead of complete consumer-facing copy.",
+      "mistake": "The r64.12 Redmi cancelled-payment state rendered the fixed CTA as `Choose payment agâ€¦` instead of complete consumer-facing copy.",
       "rootCause": "The action label exceeded the real Redmi fixed-button width at the active device text scale even though the internal 390px capture did not truncate it.",
       "prevention": "Use the complete compact label `Choose again`, assert it at Redmi geometry and large text without ellipsis, rerun affected regressions, and build a uniquely versioned successor APK.",
       "gates": [
@@ -93254,7 +93254,7 @@
       ],
       "mistake": "The successor Wholesale/Bulk store-product journey added the SKU correctly but opening the persistent store Cart entered BuyV2CartScope.all instead of BuyV2CartScope.wholesale.",
       "rootCause": "The shared store-product Cart return path invoked the default openCart behavior without deriving the cart scope from the store anchor destination.",
-      "prevention": "Resolve the cart scope from the store or supplier destination before opening Cart, preserve the supplier anchor for Continue browsing, and replay main catalogue → supplier → SKU → Add → Cart → same supplier in both Wholesale and Bulk.",
+      "prevention": "Resolve the cart scope from the store or supplier destination before opening Cart, preserve the supplier anchor for Continue browsing, and replay main catalogue â†’ supplier â†’ SKU â†’ Add â†’ Cart â†’ same supplier in both Wholesale and Bulk.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1"
       ],
@@ -93329,7 +93329,7 @@
       ],
       "mistake": "On r64.15, Ask from Masala Ghar reopened through Cart entered the contextual Conversation correctly, but Android Back returned to Cart instead of restoring the exact Masala Ghar storefront.",
       "rootCause": "Opening contextual Chat popped the storefront and pushed Chat over the underlying Cart view; the remembered store anchor was not re-presented when the Chat route returned.",
-      "prevention": "After contextual Chat completes, consume the remembered store anchor and reopen that exact store or supplier catalogue over the preserved underlying view. Replay Store → Ask → Chat → Android Back for Shop, Wholesale and Bulk before a successor APK.",
+      "prevention": "After contextual Chat completes, consume the remembered store anchor and reopen that exact store or supplier catalogue over the preserved underlying view. Replay Store â†’ Ask â†’ Chat â†’ Android Back for Shop, Wholesale and Bulk before a successor APK.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1"
       ],
@@ -93390,7 +93390,7 @@
         "navigation",
         "cart"
       ],
-      "mistake": "The r64.17 Wholesale Cart rendered `Continue browsing Thar Grains W…` instead of the complete supplier name, although the action navigated correctly.",
+      "mistake": "The r64.17 Wholesale Cart rendered `Continue browsing Thar Grains Wâ€¦` instead of the complete supplier name, although the action navigated correctly.",
       "rootCause": "The Cart return action used one large single-line label for both the verb and an unbounded store or supplier name.",
       "prevention": "Render an adaptive two-line return action with `Continue browsing` as the primary line and the complete store or supplier name as the secondary line, preserve one 44-pixel tap owner, and test long names at Redmi and 320px/140-percent geometry.",
       "gates": [
@@ -93753,7 +93753,7 @@
         "device",
         "cart"
       ],
-      "mistake": "The guarded Wholesale-tab query correctly found two clickable owners—the Cart scope tab and bottom navigation—and stopped before tapping because the target was not unique.",
+      "mistake": "The guarded Wholesale-tab query correctly found two clickable ownersâ€”the Cart scope tab and bottom navigationâ€”and stopped before tapping because the target was not unique.",
       "rootCause": "The semantic predicate matched only the `Wholesale` prefix and did not constrain the Cart-scope owner by bounds or the `0` count included in its description.",
       "prevention": "Filter the Cart scope tab to bounds above the persistent bottom rail and require its description to include the current scope count; preserve the fail-closed uniqueness check before tapping.",
       "gates": [
@@ -94841,7 +94841,7 @@
         "test",
         "navigation"
       ],
-      "mistake": "The second targeted screen run passed five of ten and exposed one real content loss—Confirm order showed only promisedByLabel instead of the combined delivery promise—and four tests tapped actions technically visible beneath the extended-body navigation overlay.",
+      "mistake": "The second targeted screen run passed five of ten and exposed one real content lossâ€”Confirm order showed only promisedByLabel instead of the combined delivery promiseâ€”and four tests tapped actions technically visible beneath the extended-body navigation overlay.",
       "rootCause": "The structured shipment card replaced the prior combined promise helper with a null-coalescing choice, and several legacy test flows used scrollUntilVisible without an additional safe-area scroll before tapping lower actions.",
       "prevention": "Restore buyV2DeliveryPromiseSummary in the structured Arrives row and move each lower tracking/store action above the dock before test taps; rerun only the five failed names.",
       "gates": [
@@ -95506,9 +95506,9 @@
         "device",
         "customer_copy"
       ],
-      "mistake": "The r65.3 Order placed split cards still render `Delivery · Delivered in 12 min` and equivalent repeated delivery wording after the Confirm order cards were corrected.",
-      "rootCause": "UAT-036 was fixed only in the structured checkout summary; the separate confirmation delivery-card formatter retained its old `Delivery ·` prefix.",
-      "prevention": "Use one concise `Arrives` or unprefixed promise on confirmation cards, assert no `Delivery · Delivered` combinations across every split order and replay COD order placement on Redmi.",
+      "mistake": "The r65.3 Order placed split cards still render `Delivery Â· Delivered in 12 min` and equivalent repeated delivery wording after the Confirm order cards were corrected.",
+      "rootCause": "UAT-036 was fixed only in the structured checkout summary; the separate confirmation delivery-card formatter retained its old `Delivery Â·` prefix.",
+      "prevention": "Use one concise `Arrives` or unprefixed promise on confirmation cards, assert no `Delivery Â· Delivered` combinations across every split order and replay COD order placement on Redmi.",
       "gates": [
         "docs/quality/CUSTOMER-COPY-MACHINE-GATE.md",
         "flutter test --no-pub",
@@ -95532,7 +95532,7 @@
         "device",
         "state"
       ],
-      "mistake": "After the r65.3 COD order persisted and relaunched, order MS-NEW-03 for Ghar Bazaar announces `Delivered today by 8:00 pm · Delivered in 30 min`, combining incompatible Scheduled and Quick promises in one delivery.",
+      "mistake": "After the r65.3 COD order persisted and relaunched, order MS-NEW-03 for Ghar Bazaar announces `Delivered today by 8:00 pm Â· Delivered in 30 min`, combining incompatible Scheduled and Quick promises in one delivery.",
       "rootCause": "Fulfilment grouping uses destination and seller as the group key but does not separate the same seller's distinct fulfilment modes/promises.",
       "prevention": "Split checkout/order groups by seller plus authoritative fulfilment mode/service promise, preserve store-based split behavior, assert no group contains incompatible timing statements and replay mixed-store/mixed-mode ordering on Redmi.",
       "gates": [
@@ -95583,7 +95583,7 @@
         "device",
         "state"
       ],
-      "mistake": "The r65.3 unavailable Beauty Supply product correctly says Products unavailable and Currently unavailable but the same decision panel says Partner availability · Open for orders.",
+      "mistake": "The r65.3 unavailable Beauty Supply product correctly says Products unavailable and Currently unavailable but the same decision panel says Partner availability Â· Open for orders.",
       "rootCause": "Partner availability derives only from store operating hours and ignores an empty/unavailable partner catalogue state.",
       "prevention": "Give unavailable/no-products state precedence over open hours in the partner availability row, keep ordering blocked, preserve store identity/Ask and assert no `Products unavailable` screen also says `Open for orders`.",
       "gates": [
@@ -96485,7 +96485,7 @@
         "responsive",
         "visual"
       ],
-      "mistake": "Three responsive product-grid tests still require the pre-defect-fix 254–256px normal cards and 318–320px large-text cards, although the approved compact layout now uses 240px and 300px owners with complete content and minimum actions.",
+      "mistake": "Three responsive product-grid tests still require the pre-defect-fix 254â€“256px normal cards and 318â€“320px large-text cards, although the approved compact layout now uses 240px and 300px owners with complete content and minimum actions.",
       "rootCause": "The fixed pixel expectations were not updated after the founder-directed density correction and subsequent measured overflow repairs.",
       "prevention": "Update only the expected bounded heights to the actual approved compact layout, retain all complete-content, fully-visible, action and zero-overflow assertions, and keep immutable visual goldens unchanged.",
       "gates": [
@@ -96550,9 +96550,9 @@
         "checkout",
         "state"
       ],
-      "mistake": "The multiple-product Wholesale test expects one `Shipment 1 · 2 products · 4 packs` label, but the corrected fulfilment grouping separates incompatible delivery modes/promises and no longer combines both products into one shipment.",
+      "mistake": "The multiple-product Wholesale test expects one `Shipment 1 Â· 2 products Â· 4 packs` label, but the corrected fulfilment grouping separates incompatible delivery modes/promises and no longer combines both products into one shipment.",
       "rootCause": "The test retained the pre-REG-4238 seller-only grouping assumption instead of asserting aggregate pack totals across authoritative fulfilment groups.",
-      "prevention": "Assert every rendered shipment's product/pack count plus the unchanged aggregate `2 products · 4 packs`, require checkout lines and item totals to remain exact, and reject any group containing incompatible promises.",
+      "prevention": "Assert every rendered shipment's product/pack count plus the unchanged aggregate `2 products Â· 4 packs`, require checkout lines and item totals to remain exact, and reject any group containing incompatible promises.",
       "gates": [
         "flutter test --no-pub"
       ],
@@ -96648,7 +96648,7 @@
         "test",
         "responsive"
       ],
-      "mistake": "The first updated responsive ranges expected 238–242px and 298–302px, while the actual keyed card owners measure 237px and 297px because the surrounding rail allocation subtracts three pixels from the configured tile extent.",
+      "mistake": "The first updated responsive ranges expected 238â€“242px and 298â€“302px, while the actual keyed card owners measure 237px and 297px because the surrounding rail allocation subtracts three pixels from the configured tile extent.",
       "rootCause": "The assertion was recalculated from tileHeight rather than read back from the rendered keyed card measurement.",
       "prevention": "Calibrate the bounded expectations around the observed rendered owners, retain zero-overflow and complete-content assertions, and rerun the three named responsive tests before the behavior batch.",
       "gates": [
@@ -97090,7 +97090,7 @@
         "checkout",
         "wholesale"
       ],
-      "mistake": "The receiving-lines test expects `Delivery 1 · 2 products · 4 packs`, although products with different authoritative promises now render in separate delivery cards.",
+      "mistake": "The receiving-lines test expects `Delivery 1 Â· 2 products Â· 4 packs`, although products with different authoritative promises now render in separate delivery cards.",
       "rootCause": "The test retained seller-only grouping while the approved order-split contract separates incompatible fulfilment promises.",
       "prevention": "Assert each actual fulfilment group has its own delivery heading and line subtotals, while aggregate checkout lines and pack total remain exact and no incompatible promises share a group.",
       "gates": [
@@ -97179,7 +97179,7 @@
         "checkout",
         "customer_copy"
       ],
-      "mistake": "The unclaimed 320px/140 percent scoped Checkout test expects text containing `Shop delivery ·`, which was replaced by the structured shipment and fulfilment labels used by current checkout.",
+      "mistake": "The unclaimed 320px/140 percent scoped Checkout test expects text containing `Shop delivery Â·`, which was replaced by the structured shipment and fulfilment labels used by current checkout.",
       "rootCause": "The legacy test remains bound to pre-redesign delivery-card wording.",
       "prevention": "Do not restore retired copy; preserve current claimed compact/semantic Checkout tests and queue this legacy assertion for its owner to align with shipment-based customer language.",
       "gates": [
@@ -97203,7 +97203,7 @@
         "payment"
       ],
       "mistake": "Both unclaimed Bank-transfer tests call choosePayment immediately after openCheckout while the real flow is still on Address, so the method correctly returns false.",
-      "rootCause": "The helper predates the approved Address → Payment → Confirm state machine.",
+      "rootCause": "The helper predates the approved Address â†’ Payment â†’ Confirm state machine.",
       "prevention": "Do not bypass production validation; the owning tests must advance Address before selecting Bank transfer, while current claimed payment/pending/restoration tests remain authoritative.",
       "gates": [
         "flutter test --no-pub"
@@ -97269,7 +97269,7 @@
         "coordination",
         "build"
       ],
-      "mistake": "The r65.4 coordination-chain patch accidentally inserted the Arabic token `امي` immediately before an assertion closing parenthesis, making the PowerShell block syntactically invalid if executed.",
+      "mistake": "The r65.4 coordination-chain patch accidentally inserted the Arabic token `Ø§Ù…ÙŠ` immediately before an assertion closing parenthesis, making the PowerShell block syntactically invalid if executed.",
       "rootCause": "An unintended token entered the manually composed long script patch and was not filtered before application.",
       "prevention": "Remove only the accidental token, parse the entire PowerShell file with Parser.ParseFile and require zero parse errors before staging or running any gate.",
       "gates": [
@@ -97387,7 +97387,7 @@
         "responsive",
         "visual"
       ],
-      "mistake": "On r65.4 Redmi, Hide replaces the Quick rail with a side bolt, but the status child still consumes a roughly 50–60dp row, leaving a conspicuous blank band above Shop controls.",
+      "mistake": "On r65.4 Redmi, Hide replaces the Quick rail with a side bolt, but the status child still consumes a roughly 50â€“60dp row, leaving a conspicuous blank band above Shop controls.",
       "rootCause": "The hidden branch renders an aligned 44px IconButton as a normal child in the header Column instead of overlaying the restorable Live icon on existing content.",
       "prevention": "Make hidden status consume zero Column height and render the 44px restore target as a content Stack overlay at the side; preserve unobstructed product taps, semantics and restored expanded/collapsed state on Redmi.",
       "gates": [
@@ -97467,7 +97467,7 @@
         "checkout",
         "customer_copy"
       ],
-      "mistake": "On r65.4 Redmi Confirm order, one Durum wheat pasta line with quantity two is headed `Shipment 1 · 2 products` instead of distinguishing one product from two items.",
+      "mistake": "On r65.4 Redmi Confirm order, one Durum wheat pasta line with quantity two is headed `Shipment 1 Â· 2 products` instead of distinguishing one product from two items.",
       "rootCause": "The non-Wholesale fulfilment-count formatter sends group.itemCount into the product-count label, matching the separate Checkout dock defect.",
       "prevention": "Format Shop shipments as distinct lines/products plus item quantity, retain Wholesale products plus packs, assert one-line/two-item and multi-line cases, and replay Confirm order and split order confirmation on Redmi.",
       "gates": [
@@ -97495,7 +97495,7 @@
         "tracking",
         "customer_copy"
       ],
-      "mistake": "On r65.4 Redmi tracking for one pasta product at quantity two, Delivery details renders `Products · 2 products · Home · ...`.",
+      "mistake": "On r65.4 Redmi tracking for one pasta product at quantity two, Delivery details renders `Products Â· 2 products Â· Home Â· ...`.",
       "rootCause": "Created order itemSummary derives its product wording from group.itemCount instead of group.lines.length and does not distinguish item quantity.",
       "prevention": "Generate order summaries from distinct line/product count plus item quantity for Shop and product count plus packs for Wholesale; assert one-product/two-item tracking and multi-product split orders, then replay Orders and Tracking on Redmi.",
       "gates": [
@@ -98420,7 +98420,7 @@
       ],
       "mistake": "The first r65.7 replay expected the previously open Payment step immediately after install and cold launch, but the app correctly opened the Shop root with retained cart state, so the payment CTA assertion had no matching node.",
       "rootCause": "The device script assumed transient Checkout view restoration across the update rather than reading the actual launch context and navigating through the retained Cart.",
-      "prevention": "Preserve review-01 as cold-launch evidence, inspect its exact root/cart semantics, then navigate Cart → Review order → Address → Payment before asserting the prerequisite CTA.",
+      "prevention": "Preserve review-01 as cold-launch evidence, inspect its exact root/cart semantics, then navigate Cart â†’ Review order â†’ Address â†’ Payment before asserting the prerequisite CTA.",
       "gates": [
         "Redmi retained cold-launch replay",
         "Redmi payment selection replay"
@@ -98443,7 +98443,7 @@
         "payment",
         "test"
       ],
-      "mistake": "After explicit Cart → Checkout → Payment navigation on r65.7, the assertion still expected `Choose payment method`, but the current retained session exposes `Review order`, indicating a valid payment selection is now restored.",
+      "mistake": "After explicit Cart â†’ Checkout â†’ Payment navigation on r65.7, the assertion still expected `Choose payment method`, but the current retained session exposes `Review order`, indicating a valid payment selection is now restored.",
       "rootCause": "The replay assumed the transient empty selection seen on the prior candidate survived the successor installation and session load, instead of reading the actual selected state first.",
       "prevention": "Inspect review-02 radio semantics and visible state before choosing an oracle; verify the enabled selected-method path on device and rely on the focused widget state test for the backend-driven empty-selection branch unless a truthful UI action can produce it.",
       "gates": [
@@ -98586,7 +98586,7 @@
         "payment",
         "customer_copy"
       ],
-      "mistake": "The r65.8 internal payment handoff displays `Phonepe · ₹469` instead of the brand-correct `PhonePe · ₹469`.",
+      "mistake": "The r65.8 internal payment handoff displays `Phonepe Â· â‚¹469` instead of the brand-correct `PhonePe Â· â‚¹469`.",
       "rootCause": "Generic URI provider title-casing uppercases only the first character of `phonepe`, losing the internal capital P required by the PhonePe brand.",
       "prevention": "Normalize known provider slugs through exact customer-facing names for PhonePe, Paytm and Pine Labs, keep a safe generic fallback, add focused provider-title tests, and replay the PhonePe handoff on Redmi.",
       "gates": [
@@ -98994,7 +98994,7 @@
       ],
       "mistake": "The floating Cart is still hosted by a full-width white horizontal strap above the bottom rail, obscuring product-grid content; its compact icon also omits the requested total amount and cannot be repositioned by the customer.",
       "rootCause": "The prior compact-cart change reduced only the button width while retaining a full-width dock/background owner and fixed placement, and optimized visible content down to icon plus count.",
-      "prevention": "Remove the full-width visual dock, render only one adaptive draggable Cart capsule with item count and Indian-formatted total, clamp/snap it within safe content bounds, cover Shop and long Wholesale totals through ₹1,00,00,000 without overflow, and replay drag/navigation on compact Redmi plus responsive widget matrices.",
+      "prevention": "Remove the full-width visual dock, render only one adaptive draggable Cart capsule with item count and Indian-formatted total, clamp/snap it within safe content bounds, cover Shop and long Wholesale totals through â‚¹1,00,00,000 without overflow, and replay drag/navigation on compact Redmi plus responsive widget matrices.",
       "gates": [
         "flutter test --no-pub",
         "Redmi Cart drag and navigation replay",
@@ -99244,7 +99244,7 @@
       ],
       "mistake": "The r65.11 Cart capsule leaves more horizontal whitespace than necessary as the bill amount grows because its deterministic width estimate expands ahead of the rendered digits.",
       "rootCause": "The adaptive width formula reserves a conservative icon/text buffer instead of measuring a tighter digit-driven intrinsic width.",
-      "prevention": "Do not change the founder-approved r65.11 candidate now. After integration, open a separate approved child to tighten width to only slightly exceed actual count/amount content while retaining ₹1 through ₹1,00,00,000 fit, drag bounds and accessibility.",
+      "prevention": "Do not change the founder-approved r65.11 candidate now. After integration, open a separate approved child to tighten width to only slightly exceed actual count/amount content while retaining â‚¹1 through â‚¹1,00,00,000 fit, drag bounds and accessibility.",
       "gates": [
         "founder post-integration review",
         "flutter test --no-pub"
@@ -101657,7 +101657,7 @@
         "collectionCoordination": "Read-only consumer HEAD now ad0526240e0e6a3980aa9686ffea751f4272e490 still has no committed collection protocol. Asked founder who is producing the common typed contract for022-R5-A: Codex can own it for Cursor reuse or consume Cursor's agreed version. Finished consumer UI or branch integration is not required first; named contract ownership is unresolved. V5 behaviour and CopyV1 stay authoritative, and no protocol/endpoint/expiry/QR/security capability is assumed implemented.",
         "attempt3": "All27 focused cases passed/exit0 with final v3 price layout. Analysis reports one test-only unnecessary non-null assertion on RenderParagraph.textDirection; remove only that !, preserve all geometry assertions, add product-result tap-to-existing-catalogue and Back checks, then rerun focused and analysis. Nine captures retained. No product compilation or customer-behaviour failure in this analysis warning.",
         "attempt2": "26passed/1failed/exit1. Product price no longer truncates, but10000crore at320/200percent still invokes the existing horizontal-money fallback. Retain r665-ancillary-range-attempt2-20260907.log. Preserve the no-sideways-scroll assertion and14px minimum actual-scaled text; reduce redundant search/card horizontal padding to8px only at200percent for room. Normal layout, other amount surfaces and data remain unchanged. Recapture and verify the complete range, then route/Back and combined qualification.",
-        "diagnostic1": "27cases completed25passed/2failed/exit1. Only product search at320px/200percent with1000/10000crore fails: expected full currency-number widths154.8936/168.3916px, rendered selection92.5547px because the two-line detail ellipsis clips the price. Exact names and stacks in r665-ancillary-range-diagnostic1-20260907.log; inspected screenshot confirms ₹10000... truncation. Order search and alerts pass current monetary checks; retain them without speculative redesign. Move only product price into its own full-width existing money row, keep the exact product search destination and complete-value/no-sideways-scroll/Back tests. Existing search fields and other routes stay unchanged.",
+        "diagnostic1": "27cases completed25passed/2failed/exit1. Only product search at320px/200percent with1000/10000crore fails: expected full currency-number widths154.8936/168.3916px, rendered selection92.5547px because the two-line detail ellipsis clips the price. Exact names and stacks in r665-ancillary-range-diagnostic1-20260907.log; inspected screenshot confirms â‚¹10000... truncation. Order search and alerts pass current monetary checks; retain them without speculative redesign. Move only product price into its own full-width existing money row, keep the exact product search destination and complete-value/no-sideways-scroll/Back tests. Existing search fields and other routes stay unchanged.",
         "baseline": "a358d34d552871da70a99f8ea2875acd89f1af1c",
         "status": "locally_qualified_oppo_pending",
         "owners": [
@@ -101672,7 +101672,7 @@
         "finalFocused": "Attempt6 completed37passed/0failed/exit0, SHA256E1745F1C77ACCFF29347CEA53D5D8AD725A81CEC88497C33AD843FE963166013. Final analysis2 completed0issues/exit0, SHA256178D9182276233AAAE3DC0AD382E7F9F75D42B48617EE4AC3B3891C45F817CF4. Twenty-one v6 images:15 SHA-identical to directly inspected v5 images; six new/changed images inspected directly. Final enlarged details keep reference/Close fixed and amount in the existing scroll body. Large-text finance rail still scrolls to offscreen siblings; do not claim all three values simultaneously visible.",
         "qualification": "Two final unchanged-source14-file cycles each673passed/81unchanged exclusions/0failed/exit0. Cycle2 SHA256D48805F1479FD79AE68AD56DA9AC73AF2EC41F27B6681A621FB16344CF01E43E; cycle3 SHA25606CAEE1AC2054771B3AAA6B5FECDC991D565500789013702550C7836FAD21A4D. Source SHA25653C9D7CEA07DD5377BC456C973B1300DE68E7AC7D15162B076FF25024A93A313; test SHA25672172321686A8984ED1E6080B022D6A35616A96FBE7BB4428E3D8DAD965F272B. Format check2files0changed; all existing copy, UI-lock, accepted-ancestry, MVP, incremental and regression-memory implementation gates pass. Exact command, prior failures, final captures and hashes retained in external r665-central-range-report-20260907.md. OPPO, remaining ancillary search/alert amount checks and Scan & Pick remain pending; no parent/service closure.",
         "readOutputRecovery": "One read-only v6-versus-v5 image hash listing returned unavailable/truncated output at context handoff. No mutation or test ran in that call. Repeated only the bounded hash inventory:21files,15unchanged,sixnew-or-changed. Analysis2 completion was recovered from its original session with exit0, not rerun. Missing original listing is not qualification evidence.",
-        "cycle1": "Combined14-file cycle1 completed671passed/81unchanged exclusions/2failed/exit1; retain r665-central-range-cycle1-20260907.log. S09 refinement finance context320/200% still expects single-line ₹28450 instead of the explicitly permitted currency line layout; preserve exact-value semantics, visibility and tap assertions while accepting only that layout alternative. Store Desk320x568/140% exposes a real0.2px detail-column overflow: the new fixed enlarged-text amount header plus fixed action footer exceed the short card. Keep only reference/Close fixed at enlarged text; place amount at the top of the existing scrollable details body, not another screen or scroll layer. Preserve no-overflow,44px/48px action, acceptance->packing and all current assertions. Recapture changed details then two complete passing cycles; failed cycle is never qualification.",
+        "cycle1": "Combined14-file cycle1 completed671passed/81unchanged exclusions/2failed/exit1; retain r665-central-range-cycle1-20260907.log. S09 refinement finance context320/200% still expects single-line â‚¹28450 instead of the explicitly permitted currency line layout; preserve exact-value semantics, visibility and tap assertions while accepting only that layout alternative. Store Desk320x568/140% exposes a real0.2px detail-column overflow: the new fixed enlarged-text amount header plus fixed action footer exceed the short card. Keep only reference/Close fixed at enlarged text; place amount at the top of the existing scrollable details body, not another screen or scroll layer. Preserve no-overflow,44px/48px action, acceptance->packing and all current assertions. Recapture changed details then two complete passing cycles; failed cycle is never qualification.",
         "attempt4": "29passed/1failed/exit1: all27 central checks now pass; ordinary pulse values pass normal/140%, but200% Dues17820 splits across two text boxes in an86px paragraph. Retain r665-central-range-attempt4-20260907.log. At200% only, give financial columns equal shares and remove redundant horizontal padding; if necessary place currency/unit on its own line above the complete digit group. Preserve exact summary units, signs/approximation markers, same14px base, actual text scaling, fixed amount-area height, exact-value accessibility and same financial taps. Do not round values or invent shorter monetary units. Expand the existing pulse display assertions to accept only that explicit currency/unit line arrangement, with unchanged exact semantics and digit geometry.",
         "attempt3": "24passed/3failed/exit1; r665-central-range-attempt3-20260907.log retained. Number/summary geometry now passes, including full10000crore disclosure. Packing's two summary semantics labels merge into neighboring content; give the actionable amount its own semantic container and pump semantic creation before asserting. The ordinary200% details Close test scrolls its target under the app bar; reveal and hit-test Close before tapping. New actual visual child S09-PULSE-ORDINARY-DIGITS-CHILD-01: v3 packing screenshot reveals inherited Settle17820 splits its last digit at320/200%. Existing pulse amount test targets only the wider Sales column. Add all-three-metric ordinary/large-value coverage and fit summary presentation without splitting digits, reducing text scale or changing confirmed financial values/eligibility; preserve exact-value semantics and one-tap financial destinations before APK.",
         "attempt2": "22passed/5failed/exit1 retained in r665-central-range-attempt2-20260907.log. Full-value dialog paths passed where entered. Three summary checks still need sideways scrolling because unit/info share constrained number width, especially under details Close. Let complete summary digits and explicit cr unit wrap as separate whole elements, and put the detail Close control on the reference row at enlarged text. Two packing disclosure hit tests fail after nested ensureVisible; capture the exact target/card/viewport rectangles before altering source and center the real scroll target. Keep all full-value, semantics, order-identity and Back assertions. Do not claim the five cases passed or change production order state.",
@@ -102138,7 +102138,7 @@
         "testing",
         "device"
       ],
-      "mistake": "OPPO-R66.2-02–04: Native OTP confirmation was obscured by the fixed Continue bar; email autocorrection inserted a space; camera permission denial appeared behind the modal.",
+      "mistake": "OPPO-R66.2-02â€“04: Native OTP confirmation was obscured by the fixed Continue bar; email autocorrection inserted a space; camera permission denial appeared behind the modal.",
       "rootCause": "Focus/scroll insets and modal feedback did not match native IME and permission transitions.",
       "prevention": "Keep active OTP confirmation visible, suppress unrelated bottom navigation while typing, disable contact/OTP autocorrection and show picker failures beside retry options.",
       "gates": [
@@ -102162,7 +102162,7 @@
         "testing",
         "device"
       ],
-      "mistake": "OPPO-R66.2-01,06–08: The first selection was clipped below repetitive hero content; camera UUID filenames dominated Review; first approval discarded the entered business name; initial Store setup opened a legacy shell.",
+      "mistake": "OPPO-R66.2-01,06â€“08: The first selection was clipped below repetitive hero content; camera UUID filenames dominated Review; first approval discarded the entered business name; initial Store setup opened a legacy shell.",
       "rootCause": "The native first-view and post-approval path retained older typography, filename and fallback-name contracts.",
       "prevention": "Compact existing entry/setup surfaces without altering approved prerequisite content or validation. Retain submitted name, readable camera filename and direct Store return. Remove old Chat/Earn navigation only on the retailer setup destination.",
       "gates": [
@@ -102175,7 +102175,7 @@
     },
     {
       "id": "REG-20260906-4512-STORE-NATIVE-PROCUREMENT-KEYBOARD-SEMANTICS",
-      "r6616ProcurementStoreIsolation": "R6616-UAT-PROCUREMENT-SCOPE-15, native086-092: Store A OPPO-QA-Recovery-Store has bread query and3packs/₹2160. Loading an isolated12-order QA Store B preserves A and uses the normal Store projections, but B Restock inherits A's query/cart. Increment once in B to4packs/₹2880; normal workspace switch back to A restores its separate zero balances but Restock shows the changed4pack cart. Screenshot088/092 and source _StoreProcurementSurface confirm one shared BuyV2Session with account identity but no Store/purpose/origin operation context in this installed base. Link to existing STORE-PROCUREMENT-ELIGIBILITY-01/DASH-LOAD07/13/14 and deferred Cursor/Store wrapper integration, not a duplicate standalone backend or new global root-cause ticket. No checkout, payment, other account or real customer was involved. Do not call it cross-account leakage or claim newer Cursor source is defective. Implementation/integration/new APK remain held; qualify exact Store-scoped persistence and unchanged consumer cart after the later controlled integration.",
+      "r6616ProcurementStoreIsolation": "R6616-UAT-PROCUREMENT-SCOPE-15, native086-092: Store A OPPO-QA-Recovery-Store has bread query and3packs/â‚¹2160. Loading an isolated12-order QA Store B preserves A and uses the normal Store projections, but B Restock inherits A's query/cart. Increment once in B to4packs/â‚¹2880; normal workspace switch back to A restores its separate zero balances but Restock shows the changed4pack cart. Screenshot088/092 and source _StoreProcurementSurface confirm one shared BuyV2Session with account identity but no Store/purpose/origin operation context in this installed base. Link to existing STORE-PROCUREMENT-ELIGIBILITY-01/DASH-LOAD07/13/14 and deferred Cursor/Store wrapper integration, not a duplicate standalone backend or new global root-cause ticket. No checkout, payment, other account or real customer was involved. Do not call it cross-account leakage or claim newer Cursor source is defective. Implementation/integration/new APK remain held; qualify exact Store-scoped persistence and unchanged consumer cart after the later controlled integration.",
       "r6614ShortcutChild": "R6614-UAT-PROCUREMENT-02, deduplicated under DASH-LOAD-07/13: OPPO r66.14 captures050/052/053 show the Store first-tap shortcut list still has Buy Direct and no Track stock, while the approved main Store dashboard exposes Track stock. Source _StoreFirstTapAccessState._actions confirms the stale list. Reconcile this Store-owned navigation surface with the approved replacement without deleting legacy direct links or changing manufacturer-only purpose. Preserve purchase context, selection and exact Back; test normal/large text and OPPO. Separate known Cursor eligibility/home-shopping promotion dependencies remain held, not fixed by this child. Record device-review.md in the r66.14 evidence folder; no product change during this collection pass.",
       "focusedChildRun3": "Third focused run: 158 passed, 79 capture skips, one semantic test mismatch. Flutter getSemantics on a clipped widget walks to its nearest retained ancestor, so isHidden on that ancestor is not a footer test. Use the SDK simulated accessibility traversal to assert the Shop rail is absent and Buy search remains accessible; retain the no-hit-test and viewport-bound checks.",
       "focusedChildRun2": "Second focused run: 157 passed, 79 captures skipped, two residual owned assertions. Exact Finish setup wording replaced the old long CTA. Clipped Buy rail is no longer hit-testable, but the test incorrectly requires its widget to cease existing; verify its exported semantics are hidden plus accessible Buy content instead of removing the retained nested screen. No source regression is waived.",
@@ -102187,7 +102187,7 @@
         "testing",
         "device"
       ],
-      "mistake": "OPPO-R66.2-10–11: Native Store procurement search reset on keyboard appearance. Overlay semantics hid the Buy body, the old Buy rail showed through, and top/right action semantics were inert.",
+      "mistake": "OPPO-R66.2-10â€“11: Native Store procurement search reset on keyboard appearance. Overlay semantics hid the Buy body, the old Buy rail showed through, and top/right action semantics were inert.",
       "rootCause": "Conditional embedding changed subtree identity; BlockSemantics and excluded InkWell actions removed accessible controls; host clamped text scale.",
       "prevention": "Keep the same nested Buy state and real insets, mask only its footer with opaque Store navigation, preserve text scaling and one accessible tap action. Do not edit any Cursor Buy owner.",
       "gates": [
@@ -103260,14 +103260,14 @@
       "r6615PrebuildLauncher": "The prebuild orchestration cell raised ReferenceError: btoa is not defined while preparing an unused JavaScript string, before exec_command or any prebuild shell command was invoked. No control result or APK exists from that cell. Remove the unused expression and let PowerShell encode the already-stored literal command through Text.Encoding.Unicode/Convert.ToBase64String; capture stdout/stderr at the process boundary. Preserve the failed tool output and do not represent it as a product regression or executed control run.",
       "r6615CandidateReservation": "After clean remote-equal seed commit 4b7ccb882a22876cddc22fdd5d597ab8acabaa2b, primary added ten exact r66.15 evidence claims before the files existed. The implementation coordination check returned exit1 at recorded owner is missing: artifacts/quality/codex-oppo-r66-15-review-20260911/candidate-contract.md. No APK/device action followed. The already-running connected16 cycle had passed its original gate and finished unchanged at1454 passed/81 existing skips/0 failed before registry movement. Correct only this candidate's predeclared evidence paths and existing continuation allowlist, with exact primary/task/lane/work/ticket/branch binding; do not permit arbitrary missing owners or change product scope. Validate negative identity/path cases and rerun the existing gate. A combined instruction read exceeded its output budget; omitted AGENTS/build segments were reread in bounded ranges before execution, not inferred as evidence.",
       "r6615SeedQualification": "The authorised review-seed slice passed its first8 focused/rendered checks, but full analysis rejected two missing if-body braces in work_workspace_dashboard_screen.dart and work_session.dart (curly_braces_in_flow_control_structures). Preserve store-review-seed-v1-analysis-20260911.log with exit1; add only those braces and rerun unchanged analysis. Actual200% captures also show the new review-only label occupying three lines; shorten only that test control, retain explicit simulation semantics, and test scroll reachability of the central actions before qualification. These are test-setup findings, not new OPPO customer defects. Earlier policy/model reads exceeded output budgets; recover exact current owners/segments and do not use omitted text as evidence. No APK or device action follows the failed analysis until corrected checks pass.",
-      "r6614DraftHelperReadRecovery": "A read-only future-draft helper inspection exceeded its2800-token budget by45tokens. The omitted SecureWorkCounterDraftStore _read segment was independently reread at work_services.dart lines362–412. No new draft implementation or qualification used missing text. Preserve the original truncated result; contact tests remained the same already-running invocation and were not restarted from observation alone.",
+      "r6614DraftHelperReadRecovery": "A read-only future-draft helper inspection exceeded its2800-token budget by45tokens. The omitted SecureWorkCounterDraftStore _read segment was independently reread at work_services.dart lines362â€“412. No new draft implementation or qualification used missing text. Preserve the original truncated result; contact tests remained the same already-running invocation and were not restarted from observation alone.",
       "r6614ContactFormatInvocation": "The layout command ran from apps/mobile but gave dart format the repository-relative apps/mobile/test/work_workspace_layout_safety_test.dart. Dart reported no file and formatted zero files while returning0, so the following correctly relative Flutter test started. Do not claim that formatter executed or treat its exit0 as file coverage. Observe the already-running test to its terminal result without duplicate execution; then format the existing test/work_workspace_layout_safety_test.dart from apps/mobile and inspect any diff before further qualification. Source/test ownership and the preceding implementation gate remain unchanged.",
       "r6614ContactReadRecovery": "A helper search incorrectly included nonexistent apps/mobile/lib/features/auth and returned rg exit2 despite results from the valid Work path. No test or source change followed that failed search. Read the discovered work_models.dart normalizeWorkspaceMobile helper directly; restrict subsequent contact searches to the existing Work owners and never count the failed path as coverage.",
       "r6614Pass6ColdCapture": "During the authorized retained-data process-stop/relaunch check, Android am start reported Status:ok, LaunchState:COLD, TotalTime5529 and Complete. Native119 PNG was captured, but uiautomator returned null root and XML pull exited1. Preserve119 as a partial capture, not synchronized acceptance or proof of app failure. No reinstall/data clear/restart retry. Inspect its image and the existing process/window read-only; after this incident is bound and gates pass, capture the settled state under a fresh number without overwriting119.",
       "r6614Pass5FounderClarification": "Founder confirmed the unexpected083/084 screen change came from an accidental manual tap and then released OPPO for exclusive testing. Exclude those transitions from app pass/fail evidence; retain the original captures and prior uncertainty. Native085 onward is the controlled replay. Capture102 completed before its combined image/command tool result was truncated; recovered existing PNG/XML and terminal file timestamps without repeating the action or overwriting evidence, then independently captured103 to verify current Stock Changes state. No product regression, host-test result or repeated tap is inferred from missing output.",
       "r6614Pass5ReadRecovery": "Read-only searches incorrectly included nonexistent apps/mobile/lib/ui_v2/core and test/work_session_test.dart paths; rg reported exit1 and no mutation/test followed. Recovery used rg --files for the actual Work tests and inspected work_widgets.dart, work_workspace_dashboard_screen.dart and work_session.dart explicitly. Do not infer full search coverage from the failed calls. OPPO083 was unexpectedly on Workspace chooser instead of082 requirement form;084 after one Back showed Promote store. Cause is unclassified pending exclusive-device confirmation, not asserted as an app defect or passed dismissal. Preserve both images/XML and inspect existing modal-Back tests before any repeat.",
       "r6614Pass2ReadRecovery": "Two read-only source lookups assumed nonexistent work_gateway.dart and work_workspace_onboarding_screen.dart paths. Both failed without mutation or test execution. rg file/class discovery resolved the actual work_services.dart and screens/work_onboarding_screens.dart owners, read before using the review-only OTP/state contract. Use discovered literal source paths. No missing read is qualification evidence, and no new APK/build or real message was initiated.",
-      "r6614EvidenceHandling": "Build/install succeeded with complete OS-boundary stdout/stderr and exact terminal exits; no replay was inferred from truncated output. Reconstruction AGENTS/old-ledger output exceeded its budget; missing ranges were recovered read-only, and current results use the successor ledger rather than omitted history. A registry discovery serialization warned at depth5; it was not qualification and the exact REG4510 owner was independently read at sufficient depth. A binding patch assumed a trailing comma and was atomically rejected without changing policy; exact lines6–9 showed the final property has none. Preserve all logs and use literal readback before edits. Native capture004 PNG precedes settled XML; it is a transient observation, not synchronized visual acceptance. No product/test or device-security change was made.",
+      "r6614EvidenceHandling": "Build/install succeeded with complete OS-boundary stdout/stderr and exact terminal exits; no replay was inferred from truncated output. Reconstruction AGENTS/old-ledger output exceeded its budget; missing ranges were recovered read-only, and current results use the successor ledger rather than omitted history. A registry discovery serialization warned at depth5; it was not qualification and the exact REG4510 owner was independently read at sufficient depth. A binding patch assumed a trailing comma and was atomically rejected without changing policy; exact lines6â€“9 showed the final property has none. Preserve all logs and use literal readback before edits. Native capture004 PNG precedes settled XML; it is a transient observation, not synchronized visual acceptance. No product/test or device-security change was made.",
       "status": "registered_test_check_correction_before_continuation",
       "appliesTo": [
         "primary",
@@ -104965,7 +104965,43 @@
       "addPlacement": "Right-side Add follow-up: add braces required by analyzer; wait for asset decoding before native captures; migrate stale bottom-Add geometry to price-side alignment and the existing 4px bound below the last detail. Transfer the exact responsive-test owner and synchronize the literal gate allowlist before editing it; retain the intermediate rejection as evidence.",
       "pendingNavigationReconciliation": "Founder requires all affected navigation passing before Git/APK. Historical test reconciliation exposed a real Create route child: retired home state rendered the editor but bypassed draft-save Back. Canonicalize unsupported/default route state to post, preserve recognized modes and test default/home/empty/invalid plus failed save and retry. Global draft-cache futures crossing widget-test FakeAsync contexts caused sequence failures; use the existing cache-injection seam through app/router and construct fresh caches inside test bodies, not setUp. Never reset production write barriers or accept isolated passes as complete. Retain failed and diagnostic logs, remove temporary probes, and qualify all12 affected navigation files together:120 passed, zero failures/skips. The two narrow analyzer annotations document forwarding the existing test-only override through production composition with default null; only those two visible-for-testing forwarding diagnostics are locally suppressed; no global analyzer setting, runtime authorization, persistence guarantee or behavior test is weakened. Map presentation tests qualify compact expansion/fallback only, not actual Google Maps/provider integration. Older D07-D11/D17 contracts remain separately open in the handoff.",
       "subsequentChecks": "C10 rename harness assumed a Store ID on a legacy fixture; supply explicit test identity. Impact tests retained boxed Wholesale/Bulk expectations and a removed duplicate-name key; migrate assertions to the approved unboxed/single-name contract while preserving actions and geometry. Four older Offers journey tests used MoolSocial-only first-page fixtures in the Suppliers promotion group; provide explicit supplier publications in that test source, preserve identity/pagination/retry assertions, and retain separate MoolSocial source tests. A cumulative run overlapped founder-requested single-card revisions and correctly failed the unchanged-source check; retain it as superseded, never bind its receipts to the new source. Final qualification must prove identical before/after source fingerprints.",
-      "successorBuildDiscipline": "Fresh r66.35 build authorized after 250 selected and120 navigation passes. Preserve complete latest branch, increment version, verify signer/installed checksum and retain prior APK/data. Canonicalize registry UTF-8 LF before raw-hash binding; original bytes retained under r6635 candidate. No gate bypass, inherited device acceptance or production provider claim."
+      "successorSelectedQualification": {
+        "date": "2026-09-24",
+        "selectedEntries": 20,
+        "passed": 388,
+        "failed": 0,
+        "skipped": 0,
+        "navigationPassed": 120,
+        "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
+        "summary": "apps/mobile/build/r6635-selected-final-r4/summary.json",
+        "fullBuyQualification": "pending two complete unchanged-source cycles",
+        "analysis": "12 changed Dart owners, zero issues"
+      },
+      "successorBuildDiscipline": "Fresh r66.35 build authorized after 250 selected and120 navigation passes. Preserve complete latest branch, increment version, verify signer/installed checksum and retain prior APK/data. Canonicalize registry UTF-8 LF before raw-hash binding; original bytes retained under r6635 candidate. No gate bypass, inherited device acceptance or production provider claim. First r6635 full prebuild found stale bottom-Add Offers assertions, an unavailable-Compare fixture receiving review data, unreadable narrow-grid prices and unsettled Store re-add taps. Preserve strict content, tap and navigation checks, adapt grid width for price plus44px action, and requalify all387 selected cases plus full Buy cycles. Second diagnostic found stale metadata/supplier-media three-column assertions and an actual Featured width regression: Featured Add is over the image, so preserve its full-width price while compact grids reserve inline Add. Keep exact fixture-specific columns, image aspect and source checks. The first310 selected assertions passed but source consistency failed because two new reference images entered the tracked inventory during that run; retain the failed summary and replay against fixed inventory. Additional Profile semantics/44px fix and cached-page price layout are covered; Store identity/gradient and two Cart Save references follow existing founder approval with historical images preserved. First diagnostic ended2617passed/50failed/27inherited skips; it is never qualifying evidence. All fixes must be committed with clean Git before APK. Wrapper safety self-test must recognize the sixth native Python invocation with its immediately bound exit check.",
+      "feedbackKeyboardQualification20260924": {
+        "parent": "R6634-C13",
+        "owner": "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart",
+        "finding": "Inherited missed rating tap during unsettled keyboard scroll; original test never asserted draft rating.",
+        "correction": "Settle keyboard, reveal rating, assert callback and hit-test, tap and assert draft rating; assert enabled reachable Save above keyboard.",
+        "state": "targeted_and_selected_passed_full_qualification_pending",
+        "previousSelectedScenarios": 387,
+        "selectedScenarios": 388,
+        "apk": "held_until_current_source_zero_failures_and_clean_committed_git"
+      },
+      "profileTooltipChild20260924": {
+        "parent": "R6634-C09",
+        "finding": "Independent audit: tooltip removed while restoring single accessible Profile label; C09 requires retained tooltips.",
+        "correction": "Restore Tooltip excluding tooltip semantics around existing labelled 44px Profile control; test long-press tooltip and preserved target/route.",
+        "state": "targeted_and_selected_passed_full_qualification_pending",
+        "registrationNote": "Initial metadata write failed on Windows default encoding before any file write; UTF-8 retry preserved registry. Runtime edit followed independent finding; testing held until durable registration.",
+        "sourceBeforeFix": "2eb3aed8349dbdf43968f3bf521a0d59e5dab0743ae5afe2bd41ce52329c9779"
+      },
+      "selectedOwnerReconciliation20260924": {
+        "finding": "Precommit rejected three application owners absent from ticket owners, although admitted by coordination: supplier-media test and two approved unboxed-Save successor goldens.",
+        "correction": "C13 now explicitly owns its already-selected supplier-media test; C09 explicitly owns its two reviewed immutable successor goldens. No source/test/evidence bytes changed; source43c89 and388 receipts unchanged.",
+        "receipt": "apps/mobile/build/review-candidates/cursor-buy-r6635-20260923/founder-precommit-r4.log",
+        "state": "metadata_reconciled_before_retry"
+      }
     }
   ],
   "counterSaleTestIncident20260919": {

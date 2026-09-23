@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "0E5C82DDB28BFBE073671FA0E3EAD3E9CC9726A941F33D9BF318276D4DE605B5"
+    "sha256": "FA34FDFCA45C61E5BD09196100BD4F324950D02DC5263BED299A790B61D3107B"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -153,7 +153,12 @@
         "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
         "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
         "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
+        "scripts/test-public-auth-sideload-build-controls.ps1",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shared_sku_fit_test.dart",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart"
       ]
     },
     {
