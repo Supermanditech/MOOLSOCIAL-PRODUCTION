@@ -21,7 +21,7 @@
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -268,7 +268,7 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
@@ -419,7 +419,7 @@
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -567,7 +567,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -760,7 +760,7 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -1038,7 +1038,7 @@
       "founderRequirement": "Cart to Offers opens Offers, never main-actions menu, preserving all baskets and explicit menu/Back actions.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
@@ -1370,10 +1370,64 @@
           "device": null
         }
       ],
-      "children": [],
+      "children": [
+        "R6634-C06-A01"
+      ],
       "dependencies": [
         "Successor APK Redmi verification and founder visual acceptance pending. Installed r66.34 is unchanged.",
         "Original direct Offers-tap trigger remains unproven; Cart -> Offers -> Android Back variant reproduced and the legacy screen retired from production routing."
+      ],
+      "founderApproval": null
+    },
+    {
+      "id": "R6634-C06-A01",
+      "status": "open",
+      "parents": [
+        "R6634-C06"
+      ],
+      "founderRequirement": "Migrate shared production-router regression expectations after founder-authorized legacy menu retirement; preserve origin return, Work reachability and no redirect loop, without restoring retired UI or skipping checks.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+      },
+      "owners": [
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C06-A01-1",
+          "route": "Legacy /app/mool and origin/Work navigation",
+          "state": "Shared historical production-router test still targets retired menu",
+          "expected": "Test approved Buy landing and preserved navigation rather than requiring retired menu",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+          "testName": "Home is the fixed six-family entry owner without a dock",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C06-A01-2",
+          "route": "Legacy /app/mool and origin/Work navigation",
+          "state": "Shared historical production-router test still targets retired menu",
+          "expected": "Test approved Buy landing and preserved navigation rather than requiring retired menu",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+          "testName": "direct Home origin Back uses the safe Ride default fallback",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C06-A01-3",
+          "route": "Legacy /app/mool and origin/Work navigation",
+          "state": "Shared historical production-router test still targets retired menu",
+          "expected": "Test approved Buy landing and preserved navigation rather than requiring retired menu",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+          "testName": "Home main action keeps route history back to fixed Home",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Inventory and migrate other shared router assertions that require the retired menu; currently three confirmed failing cases. This is a regression-suite contract migration, not proof of a new customer-visible runtime failure."
       ],
       "founderApproval": null
     }
