@@ -4916,11 +4916,9 @@ class _StoreActivityDeck extends StatelessWidget {
           };
           // Short viewports must scroll the whole card, including its actions.
           // Keep the existing compact layout when there is enough vertical room.
-          final minimumCardHeight =
-              (160 + MediaQuery.textScalerOf(context).scale(96)).clamp(
-                0,
-                desiredHeight,
-              );
+          final minimumCardHeight = MediaQuery.textScalerOf(
+            context,
+          ).scale(120).clamp(0, desiredHeight);
           final scrollCard =
               content is! _StoreOrderDetails &&
               (constraints.maxHeight < minimumCardHeight ||
