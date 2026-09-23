@@ -7,6 +7,48 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 
 void main() {
+  for (final tone in GlobalProfileSurfaceTone.values) {
+    for (final free in [false, true]) {
+      testWidgets('Profile launcher paint is opt-in ${tone.name} free=$free', (
+        tester,
+      ) async {
+        var taps = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MoolGlobalProfileShortcutV2(
+                keyName: 'profile-paint',
+                onPressed: () => taps++,
+                surfaceTone: tone,
+                freeStanding: free,
+              ),
+            ),
+          ),
+        );
+        final root = find.byKey(const Key('profile-paint'));
+        final button = tester.widget<IconButton>(
+          find.descendant(of: root, matching: find.byType(IconButton)),
+        );
+        expect(tester.getSize(root), Size.square(free ? 48 : 44));
+        expect(
+          button.style!.side!.resolve({})!.style,
+          free ? BorderStyle.none : BorderStyle.solid,
+        );
+        expect(
+          button.style!.backgroundColor!.resolve({})!.a,
+          free ? 0 : greaterThan(0),
+        );
+        expect(
+          (button.icon as Icon).icon,
+          free ? Icons.person_outline_rounded : Icons.account_circle_outlined,
+        );
+        await tester.tap(root);
+        expect(taps, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final display in [
     (size: const Size(412, 915), scale: 1.0),
     (size: const Size(320, 640), scale: 1.4),

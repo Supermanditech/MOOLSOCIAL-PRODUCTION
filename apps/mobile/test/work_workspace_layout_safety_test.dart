@@ -14276,10 +14276,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
-    expect(
-      find.byKey(const Key('work-store-action-edge')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-home')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
@@ -19128,6 +19125,65 @@ void main() {
       expect(find.byKey(const Key('work-local-workspace')), findsNothing);
       expect(find.byKey(const Key('work-dashboard-hero')), findsNothing);
       expect(find.text(work.activeWorkspace!.name), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('FREEHEADER alerts and profile stay unframed $scale', (
+      tester,
+    ) async {
+      final work = liveStore();
+      final products = List.of(work.workspaceCatalogueItems);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(scale == 1 ? 360 : 320, 806),
+        textScale: scale,
+      );
+      for (final key in ['work-dashboard-alerts', 'work-dashboard-profile']) {
+        final target = find.byKey(Key(key));
+        expect(target.hitTestable(), findsOneWidget);
+        final size = tester.getSize(target);
+        expect(size.width, greaterThanOrEqualTo(48));
+        expect(size.height, greaterThanOrEqualTo(48));
+        final paints = tester
+            .widgetList<Material>(
+              find.descendant(of: target, matching: find.byType(Material)),
+            )
+            .where((m) => m.shape is OutlinedBorder);
+        expect(paints, isNotEmpty);
+        for (final paint in paints) {
+          expect((paint.shape! as OutlinedBorder).side.style, BorderStyle.none);
+          expect(paint.color?.a ?? 0, 0);
+          expect(paint.elevation, 0);
+        }
+      }
+      final badge = tester.widget<Badge>(
+        find
+            .ancestor(
+              of: find.byKey(const Key('work-dashboard-alerts')),
+              matching: find.byType(Badge),
+            )
+            .first,
+      );
+      expect(badge.isLabelVisible, isTrue);
+      await captureStoreView(tester, 'free-header-$scale');
+      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-alerts-screen')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems, orderedEquals(products));
       expect(tester.takeException(), isNull);
     });
   }

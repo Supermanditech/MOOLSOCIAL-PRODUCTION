@@ -1,5 +1,41 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Latest — 31-finding local completion and free Store header controls
+
+Founder approved the other twelve entered-stock flow captures, with one narrow
+correction: remove round frames from Store Alert and Profile. Store now uses
+free-standing controls with accessible 48dp targets, the original callbacks and
+the unread badge. Profile reuses the shared launcher through an opt-in parameter;
+Buy/Social defaults are unchanged. No duplicate account route or new design guide.
+
+Failing-before evidence: both FREEHEADER cases detected the solid border.
+Passing-after evidence: normal/enlarged paints have no border, background or
+elevation; badge, Profile/Alerts navigation and return preserve inventory.
+Four shared-launcher cases separately cover default/free presentation for both
+surface tones. Source analysis passed. Final v13 screen/media replay passed
+422 checks with 49 skips; domain/profile replay passed 417 with 4 skips.
+Skipped conditional evidence/native cases are not passes. Logs are retained in
+the task outputs/r6638-final-connected-v13.log and r6638-domain-profile-v13.log.
+Normal/enlarged saved-stock captures were regenerated and inspected. Local
+frontend qualification is complete for this scoped batch, not device acceptance.
+
+The preceding checkpoint e5abc55b preserves the remaining local batch fixes and
+account/Store-scoped inventory persistence. Catalogue and manual use the shared
+review/save owner; CSV uses validated add-only import and that same durable
+inventory adapter. New CSV checks preserve reviewed stock/movements through a
+fresh session, including failed write + explicit retry, without seeded invoices,
+orders or fabricated missing photos. QA keys/data remain separate from production.
+
+The original register remains 31 grouped findings, plus later amendments attached
+to their existing scopes. Do not invent numbering for the earlier unnumbered
+1–25 bullets. Detailed retained mapping: task outputs/r6638-reconciliation-20260923.md.
+Frontend behavior and local qualification are distinct from final closure:
+production-authorized catalogue originals, authoritative invoice issuance,
+native camera/permission/hardware scanning and exact-successor OPPO/process-death
+verification remain pending. Backend and public/Cursor integration remain deferred.
+No blanket all-31-closed or financial-success claim; no APK/build/install in this
+local completion pass. Approved neighboring visual designs remain unchanged.
+
 ## OPPO successor qualification — narrow corrections, 23 September
 
 Complete implementation was preserved and pushed at26100fbf. The first broad

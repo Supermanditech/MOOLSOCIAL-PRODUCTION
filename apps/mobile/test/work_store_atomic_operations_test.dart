@@ -784,6 +784,60 @@ void main() {
         );
       },
     );
+    for (final interrupted in [false, true]) {
+      test(
+        'reviewed CSV stock survives restart interrupted=$interrupted',
+        () async {
+          final device = _OrderJournalStorage()..failWrite = interrupted;
+          WorkSession fresh() => WorkSession(
+            contactDraftStore: _CommandAccountStore(),
+            inventoryStore: SecureWorkInventoryStore(
+              accountScope: () => 'account-A',
+              storage: device,
+            ),
+          )..activeWorkspace = _commandStore;
+          final work = fresh();
+          expect(await work.loadWorkspaceInventory(), isTrue);
+          // Explicit QA commercial values, no catalogue seed or fake barcode.
+          final review = WorkspaceProductImport.parse(
+            'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n'
+            'Tata Salt,Tata,1 kg,25,30,6,QA-SALT-1KG',
+            catalogue: const [],
+            owned: const [],
+          );
+          final product = review.rows.single.product!;
+          work.importWorkspaceProducts([product], addOnly: true);
+          expect(await work.workspaceInventorySaved, !interrupted);
+          if (interrupted) {
+            expect(work.workspaceInventoryError, isNotNull);
+            device.failWrite = false;
+            expect(await work.retryWorkspaceInventorySave(), isTrue);
+          }
+          final before = work.workspaceCatalogueItems.single.toInventoryJson();
+          final movementIds = work.workspaceStockMovements
+              .map((m) => m.id)
+              .toList();
+          work.dispose();
+          final reopened = fresh();
+          addTearDown(reopened.dispose);
+          expect(await reopened.loadWorkspaceInventory(), isTrue);
+          expect(
+            reopened.workspaceCatalogueItems.single.toInventoryJson(),
+            before,
+          );
+          expect(
+            reopened.workspaceStockMovements.map((m) => m.id).toList(),
+            movementIds,
+          );
+          expect(
+            reopened.workspaceCatalogueItems.single.cataloguePhoto,
+            isNull,
+          );
+          expect(reopened.workspaceInvoices, isEmpty);
+          expect(reopened.workspaceOrders, isEmpty);
+        },
+      );
+    }
     test(
       'failed device write stays visible and explicit retry recovers',
       () async {

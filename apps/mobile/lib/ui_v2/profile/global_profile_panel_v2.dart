@@ -221,6 +221,7 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
     required this.keyName,
     required this.onPressed,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
+    this.freeStanding = false,
     super.key,
   });
 
@@ -228,38 +229,54 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
   final VoidCallback onPressed;
   final GlobalProfileSurfaceTone surfaceTone;
 
+  /// Store uses the same account launcher without an ornamental circle.
+  /// Other modules retain their accepted presentation by default.
+  final bool freeStanding;
+
   @override
   Widget build(BuildContext context) {
     final dark = surfaceTone == GlobalProfileSurfaceTone.socialDark;
+    final extent = freeStanding ? 48.0 : 44.0;
     return Semantics(
       key: ValueKey(keyName),
       container: true,
       button: true,
       label: 'Open your MoolSocial profile',
       child: SizedBox.square(
-        dimension: 44,
+        dimension: extent,
         child: IconButton(
           tooltip: 'Your MoolSocial profile',
           onPressed: onPressed,
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+          constraints: BoxConstraints.tightFor(width: extent, height: extent),
           style: IconButton.styleFrom(
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             foregroundColor: dark ? Colors.white : _profileNavy,
-            backgroundColor: dark
+            backgroundColor: freeStanding
+                ? Colors.transparent
+                : dark
                 ? Colors.white.withValues(alpha: .10)
                 : Colors.white.withValues(alpha: .72),
-            side: BorderSide(
-              color: dark
-                  ? Colors.white.withValues(alpha: .24)
-                  : _profileNavy.withValues(alpha: .14),
-            ),
+            side: freeStanding
+                ? BorderSide.none
+                : BorderSide(
+                    color: dark
+                        ? Colors.white.withValues(alpha: .24)
+                        : _profileNavy.withValues(alpha: .14),
+                  ),
             overlayColor: dark
                 ? Colors.white.withValues(alpha: .10)
                 : _profileNavy.withValues(alpha: .08),
-            shape: const CircleBorder(),
+            shape: freeStanding
+                ? const RoundedRectangleBorder()
+                : const CircleBorder(),
           ),
-          icon: const Icon(Icons.account_circle_outlined, size: 22),
+          icon: Icon(
+            freeStanding
+                ? Icons.person_outline_rounded
+                : Icons.account_circle_outlined,
+            size: 22,
+          ),
         ),
       ),
     );

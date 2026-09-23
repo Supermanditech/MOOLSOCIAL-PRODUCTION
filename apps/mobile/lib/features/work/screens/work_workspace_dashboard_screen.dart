@@ -3397,6 +3397,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                   MoolGlobalProfileShortcutV2(
                     keyName: 'work-dashboard-profile',
                     onPressed: onProfile,
+                    freeStanding: true,
                   ),
                 ],
               ],
@@ -9826,9 +9827,16 @@ class _DashboardAlertButton extends StatelessWidget {
       child: Badge(
         isLabelVisible: count > 0,
         label: Text('$count'),
-        child: IconButton.outlined(
+        child: IconButton(
           key: const Key('work-dashboard-alerts'),
           tooltip: 'Store alerts',
+          style: IconButton.styleFrom(
+            foregroundColor: MoolColors.navy,
+            backgroundColor: Colors.transparent,
+            side: BorderSide.none,
+            minimumSize: const Size(48, 48),
+            shape: const RoundedRectangleBorder(),
+          ),
           onPressed: onPressed,
           icon: const Icon(Icons.notifications_none_rounded),
         ),
