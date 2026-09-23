@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
@@ -13,15 +14,6 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  Future<void> tapHomeTarget(WidgetTester tester, Key key) async {
-    final target = find.byKey(key);
-    expect(target, findsOneWidget, reason: 'Missing Home target $key');
-    await tester.ensureVisible(target);
-    await tester.pumpAndSettle();
-    await tester.tap(target);
-    await tester.pumpAndSettle();
-  }
 
   Future<void> tapNavigatorTarget(WidgetTester tester, Key key) async {
     final target = find.byKey(key);
@@ -149,25 +141,65 @@ void main() {
     },
   );
 
-  testWidgets('root Back returns to Mool through repeated real-router cycles', (
+  for (final origin in ['', '?from=buy', '?from=work', '?from=social']) {
+    testWidgets(
+      'R6634 C06 legacy Mool $origin resolves to Buy and root Back exits',
+      (tester) async {
+        var exits = 0;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'SystemNavigator.pop') exits++;
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
+          ),
+        );
+        final session = await _mount(
+          tester,
+          initialLocation: '/app/mool$origin',
+        );
+        addTearDown(session.dispose);
+        expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+        expect(
+          GoRouterState.of(
+            tester.element(find.byType(BuyV2Screen)),
+          ).uri.toString(),
+          '/app/buy?sub=shop',
+        );
+        for (var cycle = 0; cycle < 3; cycle++) {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(exits, cycle + 1);
+          expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
+        }
+      },
+    );
+  }
+
+  testWidgets('R6634 C06 compact Work navigation remains reachable from Buy', (
     tester,
   ) async {
     final session = await _mount(tester, initialLocation: '/app/mool');
     addTearDown(session.dispose);
-
-    for (var cycle = 0; cycle < 3; cycle += 1) {
-      await tapHomeTarget(tester, const Key('mool-home-family-buy'));
-      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
-      expect(find.byKey(const Key('buy-v2-screen')), findsNothing);
-    }
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+    await tester.pumpAndSettle();
+    await tapNavigatorTarget(tester, const Key('mool-navigator-family-work'));
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
+    expect(find.byKey(const Key('buy-v2-screen')), findsNothing);
+    final path = GoRouterState.of(
+      tester.element(find.byType(Scaffold).first),
+    ).uri.path;
+    expect(path, startsWith('/app/work'));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
-    'root Back ignores an invalid Eat return and falls back to Mool',
+    'root Back ignores an invalid Eat return without opening legacy Mool',
     (tester) async {
       final session = JourneySession(
         store: MemoryJourneyStore(
@@ -195,9 +227,9 @@ void main() {
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+      expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
       expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
-      expect(find.byKey(const Key('buy-v2-screen')), findsNothing);
+      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     },
   );
 
@@ -281,7 +313,6 @@ void main() {
   ) async {
     final session = await _mount(tester, initialLocation: '/app/mool');
     addTearDown(session.dispose);
-    await tapHomeTarget(tester, const Key('mool-home-family-buy'));
 
     await tester.tap(find.byKey(const Key('buy-search-control')));
     await tester.pumpAndSettle();
@@ -293,7 +324,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
   });
 
   testWidgets('Buy MoolSocial chooser Back preserves Medicine in place', (

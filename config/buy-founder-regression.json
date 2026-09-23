@@ -21,7 +21,7 @@
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "1739a1530f188e838f886ecd7e3fb3b13694e5d47350ee32b0c49ae15b01ef91"
+        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -37,9 +37,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-1 Shop Visit Store opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -51,9 +51,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-2 Shop Visit Store same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -65,9 +65,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-3 Shop Visit Store mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -79,9 +79,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-4 Shop Visit Store last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -93,9 +93,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-5 Wholesale Visit Store opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -107,9 +107,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-6 Wholesale Visit Store same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -121,9 +121,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-7 Wholesale Visit Store mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -135,9 +135,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-8 Wholesale Visit Store last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -149,9 +149,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-9 Recent product opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -163,9 +163,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-10 Recent product same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -177,9 +177,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-11 Recent product mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -191,9 +191,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-12 Recent product last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -205,9 +205,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-13 Offers product opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -219,9 +219,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-14 Offers product same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -233,9 +233,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-15 Offers product mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -247,9 +247,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-16 Offers product last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         }
@@ -268,7 +268,7 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "1739a1530f188e838f886ecd7e3fb3b13694e5d47350ee32b0c49ae15b01ef91"
+        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
@@ -287,9 +287,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-1 new Orders normal",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -301,9 +301,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-2 new Orders long name",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -315,9 +315,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-3 new Orders 200 percent with keyboard",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -329,9 +329,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-4 retained Orders normal",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -343,9 +343,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-5 retained Orders long name",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -357,9 +357,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-6 retained Orders 200 percent with keyboard",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -371,9 +371,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-7 supplier chat normal",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -385,9 +385,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-8 supplier chat long name",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -399,9 +399,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-9 supplier chat 200 percent with keyboard",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         }
@@ -419,7 +419,7 @@
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "1739a1530f188e838f886ecd7e3fb3b13694e5d47350ee32b0c49ae15b01ef91"
+        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -434,9 +434,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-1 Wholesale review single item",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -448,9 +448,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-2 Wholesale review multiple Stores and packs",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -462,9 +462,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-3 Wholesale review long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -476,9 +476,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-4 Bulk review single item",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -490,9 +490,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-5 Bulk review multiple Stores and packs",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -504,9 +504,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-6 Bulk review long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -518,9 +518,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-7 Offers Wholesale review single item",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -532,9 +532,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-8 Offers Wholesale review multiple Stores and packs",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -546,9 +546,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-9 Offers Wholesale review long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         }
@@ -567,7 +567,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "1739a1530f188e838f886ecd7e3fb3b13694e5d47350ee32b0c49ae15b01ef91"
+        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -582,9 +582,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-1 active tracking missing payment",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -596,9 +596,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-2 active tracking paid",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -610,9 +610,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-3 active tracking balance due",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -624,9 +624,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-4 active tracking long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -638,9 +638,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-5 delivered tracking missing payment",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -652,9 +652,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-6 delivered tracking paid",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -666,9 +666,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-7 delivered tracking balance due",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -680,9 +680,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-8 delivered tracking long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -694,9 +694,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-9 Orders history missing payment",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -708,9 +708,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-10 Orders history paid",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -722,9 +722,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-11 Orders history balance due",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -736,9 +736,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-12 Orders history long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         }
@@ -760,7 +760,7 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "1739a1530f188e838f886ecd7e3fb3b13694e5d47350ee32b0c49ae15b01ef91"
+        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -777,9 +777,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-1 Bulk cart review normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -791,9 +791,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-2 Bulk cart review 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -805,9 +805,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-3 Bulk cart review keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -819,9 +819,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-4 address last field validation normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -833,9 +833,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-5 address last field validation 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -847,9 +847,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-6 address last field validation keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -861,9 +861,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-7 Edit basket scrolled normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -875,9 +875,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-8 Edit basket scrolled 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -889,9 +889,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-9 Edit basket scrolled keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -903,9 +903,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-10 Offers rapid switching normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -917,9 +917,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-11 Offers rapid switching 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -931,9 +931,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-12 Offers rapid switching keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -945,9 +945,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
           "testName": "R6634 C05-13 collected receipt normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -959,9 +959,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
           "testName": "R6634 C05-14 collected receipt 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -973,9 +973,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
           "testName": "R6634 C05-15 collected receipt keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -987,9 +987,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-16 partial problem receipt normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1001,9 +1001,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-17 partial problem receipt 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1015,9 +1015,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-18 partial problem receipt keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         }
@@ -1031,18 +1031,20 @@
     },
     {
       "id": "R6634-C06",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D06"
       ],
       "founderRequirement": "Cart to Offers opens Offers, never main-actions menu, preserving all baskets and explicit menu/Back actions.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "1739a1530f188e838f886ecd7e3fb3b13694e5d47350ee32b0c49ae15b01ef91"
+        "sha256": "7a3d19a6003ade49229f644d8b819ee0e93ad8c8bca7a9282879dab2ef344bc5"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart"
       ],
       "cases": [
         {
@@ -1053,9 +1055,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 shop settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1067,9 +1069,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 shop rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1081,9 +1083,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 shop pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1095,9 +1097,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 wholesale settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1109,9 +1111,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 wholesale rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1123,9 +1125,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 wholesale pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1137,9 +1139,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 offers settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1151,9 +1153,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 offers rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1165,9 +1167,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 offers pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1179,9 +1181,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 store settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1193,9 +1195,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 store rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1207,9 +1209,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 store pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1221,9 +1223,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed cart settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1235,9 +1237,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed cart rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1249,9 +1251,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed cart pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1263,9 +1265,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed offers cart settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1277,9 +1279,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed offers cart rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         },
@@ -1291,16 +1293,87 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed offers cart pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-82-regression-machine.jsonl",
-            "sha256": "670eccadce34a3c0b15353a37e19a8b3a83f5df13852a9fdbadef76c8c65228f",
-            "sourceSha256": "41fd728587c071415e50bb31cdade8670adfcc3f7a4f133c0f06e1ae64f6ca01"
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-19",
+          "route": "/app/mool",
+          "state": "retained legacy link then repeated Android Back",
+          "expected": "Approved Buy home; root Back requests native exit without legacy page or redirect loop",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+          "testName": "R6634 C06 legacy Mool  resolves to Buy and root Back exits",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-20",
+          "route": "/app/mool?from=buy",
+          "state": "retained legacy link then repeated Android Back",
+          "expected": "Approved Buy home; root Back requests native exit without legacy page or redirect loop",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+          "testName": "R6634 C06 legacy Mool ?from=buy resolves to Buy and root Back exits",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-21",
+          "route": "/app/mool?from=work",
+          "state": "retained legacy link then repeated Android Back",
+          "expected": "Approved Buy home; root Back requests native exit without legacy page or redirect loop",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+          "testName": "R6634 C06 legacy Mool ?from=work resolves to Buy and root Back exits",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-22",
+          "route": "/app/mool?from=social",
+          "state": "retained legacy link then repeated Android Back",
+          "expected": "Approved Buy home; root Back requests native exit without legacy page or redirect loop",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+          "testName": "R6634 C06 legacy Mool ?from=social resolves to Buy and root Back exits",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-23",
+          "route": "Buy compact navigation -> Work",
+          "state": "entry through retained /app/mool link",
+          "expected": "Existing Work route reachable without legacy full-screen menu",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+          "testName": "R6634 C06 compact Work navigation remains reachable from Buy",
+          "local": {
+            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
+            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
+            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
           },
           "device": null
         }
       ],
       "children": [],
       "dependencies": [
-        "Founder-reported Cart-to-Offers main-menu jump not reproduced in 18 production-router local cases or two earlier Redmi replays; exact triggering sequence is still needed. No runtime fix claimed."
+        "Successor APK Redmi verification and founder visual acceptance pending. Installed r66.34 is unchanged.",
+        "Original direct Offers-tap trigger remains unproven; Cart -> Offers -> Android Back variant reproduced and the legacy screen retired from production routing."
       ],
       "founderApproval": null
     }

@@ -1079,6 +1079,9 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+  # Founder-authorized C06 retirement of the legacy main-actions route only.
+  'apps/mobile/lib/features/journey01/journey_router.dart',
+  'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',
   'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
   'apps/mobile/lib/features/chat/widgets/chat_widgets.dart',
   'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
@@ -2539,7 +2542,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
-      $cursorReadyOwner = $cursorReadyAdmission -and $effectiveOwner -cin (@($cursorReadyOwners) + @($cursorReviewQualificationOwners))
+      $cursorReadyOwner = $cursorReadyAdmission -and $effectiveOwner -cin (@($cursorReadyOwners) + @($cursorReviewQualificationOwners) + @('apps/mobile/lib/features/journey01/journey_router.dart'))
       $storeProcurementBridgeOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and

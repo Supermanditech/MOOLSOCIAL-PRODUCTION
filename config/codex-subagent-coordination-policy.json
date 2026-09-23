@@ -132,7 +132,9 @@
         "scripts/check-buy-founder-regression.py",
         "scripts/test-buy-founder-regression.py",
         "config/buy-founder-regression.json",
-        "scripts/build-buy-device-review.ps1"
+        "scripts/build-buy-device-review.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart"
       ]
     },
     {
@@ -180,7 +182,6 @@
         "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart",
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",

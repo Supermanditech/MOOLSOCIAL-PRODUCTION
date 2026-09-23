@@ -342,6 +342,15 @@ void main() {
           '/app/buy?sub=offers',
         );
         expect(session.itemCount, 3);
+        // Redmi reproduced the legacy menu after Cart -> Offers -> Android Back.
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('personal-mool-root-v2')),
+          findsNothing,
+        );
+        expect(find.byType(BuyV2Screen), findsOneWidget);
+        expect(session.itemCount, 3);
         session.openCart(
           scope: entry == 'wholesale'
               ? BuyV2CartScope.wholesale

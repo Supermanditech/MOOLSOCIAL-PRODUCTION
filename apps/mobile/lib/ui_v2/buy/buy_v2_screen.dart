@@ -1175,7 +1175,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             } else if (widget.onExit case final onExit?) {
               onExit();
             } else {
-              context.go('/app/mool?from=buy');
+              SystemNavigator.pop();
             }
           }
         },
@@ -2681,7 +2681,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (widget.onExit case final onExit?) {
       onExit();
     } else {
-      context.go('/app/mool?from=buy');
+      SystemNavigator.pop();
     }
   }
 

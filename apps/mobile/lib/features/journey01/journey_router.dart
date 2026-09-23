@@ -117,7 +117,6 @@ import '../../ui_v2/buy/buy_v2_screen.dart';
 import '../../ui_v2/universal/legacy_route_containment_screen_v2.dart';
 import '../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
-import '../../ui_v2/universal/personal_mool_root_v2.dart';
 import 'journey_session.dart';
 import 'journey_services.dart';
 import 'screens/universal_shell.dart';
@@ -319,9 +318,15 @@ GoRouter createJourneyRouter(
       context.pop();
       return;
     }
-    router.go(
-      session.buyExitRoute(requestedRoute: state.uri.queryParameters['return']),
+    final returnRoute = session.buyExitRoute(
+      requestedRoute: state.uri.queryParameters['return'],
     );
+    if (Uri.parse(returnRoute).path == '/app/mool') {
+      // The retired main-actions page must not become a Back/redirect loop.
+      SystemNavigator.pop();
+      return;
+    }
+    router.go(returnRoute);
   };
   VoidCallback careMedicineExit(BuildContext context) => () {
     if (context.canPop()) {
@@ -1796,8 +1801,10 @@ GoRouter createJourneyRouter(
       GoRoute(
         path: '/app/:section',
         redirect: (context, state) {
-          if (legacyPresentationForTestsOnly) return null;
           final section = state.pathParameters['section'] ?? 'social';
+          // Retained links resolve to the approved commerce home.
+          if (section == 'mool') return '/app/buy?sub=shop';
+          if (legacyPresentationForTestsOnly) return null;
           if (section == 'work') return '/app/work/earn';
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (actionChoiceRoot == null || actionChoiceRoot.actions.isEmpty) {
@@ -1807,67 +1814,6 @@ GoRouter createJourneyRouter(
         },
         pageBuilder: (context, state) {
           final section = state.pathParameters['section'] ?? 'social';
-          final requestedOrigin = state.uri.queryParameters['from'];
-          final moolOrigin =
-              section == 'mool' &&
-                  const {
-                    'social',
-                    'buy',
-                    'eat',
-                    'ride',
-                    'book',
-                    'work',
-                  }.contains(requestedOrigin)
-              ? requestedOrigin
-              : null;
-          if (moolOrigin != null) {
-            session.openMoolFrom(moolOrigin);
-          }
-          if (!legacyPresentationForTestsOnly && section == 'mool') {
-            void leaveMool() {
-              if (context.canPop()) {
-                context.pop();
-              } else if (moolOrigin != null) {
-                context.go('/app/$moolOrigin');
-              } else {
-                SystemNavigator.pop();
-              }
-            }
-
-            return moolMainDestinationPage(
-              state: state,
-              child: PersonalMoolRootV2(
-                onBack: leaveMool,
-                onOpenAction: (action) => context.go(action.route),
-                onOpenRoute: (route) {
-                  if (moolOrigin == null) {
-                    context.push(route);
-                  } else {
-                    context.pushReplacement(route);
-                  }
-                },
-                onOpenChat: () =>
-                    context.push('/app/chat/inbox?return=/app/mool'),
-                onSignOut: () async {
-                  final signedOut = await session.signOut();
-                  if (!context.mounted) return;
-                  if (signedOut || !session.isAuthenticated) {
-                    context.go('/sign-in');
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          session.errorMessage ??
-                              'Sign-out could not be completed. Please try again.',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                areaLabel: session.currentAreaLabel ?? session.manualArea,
-              ),
-            );
-          }
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (legacyPresentationForTestsOnly && actionChoiceRoot != null) {
             void leaveActionChoiceRoot() {

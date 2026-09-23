@@ -25,11 +25,13 @@ class FounderGateTests(unittest.TestCase):
         gate.validate(ROOT, self.data, 'setup')
 
     def test_implementation_requires_selection(self):
+        self.data['selected'] = []
         with self.assertRaisesRegex(ValueError, 'No selected ticket'):
             gate.validate(ROOT, self.data, 'implementation')
 
     def test_implementation_requires_named_behavior_test(self):
         self.data['selected'] = ['R6634-C01']
+        self.data['tickets'][0]['cases'][0]['testName'] = ''
         with self.assertRaisesRegex(ValueError, 'Name the behavior'):
             gate.validate(ROOT, self.data, 'implementation')
 
