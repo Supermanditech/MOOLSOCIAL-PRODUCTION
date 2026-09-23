@@ -5678,6 +5678,126 @@ String? validateWorkspaceProductValues({
   delivery: delivery,
 )?.message;
 
+/// Device-owned inventory only. QA data cannot be restored into production.
+/// This checkpoint carries no invoice, payment, publication or backend authority.
+class WorkspaceSavedInventory {
+  WorkspaceSavedInventory({
+    required this.account,
+    required this.store,
+    required this.qa,
+    required this.revision,
+    required this.savedAt,
+    required List<WorkspaceCatalogueItem> products,
+    required List<WorkspaceStockMovement> movements,
+  }) : products = List.unmodifiable(products),
+       movements = List.unmodifiable(movements);
+  final String account, store;
+  final bool qa;
+  final int revision;
+  final DateTime savedAt;
+  final List<WorkspaceCatalogueItem> products;
+  final List<WorkspaceStockMovement> movements;
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': account,
+    'store': store,
+    'qa': qa,
+    'revision': revision,
+    'savedAt': savedAt.toUtc().toIso8601String(),
+    'products': products.map((p) => p.toInventoryJson()).toList(),
+    'movements': [
+      for (final m in movements)
+        {
+          'id': m.id,
+          'productId': m.productId,
+          'productLabel': m.productLabel,
+          'kind': m.kind.name,
+          'quantityDelta': m.quantityDelta,
+          'reason': m.reason,
+          'occurredAt': m.occurredAt.toUtc().toIso8601String(),
+          'referenceKind': m.referenceKind?.name,
+          'referenceId': m.referenceId,
+        },
+    ],
+  };
+
+  static WorkspaceSavedInventory fromJson(Object? raw) {
+    const invalid = FormatException(
+      'Saved inventory needs recovery. Its data has been kept.',
+    );
+    try {
+      if (raw is! Map ||
+          raw['version'] != 1 ||
+          raw['products'] is! List ||
+          raw['movements'] is! List) {
+        throw invalid;
+      }
+      if ((raw['products'] as List).length > 10000) throw invalid;
+      final result = WorkspaceSavedInventory(
+        account: raw['account'] as String,
+        store: raw['store'] as String,
+        qa: raw['qa'] as bool,
+        revision: raw['revision'] as int,
+        savedAt: DateTime.parse(raw['savedAt'] as String),
+        products: [
+          for (final p in raw['products'] as List)
+            WorkspaceCatalogueItem.fromInventoryJson(p),
+        ],
+        movements: [
+          for (final m in raw['movements'] as List)
+            WorkspaceStockMovement(
+              id: m['id'] as String,
+              productId: m['productId'] as String,
+              productLabel: m['productLabel'] as String,
+              kind: WorkspaceStockMovementKind.values.byName(
+                m['kind'] as String,
+              ),
+              quantityDelta: m['quantityDelta'] as int,
+              reason: m['reason'] as String,
+              occurredAt: DateTime.parse(m['occurredAt'] as String),
+              referenceKind: m['referenceKind'] == null
+                  ? null
+                  : WorkspaceStockReferenceKind.values.byName(
+                      m['referenceKind'] as String,
+                    ),
+              referenceId: m['referenceId'] as String?,
+            ),
+        ],
+      );
+      final ids = <String>{};
+      final movements = <String>{};
+      if (result.account.trim().isEmpty ||
+          result.store.trim().isEmpty ||
+          result.revision < 1 ||
+          result.products.any(
+            (p) =>
+                !ids.add(p.id) ||
+                (!result.qa &&
+                    p.cataloguePhoto?.status ==
+                        WorkspaceCataloguePhotoStatus.testOnly),
+          ) ||
+          result.movements.any(
+            (m) =>
+                !m.valid ||
+                !movements.add(m.id) ||
+                m.occurredAt.isAfter(result.savedAt),
+          )) {
+        throw invalid;
+      }
+      return result;
+    } on FormatException {
+      rethrow;
+    } on TypeError {
+      throw invalid;
+    } on ArgumentError {
+      throw invalid;
+    } on NoSuchMethodError {
+      throw invalid;
+    }
+  }
+}
+
 class WorkspaceCatalogueItem {
   const WorkspaceCatalogueItem({
     required this.id,
@@ -5988,6 +6108,147 @@ class WorkspaceCatalogueItem {
       deliveryFeeLabel: deliveryFeeLabel,
       observedAt: observedAt,
     );
+  }
+
+  /// Device inventory record, not publication or financial authority.
+  /// Keep QA/production and account/Store identity in the enclosing checkpoint.
+  Map<String, Object?> toInventoryJson() => {
+    'version': 1,
+    'id': id,
+    'canonicalId': canonicalId,
+    'categoryId': categoryId,
+    'brand': brand,
+    'title': title,
+    'variant': variant,
+    'pack': pack,
+    'sku': sku,
+    'barcode': barcode,
+    'purchasePrice': purchasePrice,
+    'sellingPrice': sellingPrice,
+    'unitPrice': unitPrice,
+    'stock': stock,
+    'deliveryPromise': deliveryPromise,
+    'origin': origin,
+    'visualLabel': visualLabel,
+    'visualKind': visualKind,
+    'mrp': mrp,
+    'minimumOrder': minimumOrder,
+    'returnPolicy': returnPolicy,
+    'requiresPrescription': requiresPrescription,
+    'composition': composition,
+    'regulatoryNote': regulatoryNote,
+    'compliance': compliance?.toJson(),
+    'available': available,
+    'publicListing': publicListing,
+    'stockMode': stockMode.name,
+    'lowStockThreshold': lowStockThreshold,
+    'cataloguePhoto': cataloguePhoto?.toJson(),
+    'catalogueFactsRequireReview': catalogueFactsRequireReview,
+    'packMeasure': packMeasure?.toJson(),
+    'wholesaleOffer': wholesaleOffer?.toJson(),
+    'retailEnabled': retailEnabled,
+    'content': content.toJson(),
+  };
+
+  static WorkspaceCatalogueItem fromInventoryJson(Object? raw) {
+    const invalid = FormatException(
+      'Saved product needs recovery. Its data has been kept.',
+    );
+    if (raw is! Map || raw['version'] != 1) throw invalid;
+    String text(String key, {bool required = false}) {
+      final value = raw[key];
+      if (value is! String ||
+          value.length > 16000 ||
+          (required && value.trim().isEmpty)) {
+        throw invalid;
+      }
+      return value;
+    }
+
+    int number(String key, {int minimum = 0}) {
+      final value = raw[key];
+      if (value is! int || value < minimum || value > 2147483647) throw invalid;
+      return value;
+    }
+
+    bool flag(String key) {
+      final value = raw[key];
+      if (value is! bool) throw invalid;
+      return value;
+    }
+
+    String? optionalText(String key) => raw[key] == null ? null : text(key);
+    try {
+      final photo = WorkspaceCataloguePhoto.fromJson(raw['cataloguePhoto']);
+      final compliance = WorkspaceProductCompliance.fromJson(raw['compliance']);
+      final measure = WorkspacePackMeasure.fromJson(raw['packMeasure']);
+      final wholesale = WorkspaceWholesaleOffer.fromJson(raw['wholesaleOffer']);
+      if ((raw['cataloguePhoto'] != null && photo == null) ||
+          (raw['compliance'] != null && compliance == null) ||
+          (raw['packMeasure'] != null && measure == null) ||
+          (raw['wholesaleOffer'] != null && wholesale == null)) {
+        throw invalid;
+      }
+      final contents = raw['content'];
+      if (contents is! Map ||
+          contents['description'] is! String ||
+          contents['highlights'] is! List ||
+          contents['specifications'] is! Map) {
+        throw invalid;
+      }
+      final content = WorkspaceProductContent(
+        description: contents['description'] as String,
+        highlights: List<String>.from(contents['highlights'] as List),
+        specifications: Map<String, String>.from(
+          contents['specifications'] as Map,
+        ),
+      );
+      WorkspaceProductContent.parse(content.inputValues);
+      final product = WorkspaceCatalogueItem(
+        id: text('id', required: true),
+        canonicalId: text('canonicalId', required: true),
+        categoryId: text('categoryId', required: true),
+        brand: text('brand'),
+        title: text('title', required: true),
+        variant: text('variant'),
+        pack: text('pack', required: true),
+        sku: text('sku'),
+        barcode: text('barcode'),
+        purchasePrice: number('purchasePrice'),
+        sellingPrice: number('sellingPrice'),
+        unitPrice: text('unitPrice'),
+        stock: number('stock'),
+        deliveryPromise: text('deliveryPromise'),
+        origin: text('origin'),
+        visualLabel: text('visualLabel'),
+        visualKind: text('visualKind'),
+        mrp: raw['mrp'] == null ? null : number('mrp'),
+        minimumOrder: number('minimumOrder', minimum: 1),
+        returnPolicy: optionalText('returnPolicy'),
+        requiresPrescription: flag('requiresPrescription'),
+        composition: optionalText('composition'),
+        regulatoryNote: optionalText('regulatoryNote'),
+        compliance: compliance,
+        available: flag('available'),
+        publicListing: flag('publicListing'),
+        stockMode: WorkspaceStockMode.values.byName(text('stockMode')),
+        lowStockThreshold: number('lowStockThreshold'),
+        cataloguePhoto: photo,
+        catalogueFactsRequireReview: flag('catalogueFactsRequireReview'),
+        packMeasure: measure,
+        wholesaleOffer: wholesale,
+        retailEnabled: flag('retailEnabled'),
+        content: content,
+      );
+      if (photo != null && !photo.matches(product)) throw invalid;
+      return product;
+    } on FormatException {
+      rethrow;
+    } on TypeError {
+      throw invalid;
+    } on ArgumentError {
+      throw invalid;
+    }
   }
 
   WorkspaceCatalogueItem copyWith({

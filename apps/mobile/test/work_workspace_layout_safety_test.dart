@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'
+    show FlutterSecureStorage;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -3864,7 +3866,8 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        // Add was opened from Home, so cancellation returns to Home.
+        find.byKey(const Key('work-store-action-edge')),
         findsOneWidget,
       );
     });
@@ -10613,6 +10616,67 @@ void main() {
     return (client: client, restore: restore);
   }
 
+  // Review-only media: preserve the saved product identity and all financial data.
+  // Never attach these temporary photographs to the production catalogue.
+  Future<VoidCallback> attachReceiptReviewPhotos(
+    WidgetTester tester,
+    WorkSession work,
+  ) async {
+    final media = await installCataloguePhotoClient(tester);
+    const imageDir = String.fromEnvironment('MOOL_CATALOGUE_TEST_IMAGE_DIR');
+    const files = [
+      'sunflower-oil-1l-test.png',
+      'whole-wheat-atta-1kg-test.png',
+      'iodised-salt-1kg-test.png',
+    ];
+    for (var i = 0; i < files.length; i++) {
+      final id = workspaceMasterCatalogue[i].id;
+      final index = work.workspaceCatalogueItems.indexWhere((p) => p.id == id);
+      if (index < 0) continue;
+      final product = work.workspaceCatalogueItems[index];
+      final bytes = imageDir.isEmpty
+          ? media.client.bytes
+          : (await tester.runAsync(
+              () => File('$imageDir/${files[i]}').readAsBytes(),
+            ))!;
+      final size = (await tester.runAsync(() async {
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        final result = (frame.image.width, frame.image.height);
+        frame.image.dispose();
+        codec.dispose();
+        return result;
+      }))!;
+      final uri = Uri.parse(
+        'https://example.invalid/receipt-review/${product.id}.png',
+      );
+      media.client.responses[uri] = bytes;
+      work.workspaceCatalogueItems[index] = product.copyWith(
+        cataloguePhoto: WorkspaceCataloguePhoto(
+          assetId: 'receipt-review-${product.id}',
+          revision: 'v1',
+          source: uri.toString(),
+          publisherWorkspaceId: 'test-moolsocial-catalogue',
+          canonicalId: product.canonicalId,
+          brand: product.brand,
+          variant: product.variant,
+          pack: product.pack,
+          barcode: product.barcode,
+          status: WorkspaceCataloguePhotoStatus.testOnly,
+          file: BuyV2MediaFileMetadata(
+            mimeType: 'image/png',
+            byteLength: bytes.length,
+            width: size.$1,
+            height: size.$2,
+            normalized: true,
+            frameCount: 1,
+          ),
+        ),
+      );
+    }
+    return media.restore;
+  }
+
   Future<void> awaitCataloguePhoto(
     WidgetTester tester,
     bool Function() ready,
@@ -10627,6 +10691,164 @@ void main() {
       ready(),
       isTrue,
       reason: 'Real image renderer reached the expected state',
+    );
+  }
+
+  for (final display in [(360.0, 806.0, 1.0), (320.0, 640.0, 2.0)]) {
+    testWidgets(
+      'LOCALSTOCK UI real catalogue tap save restart stock POS review $display',
+      (tester) async {
+        Future<void> capture(String name) => captureStoreView(
+          tester,
+          display.$3 == 1 ? name : '$name-large-text',
+        );
+        FlutterSecureStorage.setMockInitialValues({});
+        final media = await installCataloguePhotoClient(tester);
+        var photo = photoFixture();
+        const directory = String.fromEnvironment(
+          'MOOL_CATALOGUE_TEST_IMAGE_DIR',
+        );
+        if (directory.isNotEmpty) {
+          final bytes = (await tester.runAsync(
+            () => File('$directory/sunflower-oil-1l-test.png').readAsBytes(),
+          ))!;
+          final dimensions = (await tester.runAsync(() async {
+            final codec = await ui.instantiateImageCodec(bytes);
+            final frame = await codec.getNextFrame();
+            final dimensions = (frame.image.width, frame.image.height);
+            frame.image.dispose();
+            codec.dispose();
+            return dimensions;
+          }))!;
+          photo = photoFixture(
+            file: BuyV2MediaFileMetadata(
+              mimeType: 'image/png',
+              byteLength: bytes.length,
+              width: dimensions.$1,
+              height: dimensions.$2,
+              normalized: true,
+              frameCount: 1,
+            ),
+          );
+          media.client.responses[Uri.parse(photo.source)] = bytes;
+        }
+        final reference = workspaceMasterCatalogue.first.copyWith(
+          cataloguePhoto: photo,
+        );
+        final account = _ContactDraftFixtureStore();
+        WorkSession fresh() =>
+            WorkSession(
+                contactDraftStore: account,
+                counterDraftStore: _CounterDraftFixtureStore(),
+                catalogueReference: [reference],
+                inventoryStore: SecureWorkInventoryStore(
+                  accountScope: () => account.accountScope,
+                ),
+              )
+              ..selectedProfile = workProfiles.first
+              ..workspaceId = 'qa-entered-stock'
+              ..activeWorkspace = const WorkWorkspace(
+                id: 'qa-entered-stock',
+                name: 'QA Store · entered stock',
+                profileLabel: 'Grocery / Kirana Shop',
+                profileId: 'retailer-grocery',
+                area: 'Local QA',
+                verified: true,
+              )
+              ..reviewStage = WorkReviewStage.live
+              ..initialWorkspaceStateLoaded = true
+              ..retailerSetupSaved = true;
+        var work = fresh();
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(work.workspaceOrders, isEmpty);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await capture('qa-real-flow-01-empty-store');
+        await openAddProductsFromHome(tester);
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(find.byType(RawImage))
+              .any((i) => i.image != null),
+        );
+        await capture('qa-real-flow-02-catalogue');
+        await tester.tap(find.byKey(Key('work-catalogue-add-${reference.id}')));
+        await tester.pumpAndSettle();
+        for (final entry in [
+          ('work-product-purchase-price', '200'),
+          ('work-product-selling-price', '260'),
+          ('work-product-stock', '8'),
+        ]) {
+          final field = find.byKey(Key(entry.$1));
+          await reveal(tester, field);
+          await tester.enterText(field, entry.$2);
+        }
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await capture('qa-real-flow-03-retailer-review');
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(await work.workspaceInventorySaved, isTrue);
+        expect(work.workspaceCatalogueItems.single.stock, 8);
+        expect(work.workspaceCatalogueItems.single.sellingPrice, 260);
+        expect(
+          work.workspaceCatalogueItems.single.cataloguePhoto!.toJson(),
+          photo.toJson(),
+        );
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(find.byType(RawImage))
+              .any((i) => i.image != null),
+        );
+        await capture('qa-real-flow-04-saved-stock');
+        final savedProduct = work.workspaceCatalogueItems.single
+            .toInventoryJson();
+        await tester.pumpWidget(const SizedBox.shrink());
+        work = fresh();
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        expect(
+          work.workspaceCatalogueItems.single.toInventoryJson(),
+          savedProduct,
+        );
+        expect(work.workspaceOrders, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9000092301', name: 'QA customer');
+        final add = find.byKey(Key('work-order-add-${reference.id}'));
+        await reveal(tester, add);
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(find.byType(RawImage))
+              .any((i) => i.image != null),
+        );
+        await capture('qa-real-flow-05-pos-restored-stock');
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderQuantities[reference.id], 1);
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        await capture('qa-real-flow-06-review-bill');
+        expect(work.workspaceCatalogueItems.single.stock, 8);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceFinance, isNull);
+        expect(tester.takeException(), isNull);
+        media.restore();
+      },
     );
   }
 
@@ -11301,14 +11523,22 @@ void main() {
     final thumbnail = find.byKey(Key('work-catalogue-thumbnail-$firstSku'));
     expect(bookmark, findsOneWidget);
     expect(tester.getTopLeft(bookmark).dy, tester.getTopLeft(thumbnail).dy);
-    expect(tester.getBottomLeft(bookmark).dy,
-        lessThan(tester.getTopLeft(find.byKey(Key('work-catalogue-add-$firstSku'))).dy));
+    expect(
+      tester.getBottomLeft(bookmark).dy,
+      lessThan(
+        tester.getTopLeft(find.byKey(Key('work-catalogue-add-$firstSku'))).dy,
+      ),
+    );
     final toolbar = find.byKey(const Key('work-catalogue-toolbar'));
     final searchBand = find.byKey(const Key('work-catalogue-search-band'));
     for (final band in [searchBand, toolbar]) {
       final container = tester.widget<Container>(band);
-      expect(container.decoration, isNull,
-          reason: 'Inline search must not be enclosed by toolbar borders or gradients.');
+      expect(
+        container.decoration,
+        isNull,
+        reason:
+            'Inline search must not be enclosed by toolbar borders or gradients.',
+      );
       expect(container.color, Colors.white);
     }
     expect(tester.getTopLeft(searchBand).dy, 0);
@@ -11316,7 +11546,10 @@ void main() {
     expect(find.text('Add manually'), findsNothing);
     expect(find.text('Import CSV'), findsNothing);
     final selector = find.byKey(const Key('work-add-product-options'));
-    expect(find.descendant(of: selector, matching: find.text('Catalogue')), findsOneWidget);
+    expect(
+      find.descendant(of: selector, matching: find.text('Catalogue')),
+      findsOneWidget,
+    );
     expect(find.text('MoolSocial catalogue'), findsNothing);
     expect(find.descendant(of: toolbar, matching: selector), findsOneWidget);
     expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
@@ -11355,9 +11588,12 @@ void main() {
       expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
       expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
       expect(
-        find.descendant(of: control, matching: find.byWidgetPredicate(
-          (widget) => widget is Container && widget.decoration != null,
-        )),
+        find.descendant(
+          of: control,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Container && widget.decoration != null,
+          ),
+        ),
         findsNothing,
         reason: 'Category/filter icons must remain free of decorative boxes.',
       );
@@ -14041,7 +14277,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
     expect(
-      find.byKey(const Key('work-dashboard-catalogue-screen')),
+      find.byKey(const Key('work-store-action-edge')),
       findsOneWidget,
     );
     await tester.tap(find.byKey(const Key('work-store-home')));
@@ -14394,12 +14630,14 @@ void main() {
     final gradient =
         (gradientWidget.decoration as BoxDecoration).gradient!
             as LinearGradient;
-    expect(gradient.colors, [MoolColors.navy, MoolColors.royal]);
+    expect(gradient.colors, [const Color(0xFFF2F3F9), Colors.white]);
     for (final background in gradient.colors) {
       expect(
-        1.05 / (background.computeLuminance() + .05),
+        (background.computeLuminance() + .05) /
+            (MoolColors.navy.computeLuminance() + .05),
         greaterThanOrEqualTo(4.5),
-        reason: 'White header text stays readable across the gradient.',
+        reason:
+            'Navy header text stays readable on the approved subtle gradient.',
       );
     }
     final counterTheme = Theme.of(
@@ -14407,14 +14645,14 @@ void main() {
     );
     expect(counterTheme.colorScheme.primary, MoolColors.navy);
     expect(counterTheme.scaffoldBackgroundColor, Colors.white);
-    expect(counterTheme.appBarTheme.foregroundColor, Colors.white);
-    final business = tester.widget<IconButton>(
+    expect(counterTheme.appBarTheme.foregroundColor, MoolColors.navy);
+    final business = tester.widget<TextButton>(
       find.byKey(const Key('work-sale-business-details')),
     );
-    expect(business.style!.backgroundColor!.resolve({}), MoolColors.orange);
+    expect(business.style!.backgroundColor?.resolve({}), isNull);
     expect(business.style!.foregroundColor!.resolve({}), MoolColors.navy);
     expect(
-      (MoolColors.orange.computeLuminance() + .05) /
+      (Colors.white.computeLuminance() + .05) /
           (MoolColors.navy.computeLuminance() + .05),
       greaterThanOrEqualTo(4.5),
     );
@@ -15452,13 +15690,8 @@ void main() {
           work.showNotice('Stock updated');
         } else {
           final previousGeneration = work.counterSaleGeneration;
-          expect(
-            work.prepareWorkspaceOrder(
-              source: 'Counter',
-              fulfilment: 'At the shop',
-            ),
-            isTrue,
-          );
+          // Re-entering POS resumes a draft; only explicit new-sale resets it.
+          expect(work.startNewWorkspaceOrder(), isTrue);
           expect(work.counterSaleGeneration, greaterThan(previousGeneration));
         }
         await tester.pumpAndSettle();
@@ -29624,6 +29857,14 @@ void main() {
         final purchase = find.byKey(const Key('work-product-purchase-price'));
         await show(purchase);
         await tester.enterText(purchase, '200');
+        for (final input in [
+          ('work-product-selling-price', '260'),
+          ('work-product-stock', '8'),
+        ]) {
+          final field = find.byKey(Key(input.$1));
+          await show(field);
+          await tester.enterText(field, input.$2);
+        }
         await tester.pumpAndSettle();
         final section = find.byKey(
           const Key('work-product-customer-facts-section'),
@@ -30986,6 +31227,7 @@ void main() {
         work.workspaceCatalogueItems.addAll(
           workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
         );
+        final restorePhotos = await attachReceiptReviewPhotos(tester, work);
         expect(work.applyWorkspaceFinance(seed.finance), isTrue);
         expect(
           work.bindCustomerCollectionGateway(
@@ -31050,6 +31292,17 @@ void main() {
         expect(
           find.byKey(const Key('work-invoice-share-whatsapp')),
           findsNothing,
+        );
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(
+                find.descendant(
+                  of: find.byKey(const Key('work-invoice-item-table')),
+                  matching: find.byType(RawImage),
+                ),
+              )
+              .any((image) => image.image != null),
         );
         await captureStoreView(tester, 'invoice-$method-unpaid-$scale');
         await press('work-invoice-details');
@@ -31134,6 +31387,7 @@ void main() {
         expect(work.workspaceOrderQuantities, isEmpty);
         expect(find.byKey(const Key('work-order-customer')), findsOneWidget);
         expect(tester.takeException(), isNull);
+        restorePhotos();
       });
     }
   }
@@ -31153,6 +31407,7 @@ void main() {
         work.workspaceCatalogueItems.addAll(
           workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
         );
+        final restorePhotos = await attachReceiptReviewPhotos(tester, work);
         expect(work.applyWorkspaceFinance(seed.finance), isTrue);
         expect(
           work.bindCustomerCollectionGateway(
@@ -31257,6 +31512,12 @@ void main() {
           await tester.pumpAndSettle();
           expectVisible(reference);
         }
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(find.byType(RawImage))
+              .any((image) => image.image != null),
+        );
         await captureStoreView(tester, 'receipt-ime-$method-$scale');
         await tester.tap(confirm);
         await tester.pumpAndSettle();
@@ -31272,6 +31533,7 @@ void main() {
         );
         expect(work.workspaceInvoices.single, same(invoice));
         expect(tester.takeException(), isNull);
+        restorePhotos();
       });
     }
   }
@@ -31396,6 +31658,7 @@ void main() {
         work.workspaceCatalogueItems.addAll(
           workspaceMasterCatalogue.map((p) => p.copyWith(stock: 24)),
         );
+        final restorePhotos = await attachReceiptReviewPhotos(tester, work);
         expect(work.applyWorkspaceFinance(seed.finance), isTrue);
         expect(
           work.bindCustomerCollectionGateway(
@@ -31503,12 +31766,27 @@ void main() {
                 .text,
             '428',
           );
+          await awaitCataloguePhoto(
+            tester,
+            () =>
+                tester
+                    .widgetList<RawImage>(
+                      find.descendant(
+                        of: find.byKey(const Key('work-invoice-item-table')),
+                        matching: find.byType(RawImage),
+                      ),
+                    )
+                    .where((image) => image.image != null)
+                    .length ==
+                3,
+          );
           await captureStoreView(
             tester,
             'oppo-fix-receipt-revealed-${display.scale}',
           );
         }
         expect(tester.takeException(), isNull);
+        restorePhotos();
       },
     );
   }

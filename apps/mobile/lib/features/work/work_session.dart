@@ -464,6 +464,12 @@ class _StoreOperationalData {
       <String, DateTime>{};
 
   int pendingOperationalRequests = 0;
+  bool inventoryLoaded = false;
+  int? inventoryRevision;
+  int inventoryMutations = 0;
+  String? inventoryError;
+  Future<bool>? inventoryLoad;
+  Future<bool> inventoryWrites = Future<bool>.value(true);
 }
 
 /// Editable application data is separate from an approved Store's operations.
@@ -534,6 +540,8 @@ class WorkSession extends ChangeNotifier {
     this.upiDestinationStore,
     this.invoiceDeliveryPreferenceStore,
     this.reviewStoreSelectionStore,
+    this.inventoryStore,
+    this.catalogueReference,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -573,6 +581,8 @@ class WorkSession extends ChangeNotifier {
     this.upiDestinationStore,
     this.invoiceDeliveryPreferenceStore,
     this.reviewStoreSelectionStore,
+    this.inventoryStore,
+    this.catalogueReference,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -601,6 +611,176 @@ class WorkSession extends ChangeNotifier {
   final WorkUpiDestinationStore? upiDestinationStore;
   final WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryPreferenceStore;
   final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
+  final WorkInventoryStore? inventoryStore;
+  final List<WorkspaceCatalogueItem>? catalogueReference;
+  List<WorkspaceCatalogueItem> get referenceCatalogue =>
+      List.unmodifiable(catalogueReference ?? workspaceMasterCatalogue);
+  late final WorkInventoryStore _inventoryStorage =
+      inventoryStore ??
+      SecureWorkInventoryStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+      );
+  // Production wiring needs the future authoritative inventory adapter. QA
+  // persists the normal editor flow without migrating any seeded review Store.
+  bool get localInventoryEnabled =>
+      inventoryStore != null ||
+      (!_productionSession &&
+          kDebugMode &&
+          const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+          const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'));
+  String? get workspaceInventoryError => _storeData.inventoryError;
+  Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
+
+  Future<bool> loadWorkspaceInventory({bool retry = false}) {
+    final data = _storeData;
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (!localInventoryEnabled || _selectedReviewSeed?.storeId == store) {
+      return Future.value(true);
+    }
+    if (data.inventoryLoaded) return Future.value(true);
+    if (data.inventoryLoad != null) return data.inventoryLoad!;
+    if (!retry && data.inventoryError != null) return Future.value(false);
+    if (account == null || store == null || _disposed) {
+      return Future.value(false);
+    }
+    final generation = data.inventoryMutations;
+    final operation = () async {
+      try {
+        final saved = await _inventoryStorage.read(
+          account,
+          store,
+          qa: !_productionSession,
+        );
+        if (!_isStoreScopeCurrent(data, store, account) ||
+            generation != data.inventoryMutations) {
+          return false;
+        }
+        if (saved != null) {
+          // Never overwrite in-session/server inventory with an older local copy.
+          if (data.workspaceCatalogueItems.isNotEmpty ||
+              data.workspaceStockMovements.isNotEmpty) {
+            throw const WorkGatewayException(
+              'Saved stock needs reconciliation before editing. Existing records have been kept.',
+            );
+          }
+          data.workspaceCatalogueItems.addAll(saved.products);
+          data.workspaceStockMovements.addAll(saved.movements);
+          data.inventoryRevision = saved.revision;
+          retailerProductAdded = saved.products.isNotEmpty;
+        }
+        data.inventoryLoaded = true;
+        data.inventoryError = null;
+        return true;
+      } on Object {
+        if (_isStoreScopeCurrent(data, store, account)) {
+          data.inventoryError =
+              'Saved stock could not be recovered. Retry without clearing Store data.';
+        }
+        return false;
+      } finally {
+        data.inventoryLoad = null;
+        if (_isStoreScopeCurrent(data, store, account)) notifyListeners();
+      }
+    }();
+    data.inventoryLoad = operation;
+    return operation;
+  }
+
+  void _queueInventorySave() {
+    if (!localInventoryEnabled ||
+        _selectedReviewSeed?.storeId == activeWorkspace?.id) {
+      return;
+    }
+    final data = _storeData;
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null || store == null) {
+      data.inventoryError =
+          'Store stock cannot be saved without its account and Store.';
+      data.inventoryWrites = Future.value(false);
+      return;
+    }
+    data.inventoryMutations++;
+    // Freeze caller-owned nested content before an asynchronous write.
+    final List<WorkspaceCatalogueItem> frozenProducts;
+    try {
+      frozenProducts = [
+        for (final p in data.workspaceCatalogueItems)
+          WorkspaceCatalogueItem.fromInventoryJson(
+            jsonDecode(jsonEncode(p.toInventoryJson())),
+          ),
+      ];
+    } on Object {
+      // Keep the existing write in sequence. A bad new record must neither
+      // escape into the editor nor report an earlier valid save as this save.
+      data.inventoryWrites = data.inventoryWrites.then((_) {
+        data.inventoryError =
+            'Stock details could not be saved. Review the product and retry.';
+        if (_isStoreScopeCurrent(data, store, account)) notifyListeners();
+        return false;
+      });
+      return;
+    }
+    final movements = List<WorkspaceStockMovement>.of(
+      data.workspaceStockMovements,
+    );
+    final at = DateTime.now().toUtc();
+    data.inventoryWrites = data.inventoryWrites.then((previousSucceeded) async {
+      if (!previousSucceeded || !_isStoreScopeCurrent(data, store, account)) {
+        return false;
+      }
+      try {
+        if (!data.inventoryLoaded) {
+          final previous = await _inventoryStorage.read(
+            account,
+            store,
+            qa: !_productionSession,
+          );
+          if (previous != null) {
+            throw const WorkGatewayException(
+              'Recover saved stock before changing it.',
+            );
+          }
+          if (!_isStoreScopeCurrent(data, store, account)) return false;
+          data.inventoryLoaded = true;
+        }
+        final snapshot = WorkspaceSavedInventory(
+          account: account,
+          store: store,
+          qa: !_productionSession,
+          revision: (data.inventoryRevision ?? 0) + 1,
+          savedAt: at,
+          products: frozenProducts,
+          movements: movements,
+        );
+        await _inventoryStorage.save(
+          snapshot,
+          expectedRevision: data.inventoryRevision,
+        );
+        data.inventoryRevision = snapshot.revision;
+        data.inventoryError = null;
+        return _isStoreScopeCurrent(data, store, account);
+      } on Object {
+        data.inventoryError =
+            'Stock changes are not saved on this device. Keep this screen open and retry.';
+        return false;
+      } finally {
+        if (_isStoreScopeCurrent(data, store, account)) notifyListeners();
+      }
+    });
+  }
+
+  Future<bool> retryWorkspaceInventorySave() async {
+    final data = _storeData;
+    await data.inventoryWrites;
+    if (!identical(data, _storeData)) return false;
+    data.inventoryWrites = Future.value(true);
+    data.inventoryError = null;
+    _queueInventorySave();
+    return data.inventoryWrites;
+  }
+
   final bool _productionSession;
   StoreReviewSeed? _selectedReviewSeed;
   Future<bool>? _reviewSelectionSave;
@@ -1811,6 +1991,13 @@ class WorkSession extends ChangeNotifier {
       }
     }
     _activeWorkspace = value;
+    if (value != null && previousId != value.id && localInventoryEnabled) {
+      scheduleMicrotask(() {
+        if (!_disposed && activeWorkspace?.id == value.id) {
+          unawaited(loadWorkspaceInventory());
+        }
+      });
+    }
     if (_scopedOrderOperations != null) {
       final order = currentWorkspaceOrder;
       if (order != null) _projectSelectedWorkspaceOrder(order);
@@ -8089,6 +8276,7 @@ class WorkSession extends ChangeNotifier {
           : '${product.title} saved for store use only.',
     );
     _persistOperationalState('catalogue-updated');
+    _queueInventorySave();
   }
 
   void importWorkspaceProducts(
@@ -8190,6 +8378,7 @@ class WorkSession extends ChangeNotifier {
     _recordWorkspaceActivity('${products.length} catalogue products imported.');
     showNotice('${products.length} products imported into your catalogue.');
     _persistOperationalState('catalogue-imported');
+    _queueInventorySave();
   }
 
   void retireWorkspaceProduct(String productId) {
@@ -8212,6 +8401,7 @@ class WorkSession extends ChangeNotifier {
     _recordWorkspaceActivity('${product.title} removed from active catalogue.');
     showNotice('${product.title} is no longer shown to customers.');
     _persistOperationalState('catalogue-retired');
+    _queueInventorySave();
   }
 
   bool updateWorkspaceStock({

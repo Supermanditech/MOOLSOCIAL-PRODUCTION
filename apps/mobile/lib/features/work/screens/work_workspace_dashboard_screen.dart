@@ -7231,28 +7231,61 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       key: const Key('work-invoice-item-table'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Item',
+                style: TextStyle(fontSize: 12, color: MoolColors.muted),
+              ),
+            ),
+            Text(
+              'Amount',
+              style: TextStyle(fontSize: 12, color: MoolColors.muted),
+            ),
+          ],
+        ),
         for (final line in order.itemSnapshots)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: _StoreMoneyLine(
               alignAmountToEnd: true,
-              leading: Column(
+              leading: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    line.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: MoolColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${line.pack} · ${line.quantity} × ${_purchaseAmount(line.unitPricePaise)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: MoolColors.muted,
+                  if (session.workspaceCatalogueItems
+                          .where(
+                            (product) =>
+                                product.id == line.productId &&
+                                product.title == line.name &&
+                                product.pack == line.pack,
+                          )
+                          .firstOrNull
+                      case final product?) ...[
+                    StoreProductThumbnail(product: product, extent: 32),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          line.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: MoolColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${line.pack} · ${line.quantity} × ${_purchaseAmount(line.unitPricePaise)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: MoolColors.muted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -7536,10 +7569,10 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                             ? 'Invoice created'
                             : 'Invoice',
                         key: const Key('work-invoice-title'),
-                        style: const TextStyle(
-                          color: MoolColors.navy,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
+                        style: TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: widget.counterAppearance ? 18 : 21,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -7592,9 +7625,9 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     invoice.billingDetails.name.trim().isNotEmpty
                         ? invoice.billingDetails.name
                         : invoice.customer,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 17,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: widget.counterAppearance ? 14 : 17,
                     ),
                   ),
                   if (invoice.billingDetails.name.trim().isNotEmpty)
@@ -7604,18 +7637,17 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: EdgeInsets.all(
-                      MediaQuery.textScalerOf(sheetContext).scale(1) > 1.5
-                          ? 8
-                          : 14,
-                    ),
+                    padding: widget.counterAppearance
+                        ? const EdgeInsets.symmetric(vertical: 8)
+                        : EdgeInsets.all(
+                            MediaQuery.textScalerOf(sheetContext).scale(1) > 1.5
+                                ? 8
+                                : 14,
+                          ),
                     decoration: BoxDecoration(
                       color: widget.counterAppearance
                           ? Colors.white
                           : const Color(0xFFF4F6FF),
-                      border: widget.counterAppearance
-                          ? Border.all(color: _counterSaleLine)
-                          : null,
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Column(
@@ -12904,6 +12936,20 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 class _WorkspaceCatalogueSurfaceState
     extends State<_WorkspaceCatalogueSurface> {
   final _stockActionKeys = <String, GlobalKey>{};
+  bool _retryingInventory = false;
+
+  Future<void> _retryInventory() async {
+    if (_retryingInventory) return;
+    setState(() => _retryingInventory = true);
+    try {
+      if (await widget.session.loadWorkspaceInventory(retry: true)) {
+        await widget.session.retryWorkspaceInventorySave();
+      }
+    } finally {
+      if (mounted) setState(() => _retryingInventory = false);
+    }
+  }
+
   late final Widget _entryPage = _addProductEntry();
 
   void _restoreStockAction(String productId) {
@@ -12975,7 +13021,7 @@ class _WorkspaceCatalogueSurfaceState
           children: [
             StoreAddProductSheet(
               embedded: true,
-              catalogue: workspaceMasterCatalogue,
+              catalogue: widget.session.referenceCatalogue,
               isStoreCurrent: storeUnchanged,
               savedCatalogueKeys: widget.session.workspaceCatalogueShortlist,
               recentSearches: widget.session.workspaceCatalogueSearchHistory,
@@ -13103,7 +13149,7 @@ class _WorkspaceCatalogueSurfaceState
     final normalized = code.trim().toLowerCase();
     final products = [
       ...widget.session.workspaceCatalogueItems,
-      ...workspaceMasterCatalogue,
+      ...widget.session.referenceCatalogue,
     ];
     final product = products
         .where(
@@ -13494,7 +13540,7 @@ class _WorkspaceCatalogueSurfaceState
       final review = WorkspaceProductImport.parse(
         utf8.decode(bytes),
         json: picked.name.toLowerCase().endsWith('.json'),
-        catalogue: workspaceMasterCatalogue,
+        catalogue: widget.session.referenceCatalogue,
         owned: List.of(widget.session.workspaceCatalogueItems),
         defaults: widget.session.workspaceProductDefaults,
       );
@@ -13511,7 +13557,7 @@ class _WorkspaceCatalogueSurfaceState
               // A presentation seed is not a validated or saveable import row.
               // Only an unambiguous exact identity may supply catalogue media.
               final raw = row.rawValues;
-              final matches = workspaceMasterCatalogue
+              final matches = widget.session.referenceCatalogue
                   .where(
                     (p) =>
                         p.title.trim().toLowerCase() ==
@@ -13563,7 +13609,7 @@ class _WorkspaceCatalogueSurfaceState
                               return WorkspaceProductImport.revalidateRow(
                                 row,
                                 values,
-                                catalogue: workspaceMasterCatalogue,
+                                catalogue: widget.session.referenceCatalogue,
                                 owned: [
                                   ...widget.session.workspaceCatalogueItems,
                                 ],
@@ -13616,6 +13662,33 @@ class _WorkspaceCatalogueSurfaceState
               if (!current()) {
                 return 'Your store changed. Close this review and import again.';
               }
+              if (widget.session.localInventoryEnabled) {
+                if (!await widget.session.loadWorkspaceInventory(retry: true) ||
+                    !current()) {
+                  return widget.session.workspaceInventoryError ??
+                      'Return to the same Store before importing.';
+                }
+                if (savedCount > 0) {
+                  final owned = {
+                    for (final p in widget.session.workspaceCatalogueItems)
+                      p.id: p,
+                  };
+                  if (products.any(
+                    (p) =>
+                        jsonEncode(owned[p.id]?.toInventoryJson()) !=
+                        jsonEncode(
+                          p.copyWith(publicListing: false).toInventoryJson(),
+                        ),
+                  )) {
+                    return 'The reviewed products changed. Keep this review open and check the unsaved Store stock.';
+                  }
+                  return await widget.session.retryWorkspaceInventorySave() &&
+                          current()
+                      ? null
+                      : widget.session.workspaceInventoryError ??
+                            'Stock was not saved. Retry.';
+                }
+              }
               // Recheck against live inventory: it may have changed while reviewing.
               final owned = widget.session.workspaceCatalogueItems;
               final ids = owned.map((p) => p.id).toSet();
@@ -13640,6 +13713,11 @@ class _WorkspaceCatalogueSurfaceState
                 addOnly: true,
               );
               savedCount = products.length;
+              if (widget.session.localInventoryEnabled &&
+                  !await widget.session.workspaceInventorySaved) {
+                return widget.session.workspaceInventoryError ??
+                    'Stock was not saved. Keep this review open and retry.';
+              }
               return null;
             },
           ),
@@ -13648,7 +13726,12 @@ class _WorkspaceCatalogueSurfaceState
       if (!current()) {
         return 'Your store changed. Open the correct Store to check its stock.';
       }
-      if (saved != true) return 'Import cancelled. No products were added.';
+      if (saved != true) {
+        if (savedCount > 0) {
+          return 'Import review closed with unsaved stock changes. Return to Store stock to review and retry saving.';
+        }
+        return 'Import cancelled. No products were added.';
+      }
       setState(() {});
       return '$savedCount products saved to Store stock. Nothing was published.';
     } on FormatException catch (error) {
@@ -13665,42 +13748,75 @@ class _WorkspaceCatalogueSurfaceState
     if (widget.entryOnly) return _entryPage;
     return SizedBox.expand(
       key: const Key('work-dashboard-catalogue-screen'),
-      child: StoreAddProductSheet(
-        key: ValueKey(
-          'store-stock-${widget.session.activeWorkspace?.id ?? widget.session.workspaceId}',
-        ),
-        embedded: true,
-        stockOnly: true,
-        catalogue: const [],
-        ownedProducts: List.of(widget.session.workspaceCatalogueItems),
-        createProduct: (barcode) => _blankProduct(barcode: barcode),
-        scanBarcode: () => showStoreProductScanner(context),
-        onSelected: _edit,
-        stockStatementBuilder: (products, count, vertical, loadMore) =>
-            _StoreStockStatementTable(
-              products: products,
-              visibleCount: count,
-              vertical: vertical,
-              loadMore: loadMore,
-              rowBuilder: (product, horizontal, frozenWidth, widths, height) =>
-                  _WorkspaceProductRow(
-                    product: product,
-                    owned: true,
-                    statement: true,
-                    horizontal: horizontal,
-                    frozenWidth: frozenWidth,
-                    statementWidths: widths,
-                    statementHeight: height,
-                    stockActionKey: _stockActionKeys.putIfAbsent(
-                      product.id,
-                      () => GlobalKey(),
+      child: Column(
+        children: [
+          ListenableBuilder(
+            listenable: widget.session,
+            builder: (context, _) {
+              final error = widget.session.workspaceInventoryError;
+              if (error == null) return const SizedBox.shrink();
+              return Padding(
+                key: const Key('store-inventory-save-error'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(error, style: const TextStyle(color: MoolColors.ink)),
+                    TextButton(
+                      onPressed: _retryingInventory ? null : _retryInventory,
+                      child: Text(
+                        _retryingInventory ? 'Saving…' : 'Retry stock save',
+                      ),
                     ),
-                    onEdit: () => _edit(product),
-                    onChangePrice: () => _changePrice(product),
-                    onUpdateStock: () => _updateStock(product),
-                    onTogglePublic: () => _togglePublic(product),
+                  ],
+                ),
+              );
+            },
+          ),
+          Expanded(
+            child: StoreAddProductSheet(
+              key: ValueKey(
+                'store-stock-${widget.session.activeWorkspace?.id ?? widget.session.workspaceId}',
+              ),
+              embedded: true,
+              stockOnly: true,
+              catalogue: const [],
+              ownedProducts: List.of(widget.session.workspaceCatalogueItems),
+              createProduct: (barcode) => _blankProduct(barcode: barcode),
+              scanBarcode: () => showStoreProductScanner(context),
+              onSelected: _edit,
+              stockStatementBuilder: (products, count, vertical, loadMore) =>
+                  _StoreStockStatementTable(
+                    products: products,
+                    visibleCount: count,
+                    vertical: vertical,
+                    loadMore: loadMore,
+                    rowBuilder:
+                        (product, horizontal, frozenWidth, widths, height) =>
+                            _WorkspaceProductRow(
+                              product: product,
+                              owned: true,
+                              statement: true,
+                              horizontal: horizontal,
+                              frozenWidth: frozenWidth,
+                              statementWidths: widths,
+                              statementHeight: height,
+                              stockActionKey: _stockActionKeys.putIfAbsent(
+                                product.id,
+                                () => GlobalKey(),
+                              ),
+                              onEdit: () => _edit(product),
+                              onChangePrice: () => _changePrice(product),
+                              onUpdateStock: () => _updateStock(product),
+                              onTogglePublic: () => _togglePublic(product),
+                            ),
                   ),
             ),
+          ),
+        ],
       ),
     );
   }
@@ -14187,7 +14303,7 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
                 interactive: true,
                 thickness: 2,
                 radius: const Radius.circular(1),
-                scrollbarOrientation: ScrollbarOrientation.top,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
                 child: SingleChildScrollView(
                   key: const Key('work-stock-horizontal'),
                   controller: _horizontal,
@@ -15701,6 +15817,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late final String? _storeId;
   late final bool _wasOwned;
   bool _saved = false;
+  bool _savingInventory = false;
+  bool _pendingInventorySave = false;
 
   void _finish() {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -16118,182 +16236,223 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     super.dispose();
   }
 
-  void _save() {
-    if (_saved) return;
-    if (widget.importRow != null) {
-      _applyImportCorrection();
-      return;
-    }
-    if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
-        _storeId) {
-      setState(
-        () => _error =
-            'Your store changed. Close this product and open it in the correct store.',
-      );
-      return;
-    }
-    if (!_wasOwned &&
-        widget.session.workspaceCatalogueItems.any(
-          (item) =>
-              item.id == widget.product.id ||
-              (item.canonicalId == widget.product.canonicalId &&
-                  item.pack == _pack.text.trim() &&
-                  item.variant == _variant.text.trim() &&
-                  item.barcode == _barcode.text.trim()),
-        )) {
-      setState(
-        () => _error =
-            'This product was already added. Open it from Store stock to edit.',
-      );
-      return;
-    }
-    final duplicate = widget.session.workspaceCatalogueItems.any(
-      (item) =>
-          item.id != widget.product.id &&
-          item.sku.trim().toLowerCase() == _sku.text.trim().toLowerCase(),
-    );
-    if (duplicate) {
-      _reject(
-        'This store SKU is already in use. Choose a different SKU.',
-        field: 'sku',
-      );
-      return;
-    }
-    final purchase = int.tryParse(_purchase.text.trim());
-    final selling = int.tryParse(_selling.text.trim());
-    final mrp = int.tryParse(_mrp.text.trim());
-    final stock = _stockMode == WorkspaceStockMode.availabilityOnly
-        ? widget.product.stock.clamp(0, 1 << 31).toInt()
-        : int.tryParse(_stock.text.trim());
-    final lowStockThreshold = int.tryParse(_lowStockThreshold.text.trim());
-    final minimumOrder = int.tryParse(_minimumOrder.text.trim());
-    final issue = workspaceProductValuesIssue(
-      title: _title.text.trim(),
-      brand: _brand.text.trim(),
-      pack: _pack.text.trim(),
-      category: _category.text.trim(),
-      sku: _sku.text.trim(),
-      purchase: purchase,
-      selling: selling,
-      stock: stock,
-      mrp: mrp,
-      lowStockThreshold: lowStockThreshold,
-      minimumOrder: minimumOrder,
-      delivery: _delivery.text.trim(),
-    );
-    if (issue != null) {
-      _reject(issue.message, field: issue.field);
-      return;
-    }
-    if (!_categories.containsKey(_category.text.trim())) {
-      _reject('Choose a category from the list.', field: 'categoryId');
-      return;
-    }
-    if (_mrp.text.trim().isNotEmpty && mrp == null) {
-      _reject('Enter MRP in whole rupees, or leave it empty.', field: 'mrp');
-      return;
-    }
-    late final WorkspaceProductContent content;
+  Future<void> _save() async {
+    if (_saved || _savingInventory) return;
+    _savingInventory = true;
     try {
-      content = WorkspaceProductContent.parse({
-        for (final entry in _contentFields.entries) entry.key: entry.value.text,
-      });
-    } on FormatException catch (error) {
-      _reject(
-        error.message.substring(error.message.indexOf(':') + 1).trim(),
-        field: error.message.split(':').first,
+      if (widget.importRow != null) {
+        _applyImportCorrection();
+        return;
+      }
+      if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+          _storeId) {
+        setState(
+          () => _error =
+              'Your store changed. Close this product and open it in the correct store.',
+        );
+        return;
+      }
+      if (widget.session.localInventoryEnabled &&
+          widget.onDraftReviewed == null) {
+        final ready = await widget.session.loadWorkspaceInventory(retry: true);
+        if (!mounted) return;
+        if (!ready ||
+            (widget.session.activeWorkspace?.id ??
+                    widget.session.workspaceId) !=
+                _storeId) {
+          setState(
+            () => _error =
+                widget.session.workspaceInventoryError ??
+                'Return to this product’s Store before saving.',
+          );
+          return;
+        }
+      }
+      if (!_wasOwned &&
+          !_pendingInventorySave &&
+          widget.session.workspaceCatalogueItems.any(
+            (item) =>
+                item.id == widget.product.id ||
+                (item.canonicalId == widget.product.canonicalId &&
+                    item.pack == _pack.text.trim() &&
+                    item.variant == _variant.text.trim() &&
+                    item.barcode == _barcode.text.trim()),
+          )) {
+        setState(
+          () => _error =
+              'This product was already added. Open it from Store stock to edit.',
+        );
+        return;
+      }
+      final duplicate = widget.session.workspaceCatalogueItems.any(
+        (item) =>
+            item.id != widget.product.id &&
+            item.sku.trim().toLowerCase() == _sku.text.trim().toLowerCase(),
       );
-      return;
-    }
-    late final WorkspaceSellingInputs sellingInputs;
-    try {
-      sellingInputs = WorkspaceSellingInputs.parse(
-        _sellingInputValues,
-        clearBlankTiers: true,
-        existingMeasure: widget.product.packMeasure,
-        existingWholesale: widget.product.wholesaleOffer,
-        existingRetailEnabled: widget.product.retailEnabled,
+      if (duplicate) {
+        _reject(
+          'This store SKU is already in use. Choose a different SKU.',
+          field: 'sku',
+        );
+        return;
+      }
+      final purchase = int.tryParse(_purchase.text.trim());
+      final selling = int.tryParse(_selling.text.trim());
+      final mrp = int.tryParse(_mrp.text.trim());
+      final stock = _stockMode == WorkspaceStockMode.availabilityOnly
+          ? widget.product.stock.clamp(0, 1 << 31).toInt()
+          : int.tryParse(_stock.text.trim());
+      final lowStockThreshold = int.tryParse(_lowStockThreshold.text.trim());
+      final minimumOrder = int.tryParse(_minimumOrder.text.trim());
+      final issue = workspaceProductValuesIssue(
+        title: _title.text.trim(),
+        brand: _brand.text.trim(),
+        pack: _pack.text.trim(),
+        category: _category.text.trim(),
+        sku: _sku.text.trim(),
+        purchase: purchase,
+        selling: selling,
+        stock: stock,
+        mrp: mrp,
+        lowStockThreshold: lowStockThreshold,
+        minimumOrder: minimumOrder,
+        delivery: _delivery.text.trim(),
       );
-    } on FormatException catch (error) {
-      final field = error.message.split(':').first;
-      _reject(
-        error.message.substring(error.message.indexOf(':') + 1).trim(),
-        field: field,
+      if (issue != null) {
+        _reject(issue.message, field: issue.field);
+        return;
+      }
+      if (!_categories.containsKey(_category.text.trim())) {
+        _reject('Choose a category from the list.', field: 'categoryId');
+        return;
+      }
+      if (_mrp.text.trim().isNotEmpty && mrp == null) {
+        _reject('Enter MRP in whole rupees, or leave it empty.', field: 'mrp');
+        return;
+      }
+      late final WorkspaceProductContent content;
+      try {
+        content = WorkspaceProductContent.parse({
+          for (final entry in _contentFields.entries)
+            entry.key: entry.value.text,
+        });
+      } on FormatException catch (error) {
+        _reject(
+          error.message.substring(error.message.indexOf(':') + 1).trim(),
+          field: error.message.split(':').first,
+        );
+        return;
+      }
+      late final WorkspaceSellingInputs sellingInputs;
+      try {
+        sellingInputs = WorkspaceSellingInputs.parse(
+          _sellingInputValues,
+          clearBlankTiers: true,
+          existingMeasure: widget.product.packMeasure,
+          existingWholesale: widget.product.wholesaleOffer,
+          existingRetailEnabled: widget.product.retailEnabled,
+        );
+      } on FormatException catch (error) {
+        final field = error.message.split(':').first;
+        _reject(
+          error.message.substring(error.message.indexOf(':') + 1).trim(),
+          field: field,
+        );
+        return;
+      }
+      if (sellingInputs.wholesale?.enabled == true &&
+          mrp != null &&
+          sellingInputs.wholesale!.priceRupees > mrp) {
+        _reject(
+          'Wholesale price cannot exceed the pack MRP.',
+          field: 'wholesalePrice',
+        );
+        return;
+      }
+      final measureChanged =
+          jsonEncode(sellingInputs.measure?.toJson()) !=
+          jsonEncode(widget.product.packMeasure?.toJson());
+      final reviewedProduct = widget.product.copyWith(
+        content: content,
+        packMeasure: sellingInputs.measure,
+        wholesaleOffer: sellingInputs.wholesale,
+        retailEnabled: sellingInputs.retailEnabled,
+        categoryId: _category.text.trim(),
+        brand: _brand.text.trim(),
+        title: _title.text.trim(),
+        variant: _variant.text.trim(),
+        pack: _pack.text.trim(),
+        sku: _sku.text.trim(),
+        barcode: _barcode.text.trim(),
+        purchasePrice: purchase,
+        sellingPrice: selling,
+        mrp: mrp,
+        stock: stock,
+        unitPrice:
+            _unitPrice.text.trim().isEmpty ||
+                _unitPrice.text.trim() == widget.product.unitPrice
+            ? '₹$selling/${_pack.text.trim()}'
+            : _unitPrice.text.trim(),
+        deliveryPromise: _delivery.text.trim(),
+        origin: _origin.text.trim(),
+        visualLabel: _visualLabel.text.trim().isEmpty
+            ? '${_brand.text.trim()} ${_title.text.trim()} ${_pack.text.trim()}'
+            : _visualLabel.text.trim(),
+        minimumOrder: minimumOrder,
+        returnPolicy: _returnPolicy.text.trim(),
+        composition: _composition.text.trim(),
+        regulatoryNote: _regulatory.text.trim(),
+        compliance: _packInformation,
+        catalogueFactsRequireReview: _factsNeedReview || measureChanged,
+        available: _stockMode == WorkspaceStockMode.availabilityOnly
+            ? _available
+            : stock! > 0,
+        publicListing:
+            _public &&
+            _catalogueMatched &&
+            !_factsNeedReview &&
+            !measureChanged &&
+            (_stockMode == WorkspaceStockMode.availabilityOnly
+                ? _available
+                : stock! > 0),
+        stockMode: _stockMode,
+        lowStockThreshold: lowStockThreshold,
       );
-      return;
-    }
-    if (sellingInputs.wholesale?.enabled == true &&
-        mrp != null &&
-        sellingInputs.wholesale!.priceRupees > mrp) {
-      _reject(
-        'Wholesale price cannot exceed the pack MRP.',
-        field: 'wholesalePrice',
-      );
-      return;
-    }
-    final measureChanged =
-        jsonEncode(sellingInputs.measure?.toJson()) !=
-        jsonEncode(widget.product.packMeasure?.toJson());
-    final reviewedProduct = widget.product.copyWith(
-      content: content,
-      packMeasure: sellingInputs.measure,
-      wholesaleOffer: sellingInputs.wholesale,
-      retailEnabled: sellingInputs.retailEnabled,
-      categoryId: _category.text.trim(),
-      brand: _brand.text.trim(),
-      title: _title.text.trim(),
-      variant: _variant.text.trim(),
-      pack: _pack.text.trim(),
-      sku: _sku.text.trim(),
-      barcode: _barcode.text.trim(),
-      purchasePrice: purchase,
-      sellingPrice: selling,
-      mrp: mrp,
-      stock: stock,
-      unitPrice:
-          _unitPrice.text.trim().isEmpty ||
-              _unitPrice.text.trim() == widget.product.unitPrice
-          ? '₹$selling/${_pack.text.trim()}'
-          : _unitPrice.text.trim(),
-      deliveryPromise: _delivery.text.trim(),
-      origin: _origin.text.trim(),
-      visualLabel: _visualLabel.text.trim().isEmpty
-          ? '${_brand.text.trim()} ${_title.text.trim()} ${_pack.text.trim()}'
-          : _visualLabel.text.trim(),
-      minimumOrder: minimumOrder,
-      returnPolicy: _returnPolicy.text.trim(),
-      composition: _composition.text.trim(),
-      regulatoryNote: _regulatory.text.trim(),
-      compliance: _packInformation,
-      catalogueFactsRequireReview: _factsNeedReview || measureChanged,
-      available: _stockMode == WorkspaceStockMode.availabilityOnly
-          ? _available
-          : stock! > 0,
-      publicListing:
-          _public &&
-          _catalogueMatched &&
-          !_factsNeedReview &&
-          !measureChanged &&
-          (_stockMode == WorkspaceStockMode.availabilityOnly
-              ? _available
-              : stock! > 0),
-      stockMode: _stockMode,
-      lowStockThreshold: lowStockThreshold,
-    );
-    if (widget.onDraftReviewed != null) {
+      if (widget.onDraftReviewed != null) {
+        _saved = true;
+        FocusManager.instance.primaryFocus?.unfocus();
+        widget.onDraftReviewed!(reviewedProduct.copyWith(publicListing: false));
+        return;
+      }
+      widget.session.addOrUpdateWorkspaceProduct(reviewedProduct);
+      if (widget.session.localInventoryEnabled) {
+        final persisted = _pendingInventorySave
+            ? await widget.session.retryWorkspaceInventorySave()
+            : await widget.session.workspaceInventorySaved;
+        if (!mounted) return;
+        if (!persisted ||
+            (widget.session.activeWorkspace?.id ??
+                    widget.session.workspaceId) !=
+                _storeId) {
+          _pendingInventorySave = true;
+          setState(
+            () => _error =
+                widget.session.workspaceInventoryError ??
+                'The Store changed before saving finished. Check its stock before continuing.',
+          );
+          return;
+        }
+      }
       _saved = true;
-      FocusManager.instance.primaryFocus?.unfocus();
-      widget.onDraftReviewed!(reviewedProduct.copyWith(publicListing: false));
-      return;
-    }
-    widget.session.addOrUpdateWorkspaceProduct(reviewedProduct);
-    _saved = true;
-    if (widget.onSaved != null) {
-      FocusManager.instance.primaryFocus?.unfocus();
-      widget.session.showNotice('Saved to Store stock.');
-      widget.onSaved!();
-    } else {
-      _finish();
+      if (widget.onSaved != null) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        widget.session.showNotice('Saved to Store stock.');
+        widget.onSaved!();
+      } else {
+        _finish();
+      }
+    } finally {
+      _savingInventory = false;
     }
   }
 
@@ -16773,7 +16932,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               ),
                             const SizedBox(height: 8),
                             Text(
-                              'Enter whole rupees and units · Purchase price is private.',
+                              'Purchase price helps you track stock costs and profit. Only your Store can see it.',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             if (widget.onDraftReviewed != null ||
@@ -22874,12 +23033,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
   Widget _inlineReceipt() => Container(
     key: const Key('work-counter-inline-receipt'),
     margin: const EdgeInsets.only(top: 10, bottom: 8),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    decoration: const BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _counterSaleLine),
-      gradient: _counterSalePaperGradient,
+      border: Border(top: BorderSide(color: _counterSaleLine)),
     ),
     child: Column(
       key: _receiptContentKey,
@@ -22905,30 +23062,73 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
             ),
           ],
         ),
-        TextField(
-          key: const Key('collection-amount'),
-          controller: amount,
-          focusNode: amountFocus,
-          enabled: !saving && !confirming && draft.ready,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textInputAction: _needsReference
-              ? TextInputAction.next
-              : TextInputAction.done,
-          onSubmitted: (_) => _needsReference
-              ? referenceFocus.requestFocus()
-              : amountFocus.unfocus(),
-          onChanged: (_) {
-            if (amountError != null) {
-              setState(() => amountError = null);
-              _scheduleReceiptReveal();
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final input = TextField(
+              key: const Key('collection-amount'),
+              controller: amount,
+              focusNode: amountFocus,
+              enabled: !saving && !confirming && draft.ready,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: _needsReference
+                  ? TextInputAction.next
+                  : TextInputAction.done,
+              onSubmitted: (_) => _needsReference
+                  ? referenceFocus.requestFocus()
+                  : amountFocus.unfocus(),
+              onChanged: (_) {
+                if (amountError != null) {
+                  setState(() => amountError = null);
+                  _scheduleReceiptReveal();
+                }
+              },
+              decoration: InputDecoration(
+                labelText: 'Amount received',
+                prefixText: '₹ ',
+                errorText: amountError,
+                errorMaxLines: 3,
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+            );
+            final action = TextButton(
+              key: const Key('collection-confirm'),
+              onPressed:
+                  !draft.ready ||
+                      draft.busy ||
+                      draft.error != null ||
+                      saving ||
+                      confirming
+                  ? null
+                  : submit,
+              child: Text(saving ? 'Checking…' : 'Record receipt'),
+            );
+            if (!_needsReference &&
+                amountError == null &&
+                constraints.maxWidth >= 300 &&
+                MediaQuery.textScalerOf(context).scale(14) <= 20) {
+              return Row(
+                children: [
+                  Expanded(child: input),
+                  const SizedBox(width: 8),
+                  action,
+                ],
+              );
             }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                input,
+                if (!_needsReference)
+                  Align(alignment: Alignment.centerRight, child: action),
+              ],
+            );
           },
-          decoration: InputDecoration(
-            labelText: 'Amount received',
-            prefixText: '₹ ',
-            errorText: amountError,
-            errorMaxLines: 3,
-          ),
         ),
         if (_needsReference) ...[
           const SizedBox(height: 12),
@@ -22952,19 +23152,19 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
             ),
           ),
         ],
-        const SizedBox(height: 8),
-        FilledButton(
-          key: const Key('collection-confirm'),
-          onPressed:
-              !draft.ready ||
-                  draft.busy ||
-                  draft.error != null ||
-                  saving ||
-                  confirming
-              ? null
-              : submit,
-          child: Text(saving ? 'Checking…' : 'Record receipt'),
-        ),
+        if (_needsReference)
+          TextButton(
+            key: const Key('collection-confirm'),
+            onPressed:
+                !draft.ready ||
+                    draft.busy ||
+                    draft.error != null ||
+                    saving ||
+                    confirming
+                ? null
+                : submit,
+            child: Text(saving ? 'Checking…' : 'Record receipt'),
+          ),
         Text(
           _bankTransfer
               ? 'Confirm only after checking the credit in your bank account.'
@@ -26429,6 +26629,20 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Review bill · ${products.length} ${products.length == 1 ? 'item' : 'items'}',
+                          key: const Key('work-review-item-count'),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: MoolColors.muted,
+                          ),
+                        ),
+                      ),
                       if (compactHeader)
                         IconButton(
                           key: const Key('work-review-edit-items'),
@@ -26443,14 +26657,6 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                           child: const Text('Edit items'),
                         ),
                     ],
-                  ),
-                  Text(
-                    'Review bill · ${products.length} ${products.length == 1 ? 'item' : 'items'}',
-                    key: const Key('work-review-item-count'),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: MoolColors.muted,
-                    ),
                   ),
                 ],
               ),
@@ -26571,7 +26777,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       key: const Key('work-counter-review-totals-card'),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: const BoxDecoration(
-        gradient: _counterSalePaperGradient,
+        color: Colors.white,
         border: Border(top: BorderSide(color: _counterSaleLine)),
       ),
       child: Column(
@@ -28372,20 +28578,34 @@ class _CounterBillDiscountEditorState
                 ),
             ],
           );
+          const label = Text(
+            'Discount',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          );
+          final expandedInput =
+              MediaQuery.textScalerOf(context).scale(14) > 20 ||
+              error != null ||
+              kind == 'fixed';
+          if (!expandedInput && constraints.maxWidth >= 300) {
+            return Row(
+              children: [
+                label,
+                const SizedBox(width: 6),
+                modes,
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Semantics(label: 'Discount value', child: field),
+                ),
+                _applyButton(),
+              ],
+            );
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Discount',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  const Expanded(child: label),
                   modes,
                 ],
               ),

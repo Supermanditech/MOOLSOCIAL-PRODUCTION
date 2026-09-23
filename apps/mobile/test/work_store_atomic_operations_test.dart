@@ -533,6 +533,281 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('LOCALSTOCK durable inventory', () {
+    WorkspaceSavedInventory record({bool qa = true, int revision = 1}) =>
+        WorkspaceSavedInventory(
+          account: 'account-A',
+          store: _commandStore.id,
+          qa: qa,
+          revision: revision,
+          savedAt: DateTime.utc(2026, 9, 23),
+          products: [
+            workspaceMasterCatalogue.last.copyWith(
+              stock: 6,
+              purchasePrice: 25,
+              sellingPrice: 30,
+              publicListing: false,
+              content: const WorkspaceProductContent(
+                description: 'QA retailer-edited pack details',
+                highlights: ['Keep dry'],
+                specifications: {'Pack': '1 kg'},
+              ),
+            ),
+          ],
+          movements: const [],
+        );
+    test(
+      'metadata roundtrip preserves retailer fields and rejects invalid records',
+      () {
+        final encoded = record().toJson();
+        expect(
+          WorkspaceSavedInventory.fromJson(
+            jsonDecode(jsonEncode(encoded)),
+          ).toJson(),
+          encoded,
+        );
+        for (final field in [
+          'version',
+          'qa',
+          'account',
+          'revision',
+          'products',
+        ]) {
+          expect(
+            () => WorkspaceSavedInventory.fromJson({...encoded, field: null}),
+            throwsFormatException,
+          );
+        }
+        final product = record().products.single.toInventoryJson();
+        for (final patch in [
+          <String, Object?>{'stock': -1},
+          {'stock': 1.2},
+          {'sellingPrice': '30'},
+          {'stockMode': 'unknown'},
+          {
+            'cataloguePhoto': {'bad': true},
+          },
+        ]) {
+          expect(
+            () => WorkspaceCatalogueItem.fromInventoryJson({
+              ...product,
+              ...patch,
+            }),
+            throwsFormatException,
+          );
+        }
+        expect(
+          () => WorkspaceSavedInventory.fromJson({
+            ...encoded,
+            'products': [product, product],
+          }),
+          throwsFormatException,
+        );
+      },
+    );
+    test(
+      'QA production and account scopes are separate and corrupt bytes retained',
+      () async {
+        final device = _OrderJournalStorage();
+        final owner = _CommandAccountStore();
+        final storage = SecureWorkInventoryStore(
+          accountScope: () => owner.accountScope,
+          storage: device,
+        );
+        await storage.save(record(), expectedRevision: null);
+        expect(
+          (await storage.read(
+            'account-A',
+            _commandStore.id,
+            qa: true,
+          ))!.products.single.stock,
+          6,
+        );
+        expect(
+          await storage.read('account-A', _commandStore.id, qa: false),
+          isNull,
+        );
+        expect(
+          await storage.read('account-A', 'other-store', qa: true),
+          isNull,
+        );
+        owner.accountScope = 'account-B';
+        await expectLater(
+          storage.read('account-A', _commandStore.id, qa: true),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        owner.accountScope = 'account-A';
+        final key = device.values.keys.single;
+        device.values[key] = '{broken';
+        await expectLater(
+          storage.read('account-A', _commandStore.id, qa: true),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(device.values[key], '{broken');
+      },
+    );
+    test('lost native response is confirmed by exact readback', () async {
+      final device = _OrderJournalStorage()..loseWriteResponseOnce = true;
+      final storage = SecureWorkInventoryStore(
+        accountScope: () => 'account-A',
+        storage: device,
+      );
+      await storage.save(record(), expectedRevision: null);
+      await storage.save(record(), expectedRevision: null);
+      expect(device.writes, hasLength(1));
+      expect(
+        (await storage.read('account-A', _commandStore.id, qa: true))!.revision,
+        1,
+      );
+    });
+    test(
+      'concurrent stale writers cannot replace the winning record',
+      () async {
+        final device = _OrderJournalStorage()..holdWrite = Completer<void>();
+        final storage = SecureWorkInventoryStore(
+          accountScope: () => 'account-A',
+          storage: device,
+        );
+        final first = storage.save(record(), expectedRevision: null);
+        await _drainOrderJournal();
+        final stale = storage.save(record(revision: 2), expectedRevision: null);
+        final rejected = expectLater(
+          stale,
+          throwsA(isA<WorkGatewayException>()),
+        );
+        device.holdWrite!.complete();
+        await first;
+        await rejected;
+        expect(device.writes, hasLength(1));
+        expect(
+          (await storage.read(
+            'account-A',
+            _commandStore.id,
+            qa: true,
+          ))!.revision,
+          1,
+        );
+      },
+    );
+    test('account switch cannot acknowledge an in-flight save', () async {
+      final device = _OrderJournalStorage()..holdWrite = Completer<void>();
+      final owner = _CommandAccountStore();
+      final storage = SecureWorkInventoryStore(
+        accountScope: () => owner.accountScope,
+        storage: device,
+      );
+      final saving = storage.save(record(), expectedRevision: null);
+      final rejected = expectLater(
+        saving,
+        throwsA(isA<WorkGatewayException>()),
+      );
+      await _drainOrderJournal();
+      owner.accountScope = 'account-B';
+      device.holdWrite!.complete();
+      await rejected;
+      expect(
+        await storage.read('account-B', _commandStore.id, qa: true),
+        isNull,
+      );
+      owner.accountScope = 'account-A';
+      expect(
+        await storage.read('account-A', _commandStore.id, qa: true),
+        isNotNull,
+      );
+    });
+    test('stale writes cannot overwrite a newer revision', () async {
+      final device = _OrderJournalStorage();
+      final storage = SecureWorkInventoryStore(
+        accountScope: () => 'account-A',
+        storage: device,
+      );
+      await storage.save(record(), expectedRevision: null);
+      await storage.save(record(revision: 2), expectedRevision: 1);
+      await expectLater(
+        storage.save(record(), expectedRevision: null),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(
+        (await storage.read('account-A', _commandStore.id, qa: true))!.revision,
+        2,
+      );
+    });
+    test(
+      'normal save survives a fresh session without catalogue seeds or financial records',
+      () async {
+        final device = _OrderJournalStorage();
+        final owner = _CommandAccountStore();
+        WorkSession fresh() => WorkSession(
+          gateway: ReviewWorkGateway(),
+          contactDraftStore: owner,
+          inventoryStore: SecureWorkInventoryStore(
+            accountScope: () => owner.accountScope,
+            storage: device,
+          ),
+        )..activeWorkspace = _commandStore;
+        final first = fresh();
+        expect(await first.loadWorkspaceInventory(), isTrue);
+        expect(first.workspaceCatalogueItems, isEmpty);
+        first.addOrUpdateWorkspaceProduct(record().products.single);
+        expect(await first.workspaceInventorySaved, isTrue);
+        final movements = first.workspaceStockMovements
+            .map((m) => m.id)
+            .toList();
+        first.dispose();
+        final restarted = fresh();
+        addTearDown(restarted.dispose);
+        expect(await restarted.loadWorkspaceInventory(), isTrue);
+        expect(
+          restarted.workspaceCatalogueItems.single.toInventoryJson(),
+          record().products.single.toInventoryJson(),
+        );
+        expect(
+          restarted.workspaceStockMovements.map((m) => m.id).toList(),
+          movements,
+        );
+        expect(restarted.workspaceInvoices, isEmpty);
+        expect(restarted.workspaceOrders, isEmpty);
+        expect(restarted.workspaceFinance, isNull);
+        restarted.addOrUpdateWorkspaceProduct(
+          restarted.workspaceCatalogueItems.single.copyWith(stock: 4),
+        );
+        expect(await restarted.workspaceInventorySaved, isTrue);
+        expect(
+          (await SecureWorkInventoryStore(
+                accountScope: () => owner.accountScope,
+                storage: device,
+              ).read('account-A', _commandStore.id, qa: true))!
+              .products
+              .single
+              .stock,
+          4,
+        );
+      },
+    );
+    test(
+      'failed device write stays visible and explicit retry recovers',
+      () async {
+        final device = _OrderJournalStorage()..failWrite = true;
+        final work = WorkSession(
+          contactDraftStore: _CommandAccountStore(),
+          inventoryStore: SecureWorkInventoryStore(
+            accountScope: () => 'account-A',
+            storage: device,
+          ),
+        )..activeWorkspace = _commandStore;
+        addTearDown(work.dispose);
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        work.addOrUpdateWorkspaceProduct(record().products.single);
+        expect(await work.workspaceInventorySaved, isFalse);
+        expect(work.workspaceInventoryError, isNotNull);
+        expect(work.workspaceCatalogueItems.single.stock, 6);
+        device.failWrite = false;
+        expect(await work.retryWorkspaceInventorySave(), isTrue);
+        expect(work.workspaceInventoryError, isNull);
+      },
+    );
+  });
+
   test('CSV37 add-only rejects entire batch without overwriting stock', () {
     TestWidgetsFlutterBinding.ensureInitialized();
     FlutterSecureStorage.setMockInitialValues({});

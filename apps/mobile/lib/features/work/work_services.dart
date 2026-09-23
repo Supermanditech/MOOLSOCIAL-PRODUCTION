@@ -1321,6 +1321,118 @@ class SecureWorkUpiDestinationStore implements WorkUpiDestinationStore {
       });
 }
 
+abstract interface class WorkInventoryStore {
+  Future<WorkspaceSavedInventory?> read(
+    String account,
+    String store, {
+    required bool qa,
+  });
+  Future<void> save(
+    WorkspaceSavedInventory inventory, {
+    required int? expectedRevision,
+  });
+}
+
+/// Encrypted local inventory, deliberately separate from financial journals.
+/// No deletion/migration fallback: corrupt or newer records stay recoverable.
+class SecureWorkInventoryStore implements WorkInventoryStore {
+  SecureWorkInventoryStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static final _tails = <String, Future<void>>{};
+  String _key(String account, String store, bool qa) =>
+      'moolsocial.workspace.inventory.${qa ? 'qa' : 'production'}.v1.'
+      '${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+  void _check(String account, String store) {
+    if (account.trim().isEmpty ||
+        store.trim().isEmpty ||
+        accountScope() != account) {
+      throw const WorkGatewayException(
+        'Return to the same account to recover this Store stock.',
+      );
+    }
+  }
+
+  Future<T> _serial<T>(String key, Future<T> Function() action) {
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _tails[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_tails[key], tail)) _tails.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  Future<WorkspaceSavedInventory?> _read(
+    String account,
+    String store,
+    bool qa,
+  ) async {
+    _check(account, store);
+    final raw = await _storage.read(key: _key(account, store, qa));
+    _check(account, store);
+    if (raw == null) return null;
+    try {
+      final saved = WorkspaceSavedInventory.fromJson(jsonDecode(raw));
+      if (saved.account != account || saved.store != store || saved.qa != qa) {
+        throw const FormatException('Inventory scope mismatch');
+      }
+      return saved;
+    } on FormatException {
+      throw const WorkGatewayException(
+        'Saved stock needs recovery. Its data has been kept; no products were replaced.',
+      );
+    }
+  }
+
+  @override
+  Future<WorkspaceSavedInventory?> read(
+    String account,
+    String store, {
+    required bool qa,
+  }) => _serial(_key(account, store, qa), () => _read(account, store, qa));
+  @override
+  Future<void> save(
+    WorkspaceSavedInventory inventory, {
+    required int? expectedRevision,
+  }) async {
+    // Freeze mutable nested metadata before queuing, and validate on both paths.
+    final bytes = jsonEncode(inventory.toJson());
+    final frozen = WorkspaceSavedInventory.fromJson(jsonDecode(bytes));
+    final key = _key(frozen.account, frozen.store, frozen.qa);
+    await _serial(key, () async {
+      _check(frozen.account, frozen.store);
+      final previous = await _read(frozen.account, frozen.store, frozen.qa);
+      if (previous != null && jsonEncode(previous.toJson()) == bytes) return;
+      if (previous?.revision != expectedRevision ||
+          frozen.revision != (expectedRevision ?? 0) + 1 ||
+          (previous != null && frozen.savedAt.isBefore(previous.savedAt))) {
+        throw const WorkGatewayException(
+          'Store stock changed elsewhere. Reload it before saving again.',
+        );
+      }
+      try {
+        await _storage.write(key: key, value: bytes);
+      } on Object {
+        // A native write may finish before its response is lost. Read back the
+        // exact frozen record; never guess whether a retry would overwrite data.
+        _check(frozen.account, frozen.store);
+        if (await _storage.read(key: key) != bytes) rethrow;
+      }
+      // A scope change cannot apply this completion to another account.
+      _check(frozen.account, frozen.store);
+    });
+  }
+}
+
 abstract interface class WorkCounterDraftStore {
   Future<WorkspaceCounterDraft?> read(String account, String store);
   Future<void> save(

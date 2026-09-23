@@ -1901,6 +1901,18 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                         PopupMenuButton<String>(
                           key: const Key('work-catalogue-filter'),
                           tooltip: 'Filter products',
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: Color(0xffe8ebf0)),
+                          ),
+                          style: const ButtonStyle(
+                            foregroundColor: WidgetStatePropertyAll(
+                              Color(0xff30343b),
+                            ),
+                          ),
                           initialValue: _filter,
                           onSelected: (value) => _resetBrowse(() {
                             _filter = value;

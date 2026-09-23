@@ -86,6 +86,7 @@
         "apps/mobile/.flutter-plugins-dependencies",
         "apps/mobile/lib/features/work/work_models.dart",
         "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
         "apps/mobile/lib/features/journey01/journey_router.dart",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "apps/mobile/test/work_workspace_layout_safety_test.dart",
