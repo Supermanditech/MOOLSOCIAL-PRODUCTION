@@ -2,6 +2,18 @@
 
 ## Latest founder gate: Git checkpoint and successor APK authorized after qualification
 
+### Current installed candidate and Git discipline — 24 September 2026
+
+r66.35 (`2026092302`, isolated package `com.moolsocial.app.cursorreview`) was built only after repairs and qualification were committed/pushed, remote parity and clean Git were verified, and all 13 prebuild gates passed. Exact build HEAD: `5b58240f5df9c7dbbbc5d660158fca4e069e1b45`; application source pin remains `0fd4da937635e159354d5213d134b80516873242`. APK identity, signer and provenance passed. Data-preserving installation on Redmi `TG8HCYTGGQT885OF` succeeded. Pulled installed base APK and built artifact both have SHA256 `3fd6dccb8eac215053e33ccacd6cbfb65b1c1213365079fa4af67d6ed80cc096`. One-build authority is consumed. This evidence-only checkpoint does not change the APK's build HEAD.
+
+Native smoke evidence verifies Shop, MoolSocial Offers, product, Visit Store, Android Back, retained Cart, address/payment/review, single GST entry and editor, Wholesale, global Profile, Personal profile GST entry and return to Shop. The signed-out review session truthfully describes temporary GST retention; account-backed persistence remains dependent work. No order/payment/message was submitted. Original one-item Cart remained intact. Device tooling intermittently returned a null accessibility root during transitions; failure PNGs and diagnostic evidence are retained, and the helper now checks dump completion and retains stderr. Settled captures succeeded.
+
+Current evidence archive: `docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip`, SHA256 `939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1`, 85,568,259 bytes. All 889 previous entries are preserved unchanged; 61 build/install/device records were appended under `device-smoke-r6635-20260924/`. The ledger and registry bind this archive. Current local qualification remains 388 selected scenarios including all 120 navigation cases, and two full runs of 2666 active tests each, zero failures.
+
+This is installed smoke verification, not full device acceptance of all 20 selected entries. Comparison, mixed baskets, receipt/payment outcomes, tracking and the interruption matrix still require complete Redmi replay. Tracking visual approval and the already-listed authoritative backend/contract-dependent frontend work remain open. No ticket receives a blanket physical-device pass or production-ready claim.
+
+### Historical prebuild checkpoints (superseded by the installed-candidate record above)
+
 ### Successor APK authorization — latest founder instruction
 
 Final local qualification passed on24 September:388 selected scenarios, including all120 scoped navigation cases, with zero failures/skips; two complete Buy cycles4/5 each passed2666 active tests with zero failures and zero interaction warnings. Both retained the same27 inherited opt-in capture cases and unchanged source fingerprint `43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46`. The12 changed Dart owners have clean formatting and analysis. The application repairs are committed as `0fd4da937635e159354d5213d134b80516873242`; this remains the exact review source pin when gate/evidence metadata is committed afterward. No source/test change occurred during either qualifying full run.

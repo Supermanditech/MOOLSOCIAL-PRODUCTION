@@ -35,7 +35,7 @@
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -291,7 +291,7 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
@@ -451,7 +451,7 @@
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -608,7 +608,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -810,7 +810,7 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -1097,7 +1097,7 @@
       "founderRequirement": "Cart to Offers opens Offers, never main-actions menu, preserving all baskets and explicit menu/Back actions.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
@@ -1456,7 +1456,7 @@
       "founderRequirement": "Migrate production-route regression expectations after approved legacy Home retirement; retain standalone historical widget tests.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
@@ -3108,7 +3108,7 @@
       "founderRequirement": "After payment selection, eliminate repeated Add GST entry in Shop/Wholesale Cart review. Provide one clear recipient-details flow with correct invoice attribution and retained state. Founder amendment: store GST recipient details in the signed-in user account profile, provide an optional Profile GST entry/prompt, and reuse saved details automatically in subsequent Shop/Wholesale carts without asking again.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -3380,7 +3380,7 @@
       "founderRequirement": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -3514,7 +3514,7 @@
       "founderRequirement": "MoolSocial and Suppliers Offers display controlled source-bound listings with correct publisher and Store identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -6107,7 +6107,7 @@
       "founderRequirement": "Compact expandable live tracking map with truthful missing-provider presentation; actual Google Maps and authorized delivery lifecycle remain integration dependencies.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
+        "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -6270,7 +6270,7 @@
     "analysis": "12 changed Dart owners: zero issues; latest Profile tooltip and feedback checks passed",
     "evidenceArchive": {
       "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-      "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39",
+      "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
       "prefix": "pending-successor-local-20260923/"
     },
     "backendQualified": false,
@@ -6379,10 +6379,31 @@
     "analysis": "All11 changed Dart owners: zero issues",
     "evidenceArchive": {
       "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-      "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39",
+      "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
       "prefix": "pending-successor-local-20260923/"
     },
     "backendQualified": false,
     "repairEvidencePrefix": "prebuild-repairs-r6635-20260924/"
+  },
+  "successorDeviceSmoke20260924": {
+    "status": "installed_smoke_passed_full_device_acceptance_pending",
+    "archive": {
+      "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+      "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
+      "bytes": 85568259,
+      "preservedEntries": 889,
+      "addedEntries": 61,
+      "entries": 950,
+      "prefix": "device-smoke-r6635-20260924/"
+    },
+    "reportEntry": "device-smoke-r6635-20260924/device-smoke-report.json",
+    "buildHead": "5b58240f5df9c7dbbbc5d660158fca4e069e1b45",
+    "installedSha256": "3fd6dccb8eac215053e33ccacd6cbfb65b1c1213365079fa4af67d6ed80cc096",
+    "remaining": [
+      "No blanket device pass for all 20 entries or 388 local cases.",
+      "Comparison, mixed baskets, receipt/payment outcomes, tracking and interruption matrix still require complete device replay.",
+      "Tracking presentation founder approval pending.",
+      "Account GST persistence, authoritative offers, collection/assignment/shipment/maps/payment/PO contracts remain dependent work."
+    ]
   }
 }

@@ -105101,7 +105101,7 @@
           "preservedEntries": 858,
           "addedEntries": 31,
           "bytes": 78539834,
-          "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39",
+          "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
           "prefix": "full-qualification-r6635-20260924/",
           "integrity": "passed",
           "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46"
@@ -105110,6 +105110,35 @@
         "navigationPassed": 120,
         "physicalAcceptance": false,
         "backendQualified": false
+      },
+      "redmiCaptureIncident20260924": {
+        "status": "tool_failure_diagnosed_recovery_verified",
+        "observed": "First r66.35 uiautomator capture returned no stdout; subsequent XML pull exited 1. PNG retained.",
+        "rootCause": "uiautomator intermittently returns ERROR: null root node returned by UiTestAutomationBridge during screen transitions.",
+        "prevention": "Retain command stderr, require dumped-to confirmation, bounded 45-second tool timeout; capture after settling. All failed PNG evidence preserved.",
+        "evidence": "apps/mobile/build/review-candidates/cursor-buy-r6635-20260923/redmi-retest/01-launch.png",
+        "recovery": "Settled captures 06 and 09 onward have valid XML. Helper now excludes binary PNG bytes from new text logs."
+      },
+      "successorDeviceSmoke20260924": {
+        "status": "installed_smoke_passed_full_device_acceptance_pending",
+        "archive": {
+          "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+          "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
+          "bytes": 85568259,
+          "preservedEntries": 889,
+          "addedEntries": 61,
+          "entries": 950,
+          "prefix": "device-smoke-r6635-20260924/"
+        },
+        "reportEntry": "device-smoke-r6635-20260924/device-smoke-report.json",
+        "buildHead": "5b58240f5df9c7dbbbc5d660158fca4e069e1b45",
+        "installedSha256": "3fd6dccb8eac215053e33ccacd6cbfb65b1c1213365079fa4af67d6ed80cc096",
+        "remaining": [
+          "No blanket device pass for all 20 entries or 388 local cases.",
+          "Comparison, mixed baskets, receipt/payment outcomes, tracking and interruption matrix still require complete device replay.",
+          "Tracking presentation founder approval pending.",
+          "Account GST persistence, authoritative offers, collection/assignment/shipment/maps/payment/PO contracts remain dependent work."
+        ]
       }
     }
   ],
