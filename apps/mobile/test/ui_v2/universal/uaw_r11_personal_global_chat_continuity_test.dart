@@ -166,13 +166,25 @@ void main() {
           .first;
       final ask = find.bySemanticsLabel('Ask manufacturer');
       await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
+      await tester.pumpAndSettle();
+      expect(ask.hitTestable(), findsOneWidget);
       await tester.tap(ask);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
       final field = find.byKey(const Key('chat-message-field'));
       final prepared = tester.widget<TextField>(field).controller!.text;
       expect(prepared, contains(product.seller));
-      expect(prepared, contains('SKU: ${product.id}'));
+      final productLink = Uri.parse(
+        prepared
+            .split('\n')
+            .firstWhere((line) => line.startsWith('Product link: '))
+            .substring('Product link: '.length),
+      );
+      expect(productLink.host, 'moolsocial.com');
+      expect(productLink.path, '/app/buy');
+      expect(productLink.queryParameters['product'], product.id);
+      expect(productLink.queryParameters['sub'], 'wholesale');
+      expect(productLink.queryParameters['view'], 'product');
       expect(prepared, contains('Quantity: ${product.minimumOrder}'));
       final chatUri = GoRouterState.of(
         tester.element(find.byType(Scaffold).first),
@@ -196,6 +208,8 @@ void main() {
         origin,
       );
       await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
+      await tester.pumpAndSettle();
+      expect(ask.hitTestable(), findsOneWidget);
       await tester.tap(ask);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);

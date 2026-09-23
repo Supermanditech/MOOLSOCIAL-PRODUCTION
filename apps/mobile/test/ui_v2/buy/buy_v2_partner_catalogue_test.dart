@@ -2476,7 +2476,9 @@ void main() {
         final original = published.pages.first.items;
         final retailProduct = original
             .firstWhere(
-              (offer) => offer.product.destination == BuyV2Destination.shop,
+              (offer) =>
+                  offer.product.destination == BuyV2Destination.shop &&
+                  offer.publisherType != BuyV2OfferPublisherType.moolSocial,
             )
             .product;
         final tradeProduct = original
@@ -2589,7 +2591,13 @@ void main() {
           closeTo(offset, 1),
         );
         await capture('return');
-        final makerIndex = pager.page!.items.indexWhere(
+        final supplierOffers = pager.page!.items
+            .where(
+              (offer) =>
+                  offer.publisherType != BuyV2OfferPublisherType.moolSocial,
+            )
+            .toList();
+        final makerIndex = supplierOffers.indexWhere(
           (offer) =>
               offer.publisherType == BuyV2OfferPublisherType.manufacturer,
         );
@@ -2610,7 +2618,7 @@ void main() {
         expect(published.queries.length, promotionRequests);
         expect(published.queries.last.offerPublisher, isNull);
         expect(pager.page!.totalCount, 20000000);
-        final makerPublication = pager.page!.items[makerIndex];
+        final makerPublication = supplierOffers[makerIndex];
         expect(
           session.featuredOfferPublicationId,
           makerPublication.publicationId,
@@ -2886,6 +2894,20 @@ void main() {
           await tester.ensureVisible(firstName);
           await tester.pumpAndSettle();
           expect(firstName.hitTestable(), findsOneWidget);
+          final storeSurface = tester.widget<Ink>(
+            find.byKey(ValueKey('buy-store-search-surface-$firstStoreId')),
+          );
+          expect(
+            (storeSurface.decoration! as BoxDecoration).gradient,
+            isNotNull,
+          );
+          expect(
+            find.descendant(
+              of: firstStore,
+              matching: find.textContaining('Visit'),
+            ),
+            findsOneWidget,
+          );
           await tester.tap(firstName);
           await tester.pumpAndSettle();
           final storefront =
@@ -3680,9 +3702,13 @@ void main() {
       await tester.tap(seller);
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const ValueKey('buy-public-store-name')),
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-seller-sheet-header')),
+          matching: find.text(current.customerSeller(current.seller)),
+        ),
         findsOneWidget,
       );
+      expect(find.byKey(const ValueKey('buy-public-store-name')), findsNothing);
       expect(
         find.byKey(const ValueKey('buy-public-store-collection-benefit')),
         findsNothing,
@@ -4332,7 +4358,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Safe Protein Store'), findsWidgets);
-    expect(find.text('Store products'), findsOneWidget);
+    expect(find.text('Store products'), findsNothing);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -4566,8 +4592,8 @@ void main() {
       expect(find.text('Shree Balaji Fresh'), findsWidgets);
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
-          matching: find.text('Store products'),
+          of: find.byKey(const ValueKey('buy-shop-seller-sheet-header')),
+          matching: find.text('Shree Balaji Fresh'),
         ),
         findsOneWidget,
       );
@@ -4815,10 +4841,36 @@ class _OffersJourneySource extends BuyV2DevelopmentPublishedCatalogueSource {
   }) async {
     queries.add(query);
     if (failNext && cursor != null) throw StateError('Offer page unavailable');
-    final page = await super.loadOffers(
+    final sourcePage = await super.loadOffers(
       query,
       cursor: cursor,
       pageSize: pageSize,
+    );
+    // This journey exercises supplier publication, not the separate MoolSocial
+    // group. Keep explicit supplier fixtures as development cohorts evolve.
+    final page = BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>(
+      queryKey: sourcePage.queryKey,
+      snapshotId: sourcePage.snapshotId,
+      startIndex: sourcePage.startIndex,
+      totalCount: sourcePage.totalCount,
+      previousCursor: sourcePage.previousCursor,
+      nextCursor: sourcePage.nextCursor,
+      items: sourcePage.items.map((offer) {
+        final retail = offer.product.destination == BuyV2Destination.shop;
+        return BuyV2PublishedCatalogueOffer(
+          publicationId: offer.publicationId,
+          product: offer.product,
+          publisherType: retail
+              ? BuyV2OfferPublisherType.retailer
+              : BuyV2OfferPublisherType.manufacturer,
+          publisherId: offer.product.storeId!,
+          publisherName: offer.product.seller,
+          headline: retail ? 'Store offer' : 'Manufacturer price',
+          sourceId: offer.sourceId,
+          observedAt: offer.observedAt,
+          validUntil: offer.validUntil,
+        );
+      }),
     );
     pages.add(page);
     return page;

@@ -1076,10 +1076,36 @@ void main() {
           of: firstCard,
           matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
         );
+        final price = find.descendant(
+          of: firstCard,
+          matching: find.byKey(
+            ValueKey('buy-price-highlight-${products[0].id}'),
+          ),
+        );
         expect(
-          firstRect.bottom - tester.getRect(add).bottom,
+          tester.getRect(add).left,
+          greaterThanOrEqualTo(tester.getRect(price).right),
+        );
+        final lastDetail = find.descendant(
+          of: firstCard,
+          matching: find.text(
+            buyV2BuyerDeliveryPromise(session.productFactsFor(products[0])),
+          ),
+        );
+        expect(
+          firstRect.bottom -
+              tester
+                  .getRect(
+                    find
+                        .ancestor(
+                          of: lastDetail,
+                          matching: find.byType(Padding),
+                        )
+                        .first,
+                  )
+                  .bottom,
           lessThanOrEqualTo(4),
-          reason: '$size must not leave a dead block below Add',
+          reason: '$size must not leave a dead block below SKU details',
         );
         expect(tester.takeException(), isNull, reason: '$size overflow');
 

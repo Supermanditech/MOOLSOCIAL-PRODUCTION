@@ -275,14 +275,6 @@ class _BuyV2VerticalScrollPainter extends CustomPainter {
     final x = size.width - 6;
     const inset = 6.0;
     final bottom = size.height - inset;
-    canvas.drawLine(
-      Offset(x, inset),
-      Offset(x, bottom),
-      Paint()
-        ..color = const Color(0xFF8993A2)
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round,
-    );
     canvas.drawCircle(
       Offset(x, inset + (bottom - inset) * fraction),
       5,

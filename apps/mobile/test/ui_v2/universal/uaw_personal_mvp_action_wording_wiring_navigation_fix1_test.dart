@@ -44,6 +44,13 @@ void main() {
               (subAction['id'], subAction['label']),
           ],
       };
+      // C29E/C32I supersede only the historical Social projection.
+      expectedSubActions['social'] = [
+        ('videos', 'Home'),
+        ('shorts', 'Shorts'),
+        ('create', 'Create'),
+        ('feed', 'Feed'),
+      ];
 
       expect(
         personalMoolRootActions.map((action) => (action.id, action.label)),

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4617,
-    "sha256": "B370F05C2625C7A26BEE3C23F75A25D5F4AA4850FE2AF47A581E5E9AE945D742"
+    "entryCount": 4618,
+    "sha256": "0E5C82DDB28BFBE073671FA0E3EAD3E9CC9726A941F33D9BF318276D4DE605B5"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,11 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_dock_projection_parity_fix1_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
@@ -147,7 +152,8 @@
         "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart",
         "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
         "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
-        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart"
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart"
       ]
     },
     {
@@ -201,7 +207,6 @@
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
         "apps/mobile/test/app/ui_review_language_store_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",

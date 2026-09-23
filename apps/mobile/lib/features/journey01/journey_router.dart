@@ -11,6 +11,7 @@ import '../book/screens/doctor_screens.dart';
 import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
+import '../shared/social_create_draft_repository.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../buy/buy_v2_session.dart';
@@ -250,6 +251,7 @@ GoRouter createJourneyRouter(
   required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
   bool uiReviewOnly = false,
+  @visibleForTesting SocialCreateDraftStateCache? createDraftStateCache,
   bool legacyPresentationForTestsOnly = false,
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
@@ -1863,6 +1865,12 @@ GoRouter createJourneyRouter(
                 'pay',
                 'work',
               }.contains(section)) {
+            final requestedState =
+                state.uri.queryParameters['state'] ??
+                state.uri.queryParameters['mode'];
+            final createEntry =
+                section == 'social' &&
+                state.uri.queryParameters['sub'] == 'create';
             return moolMainDestinationPage(
               state: state,
               child: SocialUniversalV2(
@@ -1871,14 +1879,34 @@ GoRouter createJourneyRouter(
                 retailerSession: retailerSession,
                 sharedSession: sharedSession,
                 initialWorld: section,
+                // Preserve the existing test-only seam through composition.
+                // Production uses the default authenticated global cache.
+                // ignore: invalid_use_of_visible_for_testing_member
+                createDraftStateCache: createDraftStateCache,
                 initialSubAction: state.uri.queryParameters['sub'],
+                // The retired Create landing now renders the post editor.
+                // Use its editor state so system Back saves before leaving.
                 initialState:
-                    state.uri.queryParameters['state'] ??
-                    state.uri.queryParameters['mode'] ??
-                    (section == 'social' &&
-                            state.uri.queryParameters['sub'] == 'create'
-                        ? 'home'
-                        : null),
+                    createEntry &&
+                        !const {
+                          'post',
+                          'text',
+                          'image',
+                          'reel-source',
+                          'reel-camera',
+                          'reel-edit',
+                          'carousel',
+                          'image-poll',
+                          'quick-poll',
+                          'quiz',
+                          'shared-post',
+                          'drafts',
+                          'publishing',
+                          'failure',
+                          'success',
+                        }.contains(requestedState)
+                    ? 'post'
+                    : requestedState,
                 initialItem: state.uri.queryParameters['item'],
                 initialAction: state.uri.queryParameters['action'],
                 initialChoice: state.uri.queryParameters['choice'],

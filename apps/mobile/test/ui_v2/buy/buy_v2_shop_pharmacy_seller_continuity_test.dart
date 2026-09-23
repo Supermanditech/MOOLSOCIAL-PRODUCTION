@@ -169,7 +169,7 @@ void main() {
     await tester.tap(action);
     await tester.pumpAndSettle();
     expect(find.text('Sardarpura Health Pharmacy'), findsWidgets);
-    expect(find.text('Store products'), findsOneWidget);
+    expect(find.text('Store products'), findsNothing);
     expect(find.textContaining('Not medical advice'), findsWidgets);
     expect(
       find.byKey(const ValueKey('buy-product-m-metformin-500')),

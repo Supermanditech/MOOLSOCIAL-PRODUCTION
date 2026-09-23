@@ -8,6 +8,8 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 
+late SocialCreateDraftStateCache _draftState;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -31,14 +33,15 @@ void main() {
         find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
         findsOneWidget,
       );
-      expect(
-        socialCreateDraftState.snapshot?.body,
-        'Keep this exact dirty draft',
-      );
+      expect(_draftState.snapshot?.body, 'Keep this exact dirty draft');
       expect(repository.snapshot?.body, 'Keep this exact dirty draft');
-      await tester.binding.handlePopRoute();
+      await tester.tap(find.byKey(const Key('mool-compact-launcher')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+      expect(
+        find.byKey(const Key('mool-connected-action-navigator')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('screen04-rail-create')));
@@ -63,7 +66,7 @@ void main() {
         find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
         findsOneWidget,
       );
-      expect(socialCreateDraftState.snapshot, isNull);
+      expect(_draftState.snapshot, isNull);
       expect(repository.snapshot, isNull);
       expect(tester.takeException(), isNull);
     },
@@ -145,7 +148,7 @@ void main() {
       'Retry this dirty draft',
     );
     expect(find.byKey(const Key('screen04-create-home')), findsNothing);
-    expect(socialCreateDraftState.snapshot?.body, 'Retry this dirty draft');
+    expect(_draftState.snapshot?.body, 'Retry this dirty draft');
     expect(repository.snapshot, isNull);
   });
 
@@ -208,15 +211,13 @@ IgnorePointer _workbenchLock(WidgetTester tester) =>
         as IgnorePointer;
 
 Future<void> _bind(_ControlledDraftRepository repository) async {
-  final token = socialCreateDraftState.beginPrincipalBindingAttempt();
-  await socialCreateDraftState.configureDurability(
-    repository,
-    bindingAttempt: token,
-  );
+  _draftState = SocialCreateDraftStateCache();
+  final token = _draftState.beginPrincipalBindingAttempt();
+  await _draftState.configureDurability(repository, bindingAttempt: token);
 }
 
 void _detach() {
-  socialCreateDraftState.beginPrincipalBindingAttempt();
+  _draftState.beginPrincipalBindingAttempt();
 }
 
 Future<JourneySession> _pumpCreate(WidgetTester tester) async {
@@ -234,6 +235,7 @@ Future<JourneySession> _pumpCreate(WidgetTester tester) async {
   await journey.start();
   await tester.pumpWidget(
     MoolSocialApp(
+      createDraftStateCache: _draftState,
       session: journey,
       initialLocation: '/app/social?sub=create&state=text',
     ),

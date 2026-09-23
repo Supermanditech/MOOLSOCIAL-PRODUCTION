@@ -2267,9 +2267,24 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Compare prices',
-              style: context.buyTitle.copyWith(fontSize: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Compare prices',
+                    style: context.buyTitle.copyWith(fontSize: 18),
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('buy-comparison-refresh'),
+                  tooltip: 'Refresh comparison',
+                  onPressed: controller?.loading == true
+                      ? null
+                      : () => unawaited(_reload()),
+                  icon: const Icon(Icons.refresh_rounded, size: 21),
+                  color: BuyV2Colors.navy,
+                ),
+              ],
             ),
             const SizedBox(height: 3),
             Text(widget.product.customerTitle, style: context.buyBody),
@@ -2280,14 +2295,9 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                 'pack(s) · Same product and pack',
                 style: context.buyMeta,
               ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             if (message != null)
               Text(message, key: const ValueKey('buy-comparison-message')),
-            if (message != null || page != null)
-              TextButton(
-                onPressed: () => unawaited(_reload()),
-                child: const Text('Refresh comparison'),
-              ),
             if (controller?.loading == true)
               const Center(
                 child: Padding(
@@ -2296,10 +2306,6 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                 ),
               )
             else if (page != null && query != null) ...[
-              if (!page.globallyRanked)
-                const Text(
-                  'Complete price ranking is unavailable. No lowest-price result is confirmed.',
-                ),
               if (page.offers.isEmpty)
                 const Text(
                   'No other suppliers match this pack, quantity and delivery choice.',
@@ -10991,6 +10997,7 @@ class BuyV2LiveDeliveryPanel extends StatefulWidget {
 class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
     with WidgetsBindingObserver {
   Timer? _timer;
+  bool _mapExpanded = false;
 
   bool get _isForeground {
     final state = WidgetsBinding.instance.lifecycleState;
@@ -11007,6 +11014,11 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
   @override
   void didUpdateWidget(covariant BuyV2LiveDeliveryPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) ||
+        oldWidget.order.id != widget.order.id ||
+        widget.mapBuilder == null) {
+      _mapExpanded = false;
+    }
     if (!identical(oldWidget.session, widget.session) ||
         oldWidget.order.id != widget.order.id ||
         oldWidget.order.status != widget.order.status ||
@@ -11119,50 +11131,42 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
               ),
             ],
           ] else ...[
-            Semantics(
-              label: widget.mapBuilder == null
-                  ? 'Delivery map unavailable. ${snapshot.etaLabel}. Delivery details follow.'
-                  : 'Delivery partner location map. ${snapshot.etaLabel}.',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: SizedBox(
-                  key: ValueKey('buy-live-delivery-map-${widget.order.id}'),
-                  height: accessibleMap ? 210 : 158,
-                  child:
-                      widget.mapBuilder?.call(context, snapshot) ??
-                      ColoredBox(
-                        color: const Color(0xFFE7EAF4),
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.map_outlined,
-                                  color: BuyV2Colors.navy,
-                                  size: 30,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Map view is not available right now.',
-                                  textAlign: TextAlign.center,
-                                  style: context.buyBody,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'The latest delivery details are shown below.',
-                                  textAlign: TextAlign.center,
-                                  style: context.buyMeta,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+            if (widget.mapBuilder == null)
+              Semantics(
+                label:
+                    'Delivery map unavailable. ${snapshot.etaLabel}. Delivery details follow.',
+                child: Text(
+                  'Map view is not available right now.',
+                  style: context.buyMeta,
+                ),
+              )
+            else ...[
+              Semantics(
+                label: 'Delivery partner location map. ${snapshot.etaLabel}.',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: SizedBox(
+                    key: ValueKey('buy-live-delivery-map-${widget.order.id}'),
+                    height: _mapExpanded ? 280 : (accessibleMap ? 158 : 120),
+                    child: widget.mapBuilder!(context, snapshot),
+                  ),
                 ),
               ),
-            ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: ValueKey(
+                    'buy-live-delivery-map-toggle-${widget.order.id}',
+                  ),
+                  onPressed: () => setState(() => _mapExpanded = !_mapExpanded),
+                  icon: Icon(
+                    _mapExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                  ),
+                  label: Text(_mapExpanded ? 'Collapse map' : 'Expand map'),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             _DecisionRow(
               icon: Icons.schedule_outlined,

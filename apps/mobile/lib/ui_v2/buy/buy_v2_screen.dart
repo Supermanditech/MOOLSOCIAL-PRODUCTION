@@ -3559,11 +3559,7 @@ class _BuySearchBand extends StatelessWidget {
               if (!open) ...[
                 const SizedBox(width: 6),
                 Material(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: BuyV2Colors.line),
-                  ),
+                  color: Colors.transparent,
                   child: IconButton(
                     key: const ValueKey('buy-change-location'),
                     tooltip: session.pagedCatalogueEnabled
@@ -3580,9 +3576,17 @@ class _BuySearchBand extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                MoolGlobalProfileShortcutV2(
-                  keyName: 'buy-open-account',
+                IconButton(
+                  key: const ValueKey('buy-open-account'),
+                  tooltip: 'Your MoolSocial profile',
                   onPressed: onAccount,
+                  icon: const Icon(Icons.account_circle_outlined, size: 22),
+                  color: BuyV2Colors.navy,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                  padding: EdgeInsets.zero,
                 ),
               ],
               ?trailingAction,

@@ -2448,5 +2448,18 @@
     "sourceUnchangedAfterCommit": true,
     "approvedHistoricalTipsRetained": 18,
     "rejectedHistoricalTipsAbsent": true
+  },
+  "successorLocalQualification20260923": {
+    "head": "63a83d05d9d8172947f93ef322501fa7e0400842",
+    "commitsSincePriorIntegration": 75,
+    "navigationPassed": 120,
+    "navigationFailed": 0,
+    "navigationSkipped": 0,
+    "selectedScenariosPassed": 250,
+    "sourceSha256": "76ba164afcc258d1c072f6b96a3209df7b96c82e1f44050c01436528519f5607",
+    "backendQualified": false,
+    "gitCheckpointHeld": true,
+    "apkBuilt": false,
+    "details": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
   }
 }

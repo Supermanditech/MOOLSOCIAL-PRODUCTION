@@ -6,28 +6,31 @@
   "ticket": {
     "id": "UAW-CURSOR-BUY-READY-20260921",
     "classification": "mvp_supporting",
-    "customerOutcome": "Public Buy customer compares controlled review offers, sees both publisher tabs, reuses GST profile details across carts, and retains navigation after legacy-menu retirement.",
+    "customerOutcome": "Compact, readable Buy discovery, Store identity/cards and comparison controls with preserved navigation, basket, filters and truthful source data.",
     "classificationReason": "Complete founder-selected pending frontend acceptance within existing Buy launch journey; backend dependencies remain separately pending.",
     "minimumCompleteScope": [
-      "R6634-C06-A01 navigation test migration",
+      "C06-A01 impacted Create route child: normalize retired home entry to existing post editor so Back uses draft preservation",
+      "R6634-C06-A01 historical13 navigation/projection findings reconciled against accepted successors, preserving all behavioral checks",
+      "R6633-D10-C2 compact expandable provider-map presentation and truthful compact fallback; actual Google Maps/provider integration remains pending",
+      "R6634-C06-A01 navigation test migration and historical supplier-chat viewport/draft/return reconciliation",
       "R6634-C07 Profile GST and consolidated checkout entry",
       "R6633-D05 controlled comparison provider",
-      "R6633-D06-B both publisher tabs with truthful controlled offers"
+      "R6633-D06-B both publisher tabs with truthful controlled offers",
+      "R6634-C08 through C16 founder visual corrections, local impact/child-defect checks and native review captures"
     ],
     "explicitExclusions": [
-      "No APK/build/install/device action now.",
+      "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized by latest founder instruction; production promotion excluded.",
       "No production Store offers, account GST backend, payment/logistics integration or deployment.",
       "No edits to Store/Counter Sale/CSV, another worktree, main or accepted reference assets."
     ],
     "dependenciesAndApprovals": [
-      "Founder current request authorizes implementation/local tests/Git reconciliation; build deferred.",
-      "Root primary coordinates exact shared Profile and historical test owner transfers; unchanged Store contracts."
+      "Founder authorizes C08-C16 implementation and local testing now, then fresh native screens for approval. Git checkout/reconciliation and Redmi APK/device phases follow later.",
+      "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
     ],
     "testAndEvidencePlan": [
-      "Run existing GST, Offers, comparison, route and affected Profile suites.",
-      "Run all six original founder matrices against current-source fingerprint; preserve failure and pass receipts.",
-      "Render actual compact/enlarged native screens for founder review; device approval remains pending.",
-      "Reconcile all commits and changed owners from prior integration 123ff42cf8179b272d33b480e8267dfa83af2de3 through final HEAD."
+      "Run all 250 selected scenarios across 20 ticket entries against one current source fingerprint; retain the original 19-entry visual approval separately.",
+      "Run focused affected-owner tests, audit shared callers, register every child defect before retry and verify its fix plus parent regression.",
+      "Capture standard/narrow enlarged-text native screens for founder approval; no approval implied by technical checks."
     ]
   },
   "founderDisclosure": {
@@ -37,15 +40,16 @@
   "authorization": {
     "state": "founder_acknowledged_mvp_scope",
     "beyondMvpExplicitlyAuthorized": false,
-    "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+    "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+    "latestFounderInstruction": "GO AHEAD with Git checkpoint, incremental latest-work APK and Redmi testing; fix any build/validation issue before installing."
   },
   "execution": {
     "referenceWriteAuthorized": false,
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": false,
-    "deviceInstallAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
     "externalServiceWriteAuthorized": false
   },
   "checkpoint": {
@@ -65,43 +69,56 @@
     "currentTicketId": "UAW-CURSOR-BUY-READY-20260921",
     "selectedTicketAssessment": {
       "ticketId": "UAW-CURSOR-BUY-READY-20260921",
-      "customerOutcome": "Public Buy customer compares controlled review offers, sees both publisher tabs, reuses GST profile details across carts, and retains navigation after legacy-menu retirement.",
-      "necessityProof": "Reuse existing native screens, GST controller/store interface, review catalogue provider and comparison contracts. Add only bounded review adapter logic and focused acceptance tests; no new route/screen/backend.",
+      "customerOutcome": "Compact, readable Buy discovery, Store identity/cards and comparison controls with preserved navigation, basket, filters and truthful source data.",
+      "necessityProof": "Reuse existing comparison sheet, product/store cards, catalogue chrome, delivery selectors and vertical progress painter. No new screen, route, provider or backend.",
       "implementationDisposition": [
         "reuse",
         "configuration",
         "test_only_acceptance"
       ],
       "sharedImplementationOwners": [
-        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
-        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_dock_projection_parity_fix1_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
-        "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
-        "apps/mobile/lib/features/journey01/journey_router.dart"
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
       "robustnessCoverage": [
-        "Run existing GST, Offers, comparison, route and affected Profile suites.",
-        "Run all six original founder matrices against current-source fingerprint; preserve failure and pass receipts.",
-        "Render actual compact/enlarged native screens for founder review; device approval remains pending.",
-        "Reconcile all commits and changed owners from prior integration 123ff42cf8179b272d33b480e8267dfa83af2de3 through final HEAD."
+        "Run all 250 selected scenarios across 20 ticket entries against one current source fingerprint; retain the original 19-entry visual approval separately.",
+        "Run focused affected-owner tests, audit shared callers, register every child defect before retry and verify its fix plus parent regression.",
+        "Capture standard/narrow enlarged-text native screens for founder approval; no approval implied by technical checks."
       ],
       "adjustments": [
         "Keep frontend proof separate from real Store/account backend acceptance."
       ],
       "explicitExclusions": [
-        "No APK/build/install/device action now.",
+        "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized; no production promotion.",
         "No production Store offers, account GST backend, payment/logistics integration or deployment.",
         "No edits to Store/Counter Sale/CSV, another worktree, main or accepted reference assets."
       ],
       "dependenciesAndApprovals": [
-        "Founder current request authorizes implementation/local tests/Git reconciliation; build deferred.",
-        "Root primary coordinates exact shared Profile and historical test owner transfers; unchanged Store contracts."
+        "Founder authorizes C08-C16 implementation and local testing now, then fresh native screens for approval. Git checkout/reconciliation and Redmi APK/device phases follow later.",
+        "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
       ],
       "manifestPath": "config/buy-founder-regression.json",
-      "manifestSha256": "cd087f4798046c30f010a2c19c69460a01fa460dd76f8b4b7878dfdbe5ebbe86",
+      "manifestSha256": "6e4b3358a99590d9df018d933a485972959b1667cfe06ed57ca32749a0a05474",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,

@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'dart:ui' show ImageByteFormat;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -241,6 +245,14 @@ void main() {
     );
     expect(find.text('Map view is not available right now.'), findsOneWidget);
     expect(
+      find.byKey(const ValueKey('buy-live-delivery-map-PO-240783')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-live-delivery-map-toggle-PO-240783')),
+      findsNothing,
+    );
+    expect(
       find.bySemanticsLabel(
         RegExp(r'Delivery map unavailable.*About 12 minutes'),
       ),
@@ -249,6 +261,88 @@ void main() {
     semantics.dispose();
     expect(tester.takeException(), isNull);
   });
+
+  for (final scale in [1.0, 1.4]) {
+    testWidgets(
+      'provider map expands and resets for a different order at $scale text',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 700);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final session = BuyV2Session(
+          core: BuySession(),
+          liveDeliveryAdapter: _LiveDeliveryAdapter(),
+        );
+        addTearDown(session.dispose);
+        final orders = session.orders
+            .where((order) => order.status != BuyV2OrderStatus.delivered)
+            .take(2)
+            .toList();
+        expect(orders, hasLength(2));
+        Future<void> show(BuyV2Order order) async {
+          await session.refreshLiveDelivery(order.id);
+          await tester.pumpWidget(
+            MaterialApp(
+              builder: (context, child) => RepaintBoundary(
+                key: const ValueKey('tracking-review-capture'),
+                child: child!,
+              ),
+              theme: MoolTheme.light(),
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: BuyV2LiveDeliveryPanel(
+                    session: session,
+                    order: order,
+                    pollInterval: Duration.zero,
+                    mapBuilder: (context, snapshot) => const ColoredBox(
+                      color: Color(0xFFE7EAF4),
+                      child: Center(
+                        child: Text(
+                          'Test map renderer\nNo live location',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await show(orders.first);
+        final map = find.byKey(
+          ValueKey('buy-live-delivery-map-${orders.first.id}'),
+        );
+        final compactHeight = tester.getSize(map).height;
+        await _captureTracking(tester, 'compact-$scale');
+        await tester.tap(find.text('Expand map'));
+        await tester.pumpAndSettle();
+        expect(tester.getSize(map).height, greaterThan(compactHeight));
+        expect(find.text('Collapse map'), findsOneWidget);
+        await _captureTracking(tester, 'expanded-$scale');
+        await tester.tap(find.text('Collapse map'));
+        await tester.pumpAndSettle();
+        expect(tester.getSize(map).height, compactHeight);
+        await tester.tap(find.text('Expand map'));
+        await tester.pumpAndSettle();
+        await show(orders.last);
+        expect(find.text('Expand map'), findsOneWidget);
+        expect(
+          tester
+              .getSize(
+                find.byKey(ValueKey('buy-live-delivery-map-${orders.last.id}')),
+              )
+              .height,
+          compactHeight,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('completed orders do not request a live courier location', (
     tester,
@@ -280,6 +374,26 @@ void main() {
     expect(find.byKey(ValueKey('buy-live-delivery-${order.id}')), findsNothing);
     expect(adapter.loadCalls, 0);
     expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _captureTracking(WidgetTester tester, String name) async {
+  const directory = String.fromEnvironment('TRACKING_CAPTURE_DIR');
+  if (directory.isEmpty) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('tracking-review-capture')),
+  );
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1.5);
+    try {
+      final bytes = await image.toByteData(format: ImageByteFormat.png);
+      await Directory(directory).create(recursive: true);
+      await File(
+        '$directory/$name.png',
+      ).writeAsBytes(bytes!.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
   });
 }
 

@@ -1367,7 +1367,7 @@ void main() {
       find.byKey(const ValueKey('buy-product-compare-s-milk-500ml')),
       findsNothing,
     );
-    await tester.tap(find.text('Refresh comparison'));
+    await tester.tap(find.byKey(const ValueKey('buy-comparison-refresh')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
@@ -1607,7 +1607,8 @@ void main() {
       find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),
       findsOneWidget,
     );
-    expect(find.text('Store products'), findsOneWidget);
+    expect(find.text(product.customerSeller(product.seller)), findsWidgets);
+    expect(find.text('Store products'), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),

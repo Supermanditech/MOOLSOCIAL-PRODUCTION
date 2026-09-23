@@ -2784,41 +2784,28 @@ void main() {
         final iconSurface = tester.widget<AnimatedContainer>(
           find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
         );
-        final iconDecoration = iconSurface.decoration! as BoxDecoration;
+        expect(iconSurface.decoration, isNull);
         expect(
           tester.getSize(
             find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
           ),
           const Size(20, 20),
         );
-        expect(iconDecoration.color, Colors.white);
-        expect(iconDecoration.shape, BoxShape.rectangle);
-        expect(iconDecoration.borderRadius, isNull);
-        expect(
-          (iconDecoration.border! as Border).top.color,
-          isNot(BuyV2Colors.orange),
-        );
       }
-      final track = tester.getRect(
+      expect(
         find.byKey(const ValueKey('buy-shop-sale-type-track')),
+        findsNothing,
+      );
+      final selector = tester.getRect(
+        find.byKey(const ValueKey('buy-shop-sale-type-selector')),
       );
       final thumb = tester.getRect(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
-      expect(thumb.top, track.top);
-      expect(thumb.bottom, track.bottom);
-      expect(thumb.left, track.left);
-      expect(thumb.width, track.width / 2);
-      expect(thumb.height, 34);
-      expect(track.height, 34);
-      final trackSurface = tester.widget<DecoratedBox>(
-        find.byKey(const ValueKey('buy-shop-sale-type-track-surface')),
-      );
-      final trackDecoration = trackSurface.decoration as BoxDecoration;
-      expect(trackDecoration.gradient, isNull);
-      expect(trackDecoration.color, const Color(0xFFF2F3FF));
-      expect(trackDecoration.borderRadius, isNull);
-      expect(trackDecoration.boxShadow, isNull);
+      expect(thumb.bottom, selector.bottom - 1);
+      expect(thumb.left, selector.left);
+      expect(thumb.width, selector.width / 2);
+      expect(thumb.height, 3);
       final thumbMotion = tester.widget<AnimatedPositioned>(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
@@ -2896,10 +2883,7 @@ void main() {
         final iconSurface = tester.widget<AnimatedContainer>(
           find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
         );
-        final iconDecoration = iconSurface.decoration! as BoxDecoration;
-        expect(iconDecoration.color, Colors.white);
-        expect(iconDecoration.shape, BoxShape.rectangle);
-        expect(iconDecoration.borderRadius, isNull);
+        expect(iconSurface.decoration, isNull);
       }
     },
   );
@@ -11981,7 +11965,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-compact-masala-store')));
     await tester.pumpAndSettle();
 
-    final title = find.text('Store products').first;
+    final title = find.descendant(
+      of: find.byKey(const ValueKey('buy-shop-seller-sheet-header')),
+      matching: find.text(storeProduct.customerSeller(storeProduct.seller)),
+    );
     expect(tester.widget<Text>(title).style?.fontSize, 14);
     final route = find.byKey(
       const ValueKey('buy-shop-seller-route-s-turmeric'),
@@ -11998,9 +11985,8 @@ void main() {
       tester.getTopLeft(find.byKey(const ValueKey('buy-public-store-ask'))).dy,
       lessThanOrEqualTo(tester.getTopLeft(truth).dy + 12),
     );
-    final storeName = tester.widget<Text>(
-      find.byKey(const ValueKey('buy-public-store-name')),
-    );
+    final storeName = tester.widget<Text>(title);
+    expect(find.byKey(const ValueKey('buy-public-store-name')), findsNothing);
     final storeLocation = tester.widget<Text>(
       find.byKey(const ValueKey('buy-public-store-location')),
     );

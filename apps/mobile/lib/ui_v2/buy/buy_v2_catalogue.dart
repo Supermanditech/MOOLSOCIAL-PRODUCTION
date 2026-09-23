@@ -2886,25 +2886,6 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Positioned(
-                    key: ValueKey(
-                      'buy-${shop ? 'shop' : 'wholesale'}-sale-type-track',
-                    ),
-                    left: 0,
-                    right: 0,
-                    top: 7,
-                    bottom: 7,
-                    child: DecoratedBox(
-                      key: ValueKey(
-                        'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
-                        'track-surface',
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F3FF),
-                        border: Border.all(color: const Color(0xFFCFD3F8)),
-                      ),
-                    ),
-                  ),
                   AnimatedPositioned(
                     key: ValueKey(
                       'buy-${shop ? 'shop' : 'wholesale'}-sale-type-thumb',
@@ -2915,8 +2896,8 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                     ),
                     curve: Curves.easeOutQuart,
                     left: vertical || selectedIndex == 0 ? 0 : segmentWidth,
-                    top: vertical ? selectedIndex * 48.0 + 7 : 7,
-                    bottom: vertical ? (1 - selectedIndex) * 48.0 + 7 : 7,
+                    top: vertical ? selectedIndex * 48.0 + 44 : 44,
+                    bottom: vertical ? (1 - selectedIndex) * 48.0 + 1 : 1,
                     width: segmentWidth,
                     child: DecoratedBox(
                       key: ValueKey(
@@ -2978,7 +2959,7 @@ class _CatalogueSaleSegment extends StatelessWidget {
   final VoidCallback onTap;
 
   static TextStyle labelStyle(bool selected) => TextStyle(
-    color: selected ? Colors.white : BuyV2Colors.navy,
+    color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
     fontSize: 11.25,
     fontWeight: FontWeight.w900,
     height: 1,
@@ -3043,23 +3024,6 @@ class _CatalogueSaleSegment extends StatelessWidget {
                         ),
                         width: 20,
                         height: 20,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(
-                            color: selected
-                                ? const Color(0xFF1010A8)
-                                : const Color(0xFFCFD3F8),
-                          ),
-                          boxShadow: selected
-                              ? const [
-                                  BoxShadow(
-                                    color: Color(0x30000080),
-                                    blurRadius: 3,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ]
-                              : const [],
-                        ),
                         child: BuyV2DeliveryModeIcon(
                           artwork: icon,
                           size: 18,
@@ -3481,21 +3445,21 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
           text: TextSpan(text: text, style: style),
           textDirection: Directionality.of(context),
           textScaler: scaler,
-        )..layout(maxWidth: width - 24);
+        )..layout(maxWidth: width - 16);
         final height = painter.height;
         painter.dispose();
         return height;
       }
 
-      return 34 +
+      return 26 +
           measure(buyV2CustomerStoreName(store.name, store.id), titleStyle) +
           measure(_location(store), detailStyle) +
           measure(
             store.previewProduct == null
                 ? 'Products unavailable'
                 : store.collection?.isSupportedFor(store.id, now: now) == true
-                ? 'Collect at store'
-                : 'View store',
+                ? 'Visit · Collect at store'
+                : 'Visit store',
             actionStyle,
           );
     }
@@ -3550,46 +3514,60 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
                 final collect =
                     store.collection?.isSupportedFor(store.id, now: now) ==
                     true;
-                return SizedBox(
-                  width: width,
-                  child: BuyV2CartAvoidanceRegion(
-                    child: Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        side: const BorderSide(color: BuyV2Colors.line),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        key: ValueKey('buy-store-search-open-${store.id}'),
-                        onTap: product == null
-                            ? null
-                            : () => widget.onOpenStore(product),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                buyV2CustomerStoreName(store.name, store.id),
-                                style: titleStyle,
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: width,
+                    height: heightFor(store),
+                    child: BuyV2CartAvoidanceRegion(
+                      child: Material(
+                        color: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          key: ValueKey('buy-store-search-open-${store.id}'),
+                          onTap: product == null
+                              ? null
+                              : () => widget.onOpenStore(product),
+                          child: Ink(
+                            key: ValueKey(
+                              'buy-store-search-surface-${store.id}',
+                            ),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  BuyV2Colors.softOrange,
+                                  BuyV2Colors.softBlue,
+                                ],
                               ),
-                              const SizedBox(height: 3),
-                              Text(_location(store), style: detailStyle),
-                              const SizedBox(height: 5),
-                              Text(
-                                product == null
-                                    ? 'Products unavailable'
-                                    : collect
-                                    ? 'Collect at store'
-                                    : 'View store',
-                                style: actionStyle.copyWith(
-                                  color: collect
-                                      ? BuyV2Colors.green
-                                      : BuyV2Colors.navy,
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  buyV2CustomerStoreName(store.name, store.id),
+                                  style: titleStyle,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 3),
+                                Text(_location(store), style: detailStyle),
+                                const SizedBox(height: 5),
+                                Text(
+                                  product == null
+                                      ? 'Products unavailable'
+                                      : collect
+                                      ? 'Visit · Collect at store'
+                                      : 'Visit store',
+                                  style: actionStyle.copyWith(
+                                    color: collect
+                                        ? BuyV2Colors.green
+                                        : BuyV2Colors.navy,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -5042,6 +5020,7 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
     return Semantics(
       label: widget.label,
       button: true,
+      selected: widget.active,
       excludeSemantics: true,
       onTap: _activate,
       child: Tooltip(
@@ -5059,34 +5038,6 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
               curve: Curves.easeOutCubic,
               width: 48,
               height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: highlighted
-                      ? const [Color(0xFFFFE8CE), Colors.white]
-                      : const [Colors.white, Color(0xFFF4F3FF)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: highlighted ? BuyV2Colors.orange : BuyV2Colors.line,
-                  width: highlighted ? 1.15 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: highlighted
-                        ? const Color(0x30FF9933)
-                        : const Color(0x1A000080),
-                    blurRadius: highlighted ? 12 : 9,
-                    offset: const Offset(0, 4),
-                  ),
-                  const BoxShadow(
-                    color: Color(0xB8FFFFFF),
-                    blurRadius: 2,
-                    offset: Offset(0, -1),
-                  ),
-                ],
-              ),
               child: Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
@@ -6365,6 +6316,12 @@ Future<void> showBuyV2RecentlyViewed(
   }
 }
 
+String _publicStoreName(BuyV2Session session, BuyV2Product product) {
+  final id = product.storeId;
+  final store = id == null ? null : session.catalogueStore(id);
+  return buyV2CustomerStoreName(store?.name ?? product.seller, id);
+}
+
 Future<void> showBuyV2PartnerCatalogue(
   BuildContext context,
   BuyV2Session session,
@@ -6420,11 +6377,9 @@ Future<void> showBuyV2PartnerCatalogue(
           BuyV2Destination.medicine => 'buy-medicine-pharmacy',
           BuyV2Destination.orders => 'buy-order-partner',
         };
-  final title = brandOnly
+  String getTitle() => brandOnly
       ? '${current.brand} products'
-      : current.destination == BuyV2Destination.wholesale
-      ? 'Supplier products'
-      : 'Store products';
+      : _publicStoreName(session, current);
   final detail = brandOnly
       ? 'Browse ${products.length} available ${current.brand} products'
       : switch (current.destination) {
@@ -6518,7 +6473,7 @@ Future<void> showBuyV2PartnerCatalogue(
                       scopesRoute: true,
                       namesRoute: true,
                       explicitChildNodes: true,
-                      label: title,
+                      label: getTitle(),
                       child: pagedPartner
                           ? _PagedFullStoreCatalogue(
                               session: session,
@@ -6562,176 +6517,229 @@ Future<void> showBuyV2PartnerCatalogue(
                                   104,
                                 ),
                                 children: [
-                                  Row(
-                                    key: ValueKey('$ownerPrefix-sheet-header'),
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: 38,
-                                        height: 38,
-                                        decoration: BoxDecoration(
-                                          color: BuyV2Colors.softOrange,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          brandOnly
-                                              ? Icons.sell_outlined
-                                              : Icons.storefront_outlined,
-                                          color: BuyV2Colors.navy,
-                                          size: 21,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 9),
-                                      Expanded(
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: InkWell(
-                                            key: canViewAll
-                                                ? ValueKey(
-                                                    '$ownerPrefix-view-more-${current.id}',
-                                                  )
-                                                : null,
-                                            onTap: canViewAll
-                                                ? () => unawaited(
-                                                    openFullStoreCatalogue(
-                                                      sheetContext,
-                                                    ),
-                                                  )
-                                                : null,
-                                            borderRadius: BorderRadius.circular(
-                                              9,
+                                  Container(
+                                    key: ValueKey('$ownerPrefix-identity-card'),
+                                    padding: publicPartner
+                                        ? const EdgeInsets.all(8)
+                                        : EdgeInsets.zero,
+                                    decoration: publicPartner
+                                        ? BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                BuyV2Colors.softOrange,
+                                                BuyV2Colors.softBlue,
+                                              ],
                                             ),
-                                            child: ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                minHeight:
-                                                    BuyV2Metrics.minimumTap,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          )
+                                        : null,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Row(
+                                          key: ValueKey(
+                                            '$ownerPrefix-sheet-header',
+                                          ),
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              width: 38,
+                                              height: 38,
+                                              decoration: BoxDecoration(
+                                                color: BuyV2Colors.softOrange,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  Text(
-                                                    title,
-                                                    maxLines: 2,
-                                                    overflow: TextOverflow.clip,
-                                                    style: sheetContext.buyTitle
-                                                        .copyWith(
-                                                          fontSize: 14,
-                                                          height: 1.08,
+                                              child: Tooltip(
+                                                message: publicPartner
+                                                    ? 'MoolSocial fulfilment partner'
+                                                    : getTitle(),
+                                                child: Icon(
+                                                  brandOnly
+                                                      ? Icons.sell_outlined
+                                                      : publicPartner
+                                                      ? Icons.handshake_outlined
+                                                      : Icons
+                                                            .storefront_outlined,
+                                                  color: BuyV2Colors.navy,
+                                                  size: 21,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 9),
+                                            Expanded(
+                                              child: Material(
+                                                color: Colors.transparent,
+                                                child: InkWell(
+                                                  key: canViewAll
+                                                      ? ValueKey(
+                                                          '$ownerPrefix-view-more-${current.id}',
+                                                        )
+                                                      : null,
+                                                  onTap: canViewAll
+                                                      ? () => unawaited(
+                                                          openFullStoreCatalogue(
+                                                            sheetContext,
+                                                          ),
+                                                        )
+                                                      : null,
+                                                  borderRadius:
+                                                      BorderRadius.circular(9),
+                                                  child: ConstrainedBox(
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                          minHeight:
+                                                              BuyV2Metrics
+                                                                  .minimumTap,
                                                         ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  if (canViewAll)
-                                                    Row(
-                                                      key: ValueKey(
-                                                        '$ownerPrefix-view-more-visible-${current.id}',
-                                                      ),
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
                                                       children: [
-                                                        const Icon(
-                                                          Icons
-                                                              .grid_view_rounded,
-                                                          size: 13,
-                                                          color:
-                                                              BuyV2Colors.navy,
+                                                        Text(
+                                                          getTitle(),
+                                                          style: sheetContext
+                                                              .buyTitle
+                                                              .copyWith(
+                                                                fontSize: 14,
+                                                                height: 1.08,
+                                                              ),
                                                         ),
                                                         const SizedBox(
-                                                          width: 4,
+                                                          height: 2,
                                                         ),
-                                                        Flexible(
-                                                          child: Text(
-                                                            pagedPartner
-                                                                ? 'Browse all products'
-                                                                : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                        if (canViewAll)
+                                                          Row(
+                                                            key: ValueKey(
+                                                              '$ownerPrefix-view-more-visible-${current.id}',
+                                                            ),
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              const Icon(
+                                                                Icons
+                                                                    .grid_view_rounded,
+                                                                size: 13,
+                                                                color:
+                                                                    BuyV2Colors
+                                                                        .navy,
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
+                                                              Flexible(
+                                                                child: Text(
+                                                                  pagedPartner
+                                                                      ? 'Browse all products'
+                                                                      : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .clip,
+                                                                  style: sheetContext
+                                                                      .buyMeta
+                                                                      .copyWith(
+                                                                        color: BuyV2Colors
+                                                                            .navy,
+                                                                        height:
+                                                                            1,
+                                                                        fontWeight:
+                                                                            FontWeight.w900,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          )
+                                                        else if (!publicPartner)
+                                                          Text(
+                                                            detail,
+                                                            maxLines: 2,
                                                             overflow:
                                                                 TextOverflow
                                                                     .clip,
                                                             style: sheetContext
                                                                 .buyMeta
                                                                 .copyWith(
-                                                                  color:
-                                                                      BuyV2Colors
-                                                                          .navy,
-                                                                  height: 1,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w900,
+                                                                  height: 1.08,
                                                                 ),
                                                           ),
-                                                        ),
                                                       ],
-                                                    )
-                                                  else
-                                                    Text(
-                                                      detail,
-                                                      maxLines: 2,
-                                                      overflow:
-                                                          TextOverflow.clip,
-                                                      style: sheetContext
-                                                          .buyMeta
-                                                          .copyWith(
-                                                            height: 1.08,
-                                                          ),
                                                     ),
-                                                ],
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      IconButton.outlined(
-                                        key: ValueKey(
-                                          '$ownerPrefix-sheet-close',
-                                        ),
-                                        onPressed: () =>
-                                            Navigator.of(sheetContext).pop(),
-                                        tooltip: closeTooltip,
-                                        style: IconButton.styleFrom(
-                                          minimumSize: const Size.square(
-                                            BuyV2Metrics.minimumTap,
-                                          ),
-                                          side: const BorderSide(
-                                            color: BuyV2Colors.line,
-                                          ),
-                                        ),
-                                        icon: const Icon(Icons.close_rounded),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  if (publicPartner) ...[
-                                    _PublicStoreTruthPanel(
-                                      product: current,
-                                      facts: session.productFactsFor(current),
-                                      now: session.catalogueNow,
-                                      trust: storeTrust,
-                                      fulfilmentLabels: storeFulfilment,
-                                      onOrderForCollection: () {
-                                        if (session.beginStoreCollection(
-                                          current.id,
-                                        )) {
-                                          unawaited(
-                                            openFullStoreCatalogue(
-                                              sheetContext,
+                                            const SizedBox(width: 8),
+                                            IconButton.outlined(
+                                              key: ValueKey(
+                                                '$ownerPrefix-sheet-close',
+                                              ),
+                                              onPressed: () => Navigator.of(
+                                                sheetContext,
+                                              ).pop(),
+                                              tooltip: closeTooltip,
+                                              style: IconButton.styleFrom(
+                                                minimumSize: const Size.square(
+                                                  BuyV2Metrics.minimumTap,
+                                                ),
+                                                side: const BorderSide(
+                                                  color: BuyV2Colors.line,
+                                                ),
+                                              ),
+                                              icon: const Icon(
+                                                Icons.close_rounded,
+                                              ),
                                             ),
-                                          );
-                                        }
-                                      },
-                                      onAskStore: onAskStore == null
-                                          ? null
-                                          : () => Navigator.of(
-                                              sheetContext,
-                                            ).pop('ask-store:${current.id}'),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (publicPartner) ...[
+                                          _PublicStoreTruthPanel(
+                                            embedded: true,
+                                            product: current,
+                                            storeName: _publicStoreName(
+                                              session,
+                                              current,
+                                            ),
+                                            facts: session.productFactsFor(
+                                              current,
+                                            ),
+                                            now: session.catalogueNow,
+                                            trust: storeTrust,
+                                            fulfilmentLabels: storeFulfilment,
+                                            onOrderForCollection: () {
+                                              if (session.beginStoreCollection(
+                                                current.id,
+                                              )) {
+                                                unawaited(
+                                                  openFullStoreCatalogue(
+                                                    sheetContext,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            onAskStore: onAskStore == null
+                                                ? null
+                                                : () =>
+                                                      Navigator.of(
+                                                        sheetContext,
+                                                      ).pop(
+                                                        'ask-store:${current.id}',
+                                                      ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                    const SizedBox(height: 8),
-                                  ],
+                                  ),
+                                  const SizedBox(height: 4),
                                   if (pagedPartner)
                                     _PagedPublicStorePreview(
                                       session: session,
@@ -6742,7 +6750,7 @@ Future<void> showBuyV2PartnerCatalogue(
                                     )
                                   else if (previewProducts.isEmpty)
                                     const _PublicStoreNoProductsState()
-                                  else
+                                  else if (previewProducts.isNotEmpty)
                                     BuyV2ProgressiveProductGrid(
                                       session: session,
                                       products: previewProducts,
@@ -6996,6 +7004,7 @@ String _publicProviderType(String source) {
 class _PublicStoreTruthPanel extends StatefulWidget {
   const _PublicStoreTruthPanel({
     required this.product,
+    required this.storeName,
     required this.facts,
     required this.now,
     required this.trust,
@@ -7003,9 +7012,11 @@ class _PublicStoreTruthPanel extends StatefulWidget {
     required this.onAskStore,
     required this.onOrderForCollection,
     this.collectionActionOnly = false,
+    this.embedded = false,
   });
 
   final BuyV2Product product;
+  final String storeName;
   final BuyV2ProductFactsSnapshot facts;
   final DateTime Function() now;
   final BuyV2MarketplaceTrustSnapshot trust;
@@ -7013,6 +7024,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
   final VoidCallback? onAskStore;
   final VoidCallback onOrderForCollection;
   final bool collectionActionOnly;
+  final bool embedded;
 
   @override
   State<_PublicStoreTruthPanel> createState() => _PublicStoreTruthPanelState();
@@ -7128,16 +7140,21 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
       key: ValueKey('buy-public-store-truth-${product.id}'),
       container: true,
       label:
-          '$fulfilmentIdentity. ${product.customerSeller(product.seller)}. $providerType. '
+          '$fulfilmentIdentity. ${widget.storeName}. $providerType. '
           '${addressConfirmed ? 'Address confirmed. ' : ''}'
           '$locality. $statusLabel. ${fulfilmentLabels.join(', ')}',
       child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: buyV2CardDecoration(
-          color: BuyV2Colors.softBlue.withValues(alpha: .24),
-          radius: 14,
-        ),
+        padding: widget.embedded ? EdgeInsets.zero : const EdgeInsets.all(8),
+        decoration: widget.embedded
+            ? null
+            : BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [BuyV2Colors.softOrange, BuyV2Colors.softBlue],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             BuyV2AdaptiveIdentityRow(
@@ -7205,28 +7222,19 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
               body: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.customerSeller(product.seller),
-                    key: const ValueKey('buy-public-store-name'),
-                    style: context.buyBody.copyWith(
-                      color: BuyV2Colors.navy,
-                      fontSize: 12.5,
-                      height: 1.08,
-                      fontWeight: FontWeight.w900,
+                  if (!widget.embedded) ...[
+                    Text(
+                      fulfilmentIdentity,
+                      key: const ValueKey('buy-public-store-badge'),
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.navy,
+                        fontSize: 9.5,
+                        height: 1.08,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    fulfilmentIdentity,
-                    key: const ValueKey('buy-public-store-badge'),
-                    style: context.buyMeta.copyWith(
-                      color: BuyV2Colors.navy,
-                      fontSize: 9.5,
-                      height: 1.08,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
+                    const SizedBox(height: 1),
+                  ],
                   Text(
                     addressConfirmed
                         ? '$providerType · Address confirmed · $locality'
@@ -7247,7 +7255,9 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                       label: askLabel,
                       child: SizedBox(
                         key: const ValueKey('buy-public-store-ask'),
-                        width: 78,
+                        width: MediaQuery.textScalerOf(context).scale(1) > 1.25
+                            ? 78
+                            : 62,
                         height: BuyV2Metrics.minimumTap,
                         child: Material(
                           color: Colors.transparent,
@@ -7390,24 +7400,9 @@ class _PublicStoreNoProductsState extends StatelessWidget {
       key: const ValueKey('buy-public-store-no-products'),
       container: true,
       label: 'No products available right now.',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        decoration: buyV2CardDecoration(color: Colors.white, radius: 16),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.inventory_2_outlined,
-              color: BuyV2Colors.navy,
-              size: 28,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No products available right now.',
-              textAlign: TextAlign.center,
-              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Text('No products available right now.', style: context.buyMeta),
       ),
     );
   }
@@ -7972,6 +7967,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   Widget _storeInfo({bool actionOnly = false, VoidCallback? onAsk}) =>
       _PublicStoreTruthPanel(
         product: widget.product,
+        storeName: _publicStoreName(widget.session, widget.product),
         facts: widget.session.productFactsFor(widget.product),
         now: widget.session.catalogueNow,
         trust: widget.session.marketplaceTrustFor(widget.product),
@@ -8656,7 +8652,7 @@ class _RelatedStoreCard extends StatelessWidget {
         ? 'Delivery options unavailable'
         : labels.join(' · ');
     final sellerLabel = Text(
-      product.customerSeller(product.seller),
+      _publicStoreName(session, product),
       style: context.buyBody.copyWith(
         color: BuyV2Colors.navy,
         fontSize: 11.5,
@@ -8690,18 +8686,12 @@ class _RelatedStoreCard extends StatelessWidget {
             child: Container(
               key: ValueKey('buy-related-store-card-${product.id}'),
               constraints: BoxConstraints(minHeight: 44),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Colors.white,
-                border: Border.all(color: const Color(0x40000080)),
-                boxShadow: [
-                  BoxShadow(
-                    color: BuyV2Colors.navy.withValues(alpha: .09),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [BuyV2Colors.softOrange, BuyV2Colors.softBlue],
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -8724,7 +8714,16 @@ class _RelatedStoreCard extends StatelessWidget {
                               Expanded(child: sellerLabel),
                               const SizedBox(width: 6),
                             ],
-                            headerIcon(Icons.arrow_forward_rounded),
+                            Text(
+                              'Visit',
+                              key: ValueKey(
+                                'buy-related-store-visit-${product.id}',
+                              ),
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.navy,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ],
                         ),
                         if (accessibleText) ...[
@@ -10735,6 +10734,9 @@ TextStyle _readableGlancePriceStyle(
   );
 }
 
+double _compactGlanceActionWidth(double cardWidth) =>
+    cardWidth >= 230 ? 88 : 44;
+
 double _productGlanceCardHeight(
   BuildContext context,
   BuyV2Session session,
@@ -10748,6 +10750,11 @@ double _productGlanceCardHeight(
       cardWidth < 130 &&
       MediaQuery.textScalerOf(context).scale(1) <= 1.25;
   final reservedActionWidth = savedContext && !compactSavedAction ? 68.0 : 42.0;
+  final inlineAdd = session.quantityFor(product.id) == 0;
+  final actionReserve = inlineAdd
+      ? _compactGlanceActionWidth(cardWidth) + 4
+      : 0.0;
+  var priceHeight = 0.0;
   var height =
       _compactProductVisualLayout(
         context,
@@ -10757,7 +10764,7 @@ double _productGlanceCardHeight(
       ).photoInset +
       70 +
       12 +
-      BuyV2Metrics.minimumTap +
+      (inlineAdd ? 0 : BuyV2Metrics.minimumTap) +
       8 +
       4;
   for (final (index, field) in _productGlanceFields(
@@ -10765,26 +10772,42 @@ double _productGlanceCardHeight(
     product,
     storeContext,
   ).indexed) {
+    if (index >= 4 && field.text.trim().isEmpty) continue;
+    final reserve = index == 2 || index == 3 ? actionReserve : 0.0;
     final painter =
         TextPainter(
           text: TextSpan(
             text: field.text,
             style: DefaultTextStyle.of(context).style.merge(
               index == 2
-                  ? _readableGlancePriceStyle(context, field, cardWidth - 20)
+                  ? _readableGlancePriceStyle(
+                      context,
+                      field,
+                      cardWidth - 20 - reserve,
+                    )
                   : field.style,
             ),
           ),
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
         )..layout(
-          maxWidth: (cardWidth - (index == 2 ? 20 : 16)).clamp(
+          maxWidth: (cardWidth - (index == 2 ? 20 : 16) - reserve).clamp(
             1,
             double.infinity,
           ),
         );
-    height += painter.height.ceilToDouble() + 4;
+    final measured = painter.height.ceilToDouble() + 2;
+    if (inlineAdd && (index == 2 || index == 3)) {
+      priceHeight += measured;
+    } else {
+      height += measured;
+    }
     painter.dispose();
+  }
+  if (inlineAdd) {
+    height += priceHeight < BuyV2Metrics.minimumTap
+        ? BuyV2Metrics.minimumTap
+        : priceHeight;
   }
   return height;
 }
@@ -12166,29 +12189,30 @@ class _ProductGlance extends StatelessWidget {
     required this.session,
     required this.product,
     required this.storeContext,
+    this.action,
   });
   final BuyV2Session session;
   final BuyV2Product product;
   final bool storeContext;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final fields = _productGlanceFields(session, product, storeContext);
     Widget line(_ProductGlanceField field) => Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 2),
       child: Text(field.text, style: field.style),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final priceAndUnit = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        line(fields[0]),
-        line(fields[1]),
         LayoutBuilder(
           builder: (context, constraints) => Align(
             alignment: Alignment.centerLeft,
             child: Container(
               key: ValueKey('buy-price-highlight-${product.id}'),
-              margin: const EdgeInsets.only(bottom: 4),
+              margin: const EdgeInsets.only(bottom: 2),
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFE082),
@@ -12206,7 +12230,27 @@ class _ProductGlance extends StatelessWidget {
           ),
         ),
         line(fields[3]),
-        for (final field in fields.skip(4)) line(field),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        line(fields[0]),
+        line(fields[1]),
+        if (action == null)
+          priceAndUnit
+        else
+          Row(
+            key: ValueKey('buy-price-action-row-${product.id}'),
+            children: [
+              Expanded(child: priceAndUnit),
+              const SizedBox(width: 4),
+              action!,
+            ],
+          ),
+        for (final field in fields.skip(4))
+          if (field.text.trim().isNotEmpty) line(field),
       ],
     );
   }
@@ -12285,6 +12329,147 @@ class BuyV2ProductCard extends StatelessWidget {
       constraints.maxWidth - (compact ? 12 : 18),
       buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
     );
+    final inlineActionWidth = _compactGlanceActionWidth(constraints.maxWidth);
+    final inlineIconOnly = compact && inlineActionWidth == 44;
+    final cartAction = IgnorePointer(
+      ignoring: quantity > 0,
+      child: ExcludeSemantics(
+        excluding: quantity > 0,
+        child: AnimatedSwitcher(
+          key: ValueKey('buy-product-action-motion-${product.id}'),
+          duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: .97, end: 1).animate(animation),
+              child: child,
+            ),
+          ),
+          child: quantity > 0
+              ? _QuantityStepper(
+                  key: ValueKey('buy-quantity-${product.id}'),
+                  quantity: quantity,
+                  stacked: stackedQuantity,
+                )
+              : SizedBox(
+                  key: ValueKey('buy-add-shell-${product.id}'),
+                  width: compact ? inlineActionWidth : 88,
+                  height: BuyV2Metrics.minimumTap,
+                  child: Semantics(
+                    label: requiresOfferReview
+                        ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
+                        : rxBlocked
+                        ? 'Use prescription for '
+                              '${product.customerTitle}'
+                        : 'Add ${product.customerTitle} to cart',
+                    button: true,
+                    child: Material(
+                      key: ValueKey(
+                        requiresOfferReview
+                            ? 'buy-review-offer-${product.id}'
+                            : 'buy-add-${product.id}',
+                      ),
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () async {
+                          HapticFeedback.selectionClick();
+                          if (requiresOfferReview) {
+                            openProduct();
+                            return;
+                          }
+                          final count =
+                              initialAddQuantity ?? product.minimumOrder;
+                          if (await beforeCartChange?.call(count) == false) {
+                            return;
+                          }
+                          final added = session.addProduct(
+                            product.id,
+                            quantity: count,
+                          );
+                          if (!added &&
+                              context.mounted &&
+                              session.pendingPrescriptionProductId ==
+                                  product.id) {
+                            showBuyV2PrescriptionSheet(context, session);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(11),
+                        child: Center(
+                          child: Container(
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: requiresOfferReview
+                                  ? BuyV2Colors.softOrange
+                                  : rxBlocked
+                                  ? BuyV2Colors.navy
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: requiresOfferReview
+                                    ? BuyV2Colors.orange
+                                    : rxBlocked
+                                    ? BuyV2Colors.navy
+                                    : const Color(0x66000080),
+                              ),
+                            ),
+                            child: requiresOfferReview
+                                ? const Icon(
+                                    Icons.info_outline_rounded,
+                                    color: BuyV2Colors.orange,
+                                    size: 20,
+                                  )
+                                : rxBlocked
+                                ? inlineIconOnly
+                                      ? const Icon(
+                                          Icons.medication_outlined,
+                                          color: Colors.white,
+                                          size: 18,
+                                        )
+                                      : const Text(
+                                          'Use Rx',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        )
+                                : inlineIconOnly
+                                ? const Icon(
+                                    Icons.add_rounded,
+                                    color: BuyV2Colors.navy,
+                                    size: 20,
+                                  )
+                                : const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.add_rounded,
+                                        color: BuyV2Colors.navy,
+                                        size: 17,
+                                      ),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'Add',
+                                        style: TextStyle(
+                                          color: BuyV2Colors.navy,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
     return BuyV2IntentDepth(
       key: ValueKey('buy-product-depth-${product.id}'),
       spatial: true,
@@ -12360,6 +12545,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                   session: session,
                                   product: product,
                                   storeContext: storeContext,
+                                  action: quantity == 0 ? cartAction : null,
                                 )
                               else ...[
                                 if (!compact &&
@@ -12577,180 +12763,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                 ),
                                 if (!compact) const SizedBox(height: 6),
                               ],
-                              IgnorePointer(
-                                ignoring: quantity > 0,
-                                child: ExcludeSemantics(
-                                  excluding: quantity > 0,
-                                  child: AnimatedSwitcher(
-                                    key: ValueKey(
-                                      'buy-product-action-motion-${product.id}',
-                                    ),
-                                    duration: BuyV2Motion.resolved(
-                                      context,
-                                      BuyV2Motion.stateChange,
-                                    ),
-                                    switchInCurve: Curves.easeOutCubic,
-                                    switchOutCurve: Curves.easeInCubic,
-                                    transitionBuilder: (child, animation) =>
-                                        FadeTransition(
-                                          opacity: animation,
-                                          child: ScaleTransition(
-                                            scale: Tween<double>(
-                                              begin: .97,
-                                              end: 1,
-                                            ).animate(animation),
-                                            child: child,
-                                          ),
-                                        ),
-                                    child: quantity > 0
-                                        ? _QuantityStepper(
-                                            key: ValueKey(
-                                              'buy-quantity-${product.id}',
-                                            ),
-                                            quantity: quantity,
-                                            stacked: stackedQuantity,
-                                          )
-                                        : SizedBox(
-                                            key: ValueKey(
-                                              'buy-add-shell-${product.id}',
-                                            ),
-                                            width: double.infinity,
-                                            height: BuyV2Metrics.minimumTap,
-                                            child: Semantics(
-                                              label: requiresOfferReview
-                                                  ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
-                                                  : rxBlocked
-                                                  ? 'Use prescription for '
-                                                        '${product.customerTitle}'
-                                                  : 'Add ${product.customerTitle} to cart',
-                                              button: true,
-                                              child: Material(
-                                                key: ValueKey(
-                                                  requiresOfferReview
-                                                      ? 'buy-review-offer-${product.id}'
-                                                      : 'buy-add-${product.id}',
-                                                ),
-                                                color: Colors.transparent,
-                                                child: InkWell(
-                                                  onTap: () async {
-                                                    HapticFeedback.selectionClick();
-                                                    if (requiresOfferReview) {
-                                                      openProduct();
-                                                      return;
-                                                    }
-                                                    final count =
-                                                        initialAddQuantity ??
-                                                        product.minimumOrder;
-                                                    if (await beforeCartChange
-                                                            ?.call(count) ==
-                                                        false) {
-                                                      return;
-                                                    }
-                                                    final added = session
-                                                        .addProduct(
-                                                          product.id,
-                                                          quantity: count,
-                                                        );
-                                                    if (!added &&
-                                                        context.mounted &&
-                                                        session.pendingPrescriptionProductId ==
-                                                            product.id) {
-                                                      showBuyV2PrescriptionSheet(
-                                                        context,
-                                                        session,
-                                                      );
-                                                    }
-                                                  },
-                                                  borderRadius:
-                                                      BorderRadius.circular(11),
-                                                  child: Center(
-                                                    child: Container(
-                                                      height: 32,
-                                                      alignment:
-                                                          Alignment.center,
-                                                      decoration: BoxDecoration(
-                                                        color:
-                                                            requiresOfferReview
-                                                            ? BuyV2Colors
-                                                                  .softOrange
-                                                            : rxBlocked
-                                                            ? BuyV2Colors.navy
-                                                            : Colors.white,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              10,
-                                                            ),
-                                                        border: Border.all(
-                                                          color:
-                                                              requiresOfferReview
-                                                              ? BuyV2Colors
-                                                                    .orange
-                                                              : rxBlocked
-                                                              ? BuyV2Colors.navy
-                                                              : const Color(
-                                                                  0x66000080,
-                                                                ),
-                                                        ),
-                                                      ),
-                                                      child: requiresOfferReview
-                                                          ? const Icon(
-                                                              Icons
-                                                                  .info_outline_rounded,
-                                                              color: BuyV2Colors
-                                                                  .orange,
-                                                              size: 20,
-                                                            )
-                                                          : rxBlocked
-                                                          ? const Text(
-                                                              'Use Rx',
-                                                              style: TextStyle(
-                                                                color: Colors
-                                                                    .white,
-                                                                fontSize: 9,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w900,
-                                                              ),
-                                                            )
-                                                          : const Row(
-                                                              mainAxisSize:
-                                                                  MainAxisSize
-                                                                      .min,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .add_rounded,
-                                                                  color:
-                                                                      BuyV2Colors
-                                                                          .navy,
-                                                                  size: 17,
-                                                                ),
-                                                                SizedBox(
-                                                                  width: 3,
-                                                                ),
-                                                                Text(
-                                                                  'Add',
-                                                                  style: TextStyle(
-                                                                    color:
-                                                                        BuyV2Colors
-                                                                            .navy,
-                                                                    fontSize: 9,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w900,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ),
+                              if (!compact || quantity > 0) cartAction,
                             ],
                           ),
                         ),
@@ -13155,13 +13168,9 @@ class _ProductSaveButton extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           foregroundColor: saved ? BuyV2Colors.orange : BuyV2Colors.navy,
         ),
-        icon: Container(
+        icon: SizedBox(
           width: 22,
           height: 22,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
           child: Icon(
             saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             size: 15,
@@ -13188,13 +13197,6 @@ class _ProductSaveButton extends StatelessWidget {
                   padding: EdgeInsets.symmetric(
                     horizontal: compactLabel ? 2 : 6,
                     vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: BuyV2Colors.orange.withValues(alpha: .22),
-                    ),
                   ),
                   child: compactLabel
                       ? const Column(
@@ -13262,14 +13264,9 @@ class _ProductSaveButton extends StatelessWidget {
         key: ValueKey('buy-save-visual-${product.id}'),
         stateKey: saved,
         ownerSize: const Size.square(22),
-        child: Container(
+        child: SizedBox(
           width: 22,
           height: 22,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .92),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white),
-          ),
           child: Icon(
             saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             size: 16,

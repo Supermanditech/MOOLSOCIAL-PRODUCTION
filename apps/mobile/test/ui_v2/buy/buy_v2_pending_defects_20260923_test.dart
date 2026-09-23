@@ -16,6 +16,415 @@ import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+
+void _founderVisualCases() {
+  for (final width in [412, 320]) {
+    for (var number = 8; number <= 16; number++) {
+      final ticket = 'C${number.toString().padLeft(2, '0')}';
+      testWidgets('R6634 $ticket visual $width', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width.toDouble(), 892);
+        addTearDown(tester.view.reset);
+        tester.platformDispatcher.textScaleFactorTestValue = width == 320
+            ? 1.4
+            : 1;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = _VisualStoreSession(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        var product = session.product('s-tomato');
+        Widget shell(Widget child) => MaterialApp(
+          theme: MoolTheme.light(),
+          builder: _captureRoot,
+          home: Scaffold(body: child),
+        );
+        if (number == 8) {
+          product = session.product('s-milk');
+          expect(session.addProduct(product.id, quantity: 2), isTrue);
+          await tester.pumpWidget(
+            shell(
+              BuyV2Screen(
+                session: session,
+                initialView: BuyV2View.product,
+                productId: product.id,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final action = find.byKey(
+            ValueKey('buy-product-action-compare-${product.id}'),
+          );
+          await tester.scrollUntilVisible(
+            action,
+            180,
+            maxScrolls: 40,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(find.text('Refresh comparison'), findsNothing);
+          expect(find.textContaining('Complete price ranking'), findsNothing);
+          final refresh = find.byKey(const ValueKey('buy-comparison-refresh'));
+          expect(refresh.hitTestable(), findsOneWidget);
+          expect(tester.getSize(refresh).height, greaterThanOrEqualTo(44));
+          final title = tester.getRect(find.text('Compare prices'));
+          expect(
+            tester.getRect(refresh).center.dy,
+            closeTo(title.center.dy, 2),
+          );
+          final grid = find.byKey(
+            const ValueKey('buy-vertical-product-grid-comparison'),
+          );
+          expect(tester.getTopLeft(grid).dy - title.bottom, lessThan(120));
+          await tester.tap(refresh);
+          await tester.pumpAndSettle();
+          expect(grid, findsOneWidget);
+          await _capture(tester, '$ticket-$width');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(product.id), 2);
+          expect(session.selectedProductId, product.id);
+        } else if ([10, 11, 14].contains(number)) {
+          if (number == 10) {
+            product = product.copyWith(storeId: 'visual-store-identity');
+          }
+          if (number == 11) {
+            product = product.copyWith(
+              seller: 'Sardarpura Family Grocery and Household Supplies',
+            );
+          }
+          String? visited;
+          await tester.pumpWidget(
+            shell(
+              Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => unawaited(
+                    showBuyV2PartnerCatalogue(
+                      context,
+                      session,
+                      product,
+                      onAskStore: (_) {},
+                      onStoreChanged: (p) => visited = p.storeId,
+                    ),
+                  ),
+                  child: const Text('Open fixture Store'),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Open fixture Store'));
+          await tester.pumpAndSettle();
+          expect(find.text('Store products'), findsNothing);
+          final heading = find.descendant(
+            of: find.byKey(const ValueKey('buy-shop-seller-sheet-header')),
+            matching: find.text(product.customerSeller(product.seller)),
+          );
+          expect(heading, findsOneWidget);
+          expect(
+            tester.renderObject<RenderParagraph>(heading).didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            find.text(product.customerSeller(product.seller)),
+            findsOneWidget,
+          );
+          final truth = find.byKey(
+            ValueKey('buy-public-store-truth-${product.id}'),
+          );
+          expect(
+            tester.getSize(truth).height,
+            lessThan(width == 320 ? 240 : 155),
+          );
+          final identity = find.byKey(
+            const ValueKey('buy-shop-seller-identity-card'),
+          );
+          expect(identity, findsOneWidget);
+          expect(
+            find.descendant(of: identity, matching: heading),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: identity, matching: truth),
+            findsOneWidget,
+          );
+          expect(
+            find.byTooltip('MoolSocial fulfilment partner'),
+            findsOneWidget,
+          );
+          expect(find.text('MoolSocial Fulfilment Store'), findsNothing);
+          if (number == 11) {
+            final empty = find.byKey(
+              const ValueKey('buy-public-store-no-products'),
+            );
+            expect(
+              find.descendant(of: identity, matching: empty),
+              findsNothing,
+            );
+            expect(tester.getSize(empty).height, lessThan(70));
+            expect(
+              tester.getTopLeft(empty).dy,
+              greaterThanOrEqualTo(tester.getBottomLeft(identity).dy),
+            );
+          }
+          if (number == 14) {
+            final other = session.otherStorePreviewsFor(product).first;
+            final visit = find.byKey(
+              ValueKey('buy-related-store-visit-${other.id}'),
+            );
+            await tester.scrollUntilVisible(
+              visit,
+              150,
+              maxScrolls: 40,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      const ValueKey('buy-shop-seller-sheet-list'),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            final card = tester.widget<Container>(
+              find.byKey(ValueKey('buy-related-store-card-${other.id}')),
+            );
+            expect((card.decoration! as BoxDecoration).gradient, isNotNull);
+            expect(visit.hitTestable(), findsOneWidget);
+            await _capture(tester, '$ticket-$width');
+            await tester.tap(visit);
+            await tester.pumpAndSettle();
+            expect(visited, other.storeId);
+          } else {
+            if (number == 10) {
+              const renamed = 'Updated Store Workspace Name';
+              session.renameStore(product.storeId!, renamed);
+              await tester.pumpAndSettle();
+              expect(find.text(renamed), findsOneWidget);
+              expect(heading, findsNothing);
+              expect(
+                session.catalogueStore(product.storeId!)!.id,
+                product.storeId,
+              );
+            }
+            await _capture(tester, '$ticket-$width');
+          }
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        } else if (number == 12 || number == 13) {
+          final products = [product, session.product('w-rice')];
+          await tester.pumpWidget(
+            shell(
+              SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (final item in products)
+                      SizedBox(
+                        width: width == 320 ? 150 : 270,
+                        child: AnimatedBuilder(
+                          animation: session,
+                          builder: (_, _) => BuyV2ProductCard(
+                            session: session,
+                            product: item,
+                            compact: true,
+                            storeContext: true,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final add = find.byKey(ValueKey('buy-add-${product.id}'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(tester.getSize(add).width, lessThanOrEqualTo(90));
+          expect(tester.getSize(add).width, greaterThanOrEqualTo(44));
+          expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+          final price = tester.getRect(
+            find.byKey(ValueKey('buy-price-highlight-${product.id}')),
+          );
+          expect(tester.getRect(add).left, greaterThanOrEqualTo(price.right));
+          expect(
+            tester.getRect(add).bottom,
+            lessThan(
+              tester
+                      .getRect(
+                        find.byKey(ValueKey('buy-product-${product.id}')),
+                      )
+                      .bottom -
+                  4,
+            ),
+          );
+          final title = tester.getRect(find.text(product.customerTitle));
+          final pack = tester.getRect(find.text(product.pack));
+          expect(pack.top - title.bottom, inInclusiveRange(0, 3));
+          await _capture(tester, '$ticket-$width');
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(product.id), 1);
+          expect(
+            find.byKey(ValueKey('buy-quantity-${product.id}')),
+            findsOneWidget,
+          );
+        } else if (number == 15) {
+          final scroll = ScrollController();
+          addTearDown(scroll.dispose);
+          await tester.pumpWidget(
+            shell(
+              BuyV2VerticalScrollIndicator(
+                child: ListView(
+                  controller: scroll,
+                  children: List.generate(
+                    30,
+                    (i) =>
+                        SizedBox(height: 70, child: Text('Product ${i + 1}')),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          Future<double> dotY() async {
+            final boundary = tester.renderObject<RenderRepaintBoundary>(
+              find.byKey(const ValueKey('pending-native-capture')),
+            );
+            return (await tester.runAsync(() async {
+              final frame = await boundary.toImage();
+              try {
+                final raw = (await frame.toByteData(
+                  format: ImageByteFormat.rawRgba,
+                ))!;
+                var count = 0, yTotal = 0, trackPixels = 0;
+                for (var y = 0; y < frame.height; y++) {
+                  for (var x = frame.width - 12; x < frame.width; x++) {
+                    final i = (y * frame.width + x) * 4;
+                    final r = raw.getUint8(i),
+                        g = raw.getUint8(i + 1),
+                        b = raw.getUint8(i + 2);
+                    if (r == 20 && g == 70 && b == 217) {
+                      count++;
+                      yTotal += y;
+                    }
+                    if (r == 137 && g == 147 && b == 162) {
+                      trackPixels++;
+                    }
+                  }
+                }
+                expect(trackPixels, 0);
+                expect(count, greaterThan(10));
+                return yTotal / count;
+              } finally {
+                frame.dispose();
+              }
+            }))!;
+          }
+
+          final top = await dotY();
+          scroll.jumpTo(scroll.position.maxScrollExtent / 2);
+          await tester.pumpAndSettle();
+          final middle = await dotY();
+          expect(middle, greaterThan(top + 200));
+          await _capture(tester, '$ticket-$width');
+          scroll.jumpTo(scroll.position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          expect(await dotY(), greaterThan(middle + 200));
+        } else {
+          await tester.pumpWidget(shell(BuyV2Screen(session: session)));
+          await tester.pumpAndSettle();
+          if (number == 9) {
+            final category = find.byKey(const ValueKey('buy-category-picker'));
+            final surfaces = find.descendant(
+              of: category,
+              matching: find.byType(AnimatedContainer),
+            );
+            for (final e in surfaces.evaluate()) {
+              expect((e.widget as AnimatedContainer).decoration, isNull);
+            }
+            expect(tester.getSize(category).height, greaterThanOrEqualTo(44));
+            for (final key in ['buy-change-location', 'buy-open-account']) {
+              final button = find.byKey(ValueKey(key));
+              expect(button.hitTestable(), findsOneWidget);
+              expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+            }
+            await _capture(tester, '$ticket-$width');
+            await tester.tap(category);
+            await tester.pumpAndSettle();
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+          } else {
+            for (final route in ['shop', 'wholesale']) {
+              if (route == 'wholesale') {
+                await tester.tap(
+                  find.byKey(const ValueKey('buy-local-tab-wholesale')),
+                );
+                await tester.pumpAndSettle();
+              }
+              expect(
+                find.byKey(ValueKey('buy-$route-sale-type-track')),
+                findsNothing,
+              );
+              expect(
+                tester
+                    .getSize(find.byKey(ValueKey('buy-$route-sale-type-thumb')))
+                    .height,
+                3,
+              );
+              final target = route == 'shop' ? 'courier' : 'bulk';
+              await tester.tap(
+                find.byKey(ValueKey('buy-$route-sale-type-$target')),
+              );
+              await tester.pumpAndSettle();
+              if (route == 'shop') {
+                expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+              } else {
+                expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+              }
+              await _capture(tester, '$ticket-$route-$width');
+            }
+          }
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      });
+    }
+  }
+}
+
+class _VisualStoreSession extends BuyV2Session {
+  _VisualStoreSession({required super.core}) : super(reviewDataEnabled: true);
+
+  BuyV2StoreListing? renamedStore;
+
+  void renameStore(String id, String name) {
+    renamedStore = BuyV2StoreListing(
+      id: id,
+      name: name,
+      area: 'Sardarpura',
+      address: 'Sardarpura, Jodhpur',
+      regionId: 'jodhpur',
+    );
+    notifyListeners();
+  }
+
+  @override
+  BuyV2StoreListing? catalogueStore(String storeId) =>
+      renamedStore?.id == storeId
+      ? renamedStore
+      : super.catalogueStore(storeId);
+}
 
 class _AccountStore implements BuyV2GstInvoiceProfileStore {
   @override
@@ -63,6 +472,27 @@ Widget _captureRoot(BuildContext context, Widget? child) => RepaintBoundary(
 Future<void> _capture(WidgetTester tester, String name) async {
   const directory = String.fromEnvironment('PENDING_CAPTURE_DIR');
   if (directory.isEmpty) return;
+  final images = find.byType(Image).evaluate().toList();
+  await tester.runAsync(() async {
+    for (final element in images) {
+      if (!element.mounted) continue;
+      final provider = (element.widget as Image).image;
+      ImageProvider source = provider;
+      while (source is ResizeImage) {
+        source = source.imageProvider;
+      }
+      if (source is! AssetImage) continue;
+      Object? decodeError;
+      await precacheImage(
+        provider,
+        element,
+        onError: (error, stack) {
+          decodeError = error;
+        },
+      );
+      if (decodeError != null) throw StateError('Asset decode: $decodeError');
+    }
+  });
   await tester.pumpAndSettle();
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey('pending-native-capture')),
@@ -109,6 +539,7 @@ Future<void> _fillGst(
 }
 
 void main() {
+  _founderVisualCases();
   test('D05 production never receives a review comparison provider', () {
     final session = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
     addTearDown(session.dispose);
