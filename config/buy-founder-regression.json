@@ -35,7 +35,7 @@
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -276,7 +276,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -291,7 +291,7 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
@@ -437,7 +437,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -451,7 +451,7 @@
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -593,7 +593,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -608,7 +608,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -792,7 +792,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -810,7 +810,7 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -1083,7 +1083,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -1097,7 +1097,7 @@
       "founderRequirement": "Cart to Offers opens Offers, never main-actions menu, preserving all baskets and explicit menu/Back actions.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
@@ -1442,7 +1442,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -1456,7 +1456,7 @@
       "founderRequirement": "Migrate production-route regression expectations after approved legacy Home retirement; retain standalone historical widget tests.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
@@ -3094,7 +3094,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -3108,7 +3108,7 @@
       "founderRequirement": "After payment selection, eliminate repeated Add GST entry in Shop/Wholesale Cart review. Provide one clear recipient-details flow with correct invoice attribution and retained state. Founder amendment: store GST recipient details in the signed-in user account profile, provide an optional Profile GST entry/prompt, and reuse saved details automatically in subsequent Shop/Wholesale carts without asking again.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -3366,7 +3366,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -3380,7 +3380,7 @@
       "founderRequirement": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -3500,7 +3500,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -3514,7 +3514,7 @@
       "founderRequirement": "MoolSocial and Suppliers Offers display controlled source-bound listings with correct publisher and Store identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -3576,7 +3576,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -3643,7 +3643,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -3797,7 +3797,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -3864,7 +3864,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -4001,7 +4001,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -4069,7 +4069,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -5878,7 +5878,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -5959,7 +5959,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -6026,7 +6026,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -6093,7 +6093,7 @@
       },
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -6107,7 +6107,7 @@
       "founderRequirement": "Compact expandable live tracking map with truthful missing-provider presentation; actual Google Maps and authorized delivery lifecycle remain integration dependencies.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b"
+        "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -6235,7 +6235,7 @@
       "founderApproval": null,
       "localQualification": {
         "date": "2026-09-24",
-        "scope": "388 selected frontend and controlled-provider acceptance scenarios; complete full Buy qualification still pending",
+        "scope": "Current selected acceptance plus two complete Buy runs passed; no physical or backend acceptance claimed",
         "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
         "redmi": "Authorized fresh r66.35 candidate not yet built or installed; no physical acceptance claimed"
       }
@@ -6254,7 +6254,7 @@
     "releaseGate": "Git held: original 19-entry approval retained; successor 250 scenarios and all120 navigation tests pass. New tracking visual approval, Redmi and unresolved shared/provider contracts remain pending; production backend-boundary check failed20 existing findings."
   },
   "successorQualification20260923": {
-    "status": "selected_passed_full_buy_pending",
+    "status": "local_qualified_device_pending",
     "selectedTicketEntries": 20,
     "registeredScenarios": 388,
     "navigationFiles": 12,
@@ -6262,7 +6262,7 @@
     "navigationFailed": 0,
     "navigationSkipped": 0,
     "approval": "Previous 19-entry visual approval retained; new tracking presentation requires founder review",
-    "remaining": "Two complete current-source Buy cycles, final analysis, committed clean Git and source-boundary gates required before authorized isolated Redmi APK; production contracts remain open.",
+    "remaining": "Final committed clean Git/remote parity, source manifest and machine seal before authorized isolated Redmi APK; device and production/backend acceptance remain pending.",
     "passed": 388,
     "failed": 0,
     "skipped": 0,
@@ -6270,11 +6270,97 @@
     "analysis": "12 changed Dart owners: zero issues; latest Profile tooltip and feedback checks passed",
     "evidenceArchive": {
       "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-      "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b",
+      "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39",
       "prefix": "pending-successor-local-20260923/"
     },
     "backendQualified": false,
-    "repairEvidencePrefix": "prebuild-final-r6635-20260924/"
+    "repairEvidencePrefix": "prebuild-final-r6635-20260924/",
+    "fullBuyRuns": [
+      {
+        "success": true,
+        "exitCode": 0,
+        "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
+        "unchangedSource": true,
+        "passed": 2666,
+        "failures": [],
+        "warnings": [],
+        "skipped": [
+          "R56.9 address-sheet responsive evidence captures",
+          "R56.10 request/add responsive evidence captures",
+          "Buy V2 R33 search-media-chat local candidate captures",
+          "Buy V2 R33 search-media-chat responsive journey captures",
+          "Buy V2 R33 horizontal and Account supplement captures",
+          "Buy V2 R35.1 dense flat vertical search suggestion captures",
+          "OPPO installed baseline header removal review captures",
+          "post-order confirmation and invoice review captures",
+          "Offers progressive browsing laptop review captures",
+          "B01 T02 automatic fulfilment founder capture",
+          "B01 T01C delivery plan and split founder captures",
+          "B01 T01A remove Medicine tab founder capture",
+          "B01 T01B optional GST invoice founder capture",
+          "R56.3 category-sheet responsive evidence captures",
+          "R56.6 filter-sheet responsive evidence captures",
+          "R56.6 FIX3 unified-sheet responsive evidence captures",
+          "R56.4 household and Saved responsive evidence captures",
+          "R56.2 scanner manual-code responsive evidence captures",
+          "R58.7 Orders responsive founder captures",
+          "R58.8.2 Assist responsive founder captures",
+          "R58.8.3 delivery context responsive founder captures",
+          "R58.8.4 responsive founder captures",
+          "R56.7 payment-sheet responsive evidence captures",
+          "R56.8 prescription-sheet responsive evidence captures",
+          "R56.5 responsive evidence captures",
+          "R56.1 Saved-clear responsive evidence captures",
+          "B01 T02 automatic fulfilment responsive founder captures"
+        ],
+        "log": "apps/mobile/build/review-candidates/cursor-buy-r6635-20260923/buy-full-4.jsonl",
+        "logSha256": "211abeae235291d3c9efb51c6728c33f685ca4720f45fb665609faed2bb894a1",
+        "resultSha256": "72520222b7674829333609eb6718a9bf45eb1fefe48909a4307fd9250083adce"
+      },
+      {
+        "success": true,
+        "exitCode": 0,
+        "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46",
+        "unchangedSource": true,
+        "passed": 2666,
+        "failures": [],
+        "warnings": [],
+        "skipped": [
+          "R56.9 address-sheet responsive evidence captures",
+          "R56.10 request/add responsive evidence captures",
+          "Buy V2 R33 search-media-chat local candidate captures",
+          "Buy V2 R33 search-media-chat responsive journey captures",
+          "Buy V2 R33 horizontal and Account supplement captures",
+          "Buy V2 R35.1 dense flat vertical search suggestion captures",
+          "OPPO installed baseline header removal review captures",
+          "post-order confirmation and invoice review captures",
+          "Offers progressive browsing laptop review captures",
+          "B01 T02 automatic fulfilment founder capture",
+          "B01 T01C delivery plan and split founder captures",
+          "B01 T01A remove Medicine tab founder capture",
+          "B01 T01B optional GST invoice founder capture",
+          "R56.3 category-sheet responsive evidence captures",
+          "R56.6 filter-sheet responsive evidence captures",
+          "R56.6 FIX3 unified-sheet responsive evidence captures",
+          "R56.4 household and Saved responsive evidence captures",
+          "R56.2 scanner manual-code responsive evidence captures",
+          "R58.7 Orders responsive founder captures",
+          "R58.8.2 Assist responsive founder captures",
+          "R58.8.3 delivery context responsive founder captures",
+          "R58.8.4 responsive founder captures",
+          "R56.7 payment-sheet responsive evidence captures",
+          "R56.8 prescription-sheet responsive evidence captures",
+          "R56.5 responsive evidence captures",
+          "R56.1 Saved-clear responsive evidence captures",
+          "B01 T02 automatic fulfilment responsive founder captures"
+        ],
+        "log": "apps/mobile/build/review-candidates/cursor-buy-r6635-20260923/buy-full-5.jsonl",
+        "logSha256": "bfb3916590ed447c925720f7e0378fc0b1da9307b25a07de166a667137864d35",
+        "resultSha256": "f21c84cafd911555d7b971931080f048015c1a692fde3a2ac37ebe6a60e29c00"
+      }
+    ],
+    "fullEvidencePrefix": "full-qualification-r6635-20260924/",
+    "reviewSourceCommit": "0fd4da937635e159354d5213d134b80516873242"
   },
   "historicalSelectedQualificationBeforeFeedbackRepair20260924": {
     "status": "selected_passed_full_buy_pending",
@@ -6293,7 +6379,7 @@
     "analysis": "All11 changed Dart owners: zero issues",
     "evidenceArchive": {
       "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-      "sha256": "43d9c9359dca6dafebb4dadf8cf37f2560ef3a174463ea9efafbac48fe35598b",
+      "sha256": "37abfa20997aeac1da5bb0c53a73be8fdd9369224d23d42c69960259dc4aca39",
       "prefix": "pending-successor-local-20260923/"
     },
     "backendQualified": false,

@@ -344,6 +344,79 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
+  if ($SourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242') {
+    # Fresh r66.35 review: exact committed source, never a moving allowance.
+    $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+    if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
+    $reviewBranch = @(& git -C $root branch --show-current)
+    if ($LASTEXITCODE -ne 0 -or $reviewBranch.Count -ne 1 -or
+        $reviewBranch[0] -cne 'work/cursor-ui/buy-ready-20260921') { return $false }
+    foreach ($tip in @('71c48d9cec5c7c5362194c0129ba5a68ed4380ef', $SourceCommit)) {
+      & git -C $root merge-base --is-ancestor $tip HEAD
+      if ($LASTEXITCODE -ne 0) { return $false }
+    }
+    $boundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
+    $expectedDelta = @(
+      'apps/mobile/lib/app/moolsocial_app.dart',
+      'apps/mobile/lib/features/buy/buy_v2_customer_copy.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart',
+      'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
+      'apps/mobile/lib/features/journey01/journey_router.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+      'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
+      'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shared_sku_fit_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+      'apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_dock_projection_parity_fix1_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart'
+    )
+    $delta = @(& git -C $root diff --name-only '71c48d9cec5c7c5362194c0129ba5a68ed4380ef' $SourceCommit -- @boundaries)
+    if ($LASTEXITCODE -ne 0 -or (@($delta | Sort-Object) -join '|') -cne (@($expectedDelta | Sort-Object) -join '|')) { return $false }
+    & git -C $root diff --quiet $SourceCommit HEAD -- @boundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & git -C $root diff --quiet $SourceCommit -- @boundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaries)
+    if ($LASTEXITCODE -ne 0 -or $untracked.Count -ne 0) { return $false }
+    $protectedRoots = @('apps/mobile/lib/features/buy','apps/mobile/lib/ui_v2/buy') +
+      @($explicitFiles | ForEach-Object { $_.Replace('\','/') })
+    $sealedOwners = @(& git -C $root ls-tree -r --name-only $SourceCommit -- @protectedRoots)
+    return $LASTEXITCODE -eq 0 -and
+      (@($sealedOwners | Sort-Object -Unique) -join '|') -ceq ($relativeFiles -join '|')
+  }
   if ($SourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef') {
     # Fresh r66.34 review: exact committed source, never a moving allowance.
     $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')

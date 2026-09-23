@@ -146,6 +146,22 @@ function Get-MobileBoundaryViolations {
 
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
+    # Exact r66.35 source; customer-tapped Store/resolved-area Maps launchers only.
+    if ($IntegratedReviewSourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242' -and
+        $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      $expectedMapHash = if ($owner.EndsWith('/buy_v2_store_address.dart')) {
+        '20968444FB7A945288DF451D39490489348E247B3E4ACB7AC742C780E1E79C45'
+      } else { '46DFC97C99FEE2B5E5B35B235B538A819A3DAC957731576B6BE40713C9FF0EDB' }
+      if ($mapHash -ceq $expectedMapHash) {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
     # Exact r66.34 source; customer-tapped Store/resolved-area Maps launchers only.
     if ($IntegratedReviewSourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef' -and
         $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
@@ -216,6 +232,10 @@ function Get-MobileBoundaryViolations {
           # The protected-source checker first verifies the full exact snapshot.
           $IntegratedReviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0' -and
           $soundSourceHash -ceq 'D4625A0942BFE5E8E018F55F0C35028D4EBA38F01E234E3250BEC52F07BB79DB'
+        ) -or (
+          # r66.35 UI changes preserve the byte-identical local arrival cue.
+          $IntegratedReviewSourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242' -and
+          $soundSourceHash -ceq '99D3DBDA025D6037FB48C50731F9F465F5CE0CD3133994BB8C9A002F0715EE9D'
         ) -or (
           # r66.34 Cart/checkout UI changes preserve the same local arrival cue.
           $IntegratedReviewSourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef' -and
