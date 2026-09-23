@@ -1894,9 +1894,9 @@ void main() {
   }
 
   Future<void> openTrackedPurchases(WidgetTester tester) async {
-    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.tap(find.byKey(const Key('work-store-home')));
     await tester.pumpAndSettle();
-    final tracking = find.byKey(const Key('work-shortcut-sourcing'));
+    final tracking = find.byKey(const Key('work-incoming-purchases'));
     await reveal(tester, tracking);
     await tester.tap(tracking);
     await tester.pumpAndSettle();
@@ -3614,7 +3614,7 @@ void main() {
             await tester.tap(products);
             await tester.pumpAndSettle();
             expect(
-              find.byKey(const Key('work-dashboard-catalogue-screen')),
+              find.byKey(const Key('work-catalogue-grid')),
               findsOneWidget,
             );
             await tester.binding.handlePopRoute();
@@ -3772,12 +3772,7 @@ void main() {
       await reveal(tester, find.text('Add products'));
       await tester.tap(find.text('Add products'));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-order-discard-dialog')),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const Key('work-order-discard')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),
         findsOneWidget,
@@ -4253,7 +4248,10 @@ void main() {
     expect(find.byKey(const Key('work-shortcut-statement')), findsNothing);
     expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
     await captureStoreView(tester, 'rail-stock');
-    final group = find.byKey(const Key('work-shortcut-groupBuying'));
+    expect(find.byKey(const Key('work-shortcut-groupBuying')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-store-home')));
+    await tester.pumpAndSettle();
+    final group = find.byKey(const Key('work-quick-group-buy'));
     await reveal(tester, group);
     final position = tester.getRect(group);
     final order = work.currentWorkspaceOrderId;
@@ -4270,14 +4268,13 @@ void main() {
     );
     expect(work.currentWorkspaceOrderId, order);
     await captureStoreView(tester, 'rail-group');
-    await tester.tap(find.byKey(const Key('work-shortcut-sourcing')));
-    await tester.pumpAndSettle();
+    await openTrackedPurchases(tester);
     expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
     await captureStoreView(tester, 'rail-purchases');
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('S09 DF04 sale keyboard and discard protection stay intact', (
+  testWidgets('S09 DF04 sale keyboard and saved draft recovery stay intact', (
     tester,
   ) async {
     final work = liveStore();
@@ -4318,9 +4315,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-counter-close')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-order-discard-dialog')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-order-keep-editing')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+    await openCounterSaleFromSales(tester);
     expect(work.workspaceOrderCustomer, '9829012345');
     expect(
       find.byKey(const Key('work-dashboard-counter-order-screen')),
@@ -4584,10 +4580,7 @@ void main() {
       expect(find.text('Catalogue'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-dashboard-catalogue-screen')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
       expect(work.workspaceCatalogueItems, isEmpty);
       expect(tester.takeException(), isNull);
     });
@@ -8933,18 +8926,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ADDENTRY01 upstream dashboard landscape AP-S1-001', (
-    tester,
-  ) async {
-    await mount(
+  for (final scale in [1.0, 1.4, 2.0]) {
+    testWidgets('ADDENTRY01 upstream dashboard landscape AP-S1-001 $scale', (
       tester,
-      route: '/app/work/workspace/dashboard',
-      work: storeViewFixture()..workspaceCatalogueItems.clear(),
-      viewport: const Size(740, 360),
-      textScale: 1.4,
-    );
-    expect(tester.takeException(), isNull);
-  }, skip: true); // AP-S1-001, retained upstream failure before entry opens.
+    ) async {
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: storeViewFixture()..workspaceCatalogueItems.clear(),
+        viewport: const Size(740, 360),
+        textScale: scale,
+      );
+      expect(tester.takeException(), isNull);
+      final review = find.byKey(const Key('work-activity-order-review'));
+      await reveal(tester, review);
+      expect(review.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final scenario in ['cancel', 'import', 'failure', 'store switch']) {
     testWidgets('ADDENTRY02 CSV $scenario uses existing importer', (
@@ -11775,7 +11774,14 @@ void main() {
       await tester.pumpAndSettle();
       final add = find.byKey(Key('work-catalogue-add-${product.id}'));
       expect(
-        find.descendant(of: add, matching: find.text('Add to Store')),
+        find.descendant(of: add, matching: find.text('Add')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: add,
+          matching: find.byTooltip('Review product to add'),
+        ),
         findsOneWidget,
       );
       final initialRect = tester.getRect(add);
@@ -11922,8 +11928,12 @@ void main() {
       final delegate =
           tester.widget<SliverGrid>(find.byType(SliverGrid)).gridDelegate
               as SliverGridDelegateWithFixedCrossAxisCount;
-      expect(delegate.mainAxisExtent, 192);
+      // Founder-approved compact normal-text catalogue; do not restore the
+      // superseded taller cards merely to satisfy a historical expectation.
+      expect(delegate.mainAxisExtent, 176);
       expect(delegate.crossAxisCount, 3);
+      expect(find.text('1 L pouch'), findsNWidgets(2));
+      expect(find.text('5 L can'), findsOneWidget);
       await captureStoreView(tester, 'catalogue-exact-variants-grid-360');
       await tester.tap(find.byKey(Key('work-catalogue-add-${variants[1].id}')));
       expect(selected, same(variants[1]));
@@ -14911,17 +14921,11 @@ void main() {
         );
         expect(
           find.byKey(const Key('work-counter-discount-apply')),
-          findsNothing,
+          findsOneWidget,
         );
         final input = find.byKey(const Key('work-counter-discount-value'));
-        expect(
-          tester.widget<TextField>(input).decoration!.labelText,
-          'Offer discount',
-        );
-        expect(
-          tester.widget<TextField>(input).decoration!.hintText,
-          'Enter percentage',
-        );
+        expect(tester.widget<TextField>(input).decoration!.labelText, isNull);
+        expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
         expect(tester.widget<TextField>(input).controller!.text, isEmpty);
         tester.view.viewInsets = FakeViewPadding(
           bottom: display.label == 'landscape' ? 120 : 280,
@@ -14932,8 +14936,9 @@ void main() {
         await tester.enterText(input, '100');
         await tester.pumpAndSettle();
         expect(work.workspaceCounterDiscount.isEmpty, isTrue);
+        await press('work-counter-discount-apply');
         expect(
-          find.text('Enter a discount below the subtotal.'),
+          find.text('Enter a percentage from 0 to less than 100.'),
           findsOneWidget,
         );
         expect(find.byKey(const Key('work-sale-upi-qr')), findsNothing);
@@ -14945,7 +14950,7 @@ void main() {
         );
         await tester.enterText(input, '10');
         await tester.pumpAndSettle();
-        expect(work.workspaceCounterPayableMinor, 23760);
+        expect(work.workspaceCounterPayableMinor, 26400);
         expect(tester.widget<TextField>(input).controller!.text, '10');
         await press('work-counter-discount-apply');
         expect(work.workspaceCounterPayableMinor, 23760);
@@ -14963,11 +14968,10 @@ void main() {
         expect(find.textContaining('Payable '), findsNothing);
         await capture('04-discount-percentage');
         await press('work-counter-discount-fixed');
+        expect(work.workspaceCounterDiscount.kind, 'percentage');
+        expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
+        await press('work-counter-discount-apply');
         expect(work.workspaceCounterDiscount.kind, 'fixed');
-        expect(
-          tester.widget<TextField>(input).decoration!.hintText,
-          'Enter amount',
-        );
         expect(work.workspaceCounterPayableMinor, 25400);
         await reveal(tester, input);
         await tester.enterText(input, '26.40');
@@ -14978,6 +14982,8 @@ void main() {
         await reveal(tester, input);
         await tester.enterText(input, '');
         await tester.pumpAndSettle();
+        expect(work.workspaceCounterPayableMinor, 23760);
+        await press('work-counter-discount-apply');
         expect(work.workspaceCounterPayableMinor, 26400);
         expect(work.workspaceCounterDiscount.isEmpty, isTrue);
         await press('work-counter-discount-percentage');
@@ -15520,10 +15526,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('work-order-discard-dialog')),
-          findsOneWidget,
+          findsNothing,
         );
-        await tester.tap(find.byKey(const Key('work-order-keep-editing')));
-        await tester.pumpAndSettle();
+        await openCounterSaleFromSales(tester);
+        await openSaleCustomer(tester);
         await tester.enterText(
           find.byKey(const Key('work-order-customer')),
           '9000091621',
@@ -15972,7 +15978,7 @@ void main() {
       final reviewSummary = find.byKey(const Key('work-order-review-summary'));
       final save = find.byKey(const Key('work-order-save'));
       final reviewTotal = find.byKey(const Key('work-counter-review-total'));
-      expect(find.text('$itemCount items'), findsOneWidget);
+      expect(find.text('Review bill · $itemCount items'), findsOneWidget);
       expect(find.byKey(const Key('work-review-items-toggle')), findsNothing);
       expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
       await captureStoreView(tester, 'counter-cart-review-initial-$caseId');
@@ -16029,7 +16035,7 @@ void main() {
       await reveal(tester, review);
       await tester.tap(review);
       await tester.pumpAndSettle();
-      expect(find.text('$itemCount items'), findsOneWidget);
+      expect(find.text('Review bill · $itemCount items'), findsOneWidget);
       expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
       expectFullTitleFits(reviewSummary, products.first.title);
       expect(work.workspaceOrderTotal, expectedTotal);
@@ -16048,7 +16054,7 @@ void main() {
         tester,
         'counter-compact-fifty-review-total-$caseId',
       );
-      expect(find.text('Total · $itemCount units'), findsOneWidget);
+      expect(find.text('Subtotal · $itemCount units'), findsOneWidget);
       final bankLabel = find.descendant(
         of: find.byKey(const Key('work-sale-payment-bank transfer')),
         matching: find.text('Bank Transfer'),
@@ -16077,6 +16083,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.state<EditableTextState>(editable), same(inputState));
       expect(tester.widget<TextField>(discount).controller!.text, '10');
+      expect(work.workspaceCounterPayableMinor, expectedTotal * 100);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
       expect(work.workspaceCounterPayableMinor, expectedTotal * 90);
       await tester.enterText(discount, '100');
       await tester.pumpAndSettle();
@@ -16240,7 +16249,23 @@ void main() {
         await tester.tap(find.byKey(const Key('work-order-review')));
         await tester.pumpAndSettle();
         expect(find.text(privateProduct.title), findsOneWidget);
-        expect(find.text('${privateProduct.pack} · 2 × ₹56'), findsOneWidget);
+        final privateRow = find.byKey(
+          ValueKey('work-review-item-${privateProduct.id}'),
+        );
+        expect(
+          find.descendant(
+            of: privateRow,
+            matching: find.textContaining(privateProduct.pack),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: privateRow,
+            matching: find.textContaining('2 × ₹56'),
+          ),
+          findsOneWidget,
+        );
         expect(work.workspaceOrderTotal, 112);
         expect(
           work.workspaceCatalogueItems
@@ -16281,8 +16306,8 @@ void main() {
     await tester.pumpAndSettle();
     final name = find.byKey(const Key('work-sale-customer-name'));
     final mobile = find.byKey(const Key('work-order-customer'));
-    expect(find.text('Type Customer Name'), findsOneWidget);
-    expect(find.text('Mobile Number'), findsOneWidget);
+    expect(find.text('Customer name'), findsOneWidget);
+    expect(find.text('Mobile number'), findsOneWidget);
     expect(find.text('+91'), findsOneWidget);
     expect(tester.getTopLeft(name).dy, lessThan(tester.getTopLeft(mobile).dy));
     expect(find.text('Hide optional details'), findsNothing);
@@ -16307,7 +16332,8 @@ void main() {
     await tester.pumpAndSettle();
     final business = find.byKey(const Key('work-sale-business-details'));
     await reveal(tester, business);
-    expect(tester.getCenter(business).dx, greaterThan(280));
+    expect(business.hitTestable(), findsOneWidget);
+    expect(tester.getSize(business).height, greaterThanOrEqualTo(48));
     await tester.tap(business);
     await tester.pumpAndSettle();
     final businessName = find.byKey(const Key('work-sale-business-name'));
@@ -16743,18 +16769,29 @@ void main() {
               find.byKey(ValueKey('work-sale-payment-state-$method')),
             )
             .properties
-            .selected!;
+            .checked!;
         final bankChoice = find.byKey(
           const ValueKey('work-sale-payment-bank transfer'),
         );
-        expect(
-          tester.getTopLeft(cashChoice).dy,
-          tester.getTopLeft(bankChoice).dy,
-        );
-        expect(
-          tester.getBottomLeft(cashChoice).dy,
-          tester.getBottomLeft(bankChoice).dy,
-        );
+        if (scale <= 1.5) {
+          expect(
+            tester.getTopLeft(cashChoice).dy,
+            tester.getTopLeft(bankChoice).dy,
+          );
+          expect(
+            tester.getBottomLeft(cashChoice).dy,
+            tester.getBottomLeft(bankChoice).dy,
+          );
+        } else {
+          expect(
+            tester.getRect(cashChoice).bottom,
+            lessThanOrEqualTo(tester.getRect(upiChoice).top),
+          );
+          expect(
+            tester.getRect(upiChoice).bottom,
+            lessThanOrEqualTo(tester.getRect(bankChoice).top),
+          );
+        }
         expect(find.text('Review bill'), findsNothing);
         expect(methodSelected('cash'), isTrue);
         await reveal(tester, upiChoice);
@@ -19052,8 +19089,8 @@ void main() {
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('work-contextual-shortcuts')).hitTestable(),
-          findsOneWidget,
+          find.byKey(const Key('work-contextual-shortcuts')),
+          findsNothing,
         );
         expect(controller.text, 'Fortune');
         await tester.tap(find.byKey(const Key('work-store-home')));
@@ -20115,10 +20152,11 @@ void main() {
     });
   }
 
-  testWidgets('S09 order totals Create bill draft keep and discard', (
+  testWidgets('S09 order totals Create bill saved draft preserves order', (
     tester,
   ) async {
-    final work = storeViewFixture()..workspaceOrderStage = 'Preparing';
+    final work = storeViewFixture(null, _ContactDraftFixtureStore())
+      ..workspaceOrderStage = 'Preparing';
     work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
       stage: 'Preparing',
     );
@@ -20141,17 +20179,9 @@ void main() {
     await enterSaleCustomer(tester, '9876543210');
     await tester.tap(find.byKey(const Key('work-counter-close')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-order-discard-dialog')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-order-keep-editing')));
-    await tester.pumpAndSettle();
-    expect(work.workspaceOrderCustomer, '9876543210');
-    expect(work.currentWorkspaceOrderId, isNull);
-    expect(work.workspaceOrders, orderedEquals(originalOrders));
-    await tester.tap(find.byKey(const Key('work-counter-close')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-order-discard')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
     expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    expect(work.retainedCounterDraft!.customer, '9876543210');
     expect(work.currentWorkspaceOrderId, 'APP-1043');
     expect(work.workspaceOrderCustomer, originalOrders.first.customer);
     expect(work.workspaceOrderPayment, originalOrders.first.payment);
@@ -20159,6 +20189,11 @@ void main() {
     expect(work.workspaceOrders, orderedEquals(originalOrders));
     expect(work.workspaceSettlementBalance, balance);
     expect(work.workspaceInvoices, isEmpty);
+    await tester.tap(find.byKey(const Key('work-orders-create')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderCustomer, '9876543210');
+    expect(work.currentWorkspaceOrderId, isNull);
+    expect(work.workspaceOrders, orderedEquals(originalOrders));
     expect(tester.takeException(), isNull);
   });
 
@@ -26260,7 +26295,7 @@ void main() {
     expect(find.byKey(const Key('work-quick-add-products')), findsNothing);
     expect(find.byKey(const Key('work-catalogue-add')), findsNothing);
     expect(find.byKey(const Key('work-catalogue-filter')), findsNothing);
-    expect(find.byKey(const Key('work-shortcut-restock')), findsOneWidget);
+    expect(find.byKey(const Key('work-shortcut-restock')), findsNothing);
     await openProductFilters(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Low stock'));
@@ -26282,12 +26317,7 @@ void main() {
     expect(find.byKey(const Key('work-catalogue-grid')), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is StoreAddProductSheet && widget.stockOnly,
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
     expect(find.byKey(const Key('work-catalogue-more')), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -28409,9 +28439,9 @@ void main() {
       await openCounterSaleFromSales(tester);
       await openSaleCustomer(tester);
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Mobile Number'), findsOne);
+      expect(find.bySemanticsLabel('Mobile number'), findsOne);
       final customerSemantics = tester.getSemantics(
-        find.bySemanticsLabel('Mobile Number'),
+        find.bySemanticsLabel('Mobile number'),
       );
       expect(customerSemantics.identifier, 'work-order-customer');
       expect(customerSemantics.value, 'Not entered');
@@ -30774,17 +30804,15 @@ void main() {
         // Recovery uses real controls; do not fix selection directly in tests.
         await tester.tap(find.byKey(const Key('work-counter-close')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('work-order-keep-editing')));
-        await tester.pumpAndSettle();
-        expect(work.workspaceOrderCustomer, '9829012345');
-        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
-        expect(work.currentWorkspaceOrder, same(incoming));
-        await tester.tap(find.byKey(const Key('work-counter-close')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('work-order-discard')));
-        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-order-discard-dialog')),
+          findsNothing,
+        );
         expect(work.workspaceInvoices, isEmpty);
         await openCounterSaleFromSales(tester);
+        // This unscoped fixture cannot persist a conflicted selected order as
+        // a Counter draft. Recovery starts a separate bill, never that order.
+        expect(work.currentWorkspaceOrderId, isNull);
         await enterSaleCustomer(tester, '9829012345');
         await addCounterProduct(
           tester,
@@ -36952,7 +36980,7 @@ void main() {
     );
   }
 
-  testWidgets('drafted sale has explicit keep or discard recovery', (
+  testWidgets('drafted sale leaves without loss and restores on return', (
     tester,
   ) async {
     final work = liveStore();
@@ -36966,17 +36994,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-counter-close')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-order-discard-dialog')), findsOne);
-    await tester.tap(find.byKey(const Key('work-order-keep-editing')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+    await openCounterSaleFromSales(tester);
     expect(find.byKey(const Key('work-sale-customer')), findsOne);
     expect(work.workspaceOrderCustomer, '9829012345');
     await tester.tap(find.byKey(const Key('work-counter-close')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-order-discard')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-store-activity-deck')), findsOne);
-    expect(work.workspaceOrderQuantities, isEmpty);
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+    await openCounterSaleFromSales(tester);
+    expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+    expect(work.workspaceInvoices, isEmpty);
   });
 
   testWidgets('Store header and contextual tabs keep full customer labels', (

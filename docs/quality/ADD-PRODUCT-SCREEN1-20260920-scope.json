@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "2A46D5596669F13CEC9CDCD41B47E95760EC0B941FBF7B32D90D21D7EC787757",
+      "manifestSha256": "69C1F7D82178AF6DAC95DF06C26BB197CDA28A18A01484684D72F3EAD4C95217",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -47,7 +47,7 @@
       ],
       "explicitExclusions": [
         "Only the founder-authorized 31 grouped r66.38 findings and directly related child defects discovered during local testing",
-        "No backend, production release, real payments or messages, APK build or device installation in this implementation batch"
+        "No backend, production release, real payments or messages; only the explicitly approved successor debug OPPO build/install after qualification"
       ],
       "dependenciesAndApprovals": [
         "Founder Screen 1 visual approval",
@@ -83,7 +83,7 @@
     "explicitExclusions": [
       "CSV batch-review redesign pending its screenwise approval",
       "Backend",
-      "Any new build/install or live service writes; Cursor edits/integration",
+      "Unapproved builds/installs or live service writes; Cursor edits/integration",
       "Counter Sale work unrelated to the 31 grouped r66.38 findings and their directly related child defects"
     ],
     "dependenciesAndApprovals": [
@@ -108,8 +108,8 @@
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": false,
-    "deviceInstallAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
     "externalServiceWriteAuthorized": false
   }
 }

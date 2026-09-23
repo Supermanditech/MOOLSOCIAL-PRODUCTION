@@ -2333,7 +2333,13 @@ class _WorkWorkspaceDashboardScreenState
     }
     if (!_hasCounterOrderDraft) return true;
     // A durable draft makes leaving non-destructive; ask only when saving fails.
-    if (await session.saveWorkspaceCounterDraft()) return true;
+    if (await session.saveWorkspaceCounterDraft()) {
+      // Release the active editor so another order can be selected. The scoped
+      // journal, not these transient fields, restores the bill on return.
+      // Unscoped sessions have no durable journal and must retain their fields.
+      return session.counterDraftIdentity == null ||
+          session.startNewWorkspaceOrder();
+    }
     if (!mounted) return false;
     final discard = await showDialog<bool>(
       context: context,
@@ -4888,16 +4894,6 @@ class _StoreActivityDeck extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
-          final scrollCard =
-              content is! _StoreOrderDetails &&
-              (_hasStoreWorkload(session) ||
-                  (largeText &&
-                      ((content is _DeliveryActivityCard &&
-                              MediaQuery.textScalerOf(context).scale(1) >=
-                                  1.8) ||
-                          session.workspaceOrderHasTimeRequest(
-                            selectedOrder?.id ?? '',
-                          ))));
           final desiredHeight = switch (content) {
             WorkCollectionLiveCard(:final controller) =>
               switch (controller?.snapshot?.state.name) {
@@ -4918,6 +4914,24 @@ class _StoreActivityDeck extends StatelessWidget {
             _InvoiceReadyActivityCard() => 350.0,
             _ => 420.0,
           };
+          // Short viewports must scroll the whole card, including its actions.
+          // Keep the existing compact layout when there is enough vertical room.
+          final minimumCardHeight =
+              (160 + MediaQuery.textScalerOf(context).scale(96)).clamp(
+                0,
+                desiredHeight,
+              );
+          final scrollCard =
+              content is! _StoreOrderDetails &&
+              (constraints.maxHeight < minimumCardHeight ||
+                  _hasStoreWorkload(session) ||
+                  (largeText &&
+                      ((content is _DeliveryActivityCard &&
+                              MediaQuery.textScalerOf(context).scale(1) >=
+                                  1.8) ||
+                          session.workspaceOrderHasTimeRequest(
+                            selectedOrder?.id ?? '',
+                          ))));
           final card = SizedBox(
             height: scrollCard
                 ? desiredHeight

@@ -1,5 +1,45 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Incremental successor qualification — 24 September 2026
+
+Founder requires latest approved implementation to supersede older behaviour
+where applicable, zero failed required checks, and committed/pushed, clean,
+remote-exact Store source before APK. No build or installation has occurred yet.
+
+Two 55-file runs passed 3,095 tests each with unchanged source/test hashes, but
+87 inherited skips remained. Explicit replay of skipped AP-S1-001 exposed the
+102px incoming-order overflow at 740x360 / 1.4x text. Therefore those earlier
+green runs do not qualify the later source. Preserve all failed/successful logs.
+
+Reuse the activity deck's existing full-card scrolling and desired heights for
+short text-scaled constraints. This replaces the invoice-only workaround and
+protects incoming orders and invoice actions through one existing layout path.
+Remove AP-S1-001's skip; normal, 1.4x and 2x text now pass with reachable actions.
+Rerun affected activity states, analysis and both complete regressions before
+the Git checkpoint and guarded build. Durable scoped bill release remains part
+of this same incremental fix. OPPO acceptance and backend work remain deferred.
+
+## Successor qualification authority — 23 September 2026
+
+After the recorded 31-defect approval and Git reconciliation, founder explicitly
+approved a latest APK build/install on OPPO with existing data preserved, then
+screen-by-screen testing. Latest instruction: "FIX THEM THEN GO AHEAD WITH APK"
+for the remaining combined-regression failures. Correct obsolete assertions
+without reverting approved UI, and fix directly related child defects discovered
+during replay. This supersedes only the earlier build/install hold below.
+
+MVP-supporting Retailer Store outcome: approved inventory/POS journeys in one
+non-promotable debug review APK. Reuse the existing dashboard, Store session,
+scoped draft journal and layout test owners. No new backend, public publication,
+payment, messaging, Cursor changes, Redmi changes or production release.
+
+Qualification found a child defect: leaving a safely journalled Counter bill
+keeps the transient editor occupied and blocks selecting another existing order.
+Release that editor only after durable scoped save; preserve the journal for
+re-entry, failed-save protection and unscoped in-memory drafts. Test order/packing
+integrity, draft restoration and no invoice/stock mutation. All 31 device closures
+remain pending until the successor is actually verified on OPPO.
+
 ## Founder approval — all 31 defects, subject to OPPO closure
 
 Founder explicitly instructed: "RECORD APPROVAL OF ALL 31 DEFECTS TOO SUBJECT TO
