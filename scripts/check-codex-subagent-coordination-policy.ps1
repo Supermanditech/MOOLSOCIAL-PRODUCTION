@@ -2926,6 +2926,8 @@ if ($ProductionLane -ceq 'baseline') {
         $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
         $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
         $effectiveOwner -cin @(
+          # 2026-09-23 founder-authorized Store scanner mode; Buy defaults unchanged.
+          'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
           'config/codex-development-regression-registry.json',
           'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
           'apps/mobile/lib/shared/commerce/commerce_downloads.dart',

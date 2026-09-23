@@ -44,6 +44,11 @@ void main() {
         find.byType(BuyV2ProductPackshot),
       );
       final reference = BuyV2ProductPackshot.resolveMedia(buy)!;
+      expect(
+        rendered.borderRadius,
+        0,
+        reason: 'No Store thumbnail frame or inherited photo padding.',
+      );
       final actual = BuyV2ProductPackshot.resolveMedia(rendered.product)!;
       expect(actual.assetPath, reference.assetPath);
       expect(actual.sourceRect, reference.sourceRect);
@@ -57,9 +62,9 @@ void main() {
   });
 
   test('Store square grid stays smaller than Buy at every screen width', () {
-    expect(StoreProductThumbnail.gridExtent(109.333), 64);
-    expect(StoreProductThumbnail.gridExtent(60), 56);
-    expect(StoreProductThumbnail.gridExtent(300), 64);
+    expect(StoreProductThumbnail.gridExtent(109.333), 48);
+    expect(StoreProductThumbnail.gridExtent(60), 46);
+    expect(StoreProductThumbnail.gridExtent(300), 48);
   });
 
   for (final extent in [
@@ -95,18 +100,19 @@ void main() {
         tester.getSize(find.byKey(const Key('frame'))),
         Size.square(extent),
       );
-      final renderer = tester.widget<BuyV2ProductPackshot>(
-        find.byType(BuyV2ProductPackshot),
-      );
       final expected = product.toCataloguePreviewProduct();
-      expect(renderer.product.id, expected.id);
-      expect(renderer.product.canonicalId, expected.canonicalId);
-      expect(renderer.product.pack, expected.pack);
-      expect(renderer.product.variant, expected.variant);
-      expect(renderer.borderRadius, extent >= 70 ? 8 : 4);
+      expect(expected.mediaAssets, isEmpty);
+      expect(BuyV2ProductPackshot.resolveMedia(expected), isNull);
+      expect(find.byType(BuyV2ProductPackshot), findsNothing);
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
       expect(
-        BuyV2ProductPackshot.resolveMedia(renderer.product)?.assetPath,
-        BuyV2ProductPackshot.resolveMedia(expected)?.assetPath,
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label ==
+                  'Product photo unavailable for ${product.title}, ${product.pack}',
+        ),
+        findsOneWidget,
       );
       expect(tester.takeException(), isNull);
     });

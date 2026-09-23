@@ -228,13 +228,21 @@ class _BuyV2CollectionCameraState extends State<BuyV2CollectionCamera>
 
 typedef BuyV2ScannerLauncher = Future<String?> Function(BuildContext context);
 
-Future<String?> showBuyV2ProductScanner(BuildContext context) async {
+/// Returns only a code. The Store caller owns matching, review and saving.
+Future<String?> showStoreProductScanner(BuildContext context) =>
+    showBuyV2ProductScanner(context, storeMode: true);
+
+Future<String?> showBuyV2ProductScanner(
+  BuildContext context, {
+  bool storeMode = false,
+}) async {
   final permission = await Permission.camera.request();
   if (!permission.isGranted) {
     if (!context.mounted) return null;
     return showBuyV2ManualCodeSheet(
       context,
       cameraUnavailable: true,
+      storeMode: storeMode,
       canOpenSettings:
           permission.isPermanentlyDenied || permission.isRestricted,
     );
@@ -244,7 +252,7 @@ Future<String?> showBuyV2ProductScanner(BuildContext context) async {
   return Navigator.of(context).push<String>(
     MaterialPageRoute<String>(
       fullscreenDialog: true,
-      builder: (_) => const BuyV2ProductScanner(),
+      builder: (_) => BuyV2ProductScanner(storeMode: storeMode),
     ),
   );
 }
@@ -253,6 +261,7 @@ Future<String?> showBuyV2ManualCodeSheet(
   BuildContext context, {
   bool cameraUnavailable = false,
   bool canOpenSettings = false,
+  bool storeMode = false,
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -270,6 +279,7 @@ Future<String?> showBuyV2ManualCodeSheet(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
       ),
       child: _BuyV2ManualCodePanel(
+        storeMode: storeMode,
         cameraUnavailable: cameraUnavailable,
         canOpenSettings: canOpenSettings,
       ),
@@ -279,11 +289,13 @@ Future<String?> showBuyV2ManualCodeSheet(
 
 class _BuyV2ManualCodePanel extends StatefulWidget {
   const _BuyV2ManualCodePanel({
+    this.storeMode = false,
     required this.cameraUnavailable,
     required this.canOpenSettings,
   });
 
   final bool cameraUnavailable;
+  final bool storeMode;
   final bool canOpenSettings;
 
   @override
@@ -313,6 +325,8 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
   Widget build(BuildContext context) {
     final title = widget.cameraUnavailable
         ? 'Camera access needed'
+        : widget.storeMode
+        ? 'Enter barcode'
         : 'Enter product code';
     return Semantics(
       container: true,
@@ -327,8 +341,9 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
           builder: (context, constraints) {
             final scale = MediaQuery.textScalerOf(context).scale(1);
             final height =
-                (238 +
-                        (scale - 1).clamp(0, 3) * 100 +
+                ((widget.storeMode ? 198 : 238) +
+                        (scale - 1).clamp(0, 3) *
+                            (widget.storeMode ? 200 : 100) +
                         (_showCodeError ? 32 : 0))
                     .clamp(0.0, constraints.maxHeight)
                     .toDouble();
@@ -428,6 +443,8 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
                                         Text(
                                           widget.cameraUnavailable
                                               ? 'Use a code now, or allow camera access in settings.'
+                                              : widget.storeMode
+                                              ? 'For a damaged barcode or failed camera scan.'
                                               : 'Barcode, QR or catalogue code',
                                           style: const TextStyle(
                                             color: BuyV2Colors.muted,
@@ -462,7 +479,9 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
                               decoration: InputDecoration(
                                 isDense: true,
                                 labelText: 'Product code',
-                                hintText: 'Scan number or product code',
+                                hintText: widget.storeMode
+                                    ? 'Type the printed barcode'
+                                    : 'Scan number or product code',
                                 errorText: _showCodeError
                                     ? 'Enter a product code'
                                     : null,
@@ -506,7 +525,8 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
 }
 
 class BuyV2ProductScanner extends StatefulWidget {
-  const BuyV2ProductScanner({super.key});
+  const BuyV2ProductScanner({super.key, this.storeMode = false});
+  final bool storeMode;
 
   @override
   State<BuyV2ProductScanner> createState() => _BuyV2ProductScannerState();
@@ -658,7 +678,10 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
       // Manual entry remains available even when the camera cannot stop cleanly.
     }
     if (!mounted) return;
-    final code = await showBuyV2ManualCodeSheet(context);
+    final code = await showBuyV2ManualCodeSheet(
+      context,
+      storeMode: widget.storeMode,
+    );
     if (!mounted) return;
     setState(() => _manualOpen = false);
     if (code != null) {
@@ -749,6 +772,7 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
           ValueListenableBuilder<MobileScannerState>(
             valueListenable: _controller,
             builder: (context, camera, _) => _ScannerOverlay(
+              storeMode: widget.storeMode,
               camera: camera,
               feedback: _scanStatus,
               busy: _scanActionBusy || camera.isStarting || _handled,
@@ -769,6 +793,7 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
 
 @visibleForTesting
 Widget buildBuyV2ScannerOverlayForTesting({
+  bool storeMode = false,
   required MobileScannerState camera,
   String? feedback,
   bool busy = false,
@@ -780,6 +805,7 @@ Widget buildBuyV2ScannerOverlayForTesting({
   required Future<void> Function() onScanNow,
   required Future<void> Function() onEnterCode,
 }) => _ScannerOverlay(
+  storeMode: storeMode,
   camera: camera,
   feedback: feedback,
   busy: busy,
@@ -794,6 +820,7 @@ Widget buildBuyV2ScannerOverlayForTesting({
 
 class _ScannerOverlay extends StatelessWidget {
   const _ScannerOverlay({
+    this.storeMode = false,
     required this.camera,
     required this.feedback,
     required this.busy,
@@ -807,6 +834,7 @@ class _ScannerOverlay extends StatelessWidget {
   });
 
   final MobileScannerState camera;
+  final bool storeMode;
   final String? feedback;
   final bool busy;
   final bool manualOpen;
@@ -825,11 +853,15 @@ class _ScannerOverlay extends StatelessWidget {
         : feedback == 'Code found'
         ? feedback!
         : camera.error != null
-        ? 'Camera unavailable. Try Scan now or enter the code.'
+        ? storeMode
+              ? 'Camera unavailable. Restart camera or enter barcode.'
+              : 'Camera unavailable. Try Scan now or enter the code.'
         : camera.isStarting || !camera.isInitialized
         ? 'Starting camera…'
         : !active
-        ? 'Camera paused. Tap Scan now to resume.'
+        ? storeMode
+              ? 'Camera paused. Tap Restart camera.'
+              : 'Camera paused. Tap Scan now to resume.'
         : feedback ?? 'Automatic scanning is active';
     final torchAvailable =
         active && camera.torchState != TorchState.unavailable;
@@ -842,6 +874,7 @@ class _ScannerOverlay extends StatelessWidget {
             camera.cameraDirection == CameraFacing.back);
     final actions = SingleChildScrollView(
       child: _ScannerActionPanel(
+        storeMode: storeMode,
         status: status,
         scanning: busy && active,
         busy: busy || manualOpen || camera.isStarting,
@@ -991,11 +1024,13 @@ class _ScannerFrame extends StatelessWidget {
 
 @visibleForTesting
 Widget buildBuyV2ScannerActionPanelForTesting({
+  bool storeMode = false,
   required String status,
   required bool scanning,
   required Future<void> Function() onScanNow,
   required Future<void> Function() onEnterCode,
 }) => _ScannerActionPanel(
+  storeMode: storeMode,
   status: status,
   scanning: scanning,
   onScanNow: onScanNow,
@@ -1004,6 +1039,7 @@ Widget buildBuyV2ScannerActionPanelForTesting({
 
 class _ScannerActionPanel extends StatelessWidget {
   const _ScannerActionPanel({
+    this.storeMode = false,
     required this.status,
     required this.scanning,
     this.busy = false,
@@ -1012,6 +1048,7 @@ class _ScannerActionPanel extends StatelessWidget {
   });
 
   final String status;
+  final bool storeMode;
   final bool scanning;
   final bool busy;
   final Future<void> Function() onScanNow;
@@ -1049,7 +1086,11 @@ class _ScannerActionPanel extends StatelessWidget {
                   )
                 : const Icon(Icons.center_focus_strong_rounded, size: 18),
             label: Text(
-              scanning ? 'Scanning…' : 'Scan now',
+              scanning
+                  ? 'Scanning…'
+                  : storeMode
+                  ? 'Restart camera'
+                  : 'Scan now',
               textAlign: TextAlign.center,
             ),
           ),
@@ -1106,9 +1147,11 @@ class _ScannerActionPanel extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                const Text(
-                  'Place one code inside the frame',
-                  style: TextStyle(
+                Text(
+                  storeMode
+                      ? 'Scan a Store product barcode'
+                      : 'Place one code inside the frame',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -1160,6 +1203,13 @@ class _ScannerActionPanel extends StatelessWidget {
                       Expanded(child: manualAction),
                     ],
                   ),
+                if (storeMode) ...[
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Damaged barcode or camera trouble? Enter code.',
+                    style: TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+                ],
               ],
             ),
           ),

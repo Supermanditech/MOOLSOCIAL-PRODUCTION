@@ -46,6 +46,7 @@
         "apps/mobile/lib/features/work/widgets/store_catalogue_categories.dart",
         "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
         "apps/mobile/lib/features/work/widgets/store_product_thumbnail.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
         "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
         "apps/mobile/lib/features/work/work_downloads.dart",
         "apps/mobile/lib/features/work/work_publication.dart",

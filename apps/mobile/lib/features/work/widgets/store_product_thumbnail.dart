@@ -18,14 +18,36 @@ class StoreProductThumbnail extends StatelessWidget {
   final double extent;
 
   static double gridExtent(double cardWidth) =>
-      (cardWidth - 14).clamp(56.0, 64.0);
+      (cardWidth - 14).clamp(40.0, 48.0);
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: extent,
-    child: BuyV2ProductPackshot(
-      product: product.toCataloguePreviewProduct(),
-      borderRadius: extent >= 70 ? 8 : 4,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final preview = product.toCataloguePreviewProduct();
+    final missing =
+        preview.mediaAssets.isEmpty &&
+        BuyV2ProductPackshot.resolveMedia(preview) == null;
+    return SizedBox.square(
+      dimension: extent,
+      child: missing
+          ? Semantics(
+              image: true,
+              label:
+                  'Product photo unavailable for ${product.title}, ${product.pack}',
+              child: Tooltip(
+                message: 'Product photo unavailable',
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  size: (extent * .45).clamp(16.0, 24.0),
+                  color: BuyV2Colors.muted,
+                ),
+              ),
+            )
+          : BuyV2ProductPackshot(
+              product: preview,
+              // Zero radius also removes the shared renderer's photo padding.
+              // Preserve the whole exact pack, not a stretched or cropped substitute.
+              borderRadius: 0,
+            ),
+    );
+  }
 }

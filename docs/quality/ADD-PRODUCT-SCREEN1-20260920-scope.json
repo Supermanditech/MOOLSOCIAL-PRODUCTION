@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "9EE7185A2892B32303157C1E0BDFE9153259BD83E5510C9122BA2A6FE5B204ED",
+      "manifestSha256": "2A46D5596669F13CEC9CDCD41B47E95760EC0B941FBF7B32D90D21D7EC787757",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -46,8 +46,8 @@
         "Ticket-specific verified checkpoint instead of absent central v88; no acceptance implied"
       ],
       "explicitExclusions": [
-        "No downstream screen redesign before founder approval",
-        "No backend, production release, real payments or messages; only the exact founder-authorized r66.37 OPPO review candidate"
+        "Only the founder-authorized 31 grouped r66.38 findings and directly related child defects discovered during local testing",
+        "No backend, production release, real payments or messages, APK build or device installation in this implementation batch"
       ],
       "dependenciesAndApprovals": [
         "Founder Screen 1 visual approval",
@@ -77,16 +77,17 @@
       "Catalogue category counts, list/grid toggle, local 50-item pages over up to 10000 supplied SKUs and product-specific test imagery",
       "Founder-approved next screen: shared prefilled editable review with Save to Store, fuller thumbnails within existing tiles, local shared-inventory Counter Sale verification; stop before Store stock list/grid redesign",
       "Founder-authorized exact variant and pack presentation, shared product metadata editor and public-field disposition; preserve one-time Store setup and system ownership, defer backend and pause for revised editor approval",
-      "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review"
+      "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review",
+      "23 September founder-authorized continuation: implement the 31 grouped r66.38 Store/catalogue/Counter Sale findings, fix related child defects during local tests, and present all affected actual screens together for founder approval before a new APK"
     ],
     "explicitExclusions": [
       "CSV batch-review redesign pending its screenwise approval",
       "Backend",
-      "Any build/install other than the exact UAW-STORE-ADD-PRODUCT-R66.37-REVIEW-20260921 non-production OPPO candidate; live service writes",
-      "Counter Sale changes"
+      "Any new build/install or live service writes; Cursor edits/integration",
+      "Counter Sale work unrelated to the 31 grouped r66.38 findings and their directly related child defects"
     ],
     "dependenciesAndApprovals": [
-      "Founder visual approval before next screen"
+      "Founder approval of the complete locally tested correction batch before any new APK"
     ],
     "testAndEvidencePlan": [
       "Focused entry actions and connected navigation",
@@ -107,8 +108,8 @@
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": true,
-    "deviceInstallAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
     "externalServiceWriteAuthorized": false
   }
 }

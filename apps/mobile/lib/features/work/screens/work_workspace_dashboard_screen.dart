@@ -1292,7 +1292,7 @@ class _WorkWorkspaceDashboardScreenState
                 if (procurementOpen) {
                   final purchase = _activeProcurement;
                   unawaited(
-                    showBuyV2ProductScanner(context).then((code) {
+                    showStoreProductScanner(context).then((code) {
                       if (!mounted ||
                           code == null ||
                           _activeProcurement != purchase ||
@@ -1438,14 +1438,16 @@ class _WorkWorkspaceDashboardScreenState
               ).toString(),
             ),
             onAddProducts: () async {
-              _showOperation(_WorkspaceOperation.catalogue);
-              await WidgetsBinding.instance.endOfFrame;
-              if (!mounted || _operation != _WorkspaceOperation.catalogue) {
-                return;
-              }
-              final catalogue = _catalogueKey.currentState;
-              if (catalogue != null) {
-                await catalogue._addProducts();
+              final saved = await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(
+                  builder: (_) => _WorkspaceCatalogueSurface(
+                    session: session,
+                    entryOnly: true,
+                  ),
+                ),
+              );
+              if (mounted && saved == true) {
+                _showOperation(_WorkspaceOperation.catalogue);
               }
             },
             onOrders: () => _showOperation(_WorkspaceOperation.orders),
@@ -2330,13 +2332,19 @@ class _WorkWorkspaceDashboardScreenState
       return session.startNewWorkspaceOrder();
     }
     if (!_hasCounterOrderDraft) return true;
+    // A durable draft makes leaving non-destructive; ask only when saving fails.
+    if (await session.saveWorkspaceCounterDraft()) return true;
+    if (!mounted) return false;
     final discard = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         key: const Key('work-order-discard-dialog'),
-        title: const Text('Leave this sale?'),
+        title: const Text('Draft not saved'),
+        titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        actionsPadding: const EdgeInsets.all(8),
         content: const Text(
-          'The customer and selected products have not been completed.',
+          'Keep editing to retry, or discard this unfinished sale.',
         ),
         actions: [
           TextButton(
@@ -2344,10 +2352,10 @@ class _WorkWorkspaceDashboardScreenState
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Keep editing'),
           ),
-          FilledButton(
+          TextButton(
             key: const Key('work-order-discard'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFB42318),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFB42318),
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Discard sale'),
@@ -3519,10 +3527,8 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
   // exposes only related tools; settings and other forms keep their full width.
   List<String> get _contextActions => switch (widget.active) {
     'statement' || 'dues' || 'payments' => ['statement', 'dues', 'payments'],
-    'catalogue' ||
-    'stockStatement' ||
-    'sourcing' ||
-    'groupBuying' => ['restock', 'sourcing', 'groupBuying'],
+    'catalogue' || 'stockStatement' => const [],
+    'sourcing' || 'groupBuying' => ['restock', 'sourcing', 'groupBuying'],
     'storeLink' ||
     'offers' ||
     'paidWork' => ['storeLink', 'offers', 'paidWork'],
@@ -3914,7 +3920,7 @@ class _StoreControlDashboard extends StatelessWidget {
                       session: session,
                       workspace: workspace,
                       onSetup: onSetup,
-                      onProducts: onStock,
+                      onProducts: onAddProducts,
                     ));
           // At enlarged text, the selected detail owns the working area.
           // Closing restores all unchanged dashboard rails; no new route.
@@ -12881,9 +12887,14 @@ class _OperationActionCard extends StatelessWidget {
 }
 
 class _WorkspaceCatalogueSurface extends StatefulWidget {
-  const _WorkspaceCatalogueSurface({required this.session, super.key});
+  const _WorkspaceCatalogueSurface({
+    required this.session,
+    this.entryOnly = false,
+    super.key,
+  });
 
   final WorkSession session;
+  final bool entryOnly;
 
   @override
   State<_WorkspaceCatalogueSurface> createState() =>
@@ -12893,6 +12904,7 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 class _WorkspaceCatalogueSurfaceState
     extends State<_WorkspaceCatalogueSurface> {
   final _stockActionKeys = <String, GlobalKey>{};
+  late final Widget _entryPage = _addProductEntry();
 
   void _restoreStockAction(String productId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -12933,7 +12945,7 @@ class _WorkspaceCatalogueSurfaceState
     );
   }
 
-  Future<void> _addProducts() async {
+  Widget _addProductEntry() {
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     var tab = 0;
@@ -12949,124 +12961,118 @@ class _WorkspaceCatalogueSurfaceState
       return true;
     }
 
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => StatefulBuilder(
-          builder: (pageContext, setPageState) => StoreAddProductEntryScreen(
-            selectedIndex: tab,
-            catalogueEditing: catalogueProduct != null,
-            onCloseCatalogueEditor: () =>
-                setPageState(() => catalogueProduct = null),
-            onSelected: (index) {
-              if (storeUnchanged()) setPageState(() => tab = index);
-            },
-            catalogue: IndexedStack(
-              index: catalogueProduct == null ? 0 : 1,
-              children: [
-                StoreAddProductSheet(
-                  embedded: true,
-                  catalogue: workspaceMasterCatalogue,
-                  isStoreCurrent: storeUnchanged,
-                  savedCatalogueKeys:
-                      widget.session.workspaceCatalogueShortlist,
-                  recentSearches:
-                      widget.session.workspaceCatalogueSearchHistory,
-                  onBrowseChanged: () {
-                    if (storeUnchanged()) {
-                      widget.session.notifyWorkspaceCatalogueBrowsingChanged();
-                    }
-                  },
-                  ownedProducts: List.of(
-                    widget.session.workspaceCatalogueItems,
-                  ),
-                  createProduct: (barcode) => _blankProduct(barcode: barcode),
-                  scanBarcode: () => showBuyV2ProductScanner(pageContext),
-                  onAdd: (product) {
-                    if (!storeUnchanged()) return;
-                    if (catalogueProduct != null) return;
-                    final existing = widget.session.workspaceCatalogueItems;
-                    if (existing.any(
-                      (item) =>
-                          item.id == product.id ||
-                          (item.canonicalId == product.canonicalId &&
-                              item.pack == product.pack &&
-                              item.variant == product.variant &&
-                              item.barcode == product.barcode),
-                    )) {
-                      setPageState(() {});
-                      return;
-                    }
-                    if (existing.any((item) => item.sku == product.sku)) {
-                      widget.session.showError(
-                        'This SKU is already in your store. Edit the existing product.',
-                      );
-                      return;
-                    }
-                    setPageState(() {
-                      catalogueProduct = product.copyWith(
-                        stockMode:
-                            widget.session.workspaceProductDefaults.stockMode,
-                        lowStockThreshold: widget
-                            .session
-                            .workspaceProductDefaults
-                            .lowStockThreshold,
-                        purchasePrice: 0,
-                        stock: 0,
-                        available: false,
-                        publicListing: widget
-                            .session
-                            .workspaceProductDefaults
-                            .customerListingRequested,
-                        compliance: product.compliance == null
-                            ? null
-                            : WorkspaceProductCompliance.fromJson({
-                                ...product.compliance!.toJson(),
-                                'manufacturedOrPackedOn': null,
-                                'bestBeforeOrUseBy': null,
-                              }),
-                      );
-                    });
-                  },
-                  onSelected: (product) {
-                    if (storeUnchanged()) {
-                      setPageState(() => catalogueProduct = product);
-                    }
-                  },
-                ),
-                if (catalogueProduct != null)
-                  _CatalogueProductEditor(
-                    key: ValueKey('catalogue-${catalogueProduct!.id}'),
-                    session: widget.session,
-                    product: catalogueProduct!,
-                    embeddedPage: true,
-                    onDone: () => setPageState(() => catalogueProduct = null),
-                    onSaved: () => Navigator.of(pageContext).pop(),
-                  )
-                else
-                  const SizedBox.shrink(),
-              ],
+    return StatefulBuilder(
+      builder: (pageContext, setPageState) => StoreAddProductEntryScreen(
+        selectedIndex: tab,
+        catalogueEditing: catalogueProduct != null,
+        onCloseCatalogueEditor: () =>
+            setPageState(() => catalogueProduct = null),
+        onSelected: (index) {
+          if (storeUnchanged()) setPageState(() => tab = index);
+        },
+        catalogue: IndexedStack(
+          index: catalogueProduct == null ? 0 : 1,
+          children: [
+            StoreAddProductSheet(
+              embedded: true,
+              catalogue: workspaceMasterCatalogue,
+              isStoreCurrent: storeUnchanged,
+              savedCatalogueKeys: widget.session.workspaceCatalogueShortlist,
+              recentSearches: widget.session.workspaceCatalogueSearchHistory,
+              onBrowseChanged: () {
+                if (storeUnchanged()) {
+                  widget.session.notifyWorkspaceCatalogueBrowsingChanged();
+                }
+              },
+              ownedProducts: List.of(widget.session.workspaceCatalogueItems),
+              createProduct: (barcode) => _blankProduct(barcode: barcode),
+              scanBarcode: () => showStoreProductScanner(pageContext),
+              onAdd: (product) {
+                if (!storeUnchanged()) return;
+                if (catalogueProduct != null) return;
+                final existing = widget.session.workspaceCatalogueItems;
+                if (existing.any(
+                  (item) =>
+                      item.id == product.id ||
+                      (item.canonicalId == product.canonicalId &&
+                          item.pack == product.pack &&
+                          item.variant == product.variant &&
+                          item.barcode == product.barcode),
+                )) {
+                  setPageState(() {});
+                  return;
+                }
+                if (existing.any((item) => item.sku == product.sku)) {
+                  widget.session.showError(
+                    'This SKU is already in your store. Edit the existing product.',
+                  );
+                  return;
+                }
+                setPageState(() {
+                  catalogueProduct = product.copyWith(
+                    stockMode:
+                        widget.session.workspaceProductDefaults.stockMode,
+                    lowStockThreshold: widget
+                        .session
+                        .workspaceProductDefaults
+                        .lowStockThreshold,
+                    purchasePrice: 0,
+                    sellingPrice: 0,
+                    unitPrice: '',
+                    stock: 0,
+                    available: false,
+                    publicListing: widget
+                        .session
+                        .workspaceProductDefaults
+                        .customerListingRequested,
+                    compliance: product.compliance == null
+                        ? null
+                        : WorkspaceProductCompliance.fromJson({
+                            ...product.compliance!.toJson(),
+                            'manufacturedOrPackedOn': null,
+                            'bestBeforeOrUseBy': null,
+                          }),
+                  );
+                });
+              },
+              onSelected: (product) {
+                if (storeUnchanged()) {
+                  setPageState(() => catalogueProduct = product);
+                }
+              },
             ),
-            manual: _CatalogueProductEditor(
-              key: ValueKey('manual-${manualProduct.id}'),
-              session: widget.session,
-              product: manualProduct,
-              embeddedPage: true,
-              onSaved: () => Navigator.of(pageContext).pop(),
-              onDone: () => setPageState(() {
-                manualProduct = _blankProduct();
-                tab = 0;
-              }),
-            ),
-            importCsv: () async {
-              if (!storeUnchanged()) {
-                return 'Your store changed. Open Add product again.';
-              }
-              final result = await _importCatalogue(csvOnly: true);
-              if (pageContext.mounted) setPageState(() {});
-              return result;
-            },
-          ),
+            if (catalogueProduct != null)
+              _CatalogueProductEditor(
+                key: ValueKey('catalogue-${catalogueProduct!.id}'),
+                session: widget.session,
+                product: catalogueProduct!,
+                embeddedPage: true,
+                onDone: () => setPageState(() => catalogueProduct = null),
+                onSaved: () => Navigator.of(pageContext).pop(true),
+              )
+            else
+              const SizedBox.shrink(),
+          ],
         ),
+        manual: _CatalogueProductEditor(
+          key: ValueKey('manual-${manualProduct.id}'),
+          session: widget.session,
+          product: manualProduct,
+          embeddedPage: true,
+          onSaved: () => Navigator.of(pageContext).pop(true),
+          onDone: () => setPageState(() {
+            manualProduct = _blankProduct();
+            tab = 0;
+          }),
+        ),
+        importCsv: () async {
+          if (!storeUnchanged()) {
+            return 'Your store changed. Open Add product again.';
+          }
+          final result = await _importCatalogue(csvOnly: true);
+          if (pageContext.mounted) setPageState(() {});
+          return result;
+        },
       ),
     );
   }
@@ -13092,7 +13098,7 @@ class _WorkspaceCatalogueSurfaceState
   }
 
   Future<bool> _scan() async {
-    final code = await showBuyV2ProductScanner(context);
+    final code = await showStoreProductScanner(context);
     if (!mounted || code == null || code.trim().isEmpty) return false;
     final normalized = code.trim().toLowerCase();
     final products = [
@@ -13656,6 +13662,7 @@ class _WorkspaceCatalogueSurfaceState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.entryOnly) return _entryPage;
     return SizedBox.expand(
       key: const Key('work-dashboard-catalogue-screen'),
       child: StoreAddProductSheet(
@@ -13667,7 +13674,7 @@ class _WorkspaceCatalogueSurfaceState
         catalogue: const [],
         ownedProducts: List.of(widget.session.workspaceCatalogueItems),
         createProduct: (barcode) => _blankProduct(barcode: barcode),
-        scanBarcode: () => showBuyV2ProductScanner(context),
+        scanBarcode: () => showStoreProductScanner(context),
         onSelected: _edit,
         stockStatementBuilder: (products, count, vertical, loadMore) =>
             _StoreStockStatementTable(
@@ -17188,6 +17195,7 @@ class _AccessibleWorkTextField extends StatefulWidget {
     this.prefixIcon,
     this.prefixText,
     this.stackedLabel = false,
+    this.compact = false,
   });
 
   final String keyName;
@@ -17201,6 +17209,7 @@ class _AccessibleWorkTextField extends StatefulWidget {
   final Widget? prefixIcon;
   final String? prefixText;
   final bool stackedLabel;
+  final bool compact;
 
   @override
   State<_AccessibleWorkTextField> createState() =>
@@ -17251,6 +17260,10 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
       minLines: widget.minLines,
       decoration: InputDecoration(
         label: widget.stackedLabel ? null : Text(widget.label),
+        isDense: widget.compact,
+        contentPadding: widget.compact
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+            : null,
         prefixIcon: widget.prefixIcon,
         prefixText: widget.prefixText,
       ),
@@ -25954,7 +25967,7 @@ const _counterSaleLine = MoolColors.line;
 const _counterSaleTint = Color(0xFFF5F5FC);
 const _counterSaleHeaderGradient = LinearGradient(
   // One blue family only: never blend saffron, white and green into a flag strip.
-  colors: [MoolColors.navy, MoolColors.royal],
+  colors: [Color(0xfff2f3f9), Colors.white],
   begin: Alignment.centerLeft,
   end: Alignment.centerRight,
 );
@@ -25973,13 +25986,13 @@ ThemeData _counterSaleTheme(ThemeData base) => base.copyWith(
   ),
   scaffoldBackgroundColor: Colors.white,
   appBarTheme: base.appBarTheme.copyWith(
-    backgroundColor: MoolColors.navy,
-    foregroundColor: Colors.white,
-    iconTheme: const IconThemeData(color: Colors.white),
-    actionsIconTheme: const IconThemeData(color: Colors.white),
+    backgroundColor: Colors.white,
+    foregroundColor: MoolColors.navy,
+    iconTheme: const IconThemeData(color: MoolColors.navy),
+    actionsIconTheme: const IconThemeData(color: MoolColors.navy),
     titleTextStyle: const TextStyle(
       fontFamily: 'Inter',
-      color: Colors.white,
+      color: MoolColors.navy,
       fontSize: 18,
       fontWeight: FontWeight.w700,
     ),
@@ -25990,12 +26003,12 @@ ThemeData _counterSaleTheme(ThemeData base) => base.copyWith(
       backgroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.disabled)
             ? const Color(0xFFE6EAF1)
-            : _counterSalePrimary,
+            : const Color(0xffeef0f8),
       ),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.disabled)
             ? const Color(0xFF68758A)
-            : Colors.white,
+            : _counterSalePrimary,
       ),
     ),
   ),
@@ -26072,7 +26085,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     }
     if (_stage == 'customer' && !_customerReturnToItems) return false;
     if (!await flushForNavigation() || !mounted) return true;
-    setState(() => _stage = _stage == 'payment' ? 'invoice' : 'items');
+    setState(() {
+      _stage = _stage == 'payment' ? 'invoice' : 'items';
+      _error = null;
+    });
     return true;
   }
 
@@ -26358,6 +26374,22 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
         )
         .toList(growable: false);
+    final amountWidth = products.fold<double>(48, (width, product) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text:
+              '₹${_formatStoreAmount(product.sellingPrice * widget.session.workspaceOrderQuantities[product.id]!)}',
+          style: DefaultTextStyle.of(
+            context,
+          ).style.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final measured = painter.width + 8;
+      painter.dispose();
+      return measured > width ? measured : width;
+    });
     Widget cart({List<Widget> trailing = const []}) => Material(
       key: const Key('work-order-review-summary'),
       color: Colors.white,
@@ -26388,7 +26420,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                                 ),
                               ),
                             Text(
-                              _customer.text.trim(),
+                              '+91 ${_storedCounterCustomerMobile(_customer.text) ?? _customer.text.trim()}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: MoolColors.muted,
@@ -26413,7 +26445,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     ],
                   ),
                   Text(
-                    '${products.length} ${products.length == 1 ? 'item' : 'items'}',
+                    'Review bill · ${products.length} ${products.length == 1 ? 'item' : 'items'}',
                     key: const Key('work-review-item-count'),
                     style: const TextStyle(
                       fontSize: 12,
@@ -26433,41 +26465,99 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     widget.session.workspaceOrderQuantities[product.id]!;
                 return Container(
                   key: ValueKey('work-review-item-${product.id}'),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: const BoxDecoration(
                     border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
                   ),
-                  child: Row(
-                    children: [
-                      StoreProductThumbnail(product: product, extent: 36),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final rate =
+                          '$quantity × ₹${_formatStoreAmount(product.sellingPrice)}';
+                      final separateRate =
+                          constraints.maxWidth - amountWidth >= 260 &&
+                          MediaQuery.textScalerOf(context).scale(12) <= 16;
+                      if (constraints.maxWidth - amountWidth < 140) {
+                        return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _StoreMoneyLine(
-                              leading: Text(
-                                product.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+                            Row(
+                              children: [
+                                StoreProductThumbnail(
+                                  product: product,
+                                  extent: 36,
                                 ),
-                              ),
-                              alignAmountToEnd: true,
-                              value:
-                                  '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${product.title} · ${product.pack}',
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${product.pack} · $quantity × ₹${_formatStoreAmount(product.sellingPrice)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: MoolColors.muted,
+                            Text(rate, style: const TextStyle(fontSize: 12)),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          StoreProductThumbnail(product: product, extent: 36),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  product.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  separateRate
+                                      ? product.pack
+                                      : '${product.pack} · $rate',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: MoolColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (separateRate)
+                            SizedBox(
+                              width: 82,
+                              child: Text(
+                                rate,
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          SizedBox(
+                            width: amountWidth,
+                            child: Text(
+                              '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 );
               }, childCount: products.length),
@@ -26487,27 +26577,14 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!widget.session.workspaceCounterDiscount.isEmpty)
-            _StoreMoneyLine(
-              leading: const Text('Subtotal', style: TextStyle(fontSize: 12)),
-              value: _purchaseAmount(
-                widget.session.workspaceCounterSubtotalMinor,
-              ),
-            ),
           _StoreMoneyLine(
-            key: const Key('work-counter-review-total'),
+            alignAmountToEnd: true,
             leading: Text(
-              'Total · $_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
+              'Subtotal · $_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
+              style: const TextStyle(fontSize: 12),
             ),
-            value:
-                !_editingDiscount &&
-                    widget.session.workspaceCounterDiscountError == null
-                ? '₹${_formatStoreMinorAmount(widget.session.workspaceCounterPayableMinor)}'
-                : 'Review discount',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: MoolColors.navy,
+            value: _purchaseAmount(
+              widget.session.workspaceCounterSubtotalMinor,
             ),
           ),
           const SizedBox(height: 4),
@@ -26519,6 +26596,28 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             onInvalid: () => setState(() => _editingDiscount = true),
             enabled: !_saving && !widget.session.counterDraftEditingBlocked,
           ),
+          const Divider(height: 12),
+          _StoreMoneyLine(
+            key: const Key('work-counter-review-total'),
+            alignAmountToEnd: true,
+            leading: const Text('Amount due'),
+            value:
+                !_editingDiscount &&
+                    widget.session.workspaceCounterDiscountError == null
+                ? '₹${_formatStoreMinorAmount(widget.session.workspaceCounterPayableMinor)}'
+                : '—',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xff252b38),
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (_editingDiscount)
+            const Text(
+              'Apply your discount to update the total.',
+              style: TextStyle(fontSize: 11, color: MoolColors.muted),
+            ),
           if (widget.session.workspaceCounterDiscountError case final error?)
             Text(
               error,
@@ -26537,7 +26636,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               _rememberDetails();
             },
             onPaymentChanged: (value) {
-              setState(() => _payment = value);
+              setState(() {
+                _payment = value;
+                _error = null;
+              });
               _rememberDetails();
             },
           ),
@@ -26674,7 +26776,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     }
     final identity = _currentDraftIdentity;
     final saleGeneration = widget.session.counterSaleGeneration;
-    final code = await showBuyV2ProductScanner(context);
+    final code = await showStoreProductScanner(context);
     if (!mounted || code == null || code.trim().isEmpty) return;
     if (identity != _currentDraftIdentity ||
         saleGeneration != widget.session.counterSaleGeneration) {
@@ -27067,9 +27169,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                 prefixIcon: const Icon(Icons.search_rounded, size: 21),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
-                focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: _counterSalePrimary),
-                ),
+                focusedBorder: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -27569,7 +27669,7 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
           ),
           child: _StoreFormLayout(
             scrollKey: const Key('work-sale-customer-sheet'),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             action: FilledButton(
               key: const Key('work-sale-customer-confirm'),
               onPressed: _confirm,
@@ -27616,15 +27716,17 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                 const SizedBox(height: 12),
                 _AccessibleWorkTextField(
                   keyName: 'work-sale-customer-name',
+                  compact: true,
                   controller: _name,
-                  label: 'Type Customer Name',
+                  label: 'Customer name',
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 _AccessibleWorkTextField(
                   keyName: 'work-order-customer',
+                  compact: true,
                   controller: _controller,
-                  label: 'Mobile Number',
+                  label: 'Mobile number',
                   stackedLabel: media.textScaler.scale(14) > 21,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
@@ -27645,16 +27747,15 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                     ),
                   ),
                 Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
                     key: const Key('work-sale-business-details'),
-                    style: IconButton.styleFrom(
-                      backgroundColor: MoolColors.orange,
+                    style: TextButton.styleFrom(
                       foregroundColor: MoolColors.navy,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(48, 48),
                     ),
-                    tooltip: _businessExpanded
-                        ? 'Collapse business details'
-                        : 'Expand business details',
+                    label: const Text('Business details (optional)'),
                     onPressed: () {
                       setState(() {
                         _businessExpanded = !_businessExpanded;
@@ -27668,22 +27769,28 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                 if (_businessExpanded) ...[
                   _AccessibleWorkTextField(
                     keyName: 'work-sale-business-name',
+                    compact: true,
                     controller: _businessName,
-                    label: 'Business Name',
+                    label: 'Business name',
                   ),
+                  const SizedBox(height: 8),
                   _AccessibleWorkTextField(
                     keyName: 'work-sale-business-gst',
+                    compact: true,
                     controller: _gst,
                     label: 'GST',
                   ),
+                  const SizedBox(height: 8),
                   _AccessibleWorkTextField(
                     keyName: 'work-sale-billing-address',
+                    compact: true,
                     controller: _billingAddress,
-                    label: 'Billing Address',
+                    label: 'Billing address',
                   ),
+                  const SizedBox(height: 8),
                 ],
                 const Text(
-                  'For home delivery, share your store link with the customer at the mobile number entered above using WhatsApp or MoolSocial Chat.',
+                  'Home delivery? Share your Store link through WhatsApp or MoolSocial Chat.',
                   style: TextStyle(color: MoolColors.muted, fontSize: 12),
                 ),
                 if (widget.recentCustomers.isNotEmpty) ...[
@@ -28139,7 +28246,9 @@ class _CounterBillDiscountEditorState
     }
     setState(
       () => error = discount == null
-          ? 'Enter a discount below the subtotal.'
+          ? kind == 'percentage'
+                ? 'Enter a percentage from 0 to less than 100.'
+                : 'Enter an amount from 0 to less than the subtotal.'
           : null,
     );
     if (discount == null) {
@@ -28150,6 +28259,17 @@ class _CounterBillDiscountEditorState
     }
   }
 
+  Widget _applyButton() => TextButton(
+    key: const Key('work-counter-discount-apply'),
+    onPressed: !widget.enabled
+        ? null
+        : () {
+            applyInput();
+            if (error == null) FocusScope.of(context).unfocus();
+          },
+    child: const Text('Apply'),
+  );
+
   @override
   Widget build(BuildContext context) => Column(
     key: const Key('work-counter-discount-inline'),
@@ -28158,6 +28278,10 @@ class _CounterBillDiscountEditorState
     children: [
       LayoutBuilder(
         builder: (context, constraints) {
+          // Subscribe to keyboard changes as well as text scale. Otherwise the
+          // error anchor is not revealed again when the viewport shrinks.
+          MediaQuery.viewInsetsOf(context);
+          if (error != null) _revealError();
           final field = TextField(
             key: const Key('work-counter-discount-value'),
             controller: input,
@@ -28174,27 +28298,35 @@ class _CounterBillDiscountEditorState
               applyInput();
               if (error == null) FocusScope.of(context).unfocus();
             },
-            onChanged: (_) => applyInput(),
+            onChanged: (_) {
+              setState(() => error = null);
+              widget.onInvalid();
+            },
             decoration: InputDecoration(
-              labelText: 'Offer discount',
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              hintText: kind == 'percentage'
-                  ? 'Enter percentage'
-                  : 'Enter amount',
-              suffixIcon: input.text.trim().isEmpty
+              hintText: '0.00',
+              prefixText: kind == 'fixed' ? '₹ ' : null,
+              suffixText: kind == 'percentage' ? '%' : null,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              error: error == null
                   ? null
-                  : TextButton(
-                      key: const Key('work-counter-discount-apply'),
-                      onPressed: !widget.enabled || error != null
-                          ? null
-                          : () {
-                              applyInput();
-                              if (error == null) {
-                                FocusScope.of(context).unfocus();
-                              }
-                            },
-                      child: const Text('Apply'),
+                  : Semantics(
+                      key: _errorAnchor,
+                      liveRegion: true,
+                      child: Text(
+                        error!,
+                        key: const Key('work-counter-discount-input-error'),
+                        style: const TextStyle(
+                          color: Color(0xFFB42318),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
+              filled: false,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 8,
@@ -28210,10 +28342,19 @@ class _CounterBillDiscountEditorState
                   padding: const EdgeInsets.only(left: 2),
                   child: ChoiceChip(
                     key: Key('work-counter-discount-$mode'),
-                    label: Text(mode == 'percentage' ? '%' : 'AMT'),
+                    label: Text(mode == 'percentage' ? '%' : 'Amt'),
                     labelPadding: const EdgeInsets.symmetric(horizontal: 2),
                     padding: EdgeInsets.zero,
                     showCheckmark: false,
+                    selectedColor: const Color(0xffedf0f4),
+                    backgroundColor: Colors.white,
+                    side: BorderSide.none,
+                    labelStyle: TextStyle(
+                      color: MoolColors.navy,
+                      fontWeight: kind == mode
+                          ? FontWeight.w700
+                          : FontWeight.w400,
+                    ),
                     tooltip: mode == 'percentage'
                         ? 'Percentage discount'
                         : 'Amount discount',
@@ -28221,42 +28362,50 @@ class _CounterBillDiscountEditorState
                     onSelected: !widget.enabled
                         ? null
                         : (_) {
-                            setState(() => kind = mode);
-                            applyInput();
+                            setState(() {
+                              kind = mode;
+                              error = null;
+                            });
+                            widget.onInvalid();
                           },
                   ),
                 ),
             ],
           );
-          if (MediaQuery.textScalerOf(context).scale(14) > 20 &&
-              constraints.maxWidth < 320) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Align(alignment: Alignment.centerRight, child: modes),
-                field,
-              ],
-            );
-          }
-          return Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: field),
-              const SizedBox(width: 8),
-              modes,
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Discount',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  modes,
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Semantics(label: 'Discount value', child: field),
+                  ),
+                  if (MediaQuery.textScalerOf(context).scale(14) <= 20) ...[
+                    const SizedBox(width: 12),
+                    _applyButton(),
+                  ],
+                ],
+              ),
+              if (MediaQuery.textScalerOf(context).scale(14) > 20)
+                Align(alignment: Alignment.centerRight, child: _applyButton()),
             ],
           );
         },
       ),
-      if (error != null)
-        Semantics(
-          key: _errorAnchor,
-          liveRegion: true,
-          child: Text(
-            error!,
-            key: const Key('work-counter-discount-input-error'),
-            style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
-          ),
-        ),
       const SizedBox(height: 6),
     ],
   );
@@ -28589,18 +28738,15 @@ class _OrderCompletionChoices extends StatelessWidget {
       if (counterOnly) ...[
         if (!compact) const Text('Payment method'),
         if (!compact) const SizedBox(height: 8),
-        IntrinsicHeight(
-          child: Row(
+        LayoutBuilder(
+          builder: (context, constraints) => Wrap(
             key: const Key('work-sale-payment-row'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final method in const ['Cash', 'UPI', 'Bank Transfer'])
-                Expanded(
-                  flex:
-                      method == 'Bank Transfer' &&
-                          MediaQuery.textScalerOf(context).scale(12) > 18
-                      ? 16
-                      : 10,
+                SizedBox(
+                  width: MediaQuery.textScalerOf(context).scale(12) > 18
+                      ? constraints.maxWidth
+                      : constraints.maxWidth / 3,
                   child: Padding(
                     padding: EdgeInsets.only(
                       right: method == 'Bank Transfer' ? 0 : 6,
@@ -28609,34 +28755,28 @@ class _OrderCompletionChoices extends StatelessWidget {
                       key: ValueKey(
                         'work-sale-payment-state-${method.toLowerCase()}',
                       ),
-                      selected: payment == method,
-                      child: OutlinedButton(
+                      checked: payment == method,
+                      inMutuallyExclusiveGroup: true,
+                      child: TextButton.icon(
                         key: ValueKey(
                           'work-sale-payment-${method.toLowerCase()}',
                         ),
-                        style: OutlinedButton.styleFrom(
+                        style: TextButton.styleFrom(
                           minimumSize: const Size(48, 48),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
                             vertical: 8,
                           ),
-                          backgroundColor: payment == method
-                              ? _counterSalePrimary
-                              : Colors.white,
-                          foregroundColor: payment == method
-                              ? Colors.white
-                              : _counterSalePrimary,
-                          side: BorderSide(
-                            color: payment == method
-                                ? _counterSalePrimary
-                                : _counterSaleLine,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          foregroundColor: _counterSalePrimary,
                         ),
                         onPressed: () => onPaymentChanged(method),
-                        child: Text(
+                        icon: Icon(
+                          payment == method
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: 18,
+                        ),
+                        label: Text(
                           method,
                           textAlign: TextAlign.center,
                           style: const TextStyle(

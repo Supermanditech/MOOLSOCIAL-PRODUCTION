@@ -1,12 +1,20 @@
 # STORE-VISUAL-MASTER-001 — Founder visual and interaction preferences
 
-Canonical implementation guide, consolidated 22 September 2026. This extends
+Canonical implementation guide, consolidated 22 September 2026; latest founder
+decision amendment 23 September 2026. This extends
 the existing master ticket; it is not a new ticket, design system or approval.
 Read this before designing, editing, testing or presenting every authorized
 Store/Counter Sale screen. For future authorized screens elsewhere, apply the
 general preferences only where their specific accepted design permits it.
 
 ## Authority, coverage and conflict handling
+
+- Coverage amendment23September: includes the extended conversation history
+  supplied by the founder and accessible saved evidence through the current
+  OPPO r66.38 review. The founder requests continuity over the last30 days;
+  unavailable conversations/date ranges have NOT been independently read.
+  Never claim exhaustive30-day recall. Incorporate additional evidence here
+  when available, without creating a competing preferences document.
 
 - Sources: founder messages supplied in the current conversation for the recent
   ten-day work period, the existing master, screenwise OPPO defect records,
@@ -39,6 +47,109 @@ alignment, typography, good imagery, clear states and consistent brand treatment
 not tall headers, large empty cards, repeated icons, more gradients or more pages.
 Use the latest approved Buy styling as a reference when requested, adapted to the
 retailer's task. Do not make the founder repeatedly discover obvious problems.
+
+## Read first — decision contract before ANY implementation
+
+This section summarises how to apply the detailed rules below. It is the same
+master, not another policy or permission to change the app. A Markdown rule is
+NOT an implemented automated gate. Do not report it as one.
+
+### What the founder wants — explicit
+
+- A compact, useful, premium retail workflow: real products, legible amounts,
+  natural inline search, correct small photos, clear actions and short journeys.
+- One designated location for an action, not repeated icons/menus/rails across
+  screens merely because another shortcut might save a tap.
+- Shared components and data paths, not screen-specific clones. A common widget
+  still needs real, correctly mapped data and verification of all its states.
+- Founder approval is the final visual decision, not a substitute for agent QA.
+  Technical correctness remains the implementing agent's responsibility.
+
+### What NOT to do
+
+- Do not justify duplicate actions as convenience after the founder has chosen
+  their canonical location. Do not add a replacement shortcut to hide a broken
+  canonical route. Repair the route.
+- Do not infer whole-screen acceptance from an idle screenshot; focus, keyboard,
+  error, empty and returning states count. No source-only completion claims.
+- Do not turn premium into larger controls, more colours, more boxes or extra
+  pages. Compact does not mean small unreadable text or inaccessible targets.
+- Do not interpret backend deferral as permission for invented stock, photos,
+  balances, successful publication, payment or invoice issuance.
+- Do not replay old superseded decisions or rebuild already approved patterns.
+
+### Required decision receipt — short, in the existing ticket/work record
+
+Before editing, record these six answers, not another standalone document:
+1. Purpose and exact route: what task does this screen serve?
+2. Authority: latest explicit founder instruction, approved reference and any
+   earlier decision it supersedes. Mark inference as inference.
+3. Ownership: which existing component/data owner supplies the behaviour?
+4. Action inventory: each visible action's canonical home; retain/remove/reuse
+   decision. Any duplicate requires an explicit scoped exception, not assumption.
+5. Verification: exact interaction/data states that prove the requested outcome,
+   and the test to catch its recurrence. Repeated defects need failing-before /
+   passing-after evidence; do not merely replace expected screenshots with bugs.
+6. Boundaries: what remains unchanged, deferred or unverified?
+
+Before presenting, compare actual rendered/installed states with that receipt.
+If a required case has no evidence, leave it pending. Inspect the full affected
+shared-component surface set, not just the edited example. Separate implemented,
+host-tested, visually approved and exact-APK device-verified statuses.
+
+### Latest explicit amendments —23September2026, override older same-scope rules
+
+Latest local-render review: founder rejects solid-blue Add/Edit actions, thumbnail
+frames and the entire discount composition. Use subtle tonal Add actions with a
+plus; a checkmark/owned label distinguishes Store-added items from shortlisted
+ones while remaining editable. Small square photos have no ornamental frame or
+widget padding; preserve the exact complete pack without stretching. Discount
+must have legible type/value/application and aligned financial totals, not an
+embedded Apply squeezing the number. Avoid dominant blue blocks on affected
+screens; preserve accepted payment radio controls and other approved layouts.
+This supersedes previous filled-action/boxed-discount styling approvals, not
+financial validation or the requirement for truthful product media.
+
+Subsequent approval: revised screens accepted except catalogue toolbar icon boxes.
+Category/filter controls must be free-standing: no ornamental background, border,
+gradient or shadow. Retain accessible tap areas, labels/badges and active state.
+This does not remove the separately approved subtle Add/Edit action treatment.
+Catalogue search and its controls also share a continuous white surface: no
+dividing lines or tinted/gradient strip enclosing the inline search area.
+
+| Area | Required decision | Reject |
+| --- | --- | --- |
+| Stock right rail | Buy stock, Track purchases and Group remain at Store home; remove their duplicated Stock rail and vacated space | Repeating procurement actions on Stock as convenience |
+| Add Product entry | Store-home Add products opens the catalogue/manual/CSV journey directly | Routing to empty Stock whose instruction sends the user back to Add products |
+| Inline search | No decorative box, fill or underline in idle, focused, typing, cleared and keyboard-dismissed states; retain accessible focus semantics | Removing enabledBorder while retaining focused underline |
+| Inventory acceptance | Actual locally saved Store products, exact variant/pack, image, price and quantity; verify empty Store too | Seeded10000-unit products as proof of real save-to-stock-to-POS flow |
+| Review Bill payment | Compact radio circles with Cash/UPI/Bank Transfer, evenly spaced with accessible targets | Large filled payment tabs; payment selection causing invoice recording |
+| Review Bill discount | Amt casing; clear application behaviour and feedback; validation specific to percentage/amount | AMT, redundant Apply with no perceptible effect, vague subtotal error for invalid percentage |
+| Review Bill composition | Compact POS summary; product/quantity/rate/amount columns adapting to names and amounts; small correct thumbnails | Scattered counts/totals, oversized numeric fields, unaligned amounts |
+| Leave-sale confirmation | Compact grouped text/actions; protect unsaved work, make consequences clear; investigate safe draft-preserving exit | Oversized modal, dominant destructive action, silently discarding data |
+| Invoice failure | Preserve draft and show a precise actionable reason; Create invoice failure blocks downstream journey acceptance | Pretend success, repeated blind submits, treating a generic recording error as payment confirmation |
+
+The Stock-rail decision is a new explicit correction to the previous contextual
+rail placement. It does NOT remove distinct Orders/Sales actions or all rails
+globally. Prefer a verified existing route over speculative redesign.
+
+### Inferred defaults — apply only where no explicit decision conflicts
+
+- Group related facts and actions together; keep primary content near search.
+- Use restrained white/navy, aligned type and authentic imagery for richness;
+  optional tonal gradients must serve hierarchy, not decoration everywhere.
+- Expose useful detail progressively in shared sections instead of new pages.
+- Explain an unavailable action at its point of use, with a truthful recovery.
+- Preserve necessary financial/privacy/accessibility safeguards even when
+  simplifying the presentation. Ask about real conflicts, not routine spacing.
+
+### Why this amendment exists
+
+The original guide already prohibited duplication, but implementation did not
+consistently follow it. r66.38 visibly retained a focused search underline and
+seeded photo-less review inventory. Memory and test counts did not establish
+conformance. The remedy is applying these decisions in shared implementation
+and exact-state tests, not merely accumulating more Markdown.
 
 ## 1. Reuse and eliminate duplication — explicit
 

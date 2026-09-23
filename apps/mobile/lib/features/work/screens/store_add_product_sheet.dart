@@ -109,14 +109,15 @@ class _StoreAddModeSelector extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 48),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
+            Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    labels[index],
+                    index == 0 ? 'Catalogue' : labels[index],
                     style: TextStyle(
                       fontSize: compact
                           ? MediaQuery.textScalerOf(context).scale(1) > 1.3
@@ -144,6 +145,7 @@ class _StoreAddModeSelector extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 4),
             const Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 20,
@@ -1557,6 +1559,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
   Widget _viewControl() => IconButton(
     key: const Key('work-catalogue-view-toggle'),
     tooltip: _listView ? 'Grid view' : 'List view',
+    color: MoolColors.navy,
     onPressed: () => _resetBrowse(() => _listView = !_listView),
     icon: Icon(
       _listView ? Icons.grid_view_rounded : Icons.view_list_rounded,
@@ -1649,14 +1652,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                     horizontal: 8,
                     vertical: 4,
                   ),
-                  decoration: BoxDecoration(
-                    color: widget.stockOnly ? Colors.white : MoolColors.canvas,
-                    border: widget.stockOnly
-                        ? null
-                        : const Border(
-                            bottom: BorderSide(color: MoolColors.line),
-                          ),
-                  ),
+                  color: Colors.white,
                   child: Row(
                     children: [
                       if (widget.embedded && !widget.stockOnly)
@@ -1802,14 +1798,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                       6,
                       widget.stockOnly ? 0 : 5,
                     ),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFF8F8FF), Color(0xFFF5F8FF)],
-                      ),
-                      border: Border(
-                        bottom: BorderSide(color: MoolColors.line),
-                      ),
-                    ),
+                    color: Colors.white,
                     child: Row(
                       children: [
                         IconButton(
@@ -1842,7 +1831,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                                       Text(
                                         widget.stockOnly
                                             ? 'Store stock'
-                                            : 'MoolSocial catalogue',
+                                            : 'Catalogue',
                                         key: widget.stockOnly
                                             ? const Key(
                                                 'work-catalogue-heading',
@@ -1883,18 +1872,29 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                             key: const Key('work-catalogue-saved'),
                             tooltip: _savedOnly
                                 ? 'Show all products'
-                                : 'Saved shortlist',
+                                : 'Saved shortlist (${_saved.length})',
                             onPressed: () => _resetBrowse(() {
                               _savedOnly = !_savedOnly;
                             }),
                             padding: EdgeInsets.zero,
-                            icon: _control(
-                              _savedOnly
-                                  ? Icons.bookmark_rounded
-                                  : Icons.bookmark_border_rounded,
-                              'Saved shortlist',
-                              active: _savedOnly,
-                              badge: '${_saved.length}',
+                            icon: SizedBox.square(
+                              dimension: 48,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _savedOnly
+                                        ? Icons.bookmark_rounded
+                                        : Icons.bookmark_border_rounded,
+                                    size: 18,
+                                  ),
+                                  const Text(
+                                    'Saved',
+                                    style: TextStyle(fontSize: 9),
+                                    maxLines: 1,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         const SizedBox(width: 6),
@@ -1985,6 +1985,28 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                       ),
                     ),
                   ),
+                if (!widget.stockOnly &&
+                    (_category.isNotEmpty || _filter.isNotEmpty))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Wrap(
+                      spacing: 6,
+                      children: [
+                        if (_category.isNotEmpty)
+                          InputChip(
+                            label: Text(_categoryLabel(_category)),
+                            onDeleted: () => _resetBrowse(() => _category = ''),
+                          ),
+                        if (_filter.isNotEmpty)
+                          InputChip(
+                            label: Text(
+                              _filter == 'new' ? 'Not added yet' : _filter,
+                            ),
+                            onDeleted: () => _resetBrowse(() => _filter = ''),
+                          ),
+                      ],
+                    ),
+                  ),
                 if (!widget.stockOnly && _searchFocus.hasFocus) ...[
                   const Padding(
                     padding: EdgeInsets.fromLTRB(12, 4, 12, 4),
@@ -2049,18 +2071,39 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
-                            child: Text(
-                              widget.stockOnly
-                                  ? (widget.ownedProducts.isEmpty
-                                        ? 'No products saved yet. Open Store → Add products to add your stock.'
-                                        : 'No matching stock. Try another search or filter.')
-                                  : _savedOnly && _saved.isEmpty
-                                  ? 'Your shortlist is empty. Tap the bookmark on a product, then review it before adding to Store.'
-                                  : _savedOnly
-                                  ? 'No shortlisted products match. Clear search and filters to see your shortlist.'
-                                  : widget.embedded
-                                  ? 'No matching product. Use Add manually to enter its details.'
-                                  : 'No matching product. You can add its details below.',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.stockOnly
+                                      ? (widget.ownedProducts.isEmpty
+                                            ? 'No products saved yet. Open Store → Add products to add your stock.'
+                                            : 'No matching stock. Try another search or filter.')
+                                      : _savedOnly && _saved.isEmpty
+                                      ? 'Your shortlist is empty. Tap the bookmark on a product, then review it before adding to Store.'
+                                      : _savedOnly
+                                      ? 'No shortlisted products match. Clear search and filters to see your shortlist.'
+                                      : 'No matching products. Try clearing search and filters.',
+                                ),
+                                if (_search.text.isNotEmpty ||
+                                    _barcode.isNotEmpty ||
+                                    _category.isNotEmpty ||
+                                    _filter.isNotEmpty)
+                                  TextButton(
+                                    key: const Key(
+                                      'work-catalogue-clear-filters',
+                                    ),
+                                    onPressed: () => _resetBrowse(() {
+                                      _search.clear();
+                                      _barcode = '';
+                                      _category = '';
+                                      _filter = '';
+                                    }),
+                                    child: const Text(
+                                      'Clear search and filters',
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         )
@@ -2256,34 +2299,9 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
   }) => Semantics(
     label: label,
     selected: active,
-    child: Container(
+    child: SizedBox(
       width: 48,
       height: 48,
-      decoration: widget.stockOnly
-          ? BoxDecoration(
-              color: active
-                  ? MoolColors.navy.withValues(alpha: .06)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            )
-          : BoxDecoration(
-              gradient: LinearGradient(
-                colors: active
-                    ? const [Color(0xffe9ecff), Colors.white]
-                    : const [Colors.white, Color(0xFFF4F3FF)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: active ? BuyV2Colors.navy : BuyV2Colors.line,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000080),
-                  blurRadius: 9,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
       child: Center(
         child: Badge(
           isLabelVisible: badge != null,
@@ -2329,35 +2347,59 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
     }
   }
 
+  Widget _catalogueAction(WorkspaceCatalogueItem product, bool added) =>
+      DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          gradient: LinearGradient(
+            colors: added
+                ? const [Color(0xfff1f6f2), Colors.white]
+                : const [Color(0xffeef0f8), Colors.white],
+          ),
+        ),
+        child: TextButton(
+          key: Key('work-catalogue-add-${product.id}'),
+          style: TextButton.styleFrom(
+            foregroundColor: MoolColors.navy,
+            backgroundColor: Colors.transparent,
+            minimumSize: const Size(44, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            textStyle: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onPressed: () => _activate(product),
+          child: Tooltip(
+            message: added
+                ? 'Added to Store · edit product'
+                : 'Review product to add',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(added ? Icons.check_rounded : Icons.add_rounded, size: 12),
+                const SizedBox(width: 2),
+                Flexible(child: Text(added ? 'Edit' : 'Add')),
+              ],
+            ),
+          ),
+        ),
+      );
+
   Widget _listTile(WorkspaceCatalogueItem product) {
     final owned = _owned(product);
     final enlarged = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final action = SizedBox(
       width: enlarged ? double.infinity : 84,
       height: 48,
-      child: FilledButton.tonal(
-        key: Key('work-catalogue-add-${product.id}'),
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        onPressed: () => _activate(product),
-        child: Text(
-          owned == null ? 'Add to Store' : 'Edit',
-          textAlign: TextAlign.center,
-        ),
-      ),
+      child: _catalogueAction(product, owned != null),
     );
     return Material(
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: owned == null ? MoolColors.line : MoolColors.navy,
-        ),
+        side: BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -2369,7 +2411,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
             children: [
               Row(
                 children: [
-                  StoreProductThumbnail(product: product, extent: 48),
+                  StoreProductThumbnail(product: product, extent: 36),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -2385,7 +2427,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: MoolColors.navy,
+                              color: Color(0xff30343b),
                             ),
                           ),
                         ),
@@ -2398,7 +2440,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 11,
-                              color: MoolColors.navy,
+                              color: Color(0xff555b65),
                             ),
                           ),
                         Text(
@@ -2415,9 +2457,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                               ? '₹${product.sellingPrice} · ${_stockLabel(product)}'
                               : owned != null
                               ? 'In your store'
-                              : product.mrp == null
-                              ? product.brand
-                              : 'MRP ₹${product.mrp}',
+                              : product.brand,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -2452,9 +2492,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: owned == null ? MoolColors.line : MoolColors.navy,
-        ),
+        side: BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -2465,12 +2503,24 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: StoreProductThumbnail(
-                  key: Key('work-catalogue-thumbnail-${product.id}'),
-                  product: product,
-                  extent: photoExtent,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: photoExtent,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: StoreProductThumbnail(
+                          key: Key('work-catalogue-thumbnail-${product.id}'),
+                          product: product,
+                          extent: photoExtent,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!widget.stockOnly) _saveControl(product),
+                ],
               ),
               const SizedBox(height: 2),
               Tooltip(
@@ -2484,7 +2534,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                     fontSize: 11,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
-                    color: MoolColors.navy,
+                    color: Color(0xff30343b),
                   ),
                 ),
               ),
@@ -2500,7 +2550,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                     style: const TextStyle(
                       fontSize: 10,
                       height: 1.2,
-                      color: MoolColors.navy,
+                      color: Color(0xff555b65),
                     ),
                   ),
                 ),
@@ -2516,9 +2566,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                     ? '₹${product.sellingPrice}'
                     : owned != null
                     ? 'In your store'
-                    : product.mrp == null
-                    ? product.brand
-                    : 'MRP ₹${product.mrp}',
+                    : product.brand,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 10, color: MoolColors.muted),
@@ -2554,25 +2602,9 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                     Expanded(
                       child: SizedBox(
                         height: 48,
-                        child: FilledButton.tonal(
-                          key: Key('work-catalogue-add-${product.id}'),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            textStyle: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                          onPressed: act,
-                          child: Text(
-                            owned == null ? 'Add to Store' : 'Edit',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                        child: _catalogueAction(product, owned != null),
                       ),
                     ),
-                    if (!widget.stockOnly) _saveControl(product),
                   ],
                 ),
               ),

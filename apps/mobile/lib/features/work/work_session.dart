@@ -1270,14 +1270,34 @@ class WorkSession extends ChangeNotifier {
     if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
     if (workspaceFinance != null) {
       final ledgerData = _storeData;
-      if (_storeData.customerCollectionGateway is! WorkCustomerInvoiceGateway ||
-          !await recoverCustomerLedger() ||
-          !identical(ledgerData, _storeData) ||
-          (pendingCustomerCollection != null ||
-              pendingCustomerReturn != null ||
-              pendingCustomerRefund != null)) {
+      if (ledgerData.customerCollectionGateway is! WorkCustomerInvoiceGateway) {
         showError(
-          'Invoice recording is unavailable or a collection needs confirmation. Your bill is kept.',
+          'Invoice recording is not connected for this Store. Your bill is kept; no invoice or payment was recorded.',
+        );
+        return null;
+      }
+      if (!await recoverCustomerLedger()) {
+        showError(
+          'Customer ledger could not be loaded. Retry when it is available. Your bill is kept.',
+        );
+        return null;
+      }
+      if (!identical(ledgerData, _storeData)) {
+        showError(
+          'The selected Store changed. Return to the original Store to continue its bill.',
+        );
+        return null;
+      }
+      final pendingAction = pendingCustomerCollection != null
+          ? 'collection'
+          : pendingCustomerReturn != null
+          ? 'return'
+          : pendingCustomerRefund != null
+          ? 'refund'
+          : null;
+      if (pendingAction != null) {
+        showError(
+          'A customer $pendingAction needs confirmation. Resolve it before creating this invoice. Your bill is kept.',
         );
         return null;
       }
@@ -10311,6 +10331,17 @@ class WorkSession extends ChangeNotifier {
     required String source,
     required String fulfilment,
   }) {
+    // Re-entering POS resumes the selected Store's unfinished bill. Only the
+    // explicit new-sale/discard actions may reset its customer and quantities.
+    if (source == 'Counter' &&
+        fulfilment == 'At the shop' &&
+        workspaceOrderSource == source &&
+        workspaceOrderFulfilment == fulfilment &&
+        currentWorkspaceOrderId == null &&
+        (workspaceOrderCustomer.trim().isNotEmpty ||
+            workspaceOrderQuantities.isNotEmpty)) {
+      return true;
+    }
     if (!startNewWorkspaceOrder()) return false;
     workspaceOrderSource = source;
     workspaceOrderFulfilment = fulfilment;
