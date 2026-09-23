@@ -391,6 +391,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
   late BuyV2GstInvoiceController _gstInvoiceController;
+  int _gstProfileRevision = 0;
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -605,6 +606,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   void _sessionChanged() {
     if (!mounted) return;
+    if (_gstProfileRevision != widget.session.gstProfileRevision) {
+      _gstProfileRevision = widget.session.gstProfileRevision;
+      unawaited(_gstInvoiceController.restore(force: true));
+    }
     final previousStoreView = _observedStoreSessionView;
     final previousRootProduct = _observedRootProductId;
     final session = widget.session;

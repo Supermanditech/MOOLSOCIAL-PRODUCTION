@@ -2238,5 +2238,128 @@
     "archiveSha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2",
     "state": "replay_ended_findings_registered_no_further_fix_cycle",
     "productionAccepted": false
+  },
+  "pendingFrontendQualification20260923": {
+    "state": "local_passed_device_backend_pending",
+    "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4",
+    "acceptance": {
+      "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4",
+      "registeredCases": 131,
+      "passedTests": 171,
+      "failed": 0,
+      "skipped": 0,
+      "analysis": "19 changed Dart files: no issues found",
+      "log": {
+        "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+        "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+        "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+      },
+      "tickets": [
+        {
+          "id": "R6634-C01",
+          "status": "local_passed",
+          "cases": 16,
+          "dependencies": []
+        },
+        {
+          "id": "R6634-C02",
+          "status": "local_passed",
+          "cases": 9,
+          "dependencies": []
+        },
+        {
+          "id": "R6634-C03",
+          "status": "local_passed",
+          "cases": 9,
+          "dependencies": []
+        },
+        {
+          "id": "R6634-C04",
+          "status": "local_passed",
+          "cases": 12,
+          "dependencies": []
+        },
+        {
+          "id": "R6634-C05",
+          "status": "local_passed",
+          "cases": 18,
+          "dependencies": [
+            "Physical Redmi acceptance matrix remains pending; this batch is local qualification only.",
+            "Itemised partial-receipt backend/provider outcome remains deferred. Existing correlated receipt and delivery-problem report UI were tested with labelled local fixtures; no real delivery was claimed."
+          ]
+        },
+        {
+          "id": "R6634-C06",
+          "status": "local_passed",
+          "cases": 23,
+          "dependencies": [
+            "Successor APK Redmi verification and founder visual acceptance pending. Installed r66.34 is unchanged.",
+            "Original direct Offers-tap trigger remains unproven; Cart -> Offers -> Android Back variant reproduced and the legacy screen retired from production routing."
+          ]
+        },
+        {
+          "id": "R6634-C06-A01",
+          "status": "local_passed",
+          "cases": 22,
+          "dependencies": []
+        },
+        {
+          "id": "R6634-C07",
+          "status": "local_passed",
+          "cases": 14,
+          "dependencies": [
+            "Fresh Redmi journey and founder visual approval remain pending; local combined/single-scope/profile/payment-return scenarios passed.",
+            "R6634-C07 backendBusinessLogic remains PENDING for authenticated account persistence, lifecycle, access controls and authoritative order/invoice snapshots. Review runtime is session-only."
+          ]
+        },
+        {
+          "id": "R6633-D05",
+          "status": "local_passed",
+          "cases": 5,
+          "dependencies": [
+            "Authoritative Store/admin provider integration and real-device acceptance remain pending."
+          ]
+        },
+        {
+          "id": "R6633-D06-B",
+          "status": "local_passed",
+          "cases": 3,
+          "dependencies": [
+            "Authoritative Store/admin provider integration and real-device acceptance remain pending."
+          ]
+        }
+      ],
+      "visualReview": "Native Flutter 412px and320px/140% images inspected; actual account Profile prompt and combined Confirm order included. Founder visual approval and Redmi acceptance remain pending.",
+      "backend": "R6634-C07 backendBusinessLogic, R6633-D05/D06-B authoritative data, prior payment/logistics/account dependencies remain pending. Review GST is session-only; fixture persistence is not backend proof.",
+      "history": "All original22 tickets,37 prior replay records and10 current tickets retained in inclusion manifest; some overlap by parent/child intentionally retained."
+    },
+    "priorIntegration": "123ff42cf8179b272d33b480e8267dfa83af2de3",
+    "preSourceCommitHead": "a3781e60c379f0b73f4055b28090bb596093fdff",
+    "priorCommitsRetained": 72,
+    "changedPathsFromIntegration": 152,
+    "originalTicketsRetained": 22,
+    "priorReplayRecordsRetained": 37,
+    "currentSelectedTickets": 10,
+    "evidence": {
+      "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+      "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87",
+      "prefix": "pending-local-final-20260923/",
+      "priorEntriesPreserved": 427,
+      "newEntries": 59,
+      "finalTicketDisposition": "pending-local-final-20260923/FINAL-TICKET-DISPOSITION.json"
+    },
+    "remainingBoundaries": [
+      "Real Store comparison and MoolSocial publication providers pending: R6633-D05/R6633-D06-B.",
+      "Account-backed GST restart/re-login/cross-device persistence pending: R6634-C07 backendBusinessLogic. Review store is session-only and clears on account/sign-out changes.",
+      "Existing payment/account/logistics/shipment/live-map dependencies stay pending under original R6633-D07-D11 and child references.",
+      "R6633-D17 purchase-order issuance/approval/acceptance/communication remains incomplete beyond this selected frontend batch, not relabeled backend-only.",
+      "Historical Social projection/rail/video and supplier-chat test assumptions remain separately unqualified; no whole-universal-suite green claim.",
+      "No APK build, install, real payment, release or device acceptance in this task."
+    ],
+    "remoteReadback": {
+      "branchHead": "fcba2aba7971fa757b15479df6f0e2c701b6dc7f",
+      "pushPerformed": false
+    },
+    "sourceCommit": "pending source commit; next documentation seal resolves this field"
   }
 }

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4616,
-    "sha256": "16904A5FD2A521725F96758094F2C441252D18F53C1052583A9EFE8EF461634B"
+    "entryCount": 4617,
+    "sha256": "B1B1EB90A25A961914E845FA62AA3BD026BECE6D6DCC9926D6AD4EEF9A86526E"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -134,7 +134,20 @@
         "config/buy-founder-regression.json",
         "scripts/build-buy-device-review.ps1",
         "apps/mobile/lib/features/journey01/journey_router.dart",
-        "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+        "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+        "docs/quality/CURSOR-BUY-PENDING-LOCAL-SCOPE-20260923.json",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart"
       ]
     },
     {
@@ -175,8 +188,6 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart",
-        "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
-        "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart",
         "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart",
         "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",

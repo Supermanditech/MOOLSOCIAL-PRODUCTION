@@ -104824,6 +104824,36 @@
       "prevention": "Before successor integration/build, exercise every recorded historical and current candidate evidence owner against the exact successor identity with absent optional records; require ordinary missing owners, changed identities and unknown candidate paths to fail. Admit only explicitly enumerated inherited paths. Preserve historical source/version pins and one-build controls; never copy old execution authorization, create placeholder evidence, broaden wildcard admission, rewrite failed integration history or mark device gates passed. Qualify a fresh replacement checkout and preserve the failed v4 merge.",
       "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-apk-regression-gate-state.ps1"],
       "evidence": ["artifacts/quality/counter-sale-r66-36-review-20260920/prebuild-validation.md", "artifacts/quality/counter-sale-r66-36-review-20260920/local-validation.md"]
+    },
+    {
+      "id": "REG-20260923-4646-BUY-PENDING-OWNER-PREPARATION-AND-ANALYSIS",
+      "status": "registered_prevention_active",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "evidence"
+      ],
+      "mistake": "Initial new test owner admission preceded file creation; first pending Buy focused analysis reported two brace diagnostics and one unnecessary interpolation. Earlier reconstruction used oversized output and inapplicable gate phases.",
+      "rootCause": "Owner preparation and style verification were incomplete at the first checks; documentation continuation phase was inferred instead of read.",
+      "prevention": "Read exact admission prerequisites, create real claimed tests before admission, bound tool output, retain every failure, and correct all normal analyzer diagnostics before test/acceptance. Do not weaken any gate or infer a pass from compilation.",
+      "gates": [
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-buy-founder-regression.py"
+      ],
+      "evidence": [
+        "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+      ],
+      "followupAnalysis": "2026-09-23 chunk b4ac5d: focused analysis failed with missing required regionId and nullable findProduct storeId in new tests, plus two unbraced conditionals. Also bounded read attempts used a nonexistent test path and PowerShell wildcards passed literally to rg. Correct exact APIs and use rg -g with existing directories; no test pass claimed.",
+      "focusedTestFailure": "Initial focused run build/pending-defects-initial-test.log:35 passed,4 failed. GST save before first restore left owner unbound, clearing explicit opt-out on refresh (runtime defect). Tests also omitted review region, tapped before scroll settled, and expected absent legacy-named semantics wrapper still used by compact launcher. Preserve log, bind successful writes to owner, use actual region/mobile viewport/settled hit-test, preserve compact semantics assertion.",
+      "impactDiagnostics": "Retained pending-impact-machine.jsonl: old two-card GST and empty MoolSocial/count/publisher=seller expectations fail after intended contracts change. Preserve totals, Back, invoice attribution and seller identity assertions. Historical universal audit found retired Home expectations and separate Social projection/rail/legacy-pay/chat oracles; no universal acceptance claimed.",
+      "encodingPrevention": "A raw-string preservation assertion exposed unintended cp1252 decoding of historical UTF8 JSON during serialization. Restore exact HEAD historical registry text and append only this new entry. Read all JSON explicitly as UTF8; compare every prior entry exactly before rebinding. No user entry changes intended.",
+      "contractRetry": "pending-contract-retry-machine.jsonl:48 passed/8 failed. Unified GST card inherited cart insertion order, review capture omitted explicit publisher fixture, successful compare lacked Refresh control, and MoolSocial assertion incorrectly forced Wholesale-only. Stabilize unified Shop-first anchor, retain explicit production isolation, allow refresh on populated results, preserve mixed publisher destinations. Runtime/test fixes follow; no green claim.",
+      "finalFocusedDiagnostic": "pending-final-focused-machine.jsonl: all selected frontend and migrated route checks except Social generic-rail type assertion passed. Social has its existing context-tab rail, not MoolLocalNavigationRail; preserve context-owner and explicit Feed control checks. Broad pending-impact-machine.jsonl completed with1315 successful testDone records including loading records and14 failures; last four D017 contrast fixtures assumed saving another destination implicitly creates a second account profile, whereas saved defaults now reuse one profile. Explicitly construct a separate one-order recipient before remembering it, preserving contrast/selection assertions. No skipped behavior or runtime weakening.",
+      "acceptanceInvocation": "First exact131-name regex exceeded Windows batch command-line limit before Flutter started; retained build/pending-acceptance-machine.jsonl. Use bounded test-family selectors then independently assert all131 exact named passes from machine events. Do not count this zero-test invocation as acceptance.",
+      "acceptanceR2": "Retained pending-acceptance-r2-machine.jsonl:130/131 ledger cases passed; remaining Chat legacy-origin test asserted original /app/mool URI after correctly returning to canonical /app/buy?sub=shop. Correct canonical expectation without weakening exact return. Review inspection additionally requires signed-in missing-identity fallback to differ from signed-out null, and a real Profile-save/sign-out test proving review store clear.",
+      "precommitOwnerReceipt": "Final Buy evidence gate b9f373 rejected two affected tests absent from ticket owners: buy_v2_product_actions_test.dart and buy_v2_session_test.dart. Both already admitted to root ownership and passed impacted cases; add exact paths to D05/D06-B affected owners, refresh scope-manifest hash and rerun unchanged checker. No runtime/source change or test weakening.",
+      "gateSequencing": "MVP-only output c9cb4a showed a chained PowerShell LASTEXITCODE guard could exit before coordination when the preceding pure PowerShell check leaves LASTEXITCODE null. Do not infer both checks ran from exit0. Invoke final coordination as a standalone command and require its explicit pre_commit pass output before committing."
     }
   ],
   "counterSaleTestIncident20260919": {

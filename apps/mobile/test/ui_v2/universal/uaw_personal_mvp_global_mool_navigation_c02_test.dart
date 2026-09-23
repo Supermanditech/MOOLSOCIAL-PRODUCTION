@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -60,21 +61,16 @@ void main() {
     expect(implementation['newBackendOwners'], 0);
   });
 
-  testWidgets('Home is the fixed six-family entry owner without a dock', (
-    tester,
-  ) async {
+  testWidgets('Legacy Home opens Buy with compact navigation', (tester) async {
     final journey = signedInSession();
     addTearDown(journey.dispose);
     await journey.start();
     await pumpApp(tester, journey, '/app/mool');
 
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
-    expect(find.byKey(const Key('mool-home-dashboard')), findsOneWidget);
-    expect(
-      find.byKey(const Key('moolsocial-home-has-no-bottom-navigation')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('mool-home-launcher')), findsNothing);
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
     expect(
       find.byKey(const Key('mool-connected-action-navigator')),
       findsNothing,
@@ -87,7 +83,7 @@ void main() {
       'book',
       'work',
     ]) {
-      expect(find.byKey(Key('mool-home-family-$family')), findsOneWidget);
+      expect(find.byKey(Key('mool-home-family-$family')), findsNothing);
     }
   });
 
@@ -191,36 +187,52 @@ void main() {
     expect(find.byKey(const Key('ride-local-auto')), findsOneWidget);
   });
 
-  testWidgets('direct Home origin Back uses the safe Ride default fallback', (
+  testWidgets('Legacy Home origin Back exits without a redirect loop', (
     tester,
   ) async {
     final journey = signedInSession();
+    var exits = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'SystemNavigator.pop') exits++;
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
     addTearDown(journey.dispose);
     await journey.start();
     await pumpApp(tester, journey, '/app/mool?from=ride');
 
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('ride-booking-screen')), findsOneWidget);
+    expect(exits, 1);
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
     expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
   });
 
-  testWidgets('Home main action keeps route history back to fixed Home', (
-    tester,
-  ) async {
+  testWidgets('Legacy Home Work action returns to Buy', (tester) async {
     final journey = signedInSession();
     addTearDown(journey.dispose);
     await journey.start();
     await pumpApp(tester, journey, '/app/mool');
 
-    await tester.tap(find.byKey(const Key('mool-home-family-work')));
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mool-navigator-family-work')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
   });
 }

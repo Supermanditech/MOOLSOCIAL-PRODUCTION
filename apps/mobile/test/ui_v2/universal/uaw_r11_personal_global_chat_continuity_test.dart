@@ -51,8 +51,8 @@ void main() {
     (
       id: 'mool',
       entryRoute: '/app/mool',
-      returnOwnerKey: Key('personal-mool-root-v2'),
-      chatKey: Key('mool-home-chat'),
+      returnOwnerKey: Key('buy-v2-screen'),
+      chatKey: Key('mool-global-chat-tap'),
     ),
     (
       id: 'social',
@@ -122,7 +122,7 @@ void main() {
         GoRouterState.of(
           tester.element(find.byType(Scaffold).first),
         ).uri.toString(),
-        origin.entryRoute,
+        origin.id == 'mool' ? '/app/buy?sub=shop' : origin.entryRoute,
       );
       expect(tester.takeException(), isNull);
     });

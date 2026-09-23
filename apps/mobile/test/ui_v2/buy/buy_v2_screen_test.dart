@@ -10156,6 +10156,18 @@ void main() {
             ),
             isTrue,
           );
+          // Defaults now reuse the first account profile in both baskets.
+          // Choose a distinct order recipient before remembering a second one.
+          expect(
+            await controller.save(
+              destination: destination,
+              legalName: 'AuditRedmiTest',
+              gstin: '08ABCDE1234F1Z5',
+              billingAddress: 'Test billing address',
+              remember: false,
+            ),
+            isTrue,
+          );
           expect(
             await controller.save(
               destination: destination,

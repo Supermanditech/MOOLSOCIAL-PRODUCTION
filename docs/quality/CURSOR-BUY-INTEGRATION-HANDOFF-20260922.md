@@ -1,18 +1,26 @@
 # Cursor Buy integration handoff and new-baseline request — 22 September 2026
 
-## Current disposition
+## Current disposition — 23 September 2026
 
-Latest founder request: reconcile every Cursor ticket and all local/Git work after
-the installed Redmi APK before the next candidate. Reconciliation from clean
-`5f2b4428a093de2eb9d7ae3f8f47b8c2c117eb4a` identifies **22 post-r66.32 frontend
-tickets: 11 initial fixes/contracts + 3 product controls + 8 latest tickets**.
-Child fixes are retained under their parent tickets, not counted twice. Approved
-application source is `0a224e546b7c570cf2ba7772cf25e2c030ffee98`; all later commits
-are retained. Use the COMPLETE clean branch for the next candidate, not only the
-latest eight-ticket source commit. See the latest reconciliation record below
-and `next-redmi-reconciliation/apk-inclusion-manifest.json` in the evidence ZIP.
-Git preservation/inclusion is verified; no fresh APK qualification, build or
-installation is claimed. Google/provider and test-maintenance deferrals remain.
+The six original R6634 fixes and current frontend follow-ups are included in the
+complete Buy branch: C06-A01 production-route test migration, C07 Profile GST and
+single checkout entry, D05 controlled comparison and D06-B MoolSocial/Suppliers
+offers. **131 registered scenarios passed on the final source; 171 tests passed,
+zero failures/skips; analysis clean across19 changed Dart files.** Native compact
+and enlarged-text screens were inspected. This is local frontend qualification,
+not fresh Redmi, founder approval, real account persistence or production acceptance.
+
+Build later from the ENTIRE final branch, not a cherry-pick or inherited r66.34 APK.
+All72 prior commits from integration123ff42c, original22 ticket records and37 prior
+Redmi replay records remain included. The latest evidence index/inclusion manifest
+is under `pending-local-final-20260923/` in `CURSOR-BUY-R6634-EVIDENCE-20260923.zip`.
+The machine ledger retains current-source local receipts for every selected cell.
+Backend GST continuation remains `R6634-C07/backendBusinessLogic`; Store offers,
+payment/logistics and the inherited D17 purchase-order workflow remain explicitly
+pending. Fourteen separate historical Social/projection/chat test assumptions are
+retained as unqualified audit findings; no whole-universal-suite pass is claimed.
+No APK build/install/device action or push occurred. Origin was read back at
+fcba2aba; the final local source and documentation commit seals follow below.
 
 Historical eight-ticket implementation assessment follows:
 
@@ -1437,3 +1445,25 @@ Source evidence and reuse: BuyV2GstInvoiceProfileStore, its record and snapshot 
 **Backend continuation reference: R6634-C07 / backendBusinessLogic in config/buy-founder-regression.json — PENDING, required for full closure.** Later backend selection must read this machine-readable block and this handoff. Reuse the authoritative account/profile store; implement authenticated owner-only persistence, validated add/edit/remove and default selection, restore across restart/re-login, account-switch cache isolation and stale-response rejection, truthful failure/retry and concurrent-edit behavior. Bind recipient details to new order/invoice snapshots without rewriting historical invoices on profile changes. Respect account deletion/retention policy and omit private GSTIN/address from diagnostics. No new database provisioning, deployment, tax calculation changes or backend work now.
 
 Scope: signed-in public Buy customer; mvp_supporting checkout/profile continuity. Smallest complete sequence: coordinate shared Profile/account contract and admit exact owners; qualify frontend against controlled account-store fixtures; separately implement and verify authorized account persistence and order/invoice integration; run current-source Redmi and founder visual acceptance. Fourteen total C07 acceptance scenarios now cover the original duplicate cards plus Profile Add/Edit/Remove, later Shop/Wholesale carts, checkout-to-profile continuity, restart/re-login, account switching and failure/retry. All are pending; fixture passes cannot close the backend dependency. Existing C01-C06 evidence, C06-A01 and the Compare/Offers records remain intact. Founder request to retain this in Git authorizes a ticket/evidence commit on the assigned Buy branch; no push or runtime change is included.
+
+### Pending frontend execution and complete Git reconciliation — 23 September 2026
+
+Founder now authorizes implementation and local testing of all pending frontend defects, followed by reconciliation from the previous integration through the final Buy HEAD, clean Git and a complete next-Redmi inclusion inventory. APK building and device testing are explicitly later. Starting HEAD a3781e60c379f0b73f4055b28090bb596093fdff; prior integration 123ff42cf8179b272d33b480e8267dfa83af2de3. Reuse assessment, exact actor/outcome, exclusions, dependencies and test plan are recorded in CURSOR-BUY-PENDING-LOCAL-SCOPE-20260923.json. This continues UAW-CURSOR-BUY-READY-20260921, not an unrelated lane or new backend ticket.
+
+Selected scope: C06-A01 approved legacy-route test migration; C07 existing Profile GST entry and one shared checkout recipient flow; D05 bounded comparison review provider; D06-B MoolSocial and Suppliers review offers. C01-C06 remain in the regression wave. Classification mvp_supporting for the bounded frontend qualification. No new screen, route, account system or backend. Preserve Store/Counter Sale/CSV and all prior evidence. Real Store offers, account-backed GST persistence, payment/logistics and partial-receipt backend outcomes remain pending with original ticket references.
+
+Root primary coordinates exact Profile ownership transfer from the historical September 13 claim and admits existing GST and shared-navigation tests plus one focused pending-defect test. Shared Profile is limited to an optional GST content slot; the existing Buy controller/store contracts and router bind its behavior. No other worktree is mutated. Review-data adapters remain behind the existing review-data boundary; unavailable production providers remain truthful. Failed/stale account reads must not leak recipient state, and duplicate entry must not erase deliberately different recipients. Local checks and native renders precede source/evidence commits. Final Git inventory must contain every commit/owner and an explicit disposition for every original/new ticket; no missing source is excused by local test success.
+
+Implementation diagnostics retained: initial exact-owner admission found the newly claimed pending-defect test absent; creating its real production-isolation tests resolved admission without relaxing owner checks. First focused analysis of five Dart owners compiled and reported three style diagnostics only: two missing if-statement braces in the review comparison adapter and one unnecessary string interpolation in the GST title. No passing analysis is claimed for that run. Prevention: create/read back exact new test owners during preparation, then run normal formatter/analyzer and correct every diagnostic before tests/acceptance. Prior reconstruction oversized output and inapplicable gate-phase attempts are recorded above; bound subsequent outputs and use only the current continuation phase. Evidence-only registry entry records these agent diagnostics before correction/retry.
+
+Pending frontend analysis follow-up: b4ac5d failed on new-test required regionId and nullable product lookup, plus two brace warnings. Recorded under REG-20260923-4646 before correction; no acceptance claimed.
+
+C06-A01 impact expansion: exact seven historical universal test owners admitted to migrate production calls of retired Home to Buy/compact navigation/Chat/security. Preserve standalone historical root widget tests and unrelated Social projection tests. Fifteen-suite diagnostic retained in build/pending-navigation-impact-machine.jsonl; old Social rails/projection and supplier-chat baseline assumptions are separately classified, not new production fixes.
+
+### Final pending-frontend local qualification
+
+Source fingerprint: `b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4`. All131 registered cells passed; 171 actual tests passed with zero failures/skips. Analysis: no issues in19 changed Dart owners. Evidence ZIP SHA256 `a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87`; preserved all427 prior entries, appended59 entries including failures, successful machine log, screenshots, historical audit boundary and full integration inclusion manifest. C07 backend remains pending; all tickets are local_passed, none falsely closed. Review data is isolated from production; Profile details clear on sign-out/account changes. Controlled account-store fixtures prove restoration behavior, not real backend persistence. Source/UI acceptance is separate from founder/Redmi approval.
+
+Broad diagnostic run completed before final corrections:14 failures found and all corresponding corrected behavior families re-executed in final acceptance. Additional historical universal audit33 failures included19 retired-route expectations now migrated;14 non-Buy projection/rail/video/chat oracle findings remain preserved outside this bounded Buy implementation. Unchanged Social/navigation owner hashes match pre-retirement97c71953; this is scope evidence, not a claim those old suites pass.
+
+Final owner/dependency reconciliation is in `pending-local-final-20260923/FINAL-TICKET-DISPOSITION.json`: C06-A01 migration has no remaining selected-scope implementation dependency; C07 remaining dependencies are Redmi/founder review and the explicitly deferred account backend. Two pre-existing comparison tests were added to D05/D06-B affected owners after the first pre-commit gate rejected their missing ticket mapping. Machine checks remain unchanged.

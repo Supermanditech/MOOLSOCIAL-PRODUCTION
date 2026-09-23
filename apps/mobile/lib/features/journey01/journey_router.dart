@@ -114,6 +114,7 @@ import '../../ui_v2/social/social_v2_creator.dart';
 import '../../ui_v2/social/social_v2_plans_promotion.dart';
 import '../../ui_v2/social/social_v2_youtube_creator_upload.dart';
 import '../../ui_v2/buy/buy_v2_screen.dart';
+import '../../ui_v2/buy/buy_v2_views.dart';
 import '../../ui_v2/universal/legacy_route_containment_screen_v2.dart';
 import '../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
@@ -358,6 +359,9 @@ GoRouter createJourneyRouter(
       launchInterruptionGuard,
     ]),
     redirect: (context, state) async {
+      buyV2Session.synchronizeReviewGstOwner(
+        session.isAuthenticated ? (session.accountIdentity ?? session) : null,
+      );
       final location = state.uri.path;
       final careMedicineRedirect = _careMedicineRedirect(state.uri);
       if (careMedicineRedirect != null) return careMedicineRedirect;
@@ -1653,6 +1657,11 @@ GoRouter createJourneyRouter(
         path: '/app/account/identity',
         builder: (context, state) => GlobalPersonalProfileV2(
           session: session,
+          gstDetails: BuyV2GstProfileSection(
+            key: ValueKey(session.accountIdentity),
+            store: buyV2Session.gstInvoiceProfileStore,
+            onChanged: buyV2Session.refreshGstProfile,
+          ),
           surfaceTone: state.uri.queryParameters['surface'] == 'social'
               ? GlobalProfileSurfaceTone.socialDark
               : GlobalProfileSurfaceTone.light,

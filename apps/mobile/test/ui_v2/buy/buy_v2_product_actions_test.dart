@@ -1352,9 +1352,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Compare prices'), findsOneWidget);
     expect(
-      find.text(
-        'Prices from other suppliers are unavailable right now. Try again.',
-      ),
+      find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-product-compare-review-compare-s-milk-1')),
       findsOneWidget,
     );
     expect(
@@ -1368,9 +1370,11 @@ void main() {
     await tester.tap(find.text('Refresh comparison'));
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Prices from other suppliers are unavailable right now. Try again.',
-      ),
+      find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-product-compare-review-compare-s-milk-1')),
       findsOneWidget,
     );
     await tester.binding.handlePopRoute();

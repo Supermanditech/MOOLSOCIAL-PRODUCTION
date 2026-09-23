@@ -1062,59 +1062,47 @@ void main() {
             expect(target.hitTestable(), findsOneWidget);
           }
 
-          for (final destination in [
-            BuyV2Destination.shop,
-            BuyV2Destination.wholesale,
-          ]) {
-            final toggle = find.byKey(
-              ValueKey('buy-gst-request-${destination.name}'),
-            );
-            await reveal(toggle);
-            expect(
-              find.text('${destination.label} · Add GST details'),
-              findsOneWidget,
-            );
-            expect(
-              tester.getSemantics(toggle).getSemanticsData().label,
-              '${destination.label}. Add GST details',
-            );
-            final title = find.descendant(
-              of: toggle,
-              matching: find.text('${destination.label} · Add GST details'),
-            );
-            expect(
-              tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
-              isFalse,
-            );
-            await captureR66Visual(
-              tester,
-              'r669-gst-${destination.name}-${size.width}-$scale',
-            );
-            await tester.tap(toggle);
-            await tester.pumpAndSettle();
-            expect(
-              find.byKey(ValueKey('buy-gst-add-${destination.name}')),
-              findsOneWidget,
-            );
-            final other = destination == BuyV2Destination.shop
-                ? BuyV2Destination.wholesale
-                : BuyV2Destination.shop;
-            expect(
-              find.byKey(ValueKey('buy-gst-add-${other.name}')),
-              findsNothing,
-            );
-            await reveal(toggle, delta: -140);
-            expect(
-              tester.getSemantics(toggle).getSemanticsData().label,
-              '${destination.label}. Remove GST details',
-            );
-            await tester.tap(toggle);
-            await tester.pumpAndSettle();
-            expect(
-              find.byKey(ValueKey('buy-gst-add-${destination.name}')),
-              findsNothing,
-            );
-          }
+          final toggle = find.byKey(const ValueKey('buy-gst-request-shop'));
+          await reveal(toggle);
+          expect(
+            find.byKey(const ValueKey('buy-gst-request-wholesale')),
+            findsNothing,
+          );
+          expect(find.text('Add GST details'), findsOneWidget);
+          expect(
+            tester.getSemantics(toggle).getSemanticsData().label,
+            'GST invoice. Add GST details',
+          );
+          final title = find.descendant(
+            of: toggle,
+            matching: find.text('Add GST details'),
+          );
+          expect(
+            tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
+            isFalse,
+          );
+          await captureR66Visual(
+            tester,
+            'r669-gst-combined-${size.width}-$scale',
+          );
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-gst-add-shop')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-gst-add-wholesale')),
+            findsNothing,
+          );
+          await reveal(toggle, delta: -140);
+          expect(
+            tester.getSemantics(toggle).getSemanticsData().label,
+            'GST invoice. Remove GST details',
+          );
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsNothing);
           for (final step in [
             BuyV2CheckoutStep.confirm,
             BuyV2CheckoutStep.payment,
@@ -1664,15 +1652,14 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    expect(find.text('Shop · Add GST details'), findsOneWidget);
+    expect(find.text('Add GST details'), findsOneWidget);
     expect(find.textContaining('Personal'), findsNothing);
     expect(find.textContaining('Business purchase'), findsNothing);
     expect(find.text('Place order'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
     await tester.pumpAndSettle();
-    expect(find.text('Shop · Add GST details'), findsOneWidget);
-    expect(find.text('Add GST details'), findsOneWidget);
+    expect(find.text('Add GST details'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('buy-gst-add-shop')));
@@ -1693,7 +1680,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Shop · GST added'), findsOneWidget);
+    expect(find.text('GST details'), findsOneWidget);
     expect(find.text('Shree Balaji Retail'), findsWidgets);
     expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
     expect(find.text('Place order'), findsOneWidget);

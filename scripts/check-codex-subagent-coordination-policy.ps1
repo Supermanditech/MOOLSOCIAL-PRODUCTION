@@ -1079,6 +1079,21 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
+
+  # Founder-authorized pending Buy corrections and exact Profile integration.
+  'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
+  'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart',
+  'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart',
+  'docs/quality/CURSOR-BUY-PENDING-LOCAL-SCOPE-20260923.json',
   # Founder-authorized C06 retirement of the legacy main-actions route only.
   'apps/mobile/lib/features/journey01/journey_router.dart',
   'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',

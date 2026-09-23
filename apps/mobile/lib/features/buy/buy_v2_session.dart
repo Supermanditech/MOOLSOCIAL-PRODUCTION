@@ -389,9 +389,21 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
 final class _BuyV2DeviceReviewGstInvoiceProfileStore
     implements BuyV2GstInvoiceProfileStore {
   BuyV2GstInvoiceProfileSnapshot? _snapshot;
+  Object? _reviewOwner;
+  bool _ownerInitialized = false;
+  int _ownerRevision = 0;
+
+  bool synchronizeOwner(Object? owner) {
+    if (_ownerInitialized && identical(owner, _reviewOwner)) return false;
+    _ownerInitialized = true;
+    _reviewOwner = owner;
+    _snapshot = null;
+    _ownerRevision++;
+    return true;
+  }
 
   @override
-  String? get ownerScope => 'device-review-session:buy-gst';
+  String? get ownerScope => 'device-review-session:buy-gst:$_ownerRevision';
 
   @override
   Future<BuyV2GstInvoiceProfileSnapshot?> read() async => _snapshot;
@@ -1193,8 +1205,10 @@ class BuyV2DevelopmentPublishedCatalogueSource
       '$version-${_shop.providerCount}-${_shop.skusPerStore}';
 
   BuyV2OfferPublisherType _publisher(BuyV2Destination destination, int store) =>
-      (destination == BuyV2Destination.shop ? _shop : _wholesale)
-          ._publisherType(store);
+      store % 4 == 0
+      ? BuyV2OfferPublisherType.moolSocial
+      : (destination == BuyV2Destination.shop ? _shop : _wholesale)
+            ._publisherType(store);
 
   ({BuyV2DevelopmentCatalogueSource source, List<int> stores, List<int> skus})
   _cohort(BuyV2DevelopmentCatalogueSource source, BuyV2CatalogueQuery query) {
@@ -1313,10 +1327,14 @@ class BuyV2DevelopmentPublishedCatalogueSource
         publicationId: '$version-${product.id}',
         product: product,
         publisherType: publisher,
-        publisherId: publisher == BuyV2OfferPublisherType.manufacturer
+        publisherId: publisher == BuyV2OfferPublisherType.moolSocial
+            ? '$version-moolsocial'
+            : publisher == BuyV2OfferPublisherType.manufacturer
             ? '$version-maker-${product.storeId ?? product.id}'
             : product.storeId!,
-        publisherName: product.seller,
+        publisherName: publisher == BuyV2OfferPublisherType.moolSocial
+            ? 'MoolSocial'
+            : product.seller,
         headline: switch (publisher) {
           BuyV2OfferPublisherType.manufacturer => 'Manufacturer price',
           BuyV2OfferPublisherType.wholesaler => 'Bulk saving',
@@ -1977,12 +1995,187 @@ class BuyV2ComparisonController extends ChangeNotifier {
   }
 }
 
+/// Controlled comparison transport for the existing isolated review catalogue.
+/// This is never installed when reviewDataEnabled is false. One sealed pack is
+/// the review unit; no physical conversion is inferred from a display label.
+class BuyV2ReviewComparisonSource implements BuyV2ComparisonSource {
+  BuyV2ReviewComparisonSource({this.now = DateTime.now});
+  final DateTime Function() now;
+  final Map<String, BuyV2Product> _products = {};
+  final Map<String, BuyV2ComparisonIdentity> _identities = {};
+  final Map<String, BuyV2Product> _origins = {};
+  final Map<String, DateTime> _observations = {};
+
+  @override
+  BuyV2ComparisonIdentity? identityFor(BuyV2Product product) {
+    if (product.destination != BuyV2Destination.shop &&
+        product.destination != BuyV2Destination.wholesale) {
+      return null;
+    }
+    final existing = _products[product.id];
+    if (existing != null &&
+        (existing.canonicalId != product.canonicalId ||
+            existing.variant != product.variant ||
+            existing.pack != product.pack ||
+            existing.storeId != product.storeId)) {
+      return null;
+    }
+    _products[product.id] = product;
+    return _identities.putIfAbsent(
+      product.id,
+      () => BuyV2ComparisonIdentity(
+        specificationId:
+            'review-${product.canonicalId}-${Uri.encodeComponent(product.variant)}',
+        packId: 'review-pack-${Uri.encodeComponent(product.pack)}',
+        unit: BuyV2ComparisonUnit.count,
+        packQuantityMilli: 1000,
+      ),
+    );
+  }
+
+  @override
+  Future<BuyV2ComparisonPage> load(BuyV2ComparisonPageRequest request) async {
+    final q = request.query;
+    final base = _products[q.productId];
+    final identity = _identities[q.productId];
+    if (!request.valid ||
+        base == null ||
+        identity == null ||
+        q.productCanonicalId != base.canonicalId ||
+        !identity.equivalentTo(q.identity, samePack: true) ||
+        q.purpose == BuyV2ComparisonPurpose.storeProcurement) {
+      throw const FormatException(
+        'Comparison request is not in this review catalogue',
+      );
+    }
+    final currentTime = now();
+    if (request.cursor == null) {
+      if (_observations.length >= 16) {
+        _observations.remove(_observations.keys.first);
+      }
+      _observations[q.key] = currentTime;
+    }
+    final observed = _observations[q.key];
+    if (observed == null ||
+        !currentTime.isBefore(observed.add(const Duration(minutes: 5)))) {
+      throw const FormatException('Comparison snapshot expired');
+    }
+    final snapshot =
+        'review-compare-${sha256.convert(utf8.encode(q.key))}-${observed.microsecondsSinceEpoch}';
+    final origin = _origins[base.id] ?? base;
+    final channel = base.destination == BuyV2Destination.shop
+        ? BuyV2ComparisonChannel.retail
+        : BuyV2ComparisonChannel.wholesale;
+    final offers = <BuyV2ComparisonOffer>[];
+    for (var i = 0; i < 3; i++) {
+      final store = 'review-comparison-store-${i + 1}';
+      final price = math.max(1, origin.price - 5 + i * 2);
+      final product = origin.copyWith(
+        id: 'review-compare-${origin.id}-${i + 1}',
+        storeId: store,
+        seller: [
+          'Market Square Store',
+          'Neighbourhood Grocer',
+          'City Supply Store',
+        ][i],
+        price: price,
+        unitPrice: '₹$price / pack',
+        badge: '',
+      );
+      _products[product.id] = product;
+      _origins[product.id] = origin;
+      _identities[product.id] = identity;
+      final offer = BuyV2ComparisonOffer(
+        id: product.id,
+        revision: 'review-v1',
+        queryKey: q.key,
+        snapshotId: snapshot,
+        product: product,
+        identity: identity,
+        supplierWorkspaceId: store,
+        storeId: store,
+        channel: channel,
+        fulfilment: q.fulfilment ?? buyV2CatalogueFulfilmentModeFor(base),
+        originLabel: 'Jodhpur',
+        local: i < 2,
+        serviceable: true,
+        customerEligible: true,
+        availablePacks: 100,
+        minimumPacks: math.max(1, base.minimumOrder),
+        incrementPacks: 1,
+        packPriceMinor: product.price * 100,
+        charges: BuyV2ComparisonCharges(
+          taxMinor: 0,
+          freightMinor: i * 500,
+          mandatoryFeesMinor: 0,
+          immediateDiscountMinor: 0,
+        ),
+        observedAt: observed,
+        validUntil: observed.add(const Duration(minutes: 5)),
+        arrivalStart: observed.add(Duration(hours: i + 1)),
+        arrivalEnd: observed.add(Duration(hours: i + 2)),
+      );
+      if (BuyV2ComparisonCalculation.evaluate(
+        query: q,
+        offer: offer,
+        now: observed,
+      ).available) {
+        offers.add(offer);
+      }
+    }
+    offers.sort((a, b) {
+      final ca = BuyV2ComparisonCalculation.evaluate(
+        query: q,
+        offer: a,
+        now: observed,
+      );
+      final cb = BuyV2ComparisonCalculation.evaluate(
+        query: q,
+        offer: b,
+        now: observed,
+      );
+      return switch (q.sort) {
+        BuyV2ComparisonSort.itemPrice => ca.itemSubtotalMinor!.compareTo(
+          cb.itemSubtotalMinor!,
+        ),
+        BuyV2ComparisonSort.deliveredCost => ca.payableMinor!.compareTo(
+          cb.payableMinor!,
+        ),
+        BuyV2ComparisonSort.arrival => ca.arrivalEnd!.compareTo(cb.arrivalEnd!),
+      };
+    });
+    final start = request.cursor == null
+        ? 0
+        : int.tryParse(request.cursor!) ?? -1;
+    if (start < 0 ||
+        start >= math.max(1, offers.length) ||
+        (request.snapshotId != null && request.snapshotId != snapshot)) {
+      throw const FormatException('Comparison page does not match query');
+    }
+    final end = math.min(start + request.pageSize, offers.length);
+    return BuyV2ComparisonPage(
+      queryKey: q.key,
+      snapshotId: snapshot,
+      observedAt: observed,
+      validUntil: observed.add(const Duration(minutes: 5)),
+      offers: offers.sublist(start, end),
+      globallyRanked: false,
+      startIndex: start,
+      totalCount: offers.length,
+      previousCursor: start == 0
+          ? null
+          : '${math.max(0, start - request.pageSize)}',
+      nextCursor: end < offers.length ? '$end' : null,
+    );
+  }
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
     this.productContentAdapter = const BuyV2CatalogueProductContentAdapter(),
-    this.comparisonSource,
+    BuyV2ComparisonSource? comparisonSource,
     this.marketplaceTrustAdapter =
         const BuyV2CatalogueMarketplaceTrustAdapter(),
     this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
@@ -2012,7 +2205,13 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
-  }) : procurementContext = procurementIdentity?.value,
+  }) : comparisonSource =
+           comparisonSource ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? BuyV2ReviewComparisonSource(now: catalogueNow)
+               : null),
+       procurementContext = procurementIdentity?.value,
        cartBenefitsAdapter =
            cartBenefitsAdapter ??
            (buyV2DeviceReviewBenefitSeedsEnabled
@@ -2065,7 +2264,9 @@ class BuyV2Session extends ChangeNotifier {
     }
     _catalogueAreas.addAll(catalogueAreas);
     _catalogueRegionId = initialCatalogueRegionId;
-    if (cataloguePageSource == null && buyV2DeviceReviewBenefitSeedsEnabled) {
+    if (this.reviewDataEnabled &&
+        cataloguePageSource == null &&
+        buyV2DeviceReviewBenefitSeedsEnabled) {
       for (final destination in [
         BuyV2Destination.shop,
         BuyV2Destination.wholesale,
@@ -3658,6 +3859,15 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2ProductFactsAdapter productFactsAdapter;
   final BuyV2ProductContentAdapter productContentAdapter;
   final BuyV2ComparisonSource? comparisonSource;
+  int gstProfileRevision = 0;
+
+  /// The Profile editor has persisted new recipient data through the same store.
+  void refreshGstProfile() {
+    if (_collectionDisposed) return;
+    gstProfileRevision++;
+    notifyListeners();
+  }
+
   final BuyV2MarketplaceTrustAdapter marketplaceTrustAdapter;
   final BuyV2SponsoredContentAdapter sponsoredContentAdapter;
   final BuyV2CartBenefitsAdapter cartBenefitsAdapter;
@@ -3665,6 +3875,17 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2SavedProductsStore? savedProductsStore;
   final BuyV2CustomerStateStore? customerStateStore;
   final BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore;
+
+  /// Review data is discarded at identity transitions. Real account storage
+  /// must provide its own authenticated owner scope and persistence.
+  void synchronizeReviewGstOwner(Object? owner) {
+    final store = gstInvoiceProfileStore;
+    if (store is _BuyV2DeviceReviewGstInvoiceProfileStore &&
+        store.synchronizeOwner(owner)) {
+      scheduleMicrotask(refreshGstProfile);
+    }
+  }
+
   final BuyV2CommercialPaymentTermsAdapter? commercialPaymentTermsAdapter;
   final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;

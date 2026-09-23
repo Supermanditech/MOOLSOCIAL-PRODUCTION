@@ -66,7 +66,7 @@ void main() {
       addTearDown(restored.dispose);
       await restored.restore();
 
-      expect(restored.applySavedBusinessProfile(), isTrue);
+      expect(restored.requestedFor(BuyV2Destination.shop), isTrue);
       expect(restored.requestedFor(BuyV2Destination.wholesale), isTrue);
       expect(
         restored.detailsFor(BuyV2Destination.wholesale)?.legalName,

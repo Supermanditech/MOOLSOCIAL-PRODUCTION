@@ -220,7 +220,7 @@ void main() {
     );
   });
 
-  testWidgets('hub Social Mool Back Back follows exact route history', (
+  testWidgets('Legacy Home Social menu Back Back returns to Buy', (
     tester,
   ) async {
     final journey = signedInSession();
@@ -228,13 +228,18 @@ void main() {
     await journey.start();
     await pumpApp(tester, journey, '/app/mool');
 
-    await tester.tap(find.byKey(const Key('mool-action-social')));
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mool-navigator-family-social')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('mool-root-selected')));
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsOneWidget,
+    );
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -242,6 +247,6 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
   });
 }

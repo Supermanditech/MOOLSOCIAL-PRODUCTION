@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "ticket": {
+    "id": "UAW-CURSOR-BUY-READY-20260921",
+    "classification": "mvp_supporting",
+    "customerOutcome": "Public Buy customer compares controlled review offers, sees both publisher tabs, reuses GST profile details across carts, and retains navigation after legacy-menu retirement.",
+    "classificationReason": "Complete founder-selected pending frontend acceptance within existing Buy launch journey; backend dependencies remain separately pending.",
+    "minimumCompleteScope": [
+      "R6634-C06-A01 navigation test migration",
+      "R6634-C07 Profile GST and consolidated checkout entry",
+      "R6633-D05 controlled comparison provider",
+      "R6633-D06-B both publisher tabs with truthful controlled offers"
+    ],
+    "explicitExclusions": [
+      "No APK/build/install/device action now.",
+      "No production Store offers, account GST backend, payment/logistics integration or deployment.",
+      "No edits to Store/Counter Sale/CSV, another worktree, main or accepted reference assets."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder current request authorizes implementation/local tests/Git reconciliation; build deferred.",
+      "Root primary coordinates exact shared Profile and historical test owner transfers; unchanged Store contracts."
+    ],
+    "testAndEvidencePlan": [
+      "Run existing GST, Offers, comparison, route and affected Profile suites.",
+      "Run all six original founder matrices against current-source fingerprint; preserve failure and pass receipts.",
+      "Render actual compact/enlarged native screens for founder review; device approval remains pending.",
+      "Reconcile all commits and changed owners from prior integration 123ff42cf8179b272d33b480e8267dfa83af2de3 through final HEAD."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "beyondMvpExplicitlyAuthorized": false,
+    "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "checkpoint": {
+    "successorRegistered": true
+  },
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "d257d6203db07dbe1dd9de4722bc3f283981d8172ccf7474c6ae53e48e26c544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4d614f74b98ddf83fde3a1091b4344ecfd70fe87d9a23c886e5cc696886e482a",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-CURSOR-BUY-READY-20260921",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-BUY-READY-20260921",
+      "customerOutcome": "Public Buy customer compares controlled review offers, sees both publisher tabs, reuses GST profile details across carts, and retains navigation after legacy-menu retirement.",
+      "necessityProof": "Reuse existing native screens, GST controller/store interface, review catalogue provider and comparison contracts. Add only bounded review adapter logic and focused acceptance tests; no new route/screen/backend.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration",
+        "test_only_acceptance"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Run existing GST, Offers, comparison, route and affected Profile suites.",
+        "Run all six original founder matrices against current-source fingerprint; preserve failure and pass receipts.",
+        "Render actual compact/enlarged native screens for founder review; device approval remains pending.",
+        "Reconcile all commits and changed owners from prior integration 123ff42cf8179b272d33b480e8267dfa83af2de3 through final HEAD."
+      ],
+      "adjustments": [
+        "Keep frontend proof separate from real Store/account backend acceptance."
+      ],
+      "explicitExclusions": [
+        "No APK/build/install/device action now.",
+        "No production Store offers, account GST backend, payment/logistics integration or deployment.",
+        "No edits to Store/Counter Sale/CSV, another worktree, main or accepted reference assets."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder current request authorizes implementation/local tests/Git reconciliation; build deferred.",
+        "Root primary coordinates exact shared Profile and historical test owner transfers; unchanged Store contracts."
+      ],
+      "manifestPath": "config/buy-founder-regression.json",
+      "manifestSha256": "cd087f4798046c30f010a2c19c69460a01fa460dd76f8b4b7878dfdbe5ebbe86",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+    }
+  }
+}

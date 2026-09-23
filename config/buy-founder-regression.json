@@ -7,7 +7,11 @@
     "R6634-C03",
     "R6634-C04",
     "R6634-C05",
-    "R6634-C06"
+    "R6634-C06",
+    "R6634-C06-A01",
+    "R6634-C07",
+    "R6633-D05",
+    "R6633-D06-B"
   ],
   "historicalRecords": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
   "rule": "Preserve scenarios and evidence permanently. Name exact regression tests and select authorized ticket before implementation. Gate setup does not authorize application edits.",
@@ -21,7 +25,7 @@
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -37,9 +41,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-1 Shop Visit Store opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -51,9 +55,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-2 Shop Visit Store same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -65,9 +69,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-3 Shop Visit Store mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -79,9 +83,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-4 Shop Visit Store last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -93,9 +97,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-5 Wholesale Visit Store opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -107,9 +111,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-6 Wholesale Visit Store same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -121,9 +125,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-7 Wholesale Visit Store mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -135,9 +139,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-8 Wholesale Visit Store last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -149,9 +153,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-9 Recent product opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -163,9 +167,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-10 Recent product same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -177,9 +181,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-11 Recent product mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -191,9 +195,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-12 Recent product last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -205,9 +209,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-13 Offers product opposite basket only",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -219,9 +223,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-14 Offers product same basket",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -233,9 +237,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-15 Offers product mixed baskets",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -247,16 +251,21 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C01-16 Offers product last content scrolled",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         }
       ],
       "children": [],
       "dependencies": [],
-      "founderApproval": null
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C02",
@@ -268,7 +277,7 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
@@ -287,9 +296,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-1 new Orders normal",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -301,9 +310,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-2 new Orders long name",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -315,9 +324,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-3 new Orders 200 percent with keyboard",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -329,9 +338,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-4 retained Orders normal",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -343,9 +352,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-5 retained Orders long name",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -357,9 +366,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-6 retained Orders 200 percent with keyboard",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -371,9 +380,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-7 supplier chat normal",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -385,9 +394,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-8 supplier chat long name",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -399,16 +408,21 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
           "testName": "R6634 C02-9 supplier chat 200 percent with keyboard",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         }
       ],
       "children": [],
       "dependencies": [],
-      "founderApproval": null
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C03",
@@ -419,7 +433,7 @@
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -434,9 +448,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-1 Wholesale review single item",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -448,9 +462,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-2 Wholesale review multiple Stores and packs",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -462,9 +476,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-3 Wholesale review long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -476,9 +490,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-4 Bulk review single item",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -490,9 +504,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-5 Bulk review multiple Stores and packs",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -504,9 +518,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-6 Bulk review long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -518,9 +532,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-7 Offers Wholesale review single item",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -532,9 +546,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-8 Offers Wholesale review multiple Stores and packs",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -546,16 +560,21 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
           "testName": "R6634 C03-9 Offers Wholesale review long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         }
       ],
       "children": [],
       "dependencies": [],
-      "founderApproval": null
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C04",
@@ -567,7 +586,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -582,9 +601,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-1 active tracking missing payment",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -596,9 +615,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-2 active tracking paid",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -610,9 +629,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-3 active tracking balance due",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -624,9 +643,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-4 active tracking long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -638,9 +657,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-5 delivered tracking missing payment",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -652,9 +671,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-6 delivered tracking paid",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -666,9 +685,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-7 delivered tracking balance due",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -680,9 +699,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-8 delivered tracking long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -694,9 +713,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-9 Orders history missing payment",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -708,9 +727,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-10 Orders history paid",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -722,9 +741,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-11 Orders history balance due",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -736,16 +755,21 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
           "testName": "R6634 C04-12 Orders history long text 200 percent",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         }
       ],
       "children": [],
       "dependencies": [],
-      "founderApproval": null
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C05",
@@ -760,7 +784,7 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -777,9 +801,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-1 Bulk cart review normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -791,9 +815,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-2 Bulk cart review 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -805,9 +829,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-3 Bulk cart review keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -819,9 +843,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-4 address last field validation normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -833,9 +857,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-5 address last field validation 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -847,9 +871,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-6 address last field validation keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -861,9 +885,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-7 Edit basket scrolled normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -875,9 +899,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-8 Edit basket scrolled 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -889,9 +913,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-9 Edit basket scrolled keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -903,9 +927,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-10 Offers rapid switching normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -917,9 +941,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-11 Offers rapid switching 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -931,9 +955,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-12 Offers rapid switching keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -945,9 +969,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
           "testName": "R6634 C05-13 collected receipt normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -959,9 +983,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
           "testName": "R6634 C05-14 collected receipt 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -973,9 +997,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
           "testName": "R6634 C05-15 collected receipt keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -987,9 +1011,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-16 partial problem receipt normal Android",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1001,9 +1025,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-17 partial problem receipt 200 percent text",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1015,9 +1039,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
           "testName": "R6634 C05-18 partial problem receipt keyboard cancel back",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         }
@@ -1027,7 +1051,12 @@
         "Physical Redmi acceptance matrix remains pending; this batch is local qualification only.",
         "Itemised partial-receipt backend/provider outcome remains deferred. Existing correlated receipt and delivery-problem report UI were tested with labelled local fixtures; no real delivery was claimed."
       ],
-      "founderApproval": null
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C06",
@@ -1038,7 +1067,7 @@
       "founderRequirement": "Cart to Offers opens Offers, never main-actions menu, preserving all baskets and explicit menu/Back actions.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
@@ -1055,9 +1084,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 shop settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1069,9 +1098,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 shop rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1083,9 +1112,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 shop pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1097,9 +1126,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 wholesale settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1111,9 +1140,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 wholesale rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1125,9 +1154,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 wholesale pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1139,9 +1168,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 offers settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1153,9 +1182,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 offers rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1167,9 +1196,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 offers pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1181,9 +1210,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 store settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1195,9 +1224,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 store rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1209,9 +1238,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 store pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1223,9 +1252,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed cart settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1237,9 +1266,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed cart rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1251,9 +1280,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed cart pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1265,9 +1294,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed offers cart settled tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1279,9 +1308,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed offers cart rapid tap",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1293,9 +1322,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
           "testName": "R6634 C06 pushed offers cart pending return",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1307,9 +1336,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
           "testName": "R6634 C06 legacy Mool  resolves to Buy and root Back exits",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1321,9 +1350,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
           "testName": "R6634 C06 legacy Mool ?from=buy resolves to Buy and root Back exits",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1335,9 +1364,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
           "testName": "R6634 C06 legacy Mool ?from=work resolves to Buy and root Back exits",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1349,9 +1378,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
           "testName": "R6634 C06 legacy Mool ?from=social resolves to Buy and root Back exits",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         },
@@ -1363,9 +1392,9 @@
           "testFile": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
           "testName": "R6634 C06 compact Work navigation remains reachable from Buy",
           "local": {
-            "path": "apps/mobile/build/review-candidates/cursor-buy-r6634-20260923/c06-retirement-final-machine.jsonl",
-            "sha256": "c63d67013c0156d8f21c8c23ea46eddff278a37446a2e3518a1972c766281e23",
-            "sourceSha256": "f4be21ad89c10267bebd599f6e701fc716478c2455918131f696dc6856c46a3c"
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
           },
           "device": null
         }
@@ -1377,21 +1406,33 @@
         "Successor APK Redmi verification and founder visual acceptance pending. Installed r66.34 is unchanged.",
         "Original direct Offers-tap trigger remains unproven; Cart -> Offers -> Android Back variant reproduced and the legacy screen retired from production routing."
       ],
-      "founderApproval": null
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C06-A01",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6634-C06"
       ],
-      "founderRequirement": "Migrate shared production-router regression expectations after founder-authorized legacy menu retirement; preserve origin return, Work reachability and no redirect loop, without restoring retired UI or skipping checks.",
+      "founderRequirement": "Migrate production-route regression expectations after approved legacy Home retirement; retain standalone historical widget tests.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
-        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart"
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart"
       ],
       "cases": [
         {
@@ -1400,8 +1441,12 @@
           "state": "Shared historical production-router test still targets retired menu",
           "expected": "Test approved Buy landing and preserved navigation rather than requiring retired menu",
           "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
-          "testName": "Home is the fixed six-family entry owner without a dock",
-          "local": null,
+          "testName": "Legacy Home opens Buy with compact navigation",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1410,8 +1455,12 @@
           "state": "Shared historical production-router test still targets retired menu",
           "expected": "Test approved Buy landing and preserved navigation rather than requiring retired menu",
           "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
-          "testName": "direct Home origin Back uses the safe Ride default fallback",
-          "local": null,
+          "testName": "Legacy Home origin Back exits without a redirect loop",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1420,32 +1469,310 @@
           "state": "Shared historical production-router test still targets retired menu",
           "expected": "Test approved Buy landing and preserved navigation rather than requiring retired menu",
           "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
-          "testName": "Home main action keeps route history back to fixed Home",
-          "local": null,
+          "testName": "Legacy Home Work action returns to Buy",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-4",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Home social opens its direct production owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Home social opens its direct production owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-5",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Home buy opens its direct production owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Home buy opens its direct production owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-6",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Home eat opens its direct production owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Home eat opens its direct production owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-7",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Home ride opens its direct production owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Home ride opens its direct production owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-8",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Home book opens its direct production owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Home book opens its direct production owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-9",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Home work opens its direct production owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Home work opens its direct production owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-10",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Legacy Home Chat returns to Buy",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+          "testName": "Legacy Home Chat returns to Buy",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-11",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Social family and first direct action open its default owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+          "testName": "Social family and first direct action open its default owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-12",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Shop family and first direct action open its default owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+          "testName": "Shop family and first direct action open its default owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-13",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Food family and first direct action open its default owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+          "testName": "Food family and first direct action open its default owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-14",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Travel family and first direct action open its default owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+          "testName": "Travel family and first direct action open its default owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-15",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Care family and first direct action open its default owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+          "testName": "Care family and first direct action open its default owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-16",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Work family and first direct action open its default owner",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+          "testName": "Work family and first direct action open its default owner",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-17",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Legacy Home Social menu Back Back returns to Buy",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart",
+          "testName": "Legacy Home Social menu Back Back returns to Buy",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-18",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Legacy direct Home opens Buy and compact menu dismisses exactly",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart",
+          "testName": "Legacy direct Home opens Buy and compact menu dismisses exactly",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-19",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Legacy Home route opens Buy and menu Back restores it",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+          "testName": "Legacy Home route opens Buy and menu Back restores it",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-20",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Legacy Home security sign out clears session and opens sign in",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+          "testName": "Legacy Home security sign out clears session and opens sign in",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-21",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "Chat returns to exact mool origin",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+          "testName": "Chat returns to exact mool origin",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "C06-A01-22",
+          "route": "Legacy Home -> Buy / connected navigation",
+          "state": "standalone-pay old link reaches truthful shared recovery",
+          "expected": "Retired Home is absent in production navigation; exact connected owner, Chat, Back and sign-out behaviors remain reachable.",
+          "testFile": "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+          "testName": "standalone-pay old link reaches truthful shared recovery",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         }
       ],
       "children": [],
-      "dependencies": [
-        "Inventory and migrate other shared router assertions that require the retired menu; currently three confirmed failing cases. This is a regression-suite contract migration, not proof of a new customer-visible runtime failure."
-      ],
-      "founderApproval": null
+      "dependencies": [],
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
     },
     {
       "id": "R6634-C07",
-      "status": "open",
+      "status": "local_passed",
       "parents": [
         "R6633-D06-G"
       ],
       "founderRequirement": "After payment selection, eliminate repeated Add GST entry in Shop/Wholesale Cart review. Provide one clear recipient-details flow with correct invoice attribution and retained state. Founder amendment: store GST recipient details in the signed-in user account profile, provide an optional Profile GST entry/prompt, and reuse saved details automatically in subsequent Shop/Wholesale carts without asking again.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart"
       ],
       "cases": [
         {
@@ -1453,9 +1780,13 @@
           "route": "Combined Shop + Wholesale Confirm order",
           "state": "Same invoice recipient; two visible GST cards",
           "expected": "One clear GST-entry flow reuses the selected recipient details without duplicate entry; retain correct destination invoice attribution.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-1 Combined Shop + Wholesale Confirm order",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1463,9 +1794,13 @@
           "route": "Shop-only Cart > payment > Confirm order",
           "state": "GST supplied before returning to review",
           "expected": "Do not request identical GST details again; show retained details with an explicit Edit action.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-2 Shop-only Cart > payment > Confirm order",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1473,9 +1808,13 @@
           "route": "Wholesale-only Cart > payment > Confirm order",
           "state": "GST supplied before returning to review",
           "expected": "Do not request identical GST details again; preserve recipient details and invoice attribution.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-3 Wholesale-only Cart > payment > Confirm order",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1483,9 +1822,13 @@
           "route": "Combined checkout GST > payment > Back > review",
           "state": "Selected profile and mixed cart quantities",
           "expected": "Retain GST selection, payment choice and basket quantities; no repeated mandatory input.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-4 Combined checkout GST > payment > Back > review",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1493,9 +1836,13 @@
           "route": "Combined checkout GST editing",
           "state": "Distinct recipient profiles where supported",
           "expected": "Do not silently overwrite or cross-apply different recipient profiles; make applicability explicit.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-5 Combined checkout GST editing",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1503,9 +1850,13 @@
           "route": "GST entry validation and recovery",
           "state": "Missing or invalid required profile fields; save/load failure",
           "expected": "Keep valid input and clear validation/retry; no false saved state or repeated successful save requirement.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-6 GST entry validation and recovery",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1513,9 +1864,13 @@
           "route": "Optional GST preference",
           "state": "GST recipient details declined where allowed",
           "expected": "Preserve ordinary checkout tax/invoice handling and do not force GSTIN entry solely to remove duplicate prompts.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-7 Optional GST preference",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1523,9 +1878,13 @@
           "route": "Account Profile > GST details",
           "state": "No saved recipient profile",
           "expected": "Provide a discoverable optional Add GST details entry/prompt; save valid GSTIN, legal name and billing address through the account-profile interface.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-8 Account Profile > GST details",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1533,9 +1892,13 @@
           "route": "Account Profile > GST details > edit/remove",
           "state": "Existing saved recipient profile",
           "expected": "Show saved details with Edit/Remove and update future-cart defaults without modifying historical invoices.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-9 Account Profile > GST details > edit/remove",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1543,9 +1906,13 @@
           "route": "Next Shop Cart and next Wholesale Cart",
           "state": "Same account has valid saved default GST details",
           "expected": "Automatically reuse saved recipient details and preference; show a compact summary/Edit action instead of asking to add again.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-10 Next Shop Cart and next Wholesale Cart",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1553,9 +1920,13 @@
           "route": "Checkout > add GST details > later Cart",
           "state": "Customer explicitly saves recipient details to account",
           "expected": "Profile and subsequent carts use the same saved recipient record; duplicate entry is not required.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-11 Checkout > add GST details > later Cart",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1563,9 +1934,13 @@
           "route": "App restart / same-account re-login",
           "state": "Backend-persisted GST default",
           "expected": "Restore saved profile and reuse it; distinguish frontend fixture proof from real backend persistence qualification.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-12 App restart / same-account re-login",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1573,9 +1948,13 @@
           "route": "Sign-out / switch account during restore",
           "state": "Account A has GST details; account B is active",
           "expected": "Clear A state and reject stale responses; no profile data is displayed or applied across accounts.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-13 Sign-out / switch account during restore",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         },
         {
@@ -1583,20 +1962,20 @@
           "route": "Profile or checkout save/load failure",
           "state": "Timeout/offline/retry and pending save",
           "expected": "Preserve input, offer retry, avoid false saved confirmation and do not turn a failed load into a repeated Add GST request.",
-          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
-          "testName": "",
-          "local": null,
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "R6634 C07-14 Profile or checkout save/load failure",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
           "device": null
         }
       ],
       "children": [],
       "dependencies": [
-        "Registration only; exact implementation ownership and named regression tests must be admitted before selection.",
-        "Fresh screenshot confirms two scoped cards in combined checkout; payment-selection sequence is founder-reported and single-scope re-prompt paths still need reproduction.",
-        "Preserve separate invoice attribution and any intentionally different recipient profiles; profile-sharing semantics must be established before implementation.",
-        "Successor local and Redmi evidence plus founder visual approval required for closure.",
-        "R6634-C07 backendBusinessLogic is PENDING: authoritative account persistence, access controls, lifecycle and order/invoice snapshot integration are required for full closure; preserve this reference at backend phase selection.",
-        "Shared Profile and BuyV2GstInvoiceProfileStore owners require coordinated admission before any frontend/profile contract mutation; current owners list does not grant those writes."
+        "Fresh Redmi journey and founder visual approval remain pending; local combined/single-scope/profile/payment-return scenarios passed.",
+        "R6634-C07 backendBusinessLogic remains PENDING for authenticated account persistence, lifecycle, access controls and authoritative order/invoice snapshots. Review runtime is session-only."
       ],
       "founderApproval": null,
       "scopeAssessment": {
@@ -1604,7 +1983,7 @@
         "capability": "Manage account GST invoice-recipient profile and reuse it in later carts",
         "classification": "mvp_supporting",
         "reason": "Prevents repeated recipient input in the launch checkout journey while retaining correct invoice attribution.",
-        "frontendState": "open_registration_only",
+        "frontendState": "implementation_authorized",
         "backendState": "pending_backend_business_logic",
         "backendTicketReference": "R6634-C07",
         "reuse": "Reuse BuyV2GstInvoiceController, existing GST sheet and BuyV2GstInvoiceProfileStore, with the existing shared account profile surface. No separate GST screen/store hierarchy unless demonstrated necessary.",
@@ -1616,7 +1995,7 @@
         "exclusions": [
           "No backend implementation, provisioning or deployment now.",
           "No change to tax computation, historical invoices or seller GST ownership.",
-          "No account creation, new APK or runtime source edit in this registration."
+          "No account creation or new APK in this frontend implementation."
         ]
       },
       "backendBusinessLogic": {
@@ -1635,6 +2014,184 @@
           "Honor account deletion and applicable profile retention policy; do not put GSTIN/address into diagnostics."
         ],
         "activation": "Pending separately authorized backend phase and shared account/Store contract coordination. Frontend fixture passes cannot close this dependency."
+      },
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
+    },
+    {
+      "id": "R6633-D05",
+      "status": "local_passed",
+      "parents": [
+        "UAW-CURSOR-BUY-READY-20260921"
+      ],
+      "founderRequirement": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
+      },
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "D05-1",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D05 production never receives a review comparison provider",
+          "expected": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D05 production never receives a review comparison provider",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "D05-2",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D05 review session has a comparison provider",
+          "expected": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D05 review session has a comparison provider",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "D05-3",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D05 comparison matches variant pack and supplier product",
+          "expected": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D05 comparison matches variant pack and supplier product",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "D05-4",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D05 comparison rejects stale mismatched and invalid requests",
+          "expected": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D05 comparison rejects stale mismatched and invalid requests",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "D05-5",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D05 comparison sheet returns to product with cart unchanged",
+          "expected": "Compare prices displays controlled matching offers through the existing provider; production Store dependency remains pending.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D05 comparison sheet returns to product with cart unchanged",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Authoritative Store/admin provider integration and real-device acceptance remain pending."
+      ],
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
+      }
+    },
+    {
+      "id": "R6633-D06-B",
+      "status": "local_passed",
+      "parents": [
+        "R6633-D06"
+      ],
+      "founderRequirement": "MoolSocial and Suppliers Offers display controlled source-bound listings with correct publisher and Store identity.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "a34c6cae6767e834790d0cf3adc40aefcf939abf28a7209581fb4c322a46ea87"
+      },
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "D06-B-1",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D06-B MoolSocial and Suppliers filters return matching publishers",
+          "expected": "MoolSocial and Suppliers Offers display controlled source-bound listings with correct publisher and Store identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D06-B MoolSocial and Suppliers filters return matching publishers",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "D06-B-2",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D06-B offers retain supplier identity and product navigation",
+          "expected": "MoolSocial and Suppliers Offers display controlled source-bound listings with correct publisher and Store identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D06-B offers retain supplier identity and product navigation",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        },
+        {
+          "id": "D06-B-3",
+          "route": "Buy Offers / product Compare prices",
+          "state": "D06-B production offers never fall back to review data",
+          "expected": "MoolSocial and Suppliers Offers display controlled source-bound listings with correct publisher and Store identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+          "testName": "D06-B production offers never fall back to review data",
+          "local": {
+            "path": "apps/mobile/build/pending-acceptance-r3-machine.jsonl",
+            "sha256": "db91b37f62bfcc27e450235e54be06c61c94ec7d358be587a288d9bddd0821fd",
+            "sourceSha256": "b8d08c881787348202b41048b260ad1c5b8103c8a43c022a0216ebe5f40ad5b4"
+          },
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Authoritative Store/admin provider integration and real-device acceptance remain pending."
+      ],
+      "founderApproval": null,
+      "localQualification": {
+        "date": "2026-09-23",
+        "scope": "frontend controlled-provider acceptance only",
+        "redmi": "pending fresh separately authorized APK; r66.34 does not include current source"
       }
     }
   ]

@@ -5316,7 +5316,8 @@ void main() {
             expect(product.storeId, offer.product.storeId);
             expect(product.pack, offer.product.pack);
             expect(product.price, offer.product.price);
-            if (product.destination == BuyV2Destination.wholesale) {
+            if (product.destination == BuyV2Destination.wholesale &&
+                offer.publisherType != BuyV2OfferPublisherType.moolSocial) {
               expect(
                 product.sellerType,
                 offer.publisherType == BuyV2OfferPublisherType.manufacturer
@@ -5345,15 +5346,17 @@ void main() {
             pageSize: 40,
           );
           expect(page.totalCount, switch (publisher) {
-            BuyV2OfferPublisherType.retailer => 20,
-            BuyV2OfferPublisherType.moolSocial => 0,
-            _ => 10,
+            BuyV2OfferPublisherType.retailer => 10,
+            BuyV2OfferPublisherType.moolSocial => 20,
+            BuyV2OfferPublisherType.manufacturer => 0,
+            BuyV2OfferPublisherType.wholesaler => 10,
           });
           if (publisher == BuyV2OfferPublisherType.moolSocial) {
             expect(
               page.items,
-              isEmpty,
-              reason: 'The review generator must not invent admin publications',
+              isNotEmpty,
+              reason:
+                  'Explicit review mode now includes controlled MoolSocial publications',
             );
           }
           expect(page.items.every((o) => o.publisherType == publisher), isTrue);
@@ -5376,10 +5379,11 @@ void main() {
           expect(
             page.items.every(
               (o) =>
+                  publisher == BuyV2OfferPublisherType.moolSocial ||
                   o.product.destination ==
-                  (publisher == BuyV2OfferPublisherType.retailer
-                      ? BuyV2Destination.shop
-                      : BuyV2Destination.wholesale),
+                      (publisher == BuyV2OfferPublisherType.retailer
+                          ? BuyV2Destination.shop
+                          : BuyV2Destination.wholesale),
             ),
             isTrue,
           );

@@ -132,7 +132,7 @@ void main() {
     (
       id: 'standalone-pay',
       route: '/app/pay/scan',
-      rootKey: Key('personal-mool-root-v2'),
+      rootKey: Key('buy-v2-screen'),
     ),
     (
       id: 'delivery',
