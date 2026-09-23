@@ -344,8 +344,8 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
-  if ($SourceCommit -ceq '02369e96a293e4588cca06efad17a02bf53470a8') {
-    # Fresh r66.33 review: exact committed source, never a moving allowance.
+  if ($SourceCommit -ceq 'd029c18596fcb8e1fcd944c0ca57bc53ab250b55') {
+    # Fresh r66.34 review: exact committed source, never a moving allowance.
     $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
     if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
     $reviewBranch = @(& git -C $root branch --show-current)
@@ -357,12 +357,29 @@ function Test-CursorStorefrontPickupReviewSource {
     }
     $boundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
     $expectedDelta = @(
+      'apps/mobile/lib/features/buy/buy_v2_customer_copy.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart',
+      'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
+      'apps/mobile/lib/features/chat/widgets/chat_widgets.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
       'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart',
@@ -374,10 +391,24 @@ function Test-CursorStorefrontPickupReviewSource {
       'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
-      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-320x568-android-checkout.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png'
     )
     $delta = @(& git -C $root diff --name-only '3959b3c23ba09f66397b74313b8ddfb90c761442' $SourceCommit -- @boundaries)
     if ($LASTEXITCODE -ne 0 -or (@($delta | Sort-Object) -join '|') -cne ($expectedDelta -join '|')) { return $false }

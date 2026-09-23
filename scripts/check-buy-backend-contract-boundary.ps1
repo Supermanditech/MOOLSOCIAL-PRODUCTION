@@ -146,8 +146,8 @@ function Get-MobileBoundaryViolations {
 
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
-    # Exact r66.33 source; customer-tapped Store/resolved-area Maps launchers only.
-    if ($IntegratedReviewSourceCommit -ceq '02369e96a293e4588cca06efad17a02bf53470a8' -and
+    # Exact r66.34 source; customer-tapped Store/resolved-area Maps launchers only.
+    if ($IntegratedReviewSourceCommit -ceq 'd029c18596fcb8e1fcd944c0ca57bc53ab250b55' -and
         $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
       $mapSha = [Security.Cryptography.SHA256]::Create()
@@ -157,7 +157,7 @@ function Get-MobileBoundaryViolations {
       } finally { $mapSha.Dispose() }
       $expectedMapHash = if ($owner.EndsWith('/buy_v2_store_address.dart')) {
         '20968444FB7A945288DF451D39490489348E247B3E4ACB7AC742C780E1E79C45'
-      } else { '817B2298D08394E66B54C79FAB15FCC30ADEB6FBE0F76B9EC182D7E59DECCEE6' }
+      } else { 'ECA7EDC43A776E4EDA5601C3E2D90E9EAA82A1609C5D58433CDD82275FC4384B' }
       if ($mapHash -ceq $expectedMapHash) {
         $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
       }
@@ -217,9 +217,9 @@ function Get-MobileBoundaryViolations {
           $IntegratedReviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0' -and
           $soundSourceHash -ceq 'D4625A0942BFE5E8E018F55F0C35028D4EBA38F01E234E3250BEC52F07BB79DB'
         ) -or (
-          # r66.33 Cart/search UI changes preserve the same local arrival cue.
-          $IntegratedReviewSourceCommit -ceq '02369e96a293e4588cca06efad17a02bf53470a8' -and
-          $soundSourceHash -ceq 'D7A88967C967DC1FF0461AAE63B1E4888B5090D2C0CEDE0D93C28CC32F84E758'
+          # r66.34 Cart/checkout UI changes preserve the same local arrival cue.
+          $IntegratedReviewSourceCommit -ceq 'd029c18596fcb8e1fcd944c0ca57bc53ab250b55' -and
+          $soundSourceHash -ceq 'A5AD2BB59DF7BD9315908EE717E945F14D0F8037696B7CFA9388AB84AC90618A'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }
