@@ -1140,6 +1140,10 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  'scripts/check-buy-founder-regression.py',
+  'scripts/test-buy-founder-regression.py',
+  'config/buy-founder-regression.json',
+  'scripts/build-buy-device-review.ps1',
   'docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
@@ -6679,6 +6683,19 @@ if ($ProductionLane -ceq 'baseline') {
         'integration remote branch does not equal its clean verified HEAD.'
     }
   }
+}
+
+# Founder-authorized Buy evidence gate; other worktrees keep their existing gates.
+if ($ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq 'buy-ready-20260921') {
+  $buyPhase = switch ($ProductionPhase) {
+    'implementation' { 'implementation' }
+    'pre_commit' { 'pre_commit' }
+    'ticket_close' { 'close' }
+    'founder_acceptance' { 'close' }
+    default { 'setup' }
+  }
+  & python -B (Join-Path $root 'scripts/check-buy-founder-regression.py') --root $root --phase $buyPhase
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'Buy founder scenario/evidence gate failed.'
 }
 
 $resultLine = (

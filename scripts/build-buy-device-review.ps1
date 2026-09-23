@@ -62,6 +62,8 @@ $repositoryRoot = [IO.Path]::GetFullPath(
   [IO.Path]::DirectorySeparatorChar,
   [IO.Path]::AltDirectorySeparatorChar
 ))
+& python -B (Join-Path $repositoryRoot 'scripts/check-buy-founder-regression.py') --root $repositoryRoot --phase build
+if ($LASTEXITCODE -ne 0) { throw 'Buy founder scenario gate rejected the build.' }
 Assert-StoreRegistryCanonicalBytes ([IO.File]::ReadAllBytes(
   (Join-Path $repositoryRoot 'config/codex-development-regression-registry.json')
 ))

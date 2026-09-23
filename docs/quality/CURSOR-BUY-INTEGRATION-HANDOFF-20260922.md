@@ -1286,3 +1286,22 @@ Evidence: redmi/r34-address-keyboard.png, redmi/r34-return-reason.png
 
 
 Evidence archive SHA-256: b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2. Previous archive entries preserved byte-for-byte. Source implementation is unchanged after qualification; this update records evidence only. No integration into Codex/Store or main performed.
+
+### Founder-authorized recurrence prevention gate — 23 September 2026
+
+Scope: gate setup only, before any R6634 child implementation. Actor is Cursor Buy; launch-supporting reliability work prevents repeated founder-visible defects and false closure. Reuse the permanent founder-repeat regression entry, current owner check and existing review APK wrapper. No application, Store, backend or other-worktree changes; no APK and no child fix authorized by this setup.
+
+Root cause: host test counts and broad partial acceptance did not prove each affected route/state; review-only provider boundaries and visual checks were conflated with complete acceptance. Permanent REG-20260807-058-REPEATED-FOUNDER-NAVIGATION-DIRECTIVE-NOT-GATED now also records this Buy recurrence, retaining its original evidence and gates.
+
+Mandatory machine gate: `scripts/check-buy-founder-regression.py`, ledger `config/buy-founder-regression.json`. The 5 open children have 64 explicit route/state cells linked to founder requirements and retained r66.34 evidence. No test or device pass has been fabricated. `selected` is deliberately empty: the next authorized implementation must select exact ticket(s), name behavior tests and preserve reproduction evidence before editing. Tests may be added in the preparation step; runtime fixes require the implementation gate. Old records remain in the existing handoff/archive.
+
+- Implementation rejects missing selection, missing original reproduction, unnamed behavior tests and deleted/weakened original scenario cells.
+- Pre-commit rejects application deltas outside the declared affected owners and requires exact, non-skipped Flutter machine-log success for every selected scenario, bound to current source bytes.
+- The existing APK wrapper invokes the same local-evidence gate before building. It does not require future device proof before a review APK can exist.
+- Closure additionally requires each scenario's current-source Redmi evidence, screenshot and hierarchy hashes, built and pulled-installed APK hashes matching, visual inspection, separate recorded founder approval, no open children and no unresolved dependencies.
+- A coverage gap remains open. A backend dependency cannot be called a completed frontend journey. A partial improvement cannot close its parent. Historical screenshots or unrelated passing tests cannot substitute for an exact scenario.
+- These gates enforce evidence and completeness, not an impossible guarantee of zero future bugs. Human visual judgment and truthful evidence collection remain necessary. Raw filesystem writes are not intercepted; the mandatory workflow boundaries enforce the contract.
+
+Commands: `python -B scripts/check-buy-founder-regression.py --phase setup|implementation|pre_commit|build|close`. Obtain current input fingerprint with `--phase setup --fingerprint`. Run regression self-tests with `python -B scripts/test-buy-founder-regression.py`. Local evidence uses the Flutter `test --machine` JSON event log, exact test name, file hash and source fingerprint; device entries additionally identify Redmi TG8HCYTGGQT885OF, retained APKs, PNG/XML, visual review and outcome. Keep original evidence immutable and add new attempt records. Do not weaken expected outcomes to match an implementation.
+
+Validation: 21 focused gate tests passed (including wrong APK/device, missing visual approval, skipped or unrelated tests, stale source, removed scenarios and open children). Both PowerShell hooks parsed. Existing permanent regression checker passed 4,616 entries / 2,550 applicable. Setup and metadata pre-commit pass; implementation/build deliberately fail with no selected ticket. Application source/tests and installed r66.34 are unchanged.

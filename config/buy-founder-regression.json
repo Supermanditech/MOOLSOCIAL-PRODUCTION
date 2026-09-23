@@ -1,0 +1,764 @@
+{
+  "schemaVersion": 1,
+  "baseline": "aa1300df51b4971475af761757b269a128f44aa3",
+  "selected": [],
+  "historicalRecords": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+  "rule": "Preserve scenarios and evidence permanently. Name exact regression tests and select authorized ticket before implementation. Gate setup does not authorize application edits.",
+  "tickets": [
+    {
+      "id": "R6634-C01",
+      "status": "open",
+      "parents": [
+        "R6633-D02"
+      ],
+      "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C01-1",
+          "route": "Shop Visit Store",
+          "state": "opposite basket only",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-2",
+          "route": "Shop Visit Store",
+          "state": "same basket",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-3",
+          "route": "Shop Visit Store",
+          "state": "mixed baskets",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-4",
+          "route": "Shop Visit Store",
+          "state": "last content scrolled",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-5",
+          "route": "Wholesale Visit Store",
+          "state": "opposite basket only",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-6",
+          "route": "Wholesale Visit Store",
+          "state": "same basket",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-7",
+          "route": "Wholesale Visit Store",
+          "state": "mixed baskets",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-8",
+          "route": "Wholesale Visit Store",
+          "state": "last content scrolled",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-9",
+          "route": "Recent product",
+          "state": "opposite basket only",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-10",
+          "route": "Recent product",
+          "state": "same basket",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-11",
+          "route": "Recent product",
+          "state": "mixed baskets",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-12",
+          "route": "Recent product",
+          "state": "last content scrolled",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-13",
+          "route": "Offers product",
+          "state": "opposite basket only",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-14",
+          "route": "Offers product",
+          "state": "same basket",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-15",
+          "route": "Offers product",
+          "state": "mixed baskets",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C01-16",
+          "route": "Offers product",
+          "state": "last content scrolled",
+          "expected": "Cart accessible on every nested route, fixed during scroll, without white strip.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [],
+      "founderApproval": null
+    },
+    {
+      "id": "R6634-C02",
+      "status": "open",
+      "parents": [
+        "R6633-D16",
+        "R6633-D17-C2"
+      ],
+      "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+      },
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C02-1",
+          "route": "new Orders",
+          "state": "normal",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-2",
+          "route": "new Orders",
+          "state": "long name",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-3",
+          "route": "new Orders",
+          "state": "200 percent with keyboard",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-4",
+          "route": "retained Orders",
+          "state": "normal",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-5",
+          "route": "retained Orders",
+          "state": "long name",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-6",
+          "route": "retained Orders",
+          "state": "200 percent with keyboard",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-7",
+          "route": "supplier chat",
+          "state": "normal",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-8",
+          "route": "supplier chat",
+          "state": "long name",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C02-9",
+          "route": "supplier chat",
+          "state": "200 percent with keyboard",
+          "expected": "Consistent readable public Store names and compact chat; preserve legal identity.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [],
+      "founderApproval": null
+    },
+    {
+      "id": "R6634-C03",
+      "status": "open",
+      "parents": [
+        "R6633-D06-G-V05"
+      ],
+      "founderRequirement": "One compact organized trade item table without duplicate facts.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C03-1",
+          "route": "Wholesale review",
+          "state": "single item",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-2",
+          "route": "Wholesale review",
+          "state": "multiple Stores and packs",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-3",
+          "route": "Wholesale review",
+          "state": "long text 200 percent",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-4",
+          "route": "Bulk review",
+          "state": "single item",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-5",
+          "route": "Bulk review",
+          "state": "multiple Stores and packs",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-6",
+          "route": "Bulk review",
+          "state": "long text 200 percent",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-7",
+          "route": "Offers Wholesale review",
+          "state": "single item",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-8",
+          "route": "Offers Wholesale review",
+          "state": "multiple Stores and packs",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C03-9",
+          "route": "Offers Wholesale review",
+          "state": "long text 200 percent",
+          "expected": "One compact organized trade item table without duplicate facts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [],
+      "founderApproval": null
+    },
+    {
+      "id": "R6634-C04",
+      "status": "open",
+      "parents": [
+        "R6633-D06-G-V07",
+        "R6633-D06-G-V07-C1"
+      ],
+      "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C04-1",
+          "route": "active tracking",
+          "state": "missing payment",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-2",
+          "route": "active tracking",
+          "state": "paid",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-3",
+          "route": "active tracking",
+          "state": "balance due",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-4",
+          "route": "active tracking",
+          "state": "long text 200 percent",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-5",
+          "route": "delivered tracking",
+          "state": "missing payment",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-6",
+          "route": "delivered tracking",
+          "state": "paid",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-7",
+          "route": "delivered tracking",
+          "state": "balance due",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-8",
+          "route": "delivered tracking",
+          "state": "long text 200 percent",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-9",
+          "route": "Orders history",
+          "state": "missing payment",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-10",
+          "route": "Orders history",
+          "state": "paid",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-11",
+          "route": "Orders history",
+          "state": "balance due",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C04-12",
+          "route": "Orders history",
+          "state": "long text 200 percent",
+          "expected": "One status summary and meaningful payment facts; no empty Payment group.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [],
+      "founderApproval": null
+    },
+    {
+      "id": "R6634-C05",
+      "status": "open",
+      "parents": [
+        "R6633-D14",
+        "R6633-D06-G-V03",
+        "R6633-D06-G-V08",
+        "R6633-D06-G-V09",
+        "R6633-D06-G-V07-C3"
+      ],
+      "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C05-1",
+          "route": "Bulk cart review",
+          "state": "normal Android",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-2",
+          "route": "Bulk cart review",
+          "state": "200 percent text",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-3",
+          "route": "Bulk cart review",
+          "state": "keyboard cancel back",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-4",
+          "route": "address last field validation",
+          "state": "normal Android",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-5",
+          "route": "address last field validation",
+          "state": "200 percent text",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-6",
+          "route": "address last field validation",
+          "state": "keyboard cancel back",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-7",
+          "route": "Edit basket scrolled",
+          "state": "normal Android",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-8",
+          "route": "Edit basket scrolled",
+          "state": "200 percent text",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-9",
+          "route": "Edit basket scrolled",
+          "state": "keyboard cancel back",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-10",
+          "route": "Offers rapid switching",
+          "state": "normal Android",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-11",
+          "route": "Offers rapid switching",
+          "state": "200 percent text",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-12",
+          "route": "Offers rapid switching",
+          "state": "keyboard cancel back",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-13",
+          "route": "collected receipt",
+          "state": "normal Android",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-14",
+          "route": "collected receipt",
+          "state": "200 percent text",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-15",
+          "route": "collected receipt",
+          "state": "keyboard cancel back",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-16",
+          "route": "partial problem receipt",
+          "state": "normal Android",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-17",
+          "route": "partial problem receipt",
+          "state": "200 percent text",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C05-18",
+          "route": "partial problem receipt",
+          "state": "keyboard cancel back",
+          "expected": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "testName": null,
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [],
+      "founderApproval": null
+    }
+  ]
+}

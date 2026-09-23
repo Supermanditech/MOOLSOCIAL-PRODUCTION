@@ -1352,17 +1352,20 @@
       ],
       "mistake": "Repeated founder instructions required production-grade Mool bottom-rail navigation with complete main/sub-action wiring and no pop-up/menu launcher, but C01-C06 still qualified host-side while OPPO showed the same navigation-only question-and-grid launcher.",
       "rootCause": "Founder language was not converted into a durable instruction-to-assertion scenario ledger, forbidden-behavior contract and blocking device acceptance matrix before implementation and build; route ownership and Back history were incorrectly treated as proof of the requested product outcome.",
-      "prevention": "Every founder-visible navigation directive must map to a versioned scenario-ledger row, a static forbidden-implementation contract, a production-router visible-owner/state test, a named OPPO screenshot/hierarchy step and a machine state that remains unimplemented_or_unverified until all are green. Route existence, dispatch or canPop alone cannot prove implementation.",
+      "prevention": "Every founder-visible navigation directive must map to a versioned scenario-ledger row, a static forbidden-implementation contract, a production-router visible-owner/state test, a named OPPO screenshot/hierarchy step and a machine state that remains unimplemented_or_unverified until all are green. Route existence, dispatch or canPop alone cannot prove implementation. Buy recurrence 2026-09-23: missing route/state coverage and partial visual acceptance escaped to Redmi. The mandatory Buy founder ledger now binds each selected scenario to exact test execution, current source and installed-APK device evidence. Open children and coverage gaps block closure.",
       "gates": [
         "scripts/check-personal-mool-global-navigation-contract.ps1",
         "scripts/check-codex-development-regression-memory.ps1",
-        "config/apk-regression-gate-state.json"
+        "config/apk-regression-gate-state.json",
+        "scripts/check-buy-founder-regression.py"
       ],
       "evidence": [
         "artifacts/quality/uaw-personal-mvp-global-mool-bottom-rail-navigation-fix1-c06-20260806-01/oppo-u01-u22/104-u03-social-mool-hub.png",
         "artifacts/quality/uaw-personal-mvp-global-mool-bottom-rail-navigation-fix1-c06-20260806-01/oppo-u01-u22/104-u03-social-mool-hub.xml",
         "artifacts/quality/uaw-personal-mvp-global-mool-bottom-rail-navigation-fix1-c06-20260806-01/oppo-u01-u22/106-r60.7-device-rejection.md",
-        "artifacts/quality/uaw-personal-mvp-global-mool-bottom-rail-navigation-fix1-c06-20260806-01/oppo-u01-u22/111-repeated-founder-navigation-directive-not-gated.md"
+        "artifacts/quality/uaw-personal-mvp-global-mool-bottom-rail-navigation-fix1-c06-20260806-01/oppo-u01-u22/111-repeated-founder-navigation-directive-not-gated.md",
+        "config/buy-founder-regression.json",
+        "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip"
       ]
     },
     {

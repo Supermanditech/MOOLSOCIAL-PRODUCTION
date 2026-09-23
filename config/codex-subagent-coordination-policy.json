@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4616,
-    "sha256": "1843DEF6FB4BDFA6C05204C3704BDE13DF0BC33E97CE7C251CC85A11056D3B9E"
+    "sha256": "16904A5FD2A521725F96758094F2C441252D18F53C1052583A9EFE8EF461634B"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -128,7 +128,11 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
-        "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip"
+        "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "scripts/check-buy-founder-regression.py",
+        "scripts/test-buy-founder-regression.py",
+        "config/buy-founder-regression.json",
+        "scripts/build-buy-device-review.ps1"
       ]
     },
     {
