@@ -2,6 +2,19 @@
 
 ## Latest founder gate: Git checkpoint and successor APK authorized after qualification
 
+### Founder-requested Redmi defect replay — 24 September 2026
+
+Test and register issues only. The same installed r66.35 (`2026092302`) was exercised through 38 retained PNG/XML screen states against the 20 selected entries. Application, tests and APK are unchanged. The matrix records observed states and partial coverage explicitly; it does not convert 388 local cases into device passes.
+
+Two confirmed open children are registered in the founder ledger and regression record:
+
+- `R6633-D06-B-A01`: selecting Suppliers sets the paged publisher query to null/All publishers, while the promotion removes MoolSocial from only the current page. Redmi shows “No current offers from this publisher” above a populated grid. Correct source/grid/promotion agreement and publisher page-boundary recovery need implementation.
+- `R6634-C10-A01`: Store details has a generic heading and a compact identity panel without the current Store's visible name. Mool Market 1 is available in semantics and on the underlying browse screen but absent from the open details sheet. Restore one visible canonical name without duplicates; preserve Ask/address/Visit/Back.
+
+Observed working paths include comparison results/refresh/Add/Cart price, mixed baskets and totals, one GST entry, Bulk minimum packs and compact trade table, quantity Cancel above the keyboard, required address validation and last-field scrolling, Cart-to-Offers return, order status/payment presentation, category/filter and Store browsing. The missing live-update state remains truthful. Signed-in GST persistence, authoritative receipts/Store integration, live map expansion, full interruption/enlarged-text variants and unavailable retired Android link entry remain unqualified. Original rice Cart (one pack, 395) and Saved state were retained; test additions were removed. No order, payment or message was submitted; no address/GST profile was saved.
+
+Evidence archive SHA256 `f0b0b0dac485fafbc8429268b4d6cab8322eb6b4c1f28a6769e4aec31a65c7f5`, 95,080,457 bytes: all 950 earlier entries preserved; 115 files appended under `defect-replay-r6635-20260924/`, including the per-ticket matrix and screenshot/XML hashes. Parents D06-B and C10 cannot close while their children remain open. Child implementation is not part of this test-only instruction.
+
 ### Current installed candidate and Git discipline — 24 September 2026
 
 r66.35 (`2026092302`, isolated package `com.moolsocial.app.cursorreview`) was built only after repairs and qualification were committed/pushed, remote parity and clean Git were verified, and all 13 prebuild gates passed. Exact build HEAD: `5b58240f5df9c7dbbbc5d660158fca4e069e1b45`; application source pin remains `0fd4da937635e159354d5213d134b80516873242`. APK identity, signer and provenance passed. Data-preserving installation on Redmi `TG8HCYTGGQT885OF` succeeded. Pulled installed base APK and built artifact both have SHA256 `3fd6dccb8eac215053e33ccacd6cbfb65b1c1213365079fa4af67d6ed80cc096`. One-build authority is consumed. This evidence-only checkpoint does not change the APK's build HEAD.

@@ -105101,7 +105101,7 @@
           "preservedEntries": 858,
           "addedEntries": 31,
           "bytes": 78539834,
-          "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
+          "sha256": "f0b0b0dac485fafbc8429268b4d6cab8322eb6b4c1f28a6769e4aec31a65c7f5",
           "prefix": "full-qualification-r6635-20260924/",
           "integrity": "passed",
           "sourceSha256": "43c89f54c31d90b4a23607c699ba788530e98d14cbca349ea62749454370be46"
@@ -105123,7 +105123,7 @@
         "status": "installed_smoke_passed_full_device_acceptance_pending",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-          "sha256": "939c36d4d291d5231f0f37bdf4ffaf42881662330415b8f711e3a9a6a4e776c1",
+          "sha256": "f0b0b0dac485fafbc8429268b4d6cab8322eb6b4c1f28a6769e4aec31a65c7f5",
           "bytes": 85568259,
           "preservedEntries": 889,
           "addedEntries": 61,
@@ -105139,6 +105139,64 @@
           "Tracking presentation founder approval pending.",
           "Account GST persistence, authoritative offers, collection/assignment/shipment/maps/payment/PO contracts remain dependent work."
         ]
+      },
+      "redmiDefectReplay20260924": {
+        "candidate": "UAW-CURSOR-BUY-R6635-20260923",
+        "scope": "Device tests and issue registration only; no application changes or APK.",
+        "children": [
+          {
+            "id": "R6633-D06-B-A01",
+            "parent": "R6633-D06-B",
+            "status": "open",
+            "severity": "major",
+            "title": "Suppliers selector queries all publishers and shows false empty promotion",
+            "steps": [
+              "Open Offers",
+              "Select MoolSocial",
+              "Select Suppliers"
+            ],
+            "actual": "All publishers filter; No current offers from this publisher above populated grid.",
+            "expected": "Source query, grid and promotion consistently show supplier publications; empty state only when scoped source is empty.",
+            "rootCause": "Paged Offers maps Suppliers to publisher null; promotion then excludes MoolSocial from only the loaded page.",
+            "source": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+            "evidence": "apps/mobile/build/review-candidates/cursor-buy-r6635-20260923/redmi-retest/defects-17-supplier-offers.png",
+            "acceptance": [
+              "Both tabs match source, grid, promotion and filters.",
+              "Cover publisher ordering across page boundaries.",
+              "Preserve category, Saved, Cart and Back."
+            ]
+          },
+          {
+            "id": "R6634-C10-A01",
+            "parent": "R6634-C10",
+            "status": "open",
+            "severity": "major",
+            "title": "Current Store name missing from Store details sheet",
+            "steps": [
+              "Open Cart Store Mool Market 1",
+              "Tap Store details information icon"
+            ],
+            "actual": "Sheet title Store details; current identity card shows MoolSocial Fulfilment Store and address but no visible Mool Market 1. Other stores have names.",
+            "expected": "Show canonical current Store name once in the visible sheet, without reintroducing duplicate Store names.",
+            "rootCause": "Store-info modal retains generic Store details heading while shared compact _storeInfo omits the visible store identity used in the browse heading.",
+            "source": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+            "evidence": "apps/mobile/build/review-candidates/cursor-buy-r6635-20260923/redmi-retest/defects-37-store-details.png",
+            "acceptance": [
+              "Current canonical Store name visible exactly once in both browse and details.",
+              "Long names remain readable; preserve Ask, address, other Store Visit and Back."
+            ]
+          }
+        ],
+        "evidence": {
+          "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+          "sha256": "f0b0b0dac485fafbc8429268b4d6cab8322eb6b4c1f28a6769e4aec31a65c7f5",
+          "bytes": 95080457,
+          "preservedEntries": 950,
+          "addedEntries": 115,
+          "entries": 1065,
+          "prefix": "defect-replay-r6635-20260924/"
+        },
+        "reportEntry": "defect-replay-r6635-20260924/defect-replay-report.json"
       }
     }
   ],
