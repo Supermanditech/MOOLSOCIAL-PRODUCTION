@@ -21,7 +21,7 @@
       "founderRequirement": "Cart accessible on every nested route, fixed during scroll, without white strip.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -268,7 +268,7 @@
       "founderRequirement": "Consistent readable public Store names and compact chat; preserve legal identity.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_customer_copy.dart",
@@ -419,7 +419,7 @@
       "founderRequirement": "One compact organized trade item table without duplicate facts.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -567,7 +567,7 @@
       "founderRequirement": "One status summary and meaningful payment facts; no empty Payment group.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -760,7 +760,7 @@
       "founderRequirement": "Complete connected journey, editing, keyboard, Android insets and receipt outcomes before acceptance.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -1038,7 +1038,7 @@
       "founderRequirement": "Cart to Offers opens Offers, never main-actions menu, preserving all baskets and explicit menu/Back actions.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
@@ -1388,7 +1388,7 @@
       "founderRequirement": "Migrate shared production-router regression expectations after founder-authorized legacy menu retirement; preserve origin return, Work reachability and no redirect loop, without restoring retired UI or skipping checks.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
-        "sha256": "7f25816a0f16ac9d1765ec65be3c5a4b8c9c88da411bb09a698f25ff6bbef66e"
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
       },
       "owners": [
         "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart"
@@ -1430,6 +1430,212 @@
         "Inventory and migrate other shared router assertions that require the retired menu; currently three confirmed failing cases. This is a regression-suite contract migration, not proof of a new customer-visible runtime failure."
       ],
       "founderApproval": null
+    },
+    {
+      "id": "R6634-C07",
+      "status": "open",
+      "parents": [
+        "R6633-D06-G"
+      ],
+      "founderRequirement": "After payment selection, eliminate repeated Add GST entry in Shop/Wholesale Cart review. Provide one clear recipient-details flow with correct invoice attribution and retained state. Founder amendment: store GST recipient details in the signed-in user account profile, provide an optional Profile GST entry/prompt, and reuse saved details automatically in subsequent Shop/Wholesale carts without asking again.",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip",
+        "sha256": "3b974e1976c188390d3972ff5858ff8b4a16159dc65bd1aeaa2170a3f211fb6a"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart"
+      ],
+      "cases": [
+        {
+          "id": "C07-1",
+          "route": "Combined Shop + Wholesale Confirm order",
+          "state": "Same invoice recipient; two visible GST cards",
+          "expected": "One clear GST-entry flow reuses the selected recipient details without duplicate entry; retain correct destination invoice attribution.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-2",
+          "route": "Shop-only Cart > payment > Confirm order",
+          "state": "GST supplied before returning to review",
+          "expected": "Do not request identical GST details again; show retained details with an explicit Edit action.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-3",
+          "route": "Wholesale-only Cart > payment > Confirm order",
+          "state": "GST supplied before returning to review",
+          "expected": "Do not request identical GST details again; preserve recipient details and invoice attribution.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-4",
+          "route": "Combined checkout GST > payment > Back > review",
+          "state": "Selected profile and mixed cart quantities",
+          "expected": "Retain GST selection, payment choice and basket quantities; no repeated mandatory input.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-5",
+          "route": "Combined checkout GST editing",
+          "state": "Distinct recipient profiles where supported",
+          "expected": "Do not silently overwrite or cross-apply different recipient profiles; make applicability explicit.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-6",
+          "route": "GST entry validation and recovery",
+          "state": "Missing or invalid required profile fields; save/load failure",
+          "expected": "Keep valid input and clear validation/retry; no false saved state or repeated successful save requirement.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-7",
+          "route": "Optional GST preference",
+          "state": "GST recipient details declined where allowed",
+          "expected": "Preserve ordinary checkout tax/invoice handling and do not force GSTIN entry solely to remove duplicate prompts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-8",
+          "route": "Account Profile > GST details",
+          "state": "No saved recipient profile",
+          "expected": "Provide a discoverable optional Add GST details entry/prompt; save valid GSTIN, legal name and billing address through the account-profile interface.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-9",
+          "route": "Account Profile > GST details > edit/remove",
+          "state": "Existing saved recipient profile",
+          "expected": "Show saved details with Edit/Remove and update future-cart defaults without modifying historical invoices.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-10",
+          "route": "Next Shop Cart and next Wholesale Cart",
+          "state": "Same account has valid saved default GST details",
+          "expected": "Automatically reuse saved recipient details and preference; show a compact summary/Edit action instead of asking to add again.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-11",
+          "route": "Checkout > add GST details > later Cart",
+          "state": "Customer explicitly saves recipient details to account",
+          "expected": "Profile and subsequent carts use the same saved recipient record; duplicate entry is not required.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-12",
+          "route": "App restart / same-account re-login",
+          "state": "Backend-persisted GST default",
+          "expected": "Restore saved profile and reuse it; distinguish frontend fixture proof from real backend persistence qualification.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-13",
+          "route": "Sign-out / switch account during restore",
+          "state": "Account A has GST details; account B is active",
+          "expected": "Clear A state and reject stale responses; no profile data is displayed or applied across accounts.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "C07-14",
+          "route": "Profile or checkout save/load failure",
+          "state": "Timeout/offline/retry and pending save",
+          "expected": "Preserve input, offer retry, avoid false saved confirmation and do not turn a failed load into a repeated Add GST request.",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart",
+          "testName": "",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Registration only; exact implementation ownership and named regression tests must be admitted before selection.",
+        "Fresh screenshot confirms two scoped cards in combined checkout; payment-selection sequence is founder-reported and single-scope re-prompt paths still need reproduction.",
+        "Preserve separate invoice attribution and any intentionally different recipient profiles; profile-sharing semantics must be established before implementation.",
+        "Successor local and Redmi evidence plus founder visual approval required for closure.",
+        "R6634-C07 backendBusinessLogic is PENDING: authoritative account persistence, access controls, lifecycle and order/invoice snapshot integration are required for full closure; preserve this reference at backend phase selection.",
+        "Shared Profile and BuyV2GstInvoiceProfileStore owners require coordinated admission before any frontend/profile contract mutation; current owners list does not grant those writes."
+      ],
+      "founderApproval": null,
+      "scopeAssessment": {
+        "actor": "Signed-in public Buy customer",
+        "capability": "Manage account GST invoice-recipient profile and reuse it in later carts",
+        "classification": "mvp_supporting",
+        "reason": "Prevents repeated recipient input in the launch checkout journey while retaining correct invoice attribution.",
+        "frontendState": "open_registration_only",
+        "backendState": "pending_backend_business_logic",
+        "backendTicketReference": "R6634-C07",
+        "reuse": "Reuse BuyV2GstInvoiceController, existing GST sheet and BuyV2GstInvoiceProfileStore, with the existing shared account profile surface. No separate GST screen/store hierarchy unless demonstrated necessary.",
+        "dependencyOrder": [
+          "Coordinate shared Profile owner and GST account contract before implementation selection.",
+          "Implement and locally qualify frontend with controlled account-store fixtures.",
+          "Implement authorized account-backed persistence during backend phase, then qualify real account and Redmi journeys."
+        ],
+        "exclusions": [
+          "No backend implementation, provisioning or deployment now.",
+          "No change to tax computation, historical invoices or seller GST ownership.",
+          "No account creation, new APK or runtime source edit in this registration."
+        ]
+      },
+      "backendBusinessLogic": {
+        "ticketReference": "R6634-C07",
+        "status": "pending",
+        "requiredForFullClosure": true,
+        "existingInterface": "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart: BuyV2GstInvoiceProfileStore",
+        "observedGap": "Only _BuyV2DeviceReviewGstInvoiceProfileStore implementation found in runtime lib; it holds an in-memory snapshot under device-review-session scope. It is not account persistence.",
+        "requirements": [
+          "Bind GSTIN, legal name, billing address and chosen default recipient profile to the authenticated account; enforce owner-only reads and writes server-side.",
+          "Reuse the authoritative account/profile store and versioned data contract after coordination; do not provision a separate database or duplicate catalogue.",
+          "Persist explicit add/edit/remove operations and default choice; restore across app restart and same-account re-login, with cross-device verification when a backend is available.",
+          "Clear account-scoped cache and ignore stale in-flight responses on sign-out/account switch; never expose one account GST details to another.",
+          "Handle read/save failure, unavailable service, retries and concurrent edits truthfully; never report account-saved until persisted and never treat a failed read as no profile.",
+          "Snapshot applicable recipient details into new order/invoice contracts at authoritative creation; later profile edits must not rewrite historical invoices.",
+          "Honor account deletion and applicable profile retention policy; do not put GSTIN/address into diagnostics."
+        ],
+        "activation": "Pending separately authorized backend phase and shared account/Store contract coordination. Frontend fixture passes cannot close this dependency."
+      }
     }
   ]
 }
