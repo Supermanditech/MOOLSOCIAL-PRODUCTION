@@ -4515,7 +4515,8 @@ void main() {
         final expectedMessage = switch (fault) {
           'services' =>
             'Store collection is unavailable right now. Your Cart has not changed.',
-          'identity' => 'Your account could not be verified for collection. Your Cart is saved.',
+          'identity' =>
+            'Your account could not be verified for collection. Your Cart is saved.',
           'capability' =>
             'Check this store’s collection availability to continue.',
           _ =>
