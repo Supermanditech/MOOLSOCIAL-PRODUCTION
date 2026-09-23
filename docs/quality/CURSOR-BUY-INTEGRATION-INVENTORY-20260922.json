@@ -1695,7 +1695,7 @@
         "status": "open_registered_not_implemented",
         "title": "Combined historical active-order estimate still says Delivered",
         "reproduction": "Orders > Active > scroll to MS-NEW-03 (sunflower oil and soap), status Preparing 40%.",
-        "actual": "Last recorded estimate: Delivery today by 8:00 pm \u00b7 Delivered in 30 min.",
+        "actual": "Last recorded estimate: Delivery today by 8:00 pm · Delivered in 30 min.",
         "expected": "All components must retain active-order estimate wording; no completed-delivery claim.",
         "evidence": [
           "redmi/027-orders-lower.png",
@@ -2182,7 +2182,13 @@
   },
   "orderFrontendAuditContinuation20260923": {
     "newParent": "R6633-D17",
-    "children": ["R6633-D17-C1", "R6633-D17-C2", "R6633-D06-G-V07-C1", "R6633-D06-G-V07-C2", "R6633-D06-G-V07-C3"],
+    "children": [
+      "R6633-D17-C1",
+      "R6633-D17-C2",
+      "R6633-D06-G-V07-C1",
+      "R6633-D06-G-V07-C2",
+      "R6633-D06-G-V07-C3"
+    ],
     "status": "open_registered_only",
     "captureRange": "184-200",
     "evidencePrefix": "r6633-po-order-visual-followup/",
@@ -2204,5 +2210,33 @@
     "currentDeviceLiveMapVerified": false,
     "blocksCurrentFrontendAudit": false,
     "report": "CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+  },
+  "r6634FinalReplay": {
+    "buildSourceHead": "821590ce845f6719439fc92077ce3bf1eea23053",
+    "installedSha256": "6B624757007AF342491BE1360DC0EE0D625C5E265C889DF3C0A43BD6F5FD21AC",
+    "manifestFiles": 3246,
+    "sourceUnchangedAfterDevice": true,
+    "twoBuyPasses": {
+      "passedEach": 2535,
+      "skippedEach": 27
+    },
+    "dispositions": {
+      "closed_verified": 13,
+      "partial_child_registered": 12,
+      "open_dependency": 6,
+      "partial_dependency": 4,
+      "closed_superseded": 2
+    },
+    "newOpenChildren": [
+      "R6634-C01",
+      "R6634-C02",
+      "R6634-C03",
+      "R6634-C04",
+      "R6634-C05"
+    ],
+    "reportInArchive": "final-r6634/FINAL-REPLAY.md",
+    "archiveSha256": "b97036ace077a798bb571099b0197967dac768995c7c136292a7c0a07144edf2",
+    "state": "replay_ended_findings_registered_no_further_fix_cycle",
+    "productionAccepted": false
   }
 }
