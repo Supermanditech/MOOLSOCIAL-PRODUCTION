@@ -1,5 +1,36 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Founder approval — all 31 defects, subject to OPPO closure
+
+Founder explicitly instructed: "RECORD APPROVAL OF ALL 31 DEFECTS TOO SUBJECT TO
+OPPO TESTING CLOSURE". Approval is recorded for the complete original 31-finding
+batch and its shown corrections at implementation checkpoint
+`4df7950a1e210337b5ea8c909da0b52e99ed9fc8`. This includes the final free-standing
+Alert/Profile correction. Final device closure remains OPEN until the approved
+successor APK is tested on OPPO. No backend, production-media or native-device
+success is inferred; previously deferred dependencies remain deferred.
+
+Founder requests complete Git reconciliation and a C: cleanup PowerShell plan
+before giving new OPPO APK approval. No APK build/install is authorized by this
+approval record. Memory/logs/data/Git history, last Play upload and current Redmi/
+OPPO packages must be protected during any later cleanup.
+
+Read-only reconciliation: the source descends from the prior Cursor/Store
+baseline `123ff42c`. The later Store integration `f27c09e1` has exactly the same
+apps/mobile tree as its feature parent `f71602a9`, which is an ancestor of this
+branch. All 29 commits from the earlier baseline through `4df7950a` remain in
+history, including the complete counter-sale/catalogue/CSV/settings/accounting/
+31-defect/persistence/header work. Inspected Codex worktrees have zero dirt and
+the shared stash list is empty. Non-ancestor qualification/governance branches
+`7d30b7a5`, `009b3721`, `6192baec` contain no apps/mobile commits missing here and
+are retained, not discarded or blindly merged. Git connectivity check passed.
+Remote initially ends at `7dd99396`; the three implementation checkpoints
+`9a0c39c0`, `e5abc55b`, `4df7950a` were local-only at first inspection. Founder
+explicitly authorizes pushing this Store branch and this approval record only;
+remote exact-SHA readback must verify that push. Current Cursor work remains
+separate and untouched. This record is
+not an assertion that unrelated Cursor changes have been integrated.
+
 ## Latest — 31-finding local completion and free Store header controls
 
 Founder approved the other twelve entered-stock flow captures, with one narrow
