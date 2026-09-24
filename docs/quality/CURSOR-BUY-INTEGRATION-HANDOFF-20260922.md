@@ -1,5 +1,16 @@
 # Cursor Buy integration handoff and new-baseline request — 22 September 2026
 
+## Visit Store Close surround — R6634-C10-A02 — 24 September 2026
+
+Founder requested registration, implementation, local testing and repair of any affected children. Registered as a child of C10 before execution. Removed the circular Close outline from paged/full Store catalogue and finite Shop/Wholesale supplier sheets. Kept existing icon, minimum accessible tap size, tooltip, callbacks and Cart/Back state. Brand and pharmacy presentation remain unchanged. Two application/test files changed; no backend or Store workspace changes.
+
+All 16 focused connected checks and 404 selected behavior scenarios pass on unchanged source `806acfa1b632978aa68922ee4b42b3b41ae15f313aff47edb86580c4d119001f`; these suites overlap. Zero failures/skips/missed taps/overflow warnings; analysis and formatting clean. Actual Shop normal and Wholesale 200-percent captures inspected. No additional child defect found. The selected ledger now contains 23 entries, with prior tickets and scenarios preserved.
+
+Evidence appended under `store-close-20260924/` in `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`, SHA256 `f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635`, 38,172,348 bytes. Every earlier archive entry retains its CRC and size. Registered reproduction, raw test logs, captures and source diff are retained. Local screen review: `apps/mobile/build/store-close-20260924/captures/eight-store-shop-1.0.png` and `eight-store-wholesale-2.0.png`.
+
+Local pass does not close the device gate. No APK built/installed; founder visual acceptance and successor Redmi verification pending. Existing Store/public integration and backend dependencies remain separate.
+
+
 ## Redmi child repairs locally qualified — 24 September 2026
 
 Latest founder instruction: implement and test locally. Both registered children are implemented and locally passed; neither is closed or verified on the installed Redmi APK.

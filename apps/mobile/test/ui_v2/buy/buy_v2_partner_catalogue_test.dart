@@ -73,6 +73,14 @@ void main() {
           await tester.tap(action);
           await tester.pumpAndSettle();
           final scope = 'store-${destination.name}-${source.storeIdAt(0)}';
+          final close = find.byKey(const ValueKey('buy-paged-store-close'));
+          expect(close.hitTestable(), findsOneWidget);
+          expect(
+            tester.widget<IconButton>(close).style!.side!.resolve({}),
+            BorderSide.none,
+          );
+          expect(tester.getSize(close).shortestSide, greaterThanOrEqualTo(44));
+          expect(tester.widget<IconButton>(close).tooltip, 'Close store');
           final field = find.byKey(const ValueKey('buy-store-product-search'));
           expect(field.hitTestable(), findsOneWidget);
           final width = tester.getSize(field).width;
@@ -4266,7 +4274,17 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(sheet, findsOneWidget);
-        await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+        final storeClose = find.byKey(ValueKey('$prefix-sheet-close'));
+        expect(storeClose.hitTestable(), findsOneWidget);
+        expect(
+          tester.widget<IconButton>(storeClose).style!.side!.resolve({}),
+          BorderSide.none,
+        );
+        expect(
+          tester.getSize(storeClose).shortestSide,
+          greaterThanOrEqualTo(44),
+        );
+        await tester.tap(storeClose);
         await tester.pumpAndSettle();
         expect(session.selectedProductId, id);
         expect(session.quantityFor(id), product.minimumOrder);

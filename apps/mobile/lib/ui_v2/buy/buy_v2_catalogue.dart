@@ -6694,9 +6694,11 @@ Future<void> showBuyV2PartnerCatalogue(
                                                 minimumSize: const Size.square(
                                                   BuyV2Metrics.minimumTap,
                                                 ),
-                                                side: const BorderSide(
-                                                  color: BuyV2Colors.line,
-                                                ),
+                                                side: publicPartner
+                                                    ? BorderSide.none
+                                                    : const BorderSide(
+                                                        color: BuyV2Colors.line,
+                                                      ),
                                               ),
                                               icon: const Icon(
                                                 Icons.close_rounded,
@@ -8156,10 +8158,14 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                   ),
                 ],
               ),
-              trailing: IconButton.outlined(
+              trailing: IconButton(
                 key: const ValueKey('buy-paged-store-close'),
                 tooltip: 'Close full store catalogue',
                 onPressed: widget.onClose,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(BuyV2Metrics.minimumTap),
+                  side: BorderSide.none,
+                ),
                 icon: const Icon(Icons.close_rounded),
               ),
             ),
@@ -8251,7 +8257,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               ),
               const SizedBox(width: 8),
               if (widget.storefront && !_searching)
-                IconButton.outlined(
+                IconButton(
                   key: ValueKey(
                     _searching
                         ? 'buy-store-search-finish'
@@ -8259,6 +8265,10 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                   ),
                   tooltip: _searching ? 'Finish store search' : 'Close store',
                   onPressed: _searching ? _finishStoreSearch : widget.onClose,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size.square(BuyV2Metrics.minimumTap),
+                    side: BorderSide.none,
+                  ),
                   icon: Icon(
                     _searching ? Icons.check_rounded : Icons.close_rounded,
                   ),

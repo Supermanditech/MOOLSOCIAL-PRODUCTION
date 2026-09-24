@@ -105264,8 +105264,8 @@
           ],
           "archive": {
             "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-            "sha256": "e2bc90c39244c5181974c7db4b51934cef22185fb9db80705148a69cca3a91d6",
-            "bytes": 18814185
+            "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
+            "bytes": 38172348
           }
         },
         "resolvedFixtureCauses": [
@@ -105283,6 +105283,32 @@
             "apps/mobile/build/redmi-child-fixes-20260924/regression-memory-final.log"
           ],
           "prevention": "Add only the exact new archive to paired owner list; use existing archive-root parameter. Preserve exact owner equality and historical evidence requirements. Application source unchanged."
+        }
+      },
+      "storeCloseRepair20260924": {
+        "ticket": "R6634-C10-A02",
+        "status": "local_passed_device_pending",
+        "rootCause": "Visit Store retained outlined Close controls in paged/full and finite Store sheets after surrounding controls were unboxed.",
+        "prevention": "Keep unboxed Store Close assertions in existing Shop/Wholesale normal and enlarged-text navigation tests; preserve minimum tap size, tooltip and Close/Cart/Back.",
+        "evidence": "apps/mobile/build/store-close-20260924/reproduction.txt",
+        "scope": "Public Store Close only; brand and pharmacy surrounds preserved.",
+        "qualification": {
+          "ticket": "R6634-C10-A02",
+          "status": "local_passed_device_pending",
+          "sourceSha256": "806acfa1b632978aa68922ee4b42b3b41ae15f313aff47edb86580c4d119001f",
+          "focusedPassed": 16,
+          "selectedPassed": 404,
+          "failed": 0,
+          "skipped": 0,
+          "childDefectsFound": 0,
+          "scope": "Paged/full and compact public Store Close; brand/pharmacy unchanged.",
+          "visual": "Reviewed actual Shop normal and Wholesale 200-percent local captures; founder/device approval pending.",
+          "device": "No APK built or installed.",
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+            "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
+            "bytes": 38172348
+          }
         }
       }
     }
