@@ -6358,8 +6358,8 @@
         "device": "pending_successor_redmi",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-          "bytes": 38172348
+          "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+          "bytes": 44299869
         }
       }
     },
@@ -6440,8 +6440,8 @@
         "device": "pending_successor_redmi",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-          "bytes": 38172348
+          "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+          "bytes": 44299869
         }
       }
     },
@@ -6454,8 +6454,8 @@
       "founderRequirement": "Remove the circular surround from the top-right Close after Visit Store; preserve accessible target, Close/Back and Store/cart state.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-        "bytes": 38172348,
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
         "entry": "store-close-20260924/reproduction.txt"
       },
       "owners": [
@@ -6665,9 +6665,516 @@
         "device": "No APK built or installed.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-          "bytes": 38172348
+          "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+          "bytes": 44299869
         }
+      }
+    },
+    {
+      "id": "BUY-PDP-REF-20260924-01",
+      "title": "Multi-photo SKU gallery and reference product-page composition",
+      "kind": "founder_reference_requirement",
+      "status": "open",
+      "parents": [
+        "founder-product-page-reference-20260924"
+      ],
+      "founderRequirement": "1. Multiple SKU photos: Multi-photo SKU gallery and reference product-page composition",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
+        "entry": "flipkart-reference-20260924/captures/02-product.png"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart"
+      ],
+      "cases": [
+        {
+          "id": "BUY-PDP-REF-20260924-01-1",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Gallery",
+          "expected": "Ordered approved photo list, primary photo, image labels, exact Store/SKU/variant/pack, source and media revision. Swipe both ways; indicator tracks current page. Bind every Buy, Wholesale, Bulk and Offers entry to the same selected SKU media.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-01-2",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Image states",
+          "expected": "One image: no misleading pagination. Multiple: retain order and current selection. Empty/loading/failed/rejected image: truthful state and retry; no repeated cover masquerading as different photos. Changing variant replaces its media atomically.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-01-3",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Composition",
+          "expected": "Match captured image proportions, spacing, control placement and page-indicator treatment in the existing native product page. Retain MoolSocial identity, actual product assets and existing Save/Share handlers. Preserve fixed action safe area and scrolling beneath it.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-01-4",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Detail viewer",
+          "expected": "Full-screen/zoom behavior was not inspected; do not label it reference-proven. Preserve existing accessible media/video behavior and decide any extension explicitly within implementation.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Approved Store/catalogue multi-photo source, order and exact-pack bindings; live media publication remains provider work."
+      ],
+      "founderApproval": null,
+      "implementationAuthorized": false,
+      "referenceObserved": "Large full-width swipeable photo region; pale neutral background; rounded lower corners; thin segmented page indicator; Save and Share stacked at right; rating/count badge at lower left. Size selection follows gallery; two fixed purchase actions remain at screen bottom.",
+      "referenceCaptures": [
+        "02-product",
+        "03-gallery"
+      ],
+      "reuseAssessment": "Existing mediaAssets, BuyV2ProductContentSnapshot.media, media admission rules and PageView in buy_v2_views.dart already support multiple media. This is source population and presentation parity, not a second gallery system.",
+      "acceptancePlan": [
+        "0/1/many photos, broken image, same-SKU revision and variant change",
+        "Swipe versus page scroll, Save/Share, Cart/Back, no wrong-pack media",
+        "All four channels; 320/390 widths, 200-percent text, screen reader and reduced motion"
+      ],
+      "executionAssessment": {
+        "actor": "Public Buy customer",
+        "classification": "mvp_supporting",
+        "reason": "Founder-requested existing commerce product-page presentation and data completeness.",
+        "scope": "Registration and reference inspection only; select exact existing owners before implementation.",
+        "authority": "Founder requested Flipkart screenshot inspection and detailed tickets.",
+        "data": "Existing MoolSocial product/content/compliance/Store providers; unavailable data must not become an affirmative claim.",
+        "verification": "Future local, visual, impacted/child and checksum-matched device checks; none claimed by reference capture."
+      }
+    },
+    {
+      "id": "BUY-PDP-REF-20260924-02",
+      "title": "Variant, price, price details and delivery/seller panel",
+      "kind": "founder_reference_requirement",
+      "status": "open",
+      "parents": [
+        "founder-product-page-reference-20260924"
+      ],
+      "founderRequirement": "2. Variants, prices and delivery: Variant, price, price details and delivery/seller panel",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
+        "entry": "flipkart-reference-20260924/captures/04-price.png"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      ],
+      "cases": [
+        {
+          "id": "BUY-PDP-REF-20260924-02-1",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Variant dimensions",
+          "expected": "Use category-applicable size, color, pack quantity, weight/volume and unit. Show selected, unavailable and out-of-stock states. A variant selects an exact SKU, not a label-only local price change. Preserve Wholesale/Bulk MOQ, order increments and tiers.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-02-2",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Size chart table",
+          "expected": "Observed columns: UK/India, Foot Length (cm), Euro, US (Men), plus measurement guidance. Reuse table layout for category-supplied dimension/unit charts; do not attach footwear conversion values to grocery packs. Sheet title, plain Close, scrollable rows and readable headers.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-02-3",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Price summary",
+          "expected": "MRP/list price, discount percent, actual current selling amount, pack/unit basis and applicable tax wording. Use current MoolSocial monetary contracts and explicit minor-unit conversion. Price-details sheet: MRP inclusive of taxes, discount amount, separator, total; explain cart-dependent fees/discounts using actual quote inputs.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-02-4",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Price drop",
+          "expected": "Requested by founder but no historical drop block observed on this product. Record previous comparable selling price, effective dates and current price from a verified history source before showing a drop badge. MRP discount is not proof of a historical price drop; do not copy the reference cart/PDP percentage mismatch.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-02-5",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Delivery/seller table",
+          "expected": "Location/PIN/change entry; authoritative eligible service/date/charge; Store name/ID, verified rating/count and tenure only if supplied; other-seller entry. Location/variant/Store change refreshes serviceability and price together. Unknown or stale facts do not promise COD, Quick ETA or a delivery date.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Existing R6633-D05 comparison and D08/D09 delivery/quote contracts",
+        "Authoritative price history and current quote/serviceability; Store classification and pack mapping"
+      ],
+      "founderApproval": null,
+      "implementationAuthorized": false,
+      "referenceObserved": "Size chips plus Size Chart; brand and selected product/color/size; green discount percentage, struck-through MRP and bold selling price; tap price opens bottom sheet. Delivery panel has location, delivery date, seller rating/tenure and other-sellers entry.",
+      "referenceCaptures": [
+        "04-price",
+        "06-price-details",
+        "08-size-chart"
+      ],
+      "reuseAssessment": "Existing variant selection, product facts/eligibility, commercial offers, price, Store address and Cart quote owners. Read current Store mapping contracts before extending shared fields.",
+      "acceptancePlan": [
+        "Variant changes bind image/price/stock/cart identity; Back restores selection",
+        "MRP/discount/price arithmetic, missing MRP, zero discount, price rise/drop and large values",
+        "Unsupported size chart, stale location response, unavailable delivery, Wholesale tiers/MOQ"
+      ],
+      "executionAssessment": {
+        "actor": "Public Buy customer",
+        "classification": "mvp_supporting",
+        "reason": "Founder-requested existing commerce product-page presentation and data completeness.",
+        "scope": "Registration and reference inspection only; select exact existing owners before implementation.",
+        "authority": "Founder requested Flipkart screenshot inspection and detailed tickets.",
+        "data": "Existing MoolSocial product/content/compliance/Store providers; unavailable data must not become an affirmative claim.",
+        "verification": "Future local, visual, impacted/child and checksum-matched device checks; none claimed by reference capture."
+      }
+    },
+    {
+      "id": "BUY-PDP-REF-20260924-03",
+      "title": "Return, Cash on Delivery and customer-support detail controls",
+      "kind": "founder_reference_requirement",
+      "status": "open",
+      "parents": [
+        "founder-product-page-reference-20260924"
+      ],
+      "founderRequirement": "3. Return, COD and support: Return, Cash on Delivery and customer-support detail controls",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
+        "entry": "flipkart-reference-20260924/captures/11-return-policy-loaded.png"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      ],
+      "cases": [
+        {
+          "id": "BUY-PDP-REF-20260924-03-1",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Return summary and remedies",
+          "expected": "Use product/Store policy window, returnable/non-returnable state, applicable replacement/refund/exchange, conditions, exclusions, policy revision and initiation path. Reference condition categories: damaged, defective, wrong item and change-of-mind only where actual MoolSocial policy permits.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-03-2",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Return process",
+          "expected": "Show actual order/support route and supported steps: issue selection, eligibility checks, evidence where required, approval, pickup and refund status/timeline when supplied. No blanket 10-day or unconditional-refund promise copied from the example.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-03-3",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "COD/payment options",
+          "expected": "Available/unavailable state from exact order/location/Store eligibility; explain amount payable, applicable fee and payment timing. Reference COD/UPI tab layout can present supported MoolSocial options. Do not enable COD or credit merely because the reference shows it.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-03-4",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Customer support",
+          "expected": "Product/order/Store context, reachable existing help/support entry and truthful supported topics: tracking, returns, refunds, delivery and payments. Display operating hours/channels only from actual service data; no invented 24x7 promise or automatic call/message.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "R6633-D11 payment handoff; authoritative returns/COD/support policy and access",
+        "Store default/per-product return-policy mapping"
+      ],
+      "founderApproval": null,
+      "implementationAuthorized": false,
+      "referenceObserved": "Horizontal compact icon-label controls open sheets. Return sheet distinguishes replacement/refund/exchange and conditions; COD sheet has payment-option tabs; support sheet explains supported help topics and entry location.",
+      "referenceCaptures": [
+        "11-return-policy-loaded",
+        "14-cod-loaded",
+        "16-support-row",
+        "17-support"
+      ],
+      "reuseAssessment": "Existing BuyV2ProductProtection, return-policy/compliance facts, payment selection and contextual Shop chat/support; reuse same sheets/handlers where suitable.",
+      "acceptancePlan": [
+        "Returnable/non-returnable/missing policy; independently enabled remedies",
+        "COD allowed/denied/expired after address change; no paid-state mutation",
+        "Open/Close/Back of each sheet, return to correct SKU and Cart; no accidental purchase or support message"
+      ],
+      "executionAssessment": {
+        "actor": "Public Buy customer",
+        "classification": "mvp_supporting",
+        "reason": "Founder-requested existing commerce product-page presentation and data completeness.",
+        "scope": "Registration and reference inspection only; select exact existing owners before implementation.",
+        "authority": "Founder requested Flipkart screenshot inspection and detailed tickets.",
+        "data": "Existing MoolSocial product/content/compliance/Store providers; unavailable data must not become an affirmative claim.",
+        "verification": "Future local, visual, impacted/child and checksum-matched device checks; none claimed by reference capture."
+      }
+    },
+    {
+      "id": "BUY-PDP-REF-20260924-04",
+      "title": "Similar Products horizontal rail",
+      "kind": "founder_reference_requirement",
+      "status": "open",
+      "parents": [
+        "founder-product-page-reference-20260924"
+      ],
+      "founderRequirement": "4. Similar products: Similar Products horizontal rail",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
+        "entry": "flipkart-reference-20260924/captures/19-similar-highlights.png"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      ],
+      "cases": [
+        {
+          "id": "BUY-PDP-REF-20260924-04-1",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Cards and ordering",
+          "expected": "Match captured rail placement, image proportions, spacing and typography; show image, title/variant/pack, real rating where present, current offer price/discount and eligible delivery date.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-04-2",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Product identity",
+          "expected": "Similar means alternatives, not identical-pack comparison. Each card retains its own Store/SKU/variant/pack. Do not share mutable selected-variant/cart state between cards.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-04-3",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Loading and navigation",
+          "expected": "Use bounded source-backed results, deduplicate exact identities, suppress unavailable/unpublished records, retain rail offset on return, open the existing product route and preserve original Cart. Empty results collapse cleanly.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Authoritative related-product discovery; existing R6633-D05 remains price comparison, not this rail"
+      ],
+      "founderApproval": null,
+      "implementationAuthorized": false,
+      "referenceObserved": "Horizontal cards with a partially visible next card: product image, rating badge, shortened title, discount, crossed MRP/current price and delivery date; rail sits between assurance controls and product highlights.",
+      "referenceCaptures": [
+        "19-similar-highlights",
+        "20-highlights"
+      ],
+      "reuseAssessment": "Reuse existing product cards and catalogue/recommendation/session access; confirm provider semantics instead of duplicating a recommendation engine.",
+      "acceptancePlan": [
+        "0/1/many alternatives, duplicates, invalid identity, unavailable stock and source retry",
+        "Tap a different Store/variant, Back preserves original selection/rail offset/Cart",
+        "Normal/enlarged text and horizontal versus vertical scrolling"
+      ],
+      "executionAssessment": {
+        "actor": "Public Buy customer",
+        "classification": "mvp_supporting",
+        "reason": "Founder-requested existing commerce product-page presentation and data completeness.",
+        "scope": "Registration and reference inspection only; select exact existing owners before implementation.",
+        "authority": "Founder requested Flipkart screenshot inspection and detailed tickets.",
+        "data": "Existing MoolSocial product/content/compliance/Store providers; unavailable data must not become an affirmative claim.",
+        "verification": "Future local, visual, impacted/child and checksum-matched device checks; none claimed by reference capture."
+      }
+    },
+    {
+      "id": "BUY-PDP-REF-20260924-05",
+      "title": "Product highlights and All details with three tabs",
+      "kind": "founder_reference_requirement",
+      "status": "open",
+      "parents": [
+        "founder-product-page-reference-20260924"
+      ],
+      "founderRequirement": "5. Highlights, specifications, description, manufacturer info: Product highlights and All details with three tabs",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
+        "entry": "flipkart-reference-20260924/captures/20-highlights.png"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      ],
+      "cases": [
+        {
+          "id": "BUY-PDP-REF-20260924-05-1",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Highlights table",
+          "expected": "Category-appropriate key fields, ordered by supplied schema. Reference examples: color, strap material, sole material. Grocery/Wholesale/Bulk should use applicable pack, net quantity, grade/material and other existing factual attributes, never footwear defaults.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-05-2",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Specifications table",
+          "expected": "Observed General fields: Brand, Color, Ideal For, Strap Material, Weight, Pack of, Sole Material, Net Quantity, Article Number, Character, Brand Color, Euro Size, Pattern, Size, Type, UK/India Size. Implement reusable supplied label/value rows with units, not hard-coded shoe fields. Preserve independent pack count versus net quantity.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-05-3",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Description",
+          "expected": "Use existing approved product description verbatim as product data; readable wrapping, paragraph spacing and safe content rendering. Do not copy the reference seller description into MoolSocial.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-05-4",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Manufacturer info table",
+          "expected": "Observed: Generic Name and Country of Origin side-by-side; manufacturer name/address and packer name/address as full-width rows. Reuse existing compliance manufacturer/packer/importer/origin/consumer-care and applicable date/license fields; missing address cannot be replaced with Store address or invented text.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-05-5",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Expansion/tab behavior",
+          "expected": "Retain section expansion, active tab and reading position for the current SKU; reset appropriately for another SKU. Long labels/addresses wrap, tables stack at narrow/enlarged text, sticky purchase actions never cover final rows. Empty/loading/unavailable content remains truthful.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Current Store/public content projection and approved revision delivery",
+        "Category field ownership and structured manufacturer/packer addresses if existing strings are insufficient"
+      ],
+      "founderApproval": null,
+      "implementationAuthorized": false,
+      "referenceObserved": "Expandable Product highlights uses label-above-value two-column cells and thin separators. All details expands to a horizontally scrollable three-tab row; active tab dark-filled. Specifications has a General section; Description is body copy; Manufacturer info mixes two-column and full-width rows.",
+      "referenceCaptures": [
+        "20-highlights",
+        "22-all-details",
+        "23-specifications",
+        "24-description",
+        "25-manufacturer"
+      ],
+      "reuseAssessment": "BuyV2ProductContentSnapshot already has highlights/specifications/description; BuyV2ProductCompliance already has manufacturer/packer/importer/origin/quantity/date/consumer-care fields. Codex Store toBuyPublicContent projection exists separately and must be integrated, not copied into Buy.",
+      "acceptancePlan": [
+        "All tabs and expansion/Back, short/long/empty content, no duplicate summary facts",
+        "Wrong Store/SKU/variant/pack content rejected, stale responses do not overwrite new selection",
+        "Manufacturer distinct from seller; category-specific fields, long addresses, 200-percent text"
+      ],
+      "executionAssessment": {
+        "actor": "Public Buy customer",
+        "classification": "mvp_supporting",
+        "reason": "Founder-requested existing commerce product-page presentation and data completeness.",
+        "scope": "Registration and reference inspection only; select exact existing owners before implementation.",
+        "authority": "Founder requested Flipkart screenshot inspection and detailed tickets.",
+        "data": "Existing MoolSocial product/content/compliance/Store providers; unavailable data must not become an affirmative claim.",
+        "verification": "Future local, visual, impacted/child and checksum-matched device checks; none claimed by reference capture."
+      }
+    },
+    {
+      "id": "BUY-PDP-REF-20260924-06",
+      "title": "Recently Viewed rail and More products for you grid",
+      "kind": "founder_reference_requirement",
+      "status": "open",
+      "parents": [
+        "founder-product-page-reference-20260924"
+      ],
+      "founderRequirement": "6. Recently viewed and further recommendations: Recently Viewed rail and More products for you grid",
+      "reproduction": {
+        "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+        "bytes": 44299869,
+        "entry": "flipkart-reference-20260924/captures/26-lower-page.png"
+      },
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      ],
+      "cases": [
+        {
+          "id": "BUY-PDP-REF-20260924-06-1",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Recently Viewed",
+          "expected": "Reuse real browsing history, recency order and exact product identity. Match captured heading/arrow and card layout; retain existing clear/remove/account-scope behavior. No invented history or duplicate cards from repeated views.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-06-2",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "More products for you",
+          "expected": "Reuse existing discovery/card route with bounded results and two-column reference layout at normal width; adaptive single column where needed for accessibility. Display actual image, title, variant/pack, price and rating data. Personalization must not be claimed when only general related products exist.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-06-3",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Navigation and visibility",
+          "expected": "View-all/open product/Back retain source page, scroll, variant and Cart. Filter unpublished/unavailable records according to current catalogue policy; clear previous-account history on account change. Empty/error/retry and load-more states must not leave blank card space.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-PDP-REF-20260924-06-4",
+          "route": "Existing product page in Buy / Wholesale / Bulk / Offers",
+          "state": "Ads and scope",
+          "expected": "Observed sponsored badge is recorded as a reference condition only. Show such a badge only for an existing authorized sponsored source; no advertising system, gift-card banner or shopping assistant feature is added by these six tickets.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "children": [],
+      "dependencies": [
+        "Current catalogue visibility and discovery adapters; account-scoped history persistence where required"
+      ],
+      "founderApproval": null,
+      "implementationAuthorized": false,
+      "referenceObserved": "Recently Viewed heading with View-all arrow and horizontal product cards; following More products for you uses two columns with large images, optional rating/count badge, title and list/current price. Sponsored example cards carry an AD label.",
+      "referenceCaptures": [
+        "26-lower-page",
+        "27-recommendations",
+        "28-more-products"
+      ],
+      "reuseAssessment": "Existing recentlyViewedProductsFor, bounded saved history and product-card/catalogue owners; public product-page placement/adapters need reconciliation. Existing recent-history tests remain authoritative.",
+      "acceptancePlan": [
+        "History order/dedup/remove/clear/restore/account switch and unpublished item",
+        "Recommendation pagination/retry, product/Cart/Back continuity, distinct Store/SKU identity",
+        "Normal two-column and enlarged-text adaptive layouts; truthful rating/sponsorship"
+      ],
+      "executionAssessment": {
+        "actor": "Public Buy customer",
+        "classification": "mvp_supporting",
+        "reason": "Founder-requested existing commerce product-page presentation and data completeness.",
+        "scope": "Registration and reference inspection only; select exact existing owners before implementation.",
+        "authority": "Founder requested Flipkart screenshot inspection and detailed tickets.",
+        "data": "Existing MoolSocial product/content/compliance/Store providers; unavailable data must not become an affirmative claim.",
+        "verification": "Future local, visual, impacted/child and checksum-matched device checks; none claimed by reference capture."
       }
     }
   ],
@@ -7116,8 +7623,8 @@
     ],
     "archive": {
       "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-      "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-      "bytes": 38172348
+      "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+      "bytes": 44299869
     }
   },
   "storeCloseQualification20260924": {
@@ -7134,8 +7641,26 @@
     "device": "No APK built or installed.",
     "archive": {
       "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-      "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-      "bytes": 38172348
+      "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+      "bytes": 44299869
     }
+  },
+  "productPageReference20260924": {
+    "status": "registered_only",
+    "tickets": [
+      "BUY-PDP-REF-20260924-01",
+      "BUY-PDP-REF-20260924-02",
+      "BUY-PDP-REF-20260924-03",
+      "BUY-PDP-REF-20260924-04",
+      "BUY-PDP-REF-20260924-05",
+      "BUY-PDP-REF-20260924-06"
+    ],
+    "archive": {
+      "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+      "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+      "bytes": 44299869
+    },
+    "reportEntry": "flipkart-reference-20260924/reference-ticket-report.md",
+    "screenshotCount": 29
   }
 }

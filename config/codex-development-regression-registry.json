@@ -105264,8 +105264,8 @@
           ],
           "archive": {
             "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-            "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-            "bytes": 38172348
+            "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+            "bytes": 44299869
           }
         },
         "resolvedFixtureCauses": [
@@ -105306,9 +105306,30 @@
           "device": "No APK built or installed.",
           "archive": {
             "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-            "sha256": "f3182150c883da65288b965859041bdf3903afd603ec1833afbe8e7065b75635",
-            "bytes": 38172348
+            "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+            "bytes": 44299869
           }
+        }
+      },
+      "flipkartReferenceCapture20260924": {
+        "status": "completed_with_preserved_accessibility_failures",
+        "finding": "uiautomator dump incomplete during reference page transition; PNG and stderr retained under 20-highlights.",
+        "rootCause": "Device accessibility root unavailable during transition; not MoolSocial runtime defect.",
+        "prevention": "Preserve failure and screenshot; use fresh capture name after settled state; inspect pixels when WebView text is absent.",
+        "evidence": "apps/mobile/build/flipkart-reference-20260924/captures/20-highlights-commands.log",
+        "resolution": "20 and 21 preserve failed XML attempts; later screenshots inspected visually. No MoolSocial runtime defect inferred.",
+        "tickets": [
+          "BUY-PDP-REF-20260924-01",
+          "BUY-PDP-REF-20260924-02",
+          "BUY-PDP-REF-20260924-03",
+          "BUY-PDP-REF-20260924-04",
+          "BUY-PDP-REF-20260924-05",
+          "BUY-PDP-REF-20260924-06"
+        ],
+        "archive": {
+          "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+          "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
+          "bytes": 44299869
         }
       }
     }

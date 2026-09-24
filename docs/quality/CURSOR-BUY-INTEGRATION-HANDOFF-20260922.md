@@ -1,5 +1,144 @@
 # Cursor Buy integration handoff and new-baseline request — 22 September 2026
 
+## Flipkart Redmi reference and six product-page tickets — 24 September 2026
+
+Status: registered/open; implementation not started. Source reviewed: Buy `8715a458`; Store read-only contract checkpoint `ac8d7cee`. Device `TG8HCYTGGQT885OF`, 720×1600 screenshot pixels. Reference is the actual Foot Print slides page opened from the existing one-item Flipkart Cart. Original Cart item, size 8, quantity 1 and price 380 were observed again at the end; no purchase, payment, rating, wishlist edit or support message was performed.
+
+The 29 PNG captures include transient loading and two failed accessibility dumps (20/21), with successful pixel evidence retained. WebView content was inspected visually. Raw reference images are evidence only, not MoolSocial production assets.
+
+### Shared scope and acceptance
+
+- Reuse the existing MoolSocial native product page and underlying facts; no copied Flipkart product values, assets, ratings or commercial promises.
+- Founder requests reference design/UI/UX parity for these specified sections, across Buy, Wholesale, Bulk and Offers. Later implementation must compare actual native captures with the reference at equivalent viewport/state.
+- Keep observed reference behavior separate from requested additions and provider/backend dependencies. These are six open requirement tickets, not six newly proven runtime defects.
+- For every implementation: inspect child/impacted code, register findings before retry, fix in-scope children, rerun parent/affected checks; no closure from screenshots alone.
+- No new manufacturer/distributor workspace, payments backend, production offer, purchase/message, APK or implementation is authorized by this registration.
+- Existing MoolSocial card Add placement remains accepted; reference product-page sticky CTA layout is scoped to product detail, not a blanket reversion of catalogue cards.
+
+### BUY-PDP-REF-20260924-01 — 1. Multiple SKU photos
+
+Large full-width swipeable photo region; pale neutral background; rounded lower corners; thin segmented page indicator; Save and Share stacked at right; rating/count badge at lower left. Size selection follows gallery; two fixed purchase actions remain at screen bottom.
+
+**Reuse/current gap:** Existing mediaAssets, BuyV2ProductContentSnapshot.media, media admission rules and PageView in buy_v2_views.dart already support multiple media. This is source population and presentation parity, not a second gallery system.
+
+| Subsection | Required content and behavior |
+| --- | --- |
+| Gallery | Ordered approved photo list, primary photo, image labels, exact Store/SKU/variant/pack, source and media revision. Swipe both ways; indicator tracks current page. Bind every Buy, Wholesale, Bulk and Offers entry to the same selected SKU media. |
+| Image states | One image: no misleading pagination. Multiple: retain order and current selection. Empty/loading/failed/rejected image: truthful state and retry; no repeated cover masquerading as different photos. Changing variant replaces its media atomically. |
+| Composition | Match captured image proportions, spacing, control placement and page-indicator treatment in the existing native product page. Retain MoolSocial identity, actual product assets and existing Save/Share handlers. Preserve fixed action safe area and scrolling beneath it. |
+| Detail viewer | Full-screen/zoom behavior was not inspected; do not label it reference-proven. Preserve existing accessible media/video behavior and decide any extension explicitly within implementation. |
+
+**Dependencies:** Approved Store/catalogue multi-photo source, order and exact-pack bindings; live media publication remains provider work.
+
+**Acceptance:** 0/1/many photos, broken image, same-SKU revision and variant change; Swipe versus page scroll, Save/Share, Cart/Back, no wrong-pack media; All four channels; 320/390 widths, 200-percent text, screen reader and reduced motion
+
+**Reference captures:** 02-product.png, 03-gallery.png.
+
+### BUY-PDP-REF-20260924-02 — 2. Variants, prices and delivery
+
+Size chips plus Size Chart; brand and selected product/color/size; green discount percentage, struck-through MRP and bold selling price; tap price opens bottom sheet. Delivery panel has location, delivery date, seller rating/tenure and other-sellers entry.
+
+**Reuse/current gap:** Existing variant selection, product facts/eligibility, commercial offers, price, Store address and Cart quote owners. Read current Store mapping contracts before extending shared fields.
+
+| Subsection | Required content and behavior |
+| --- | --- |
+| Variant dimensions | Use category-applicable size, color, pack quantity, weight/volume and unit. Show selected, unavailable and out-of-stock states. A variant selects an exact SKU, not a label-only local price change. Preserve Wholesale/Bulk MOQ, order increments and tiers. |
+| Size chart table | Observed columns: UK/India, Foot Length (cm), Euro, US (Men), plus measurement guidance. Reuse table layout for category-supplied dimension/unit charts; do not attach footwear conversion values to grocery packs. Sheet title, plain Close, scrollable rows and readable headers. |
+| Price summary | MRP/list price, discount percent, actual current selling amount, pack/unit basis and applicable tax wording. Use current MoolSocial monetary contracts and explicit minor-unit conversion. Price-details sheet: MRP inclusive of taxes, discount amount, separator, total; explain cart-dependent fees/discounts using actual quote inputs. |
+| Price drop | Requested by founder but no historical drop block observed on this product. Record previous comparable selling price, effective dates and current price from a verified history source before showing a drop badge. MRP discount is not proof of a historical price drop; do not copy the reference cart/PDP percentage mismatch. |
+| Delivery/seller table | Location/PIN/change entry; authoritative eligible service/date/charge; Store name/ID, verified rating/count and tenure only if supplied; other-seller entry. Location/variant/Store change refreshes serviceability and price together. Unknown or stale facts do not promise COD, Quick ETA or a delivery date. |
+
+**Dependencies:** Existing R6633-D05 comparison and D08/D09 delivery/quote contracts; Authoritative price history and current quote/serviceability; Store classification and pack mapping
+
+**Acceptance:** Variant changes bind image/price/stock/cart identity; Back restores selection; MRP/discount/price arithmetic, missing MRP, zero discount, price rise/drop and large values; Unsupported size chart, stale location response, unavailable delivery, Wholesale tiers/MOQ
+
+**Reference captures:** 04-price.png, 06-price-details.png, 08-size-chart.png.
+
+### BUY-PDP-REF-20260924-03 — 3. Return, COD and support
+
+Horizontal compact icon-label controls open sheets. Return sheet distinguishes replacement/refund/exchange and conditions; COD sheet has payment-option tabs; support sheet explains supported help topics and entry location.
+
+**Reuse/current gap:** Existing BuyV2ProductProtection, return-policy/compliance facts, payment selection and contextual Shop chat/support; reuse same sheets/handlers where suitable.
+
+| Subsection | Required content and behavior |
+| --- | --- |
+| Return summary and remedies | Use product/Store policy window, returnable/non-returnable state, applicable replacement/refund/exchange, conditions, exclusions, policy revision and initiation path. Reference condition categories: damaged, defective, wrong item and change-of-mind only where actual MoolSocial policy permits. |
+| Return process | Show actual order/support route and supported steps: issue selection, eligibility checks, evidence where required, approval, pickup and refund status/timeline when supplied. No blanket 10-day or unconditional-refund promise copied from the example. |
+| COD/payment options | Available/unavailable state from exact order/location/Store eligibility; explain amount payable, applicable fee and payment timing. Reference COD/UPI tab layout can present supported MoolSocial options. Do not enable COD or credit merely because the reference shows it. |
+| Customer support | Product/order/Store context, reachable existing help/support entry and truthful supported topics: tracking, returns, refunds, delivery and payments. Display operating hours/channels only from actual service data; no invented 24x7 promise or automatic call/message. |
+
+**Dependencies:** R6633-D11 payment handoff; authoritative returns/COD/support policy and access; Store default/per-product return-policy mapping
+
+**Acceptance:** Returnable/non-returnable/missing policy; independently enabled remedies; COD allowed/denied/expired after address change; no paid-state mutation; Open/Close/Back of each sheet, return to correct SKU and Cart; no accidental purchase or support message
+
+**Reference captures:** 11-return-policy-loaded.png, 14-cod-loaded.png, 16-support-row.png, 17-support.png.
+
+### BUY-PDP-REF-20260924-04 — 4. Similar products
+
+Horizontal cards with a partially visible next card: product image, rating badge, shortened title, discount, crossed MRP/current price and delivery date; rail sits between assurance controls and product highlights.
+
+**Reuse/current gap:** Reuse existing product cards and catalogue/recommendation/session access; confirm provider semantics instead of duplicating a recommendation engine.
+
+| Subsection | Required content and behavior |
+| --- | --- |
+| Cards and ordering | Match captured rail placement, image proportions, spacing and typography; show image, title/variant/pack, real rating where present, current offer price/discount and eligible delivery date. |
+| Product identity | Similar means alternatives, not identical-pack comparison. Each card retains its own Store/SKU/variant/pack. Do not share mutable selected-variant/cart state between cards. |
+| Loading and navigation | Use bounded source-backed results, deduplicate exact identities, suppress unavailable/unpublished records, retain rail offset on return, open the existing product route and preserve original Cart. Empty results collapse cleanly. |
+
+**Dependencies:** Authoritative related-product discovery; existing R6633-D05 remains price comparison, not this rail
+
+**Acceptance:** 0/1/many alternatives, duplicates, invalid identity, unavailable stock and source retry; Tap a different Store/variant, Back preserves original selection/rail offset/Cart; Normal/enlarged text and horizontal versus vertical scrolling
+
+**Reference captures:** 19-similar-highlights.png, 20-highlights.png.
+
+### BUY-PDP-REF-20260924-05 — 5. Highlights, specifications, description, manufacturer info
+
+Expandable Product highlights uses label-above-value two-column cells and thin separators. All details expands to a horizontally scrollable three-tab row; active tab dark-filled. Specifications has a General section; Description is body copy; Manufacturer info mixes two-column and full-width rows.
+
+**Reuse/current gap:** BuyV2ProductContentSnapshot already has highlights/specifications/description; BuyV2ProductCompliance already has manufacturer/packer/importer/origin/quantity/date/consumer-care fields. Codex Store toBuyPublicContent projection exists separately and must be integrated, not copied into Buy.
+
+| Subsection | Required content and behavior |
+| --- | --- |
+| Highlights table | Category-appropriate key fields, ordered by supplied schema. Reference examples: color, strap material, sole material. Grocery/Wholesale/Bulk should use applicable pack, net quantity, grade/material and other existing factual attributes, never footwear defaults. |
+| Specifications table | Observed General fields: Brand, Color, Ideal For, Strap Material, Weight, Pack of, Sole Material, Net Quantity, Article Number, Character, Brand Color, Euro Size, Pattern, Size, Type, UK/India Size. Implement reusable supplied label/value rows with units, not hard-coded shoe fields. Preserve independent pack count versus net quantity. |
+| Description | Use existing approved product description verbatim as product data; readable wrapping, paragraph spacing and safe content rendering. Do not copy the reference seller description into MoolSocial. |
+| Manufacturer info table | Observed: Generic Name and Country of Origin side-by-side; manufacturer name/address and packer name/address as full-width rows. Reuse existing compliance manufacturer/packer/importer/origin/consumer-care and applicable date/license fields; missing address cannot be replaced with Store address or invented text. |
+| Expansion/tab behavior | Retain section expansion, active tab and reading position for the current SKU; reset appropriately for another SKU. Long labels/addresses wrap, tables stack at narrow/enlarged text, sticky purchase actions never cover final rows. Empty/loading/unavailable content remains truthful. |
+
+**Dependencies:** Current Store/public content projection and approved revision delivery; Category field ownership and structured manufacturer/packer addresses if existing strings are insufficient
+
+**Acceptance:** All tabs and expansion/Back, short/long/empty content, no duplicate summary facts; Wrong Store/SKU/variant/pack content rejected, stale responses do not overwrite new selection; Manufacturer distinct from seller; category-specific fields, long addresses, 200-percent text
+
+**Reference captures:** 20-highlights.png, 22-all-details.png, 23-specifications.png, 24-description.png, 25-manufacturer.png.
+
+### BUY-PDP-REF-20260924-06 — 6. Recently viewed and further recommendations
+
+Recently Viewed heading with View-all arrow and horizontal product cards; following More products for you uses two columns with large images, optional rating/count badge, title and list/current price. Sponsored example cards carry an AD label.
+
+**Reuse/current gap:** Existing recentlyViewedProductsFor, bounded saved history and product-card/catalogue owners; public product-page placement/adapters need reconciliation. Existing recent-history tests remain authoritative.
+
+| Subsection | Required content and behavior |
+| --- | --- |
+| Recently Viewed | Reuse real browsing history, recency order and exact product identity. Match captured heading/arrow and card layout; retain existing clear/remove/account-scope behavior. No invented history or duplicate cards from repeated views. |
+| More products for you | Reuse existing discovery/card route with bounded results and two-column reference layout at normal width; adaptive single column where needed for accessibility. Display actual image, title, variant/pack, price and rating data. Personalization must not be claimed when only general related products exist. |
+| Navigation and visibility | View-all/open product/Back retain source page, scroll, variant and Cart. Filter unpublished/unavailable records according to current catalogue policy; clear previous-account history on account change. Empty/error/retry and load-more states must not leave blank card space. |
+| Ads and scope | Observed sponsored badge is recorded as a reference condition only. Show such a badge only for an existing authorized sponsored source; no advertising system, gift-card banner or shopping assistant feature is added by these six tickets. |
+
+**Dependencies:** Current catalogue visibility and discovery adapters; account-scoped history persistence where required
+
+**Acceptance:** History order/dedup/remove/clear/restore/account switch and unpublished item; Recommendation pagination/retry, product/Cart/Back continuity, distinct Store/SKU identity; Normal two-column and enlarged-text adaptive layouts; truthful rating/sponsorship
+
+**Reference captures:** 26-lower-page.png, 27-recommendations.png, 28-more-products.png.
+
+### Observed extras and unverified items
+
+Ratings/reviews, Q&A and advertising appear between details and recent products. They are captured as surrounding context, not silently added as new implementation tickets. Size Chart first showed a loader and then a real table. Full-screen photo zoom, price-history drop, unavailable variants and delivery-detail sub-sheet internals were not verified. This report does not claim those interactions were observed. MRP discount and sale price were observed; the Cart displayed 61 percent while the product page displayed 62 percent for the same shown MRP/current price. Reuse correct MoolSocial arithmetic instead of copying that inconsistency.
+
+Store synchronization: manufacturer metadata is product information, not activation of a manufacturer workspace. Public fields remain bound to Store ID, canonical product, variant, pack and source revision. Private purchase cost, banking and settlement data must never enter public content.
+
+Evidence archive: `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`, SHA256 `044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd`, 44,299,869 bytes; prior entries preserved.
+
+
 ## Visit Store Close surround — R6634-C10-A02 — 24 September 2026
 
 Founder requested registration, implementation, local testing and repair of any affected children. Registered as a child of C10 before execution. Removed the circular Close outline from paged/full Store catalogue and finite Shop/Wholesale supplier sheets. Kept existing icon, minimum accessible tap size, tooltip, callbacks and Cart/Back state. Brand and pharmacy presentation remain unchanged. Two application/test files changed; no backend or Store workspace changes.
