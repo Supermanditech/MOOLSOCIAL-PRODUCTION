@@ -71,4 +71,25 @@ $registry.entries[0].storeJourneyLocalBlockers=@()
 $registry.entries[0].storeJourneyDeviceDependencies=@('photo-continuity')
 $registry | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $registryPath
 Check canonical-device {} $true
+# Exercise the real preceding parser: PowerShell variable names ignore case.
+# A loop named runtimeDefine must not overwrite the RuntimeDefine array.
+$apkGate=Get-Content -LiteralPath "$PSScriptRoot/check-apk-regression-gate-state.ps1" -Raw
+$parserStart=$apkGate.IndexOf('$actualByName = @{}')
+$parserEnd=$apkGate.IndexOf('$exactProperties =', $parserStart)
+if($parserStart -lt 0 -or $parserEnd -le $parserStart){throw 'Runtime parser missing'}
+$parser=[scriptblock]::Create($apkGate.Substring($parserStart,$parserEnd-$parserStart))
+& {
+  function Assert-Gate([bool]$Condition,[string]$Message){if(!$Condition){throw $Message}}
+  foreach($case in @('multiple','duplicate','malformed')){
+    $RuntimeDefine=@('MOOLSOCIAL_DEVICE_REVIEW=true','MOOLSOCIAL_UI_REVIEW_ONLY=true')
+    if($case -eq 'duplicate'){$RuntimeDefine+=@('MOOLSOCIAL_DEVICE_REVIEW=false')}
+    if($case -eq 'malformed'){$RuntimeDefine+=@('invalid')}
+    $before=$RuntimeDefine -join "`n"
+    $rejected=$false
+    try{. $parser}catch{$rejected=$true}
+    if($rejected -ne ($case -ne 'multiple')){throw "Runtime parser outcome: $case"}
+    if(($RuntimeDefine -join "`n") -cne $before){throw 'Runtime define array was overwritten'}
+    $script:checks++
+  }
+}
 Write-Output "$script:checks gate contract checks passed. Generated contract fixtures retained at $root; not application/device evidence."

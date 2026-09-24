@@ -403,8 +403,8 @@ foreach ($gateId in $requiredGateIds) {
 }
 
 $actualByName = @{}
-foreach ($runtimeDefine in $RuntimeDefine) {
-  $parts = $runtimeDefine.Split('=', 2)
+foreach ($runtimeDefineEntry in $RuntimeDefine) {
+  $parts = $runtimeDefineEntry.Split('=', 2)
   Assert-Gate -Condition ($parts.Count -eq 2 -and $parts[0].Length -gt 0) `
     -Message 'runtime define is malformed.'
   Assert-Gate -Condition (-not $actualByName.ContainsKey($parts[0])) `
