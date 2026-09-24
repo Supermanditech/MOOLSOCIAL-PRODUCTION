@@ -99,6 +99,14 @@ host-tested, visually approved and exact-APK device-verified statuses.
 
 ### Latest explicit amendments —23September2026, override older same-scope rules
 
+24 September evening discount amendment: founder requests %, Amt, the discount
+value and Apply together in one compact lane. Neither fixed-amount selection nor
+a separate redundant label should force an extra row at normal phone text size.
+Keep the field unboxed and preserve explicit Apply, validation and accessible
+targets. Enlarged-text/error recovery must stay readable rather than shrinking
+type or clipping the amount. This supersedes the older two-row fixed-amount
+composition; prior 31-finding approval remains subject to OPPO closure.
+
 Latest local-render review: founder rejects solid-blue Add/Edit actions, thumbnail
 frames and the entire discount composition. Use subtle tonal Add actions with a
 plus; a checkmark/owned label distinguishes Store-added items from shortlisted

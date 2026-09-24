@@ -15355,6 +15355,7 @@ void main() {
   for (final method in ['Cash', 'UPI', 'Bank Transfer']) {
     for (final display in [
       (size: const Size(360, 806), scale: 1.0, label: 'portrait'),
+      (size: const Size(320, 740), scale: 1.0, label: 'narrow'),
       (size: const Size(360, 806), scale: 1.4, label: 'large-text'),
       (size: const Size(806, 360), scale: 1.0, label: 'landscape'),
     ]) {
@@ -15475,8 +15476,31 @@ void main() {
           findsOneWidget,
         );
         final input = find.byKey(const Key('work-counter-discount-value'));
+        void expectCompactDiscountRow() {
+          if (display.scale != 1.0) return;
+          final controls = [
+            find.byKey(const Key('work-counter-discount-percentage')),
+            find.byKey(const Key('work-counter-discount-fixed')),
+            input,
+            find.byKey(const Key('work-counter-discount-apply')),
+          ];
+          final center = tester.getCenter(input).dy;
+          for (final control in controls) {
+            expect(
+              (tester.getCenter(control).dy - center).abs(),
+              lessThan(2),
+              reason: 'Percent, Amt, value and Apply share one compact lane.',
+            );
+          }
+          expect(tester.getSize(input).width, greaterThanOrEqualTo(80));
+        }
+
+        expectCompactDiscountRow();
         expect(tester.widget<TextField>(input).decoration!.labelText, isNull);
-        expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
+        expect(
+          tester.widget<TextField>(input).decoration!.hintText,
+          'Discount',
+        );
         expect(tester.widget<TextField>(input).controller!.text, isEmpty);
         tester.view.viewInsets = FakeViewPadding(
           bottom: display.label == 'landscape' ? 120 : 280,
@@ -15520,7 +15544,11 @@ void main() {
         await capture('04-discount-percentage');
         await press('work-counter-discount-fixed');
         expect(work.workspaceCounterDiscount.kind, 'percentage');
-        expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
+        expectCompactDiscountRow();
+        expect(
+          tester.widget<TextField>(input).decoration!.hintText,
+          'Discount',
+        );
         await press('work-counter-discount-apply');
         expect(work.workspaceCounterDiscount.kind, 'fixed');
         expect(work.workspaceCounterPayableMinor, 25400);

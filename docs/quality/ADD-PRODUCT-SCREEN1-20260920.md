@@ -1,5 +1,45 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## 24 September evening — Git reconciliation and compact discount amendment
+
+Founder asks to preserve incremental development for the preceding 24 hours
+ending 6:30 IST, interpreted as 18:30 on24September (host time was19:03).
+Window commits on this same Store branch: e5abc55b,4df7950a,e985a65c,2004e6ec,
+471c23c1,ac8d7cee,faf58e3b,20932c38,fba980cd,17677ed5. Existing31-defect
+approval is e985a65c, explicitly subject to OPPO closure. No merge/rebase/reset
+or Cursor/Redmi modification. Newer outstanding local source/tests/evaluation
+media were also preserved rather than excluded by timestamp:21owners committed
+as7ab49f3ec8278d552072b0297c14f7f675d80dfd, pushed Store branch only and verified
+with exact origin readback, zero tracked differences and zero untracked files.
+
+Then founder specifically requests %, Amt, discount value and Apply in one
+compact lane. Reuse shared _CounterBillDiscountEditor in Counter Sale review;
+fixed amount no longer forces two rows at normal phone text size. Remove the
+redundant inline label, use Discount input hint, reduce Apply padding while
+retaining48dp target. Existing draft, validation, explicit application, totals
+and payment radios remain. Enlarged-text/error fallback remains readable.
+This supersedes the older composition, not accounting safeguards or other UI.
+
+OPPO before-capture: task outputs/oppo-r6640-audit/discount-before-20260924-1915
+PNG/XML. No taps, invoice/payment, data changes, install or APK build. Cannot
+infer exact-pixel device acceptance from the earlier conditional batch approval.
+New geometry regression fails before correction by48dp. First after-run catches
+large fixed-value width shortfall at320; reduced button padding, not assertions.
+Final compact-discount-final.jsonl:19passed,0failed,0skipped (all payment methods,
+portrait/narrow/landscape/large text, crore/five-lakh amounts and CS017 keyboard
+errors). Focused Dart analysis clean; diff whitespace check passed. Local renders
+are in external audit root compact-discount-20260924-v2. Portrait/narrow fixed
+states inspected and portrait preview opened for founder; these deliberately
+missing-photo layout fixtures are not media-continuity or device qualification.
+New layout awaits visual approval and later exact-APK OPPO testing.
+
+Preceding eight-product verification remains separately retained in task report
+outputs/empty-store-correction-20260924.md: all47 original failures match passing
+core-review tests; core400default/409review, flow14default/20review and43media
+pass (17mode-dependent skips across configurations, not unique-test totals).
+Backend, two historical orphan records and production-photo/device acceptance
+remain pending; Git preservation does not certify production readiness.
+
 ## r66.40 correction — empty Store and actual product-entry lifecycle
 
 Founder authorizes safe archival of the old automatically seeded Store, retained

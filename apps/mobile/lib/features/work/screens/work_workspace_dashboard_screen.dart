@@ -28700,6 +28700,10 @@ class _CounterBillDiscountEditorState
 
   Widget _applyButton() => TextButton(
     key: const Key('work-counter-discount-apply'),
+    style: TextButton.styleFrom(
+      minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+    ),
     onPressed: !widget.enabled
         ? null
         : () {
@@ -28742,7 +28746,7 @@ class _CounterBillDiscountEditorState
               widget.onInvalid();
             },
             decoration: InputDecoration(
-              hintText: '0.00',
+              hintText: 'Discount',
               prefixText: kind == 'fixed' ? '₹ ' : null,
               suffixText: kind == 'percentage' ? '%' : null,
               border: InputBorder.none,
@@ -28816,14 +28820,10 @@ class _CounterBillDiscountEditorState
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           );
           final expandedInput =
-              MediaQuery.textScalerOf(context).scale(14) > 20 ||
-              error != null ||
-              kind == 'fixed';
-          if (!expandedInput && constraints.maxWidth >= 300) {
+              MediaQuery.textScalerOf(context).scale(14) > 20 || error != null;
+          if (!expandedInput && constraints.maxWidth >= 260) {
             return Row(
               children: [
-                label,
-                const SizedBox(width: 6),
                 modes,
                 const SizedBox(width: 6),
                 Expanded(
