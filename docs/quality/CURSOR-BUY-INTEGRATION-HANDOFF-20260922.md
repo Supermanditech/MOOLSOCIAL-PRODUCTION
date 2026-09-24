@@ -1,5 +1,23 @@
 # Cursor Buy integration handoff and new-baseline request — 22 September 2026
 
+## Redmi child repairs locally qualified — 24 September 2026
+
+Latest founder instruction: implement and test locally. Both registered children are implemented and locally passed; neither is closed or verified on the installed Redmi APK.
+
+- `R6633-D06-B-A01`: Suppliers now excludes MoolSocial at the source before counts and pagination, has a distinct query/cursor identity, and rejects a mismatched publisher response before admitting products. Finite and paged views agree. Existing category, Saved, refresh/retry, Store, Cart and Back journeys are retained.
+- `R6634-C10-A01`: Store details displays its canonical current Store name once in the heading; the compact details panel does not repeat it. Long names wrap, including narrow 200-percent text; address, partnership, Ask, Close and Back remain covered.
+
+Final qualification: 22 selected ticket entries, all 392 selected scenarios passed, including the existing complete scoped navigation selection. The complete four affected test files passed 640 active tests. These suites overlap; their counts must not be added as unique cases. Zero failures, zero new skips, zero missed-tap or overflow warnings. All six changed Dart owners pass analysis and formatting. Frozen source: `14f65a9f9cdb4569bea4de638103b3bb60694069584ee1528af55176d750c60f`.
+
+The first focused attempt exposed nullable-count and widget-fixture assumptions; the first broader run exposed four historical expectations that Suppliers includes all publishers. Original failure evidence remains preserved. Corrected tests assert exact supplier-only totals and keep paging, failure/retry, Store, Cart, Saved and Back checks. Final source was unchanged throughout both qualifying runs. No additional customer-visible child was found in this local impact replay.
+
+Durable evidence: `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`, SHA256 `e2bc90c39244c5181974c7db4b51934cef22185fb9db80705148a69cca3a91d6`, 18,814,185 bytes. Contains raw failed/passing logs, 200-percent/standard Store and supplier captures, source/test diff and qualification receipt. Prior 95,080,457-byte Redmi archive remains unchanged at `f0b0b0dac485fafbc8429268b4d6cab8322eb6b4c1f28a6769e4aec31a65c7f5`.
+
+Final checkpoint gates passed after synchronizing the exact new archive owner with the paired checker and supplying the existing retained evidence archive path. Both diagnostic failures are registered and preserved; ownership equality and evidence requirements remain enforced.
+
+Local screenshots are under `redmi-child-fixes-20260924/store-captures/` and `offer-captures/` within the new archive. Founder visual acceptance of these exact repair captures and a successor checksum-matched Redmi replay remain pending. Installed r66.35 is unchanged; no APK build/install occurred. Existing Store/backend dependencies remain open. A future published-offer backend must honor `supplierOffersOnly` before counting/paging; the session rejects out-of-scope publications.
+
+
 ## Latest founder gate: Git checkpoint and successor APK authorized after qualification
 
 ### Founder-requested Redmi defect replay — 24 September 2026

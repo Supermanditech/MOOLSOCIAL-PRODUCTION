@@ -131,7 +131,7 @@ class _OffersSource implements BuyV2PublishedCatalogueSource {
           : product.destination == BuyV2Destination.shop
           ? BuyV2OfferPublisherType.retailer
           : BuyV2OfferPublisherType.manufacturer;
-      if (query.offerPublisher != null && publisher != query.offerPublisher) {
+      if (!query.acceptsOfferPublisher(publisher)) {
         continue;
       }
       if (query.categoryId != 'all' && product.categoryId != query.categoryId) {
@@ -169,6 +169,90 @@ void main() {
       ..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));
     await font.load();
   });
+  testWidgets(
+    'D06-B-A01 supplier tab filters before paging and retains Cart return',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final now = DateTime.utc(2026, 9, 24);
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: true,
+        cataloguePageSource: _Source(BuyV2Destination.shop),
+        publishedCatalogueSource: BuyV2DevelopmentPublishedCatalogueSource(
+          providerCount: 20,
+          skusPerStore: 500,
+          now: () => now,
+        ),
+        initialCatalogueRegionId: 'jodhpur',
+        catalogueNow: () => now,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await tester.pumpWidget(_app(session));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      final pager = session.acquireCatalogueOffers('published-offers');
+      addTearDown(() => session.releaseCatalogueOffers('published-offers'));
+      expect(pager.query!.supplierOffersOnly, isTrue);
+      expect(pager.page!.items, isNotEmpty);
+      expect(
+        pager.page!.items.every(
+          (o) => o.publisherType != BuyV2OfferPublisherType.moolSocial,
+        ),
+        isTrue,
+      );
+      expect(find.text('No current offers from this publisher.'), findsNothing);
+      final id = pager.page!.items.first.product.id;
+      final add = find.byKey(ValueKey('buy-add-$id'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor(id), greaterThan(0));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-cart-navigation-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('buy-cart-line-$id')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      for (final mool in [true, false]) {
+        tester
+            .widget<ListView>(
+              find.byKey(const ValueKey('buy-paged-scroll-published-offers')),
+            )
+            .controller!
+            .jumpTo(0);
+        await tester.pumpAndSettle();
+        final tab = find.byKey(
+          ValueKey('buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}'),
+        );
+        await tester.ensureVisible(tab);
+        await tester.pumpAndSettle();
+        await tester.tap(tab);
+        await tester.pumpAndSettle();
+        expect(pager.query!.supplierOffersOnly, !mool);
+        expect(
+          pager.page!.items.every(
+            (o) =>
+                (o.publisherType == BuyV2OfferPublisherType.moolSocial) == mool,
+          ),
+          isTrue,
+        );
+        expect(
+          find.text('No current offers from this publisher.'),
+          findsNothing,
+        );
+        expect(session.quantityFor(id), greaterThan(0));
+      }
+      await _capture(tester, 'D06-B-A01-suppliers-after-return');
+      expect(tester.takeException(), isNull);
+    },
+  );
   for (final size in [
     const Size(390, 844),
     const Size(320, 720),

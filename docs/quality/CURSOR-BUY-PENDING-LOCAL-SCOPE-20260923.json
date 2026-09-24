@@ -16,7 +16,8 @@
       "R6634-C07 Profile GST and consolidated checkout entry",
       "R6633-D05 controlled comparison provider",
       "R6633-D06-B both publisher tabs with truthful controlled offers",
-      "R6634-C08 through C16 founder visual corrections, local impact/child-defect checks and native review captures"
+      "R6634-C08 through C16 founder visual corrections, local impact/child-defect checks and native review captures",
+      "Founder-authorized Redmi children D06-B-A01 publisher query and C10-A01 Store-details identity: implement and locally test, no new APK."
     ],
     "explicitExclusions": [
       "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized by latest founder instruction; production promotion excluded.",
@@ -118,7 +119,7 @@
         "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
       ],
       "manifestPath": "config/buy-founder-regression.json",
-      "manifestSha256": "5d2b4a30408c2a594ea33b0e6564d7fab32ce37cca21717ec48105017dd6888c",
+      "manifestSha256": "99fe808ba7c16e7e30a464da616e5d2bfca8bee9323f5cba9dfb095b05032b61",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,

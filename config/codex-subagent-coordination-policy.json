@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "7FD5FD9446C5DFD58F1BD74DE142079B917108F2697BA02202CF9F07FB16F675"
+    "sha256": "06749CFD503334DBB6D33F4E070A32C460F9BF4E824351D3F98668590E5E0F96"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -158,7 +158,8 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_shared_sku_fit_test.dart",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
-        "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart",
+        "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip"
       ]
     },
     {

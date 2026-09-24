@@ -1230,14 +1230,15 @@ class BuyV2DevelopmentPublishedCatalogueSource
       offersOnly: true,
       collectionOnly: query.collectionOnly,
       offerPublisher: query.offerPublisher,
+      supplierOffersOnly: query.supplierOffersOnly,
       procurementContext: query.procurementContext,
     );
     var stores = source
         ._stores(scoped, searchNames: false)
         .where(
-          (store) =>
-              query.offerPublisher == null ||
-              _publisher(source.destination, store) == query.offerPublisher,
+          (store) => query.acceptsOfferPublisher(
+            _publisher(source.destination, store),
+          ),
         )
         .toList(growable: false);
     final text = query.query.trim().toLowerCase();
@@ -2745,6 +2746,7 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2CatalogueQuery catalogueOffersQuery({
     BuyV2OfferPublisherType? publisher,
+    bool supplierOffersOnly = false,
     String categoryId = 'all',
   }) => BuyV2CatalogueQuery(
     destination: BuyV2Destination.shop,
@@ -2755,6 +2757,7 @@ class BuyV2Session extends ChangeNotifier {
     categoryId: categoryId,
     offersOnly: true,
     offerPublisher: publisher,
+    supplierOffersOnly: supplierOffersOnly,
     procurementContext: procurementContext,
   );
 
@@ -3165,8 +3168,7 @@ class BuyV2Session extends ChangeNotifier {
           for (final offer in page.items) {
             if (!offer.isCurrent(now: catalogueNow()) ||
                 !publications.add(offer.publicationId) ||
-                (query.offerPublisher != null &&
-                    query.offerPublisher != offer.publisherType) ||
+                !query.acceptsOfferPublisher(offer.publisherType) ||
                 pager.cachedItems.any(
                   (previous) =>
                       previous.publicationId == offer.publicationId &&

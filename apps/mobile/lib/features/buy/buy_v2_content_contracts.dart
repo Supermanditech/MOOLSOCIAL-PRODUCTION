@@ -95,6 +95,7 @@ class BuyV2CatalogueQuery {
     this.offersOnly = false,
     this.collectionOnly = false,
     this.offerPublisher,
+    this.supplierOffersOnly = false,
     this.procurementContext,
   }) : brands = Set.unmodifiable(brands);
 
@@ -117,6 +118,14 @@ class BuyV2CatalogueQuery {
   final bool offersOnly;
   final bool collectionOnly;
   final BuyV2OfferPublisherType? offerPublisher;
+
+  /// Applies before counting/paging; supplier publications exclude MoolSocial.
+  final bool supplierOffersOnly;
+
+  bool acceptsOfferPublisher(BuyV2OfferPublisherType publisher) =>
+      (!supplierOffersOnly ||
+          publisher != BuyV2OfferPublisherType.moolSocial) &&
+      (offerPublisher == null || offerPublisher == publisher);
   final BuyV2ProcurementContext? procurementContext;
 
   String get key => jsonEncode([
@@ -147,6 +156,7 @@ class BuyV2CatalogueQuery {
         context.purpose.name,
         context.originOperationId,
       ],
+    if (supplierOffersOnly) 'supplierOffersOnly',
   ]);
 
   @override
@@ -385,8 +395,9 @@ class BuyV2OfferEligibility {
         !storeReady ||
         observedAt.isAfter(now) ||
         !expiresAt.isAfter(observedAt) ||
-        !now.isBefore(expiresAt))
+        !now.isBefore(expiresAt)) {
       return const {};
+    }
     return Set.unmodifiable(
       options.where(
         (option) => switch (option) {

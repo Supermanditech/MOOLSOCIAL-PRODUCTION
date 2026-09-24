@@ -105197,6 +105197,93 @@
           "prefix": "defect-replay-r6635-20260924/"
         },
         "reportEntry": "defect-replay-r6635-20260924/defect-replay-report.json"
+      },
+      "childRepairLocal20260924": {
+        "status": "local_passed_device_pending",
+        "evidence": "apps/mobile/build/redmi-child-fixes-20260924/focused-1.jsonl",
+        "findings": [
+          "New source-count test treated optional totalCount as non-null; compiler rejected it.",
+          "New widget/Store assertions failed; inspect exact test events before correction."
+        ],
+        "prevention": "Preserve failed log; correct test type assumptions and inspect root assertions without weakening behavioral requirements.",
+        "affectedFixtureFinding": {
+          "observed": "Four viewport cases required the corrected supplier-only count of 10,000,000 instead of the historical all-publisher 20,000,000.",
+          "rootCause": "Historical fixture assertion encodes superseded unfiltered Suppliers behavior.",
+          "evidence": "apps/mobile/build/redmi-child-fixes-20260924/affected-full.jsonl",
+          "prevention": "Update exact supplier-scope total and retain row/range/paging/Cart/Back checks. Repeat on final source; current runs retained as diagnostic."
+        },
+        "qualification": {
+          "status": "local_passed_device_pending",
+          "sourceSha256": "14f65a9f9cdb4569bea4de638103b3bb60694069584ee1528af55176d750c60f",
+          "selectedTicketEntries": 22,
+          "selectedScenarios": 392,
+          "selectedBatches": [
+            {
+              "path": "apps/mobile/build/redmi-child-fixes-20260924/selected-r2/batch-1.jsonl",
+              "sha256": "2e67ba17e05d2811b70d690b15034e92a31019087f599e89243ec3330576273f",
+              "passed": 133,
+              "skipped": 0,
+              "failed": 0
+            },
+            {
+              "path": "apps/mobile/build/redmi-child-fixes-20260924/selected-r2/batch-2.jsonl",
+              "sha256": "ba0837a7ef8e82a93ff13c4a2c07a0a56eb16b8272de8c6f3d6f359dd6c58007",
+              "passed": 124,
+              "skipped": 0,
+              "failed": 0
+            },
+            {
+              "path": "apps/mobile/build/redmi-child-fixes-20260924/selected-r2/batch-3.jsonl",
+              "sha256": "4b90af045f8679dfc4533eb4d89747ef51b2726815da2a740e96054cc23eab80",
+              "passed": 135,
+              "skipped": 0,
+              "failed": 0
+            }
+          ],
+          "affectedFull": {
+            "path": "apps/mobile/build/redmi-child-fixes-20260924/affected-full-2.jsonl",
+            "sha256": "ea823e997cefe945a1a05547166f5ea7a4f77244b7e8f31919496ef44a31a252",
+            "passed": 640,
+            "skipped": 0,
+            "failed": 0
+          },
+          "analysis": {
+            "path": "apps/mobile/build/redmi-child-fixes-20260924/analysis-3.log",
+            "sha256": "e7d27f5a2ddc998755f4a4a1b4ee8b42ca4154b2aff59269089f35548fd67709"
+          },
+          "format": {
+            "path": "apps/mobile/build/redmi-child-fixes-20260924/format-final.log",
+            "sha256": "820f8e1ae759ccbc3362fb4664f304ea800975324a5b1a3647c7b0d9d6cd334f"
+          },
+          "device": "Pending new candidate; installed r66.35 unchanged.",
+          "backendQualified": false,
+          "notes": [
+            "Selected and affected suites overlap; counts are not unique cumulative tests.",
+            "Initial focused fixture mistakes and four historical unfiltered Suppliers count failures retained; final exact checks pass.",
+            "No skips or assertions were removed to achieve the fixes."
+          ],
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+            "sha256": "e2bc90c39244c5181974c7db4b51934cef22185fb9db80705148a69cca3a91d6",
+            "bytes": 18814185
+          }
+        },
+        "resolvedFixtureCauses": [
+          "Assert optional totals non-null before arithmetic.",
+          "Return retained Offers list to header before interacting with lazily mounted tabs.",
+          "Count the current Store heading and panel separately from Other stores with repeated fixture names.",
+          "Assert supplier-only exact total while preserving paging, retry, Store, Cart, Saved and Back checks."
+        ],
+        "toolingDiagnostic": "Read JSONL as UTF-8, ignore non-object protocol output and incomplete live lines; final receipts require completed strict object events and successful exit.",
+        "checkpointGateDiagnostic": {
+          "status": "resolved_exact_owner_pair_and_archive_parameter_passed",
+          "rootCause": "New dedicated archive claim omitted matching exact checker owner entry; memory invocation omitted existing retained EvidenceArchiveRoot.",
+          "detection": [
+            "apps/mobile/build/redmi-child-fixes-20260924/precommit-final.log",
+            "apps/mobile/build/redmi-child-fixes-20260924/regression-memory-final.log"
+          ],
+          "prevention": "Add only the exact new archive to paired owner list; use existing archive-root parameter. Preserve exact owner equality and historical evidence requirements. Application source unchanged."
+        }
       }
     }
   ],

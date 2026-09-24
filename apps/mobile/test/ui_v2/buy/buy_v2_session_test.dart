@@ -5223,6 +5223,7 @@ void main() {
     final now = DateTime.utc(2026, 9, 8);
     BuyV2CatalogueQuery query({
       BuyV2OfferPublisherType? publisher,
+      bool suppliersOnly = false,
       String? region = 'jodhpur',
       BuyV2CatalogueAreaScope scope = BuyV2CatalogueAreaScope.regional,
       String text = '',
@@ -5236,8 +5237,86 @@ void main() {
       categoryId: category,
       offersOnly: true,
       offerPublisher: publisher,
+      supplierOffersOnly: suppliersOnly,
       storeId: storeId,
     );
+
+    test(
+      'D06-B-A01 suppliers scope filters before paging and isolates cursors',
+      () async {
+        final source = BuyV2DevelopmentPublishedCatalogueSource(
+          providerCount: 20,
+          skusPerStore: 500,
+          now: () => now,
+        );
+        final all = await source.loadOffers(query(), pageSize: 40);
+        final suppliers = query(suppliersOnly: true);
+        final first = await source.loadOffers(suppliers, pageSize: 40);
+        final mool = await source.loadOffers(
+          query(publisher: BuyV2OfferPublisherType.moolSocial),
+          pageSize: 40,
+        );
+        expect(
+          all.items.every(
+            (o) => o.publisherType == BuyV2OfferPublisherType.moolSocial,
+          ),
+          isTrue,
+        );
+        expect(first.items, hasLength(40));
+        expect(first.totalCount, isNotNull);
+        expect(mool.totalCount, isNotNull);
+        expect(first.totalCount! + mool.totalCount!, all.totalCount);
+        expect(
+          first.items.every(
+            (o) => o.publisherType != BuyV2OfferPublisherType.moolSocial,
+          ),
+          isTrue,
+        );
+        final next = await source.loadOffers(
+          suppliers,
+          cursor: first.nextCursor,
+          pageSize: 40,
+        );
+        expect(next.startIndex, 40);
+        expect(
+          next.items.every(
+            (o) => o.publisherType != BuyV2OfferPublisherType.moolSocial,
+          ),
+          isTrue,
+        );
+        expect({
+          ...first.items.map((o) => o.publicationId),
+          ...next.items.map((o) => o.publicationId),
+        }, hasLength(80));
+        expect(suppliers.key, isNot(query().key));
+        await expectLater(
+          source.loadOffers(query(), cursor: first.nextCursor, pageSize: 40),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test('D06-B-A01 rejects MoolSocial response in supplier scope', () async {
+      final source = _PublishedFixtureSource(now: () => now)
+        ..rewrite = (offer) => _copyPublication(
+          offer,
+          publisher: BuyV2OfferPublisherType.moolSocial,
+        );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        publishedCatalogueSource: source,
+        catalogueNow: () => now,
+        reviewDataEnabled: false,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final pager = session.acquireCatalogueOffers('supplier-validation');
+      await pager.open(query(suppliersOnly: true));
+      expect(pager.page, isNull);
+      expect(pager.message, isNotNull);
+      expect(session.pagedProductCount, 0);
+    });
 
     test(
       'unsupported channel filters cannot silently broaden Offers',

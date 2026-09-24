@@ -422,6 +422,9 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
         .where(
           (entry) =>
               (!_savedOnly || session.isSaved(entry.product.id)) &&
+              (_mool ||
+                  entry.offer.publisherType !=
+                      BuyV2OfferPublisherType.moolSocial) &&
               (_publisher == null || entry.offer.publisherType == _publisher) &&
               (session.finiteOffersCategoryId == 'all' ||
                   entry.product.categoryId == session.finiteOffersCategoryId),
@@ -584,6 +587,7 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
       query: session.catalogueOffersQuery(
         categoryId: _category,
         publisher: _publisher,
+        supplierOffersOnly: !_mool,
       ),
       publishedOffers: true,
       showAreaControl: true,
@@ -718,7 +722,7 @@ String _offerPublisherLabel(BuyV2OfferPublisherType? publisher) =>
       BuyV2OfferPublisherType.wholesaler => 'Wholesalers',
       BuyV2OfferPublisherType.retailer => 'Stores',
       BuyV2OfferPublisherType.moolSocial => 'MoolSocial',
-      null => 'All publishers',
+      null => 'All suppliers',
     };
 
 Future<({BuyV2OfferPublisherType? publisher})?> _chooseOfferPublisher(
@@ -8052,7 +8056,11 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Store details', style: context.buyTitle),
+                    child: Text(
+                      _publicStoreName(widget.session, widget.product),
+                      key: const ValueKey('buy-store-details-name'),
+                      style: context.buyTitle,
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Close store details',

@@ -376,6 +376,40 @@ void main() {
         await tester.tap(info);
         await tester.pumpAndSettle();
         final details = find.byKey(const ValueKey('buy-store-info-scroll'));
+        final name = find.descendant(
+          of: details,
+          matching: find.byKey(const ValueKey('buy-store-details-name')),
+        );
+        expect(
+          name,
+          findsOneWidget,
+          reason:
+              'C10-A01 current Store name is visible exactly once in details',
+        );
+        final heading = tester.widget<Text>(
+          find.byKey(const ValueKey('buy-store-details-name')),
+        );
+        expect(heading.data, source.name);
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey('buy-public-store-truth-$id')),
+            matching: find.text(source.name),
+          ),
+          findsNothing,
+          reason: 'The current Store panel must not repeat its heading',
+        );
+        expect(heading.maxLines, isNull);
+        expect(heading.overflow, isNot(TextOverflow.ellipsis));
+        expect(
+          tester.getRect(name).right,
+          lessThanOrEqualTo(
+            tester.getRect(find.byTooltip('Close store details')).left,
+          ),
+        );
+        await captureR66Visual(
+          tester,
+          'C10-A01-store-name-${profile.$1}-${profile.$2}-${profile.$3}',
+        );
         final detailsWidget = tester.widget<SingleChildScrollView>(details);
         expect(
           (detailsWidget.padding! as EdgeInsets).bottom,
@@ -2544,7 +2578,7 @@ void main() {
         await reveal(next);
         expect(
           tester.widget<Semantics>(range).properties.label,
-          '1–40 of 20,000,000 offers',
+          '1–40 of 10,000,000 offers',
         );
         expect(published.pages.first.items.length, 40);
         await capture('initial');
@@ -2628,7 +2662,7 @@ void main() {
         await reveal(next);
         expect(
           tester.widget<Semantics>(range).properties.label,
-          '1–40 of 20,000,000 offers',
+          '1–40 of 10,000,000 offers',
         );
         await reveal(retry);
         expect(find.text('Results could not refresh'), findsOneWidget);
@@ -2639,7 +2673,7 @@ void main() {
         await reveal(next);
         expect(
           tester.widget<Semantics>(range).properties.label,
-          '41–80 of 20,000,000 offers',
+          '41–80 of 10,000,000 offers',
         );
         final pageProduct = pager.page!.items.first.product;
         await reveal(
@@ -2692,7 +2726,8 @@ void main() {
         }
         expect(published.queries.length, promotionRequests);
         expect(published.queries.last.offerPublisher, isNull);
-        expect(pager.page!.totalCount, 20000000);
+        expect(published.queries.last.supplierOffersOnly, isTrue);
+        expect(pager.page!.totalCount, 10000000);
         final makerPublication = supplierOffers[makerIndex];
         expect(
           session.featuredOfferPublicationId,
