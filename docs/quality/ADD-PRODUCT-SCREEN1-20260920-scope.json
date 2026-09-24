@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "6D10396511220BE89ADD78246BC10D0E0E57F0CF64426BDD4A01F9A645458018",
+      "manifestSha256": "6759CB548047104D5A499A461E194FFF5C855F61D6B0F8C614D7EBD4A64399DA",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [

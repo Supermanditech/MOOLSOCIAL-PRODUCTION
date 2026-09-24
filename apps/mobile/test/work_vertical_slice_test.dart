@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -26,6 +29,8 @@ class _ReviewCaseMemoryStore implements BuyV2CustomerStateStore {
 }
 
 class _ReviewCaseDraftStore implements WorkPendingProofStore {
+  _ReviewCaseDraftStore({this.retainDraft = true});
+  final bool retainDraft;
   Map<String, Object?>? draft;
   @override
   String get accountScope => 'review-case-widget';
@@ -34,7 +39,7 @@ class _ReviewCaseDraftStore implements WorkPendingProofStore {
       scope == accountScope ? draft : null;
   @override
   Future<void> save(String scope, Map<String, Object?> value) async {
-    if (scope == accountScope) draft = Map.of(value);
+    if (retainDraft && scope == accountScope) draft = Map.of(value);
   }
 
   @override
@@ -43,7 +48,38 @@ class _ReviewCaseDraftStore implements WorkPendingProofStore {
   }
 }
 
+// Host tests supply deterministic account, picker and review adapters in both
+// configurations. Native adapters are qualified separately.
+WorkSession _testWorkSession({
+  WorkGateway? gateway,
+  WorkProofPicker? proofPicker,
+  WorkPendingProofStore? contactDraftStore,
+  WorkPendingProofStore? pendingProofStore,
+}) {
+  // Direct-route tests prepare confirmed contacts in memory before mounting.
+  // Do not replay a locally saved draft (which correctly cannot assert identity).
+  // Persistence tests pass their own retaining store explicitly.
+  final account =
+      contactDraftStore ?? _ReviewCaseDraftStore(retainDraft: false);
+  return WorkSession(
+    gateway:
+        gateway ??
+        ReviewWorkGateway(initialReviewStatus: WorkRemoteReviewStatus.approved),
+    proofPicker: proofPicker ?? ReviewWorkProofPicker(),
+    contactDraftStore: account,
+    pendingProofStore: pendingProofStore ?? _ReviewCaseDraftStore(),
+  );
+}
+
 void main() {
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterSecureStorage.setMockInitialValues({});
+    final previous = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+  });
   test('Store review seed V1 is deterministic scoped and internally valid', () {
     final now = DateTime.utc(2026, 9, 11, 12);
     for (final count in [12, 100, 1000]) {
@@ -117,7 +153,8 @@ void main() {
     'Store review seed loader is gated and never overwrites another Store',
     () {
       final drafts = _ReviewCaseDraftStore();
-      final work = WorkSession(
+      final work = _testWorkSession(
+        proofPicker: ReviewWorkProofPicker(),
         contactDraftStore: drafts,
         pendingProofStore: drafts,
       )..seedVerifiedWorkspace();
@@ -257,7 +294,8 @@ void main() {
         tester.view.viewPadding = const FakeViewPadding(bottom: 24);
         addTearDown(tester.view.reset);
         final drafts = _ReviewCaseDraftStore();
-        final work = WorkSession(
+        final work = _testWorkSession(
+          proofPicker: ReviewWorkProofPicker(),
           contactDraftStore: drafts,
           pendingProofStore: drafts,
         )..seedVerifiedWorkspace();
@@ -303,7 +341,16 @@ void main() {
         }
         await tester.tap(menu);
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Test Store · $count orders'));
+        expect(find.text('Test Store · 100 orders'), findsNothing);
+        expect(find.text('Test Store · 1000 orders'), findsNothing);
+        await tester.tap(find.text('Test Store · product entry'));
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(work.workspaceOrders, isEmpty);
+        expect(work.activeWorkspace!.id, startsWith('QA-STORE-V1-0-'));
+        expect(tester.takeException(), isNull);
+        // Workload fixtures remain explicit test setup, not normal app actions.
+        expect(work.loadStoreReviewSeed(count), isTrue);
         await tester.pumpAndSettle();
         expect(
           work.activeWorkspace!.id,
@@ -396,7 +443,8 @@ void main() {
   }) async {
     await tester.binding.setSurfaceSize(size);
     final journey = journeySession ?? await readyJourney();
-    final work = workSession ?? WorkSession();
+    final work =
+        workSession ?? _testWorkSession(proofPicker: ReviewWorkProofPicker());
     addTearDown(() {
       tester.binding.setSurfaceSize(null);
       journey.dispose();
@@ -559,8 +607,13 @@ void main() {
   testWidgets(
     'Apply Now enters Workspace onboarding with the exact opportunity',
     (tester) async {
-      final gateway = ReviewWorkGateway();
-      final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.approved,
+      );
+      final work = _testWorkSession(
+        proofPicker: ReviewWorkProofPicker(),
+        gateway: gateway,
+      )..seedVerifiedWorkspace();
       await mount(
         tester,
         route: '/app/work/opportunity/quick-delivery-biker',
@@ -578,8 +631,13 @@ void main() {
   testWidgets('feed filters, search empty and failed refresh recover safely', (
     tester,
   ) async {
-    final gateway = ReviewWorkGateway()..failFeed = true;
-    final work = WorkSession(gateway: gateway);
+    final gateway = ReviewWorkGateway(
+      initialReviewStatus: WorkRemoteReviewStatus.approved,
+    )..failFeed = true;
+    final work = _testWorkSession(
+      proofPicker: ReviewWorkProofPicker(),
+      gateway: gateway,
+    );
     await mount(tester, route: '/app/work/earn', workSession: work);
 
     await tapVisible(tester, const Key('work-filter-button'));
@@ -619,8 +677,13 @@ void main() {
   testWidgets(
     'alternate work number handles invalid, gateway failure and exact OTP',
     (tester) async {
-      final gateway = ReviewWorkGateway()..failOtp = true;
-      final work = WorkSession(gateway: gateway);
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.approved,
+      )..failOtp = true;
+      final work = _testWorkSession(
+        proofPicker: ReviewWorkProofPicker(),
+        gateway: gateway,
+      );
       await mount(
         tester,
         route: '/app/work/workspace/choose',
@@ -701,7 +764,7 @@ void main() {
           signInMethods: ['Google'],
         )
         ..socialAuthProvider = SocialAuthProvider.google;
-      final work = WorkSession()
+      final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
         ..selectFamily('products-trade')
         ..selectProfile('retailer-grocery');
 
@@ -766,7 +829,7 @@ void main() {
     test(
       'r6611 contact Continue separates format and confirmation ${entry.$1}',
       () {
-        final work = WorkSession()
+        final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
           ..selectFamily('products-trade')
           ..selectProfile('retailer-grocery');
         addTearDown(work.dispose);
@@ -974,10 +1037,16 @@ void main() {
   testWidgets(
     'Workspace submits without documents and keeps review status in the same screen',
     (tester) async {
-      final gateway = ReviewWorkGateway();
-      final work = WorkSession(gateway: gateway)
-        ..selectFamily('products-trade')
-        ..selectProfile('retailer-grocery');
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.approved,
+      );
+      final work =
+          _testWorkSession(
+              proofPicker: ReviewWorkProofPicker(),
+              gateway: gateway,
+            )
+            ..selectFamily('products-trade')
+            ..selectProfile('retailer-grocery');
       confirmWorkspaceContacts(work);
       await mount(
         tester,
@@ -1001,6 +1070,12 @@ void main() {
       await tapVisible(tester, const Key('work-submit-profile'));
 
       expect(
+        work.errorMessage,
+        isNull,
+        reason: 'Submission should not lose confirmed contacts',
+      );
+
+      expect(
         find.byKey(const Key('work-inline-review-status')),
         findsOneWidget,
       );
@@ -1021,7 +1096,7 @@ void main() {
   testWidgets(
     'rejected Workspace explains the reason inside Complete your Workspace',
     (tester) async {
-      final work = WorkSession()
+      final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
         ..selectFamily('products-trade')
         ..selectProfile('retailer-grocery')
         ..reviewCaseId = 'WP-REVIEW-92'
@@ -1056,10 +1131,16 @@ void main() {
   testWidgets(
     'proof and submission failures preserve fields then submit exactly once',
     (tester) async {
-      final gateway = ReviewWorkGateway()..failProof = true;
-      final work = WorkSession(gateway: gateway)
-        ..selectFamily('products-trade')
-        ..selectProfile('retailer-grocery');
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.approved,
+      )..failProof = true;
+      final work =
+          _testWorkSession(
+              proofPicker: ReviewWorkProofPicker(),
+              gateway: gateway,
+            )
+            ..selectFamily('products-trade')
+            ..selectProfile('retailer-grocery');
       confirmWorkspaceContacts(work);
       await mount(
         tester,
@@ -1120,17 +1201,24 @@ void main() {
   testWidgets(
     'document and automatic review failures preserve one case with exact retry',
     (tester) async {
-      final gateway = ReviewWorkGateway()
-        ..failProof = true
-        ..failReview = true;
-      final work = WorkSession(gateway: gateway)
-        ..selectFamily('products-trade')
-        ..selectProfile('retailer-grocery')
-        ..saveDetails(
-          name: 'Mahadev Fresh Mart',
-          area: 'Jodhpur',
-          activity: 'Grocery retail',
-        );
+      final gateway =
+          ReviewWorkGateway(
+              initialReviewStatus: WorkRemoteReviewStatus.approved,
+            )
+            ..failProof = true
+            ..failReview = true;
+      final work =
+          _testWorkSession(
+              proofPicker: ReviewWorkProofPicker(),
+              gateway: gateway,
+            )
+            ..selectFamily('products-trade')
+            ..selectProfile('retailer-grocery')
+            ..saveDetails(
+              name: 'Mahadev Fresh Mart',
+              area: 'Jodhpur',
+              activity: 'Grocery retail',
+            );
       confirmWorkspaceContacts(work);
       await mount(
         tester,
@@ -1175,14 +1263,18 @@ void main() {
       final gateway = ReviewWorkGateway(
         initialReviewStatus: WorkRemoteReviewStatus.pending,
       );
-      final work = WorkSession(gateway: gateway)
-        ..selectProfile('retailer-grocery')
-        ..saveDetails(
-          name: 'QA Retail Store',
-          area: 'Jodhpur',
-          activity: 'Grocery retail',
-        )
-        ..businessRelationship = 'Owner';
+      final work =
+          _testWorkSession(
+              proofPicker: ReviewWorkProofPicker(),
+              gateway: gateway,
+            )
+            ..selectProfile('retailer-grocery')
+            ..saveDetails(
+              name: 'QA Retail Store',
+              area: 'Jodhpur',
+              activity: 'Grocery retail',
+            )
+            ..businessRelationship = 'Owner';
       confirmWorkspaceContacts(work);
       await mount(
         tester,
@@ -1244,7 +1336,8 @@ void main() {
           initialReviewStatus: WorkRemoteReviewStatus.pending,
         );
         final work =
-            WorkSession(
+            _testWorkSession(
+                proofPicker: ReviewWorkProofPicker(),
                 gateway: gateway,
                 contactDraftStore: _ReviewCaseDraftStore(),
                 pendingProofStore: _ReviewCaseDraftStore(),
@@ -1385,8 +1478,13 @@ void main() {
   testWidgets(
     'retailer setup rejects incomplete inputs and exact failure retry goes live',
     (tester) async {
-      final gateway = ReviewWorkGateway()..failSetup = true;
-      final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.approved,
+      )..failSetup = true;
+      final work = _testWorkSession(
+        proofPicker: ReviewWorkProofPicker(),
+        gateway: gateway,
+      )..seedVerifiedWorkspace();
       await mount(tester, route: '/app/work/ready', workSession: work);
 
       expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
@@ -1428,7 +1526,8 @@ void main() {
   testWidgets('R669 existing stores stay out of the new Workspace selector', (
     tester,
   ) async {
-    final work = WorkSession()..seedMultipleWorkspaces();
+    final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
+      ..seedMultipleWorkspaces();
     await mount(tester, route: '/app/work/workspace/choose', workSession: work);
 
     expect(find.byKey(const Key('my-work-screen')), findsNothing);
@@ -1458,7 +1557,7 @@ void main() {
   });
 
   testWidgets('status Chat returns to the exact review screen', (tester) async {
-    final work = WorkSession()
+    final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
       ..selectFamily('products-trade')
       ..selectProfile('retailer-grocery')
       ..reviewCaseId = 'WP-240701'
@@ -1484,7 +1583,7 @@ void main() {
   testWidgets(
     'review step animates and offers direct detail and document corrections',
     (tester) async {
-      final work = WorkSession()
+      final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
         ..selectFamily('products-trade')
         ..selectProfile('retailer-grocery')
         ..saveDetails(
@@ -1535,23 +1634,25 @@ void main() {
   testWidgets('clarification corrections update the existing review reference', (
     tester,
   ) async {
-    final gateway = ReviewWorkGateway()
-      ..reviewResultStatus = WorkRemoteReviewStatus.pending
-      ..reviewResultReason =
-          'Please confirm the shop entrance and upload a clearer address document.';
-    final work = WorkSession(gateway: gateway)
-      ..selectFamily('products-trade')
-      ..selectProfile('retailer-grocery')
-      ..saveDetails(
-        name: 'Mahadev Fresh Mart',
-        area: 'Sardarpura, Jodhpur',
-        activity: 'Grocery retail',
-      )
-      ..reviewCaseId = 'WP-CLARIFY-101'
-      ..reviewStage = WorkReviewStage.gstPending
-      ..remoteReviewStatus = WorkRemoteReviewStatus.pending
-      ..reviewReason =
-          'Please confirm the shop entrance and upload a clearer address document.';
+    final gateway =
+        ReviewWorkGateway(initialReviewStatus: WorkRemoteReviewStatus.approved)
+          ..reviewResultStatus = WorkRemoteReviewStatus.pending
+          ..reviewResultReason =
+              'Please confirm the shop entrance and upload a clearer address document.';
+    final work =
+        _testWorkSession(proofPicker: ReviewWorkProofPicker(), gateway: gateway)
+          ..selectFamily('products-trade')
+          ..selectProfile('retailer-grocery')
+          ..saveDetails(
+            name: 'Mahadev Fresh Mart',
+            area: 'Sardarpura, Jodhpur',
+            activity: 'Grocery retail',
+          )
+          ..reviewCaseId = 'WP-CLARIFY-101'
+          ..reviewStage = WorkReviewStage.gstPending
+          ..remoteReviewStatus = WorkRemoteReviewStatus.pending
+          ..reviewReason =
+              'Please confirm the shop entrance and upload a clearer address document.';
     confirmWorkspaceContacts(work);
     await mount(tester, route: '/app/work/workspace/proof', workSession: work);
 
@@ -1586,19 +1687,25 @@ void main() {
   testWidgets(
     'rejected Workspace retains its decision and cannot restart submission',
     (tester) async {
-      final gateway = ReviewWorkGateway();
-      final work = WorkSession(gateway: gateway)
-        ..selectFamily('products-trade')
-        ..selectProfile('retailer-grocery')
-        ..saveDetails(
-          name: 'Mahadev Fresh Mart',
-          area: 'Sardarpura, Jodhpur',
-          activity: 'Grocery retail',
-        )
-        ..reviewCaseId = 'WP-REJECTED-101'
-        ..reviewStage = WorkReviewStage.gstPending
-        ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
-        ..reviewReason = 'The submitted address could not be confirmed.';
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.approved,
+      );
+      final work =
+          _testWorkSession(
+              proofPicker: ReviewWorkProofPicker(),
+              gateway: gateway,
+            )
+            ..selectFamily('products-trade')
+            ..selectProfile('retailer-grocery')
+            ..saveDetails(
+              name: 'Mahadev Fresh Mart',
+              area: 'Sardarpura, Jodhpur',
+              activity: 'Grocery retail',
+            )
+            ..reviewCaseId = 'WP-REJECTED-101'
+            ..reviewStage = WorkReviewStage.gstPending
+            ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
+            ..reviewReason = 'The submitted address could not be confirmed.';
       confirmWorkspaceContacts(work);
       await mount(
         tester,
@@ -1634,18 +1741,21 @@ void main() {
   testWidgets('approved review opens the selected Workspace dashboard', (
     tester,
   ) async {
-    final gateway = ReviewWorkGateway();
-    final work = WorkSession(gateway: gateway)
-      ..selectFamily('health')
-      ..selectProfile('clinic')
-      ..saveDetails(
-        name: 'Asha Family Clinic',
-        area: 'Jodhpur',
-        activity: 'Consultations and follow-up',
-      )
-      ..reviewCaseId = 'WP-CLINIC-101'
-      ..reviewStage = WorkReviewStage.gstPending
-      ..remoteReviewStatus = WorkRemoteReviewStatus.pending;
+    final gateway = ReviewWorkGateway(
+      initialReviewStatus: WorkRemoteReviewStatus.approved,
+    );
+    final work =
+        _testWorkSession(proofPicker: ReviewWorkProofPicker(), gateway: gateway)
+          ..selectFamily('health')
+          ..selectProfile('clinic')
+          ..saveDetails(
+            name: 'Asha Family Clinic',
+            area: 'Jodhpur',
+            activity: 'Consultations and follow-up',
+          )
+          ..reviewCaseId = 'WP-CLINIC-101'
+          ..reviewStage = WorkReviewStage.gstPending
+          ..remoteReviewStatus = WorkRemoteReviewStatus.pending;
     confirmWorkspaceContacts(work);
     await mount(tester, route: '/app/work/workspace/proof', workSession: work);
 
@@ -1667,7 +1777,7 @@ void main() {
   testWidgets(
     'restored live retailer opens operations without setup downgrade',
     (tester) async {
-      final work = WorkSession()
+      final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
         ..seedVerifiedWorkspace()
         ..reviewStage = WorkReviewStage.live
         ..remoteReviewStatus = WorkRemoteReviewStatus.live
@@ -1702,7 +1812,7 @@ void main() {
       'create-work': 'Opportunities',
     };
     for (final profile in workProfiles) {
-      final work = WorkSession()
+      final work = _testWorkSession(proofPicker: ReviewWorkProofPicker())
         ..selectFamily(profile.familyId)
         ..selectProfile(profile.id)
         ..saveDetails(

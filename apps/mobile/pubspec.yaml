@@ -96,6 +96,7 @@ flutter:
         - asset: assets/fonts/Inter-Variable.ttf
 
   assets:
+    - assets/store_evaluation_v1/
     - assets/prototype/
     - assets/prototype/social-market-grocery.png
 

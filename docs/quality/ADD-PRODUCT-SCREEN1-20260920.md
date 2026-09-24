@@ -1,5 +1,29 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## r66.40 correction — empty Store and actual product-entry lifecycle
+
+Founder authorizes safe archival of the old automatically seeded Store, retained
+linked history, and removal of automatic seeded inventory/orders/finance from
+the normal review journey. Reuse the existing scoped local stores and product
+editor/importer; no new backend or duplicate route. This is MVP-supporting repair
+of the existing Add Product/Stock/POS continuity requirement, not another ticket.
+
+Founder clarified that 8-10 products and replaceable evaluation photos plus
+explicit test quantities/prices are allowed in a testing Store. "Real testing"
+means actual save, persistence, restart and shared-SKU use, not certified shop
+inventory. Keep these records isolated, test-labelled and excluded from production
+publication/migration unless independently approved. No waiting for physical-stock
+facts to exercise this testing journey; no invented historical recovery.
+
+Acceptance: each catalogue/manual/CSV entry persists exact SKU, fields and image
+identity to Stock and POS/Review Bill after restart. Include empty Store, failed
+save/archive, repeated migration, offline/retry and account/Store isolation.
+Archive old selection only after durable readback; retain all original ledger,
+inventory and draft namespaces. Stable empty Store identity must not regenerate
+sample products on relaunch. Backend sync stays deferred; schema/revision and
+idempotent local save contracts stay reusable. Existing design/printing unchanged.
+No new APK acceptance until these requirements and exact device replay are proven.
+
 ## Printing/photo frontend review disposition — 24 September 2026
 
 Founder explicitly approved proceeding to the incremental frontend review APK

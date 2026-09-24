@@ -152,6 +152,19 @@ class _ReviewSelectionFixtureStore implements WorkReviewStoreSelectionStore {
   Completer<void>? holdRead;
   bool failRead = false;
   @override
+  Future<StoreReviewSeed?> archiveLegacySelectionForEntry(
+    String account,
+  ) async {
+    final previous = await read(account);
+    if (previous == null || previous.orderCount == 0) return previous;
+    return seed = StoreReviewSeed(
+      accountScope: previous.accountScope,
+      orderCount: 0,
+      now: previous.now,
+    );
+  }
+
+  @override
   Future<StoreReviewSeed?> read(String account) async {
     reads++;
     await holdRead?.future;
@@ -302,6 +315,7 @@ class _IssueCommandFixture {
   final gateway = _IssueCommandGateway();
   WorkSession make(WorkspaceIssueRecord issue) {
     final work = WorkSession(
+      contactDraftStore: account,
       pendingProofStore: account,
       issueDraftStore: SecureWorkIssueDraftStore(
         accountScope: () => account.accountScope,
@@ -1147,6 +1161,52 @@ void main() {
   });
 
   group('COUNTERRELAUNCH review Store recovery', () {
+    test(
+      'EVALUATION eight reference products never create stock or photo approval',
+      () {
+        expect(storeEntryEvaluationCatalogue, hasLength(8));
+        expect(
+          storeEntryEvaluationCatalogue.map((p) => p.id).toSet(),
+          hasLength(8),
+        );
+        for (final product in storeEntryEvaluationCatalogue) {
+          expect(product.stock, 0);
+          expect(product.purchasePrice, 0);
+          expect(product.sellingPrice, 0);
+          expect(product.publicListing, isFalse);
+          expect(
+            product.cataloguePhoto!.status,
+            WorkspaceCataloguePhotoStatus.testOnly,
+          );
+          expect(
+            storeEntryEvaluationPhotoAsset(product),
+            SecureWorkReviewStoreSelectionStore.enabled ? isNotNull : isNull,
+          );
+          expect(
+            storeEntryEvaluationPhotoAsset(
+              product.copyWith(pack: 'wrong pack'),
+            ),
+            isNull,
+          );
+          expect(
+            storeEntryEvaluationPhotoAsset(
+              product.copyWith(brand: 'wrong brand'),
+            ),
+            isNull,
+          );
+          final wrongPhoto = WorkspaceCataloguePhoto.fromJson({
+            ...product.cataloguePhoto!.toJson(),
+            'source': 'https://wrong.invalid/photo.png',
+          });
+          expect(
+            storeEntryEvaluationPhotoAsset(
+              product.copyWith(cataloguePhoto: wrongPhoto),
+            ),
+            isNull,
+          );
+        }
+      },
+    );
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();
       FlutterSecureStorage.setMockInitialValues({});
@@ -1204,6 +1264,144 @@ void main() {
 
     group('enabled fixture mode', () {
       test(
+        'ENTRYEMPTY actual startup migrates legacy Store and stays empty after relaunch',
+        () async {
+          final native = _OrderJournalStorage();
+          final account = _CommandAccountStore();
+          final selection = SecureWorkReviewStoreSelectionStore(
+            accountScope: () => account.accountScope,
+            storage: native,
+          );
+          await selection.save(
+            StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 1000,
+              now: DateTime.utc(2026, 9, 19),
+            ),
+          );
+          WorkSession open() => WorkSession(
+            gateway: ReviewWorkGateway(),
+            contactDraftStore: account,
+            reviewStoreSelectionStore: selection,
+            inventoryStore: SecureWorkInventoryStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+          );
+          String? storeId;
+          for (var launch = 0; launch < 2; launch++) {
+            final session = open();
+            await session.loadInitialWorkspaceState();
+            expect(session.initialWorkspaceStateLoaded, isTrue);
+            expect(session.activeWorkspace?.id, startsWith('QA-STORE-V1-0-'));
+            storeId ??= session.activeWorkspace!.id;
+            expect(session.activeWorkspace!.id, storeId);
+            expect(session.workspaceCatalogueItems, isEmpty);
+            expect(session.referenceCatalogue, storeEntryEvaluationCatalogue);
+            expect(session.workspaceOrders, isEmpty);
+            expect(session.workspaceInvoices, isEmpty);
+            expect(session.customerLedgerRecoveryError, isNull);
+            session.dispose();
+          }
+          expect(
+            native.values.keys.where((key) => key.contains('.archive.')),
+            hasLength(1),
+          );
+        },
+      );
+
+      test(
+        'ENTRYEMPTY archives legacy selection without deleting linked data',
+        () async {
+          final native = _OrderJournalStorage();
+          final store = SecureWorkReviewStoreSelectionStore(
+            accountScope: () => 'account-A',
+            storage: native,
+          );
+          final legacy = StoreReviewSeed(
+            accountScope: 'account-A',
+            orderCount: 1000,
+            now: DateTime.utc(2026, 9, 19),
+          );
+          await store.save(legacy);
+          final selectionKey = native.values.keys.single;
+          final original = native.values[selectionKey];
+          final linkedKey = 'inventory/${legacy.storeId}';
+          native.values[linkedKey] = 'preserve legacy history exactly';
+          final empty = (await store.archiveLegacySelectionForEntry(
+            'account-A',
+          ))!;
+          expect(empty.orderCount, 0);
+          expect(empty.storeId, isNot(legacy.storeId));
+          expect(empty.products, isEmpty);
+          expect(empty.orders, isEmpty);
+          expect(empty.purchases, isEmpty);
+          expect(empty.offers, isEmpty);
+          expect(empty.supplierLedgers, isEmpty);
+          expect(empty.finance.customerLedgers, isEmpty);
+          expect(empty.finance.payments, isEmpty);
+          expect(empty.finance.availableMinor, 0);
+          expect(native.values[linkedKey], 'preserve legacy history exactly');
+          expect(
+            native.values['$selectionKey.archive.${legacy.storeId}'],
+            original,
+          );
+          final before = Map<String, String>.from(native.values);
+          expect(
+            (await store.archiveLegacySelectionForEntry('account-A'))!.storeId,
+            empty.storeId,
+          );
+          expect(native.values, before);
+        },
+      );
+
+      for (final failure in ['write', 'lost-reply', 'archive-conflict']) {
+        test(
+          'ENTRYEMPTY $failure preserves legacy selection and supports safe retry',
+          () async {
+            final native = _OrderJournalStorage();
+            final store = SecureWorkReviewStoreSelectionStore(
+              accountScope: () => 'account-A',
+              storage: native,
+            );
+            final legacy = StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 12,
+              now: DateTime.utc(2026, 9, 19),
+            );
+            await store.save(legacy);
+            final key = native.values.keys.single;
+            final original = native.values[key];
+            native.failWrite = failure == 'write';
+            native.loseWriteResponseOnce = failure == 'lost-reply';
+            if (failure == 'archive-conflict') {
+              native.values['$key.archive.${legacy.storeId}'] =
+                  'conflicting history';
+            }
+            await expectLater(
+              store.archiveLegacySelectionForEntry('account-A'),
+              throwsA(isA<Object>()),
+            );
+            expect(native.values[key], original);
+            native.failWrite = false;
+            if (failure == 'archive-conflict') {
+              expect(
+                native.values['$key.archive.${legacy.storeId}'],
+                'conflicting history',
+              );
+            } else {
+              expect(
+                (await store.archiveLegacySelectionForEntry(
+                  'account-A',
+                ))!.orderCount,
+                0,
+              );
+            }
+          },
+        );
+      }
+
+      test(
         'selected Store retains imported stock and photo identity through invoice restart',
         () async {
           final account = _CommandAccountStore();
@@ -1222,13 +1420,14 @@ void main() {
           );
           final first = open()..activeWorkspace = _commandStore;
           expect(
-            first.loadStoreReviewSeed(12, now: DateTime.utc(2026, 9, 19)),
+            first.loadStoreReviewSeed(0, now: DateTime.utc(2026, 9, 19)),
             isTrue,
           );
           expect(await first.storeReviewSelectionSaved, isTrue);
           expect(await first.recoverCustomerLedger(), isTrue);
           expect(await first.loadWorkspaceInventory(), isTrue);
-          final original = first.workspaceCatalogueItems.first;
+          expect(first.workspaceCatalogueItems, isEmpty);
+          final original = workspaceMasterCatalogue.first.copyWith(stock: 10);
           final edited = original.copyWith(
             sellingPrice: 270,
             cataloguePhoto: WorkspaceCataloguePhoto(
@@ -1444,12 +1643,17 @@ void main() {
           );
           final first = open()..activeWorkspace = _commandStore;
           expect(
-            first.loadStoreReviewSeed(12, now: DateTime.utc(2026, 9, 19)),
+            first.loadStoreReviewSeed(0, now: DateTime.utc(2026, 9, 19)),
             isTrue,
           );
           expect(await first.storeReviewSelectionSaved, isTrue);
           expect(await first.recoverCustomerLedger(), isTrue);
           final storeId = first.activeWorkspace!.id;
+          expect(first.workspaceCatalogueItems, isEmpty);
+          first.addOrUpdateWorkspaceProduct(
+            workspaceMasterCatalogue.first.copyWith(stock: 10),
+          );
+          expect(await first.workspaceInventorySaved, isTrue);
           final productId = first.workspaceCatalogueItems.first.id;
           expect(first.startNewWorkspaceOrder(), isTrue);
           await first.loadWorkspaceCounterDraft();
@@ -1627,6 +1831,7 @@ void main() {
       );
       final work = WorkSession(
         gateway: ReviewWorkGateway(),
+        contactDraftStore: _CommandAccountStore(),
         pendingProofStore: _CommandAccountStore(),
       )..activeWorkspace = seed.workspace;
       addTearDown(work.dispose);
@@ -2063,6 +2268,7 @@ void main() {
       WorkSession openStore() {
         final session = WorkSession(
           gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
         )..activeWorkspace = seed.workspace;
         addTearDown(session.dispose);
@@ -2137,7 +2343,11 @@ void main() {
     () {
       final account = _CommandAccountStore();
       final session =
-          WorkSession(gateway: ReviewWorkGateway(), pendingProofStore: account)
+          WorkSession(
+              gateway: ReviewWorkGateway(),
+              contactDraftStore: account,
+              pendingProofStore: account,
+            )
             ..activeWorkspace = const WorkWorkspace(
               id: 'store-A',
               name: 'Test Store',
@@ -2258,6 +2468,7 @@ void main() {
       WorkSession openStore() {
         final session = WorkSession(
           gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
         )..activeWorkspace = seed.workspace;
         addTearDown(session.dispose);
@@ -4262,6 +4473,7 @@ void main() {
         );
         final work = WorkSession(
           gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
         )..activeWorkspace = seed.workspace;
         addTearDown(work.dispose);
@@ -4329,6 +4541,7 @@ void main() {
           WorkSession open(WorkCustomerCollectionGateway adapter) {
             final work = WorkSession(
               gateway: ReviewWorkGateway(),
+              contactDraftStore: _CommandAccountStore(),
               pendingProofStore: _CommandAccountStore(),
             )..activeWorkspace = seed.workspace;
             work.applyWorkspaceFinance(seed.finance);
@@ -4440,6 +4653,7 @@ void main() {
         );
         final session = WorkSession(
           gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
         )..activeWorkspace = seed.workspace;
         addTearDown(session.dispose);
@@ -4507,6 +4721,7 @@ void main() {
         ) {
           final session = WorkSession(
             gateway: ReviewWorkGateway(),
+            contactDraftStore: _CommandAccountStore(),
             pendingProofStore: _CommandAccountStore(),
           )..activeWorkspace = value.workspace;
           session.workspaceOrders.addAll(value.orders);
@@ -4589,6 +4804,7 @@ void main() {
         final adapter = _LostCollectionGateway(seed.finance);
         final work = WorkSession(
           gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
         )..activeWorkspace = seed.workspace;
         addTearDown(work.dispose);
@@ -4918,6 +5134,7 @@ void main() {
         );
         final work = WorkSession(
           gateway: ReviewWorkGateway(),
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
         )..activeWorkspace = seed.workspace;
         addTearDown(work.dispose);
@@ -8041,6 +8258,7 @@ void main() {
         List.generate(10000, _historyMovement),
       );
       final work = WorkSession(
+        contactDraftStore: _CommandAccountStore(),
         pendingProofStore: _CommandAccountStore(),
         stockHistoryGateway: gateway,
       )..activeWorkspace = _commandStore;
@@ -8090,6 +8308,7 @@ void main() {
           List.generate(151, _historyMovement),
         );
         final work = WorkSession(
+          contactDraftStore: _CommandAccountStore(),
           pendingProofStore: _CommandAccountStore(),
           stockHistoryGateway: gateway,
         )..activeWorkspace = _commandStore;
@@ -8143,6 +8362,7 @@ void main() {
       );
       final account = _CommandAccountStore();
       final work = WorkSession(
+        contactDraftStore: account,
         pendingProofStore: account,
         stockHistoryGateway: gateway,
       )..activeWorkspace = _commandStore;
@@ -8237,8 +8457,10 @@ void main() {
         ).valid,
         isFalse,
       );
-      final work = WorkSession(pendingProofStore: _CommandAccountStore())
-        ..activeWorkspace = _commandStore;
+      final work = WorkSession(
+        contactDraftStore: _CommandAccountStore(),
+        pendingProofStore: _CommandAccountStore(),
+      )..activeWorkspace = _commandStore;
       addTearDown(work.dispose);
       expect(await work.loadWorkspaceStockHistory(query), isFalse);
       expect(work.workspaceStockHistoryLoaded, isFalse);
@@ -8641,6 +8863,7 @@ void main() {
       );
       WorkSession make() {
         final work = WorkSession(
+          contactDraftStore: account,
           pendingProofStore: account,
           issueDraftStore: drafts,
         )..activeWorkspace = _commandStore;
@@ -10503,6 +10726,7 @@ void main() {
       final account = _CommandAccountStore();
       final session = WorkSession(
         gateway: ReviewWorkGateway(),
+        contactDraftStore: account,
         pendingProofStore: account,
       )..activeWorkspace = _commandStore;
       addTearDown(session.dispose);
@@ -11194,6 +11418,7 @@ void main() {
     () {
       final session = WorkSession(
         gateway: ReviewWorkGateway(),
+        contactDraftStore: _CommandAccountStore(),
         pendingProofStore: _CommandAccountStore(),
       )..activeWorkspace = _commandStore;
       addTearDown(session.dispose);
@@ -11270,8 +11495,11 @@ void main() {
     () async {
       final account = _CommandAccountStore();
       final gateway = ReviewWorkGateway();
-      final session = WorkSession(gateway: gateway, pendingProofStore: account)
-        ..activeWorkspace = _commandStore;
+      final session = WorkSession(
+        gateway: gateway,
+        contactDraftStore: account,
+        pendingProofStore: account,
+      )..activeWorkspace = _commandStore;
       addTearDown(session.dispose);
       for (var i = 0; i < 100; i++) {
         session.workspaceOrders.add(
@@ -11408,6 +11636,7 @@ void main() {
       final session =
           WorkSession(
               gateway: UnavailableWorkGateway(),
+              contactDraftStore: _CommandAccountStore(),
               pendingProofStore: _CommandAccountStore(),
             )
             ..activeWorkspace = _commandStore
@@ -11429,6 +11658,7 @@ void main() {
       final account = _CommandAccountStore();
       final native = _OrderJournalStorage();
       WorkSession fresh() => WorkSession(
+        contactDraftStore: account,
         pendingProofStore: account,
         receiptDraftStore: SecureWorkReceiptDraftStore(
           accountScope: () => account.accountScope,
@@ -11529,6 +11759,7 @@ void main() {
       final account = _CommandAccountStore();
       final native = _OrderJournalStorage();
       final session = WorkSession(
+        contactDraftStore: account,
         pendingProofStore: account,
         receiptDraftStore: SecureWorkReceiptDraftStore(
           accountScope: () => account.accountScope,
@@ -11584,6 +11815,7 @@ void main() {
       final account = _CommandAccountStore();
       final session = WorkSession(
         gateway: ReviewWorkGateway(),
+        contactDraftStore: account,
         pendingProofStore: account,
       )..activeWorkspace = _commandStore;
       addTearDown(session.dispose);

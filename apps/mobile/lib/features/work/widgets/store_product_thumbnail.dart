@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../../../ui_v2/buy/buy_v2_design.dart';
 import '../work_models.dart';
 import '../work_session.dart';
+import '../work_services.dart' show storeEntryEvaluationPhotoAsset;
 
 /// Store presentation of the same identity-bound media used by Buy.
 /// Square bounds prevent a narrow list slot from shrinking a complete pack.
@@ -98,6 +99,18 @@ class _StoreProductThumbnailState extends State<StoreProductThumbnail> {
     }
     _mediaKey = null;
     _bytes = null;
+    final evaluationAsset = storeEntryEvaluationPhotoAsset(product);
+    if (evaluationAsset != null) {
+      return SizedBox.square(
+        dimension: extent,
+        child: Image.asset(
+          evaluationAsset,
+          fit: BoxFit.contain,
+          semanticLabel: '${product.title}, ${product.pack}, evaluation image',
+          errorBuilder: (_, error, trace) => _missing(),
+        ),
+      );
+    }
     final preview = product.toCataloguePreviewProduct();
     final missing =
         preview.mediaAssets.isEmpty &&

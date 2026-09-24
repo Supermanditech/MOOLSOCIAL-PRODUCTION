@@ -1653,7 +1653,7 @@ class _WorkWorkspaceDashboardScreenState
           color: Colors.white,
           child: PopupMenuButton<int>(
             key: const Key('store-review-seed-menu'),
-            tooltip: 'Load isolated synthetic Store data',
+            tooltip: 'Open product-entry evaluation Store',
             onSelected: (count) {
               if (count < 0) {
                 session.setStoreReviewOrderResponse(
@@ -1666,11 +1666,10 @@ class _WorkWorkspaceDashboardScreenState
               if (session.loadStoreReviewSeed(count)) _showDashboard();
             },
             itemBuilder: (_) => [
-              for (final count in const [12, 100, 1000])
-                PopupMenuItem(
-                  value: count,
-                  child: Text('Test Store · $count orders'),
-                ),
+              const PopupMenuItem(
+                value: 0,
+                child: Text('Test Store · product entry'),
+              ),
               if (session.activeWorkspace?.id.startsWith('QA-STORE-V1-') ==
                   true) ...[
                 const PopupMenuItem(
@@ -14761,7 +14760,7 @@ class _WorkspaceProductRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             child: Row(
               children: [
-                product.cataloguePhoto == null
+                product.cataloguePhoto == null && product.privatePhoto == null
                     ? const Tooltip(
                         message: 'Photo unavailable',
                         child: SizedBox.square(

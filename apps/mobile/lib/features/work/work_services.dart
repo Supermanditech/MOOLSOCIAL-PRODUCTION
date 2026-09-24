@@ -4578,6 +4578,7 @@ enum WorkReviewTestCase { pending, clarification, rejected, approved }
 /// A review-fixture selection, never Store approval or payment authority.
 abstract interface class WorkReviewStoreSelectionStore {
   Future<StoreReviewSeed?> read(String account);
+  Future<StoreReviewSeed?> archiveLegacySelectionForEntry(String account);
   Future<void> save(StoreReviewSeed seed);
 }
 
@@ -4652,6 +4653,70 @@ class SecureWorkReviewStoreSelectionStore
   @override
   Future<StoreReviewSeed?> read(String account) =>
       _exclusive(account, () => _read(account));
+
+  /// Frontend evaluation migration only. Old Store namespaces (inventory,
+  /// financial journals and drafts) remain intact under their original IDs.
+  /// Never reset those records or grant production inventory authority.
+  @override
+  Future<StoreReviewSeed?> archiveLegacySelectionForEntry(
+    String account,
+  ) => _exclusive(account, () async {
+    final previous = await _read(account);
+    if (previous == null || previous.orderCount == 0) return previous;
+    final selectionKey = _key(account);
+    final raw = await _storage.read(key: selectionKey);
+    _check(account);
+    if (raw == null) {
+      throw const WorkGatewayException(
+        'The selected test Store changed. Retry.',
+      );
+    }
+    final archiveKey = '$selectionKey.archive.${previous.storeId}';
+    final archived = await _storage.read(key: archiveKey);
+    _check(account);
+    if (archived != null && archived != raw) {
+      throw const WorkGatewayException(
+        'The previous test Store archive needs review. Its data has been kept.',
+      );
+    }
+    if (archived == null) {
+      await _storage.write(key: archiveKey, value: raw);
+    }
+    _check(account);
+    if (await _storage.read(key: archiveKey) != raw) {
+      throw const WorkGatewayException(
+        'The test Store archive was not saved. Retry.',
+      );
+    }
+    _check(account);
+    // Another session must not be silently overwritten after archival.
+    if (await _storage.read(key: selectionKey) != raw) {
+      throw const WorkGatewayException(
+        'The selected test Store changed. Retry.',
+      );
+    }
+    _check(account);
+    final empty = StoreReviewSeed(
+      accountScope: account,
+      orderCount: 0,
+      now: previous.now,
+    );
+    final replacement = jsonEncode({
+      'version': StoreReviewSeed.version,
+      'account': account,
+      'orderCount': 0,
+      'seedAt': empty.now.toIso8601String(),
+    });
+    await _storage.write(key: selectionKey, value: replacement);
+    _check(account);
+    if (await _storage.read(key: selectionKey) != replacement) {
+      throw const WorkGatewayException(
+        'The empty test Store was not saved. Retry.',
+      );
+    }
+    _check(account);
+    return empty;
+  });
   @override
   Future<void> save(StoreReviewSeed seed) =>
       _exclusive(seed.accountScope, () async {
@@ -4675,13 +4740,147 @@ class SecureWorkReviewStoreSelectionStore
 /// Versioned, synthetic projections for frontend UAT and future adapter tests.
 /// Pure data only: no network, approval, payment or collection authority.
 /// The runtime loader separately requires both review defines and debug mode.
+/// Replaceable reference data for the empty frontend evaluation Store only.
+/// No inventory, prices, orders, payments or approval are created by this list.
+final storeEntryEvaluationCatalogue = List<WorkspaceCatalogueItem>.unmodifiable(
+  [
+    for (final row in const [
+      (
+        'oil-1l',
+        'Sunflower oil',
+        'Refined sunflower oil',
+        '1 L pouch',
+        'oils-ghee',
+        1415081,
+      ),
+      (
+        'atta-1kg',
+        'Whole wheat atta',
+        'Whole wheat flour',
+        '1 kg pack',
+        'flour-grains',
+        1832510,
+      ),
+      (
+        'salt-1kg',
+        'Iodised salt',
+        'Iodised salt',
+        '1 kg pack',
+        'salt-spices',
+        1530221,
+      ),
+      (
+        'rice-1kg',
+        'Basmati rice',
+        'Long grain rice',
+        '1 kg pouch',
+        'flour-grains',
+        1670437,
+      ),
+      (
+        'tea-250g',
+        'Black tea',
+        'Loose leaf tea',
+        '250 g box',
+        'tea-coffee',
+        1800620,
+      ),
+      (
+        'sugar-1kg',
+        'White sugar',
+        'Granulated sugar',
+        '1 kg pouch',
+        'salt-spices',
+        1649924,
+      ),
+      (
+        'lentils-500g',
+        'Red lentils',
+        'Split red lentils',
+        '500 g pouch',
+        'flour-grains',
+        1792294,
+      ),
+      (
+        'soap-100g',
+        'Bath soap',
+        'Wrapped soap bar',
+        '100 g bar',
+        'personal-care',
+        1471018,
+      ),
+    ])
+      WorkspaceCatalogueItem(
+        id: 'evaluation-${row.$1}',
+        canonicalId: 'evaluation-${row.$1}',
+        categoryId: row.$5,
+        brand: 'Evaluation',
+        title: row.$2,
+        variant: row.$3,
+        pack: row.$4,
+        sku: 'EVAL-${row.$1.toUpperCase()}',
+        barcode: '',
+        purchasePrice: 0,
+        sellingPrice: 0,
+        unitPrice: '',
+        stock: 0,
+        deliveryPromise: 'Store pickup',
+        origin: '',
+        visualLabel: '${row.$2} ${row.$4}',
+        visualKind: 'catalogue-packshot',
+        publicListing: false,
+        cataloguePhoto: WorkspaceCataloguePhoto(
+          assetId: 'evaluation-${row.$1}',
+          revision: '20260924-v1',
+          source: 'https://store-entry-evaluation.invalid/v1/${row.$1}.png',
+          publisherWorkspaceId: 'evaluation-catalogue',
+          canonicalId: 'evaluation-${row.$1}',
+          brand: 'Evaluation',
+          variant: row.$3,
+          pack: row.$4,
+          barcode: '',
+          file: BuyV2MediaFileMetadata(
+            mimeType: 'image/png',
+            byteLength: row.$6,
+            width: 1254,
+            height: 1254,
+            normalized: true,
+            frameCount: 1,
+          ),
+          status: WorkspaceCataloguePhotoStatus.testOnly,
+        ),
+      ),
+  ],
+);
+
+/// Exact bundled test-media adapter. Never fallback to another SKU or URL.
+/// The .invalid source is an identifier, not a public endpoint or upload result.
+String? storeEntryEvaluationPhotoAsset(WorkspaceCatalogueItem product) {
+  if (!SecureWorkReviewStoreSelectionStore.enabled) return null;
+  final photo = product.cataloguePhoto;
+  if (photo == null ||
+      !photo.matches(product) ||
+      photo.status != WorkspaceCataloguePhotoStatus.testOnly) {
+    return null;
+  }
+  for (final reference in storeEntryEvaluationCatalogue) {
+    if (reference.canonicalId == product.canonicalId &&
+        jsonEncode(reference.cataloguePhoto!.toJson()) ==
+            jsonEncode(photo.toJson())) {
+      return 'assets/store_evaluation_v1/${reference.id.substring('evaluation-'.length)}.png';
+    }
+  }
+  return null;
+}
+
 class StoreReviewSeed {
   StoreReviewSeed({
     required this.accountScope,
     required this.orderCount,
     required DateTime now,
   }) : now = now.toUtc() {
-    if (accountScope.trim().isEmpty || !{12, 100, 1000}.contains(orderCount)) {
+    if (accountScope.trim().isEmpty ||
+        !{0, 12, 100, 1000}.contains(orderCount)) {
       throw ArgumentError('Unsupported Store review scenario');
     }
   }
@@ -4693,18 +4892,22 @@ class StoreReviewSeed {
   String get storeId =>
       'QA-STORE-V1-$orderCount-'
       '${crypto.sha256.convert(utf8.encode(accountScope)).toString().substring(0, 16)}';
-  String get label => 'TEST Store · $orderCount orders';
+  String get label => orderCount == 0
+      ? 'TEST Store · product entry'
+      : 'TEST Store · $orderCount orders';
   WorkWorkspace get workspace => WorkWorkspace(
     id: storeId,
     name: label,
     profileLabel: 'Grocery / Kirana Shop',
     profileId: 'retailer-grocery',
-    area: 'Synthetic test data',
+    area: orderCount == 0 ? 'Frontend evaluation only' : 'Synthetic test data',
     verified: true,
   );
 
   late final List<WorkspaceCatalogueItem> products = List.unmodifiable([
-    for (final product in workspaceMasterCatalogue.take(6))
+    for (final product in workspaceMasterCatalogue.take(
+      orderCount == 0 ? 0 : 6,
+    ))
       product.copyWith(stock: 10000, available: true, publicListing: true),
   ]);
 
@@ -4764,12 +4967,14 @@ class StoreReviewSeed {
     duesMinor: [
       for (var i = 0; i < orders.length; i += 3) orders[i],
     ].fold<int>(0, (total, order) => total + order.amount * 100),
-    availableMinor: orderCount == 1000 ? 100000000000 : 250000,
-    heldMinor: 125000,
+    availableMinor: orderCount == 0
+        ? 0
+        : (orderCount == 1000 ? 100000000000 : 250000),
+    heldMinor: orderCount == 0 ? 0 : 125000,
     requestedMinor: 0,
-    paidOutMinor: 450000,
-    feesMinor: 1200,
-    deliveryAdjustmentsMinor: -300,
+    paidOutMinor: orderCount == 0 ? 0 : 450000,
+    feesMinor: orderCount == 0 ? 0 : 1200,
+    deliveryAdjustmentsMinor: orderCount == 0 ? 0 : -300,
     refundsMinor: 0,
     taxWithheldMinor: 0,
     payments: [
@@ -4796,7 +5001,7 @@ class StoreReviewSeed {
     customerLedgers: [
       // Explicit synthetic history for existing test customers. It does not
       // derive production transaction history from payment status.
-      for (var i = 0; i < 3; i++)
+      for (var i = 0; i < (orderCount == 0 ? 0 : 3); i++)
         WorkspaceCustomerLedger(
           accountScope: accountScope,
           workspaceId: storeId,
@@ -4834,11 +5039,15 @@ class StoreReviewSeed {
         ),
     ],
     payouts: const [],
-    historyComplete: false,
+    historyComplete: orderCount == 0,
   );
 
   List<WorkspacePurchaseRecord> get purchases => List.unmodifiable([
-    for (var i = 0; i < WorkspaceSupplyStage.values.length; i++)
+    for (
+      var i = 0;
+      i < (orderCount == 0 ? 0 : WorkspaceSupplyStage.values.length);
+      i++
+    )
       WorkspacePurchaseRecord(
         accountScope: accountScope,
         workspaceId: storeId,
@@ -4872,7 +5081,7 @@ class StoreReviewSeed {
   /// Explicit synthetic invoice/payment facts for the existing review Store.
   /// No production shipment status is converted into financial authority.
   List<WorkspaceSupplierLedger> get supplierLedgers => List.unmodifiable([
-    for (var supplier = 0; supplier < 3; supplier++)
+    for (var supplier = 0; supplier < (orderCount == 0 ? 0 : 3); supplier++)
       WorkspaceSupplierLedger(
         accountScope: accountScope,
         workspaceId: storeId,
@@ -4913,7 +5122,7 @@ class StoreReviewSeed {
   ]);
 
   List<WorkspaceGroupOffer> get offers => List.unmodifiable([
-    for (var i = 0; i < 3; i++)
+    for (var i = 0; i < (orderCount == 0 ? 0 : 3); i++)
       WorkspaceGroupOffer(
         accountScope: accountScope,
         workspaceId: storeId,

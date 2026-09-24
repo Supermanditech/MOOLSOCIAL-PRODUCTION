@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4603,
-    "sha256": "68DD3B53D03861005FBA5E64E13003212BBCAB019899532ABCC91C21F06675CC"
+    "sha256": "2475F8CC7DB69B5483EAB00884E9F1F27FA8DC4E72B60357D821029F37086B38"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -50,6 +50,7 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-430x932-ios-cart.png",
         "apps/mobile/test/work_production_gateway_test.dart",
         "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
         "apps/mobile/lib/features/work/widgets/store_catalogue_categories.dart",
         "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
         "apps/mobile/lib/features/work/widgets/store_product_thumbnail.dart",
@@ -87,6 +88,15 @@
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt",
         "apps/mobile/pubspec.yaml",
+        "apps/mobile/assets/store_evaluation_v1/oil-1l.png",
+        "apps/mobile/assets/store_evaluation_v1/atta-1kg.png",
+        "apps/mobile/assets/store_evaluation_v1/salt-1kg.png",
+        "apps/mobile/assets/store_evaluation_v1/rice-1kg.png",
+        "apps/mobile/assets/store_evaluation_v1/tea-250g.png",
+        "apps/mobile/assets/store_evaluation_v1/sugar-1kg.png",
+        "apps/mobile/assets/store_evaluation_v1/lentils-500g.png",
+        "apps/mobile/assets/store_evaluation_v1/soap-100g.png",
+        "apps/mobile/assets/store_evaluation_v1/README.md",
         "apps/mobile/pubspec.lock",
         "apps/mobile/.dart_tool/package_config.json",
         "apps/mobile/.dart_tool/package_graph.json",
@@ -2076,6 +2086,15 @@
         "commitPrefix": "ui",
         "baseRule": "approved_codex_ui_checkpoint",
         "allowedOwnerRoots": [
+          "apps/mobile/assets/store_evaluation_v1/oil-1l.png",
+          "apps/mobile/assets/store_evaluation_v1/atta-1kg.png",
+          "apps/mobile/assets/store_evaluation_v1/salt-1kg.png",
+          "apps/mobile/assets/store_evaluation_v1/rice-1kg.png",
+          "apps/mobile/assets/store_evaluation_v1/tea-250g.png",
+          "apps/mobile/assets/store_evaluation_v1/sugar-1kg.png",
+          "apps/mobile/assets/store_evaluation_v1/lentils-500g.png",
+          "apps/mobile/assets/store_evaluation_v1/soap-100g.png",
+          "apps/mobile/assets/store_evaluation_v1/README.md",
           "scripts/check-apk-regression-gate-state.ps1",
           "scripts/check-store-journey-qualification.ps1",
           "scripts/test-store-journey-qualification.ps1",

@@ -173,9 +173,11 @@ final class _EntryCsvFile extends PlatformFile {
 
 Future<void> awaitCataloguePhoto(
   WidgetTester tester,
-  bool Function() ready,
-) async {
-  for (var i = 0; i < 100 && !ready(); i++) {
+  bool Function() ready, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final elapsed = Stopwatch()..start();
+  while (!ready() && elapsed.elapsed < timeout) {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 15)),
     );
@@ -8924,9 +8926,21 @@ void main() {
     },
   );
 
-  for (final entryPath in ['manual', 'csv']) {
+  for (final scenario in <(String, int?)>[
+    ('manual', null),
+    ('csv', null),
+    ('manual', 4),
+    ('manual', 7),
+    ('csv', 3),
+    ('csv', 5),
+    ('csv', 6),
+  ]) {
+    final entryPath = scenario.$1;
+    final sample = scenario.$2 == null
+        ? null
+        : storeEntryEvaluationCatalogue[scenario.$2!];
     testWidgets(
-      'PRIVATEPHOTO $entryPath selected image saves restarts and follows exact SKU into POS',
+      'PRIVATEPHOTO $entryPath ${sample?.id ?? 'fixture'} selected image saves restarts and follows exact SKU into POS',
       (tester) async {
         FlutterSecureStorage.setMockInitialValues({});
         final directory = (await tester.runAsync(
@@ -8935,7 +8949,11 @@ void main() {
         addTearDown(() async {
           await directory.delete(recursive: true);
         });
-        final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+        final bytes = sample == null
+            ? (await tester.runAsync(_catalogueTestPhoto))!
+            : (await rootBundle.load(
+                'assets/store_evaluation_v1/${sample.id.substring('evaluation-'.length)}.png',
+              )).buffer.asUint8List();
         final picker = _EntryFilePicker()..file = _EntryImageFile(bytes);
         final previous = FilePickerPlatform.instance;
         FilePickerPlatform.instance = picker;
@@ -8974,7 +8992,7 @@ void main() {
         await openAddProductsFromHome(tester);
         if (entryPath == 'csv') {
           picker.file = _EntryCsvFile(
-            'title,brand,pack,purchasePrice,sellingPrice,stock,sku\nQA own product,QA own brand,1 kg,28,32,8,QA-PHOTO-1',
+            'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n${sample?.title ?? 'QA own product'},QA own brand,${sample?.pack ?? '1 kg'},28,32,8,${sample?.sku ?? 'QA-PHOTO-1'}',
           );
           await chooseAddProductMode(tester, 'import');
           await tester.tap(
@@ -8990,7 +9008,7 @@ void main() {
           await chooseAddProductMode(tester, 'enter');
           await tester.enterText(
             find.byKey(const Key('work-product-title')),
-            'QA own product',
+            sample?.title ?? 'QA own product',
           );
           final details = find.byKey(const Key('work-product-details-section'));
           await reveal(tester, details);
@@ -8998,8 +9016,8 @@ void main() {
           await tester.pumpAndSettle();
           for (final entry in [
             ('work-product-brand', 'QA own brand'),
-            ('work-product-pack', '1 kg'),
-            ('work-product-sku', 'QA-PHOTO-1'),
+            ('work-product-pack', sample?.pack ?? '1 kg'),
+            ('work-product-sku', sample?.sku ?? 'QA-PHOTO-1'),
           ]) {
             final field = find.byKey(Key(entry.$1));
             await reveal(tester, field);
@@ -9031,6 +9049,9 @@ void main() {
                 .byKey(const Key('work-product-photo-confirm'))
                 .evaluate()
                 .isNotEmpty,
+            // Full-size image validation includes real file I/O and decoding.
+            // Wait for its observable completion, not a 1.5-second host budget.
+            timeout: const Duration(seconds: 15),
           );
         } catch (_) {
           debugPrint(
@@ -9058,6 +9079,15 @@ void main() {
           () => work.privateProductPhotos!.read(saved),
         );
         expect(storedBytes, isNotEmpty);
+        if (sample != null) {
+          await awaitCataloguePhoto(
+            tester,
+            () => tester
+                .widgetList<RawImage>(find.byType(RawImage))
+                .any((image) => image.image != null),
+          );
+          await captureStoreView(tester, '$entryPath-${sample.id}-saved-stock');
+        }
         await tester.pumpWidget(const SizedBox.shrink());
         work = fresh();
         expect(await work.loadWorkspaceInventory(), isTrue);
@@ -9115,6 +9145,9 @@ void main() {
           (reviewImage.image as MemoryImage).bytes,
           orderedEquals(storedBytes),
         );
+        if (sample != null) {
+          await captureStoreView(tester, '$entryPath-${sample.id}-review-bill');
+        }
         await tester.pumpWidget(
           MaterialApp(
             home: StoreProductThumbnail(
@@ -11076,57 +11109,72 @@ void main() {
     return media.restore;
   }
 
-  for (final entryPath in ['catalogue', 'manual', 'csv']) {
+  for (final scenario in <(String, int?)>[
+    ('catalogue', null),
+    ('manual', null),
+    ('csv', null),
+    ('catalogue', 0),
+    ('catalogue', 1),
+    ('catalogue', 2),
+  ]) {
+    final entryPath = scenario.$1;
+    final evaluation = scenario.$2 == null
+        ? null
+        : storeEntryEvaluationCatalogue[scenario.$2!];
     for (final display in [(360.0, 806.0, 1.0), (320.0, 640.0, 2.0)]) {
       testWidgets(
-        'LOCALSTOCK UI $entryPath tap save restart stock POS review $display',
+        'LOCALSTOCK UI $entryPath ${evaluation?.id ?? 'fixture'} tap save restart stock POS review $display',
         (tester) async {
           Future<void> capture(String name) => captureStoreView(
             tester,
-            '$entryPath-${display.$3 == 1 ? name : '$name-large-text'}',
+            '$entryPath-${evaluation?.id ?? 'fixture'}-${display.$3 == 1 ? name : '$name-large-text'}',
           );
           FlutterSecureStorage.setMockInitialValues({});
           final media = await installCataloguePhotoClient(tester);
           // Brand-source product facts, not the catalogue's illustrative prices,
           // barcode or seed quantities. All commerce entered below is QA-only.
-          const base = WorkspaceCatalogueItem(
-            id: 'salt-tata-1kg',
-            canonicalId: 'salt-tata-iodised',
-            categoryId: 'salt-spices',
-            brand: 'Tata',
-            title: 'Tata Salt',
-            variant: 'Iodised salt',
-            pack: '1 kg pack',
-            sku: 'QA-TATA-1KG',
-            barcode: '',
-            purchasePrice: 0,
-            sellingPrice: 0,
-            stock: 0,
-            unitPrice: '',
-            deliveryPromise: 'Store pickup or local delivery',
-            origin: 'India',
-            visualLabel: 'Tata Salt 1 kg pack',
-            visualKind: 'catalogue-packshot',
-            publicListing: false,
-          );
-          var photo = WorkspaceCataloguePhoto(
-            assetId: 'tata-salt-1kg-evaluation',
-            revision: '20260923',
-            source:
-                'https://www.tatanutrikorner.com/cdn/shop/files/Tata_Salt_-_North_Central_Recyclable_AH-IN-JB-RP-BH-PU-SG_1_Kg_FOP-removebg-preview.png?v=1745827173&width=416',
-            publisherWorkspaceId: 'test-moolsocial-catalogue',
-            canonicalId: base.canonicalId,
-            brand: base.brand,
-            variant: base.variant,
-            pack: base.pack,
-            barcode: base.barcode,
-            file: photoFixture().file,
-            status: WorkspaceCataloguePhotoStatus.testOnly,
-          );
+          final base =
+              evaluation ??
+              const WorkspaceCatalogueItem(
+                id: 'salt-tata-1kg',
+                canonicalId: 'salt-tata-iodised',
+                categoryId: 'salt-spices',
+                brand: 'Tata',
+                title: 'Tata Salt',
+                variant: 'Iodised salt',
+                pack: '1 kg pack',
+                sku: 'QA-TATA-1KG',
+                barcode: '',
+                purchasePrice: 0,
+                sellingPrice: 0,
+                stock: 0,
+                unitPrice: '',
+                deliveryPromise: 'Store pickup or local delivery',
+                origin: 'India',
+                visualLabel: 'Tata Salt 1 kg pack',
+                visualKind: 'catalogue-packshot',
+                publicListing: false,
+              );
+          var photo =
+              evaluation?.cataloguePhoto ??
+              WorkspaceCataloguePhoto(
+                assetId: 'tata-salt-1kg-evaluation',
+                revision: '20260923',
+                source:
+                    'https://www.tatanutrikorner.com/cdn/shop/files/Tata_Salt_-_North_Central_Recyclable_AH-IN-JB-RP-BH-PU-SG_1_Kg_FOP-removebg-preview.png?v=1745827173&width=416',
+                publisherWorkspaceId: 'test-moolsocial-catalogue',
+                canonicalId: base.canonicalId,
+                brand: base.brand,
+                variant: base.variant,
+                pack: base.pack,
+                barcode: base.barcode,
+                file: photoFixture().file,
+                status: WorkspaceCataloguePhotoStatus.testOnly,
+              );
           const directory = String.fromEnvironment(
             'MOOL_CATALOGUE_TEST_IMAGE_DIR',
           );
-          if (directory.isNotEmpty) {
+          if (evaluation == null && directory.isNotEmpty) {
             final bytes = (await tester.runAsync(
               () => File('$directory/iodised-salt-1kg-test.png').readAsBytes(),
             ))!;
@@ -11348,6 +11396,8 @@ void main() {
           expect(tester.takeException(), isNull);
           media.restore();
         },
+        skip:
+            evaluation != null && !SecureWorkReviewStoreSelectionStore.enabled,
       );
     }
   }

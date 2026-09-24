@@ -620,8 +620,14 @@ class WorkSession extends ChangeNotifier {
   /// Optional filesystem location injection; the real scoped media store is
   /// retained in tests. Production uses the OS application-support directory.
   final Future<Directory> Function()? productPhotoSupportDirectory;
-  List<WorkspaceCatalogueItem> get referenceCatalogue =>
-      List.unmodifiable(catalogueReference ?? workspaceMasterCatalogue);
+  List<WorkspaceCatalogueItem> get referenceCatalogue => List.unmodifiable(
+    catalogueReference ??
+        (!_productionSession &&
+                SecureWorkReviewStoreSelectionStore.enabled &&
+                _selectedReviewSeed?.orderCount == 0
+            ? storeEntryEvaluationCatalogue
+            : workspaceMasterCatalogue),
+  );
   late final WorkInventoryStore _inventoryStorage =
       inventoryStore ??
       SecureWorkInventoryStore(
@@ -10886,7 +10892,9 @@ class WorkSession extends ChangeNotifier {
     final account = _contactAccountScope!;
     StoreReviewSeed? seed;
     try {
-      seed = await _reviewSelectionStorage.read(account);
+      seed = await _reviewSelectionStorage.archiveLegacySelectionForEntry(
+        account,
+      );
     } on Object {
       if (_disposed || account != _contactAccountScope) return;
       throw const WorkGatewayException(
@@ -10905,7 +10913,8 @@ class WorkSession extends ChangeNotifier {
         'Return to the same review account to reopen this test Store.',
       );
     }
-    // Only regenerates the explicitly selected labelled synthetic Store.
+    // Legacy workload selection is archived before opening an empty evaluation
+    // identity. Only saved inventory may repopulate it; never restore seed stock.
     // Production sessions and gateways never enter this branch.
     _activateStoreReviewSeed(seed, restoring: true);
     await _recoverReviewSupplierLedgers(seed);
@@ -10924,7 +10933,7 @@ class WorkSession extends ChangeNotifier {
 
   bool loadStoreReviewSeed(int orderCount, {DateTime? now}) {
     if (!canLoadStoreReviewSeed ||
-        !{12, 100, 1000}.contains(orderCount) ||
+        !{0, 12, 100, 1000}.contains(orderCount) ||
         busy ||
         workspaceOperationsSyncing ||
         workspaceHandoverBusy ||
@@ -10975,7 +10984,7 @@ class WorkSession extends ChangeNotifier {
       workspaceCatalogueItems.addAll(seed.products);
       workspaceOrders.addAll(seed.orders);
       retailerSetupSaved = true;
-      retailerProductAdded = true;
+      retailerProductAdded = seed.products.isNotEmpty;
       workspaceStoreState = WorkspaceStoreState.open;
       workspaceAcceptingOrders = true;
       workspaceVisibleToCustomers = true;
@@ -11016,7 +11025,7 @@ class WorkSession extends ChangeNotifier {
         operations.dispose();
         throw StateError('Review order controller could not be bound');
       }
-      selectWorkspaceOrder(seed.orders.first.id);
+      if (seed.orders.isNotEmpty) selectWorkspaceOrder(seed.orders.first.id);
     }
     if (!restoring) _reviewSelectionSave = _saveSelectedReviewStore(seed);
     notifyListeners();
