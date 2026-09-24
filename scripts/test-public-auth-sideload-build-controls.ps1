@@ -1095,7 +1095,8 @@ $deviceProbeStart = $apkGate.IndexOf('$storeDeviceGateIds = @(')
 $deviceProbeEnd = $apkGate.IndexOf('Write-Output (', $deviceProbeStart)
 Assert-SideloadControl ($deviceProbeStart -ge 0 -and $deviceProbeEnd -gt $deviceProbeStart) `
   'Store OPPO device qualification gate is missing.'
-$deviceProbe = [scriptblock]::Create($apkGate.Substring(
+$deviceProbeScriptsRoot = Join-Path $RepositoryRoot 'scripts'
+$deviceProbe = [scriptblock]::Create("param([string]`$PSScriptRoot)`n" + $apkGate.Substring(
   $deviceProbeStart, $deviceProbeEnd - $deviceProbeStart
 ))
 & {
@@ -1103,8 +1104,51 @@ $deviceProbe = [scriptblock]::Create($apkGate.Substring(
     if (-not $Condition) { throw $Message }
   }
   $gateProfile = 'uaw_runtime_ui_review_debug'
+  # Isolated gate-contract fixtures only; never APK or device qualification.
+  # Exercise the real journey checker, not a stub or an extracted bypass.
+  $repositoryRoot = Join-Path ([IO.Path]::GetTempPath()) (
+    'moolsocial-store-device-gate-contract-' + [guid]::NewGuid().ToString('N')
+  )
+  [void][IO.Directory]::CreateDirectory((Join-Path $repositoryRoot 'config'))
+  @{entries=@(@{
+    id='REG-20260906-4499-STORE-REVIEW-TEST-CONTRACT-AND-OUTPUT-RECOVERY'
+    storeJourneyLocalBlockers=@();storeJourneyDeviceDependencies=@()
+  })} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
+    Join-Path $repositoryRoot 'config/codex-development-regression-registry.json'
+  )
+  $SourceFingerprint = 'gate-contract-only'
+  $RuntimeDefine = @('REVIEW=true')
+  $eventPath = Join-Path $repositoryRoot 'host-events.jsonl'
+  $events = @()
+  $testId = 0
+  foreach ($name in @('STORE-PARITY landscape whole screen', 'STORE-PARITY single Sales action',
+      'Store View v2 - compact large text, signals and keyboard',
+      'counter isolation refused save retains bill and recovers 1.0',
+      'counter isolation refused save retains bill and recovers 2.0')) {
+    $testId++
+    $events += @{type='testStart';test=@{id=$testId;name=$name}}
+    $events += @{type='testDone';testID=$testId;result='success';skipped=$false}
+  }
+  $events += @{type='done';success=$true}
+  $events | ForEach-Object { $_ | ConvertTo-Json -Depth 5 -Compress } |
+    Set-Content -LiteralPath $eventPath
+  $proof = @{path='host-events.jsonl';sha256=(Get-FileHash -LiteralPath $eventPath).Hash}
+  $fixtureHash = 'A' * 64
+  $journey = @{
+    schemaVersion=1;sourceFingerprint=$SourceFingerprint;runtimeDefines=$RuntimeDefine
+    openLocalDefects=@();host=@{exitCode=0;machineLog=$proof}
+    device=@{apkSha256=$fixtureHash;serial='2b3e0f71';openDefects=@();cases=@(
+      @('store-home-landscape','sales-single-action','catalogue-save-stock','manual-save-stock',
+        'csv-save-stock','stock-pos-photo-identity','invoice-create-relaunch','receipt-and-document') |
+      ForEach-Object { @{
+        id=$_;state='passed';dataOrigin='retailer-saved';storeId='gate-contract-only'
+        evidence=@($proof);productId='gate-contract-only';originalPhotoSha256=$fixtureHash
+        savedPhotoSha256=$fixtureHash;posPhotoSha256=$fixtureHash
+      } }
+    )}
+  }
   foreach ($case in @('prebuild-pending', 'missing', 'duplicated', 'invalid',
-      'device-pending', 'device-failed', 'device-no-evidence')) {
+      'device-pending', 'device-failed', 'device-no-evidence', 'missing-journey', 'failed-host')) {
     $Phase = if ($case.StartsWith('device-')) { 'DeviceQualification' } else { 'PreBuild' }
     $ids = @('apk-package-version-signer-sha256','oppo-installed-apk-identity',
       'oppo-orders-selected-filter','oppo-profile-authentication-state',
@@ -1121,11 +1165,18 @@ $deviceProbe = [scriptblock]::Create($apkGate.Substring(
       'device-failed' { $entries[0].state = 'failed' }
       'device-no-evidence' { $entries | ForEach-Object { $_.state = 'passed' } }
     }
-    $state = [pscustomobject]@{postBuildGates=$entries}
+    $state = [pscustomobject]@{
+      postBuildGates=$entries
+      storeJourneyQualification=($journey | ConvertTo-Json -Depth 20 | ConvertFrom-Json)
+      oppoQualification=@{apkSha256=$fixtureHash}
+    }
+    if ($case -ceq 'missing-journey') { $state.storeJourneyQualification=$null }
+    if ($case -ceq 'failed-host') { $state.storeJourneyQualification.host.exitCode=1 }
     $rejected = $false
-    try { & $deviceProbe } catch { $rejected = $true }
+    $rejectionReason = ''
+    try { & $deviceProbe $deviceProbeScriptsRoot } catch { $rejected = $true; $rejectionReason = $_.Exception.Message }
     Assert-SideloadControl ($rejected -eq ($case -cne 'prebuild-pending')) `
-      "Store OPPO qualification fixture '$case' had the wrong outcome."
+      "Store OPPO qualification fixture '$case' had the wrong outcome: $rejectionReason"
   }
 }
 

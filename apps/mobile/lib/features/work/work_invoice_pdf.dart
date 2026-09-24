@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../shared/commerce/commerce_invoice_document.dart';
 import '../../shared/commerce/commerce_invoice_pdf.dart';
@@ -68,6 +69,14 @@ abstract interface class WorkInvoicePdfSource {
   Future<WorkInvoicePdfDocument> load(WorkInvoicePdfRequest request);
 }
 
+abstract interface class WorkInvoicePrintSource {
+  Future<WorkInvoicePdfDocument> forPrint(
+    WorkInvoicePdfRequest request,
+    PdfPageFormat paper,
+    List<int>? pages,
+  );
+}
+
 class UnavailableWorkInvoicePdfSource implements WorkInvoicePdfSource {
   const UnavailableWorkInvoicePdfSource();
   @override
@@ -80,8 +89,23 @@ class UnavailableWorkInvoicePdfSource implements WorkInvoicePdfSource {
 
 /// Explicit local-review implementation only. No remote fonts, network, writes,
 /// payment mutation or implied invoice issuance.
-class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
-  const LocalReviewWorkInvoicePdfSource();
+class LocalReviewWorkInvoicePdfSource
+    implements WorkInvoicePdfSource, WorkInvoicePrintSource {
+  const LocalReviewWorkInvoicePdfSource({
+    this.printPageFormat,
+    this.printPages,
+  });
+  final PdfPageFormat? printPageFormat;
+  final List<int>? printPages;
+  @override
+  Future<WorkInvoicePdfDocument> forPrint(
+    WorkInvoicePdfRequest request,
+    PdfPageFormat paper,
+    List<int>? pages,
+  ) => LocalReviewWorkInvoicePdfSource(
+    printPageFormat: paper,
+    printPages: pages,
+  ).load(request);
   @override
   Future<WorkInvoicePdfDocument> load(WorkInvoicePdfRequest request) async {
     final invoice = request.invoice;
@@ -149,7 +173,11 @@ class LocalReviewWorkInvoicePdfSource implements WorkInvoicePdfSource {
       );
     }
     try {
-      final bytes = await renderCommerceInvoicePdf(renderDetails);
+      final bytes = await renderCommerceInvoicePdf(
+        renderDetails,
+        printPageFormat: printPageFormat,
+        printPages: printPages,
+      );
       final suffix = details == null
           ? ''
           : '-${commerceInvoiceFileComponent(details.documentId)}-${details.format.name}';

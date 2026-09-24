@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -542,6 +543,7 @@ class WorkSession extends ChangeNotifier {
     this.reviewStoreSelectionStore,
     this.inventoryStore,
     this.catalogueReference,
+    this.productPhotoSupportDirectory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -583,6 +585,7 @@ class WorkSession extends ChangeNotifier {
     this.reviewStoreSelectionStore,
     this.inventoryStore,
     this.catalogueReference,
+    this.productPhotoSupportDirectory,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -613,6 +616,10 @@ class WorkSession extends ChangeNotifier {
   final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
   final WorkInventoryStore? inventoryStore;
   final List<WorkspaceCatalogueItem>? catalogueReference;
+
+  /// Optional filesystem location injection; the real scoped media store is
+  /// retained in tests. Production uses the OS application-support directory.
+  final Future<Directory> Function()? productPhotoSupportDirectory;
   List<WorkspaceCatalogueItem> get referenceCatalogue =>
       List.unmodifiable(catalogueReference ?? workspaceMasterCatalogue);
   late final WorkInventoryStore _inventoryStorage =
@@ -5687,6 +5694,31 @@ class WorkSession extends ChangeNotifier {
       _storeData.workspacePayoutAccountEnding = value;
   List<WorkspaceCatalogueItem> get workspaceCatalogueItems =>
       _storeData.workspaceCatalogueItems;
+
+  bool catalogueManagesProductPhoto(WorkspaceCatalogueItem product) =>
+      product.cataloguePhoto != null ||
+      referenceCatalogue.any(
+        (entry) => entry.canonicalId == product.canonicalId,
+      );
+
+  /// Captures the current signed session and Store, without another sign-in.
+  /// A returned loader cannot be reused after leaving that scope.
+  WorkPrivateProductPhotoStore? get privateProductPhotos {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (_disposed || account == null || store == null) return null;
+    return WorkPrivateProductPhotoStore(
+      accountId: account,
+      storeId: store,
+      evaluationOnly: !_productionSession,
+      supportDirectory: productPhotoSupportDirectory,
+      isCurrent: () =>
+          !_disposed &&
+          _contactAccountScope == account &&
+          activeWorkspace?.id == store,
+    );
+  }
+
   WorkspaceProductDefaults get workspaceProductDefaults =>
       _storeData.productDefaults;
   WorkspaceStorePublicationDetails get workspacePublicationDetails =>

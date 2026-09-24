@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:moolsocial/features/work/work_stock_export.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_document_preview.dart';
@@ -90,6 +92,16 @@ class Actions implements WorkInvoicePdfActions {
   }
 }
 
+class PrintSource extends Source implements WorkInvoicePrintSource {
+  PrintSource() : super(() async => document());
+  @override
+  Future<WorkInvoicePdfDocument> forPrint(
+    WorkInvoicePdfRequest request,
+    PdfPageFormat paper,
+    List<int>? pages,
+  ) async => document();
+}
+
 Future<WorkPdfPage> page(
   WorkInvoicePdfDocument doc,
   int index,
@@ -137,6 +149,245 @@ Future<void> tap(WidgetTester tester, String key) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets(
+    'PRINT UI explicit paper suggestions and cancellation do not issue jobs prematurely',
+    (tester) async {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final widths = <double>[];
+      messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+        call,
+      ) async {
+        if (call.method == 'print') {
+          widths.add(((call.arguments as Map)['width'] as num).toDouble());
+        }
+        return 'cancelled';
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(
+          StoreDocumentPrinter.channel,
+          null,
+        ),
+      );
+      await open(tester, PrintSource());
+      await tester.pumpAndSettle();
+      await tap(tester, 'invoice-pdf-print');
+      await tester.pumpAndSettle();
+      expect(widths, isEmpty);
+      await tester.tapAt(const Offset(5, 400));
+      await tester.pumpAndSettle();
+      expect(widths, isEmpty);
+      for (final choice in StorePrintPaper.values) {
+        await tap(tester, 'invoice-pdf-print');
+        await tester.pumpAndSettle();
+        await tap(tester, 'store-print-paper-${choice.name}');
+        await tester.pumpAndSettle();
+        expect(widths.last, closeTo(choice.initialFormat.width, .01));
+        expect(find.text('Printing cancelled.'), findsOneWidget);
+      }
+      expect(widths.length, 4);
+    },
+  );
+  group('PRINT native contract', () {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    Future<Object?> nativeRender(String id, Map<String, Object?> args) {
+      final response = Completer<Object?>();
+      const codec = StandardMethodCodec();
+      ServicesBinding.instance.channelBuffers.push(
+        'com.moolsocial.app/store_document_print/$id',
+        codec.encodeMethodCall(MethodCall('render', {'id': id, ...args})),
+        (reply) {
+          try {
+            response.complete(codec.decodeEnvelope(reply!));
+          } catch (error, stack) {
+            response.completeError(error, stack);
+          }
+        },
+      );
+      return response.future;
+    }
+
+    Map<String, Object?> paper(double width) => {
+      'width': width,
+      'height': 567.0,
+      'left': 0.0,
+      'top': 0.0,
+      'right': 0.0,
+      'bottom': 0.0,
+      'pages': null,
+    };
+    tearDown(
+      () => messenger.setMockMethodCallHandler(
+        StoreDocumentPrinter.channel,
+        null,
+      ),
+    );
+    test(
+      'printer media changes and selected pages reach the same renderer',
+      () async {
+        final changes = ChangeNotifier();
+        addTearDown(changes.dispose);
+        final widths = <double>[];
+        final selections = <List<int>?>[];
+        messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+          call,
+        ) async {
+          final id = (call.arguments as Map)['id'] as String;
+          for (final width in [164.4, 226.8, 595.0]) {
+            expect(await nativeRender(id, paper(width)), isA<Uint8List>());
+          }
+          await nativeRender(id, {
+            ...paper(226.8),
+            'pages': [2, 0, 2],
+          });
+          return 'submitted';
+        });
+        final state = await StoreDocumentPrinter.print(
+          name: 'invoice.pdf',
+          isCurrent: () => true,
+          scopeChanges: changes,
+          render: (format, pages) async {
+            widths.add(format.width);
+            selections.add(pages);
+            return document().bytes;
+          },
+        );
+        expect(state, StorePrintState.submitted);
+        expect(widths, [164.4, 226.8, 595.0, 226.8]);
+        expect(selections.last, [0, 2]);
+      },
+    );
+    test(
+      'invalid printable area never invokes the document renderer',
+      () async {
+        final changes = ChangeNotifier();
+        addTearDown(changes.dispose);
+        var renders = 0;
+        messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+          call,
+        ) async {
+          final id = (call.arguments as Map)['id'] as String;
+          await expectLater(
+            nativeRender(id, {...paper(164.4), 'left': 100.0}),
+            throwsA(isA<PlatformException>()),
+          );
+          return 'failed';
+        });
+        expect(
+          await StoreDocumentPrinter.print(
+            name: 'invoice.pdf',
+            isCurrent: () => true,
+            scopeChanges: changes,
+            render: (_, _) async {
+              renders++;
+              return document().bytes;
+            },
+          ),
+          StorePrintState.failed,
+        );
+        expect(renders, 0);
+      },
+    );
+    test('scope change cancels and rejects generated document bytes', () async {
+      final changes = ChangeNotifier();
+      addTearDown(changes.dispose);
+      var current = true, cancelled = false;
+      messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+        call,
+      ) async {
+        if (call.method == 'cancel') {
+          cancelled = true;
+          return null;
+        }
+        final id = (call.arguments as Map)['id'] as String;
+        await expectLater(
+          nativeRender(id, paper(164.4)),
+          throwsA(isA<PlatformException>()),
+        );
+        return 'completed';
+      });
+      expect(
+        await StoreDocumentPrinter.print(
+          name: 'invoice.pdf',
+          isCurrent: () => current,
+          scopeChanges: changes,
+          render: (_, _) async {
+            current = false;
+            changes.notifyListeners();
+            return document().bytes;
+          },
+        ),
+        StorePrintState.cancelled,
+      );
+      expect(cancelled, isTrue);
+    });
+    test(
+      'terminal and unknown native outcomes never imply completion',
+      () async {
+        final changes = ChangeNotifier();
+        addTearDown(changes.dispose);
+        for (final state in StorePrintState.values) {
+          messenger.setMockMethodCallHandler(
+            StoreDocumentPrinter.channel,
+            (_) async => state.name,
+          );
+          expect(
+            await StoreDocumentPrinter.print(
+              name: 'invoice.pdf',
+              isCurrent: () => true,
+              scopeChanges: changes,
+              render: (_, _) async => document().bytes,
+            ),
+            state,
+          );
+        }
+        messenger.setMockMethodCallHandler(
+          StoreDocumentPrinter.channel,
+          (_) async => 'not-a-state',
+        );
+        expect(
+          await StoreDocumentPrinter.print(
+            name: 'invoice.pdf',
+            isCurrent: () => true,
+            scopeChanges: changes,
+            render: (_, _) async => document().bytes,
+          ),
+          StorePrintState.unknown,
+        );
+      },
+    );
+    test(
+      'malformed native reply cancels uncertain job and releases busy state',
+      () async {
+        final changes = ChangeNotifier();
+        addTearDown(changes.dispose);
+        var cancels = 0;
+        messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+          call,
+        ) async {
+          if (call.method == 'cancel') {
+            cancels++;
+            return null;
+          }
+          return 42;
+        });
+        Future<StorePrintState> start() => StoreDocumentPrinter.print(
+          name: 'invoice.pdf',
+          isCurrent: () => true,
+          scopeChanges: changes,
+          render: (_, _) async => document().bytes,
+        );
+        expect(await start(), StorePrintState.unknown);
+        expect(cancels, 1);
+        messenger.setMockMethodCallHandler(
+          StoreDocumentPrinter.channel,
+          (_) async => 'cancelled',
+        );
+        expect(await start(), StorePrintState.cancelled);
+      },
+    );
+  });
   test('SELLER-SNAPSHOT codec, legacy absence and private field exclusion', () {
     final invoice = request().invoice;
     final restored = WorkspaceCustomerInvoice.fromLedgerJson(

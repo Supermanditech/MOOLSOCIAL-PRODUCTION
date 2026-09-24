@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:excel_community/excel_community.dart' as xls;
@@ -9,6 +10,204 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'work_models.dart';
+import '../../shared/commerce/commerce_invoice_pdf.dart'
+    show saveCommercePrintPages;
+
+enum StorePrintState {
+  completed,
+  cancelled,
+  unavailable,
+  failed,
+  submitted,
+  blocked,
+  unknown,
+}
+
+enum StorePrintPaper {
+  printer('Printer settings'),
+  a4('A4'),
+  receipt58('58 mm receipt'),
+  receipt80('80 mm receipt');
+
+  const StorePrintPaper(this.label);
+  final String label;
+  // An initial suggestion only: native onLayout reports the printer's actual
+  // selected paper. Never force a thermal layout onto reported A4 or vice versa.
+  PdfPageFormat get initialFormat => switch (this) {
+    printer || a4 => PdfPageFormat.a4,
+    receipt58 => PdfPageFormat(58 * PdfPageFormat.mm, 200 * PdfPageFormat.mm),
+    receipt80 => PdfPageFormat(80 * PdfPageFormat.mm, 200 * PdfPageFormat.mm),
+  };
+}
+
+/// One contextual print action, with explicit paper suggestions when printer
+/// configuration is ambiguous. No printer settings or device discovery clone.
+class StorePrintButton extends StatelessWidget {
+  const StorePrintButton({
+    super.key,
+    required this.onSelected,
+    this.tooltip = 'Print document',
+  });
+  final ValueChanged<StorePrintPaper>? onSelected;
+  final String tooltip;
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<StorePrintPaper>(
+    tooltip: tooltip,
+    enabled: onSelected != null,
+    onSelected: onSelected,
+    icon: const Icon(Icons.print_outlined),
+    itemBuilder: (_) => [
+      for (final paper in StorePrintPaper.values)
+        PopupMenuItem(
+          value: paper,
+          key: ValueKey('store-print-paper-${paper.name}'),
+          child: Text(paper.label),
+        ),
+    ],
+  );
+}
+
+/// One explicit, scoped OS print handoff. A queued job is not printed paper.
+/// Native requests a new layout when the selected printer/media changes.
+class StoreDocumentPrinter {
+  static const channel = MethodChannel(
+    'com.moolsocial.app/store_document_print',
+  );
+  static int _sequence = 0;
+  static bool _busy = false;
+
+  static Future<StorePrintState> print({
+    required String name,
+    required bool Function() isCurrent,
+    required Listenable scopeChanges,
+    required Future<Uint8List> Function(PdfPageFormat, List<int>?) render,
+    PdfPageFormat initialFormat = PdfPageFormat.a4,
+  }) async {
+    if (_busy || !isCurrent()) return StorePrintState.unavailable;
+    if (name.isEmpty ||
+        name.length > 160 ||
+        name.contains(RegExp(r'[\x00-\x1f]'))) {
+      return StorePrintState.unavailable;
+    }
+    _busy = true;
+    final id =
+        'store-print-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
+    final requests = MethodChannel(
+      'com.moolsocial.app/store_document_print/$id',
+    );
+    var invalidated = false;
+    Future<void> cancel() async {
+      try {
+        await channel
+            .invokeMethod<void>('cancel', {'id': id})
+            .timeout(const Duration(seconds: 3));
+      } on Object {
+        // Never replace an unknown native outcome with a success claim.
+      }
+    }
+
+    void changed() {
+      if (!isCurrent() && !invalidated) {
+        invalidated = true;
+        unawaited(cancel());
+      }
+    }
+
+    scopeChanges.addListener(changed);
+    requests.setMethodCallHandler((call) async {
+      if (call.method != 'render' || invalidated || !isCurrent()) {
+        throw PlatformException(code: 'print_scope_changed');
+      }
+      final args = call.arguments;
+      if (args is! Map || args['id'] != id) {
+        throw PlatformException(code: 'invalid_print_request');
+      }
+      double number(String key) {
+        final value = args[key];
+        if (value is! num || !value.toDouble().isFinite || value < 0) {
+          throw PlatformException(code: 'invalid_print_paper');
+        }
+        return value.toDouble();
+      }
+
+      final width = number('width'), height = number('height');
+      final left = number('left'), top = number('top');
+      final right = number('right'), bottom = number('bottom');
+      if (width < 48 * PdfPageFormat.mm ||
+          width > 330 * PdfPageFormat.mm ||
+          height < 100 * PdfPageFormat.mm ||
+          height > 1000 * PdfPageFormat.mm ||
+          width - left - right < 40 * PdfPageFormat.mm ||
+          height - top - bottom < 70 * PdfPageFormat.mm) {
+        throw PlatformException(code: 'unsupported_print_paper');
+      }
+      final rawPages = args['pages'];
+      List<int>? pages;
+      if (rawPages != null) {
+        if (rawPages is! List ||
+            rawPages.isEmpty ||
+            rawPages.length > 100 ||
+            rawPages.any((p) => p is! int || p < 0 || p >= 100)) {
+          throw PlatformException(code: 'invalid_print_pages');
+        }
+        pages = rawPages.cast<int>().toSet().toList()..sort();
+      }
+      final bytes = await render(
+        PdfPageFormat(
+          width,
+          height,
+          marginLeft: left,
+          marginTop: top,
+          marginRight: right,
+          marginBottom: bottom,
+        ),
+        pages,
+      ).timeout(const Duration(seconds: 30));
+      if (invalidated || !isCurrent()) {
+        throw PlatformException(code: 'print_scope_changed');
+      }
+      if (bytes.length < 8 ||
+          bytes.length > 10 * 1024 * 1024 ||
+          String.fromCharCodes(bytes.take(5)) != '%PDF-') {
+        throw PlatformException(code: 'invalid_print_document');
+      }
+      return bytes;
+    });
+    try {
+      final outcome = await channel
+          .invokeMethod<String>('print', {
+            'id': id,
+            'name': name,
+            'width': initialFormat.width,
+            'height': initialFormat.height,
+          })
+          .timeout(const Duration(minutes: 3));
+      if (invalidated || !isCurrent()) return StorePrintState.cancelled;
+      return StorePrintState.values
+              .where((s) => s.name == outcome)
+              .firstOrNull ??
+          StorePrintState.unknown;
+    } on MissingPluginException {
+      return StorePrintState.unavailable;
+    } on TimeoutException {
+      await cancel();
+      return StorePrintState.unknown;
+    } on PlatformException catch (error) {
+      return error.code == 'print_unavailable'
+          ? StorePrintState.unavailable
+          : StorePrintState.failed;
+    } on Object {
+      // A malformed native reply cannot establish whether a job was queued.
+      // Request cancellation and preserve uncertainty; do not retry silently.
+      await cancel();
+      return StorePrintState.unknown;
+    } finally {
+      scopeChanges.removeListener(changed);
+      requests.setMethodCallHandler(null);
+      _busy = false;
+    }
+  }
+}
 
 typedef StoreStockFileSaver =
     Future<bool> Function(
@@ -115,8 +314,10 @@ class _StoreStockDownloadControlsState
   StoreStockExportFormat? _busy;
   String? _status;
   bool _invalidated = false;
+  final _printChanges = ValueNotifier<int>(0);
   void _trackScope() {
     if (!widget.isCurrent()) _invalidated = true;
+    _printChanges.value++;
   }
 
   bool get _isCurrent => !_invalidated && widget.isCurrent();
@@ -129,6 +330,10 @@ class _StoreStockDownloadControlsState
   @override
   void didUpdateWidget(StoreStockDownloadControls oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.accountId != widget.accountId ||
+        oldWidget.storeId != widget.storeId) {
+      _invalidated = true;
+    }
     if (oldWidget.scopeChanges != widget.scopeChanges) {
       oldWidget.scopeChanges?.removeListener(_trackScope);
       widget.scopeChanges?.addListener(_trackScope);
@@ -148,6 +353,9 @@ class _StoreStockDownloadControlsState
   @override
   void dispose() {
     widget.scopeChanges?.removeListener(_trackScope);
+    _invalidated = true;
+    _trackScope();
+    _printChanges.dispose();
     _from.dispose();
     _to.dispose();
     super.dispose();
@@ -221,6 +429,69 @@ class _StoreStockDownloadControlsState
       _ => today,
     };
     return from == today ? _label(today) : '${_label(from)} – ${_label(today)}';
+  }
+
+  Future<void> _print(StorePrintPaper paper) async {
+    final current = _period == StoreStockPeriod.current;
+    final ledger = current ? null : _ledger;
+    if (_busy != null ||
+        !_isCurrent ||
+        (current ? widget.filteredProducts.isEmpty : ledger == null)) {
+      return;
+    }
+    final revision = _printChanges.value;
+    bool valid() => mounted && _isCurrent && revision == _printChanges.value;
+    setState(() {
+      _busy = StoreStockExportFormat.pdf;
+      _status = null;
+    });
+    try {
+      final snapshot = current
+          ? StoreStockSnapshot(
+              storeId: widget.storeId,
+              storeName: widget.storeName,
+              scope: widget.filterDescription.isEmpty
+                  ? 'All Store stock'
+                  : 'Current results: ${widget.filterDescription}',
+              generatedAt: DateTime.now(),
+              products: widget.filteredProducts,
+            )
+          : null;
+      final state = await StoreDocumentPrinter.print(
+        name: current ? 'Current stock snapshot' : 'Stock statement',
+        initialFormat: paper.initialFormat,
+        isCurrent: valid,
+        scopeChanges: _printChanges,
+        render: (media, pages) => current
+            ? snapshot!.forPrint(media, pages)
+            : ledger!.forPrint(media, pages),
+      );
+      if (mounted) {
+        setState(
+          () => _status = !valid()
+              ? 'Stock changed. Reopen the statement before printing.'
+              : switch (state) {
+                  StorePrintState.completed =>
+                    'The print service reports completion. Check your printer.',
+                  StorePrintState.cancelled => 'Printing cancelled.',
+                  StorePrintState.unavailable =>
+                    'Printing is unavailable. Enable a compatible print service in phone settings.',
+                  StorePrintState.failed =>
+                    'Printing failed. Check the printer and retry.',
+                  StorePrintState.submitted =>
+                    'Sent to the print queue. Check the printer for completion.',
+                  StorePrintState.blocked =>
+                    'The print queue needs attention. Check the printer connection, paper and ink.',
+                  StorePrintState.unknown =>
+                    'Print status could not be confirmed. Check the print queue before retrying.',
+                },
+        );
+      }
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _status = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
   }
 
   Future<void> _download(StoreStockExportFormat format) async {
@@ -359,6 +630,18 @@ class _StoreStockDownloadControlsState
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
+            StorePrintButton(
+              key: const Key('work-stock-print'),
+              tooltip: 'Print stock statement',
+              onSelected:
+                  !_isCurrent ||
+                      _busy != null ||
+                      (current
+                          ? widget.filteredProducts.isEmpty
+                          : ledger == null)
+                  ? null
+                  : _print,
+            ),
           ],
         ),
         if (_period == StoreStockPeriod.custom)
@@ -598,6 +881,16 @@ class StoreStockLedgerSnapshot {
         : null;
     return compute(_generateStockLedgerFile, (this, format, font));
   }
+
+  Future<Uint8List> forPrint(PdfPageFormat paper, List<int>? pages) async {
+    if (!valid) {
+      throw const FormatException(
+        'The stock statement is incomplete or inconsistent.',
+      );
+    }
+    final font = await rootBundle.load('assets/fonts/Inter-Variable.ttf');
+    return compute(_generatePrintedStockLedger, (this, font, paper, pages));
+  }
 }
 
 class StoreStockValueSummary extends StatelessWidget {
@@ -824,9 +1117,19 @@ class _StoreStockLedgerTableState extends State<StoreStockLedgerTable> {
   }
 }
 
+Future<Uint8List> _generatePrintedStockLedger(
+  (StoreStockLedgerSnapshot, ByteData, PdfPageFormat, List<int>?) input,
+) => _generateStockLedgerFile(
+  (input.$1, StoreStockExportFormat.pdf, input.$2),
+  paper: input.$3,
+  pages: input.$4,
+);
+
 Future<Uint8List> _generateStockLedgerFile(
-  (StoreStockLedgerSnapshot, StoreStockExportFormat, ByteData?) input,
-) async {
+  (StoreStockLedgerSnapshot, StoreStockExportFormat, ByteData?) input, {
+  PdfPageFormat? paper,
+  List<int>? pages,
+}) async {
   final (report, format, fontData) = input;
   final metadata = <List<Object?>>[
     ['Stock ledger', report.disclosure],
@@ -897,19 +1200,23 @@ Future<Uint8List> _generateStockLedgerFile(
       ),
     );
   }
-  return _generateStoreTable((
-    StoreTabularReport(
-      title: 'Stock ledger',
-      disclosure: report.disclosure,
-      metadata: metadata,
-      headers: StoreStockLedgerSnapshot.headers,
-      rows: rows,
-      moneyColumns: const {9, 10, 11, 12},
-      rightAlignedColumns: const {3, 4, 5, 6, 7, 8},
+  return _generateStoreTable(
+    (
+      StoreTabularReport(
+        title: 'Stock ledger',
+        disclosure: report.disclosure,
+        metadata: metadata,
+        headers: StoreStockLedgerSnapshot.headers,
+        rows: rows,
+        moneyColumns: const {9, 10, 11, 12},
+        rightAlignedColumns: const {3, 4, 5, 6, 7, 8},
+      ),
+      format,
+      fontData,
     ),
-    format,
-    fontData,
-  ));
+    paper: paper,
+    pages: pages,
+  );
 }
 
 /// Shared renderer only. Callers must validate account, coverage and balances
@@ -944,11 +1251,26 @@ class StoreTabularReport {
         : null;
     return compute(_generateStoreTable, (this, format, font));
   }
+
+  Future<Uint8List> forPrint(PdfPageFormat paper, List<int>? pages) async {
+    final font = await rootBundle.load('assets/fonts/Inter-Variable.ttf');
+    return compute(_generatePrintedStoreTable, (this, font, paper, pages));
+  }
 }
 
+Future<Uint8List> _generatePrintedStoreTable(
+  (StoreTabularReport, ByteData, PdfPageFormat, List<int>?) input,
+) => _generateStoreTable(
+  (input.$1, StoreStockExportFormat.pdf, input.$2),
+  paper: input.$3,
+  pages: input.$4,
+);
+
 Future<Uint8List> _generateStoreTable(
-  (StoreTabularReport, StoreStockExportFormat, ByteData?) input,
-) async {
+  (StoreTabularReport, StoreStockExportFormat, ByteData?) input, {
+  PdfPageFormat? paper,
+  List<int>? pages,
+}) async {
   final (report, format, fontData) = input;
   final metadata = report.metadata, rows = report.rows;
   final headers = report.headers, moneyColumns = report.moneyColumns;
@@ -1050,9 +1372,45 @@ Future<Uint8List> _generateStoreTable(
     return Uint8List.fromList(book.encode()!);
   }
   final document = pw.Document();
+  if (headers.isEmpty || rows.any((row) => row.length != headers.length)) {
+    throw const FormatException('Statement columns and values do not match.');
+  }
+  final pageFormat = paper ?? PdfPageFormat.a4.landscape;
+  final receipt = pageFormat.width <= 100 * PdfPageFormat.mm;
+  final baseMargin = receipt ? 3 * PdfPageFormat.mm : 24.0;
+  final rawMargins = [
+    pageFormat.marginLeft,
+    pageFormat.marginTop,
+    pageFormat.marginRight,
+    pageFormat.marginBottom,
+  ];
+  final margins = rawMargins
+      .map((m) => (m > baseMargin ? m : baseMargin) + (paper == null ? 0 : 1))
+      .toList();
+  if (!pageFormat.width.isFinite ||
+      !pageFormat.height.isFinite ||
+      pageFormat.width < 48 * PdfPageFormat.mm ||
+      pageFormat.width > 330 * PdfPageFormat.mm ||
+      pageFormat.height < 100 * PdfPageFormat.mm ||
+      pageFormat.height > 1000 * PdfPageFormat.mm ||
+      rawMargins.any((m) => !m.isFinite || m < 0) ||
+      pageFormat.width - margins[0] - margins[2] < 40 * PdfPageFormat.mm ||
+      pageFormat.height - margins[1] - margins[3] < 70 * PdfPageFormat.mm) {
+    throw const FormatException(
+      'Unsupported statement paper or printable area.',
+    );
+  }
+  String value(Object? cell, int column) => cell == null
+      ? report.nullLabel
+      : moneyColumns.contains(column) && cell is num
+      ? cell.toStringAsFixed(2)
+      : '$cell';
   final font = pw.Font.ttf(fontData!);
   final embedded = font.getFont(pw.Context(document: document.document));
   final text = [
+    report.title,
+    report.disclosure,
+    ...headers,
     ...metadata.expand((r) => r),
     ...rows.expand((r) => r),
   ].join(' ');
@@ -1061,12 +1419,32 @@ Future<Uint8List> _generateStoreTable(
       'Some characters cannot be shown in PDF. Choose Excel or CSV to keep all details.',
     );
   }
+  // Repeat identifying fields across column sections instead of shrinking an
+  // entire ledger to illegibility when the printer selects portrait media.
+  final capacity = ((pageFormat.width - margins[0] - margins[2]) / 80)
+      .floor()
+      .clamp(4, 30);
+  final allColumns = List<int>.generate(headers.length, (i) => i);
+  final sections = <List<int>>[];
+  if (receipt || headers.length <= capacity) {
+    sections.add(allColumns);
+  } else {
+    for (var offset = 3; offset < headers.length; offset += capacity - 3) {
+      sections.add([0, 1, 2, ...allColumns.skip(offset).take(capacity - 3)]);
+    }
+  }
   for (var start = 0; start < (rows.isEmpty ? 1 : rows.length); start += 50) {
     final batch = rows.skip(start).take(50);
     document.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(24),
+        pageFormat: pageFormat,
+        maxPages: 100,
+        margin: pw.EdgeInsets.fromLTRB(
+          margins[0],
+          margins[1],
+          margins[2],
+          margins[3],
+        ),
         theme: pw.ThemeData.withFont(base: font, bold: font),
         header: (_) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1081,57 +1459,98 @@ Future<Uint8List> _generateStoreTable(
           style: const pw.TextStyle(fontSize: 8),
         ),
         build: (_) => [
-          pw.TableHelper.fromTextArray(
-            headers: headers,
-            data: [
-              for (final row in batch)
-                [
-                  for (var i = 0; i < row.length; i++)
-                    row[i] == null
-                        ? report.nullLabel
-                        : report.dateColumns.contains(i) &&
-                              row[i] is String &&
-                              DateTime.tryParse(row[i] as String) != null
-                        ? (row[i] as String)
-                              .replaceFirst('T', '\n')
-                              .split('.')
-                              .first
-                              .replaceAll('Z', '')
-                        : moneyColumns.contains(i) && row[i] is num
-                        ? (row[i] as num).toStringAsFixed(2)
-                        : '${row[i]}',
+          if (receipt)
+            for (final row in batch)
+              pw.Inseparable(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 8),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < headers.length; i++)
+                        pw.Text(
+                          '${headers[i]}: ${value(i < row.length ? row[i] : null, i)}',
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                    ],
+                  ),
+                ),
+              )
+          else
+            for (final columns in sections) ...[
+              pw.NewPage(freeSpace: 70),
+              if (sections.length > 1)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 6),
+                  child: pw.Text(
+                    'Fields ${sections.indexOf(columns) + 1} of ${sections.length}',
+                    style: const pw.TextStyle(fontSize: 9),
+                  ),
+                ),
+              pw.TableHelper.fromTextArray(
+                headers: [for (final i in columns) headers[i]],
+                data: [
+                  for (final row in batch)
+                    [
+                      for (final i in columns)
+                        row[i] == null
+                            ? report.nullLabel
+                            : report.dateColumns.contains(i) &&
+                                  row[i] is String &&
+                                  DateTime.tryParse(row[i] as String) != null
+                            ? (row[i] as String)
+                                  .replaceFirst('T', '\n')
+                                  .split('.')
+                                  .first
+                                  .replaceAll('Z', '')
+                            : moneyColumns.contains(i) && row[i] is num
+                            ? (row[i] as num).toStringAsFixed(2)
+                            : '${row[i]}',
+                    ],
                 ],
+                border: null,
+                cellPadding: const pw.EdgeInsets.all(5),
+                headerDecoration: const pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xff080078),
+                ),
+                headerStyle: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                cellStyle: const pw.TextStyle(fontSize: 8),
+                columnWidths: {
+                  // Every column must participate in allocation. Intrinsic
+                  // defaults can consume the page and collapse Date/Particulars.
+                  for (var i = 0; i < columns.length; i++)
+                    i: pw.FlexColumnWidth(
+                      columns[i] == 1
+                          ? 2.5
+                          : columns[i] == 0
+                          ? 1.6
+                          : moneyColumns.contains(columns[i])
+                          ? 1.5
+                          : 1.4,
+                    ),
+                },
+                cellAlignments: {
+                  for (var i = 0; i < columns.length; i++)
+                    if (moneyColumns.contains(columns[i]) ||
+                        report.rightAlignedColumns.contains(columns[i]))
+                      i: pw.Alignment.centerRight,
+                },
+                oddRowDecoration: const pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xfff5f6fb),
+                ),
+              ),
+              pw.SizedBox(height: 12),
             ],
-            border: null,
-            cellPadding: const pw.EdgeInsets.all(5),
-            headerDecoration: const pw.BoxDecoration(
-              color: PdfColor.fromInt(0xff080078),
-            ),
-            headerStyle: pw.TextStyle(
-              color: PdfColors.white,
-              fontSize: 8,
-              fontWeight: pw.FontWeight.bold,
-            ),
-            cellStyle: const pw.TextStyle(fontSize: 8),
-            columnWidths: {
-              0: const pw.FlexColumnWidth(1.3),
-              1: const pw.FlexColumnWidth(2.5),
-              if (headers.length > 9) 9: const pw.FlexColumnWidth(1.5),
-            },
-            cellAlignments: {
-              for (final i in {...moneyColumns, ...report.rightAlignedColumns})
-                i: pw.Alignment.centerRight,
-            },
-            oddRowDecoration: const pw.BoxDecoration(
-              color: PdfColor.fromInt(0xfff5f6fb),
-            ),
-          ),
           if (rows.isEmpty) pw.Text('No records for this period.'),
         ],
       ),
     );
   }
-  return document.save();
+  return saveCommercePrintPages(document, pages);
 }
 
 /// Immutable current balances, not an accounting ledger or physical stock count.
@@ -1233,6 +1652,21 @@ class StoreStockSnapshot {
     'Regulatory note',
   ];
   String get timestamp => generatedAt.toUtc().toIso8601String();
+  Future<Uint8List> forPrint(
+    PdfPageFormat paper,
+    List<int>? pages,
+  ) => StoreTabularReport(
+    title: 'Current stock snapshot',
+    disclosure:
+        'Current recorded balances; not a historical or audited statement. Full product metadata: Excel or CSV.',
+    metadata: exportRows.take(5).toList(),
+    // The existing stock PDF includes position and reference fields, not
+    // the full compliance export. Keep that same scope for print media.
+    headers: headers.take(15).toList(),
+    rows: [for (final row in rows) row.take(15).toList()],
+    moneyColumns: const {10, 11, 12},
+    rightAlignedColumns: const {7, 13},
+  ).forPrint(paper, pages);
   String fileName(StoreStockExportFormat format) =>
       'stock-snapshot-${timestamp.replaceAll(RegExp(r'[^0-9]'), '')}.${format.extension}';
 

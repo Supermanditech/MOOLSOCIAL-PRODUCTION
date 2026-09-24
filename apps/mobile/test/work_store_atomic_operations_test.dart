@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -533,6 +536,228 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('PRIVATEPHOTO scoped durable media', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    late Directory directory;
+    var current = true;
+    final product = workspaceMasterCatalogue.first.copyWith(
+      publicListing: false,
+      canonicalId: 'private-photo-codec-test',
+      title: 'Codec test own product',
+    );
+    WorkPrivateProductPhotoStore store({
+      String account = 'account-A',
+      String storeId = 'store-A',
+      bool qa = true,
+    }) => WorkPrivateProductPhotoStore(
+      accountId: account,
+      storeId: storeId,
+      evaluationOnly: qa,
+      isCurrent: () => current,
+      supportDirectory: () async => directory,
+    );
+
+    // Codec fixture only, never an approval screenshot or real product record.
+    Future<WorkPickedProof> selectedImage({
+      int width = 512,
+      int height = 512,
+    }) async {
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      canvas.drawColor(const ui.Color(0xff676767), ui.BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(width, height);
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        return WorkPickedProof(
+          fileName: 'codec-test.png',
+          contentType: 'image/png',
+          bytes: data!.buffer.asUint8List(),
+        );
+      } finally {
+        image.dispose();
+        picture.dispose();
+      }
+    }
+
+    setUp(() async {
+      current = true;
+      directory = await Directory.systemTemp.createTemp(
+        'store-private-photo-test-',
+      );
+    });
+    tearDown(() async {
+      // Only this test-created directory; never app or device data.
+      await directory.delete(recursive: true);
+    });
+
+    test('small images require replacement, not upscaling', () async {
+      for (final dimensions in [(255, 512), (512, 255), (511, 511)]) {
+        await expectLater(
+          store().save(
+            product: product,
+            picked: await selectedImage(
+              width: dimensions.$1,
+              height: dimensions.$2,
+            ),
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+      }
+      expect(await directory.list(recursive: true).length, 0);
+      final photo = await store().save(
+        product: product,
+        picked: await selectedImage(width: 256, height: 512),
+      );
+      expect(photo.width, 256);
+      expect(photo.height, 512);
+    });
+
+    test('catalogue photo cannot be overridden by retailer bytes', () async {
+      await expectLater(
+        store().save(
+          product: workspaceMasterCatalogue.first,
+          picked: await selectedImage(),
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(await directory.list(recursive: true).length, 0);
+    });
+
+    test('restart restores identical pixels without public approval', () async {
+      final picked = await selectedImage();
+      final photo = await store().save(product: product, picked: picked);
+      final saved = product.copyWith(privatePhoto: photo);
+      final restored = WorkspaceCatalogueItem.fromInventoryJson(
+        jsonDecode(jsonEncode(saved.toInventoryJson())),
+      );
+      expect(await store().read(restored), orderedEquals(picked.bytes));
+      expect(restored.privatePhoto!.width, 512);
+      expect(restored.privatePhoto!.height, 512);
+      expect(restored.toBuyPublicProduct(storeName: '').mediaAssets, isEmpty);
+      expect(
+        (await store().save(product: restored, picked: picked)).toJson(),
+        photo.toJson(),
+      );
+      expect(
+        await directory.list(recursive: true).where((f) => f is File).length,
+        1,
+      );
+    });
+
+    test('account, Store, QA and exact product cannot cross', () async {
+      final photo = await store().save(
+        product: product,
+        picked: await selectedImage(),
+      );
+      final saved = product.copyWith(privatePhoto: photo);
+      for (final other in [
+        store(account: 'account-B'),
+        store(storeId: 'store-B'),
+        store(qa: false),
+      ]) {
+        await expectLater(
+          other.read(saved),
+          throwsA(isA<WorkGatewayException>()),
+        );
+      }
+      await expectLater(
+        store().read(saved.copyWith(pack: 'different pack')),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(
+        () => WorkspaceCatalogueItem.fromInventoryJson(
+          saved.copyWith(pack: 'different pack').toInventoryJson(),
+        ),
+        throwsFormatException,
+      );
+      current = false;
+      await expectLater(
+        store().read(saved),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      await expectLater(
+        store().save(product: product, picked: await selectedImage()),
+        throwsA(isA<WorkGatewayException>()),
+      );
+    });
+
+    test(
+      'corrupt or missing bytes fail without manufacturing a replacement',
+      () async {
+        final photo = await store().save(
+          product: product,
+          picked: await selectedImage(),
+        );
+        final saved = product.copyWith(privatePhoto: photo);
+        final file =
+            (await directory
+                    .list(recursive: true)
+                    .where((f) => f is File)
+                    .single)
+                as File;
+        final original = await file.readAsBytes();
+        final changed = Uint8List.fromList(original)
+          ..[original.length - 1] ^= 1;
+        await file.writeAsBytes(changed);
+        await expectLater(
+          store().read(saved),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await file.delete();
+        await expectLater(
+          store().read(saved),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(
+          await directory.list(recursive: true).where((f) => f is File).length,
+          0,
+        );
+      },
+    );
+
+    test(
+      'rejects PDF, corrupt image and unsafe reference before stock save',
+      () async {
+        for (final picked in [
+          WorkPickedProof(
+            fileName: 'not-photo.pdf',
+            contentType: 'application/pdf',
+            bytes: Uint8List.fromList([37, 80, 68, 70]),
+          ),
+          WorkPickedProof(
+            fileName: 'broken.png',
+            contentType: 'image/png',
+            bytes: Uint8List.fromList([1, 2, 3]),
+          ),
+        ]) {
+          await expectLater(
+            store().save(product: product, picked: picked),
+            throwsA(isA<WorkGatewayException>()),
+          );
+        }
+        final photo = await store().save(
+          product: product,
+          picked: await selectedImage(),
+        );
+        expect(
+          () => WorkspacePrivateProductPhoto.fromJson({
+            ...photo.toJson(),
+            'sha256': '../other',
+          }),
+          throwsFormatException,
+        );
+        expect(
+          () => WorkspacePrivateProductPhoto.fromJson({
+            ...photo.toJson(),
+            'byteLength': 0,
+          }),
+          throwsFormatException,
+        );
+        expect(product.privatePhoto, isNull);
+      },
+    );
+  });
   group('LOCALSTOCK durable inventory', () {
     WorkspaceSavedInventory record({bool qa = true, int revision = 1}) =>
         WorkspaceSavedInventory(

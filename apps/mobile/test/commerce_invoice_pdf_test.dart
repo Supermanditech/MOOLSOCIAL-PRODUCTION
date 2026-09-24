@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:pdf/pdf.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/shared/commerce/commerce_invoice_pdf.dart';
 import 'package:moolsocial/features/work/work_invoice_pdf.dart';
@@ -115,6 +116,122 @@ CommerceInvoiceDocumentDetails sample(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'PRINT receipt widths reflow every document role and multiple pages',
+    () async {
+      for (final width in [58, 80]) {
+        for (final format in CommerceInvoiceFormat.values) {
+          final details = sample(format, count: 20);
+          final beforeTotal = details.totalMinor;
+          final bytes = await renderCommerceInvoicePdf(
+            details,
+            printPageFormat: PdfPageFormat(
+              width * PdfPageFormat.mm,
+              200 * PdfPageFormat.mm,
+            ),
+          );
+          expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+          expect(bytes.length, greaterThan(1000));
+          expect(details.totalMinor, beforeTotal);
+          const output = String.fromEnvironment('COMMERCE_PDF_OUTPUT');
+          if (output.isNotEmpty) {
+            final dir = Directory(output)..createSync(recursive: true);
+            File(
+              '${dir.path}/receipt-$width-${format.name}.pdf',
+            ).writeAsBytesSync(bytes);
+          }
+        }
+      }
+    },
+  );
+  test('PRINT rejects invalid paper before preparing a document', () async {
+    expect(() => PdfPageFormat(double.nan, 300), throwsAssertionError);
+    for (final paper in [
+      PdfPageFormat(100, double.infinity),
+      const PdfPageFormat(20, 300),
+      const PdfPageFormat(200, 20),
+    ]) {
+      await expectLater(
+        renderCommerceInvoicePdf(
+          sample(CommerceInvoiceFormat.seller),
+          printPageFormat: paper,
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+  test(
+    'PRINT A4 honors larger reported margins and rejects exhausted area',
+    () async {
+      final paper = PdfPageFormat(
+        PdfPageFormat.a4.width,
+        PdfPageFormat.a4.height,
+        marginLeft: 70,
+        marginTop: 80,
+        marginRight: 90,
+        marginBottom: 100,
+      );
+      final bytes = await renderCommerceInvoicePdf(
+        sample(CommerceInvoiceFormat.seller, count: 20),
+        printPageFormat: paper,
+      );
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      const output = String.fromEnvironment('COMMERCE_PDF_OUTPUT');
+      if (output.isNotEmpty) {
+        final dir = Directory(output)..createSync(recursive: true);
+        File('${dir.path}/a4-printer-margins.pdf').writeAsBytesSync(bytes);
+      }
+      await expectLater(
+        renderCommerceInvoicePdf(
+          sample(CommerceInvoiceFormat.seller),
+          printPageFormat: PdfPageFormat(
+            PdfPageFormat.a4.width,
+            PdfPageFormat.a4.height,
+            marginLeft: 300,
+            marginRight: 200,
+          ),
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+  test('PRINT selected pages retain order and reject missing pages', () async {
+    final details = sample(CommerceInvoiceFormat.seller, count: 20);
+    final paper = PdfPageFormat(58 * PdfPageFormat.mm, 200 * PdfPageFormat.mm);
+    final bytes = await renderCommerceInvoicePdf(
+      details,
+      printPageFormat: paper,
+      printPages: [0, 2],
+    );
+    expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+    const output = String.fromEnvironment('COMMERCE_PDF_OUTPUT');
+    if (output.isNotEmpty) {
+      final dir = Directory(output)..createSync(recursive: true);
+      File('${dir.path}/receipt-58-selected.pdf').writeAsBytesSync(bytes);
+    }
+    for (final pages in [
+      <int>[],
+      [-1],
+      [100],
+      [0, 0],
+    ]) {
+      await expectLater(
+        renderCommerceInvoicePdf(
+          details,
+          printPageFormat: paper,
+          printPages: pages,
+        ),
+        throwsFormatException,
+      );
+    }
+    await expectLater(
+      renderCommerceInvoicePdf(
+        details,
+        printPageFormat: PdfPageFormat(164, 567, marginLeft: 100),
+      ),
+      throwsFormatException,
+    );
+  });
   test('large amount and long supplied identity remain renderable', () async {
     for (final longIdentity in [false, true]) {
       final d = CommerceInvoiceDocumentDetails(

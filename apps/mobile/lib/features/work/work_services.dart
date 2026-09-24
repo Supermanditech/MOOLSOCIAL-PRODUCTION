@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1851,12 +1852,14 @@ class NativeWorkProofPicker
   NativeWorkProofPicker({
     ImagePicker? imagePicker,
     this.documentPicker,
+    this.documentFileName,
     Future<Directory> Function()? temporaryDirectory,
   }) : _imagePicker = imagePicker ?? ImagePicker(),
        _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
   final ImagePicker _imagePicker;
   final Future<XFile?> Function()? documentPicker;
+  final String? Function()? documentFileName;
   final Future<Directory> Function() _temporaryDirectory;
   static const _maxProofBytes = 10 * 1024 * 1024;
 
@@ -1935,7 +1938,10 @@ class NativeWorkProofPicker
         }
         if (file == null) return null;
         final bytes = await _readDocument(file);
-        final proof = _validateProof(selectedName ?? file.name, bytes);
+        final proof = _validateProof(
+          selectedName ?? documentFileName?.call() ?? file.name,
+          bytes,
+        );
         return WorkPickedProof(
           fileName: proof.fileName,
           contentType: proof.contentType,
@@ -2007,6 +2013,231 @@ class NativeWorkProofPicker
       throw const WorkGatewayException(
         'Your details are restored. Please add the document again.',
       );
+    }
+  }
+}
+
+/// Durable private product images, isolated from public catalogue approval.
+/// Inventory stores the reference, not picker paths or image blobs. No network
+/// upload or publication is performed here. Evaluation and real Stores differ.
+class WorkPrivateProductPhotoStore {
+  WorkPrivateProductPhotoStore({
+    required this.accountId,
+    required this.storeId,
+    required this.evaluationOnly,
+    required this.isCurrent,
+    Future<Directory> Function()? supportDirectory,
+  }) : _supportDirectory = supportDirectory ?? getApplicationSupportDirectory;
+
+  final String accountId, storeId;
+  final bool evaluationOnly;
+  final bool Function() isCurrent;
+  final Future<Directory> Function() _supportDirectory;
+  static const _limit = 10 * 1024 * 1024;
+
+  String get owner => crypto.sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            'store-product-photo-v1',
+            evaluationOnly,
+            accountId,
+            storeId,
+          ]),
+        ),
+      )
+      .toString();
+
+  void _checkScope() {
+    if (accountId.trim().isEmpty || storeId.trim().isEmpty || !isCurrent()) {
+      throw const WorkGatewayException(
+        'Store changed. Open the product again.',
+      );
+    }
+  }
+
+  Future<Directory> _directory() async {
+    _checkScope();
+    final support = await _supportDirectory();
+    final base = await support.resolveSymbolicLinks();
+    var path = base;
+    for (final segment in ['store-product-photos-v1', owner]) {
+      path = '$path${Platform.pathSeparator}$segment';
+      final type = await FileSystemEntity.type(path, followLinks: false);
+      if (type != FileSystemEntityType.notFound &&
+          type != FileSystemEntityType.directory) {
+        throw const WorkGatewayException(
+          'Product photo storage is unavailable.',
+        );
+      }
+      final directory = await Directory(path).create();
+      if (await directory.resolveSymbolicLinks() != path) {
+        throw const WorkGatewayException(
+          'Product photo storage is unavailable.',
+        );
+      }
+    }
+    _checkScope();
+    return Directory(path);
+  }
+
+  String _fileName(WorkspacePrivateProductPhoto photo) {
+    final identity = crypto.sha256.convert(utf8.encode(photo.identity));
+    return '$identity-${photo.sha256}.png';
+  }
+
+  Future<Uint8List> _verifiedBytes(
+    File file,
+    WorkspacePrivateProductPhoto photo,
+  ) async {
+    if (await FileSystemEntity.type(file.path, followLinks: false) !=
+            FileSystemEntityType.file ||
+        await file.length() != photo.byteLength) {
+      throw const WorkGatewayException(
+        'Saved photo is unavailable. Choose it again.',
+      );
+    }
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in file.openRead()) {
+      if (builder.length + chunk.length > photo.byteLength) {
+        throw const WorkGatewayException(
+          'Saved photo changed. Choose it again.',
+        );
+      }
+      builder.add(chunk);
+    }
+    final bytes = builder.takeBytes();
+    if (bytes.length != photo.byteLength ||
+        crypto.sha256.convert(bytes).toString() != photo.sha256) {
+      throw const WorkGatewayException('Saved photo changed. Choose it again.');
+    }
+    _checkScope();
+    return bytes;
+  }
+
+  Future<Uint8List> read(WorkspaceCatalogueItem product) async {
+    _checkScope();
+    final photo = product.privatePhoto;
+    if (photo == null || photo.owner != owner || !photo.matches(product)) {
+      throw const WorkGatewayException(
+        'Photo does not belong to this Store product.',
+      );
+    }
+    WorkspacePrivateProductPhoto.fromJson(photo.toJson());
+    final directory = await _directory();
+    return _verifiedBytes(
+      File('${directory.path}${Platform.pathSeparator}${_fileName(photo)}'),
+      photo,
+    );
+  }
+
+  /// Uses an actual selected image. Re-encodes a bounded still image to avoid
+  /// retaining GPS/EXIF/provider metadata; does not invent or replace its content.
+  Future<WorkspacePrivateProductPhoto> save({
+    required WorkspaceCatalogueItem product,
+    required WorkPickedProof picked,
+  }) async {
+    _checkScope();
+    if (product.cataloguePhoto != null ||
+        workspaceMasterCatalogue.any(
+          (entry) => entry.canonicalId == product.canonicalId,
+        )) {
+      throw const WorkGatewayException(
+        'MoolSocial manages this catalogue product photo.',
+      );
+    }
+    if (!const [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+        ].contains(picked.contentType) ||
+        picked.bytes.isEmpty ||
+        picked.bytes.length > _limit) {
+      throw const WorkGatewayException(
+        'Choose a JPG, PNG or WebP product photo up to 10 MB.',
+      );
+    }
+    ui.ImmutableBuffer? buffer;
+    ui.ImageDescriptor? descriptor;
+    ui.Codec? codec;
+    ui.Image? image;
+    late Uint8List bytes;
+    late int width, height;
+    try {
+      buffer = await ui.ImmutableBuffer.fromUint8List(picked.bytes);
+      descriptor = await ui.ImageDescriptor.encoded(buffer);
+      // Technical floor only, not an assertion of composition or media rights.
+      // A square presentation contains the whole source; it never stretches it.
+      if (min(descriptor.width, descriptor.height) < 256 ||
+          max(descriptor.width, descriptor.height) < 512) {
+        throw const WorkGatewayException(
+          'Choose a clearer product image: at least 512 pixels on the longer side and 256 on the shorter side.',
+        );
+      }
+      if (descriptor.width <= 0 ||
+          descriptor.height <= 0 ||
+          descriptor.width * descriptor.height > 32000000) {
+        throw const WorkGatewayException('Choose a smaller product photo.');
+      }
+      final ratio = min(1.0, 2400 / max(descriptor.width, descriptor.height));
+      codec = await descriptor.instantiateCodec(
+        targetWidth: max(1, (descriptor.width * ratio).round()),
+        targetHeight: max(1, (descriptor.height * ratio).round()),
+      );
+      image = (await codec.getNextFrame()).image;
+      width = image.width;
+      height = image.height;
+      final encoded = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (encoded == null || encoded.lengthInBytes > _limit) {
+        throw const WorkGatewayException('Choose a smaller product photo.');
+      }
+      bytes = encoded.buffer.asUint8List(
+        encoded.offsetInBytes,
+        encoded.lengthInBytes,
+      );
+    } on WorkGatewayException {
+      rethrow;
+    } on Object {
+      throw const WorkGatewayException(
+        'This product photo could not be opened. Choose another copy.',
+      );
+    } finally {
+      image?.dispose();
+      codec?.dispose();
+      descriptor?.dispose();
+      buffer?.dispose();
+    }
+    _checkScope();
+    final photo = WorkspacePrivateProductPhoto(
+      owner: owner,
+      identity: WorkspacePrivateProductPhoto.identityOf(product),
+      sha256: crypto.sha256.convert(bytes).toString(),
+      byteLength: bytes.length,
+      width: width,
+      height: height,
+    );
+    WorkspacePrivateProductPhoto.fromJson(photo.toJson());
+    final directory = await _directory();
+    final target = File(
+      '${directory.path}${Platform.pathSeparator}${_fileName(photo)}',
+    );
+    if (await target.exists()) {
+      await _verifiedBytes(target, photo);
+      return photo;
+    }
+    // Staging is owned by this operation only. Never remove another photo or
+    // directory; a scope change can leave an unreferenced private image safely.
+    final staging = await File(
+      '${target.path}.${DateTime.now().microsecondsSinceEpoch}.${Random.secure().nextInt(1 << 32)}.pending',
+    ).create(exclusive: true);
+    try {
+      await staging.writeAsBytes(bytes, flush: true);
+      _checkScope();
+      await staging.rename(target.path);
+      await _verifiedBytes(target, photo);
+      return photo;
+    } finally {
+      if (await staging.exists()) await staging.delete();
     }
   }
 }

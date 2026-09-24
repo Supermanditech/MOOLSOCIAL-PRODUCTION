@@ -5798,6 +5798,84 @@ class WorkspaceSavedInventory {
   }
 }
 
+/// Private, device-retained retailer media. Never publication approval or a URL.
+/// The enclosing inventory owns this reference; the scoped media store owns bytes.
+class WorkspacePrivateProductPhoto {
+  const WorkspacePrivateProductPhoto({
+    required this.owner,
+    required this.identity,
+    required this.sha256,
+    required this.byteLength,
+    required this.width,
+    required this.height,
+  });
+
+  final String owner, identity, sha256;
+  final int byteLength, width, height;
+
+  static String identityOf(WorkspaceCatalogueItem product) => jsonEncode([
+    product.id,
+    product.canonicalId,
+    product.brand,
+    product.title,
+    product.variant,
+    product.pack,
+    product.barcode,
+  ]);
+
+  bool matches(WorkspaceCatalogueItem product) =>
+      identity == identityOf(product);
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'owner': owner,
+    'identity': identity,
+    'sha256': sha256,
+    'byteLength': byteLength,
+    'width': width,
+    'height': height,
+  };
+
+  static WorkspacePrivateProductPhoto? fromJson(Object? raw) {
+    if (raw == null) return null;
+    const invalid = FormatException('Saved product photo needs recovery.');
+    if (raw is! Map || raw['version'] != 1) throw invalid;
+    final owner = raw['owner'],
+        digest = raw['sha256'],
+        identity = raw['identity'];
+    final length = raw['byteLength'],
+        width = raw['width'],
+        height = raw['height'];
+    final hash = RegExp(r'^[a-f0-9]{64}$');
+    if (owner is! String ||
+        !hash.hasMatch(owner) ||
+        digest is! String ||
+        !hash.hasMatch(digest) ||
+        identity is! String ||
+        identity.isEmpty ||
+        identity.length > 112000 ||
+        length is! int ||
+        length <= 0 ||
+        length > 10 * 1024 * 1024 ||
+        width is! int ||
+        width <= 0 ||
+        width > 2400 ||
+        height is! int ||
+        height <= 0 ||
+        height > 2400) {
+      throw invalid;
+    }
+    return WorkspacePrivateProductPhoto(
+      owner: owner,
+      identity: identity,
+      sha256: digest,
+      byteLength: length,
+      width: width,
+      height: height,
+    );
+  }
+}
+
 class WorkspaceCatalogueItem {
   const WorkspaceCatalogueItem({
     required this.id,
@@ -5829,6 +5907,7 @@ class WorkspaceCatalogueItem {
     this.stockMode = WorkspaceStockMode.exactQuantity,
     this.lowStockThreshold = 5,
     this.cataloguePhoto,
+    this.privatePhoto,
     this.catalogueFactsRequireReview = false,
     this.packMeasure,
     this.wholesaleOffer,
@@ -5865,6 +5944,7 @@ class WorkspaceCatalogueItem {
   final WorkspaceStockMode stockMode;
   final int lowStockThreshold;
   final WorkspaceCataloguePhoto? cataloguePhoto;
+  final WorkspacePrivateProductPhoto? privatePhoto;
   final WorkspacePackMeasure? packMeasure;
   final WorkspaceWholesaleOffer? wholesaleOffer;
   final bool retailEnabled;
@@ -6143,6 +6223,7 @@ class WorkspaceCatalogueItem {
     'stockMode': stockMode.name,
     'lowStockThreshold': lowStockThreshold,
     'cataloguePhoto': cataloguePhoto?.toJson(),
+    'privatePhoto': privatePhoto?.toJson(),
     'catalogueFactsRequireReview': catalogueFactsRequireReview,
     'packMeasure': packMeasure?.toJson(),
     'wholesaleOffer': wholesaleOffer?.toJson(),
@@ -6180,6 +6261,9 @@ class WorkspaceCatalogueItem {
     String? optionalText(String key) => raw[key] == null ? null : text(key);
     try {
       final photo = WorkspaceCataloguePhoto.fromJson(raw['cataloguePhoto']);
+      final privatePhoto = WorkspacePrivateProductPhoto.fromJson(
+        raw['privatePhoto'],
+      );
       final compliance = WorkspaceProductCompliance.fromJson(raw['compliance']);
       final measure = WorkspacePackMeasure.fromJson(raw['packMeasure']);
       final wholesale = WorkspaceWholesaleOffer.fromJson(raw['wholesaleOffer']);
@@ -6234,6 +6318,7 @@ class WorkspaceCatalogueItem {
         stockMode: WorkspaceStockMode.values.byName(text('stockMode')),
         lowStockThreshold: number('lowStockThreshold'),
         cataloguePhoto: photo,
+        privatePhoto: privatePhoto,
         catalogueFactsRequireReview: flag('catalogueFactsRequireReview'),
         packMeasure: measure,
         wholesaleOffer: wholesale,
@@ -6241,6 +6326,7 @@ class WorkspaceCatalogueItem {
         content: content,
       );
       if (photo != null && !photo.matches(product)) throw invalid;
+      if (privatePhoto != null && !privatePhoto.matches(product)) throw invalid;
       return product;
     } on FormatException {
       rethrow;
@@ -6282,6 +6368,8 @@ class WorkspaceCatalogueItem {
     int? lowStockThreshold,
     WorkspaceCataloguePhoto? cataloguePhoto,
     bool clearCataloguePhoto = false,
+    WorkspacePrivateProductPhoto? privatePhoto,
+    bool clearPrivatePhoto = false,
     bool? catalogueFactsRequireReview,
     WorkspacePackMeasure? packMeasure,
     WorkspaceWholesaleOffer? wholesaleOffer,
@@ -6321,6 +6409,7 @@ class WorkspaceCatalogueItem {
     cataloguePhoto: clearCataloguePhoto
         ? null
         : cataloguePhoto ?? this.cataloguePhoto,
+    privatePhoto: clearPrivatePhoto ? null : privatePhoto ?? this.privatePhoto,
     catalogueFactsRequireReview:
         catalogueFactsRequireReview ?? this.catalogueFactsRequireReview,
     packMeasure: clearPackMeasure ? null : packMeasure ?? this.packMeasure,

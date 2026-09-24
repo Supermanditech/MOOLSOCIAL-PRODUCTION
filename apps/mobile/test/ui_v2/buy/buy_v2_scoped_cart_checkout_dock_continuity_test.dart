@@ -3796,7 +3796,12 @@ void main() {
         await expectLater(
           find.byType(BuyV2Screen),
           matchesGoldenFile(
-            'candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-${viewport.label}.png',
+            // Founder-approved integrated Cart media/control successor.
+            // Preserve the original references and all checkout expectations.
+            viewport.label == '360x800-android-cart' ||
+                    viewport.label == '430x932-ios-cart'
+                ? 'candidate_captures/store-integrated-cart-20260924-v1/cart-${viewport.label}.png'
+                : 'candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
       },

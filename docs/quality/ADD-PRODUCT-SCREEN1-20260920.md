@@ -1,5 +1,71 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## Printing/photo frontend review disposition — 24 September 2026
+
+Founder explicitly approved proceeding to the incremental frontend review APK
+with the two historical test records preserved as unresolved and genuine-data/
+photo verification deferred, then confirmed "i gpt it move ahead". This does not
+authorize invented metadata, substitute production photos, discarded history,
+automatic installation or a claim of recovered records/physical printing.
+
+Preserve orphan IDs `import-1789994820133212-0` and
+`import-1789994820133212-7`, original ledger and draft. Their missing originals
+cannot be recovered from the surviving synthetic CSV. New manual/CSV photo and
+stock persistence tests prove local behavior only. Public media approval/backend
+transport, genuine Store acceptance and OPPO verification remain deferred.
+
+Qualification completed on current runtime: two 55-file cycles, 3,125 passes
+each, zero failures, 87 mode/capture skips each, source/test hashes unchanged.
+Review-runtime checks: 18 passes and one inapplicable-mode skip. Fifteen changed
+Dart owners analyzed cleanly. Native download filename validation: five accepted
+cases and nine negative cases; bridge compiled. Print admission mutation checks
+and UI locks passed. A4/thermal samples were rendered and inspected; no physical
+printer success is claimed. Logs are retained in this task's outputs directory.
+
+Separately, protected Buy Cart checks found two obsolete golden references.
+Founder authorized narrow requalification; original goldens remain unchanged.
+Only 360x800 and 430x932 Cart cases use versioned successors under
+`candidate_captures/store-integrated-cart-20260924-v1`. All ten protected cases
+pass with no skips and unchanged runtime. No Buy runtime/Cursor tree was edited.
+The local primary owner admission covers only those two assets and their test.
+
+Candidate planning: r66.40 / 2026092401, existing runtime review package. Not yet
+built or sealed. Remaining static/release checks, source reconciliation, exact
+Store-branch Git checkpoint/push and clean remote readback precede the guarded
+build. Preserve all prior evidence. Stop after APK verification; no installation.
+
+## Founder bounded extension v1 — 24 September 2026
+
+Founder explicitly requests printing, the two orphaned historical OPPO records,
+and manual photo input/stock-to-POS continuity as one implementation/local-test
+batch, followed by an incremental APK only after required checks pass and Git
+preservation. This supersedes the unrelated-Counter-Sale exclusion only for
+these named capabilities; it does not waive any failed gate or device evidence.
+
+MVP-supporting outcome for Retailer/Grocery Store: print the current invoice or
+applicable document through the phone's installed print service, using reported
+media size for A4 or 58/80 mm receipt composition and explicit choice where
+ambiguous. Small contextual accessible Print action, no duplicate setup route.
+Unavailable, offline, cancelled, failed and completed states must reflect actual
+framework evidence; opening the chooser is not printed-paper confirmation.
+
+Reuse inventory/session/editor/thumbnail owners and shared commerce PDF renderer,
+existing native document/download bridge and focused tests. No independent photo
+catalogue, billing renderer, network discovery service, new screen/route or backend.
+Private selected media must persist account/Store scoped through restart; public
+media approval is separate. Historical recovery requires validated original IDs
+and commercial metadata; never reconstruct unknown edits from synthetic CSV.
+
+Tests: media cancel/replacement/invalid input/save failure/restart and POS binding;
+print paper adaptation, long items/totals/multipage output, scope changes,
+unavailable service and cancellation; retained-history recovery/conflict safety.
+Physical printer output and OPPO acceptance are separate evidence. Backend,
+production release, Cursor/Redmi, unrelated redesign and automatic installation
+remain excluded. Source-data/media rights are explicit external dependencies.
+Reuse assessment: configuration/thin adapter/new necessary input handling in
+existing owners; no duplicate routes or backend owners. Execute the shared print
+contract first, then UI/native wiring and photo storage; qualify all together.
+
 ## Incremental successor qualification — 24 September 2026
 
 Founder requires latest approved implementation to supersede older behaviour

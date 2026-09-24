@@ -7287,7 +7287,11 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                           )
                           .firstOrNull
                       case final product?) ...[
-                    StoreProductThumbnail(product: product, extent: 32),
+                    StoreProductThumbnail(
+                      product: product,
+                      extent: 32,
+                      session: session,
+                    ),
                     const SizedBox(width: 8),
                   ],
                   Expanded(
@@ -12369,6 +12373,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                                 accountId: account ?? '',
                                 storeId: workspace.id,
                                 storeName: workspace.name,
+                                scopeChanges: session,
                                 ledgers:
                                     session.workspaceFinance?.customerLedgers ??
                                     const [],
@@ -13534,6 +13539,7 @@ class _WorkspaceCatalogueSurfaceState
                         final product = products[index];
                         return _WorkspaceProductRow(
                           product: product,
+                          session: widget.session,
                           owned: false,
                           onEdit: () {
                             Navigator.pop(sheetContext);
@@ -13845,6 +13851,7 @@ class _WorkspaceCatalogueSurfaceState
                         (product, horizontal, frozenWidth, widths, height) =>
                             _WorkspaceProductRow(
                               product: product,
+                              session: widget.session,
                               owned: true,
                               statement: true,
                               horizontal: horizontal,
@@ -14535,6 +14542,7 @@ class _StockFrozenRow extends StatelessWidget {
 class _WorkspaceProductRow extends StatelessWidget {
   const _WorkspaceProductRow({
     required this.product,
+    required this.session,
     required this.owned,
     required this.onEdit,
     this.onChangePrice,
@@ -14549,6 +14557,7 @@ class _WorkspaceProductRow extends StatelessWidget {
   });
 
   final WorkspaceCatalogueItem product;
+  final WorkSession session;
   final bool owned;
   final VoidCallback onEdit;
   final VoidCallback? onChangePrice;
@@ -14577,7 +14586,11 @@ class _WorkspaceProductRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 7, 6, 7),
         child: Row(
           children: [
-            StoreProductThumbnail(product: product, extent: 48),
+            StoreProductThumbnail(
+              product: product,
+              extent: 48,
+              session: session,
+            ),
             const SizedBox(width: MoolSpacing.xs),
             Expanded(
               child: Column(
@@ -14760,7 +14773,11 @@ class _WorkspaceProductRow extends StatelessWidget {
                           ),
                         ),
                       )
-                    : StoreProductThumbnail(product: product, extent: 32),
+                    : StoreProductThumbnail(
+                        product: product,
+                        extent: 32,
+                        session: session,
+                      ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: InkWell(
@@ -14900,7 +14917,11 @@ class _WorkspaceProductRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (statement) ...[
-                  StoreProductThumbnail(product: product, extent: 42),
+                  StoreProductThumbnail(
+                    product: product,
+                    extent: 42,
+                    session: session,
+                  ),
                   const SizedBox(width: 6),
                 ],
                 Expanded(
@@ -15866,6 +15887,109 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   bool _saved = false;
   bool _savingInventory = false;
   bool _pendingInventorySave = false;
+  bool _choosingPhoto = false;
+  late WorkspacePrivateProductPhoto? _privatePhoto =
+      widget.product.privatePhoto;
+
+  WorkspaceCatalogueItem get _photoIdentity => widget.product.copyWith(
+    title: _title.text.trim(),
+    brand: _brand.text.trim(),
+    variant: _variant.text.trim(),
+    pack: _pack.text.trim(),
+    barcode: _barcode.text.trim(),
+    categoryId: _category.text.trim(),
+    clearPrivatePhoto: true,
+  );
+
+  WorkspacePrivateProductPhoto? get _matchingPhoto =>
+      _privatePhoto?.matches(_photoIdentity) == true ? _privatePhoto : null;
+
+  Future<void> _chooseProductPhoto() async {
+    if (_choosingPhoto ||
+        _savingInventory ||
+        _saved ||
+        widget.importRow != null) {
+      return;
+    }
+    final product = _photoIdentity;
+    if (widget.session.catalogueManagesProductPhoto(product)) return;
+    final store = widget.session.privateProductPhotos;
+    if (store == null) {
+      _reject('Store photo storage is unavailable. Try again from your Store.');
+      return;
+    }
+    setState(() => _choosingPhoto = true);
+    try {
+      String? selectedName;
+      final picked = await NativeWorkProofPicker(
+        documentFileName: () => selectedName,
+        documentPicker: () async {
+          final selected = await FilePicker.pickFile(type: FileType.image);
+          selectedName = selected?.name;
+          return selected?.xFile;
+        },
+      ).pick(WorkProofSource.upload);
+      if (picked == null || !mounted || !store.isCurrent()) return;
+      final photo = await store.save(product: product, picked: picked);
+      final bytes = await store.read(product.copyWith(privatePhoto: photo));
+      if (!mounted || !store.isCurrent()) return;
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Check product image'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox.square(
+                  dimension: 180,
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Use an image you have permission to use. Check that the exact product and pack are upright, clear and fully visible.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Choose another'),
+            ),
+            TextButton(
+              key: const Key('work-product-photo-confirm'),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Use image'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || !store.isCurrent()) return;
+      if (accepted == true) {
+        if (!photo.matches(_photoIdentity)) {
+          _reject(
+            'Product details changed. Choose the image for this exact pack again.',
+          );
+          return;
+        }
+        setState(() {
+          _privatePhoto = photo;
+          _error = null;
+        });
+      }
+    } on WorkGatewayException catch (error) {
+      if (mounted) _reject(error.message);
+    } on Object {
+      if (mounted) {
+        _reject(
+          'The product image could not be saved. Your existing product is unchanged. Try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _choosingPhoto = false);
+    }
+  }
 
   void _finish() {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -16284,7 +16408,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 
   Future<void> _save() async {
-    if (_saved || _savingInventory) return;
+    if (_saved || _savingInventory || _choosingPhoto) return;
     _savingInventory = true;
     try {
       if (widget.importRow != null) {
@@ -16420,6 +16544,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           jsonEncode(sellingInputs.measure?.toJson()) !=
           jsonEncode(widget.product.packMeasure?.toJson());
       final reviewedProduct = widget.product.copyWith(
+        privatePhoto: _matchingPhoto,
+        clearPrivatePhoto: _matchingPhoto == null,
         content: content,
         packMeasure: sellingInputs.measure,
         wholesaleOffer: sellingInputs.wholesale,
@@ -16853,6 +16979,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         ? 0.0
         : MediaQuery.viewInsetsOf(context).bottom;
     final product = widget.product.copyWith(
+      privatePhoto: _matchingPhoto,
+      clearPrivatePhoto: _matchingPhoto == null,
       title: _title.text.trim(),
       brand: _brand.text.trim(),
       pack: _pack.text.trim(),
@@ -17013,6 +17141,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           ],
                           leading: StoreProductThumbnail(
                             product: product,
+                            session: widget.session,
                             extent: 44,
                           ),
                         ),
@@ -17282,13 +17411,62 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               ),
                             _referenceLine(
                               'Product photo',
-                              product
-                                      .toCataloguePreviewProduct()
-                                      .mediaAssets
-                                      .isEmpty
+                              _matchingPhoto != null
+                                  ? 'Your product image · saved with this SKU'
+                                  : product
+                                        .toCataloguePreviewProduct()
+                                        .mediaAssets
+                                        .isEmpty
                                   ? 'Photo not available for this pack'
                                   : 'Catalogue photo',
                             ),
+                            if (widget.session.catalogueManagesProductPhoto(
+                              product,
+                            ))
+                              const Text(
+                                'MoolSocial manages this catalogue image.',
+                              )
+                            else if (widget.importRow != null)
+                              const Text(
+                                'Save corrections, then choose an image in product review.',
+                              )
+                            else
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  TextButton.icon(
+                                    key: const Key('work-product-photo-choose'),
+                                    onPressed:
+                                        _choosingPhoto || _savingInventory
+                                        ? null
+                                        : _chooseProductPhoto,
+                                    icon: const Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 20,
+                                    ),
+                                    label: Text(
+                                      _choosingPhoto
+                                          ? 'Checking image…'
+                                          : _matchingPhoto == null
+                                          ? 'Choose image'
+                                          : 'Replace image',
+                                    ),
+                                  ),
+                                  if (_matchingPhoto != null)
+                                    TextButton(
+                                      key: const Key(
+                                        'work-product-photo-remove',
+                                      ),
+                                      onPressed:
+                                          _choosingPhoto || _savingInventory
+                                          ? null
+                                          : () => setState(
+                                              () => _privatePhoto = null,
+                                            ),
+                                      child: const Text('Remove image'),
+                                    ),
+                                ],
+                              ),
                             if (widget
                                     .product
                                     .compliance
@@ -26737,6 +26915,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                               children: [
                                 StoreProductThumbnail(
                                   product: product,
+                                  session: widget.session,
                                   extent: 36,
                                 ),
                                 const SizedBox(width: 8),
@@ -26763,7 +26942,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                       }
                       return Row(
                         children: [
-                          StoreProductThumbnail(product: product, extent: 36),
+                          StoreProductThumbnail(
+                            product: product,
+                            extent: 36,
+                            session: widget.session,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -28117,7 +28300,11 @@ class _SaleProductTile extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 48),
         child: Row(
           children: [
-            StoreProductThumbnail(product: product, extent: 36),
+            StoreProductThumbnail(
+              product: product,
+              extent: 36,
+              session: session,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: Column(

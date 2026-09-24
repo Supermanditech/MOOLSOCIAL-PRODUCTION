@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:convert';
+import 'package:pdf/pdf.dart';
 import 'dart:io';
 import 'package:excel_community/excel_community.dart' as xls;
 import 'package:moolsocial/features/work/work_stock_export.dart';
@@ -98,6 +101,103 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'PRINT stock current and complete empty ledger support reported media',
+    () async {
+      final current = StoreStockSnapshot(
+        storeId: 'store',
+        storeName: 'QA Store',
+        scope: 'Selected QA stock',
+        generatedAt: DateTime.utc(2026, 9, 24),
+        products: [workspaceMasterCatalogue.first],
+      );
+      final ledger = StoreStockLedgerSnapshot(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'QA Store',
+        snapshotId: 'qa-snapshot',
+        from: DateTime.utc(2026, 9, 1),
+        until: DateTime.utc(2026, 9, 24),
+        observedAt: DateTime.utc(2026, 9, 24),
+        complete: true,
+        reviewOnly: true,
+        lines: [],
+      );
+      for (final paper in [
+        StorePrintPaper.a4,
+        StorePrintPaper.receipt58,
+        StorePrintPaper.receipt80,
+      ]) {
+        for (final entry in [
+          ('current', await current.forPrint(paper.initialFormat, null)),
+          ('ledger', await ledger.forPrint(paper.initialFormat, null)),
+        ]) {
+          expect(ascii.decode(entry.$2.take(5).toList()), '%PDF-');
+          const output = String.fromEnvironment(
+            'MOOL_CUSTOMER_REPORT_TEST_DIR',
+          );
+          if (output.isNotEmpty) {
+            Directory(output).createSync(recursive: true);
+            File(
+              '$output/stock-${entry.$1}-${paper.name}.pdf',
+            ).writeAsBytesSync(entry.$2);
+          }
+        }
+      }
+      await expectLater(
+        current.forPrint(PdfPageFormat.a4, [999]),
+        throwsFormatException,
+      );
+    },
+  );
+  testWidgets('PRINT stock action cancels on source change', (tester) async {
+    final changes = ChangeNotifier();
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final result = Completer<String>();
+    final calls = <String>[];
+    messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+      call,
+    ) async {
+      calls.add(call.method);
+      return call.method == 'print' ? result.future : null;
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, null);
+      changes.dispose();
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoreStockDownloadControls(
+            storeId: 'store',
+            storeName: 'Store',
+            accountId: 'account',
+            filteredProducts: [workspaceMasterCatalogue.first],
+            filterDescription: 'QA selected',
+            isCurrent: () => true,
+            scopeChanges: changes,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('work-stock-print')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('store-print-paper-receipt58')));
+    await tester.pumpAndSettle();
+    expect(calls, ['print']);
+    changes.notifyListeners();
+    await tester.pump();
+    expect(calls, ['print', 'cancel']);
+    result.complete('completed');
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Stock changed. Reopen the statement before printing.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   WorkspaceCustomerLedger customer({
     String id = 'customer-01',
     String account = 'account',
@@ -145,6 +245,77 @@ void main() {
           : [],
     );
   }
+
+  testWidgets(
+    'PRINT customer statement action cancels stale source and never claims queued completion',
+    (tester) async {
+      final changes = ChangeNotifier();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      var result = Completer<String>();
+      final calls = <String>[];
+      messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+        call,
+      ) async {
+        calls.add(call.method);
+        if (call.method == 'print') return result.future;
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, null);
+        changes.dispose();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StoreCustomerReportsPanel(
+                accountId: 'account',
+                storeId: 'store',
+                storeName: 'Store',
+                ledgers: [customer()],
+                isCurrent: () => true,
+                scopeChanges: changes,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('customer-statement-customer-01')),
+      );
+      await tester.pumpAndSettle();
+      Future<void> start() async {
+        await tester.tap(find.byKey(const Key('customer-statement-print')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('store-print-paper-a4')));
+        await tester.pumpAndSettle();
+      }
+
+      await start();
+      expect(calls, ['print']);
+      changes.notifyListeners();
+      await tester.pump();
+      expect(calls, ['print', 'cancel']);
+      result.complete('completed');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Records changed. Reopen the statement before printing.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('reports completion'), findsNothing);
+      result = Completer<String>();
+      await start();
+      result.complete('submitted');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Sent to the print queue. Check the printer for completion.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test(
     'D2 ledger uses posted entries and preserves vouchers and pending amounts',
@@ -253,6 +424,60 @@ void main() {
       );
     },
   );
+  test(
+    'PRINT statement A4 and thermal retain scoped report and validate selection',
+    () async {
+      final report = StoreCustomerStatement(
+        ledger: customer(),
+        storeName: 'QA Store',
+      ).document;
+      final original = jsonEncode(report.rows);
+      for (final paper in [
+        PdfPageFormat.a4,
+        StorePrintPaper.receipt58.initialFormat,
+        StorePrintPaper.receipt80.initialFormat,
+      ]) {
+        final bytes = await report.forPrint(paper, null);
+        expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+        expect(jsonEncode(report.rows), original);
+        final selected = await report.forPrint(paper, [0]);
+        expect(selected, isNotEmpty);
+        const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+        if (output.isNotEmpty) {
+          final dir = Directory(output)..createSync(recursive: true);
+          File(
+            '${dir.path}/print-statement-${(paper.width / PdfPageFormat.mm).round()}.pdf',
+          ).writeAsBytesSync(bytes);
+        }
+      }
+      await expectLater(
+        report.forPrint(PdfPageFormat.a4, [999]),
+        throwsFormatException,
+      );
+      await expectLater(
+        report.forPrint(const PdfPageFormat(10, 200), null),
+        throwsFormatException,
+      );
+      for (final row in <List<Object?>>[
+        ['missing fields'],
+        [...report.rows.first, 'unexpected field'],
+      ]) {
+        final malformed = StoreTabularReport(
+          title: report.title,
+          disclosure: report.disclosure,
+          metadata: report.metadata,
+          headers: report.headers,
+          rows: [row],
+          moneyColumns: report.moneyColumns,
+        );
+        await expectLater(
+          malformed.forPrint(PdfPageFormat.a4, null),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
   test('D2 exports preserve typed values and all statement fields', () async {
     final document = StoreCustomerStatement(
       ledger: customer(),

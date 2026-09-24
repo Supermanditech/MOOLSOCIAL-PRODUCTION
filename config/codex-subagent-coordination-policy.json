@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4603,
-    "sha256": "2904D6EB6001FB3A90F22FA502790284EEB5D3A7C7FE3513702091EE8794FECB"
+    "sha256": "D495D59E37C24C79DE646CE575825B9F2F845353FBF2E578B8C799913EE22D04"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -38,12 +38,16 @@
         "scripts/check-apk-regression-gate-state.ps1",
         "scripts/check-store-journey-qualification.ps1",
         "scripts/test-store-journey-qualification.ps1",
+        "scripts/test-public-auth-sideload-build-controls.ps1",
         "apps/mobile/lib/features/work/screens/work_invoice_pdf_screen.dart",
         "apps/mobile/lib/features/work/widgets/store_settings_widgets.dart",
         "apps/mobile/lib/features/work/work_invoice_pdf.dart",
         "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",
         "apps/mobile/test/work_invoice_pdf_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-430x932-ios-cart.png",
         "apps/mobile/test/work_production_gateway_test.dart",
         "apps/mobile/test/work_store_atomic_operations_test.dart",
         "apps/mobile/lib/features/work/widgets/store_catalogue_categories.dart",
@@ -163,7 +167,6 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",

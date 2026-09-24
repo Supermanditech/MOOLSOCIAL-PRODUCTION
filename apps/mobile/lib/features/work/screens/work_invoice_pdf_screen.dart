@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../shared/commerce/commerce_downloads.dart';
 import '../work_document_preview.dart';
 import '../work_invoice_pdf.dart';
+import '../work_stock_export.dart';
 
 enum WorkPdfActionResult { completed, cancelled, unavailable }
 
@@ -243,9 +244,81 @@ class _WorkInvoicePdfScreenState extends State<WorkInvoicePdfScreen> {
     }
   }
 
+  Future<void> _print(StorePrintPaper paper) async {
+    final document = _document;
+    if (document == null || _acting || _stale || !widget.isCurrent()) return;
+    final source = widget.source;
+    if (source is! WorkInvoicePrintSource) {
+      setState(
+        () => _notice =
+            'Printing is unavailable for this document source. You can save the PDF.',
+      );
+      return;
+    }
+    final epoch = _epoch;
+    setState(() {
+      _acting = true;
+      _notice = null;
+    });
+    try {
+      final state = await StoreDocumentPrinter.print(
+        name: document.fileName,
+        initialFormat: paper.initialFormat,
+        isCurrent: () => _valid(epoch),
+        scopeChanges: widget.scopeChanges,
+        render: (paper, pages) async {
+          final output = await (source as WorkInvoicePrintSource).forPrint(
+            widget.request,
+            paper,
+            pages,
+          );
+          if (!_valid(epoch) ||
+              output.identity != document.identity ||
+              output.reviewOnly != document.reviewOnly) {
+            throw const WorkInvoicePdfException(
+              'The document changed. Reopen it to print.',
+            );
+          }
+          return output.bytes;
+        },
+      );
+      if (!_valid(epoch)) return;
+      setState(
+        () => _notice = switch (state) {
+          StorePrintState.completed =>
+            'The print service reports completion. Check your printer.',
+          StorePrintState.cancelled => 'Printing cancelled.',
+          StorePrintState.unavailable =>
+            'Printing is unavailable. Enable a compatible print service in phone settings.',
+          StorePrintState.failed =>
+            'Printing failed. Check the printer and retry.',
+          StorePrintState.submitted =>
+            'Sent to the print queue. Check the printer for completion.',
+          StorePrintState.blocked =>
+            'The print queue needs attention. Check the printer connection, paper and ink.',
+          StorePrintState.unknown =>
+            'Print status could not be confirmed. Check the print queue before retrying.',
+        },
+      );
+    } finally {
+      if (_valid(epoch)) setState(() => _acting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Invoice PDF')),
+    appBar: AppBar(
+      title: const Text('Invoice PDF'),
+      actions: [
+        StorePrintButton(
+          key: const Key('invoice-pdf-print'),
+          tooltip: 'Print invoice',
+          onSelected: _document == null || _acting || _rendering || _stale
+              ? null
+              : _print,
+        ),
+      ],
+    ),
     body: SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(

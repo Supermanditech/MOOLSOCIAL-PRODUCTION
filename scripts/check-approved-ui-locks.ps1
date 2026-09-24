@@ -301,6 +301,18 @@ function Get-CursorAccessibilityNativeProjection {
       # No other native/accessibility projection boundary changes.
       $expectedBridgeHash = '3369c2b8f835d704bb18ca9d46cd76a6e0d93dceb05d0676a34da42acba288e6'
     }
+    # Founder bounded printing extension: exact additive implementation only,
+    # isolated Store lane and preserved pre-extension checkpoint. This does not
+    # admit changed MainActivity, other native sources, or integration/Cursor.
+    $printBridgeHash = '4e7bd5a468849e67f9d1654dde6e422eca769f6a6e4a753b4b91f45b0c3f9aa3'
+    if ($requiredBranch -ceq 'work/codex-ui/add-product-screen1-20260920' -and
+        (Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -ceq $printBridgeHash) {
+      & git -C $root merge-base --is-ancestor 'd99b6c0f9c40da5b88f2a479371ae9589d9ec263' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'Store printing requires the original Downloads ancestor.' }
+      & git -C $root merge-base --is-ancestor '20932c3869f360b71cd09d0b840368a86ee89b9d' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'Store printing requires its preserved pre-extension ancestor.' }
+      $expectedBridgeHash = $printBridgeHash
+    }
     if ((Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -cne
         $expectedBridgeHash) {
       throw 'Store download projection rejects changed bridge source.'

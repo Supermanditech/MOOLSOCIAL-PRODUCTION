@@ -2927,7 +2927,13 @@ if ($ProductionLane -ceq 'baseline') {
         $branch -ceq $addProductBinding.branch -and $rootForward -ceq $addProductBinding.worktreePath -and
         $effectiveOwner -cin @(
           # 2026-09-23 founder-authorized Store scanner mode; Buy defaults unchanged.
+          # Bounded self-test repair for the mandatory Store journey build gate.
+          'scripts/test-public-auth-sideload-build-controls.ps1',
           'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+          # 2026-09-24 approved integrated Cart reference successors only.
+          'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+          'apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-360x800-android-cart.png',
+          'apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-430x932-ios-cart.png',
           'config/codex-development-regression-registry.json',
           'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
           'apps/mobile/lib/shared/commerce/commerce_downloads.dart',

@@ -171,8 +171,44 @@ final class _EntryCsvFile extends PlatformFile {
   }
 }
 
+Future<void> awaitCataloguePhoto(
+  WidgetTester tester,
+  bool Function() ready,
+) async {
+  for (var i = 0; i < 100 && !ready(); i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 15)),
+    );
+    await tester.pump();
+  }
+  expect(
+    ready(),
+    isTrue,
+    reason: 'Real image renderer reached the expected state',
+  );
+}
+
+final class _EntryImageFile extends PlatformFile {
+  _EntryImageFile(Uint8List bytes)
+    : _file = XFile.fromData(bytes, name: 'own-test.png');
+  final XFile _file;
+  @override
+  String get name => 'own-test.png';
+  @override
+  Uri get uri => Uri.parse('memory:own-test.png');
+  @override
+  XFile get xFile => _file;
+  @override
+  Future<int> length() => _file.length();
+  @override
+  Future<Uint8List> readAsBytes() => _file.readAsBytes();
+  @override
+  Stream<Uint8List> readAsByteStream() => _file.openRead();
+}
+
 class _EntryFilePicker extends FilePickerPlatform {
   int calls = 0;
+  FileType? selectedType;
   List<String>? extensions;
   Completer<PlatformFile?>? pending;
   bool fail = false;
@@ -192,6 +228,7 @@ class _EntryFilePicker extends FilePickerPlatform {
     WebOptions webOptions = const WebOptions(),
   }) async {
     calls++;
+    selectedType = type;
     extensions = allowedExtensions;
     if (fail) throw StateError('Picker unavailable');
     return pending == null ? file : await pending!.future;
@@ -8833,6 +8870,284 @@ void main() {
     });
   }
 
+  testWidgets(
+    'PRIVATEPHOTO editor image-only cancellation and failure preserve draft',
+    (tester) async {
+      final picker = _EntryFilePicker();
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = picker;
+      addTearDown(() => FilePickerPlatform.instance = previous);
+      final work = storeViewFixture(null, _ContactDraftFixtureStore())
+        ..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+      );
+      final open = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      await chooseAddProductMode(tester, 'enter');
+      await tester.enterText(
+        find.byKey(const Key('work-product-title')),
+        'Own SKU draft',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      final reference = find.byKey(const Key('work-product-reference'));
+      await tester.ensureVisible(reference);
+      await tester.tap(reference);
+      await tester.pumpAndSettle();
+      final choose = find.byKey(const Key('work-product-photo-choose'));
+      await tester.ensureVisible(choose);
+      await tester.tap(choose);
+      await tester.pumpAndSettle();
+      expect(picker.calls, 1);
+      expect(picker.selectedType, FileType.image);
+      expect(find.byKey(const Key('work-product-photo-confirm')), findsNothing);
+      expect(work.workspaceCatalogueItems, isEmpty);
+      picker.fail = true;
+      await tester.tap(choose);
+      await tester.pumpAndSettle();
+      expect(picker.calls, 2);
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('work-product-title')))
+            .controller!
+            .text,
+        'Own SKU draft',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final entryPath in ['manual', 'csv']) {
+    testWidgets(
+      'PRIVATEPHOTO $entryPath selected image saves restarts and follows exact SKU into POS',
+      (tester) async {
+        FlutterSecureStorage.setMockInitialValues({});
+        final directory = (await tester.runAsync(
+          () => Directory.systemTemp.createTemp('store-photo-flow-'),
+        ))!;
+        addTearDown(() async {
+          await directory.delete(recursive: true);
+        });
+        final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+        final picker = _EntryFilePicker()..file = _EntryImageFile(bytes);
+        final previous = FilePickerPlatform.instance;
+        FilePickerPlatform.instance = picker;
+        addTearDown(() => FilePickerPlatform.instance = previous);
+        final account = _ContactDraftFixtureStore();
+        WorkSession fresh() =>
+            WorkSession(
+                contactDraftStore: account,
+                counterDraftStore: _CounterDraftFixtureStore(),
+                inventoryStore: SecureWorkInventoryStore(
+                  accountScope: () => account.accountScope,
+                ),
+                productPhotoSupportDirectory: () async => directory,
+              )
+              ..selectedProfile = workProfiles.first
+              ..workspaceId = 'qa-own-photo'
+              ..activeWorkspace = const WorkWorkspace(
+                id: 'qa-own-photo',
+                name: 'QA image flow',
+                profileLabel: 'Grocery / Kirana Shop',
+                profileId: 'retailer-grocery',
+                area: 'Local QA',
+                verified: true,
+              )
+              ..reviewStage = WorkReviewStage.live
+              ..initialWorkspaceStateLoaded = true
+              ..retailerSetupSaved = true;
+        var work = fresh();
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 806),
+        );
+        await openAddProductsFromHome(tester);
+        if (entryPath == 'csv') {
+          picker.file = _EntryCsvFile(
+            'title,brand,pack,purchasePrice,sellingPrice,stock,sku\nQA own product,QA own brand,1 kg,28,32,8,QA-PHOTO-1',
+          );
+          await chooseAddProductMode(tester, 'import');
+          await tester.tap(
+            find.byKey(const Key('work-add-product-choose-csv')),
+          );
+          await tester.pumpAndSettle();
+          final edit = find.byKey(const Key('work-import-edit-2'));
+          await tester.ensureVisible(edit);
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          picker.file = _EntryImageFile(bytes);
+        } else {
+          await chooseAddProductMode(tester, 'enter');
+          await tester.enterText(
+            find.byKey(const Key('work-product-title')),
+            'QA own product',
+          );
+          final details = find.byKey(const Key('work-product-details-section'));
+          await reveal(tester, details);
+          await tester.tap(details);
+          await tester.pumpAndSettle();
+          for (final entry in [
+            ('work-product-brand', 'QA own brand'),
+            ('work-product-pack', '1 kg'),
+            ('work-product-sku', 'QA-PHOTO-1'),
+          ]) {
+            final field = find.byKey(Key(entry.$1));
+            await reveal(tester, field);
+            await tester.enterText(field, entry.$2);
+          }
+          for (final entry in [
+            ('work-product-purchase-price', '28'),
+            ('work-product-selling-price', '32'),
+            ('work-product-stock', '8'),
+          ]) {
+            final field = find.byKey(Key(entry.$1));
+            await reveal(tester, field);
+            await tester.enterText(field, entry.$2);
+          }
+          tester.testTextInput.hide();
+        }
+        await tester.pumpAndSettle();
+        final reference = find.byKey(const Key('work-product-reference'));
+        await reveal(tester, reference);
+        await tester.tap(reference);
+        await tester.pumpAndSettle();
+        final choose = find.byKey(const Key('work-product-photo-choose'));
+        await tester.ensureVisible(choose);
+        await tester.tap(choose);
+        try {
+          await awaitCataloguePhoto(
+            tester,
+            () => find
+                .byKey(const Key('work-product-photo-confirm'))
+                .evaluate()
+                .isNotEmpty,
+          );
+        } catch (_) {
+          debugPrint(
+            'PRIVATEPHOTO editor diagnostics: ${tester.widgetList<Text>(find.byType(Text)).map((text) => text.data).whereType<String>().join(' | ')}',
+          );
+          rethrow;
+        }
+        await tester.tap(find.byKey(const Key('work-product-photo-confirm')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems, isEmpty);
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        if (entryPath == 'csv') {
+          expect(work.workspaceCatalogueItems, isEmpty);
+          await tester.tap(find.byKey(const Key('work-import-save')));
+          await tester.pumpAndSettle();
+        }
+        expect(await work.workspaceInventorySaved, isTrue);
+        final saved = work.workspaceCatalogueItems.single;
+        expect(saved.privatePhoto, isNotNull);
+        expect(saved.cataloguePhoto, isNull);
+        expect(saved.publicListing, isFalse);
+        final record = saved.toInventoryJson();
+        final storedBytes = await tester.runAsync(
+          () => work.privateProductPhotos!.read(saved),
+        );
+        expect(storedBytes, isNotEmpty);
+        await tester.pumpWidget(const SizedBox.shrink());
+        work = fresh();
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        expect(work.workspaceCatalogueItems.single.toInventoryJson(), record);
+        expect(
+          await tester.runAsync(
+            () => work.privateProductPhotos!.read(
+              work.workspaceCatalogueItems.single,
+            ),
+          ),
+          orderedEquals(storedBytes!),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 806),
+        );
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9000092301', name: 'QA customer');
+        final tile = find.byKey(Key('work-sale-product-${saved.id}'));
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(
+                find.descendant(of: tile, matching: find.byType(RawImage)),
+              )
+              .any((image) => image.image != null),
+        );
+        await tester.tap(find.byKey(Key('work-order-add-${saved.id}')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterPayableMinor, 3200);
+        expect(
+          work.workspaceCatalogueItems.single.privatePhoto!.toJson(),
+          saved.privatePhoto!.toJson(),
+        );
+        final reviewItem = find.byKey(Key('work-review-item-${saved.id}'));
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(
+                find.descendant(
+                  of: reviewItem,
+                  matching: find.byType(RawImage),
+                ),
+              )
+              .any((image) => image.image != null),
+        );
+        final reviewImage = tester.widget<Image>(
+          find.descendant(of: reviewItem, matching: find.byType(Image)).first,
+        );
+        expect(
+          (reviewImage.image as MemoryImage).bytes,
+          orderedEquals(storedBytes),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StoreProductThumbnail(
+              product: saved,
+              extent: 48,
+              session: work,
+            ),
+          ),
+        );
+        await awaitCataloguePhoto(
+          tester,
+          () => tester
+              .widgetList<RawImage>(find.byType(RawImage))
+              .any((image) => image.image != null),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StoreProductThumbnail(
+              product: saved.copyWith(pack: 'different pack'),
+              extent: 48,
+              session: work,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(Image), findsNothing);
+        expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   testWidgets('ADDENTRY03 manual keyboard keeps save and cancel reachable', (
     tester,
   ) async {
@@ -10759,23 +11074,6 @@ void main() {
       );
     }
     return media.restore;
-  }
-
-  Future<void> awaitCataloguePhoto(
-    WidgetTester tester,
-    bool Function() ready,
-  ) async {
-    for (var i = 0; i < 100 && !ready(); i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 15)),
-      );
-      await tester.pump();
-    }
-    expect(
-      ready(),
-      isTrue,
-      reason: 'Real image renderer reached the expected state',
-    );
   }
 
   for (final entryPath in ['catalogue', 'manual', 'csv']) {

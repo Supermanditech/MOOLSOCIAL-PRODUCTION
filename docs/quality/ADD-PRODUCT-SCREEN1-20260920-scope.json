@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "69C1F7D82178AF6DAC95DF06C26BB197CDA28A18A01484684D72F3EAD4C95217",
+      "manifestSha256": "6D10396511220BE89ADD78246BC10D0E0E57F0CF64426BDD4A01F9A645458018",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -78,13 +78,14 @@
       "Founder-approved next screen: shared prefilled editable review with Save to Store, fuller thumbnails within existing tiles, local shared-inventory Counter Sale verification; stop before Store stock list/grid redesign",
       "Founder-authorized exact variant and pack presentation, shared product metadata editor and public-field disposition; preserve one-time Store setup and system ownership, defer backend and pause for revised editor approval",
       "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review",
-      "23 September founder-authorized continuation: implement the 31 grouped r66.38 Store/catalogue/Counter Sale findings, fix related child defects during local tests, and present all affected actual screens together for founder approval before a new APK"
+      "23 September founder-authorized continuation: implement the 31 grouped r66.38 Store/catalogue/Counter Sale findings, fix related child defects during local tests, and present all affected actual screens together for founder approval before a new APK",
+      "24 September founder bounded extension v1: shared contextual A4/58/80 mm printing, evidence-backed orphan-history recovery, and manual-photo stock-to-POS continuity; local tests and Git preservation before guarded APK; no automatic installation"
     ],
     "explicitExclusions": [
       "CSV batch-review redesign pending its screenwise approval",
       "Backend",
       "Unapproved builds/installs or live service writes; Cursor edits/integration",
-      "Counter Sale work unrelated to the 31 grouped r66.38 findings and their directly related child defects"
+      "Counter Sale work unrelated to the 31 grouped r66.38 findings, directly related child defects, or founder bounded extension v1 printing/history/photos"
     ],
     "dependenciesAndApprovals": [
       "Founder approval of the complete locally tested correction batch before any new APK"

@@ -270,6 +270,7 @@ class StoreCustomerReportsPanel extends StatefulWidget {
     this.allCustomersComplete = false,
     this.coverageStarts = const {},
     this.saveFile = saveStoreStockFile,
+    this.scopeChanges,
   });
   final String accountId, storeId, storeName;
   final List<WorkspaceCustomerLedger> ledgers;
@@ -277,6 +278,7 @@ class StoreCustomerReportsPanel extends StatefulWidget {
   final bool allCustomersComplete;
   final bool Function() isCurrent;
   final StoreStockFileSaver saveFile;
+  final Listenable? scopeChanges;
   @override
   State<StoreCustomerReportsPanel> createState() =>
       _StoreCustomerReportsPanelState();
@@ -287,12 +289,41 @@ class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
       _from = TextEditingController(),
       _to = TextEditingController();
   final _horizontal = ScrollController();
+  final _printChanges = ValueNotifier<int>(0);
+  int _printRevision = 0;
   String? _customer, _notice;
   String _period = 'Recorded history';
   bool _outstanding = false, _busy = false, _invalidated = false;
   @override
+  void initState() {
+    super.initState();
+    widget.scopeChanges?.addListener(_printScopeChanged);
+  }
+
+  void _printScopeChanged() {
+    // A session notification can carry changed ledger data before its widget
+    // rebuild arrives. Cancel the captured print snapshot conservatively.
+    _printRevision++;
+    _printChanges.value = _printRevision;
+  }
+
+  @override
   void didUpdateWidget(StoreCustomerReportsPanel old) {
     super.didUpdateWidget(old);
+    if (old.scopeChanges != widget.scopeChanges) {
+      old.scopeChanges?.removeListener(_printScopeChanged);
+      widget.scopeChanges?.addListener(_printScopeChanged);
+    }
+    if (old.accountId != widget.accountId ||
+        old.storeId != widget.storeId ||
+        old.storeName != widget.storeName ||
+        !identical(old.ledgers, widget.ledgers) ||
+        !identical(old.coverageStarts, widget.coverageStarts) ||
+        old.allCustomersComplete != widget.allCustomersComplete ||
+        old.scopeChanges != widget.scopeChanges ||
+        !widget.isCurrent()) {
+      _printScopeChanged();
+    }
     if (old.accountId != widget.accountId ||
         old.storeId != widget.storeId ||
         !widget.isCurrent()) {
@@ -303,6 +334,10 @@ class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
 
   @override
   void dispose() {
+    _invalidated = true;
+    widget.scopeChanges?.removeListener(_printScopeChanged);
+    _printScopeChanged();
+    _printChanges.dispose();
     _search.dispose();
     _from.dispose();
     _to.dispose();
@@ -401,6 +436,49 @@ class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
       );
     } on FormatException {
       return null;
+    }
+  }
+
+  Future<void> printReport(StorePrintPaper paper) async {
+    final report = document;
+    if (_busy || report == null) return;
+    final revision = _printRevision;
+    bool valid() => mounted && current && revision == _printRevision;
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+    try {
+      final state = await StoreDocumentPrinter.print(
+        name: _outstanding ? 'Customer outstanding' : 'Customer statement',
+        initialFormat: paper.initialFormat,
+        isCurrent: valid,
+        scopeChanges: _printChanges,
+        render: report.forPrint,
+      );
+      if (mounted && current) {
+        setState(
+          () => _notice = valid()
+              ? switch (state) {
+                  StorePrintState.completed =>
+                    'The print service reports completion. Check your printer.',
+                  StorePrintState.cancelled => 'Printing cancelled.',
+                  StorePrintState.unavailable =>
+                    'Printing is unavailable. Enable a compatible print service in phone settings.',
+                  StorePrintState.failed =>
+                    'Printing failed. Check the printer and retry.',
+                  StorePrintState.submitted =>
+                    'Sent to the print queue. Check the printer for completion.',
+                  StorePrintState.blocked =>
+                    'The print queue needs attention. Check the printer connection, paper and ink.',
+                  StorePrintState.unknown =>
+                    'Print status could not be confirmed. Check the print queue before retrying.',
+                }
+              : 'Records changed. Reopen the statement before printing.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -737,6 +815,11 @@ class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
                   onPressed: report == null || _busy ? null : () => download(f),
                   child: Text(f.label),
                 ),
+              StorePrintButton(
+                key: const Key('customer-statement-print'),
+                tooltip: 'Print statement',
+                onSelected: report == null || _busy ? null : printReport,
+              ),
             ],
           ),
           if (_period == 'Custom dates')
