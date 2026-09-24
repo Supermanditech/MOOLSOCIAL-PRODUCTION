@@ -621,7 +621,7 @@ class WorkSession extends ChangeNotifier {
         accountScope: () => _disposed ? null : _contactAccountScope,
       );
   // Production wiring needs the future authoritative inventory adapter. QA
-  // persists the normal editor flow without migrating any seeded review Store.
+  // persists edited stock in the QA namespace, never as production inventory.
   bool get localInventoryEnabled =>
       inventoryStore != null ||
       (!_productionSession &&
@@ -635,7 +635,7 @@ class WorkSession extends ChangeNotifier {
     final data = _storeData;
     final account = _contactAccountScope;
     final store = activeWorkspace?.id;
-    if (!localInventoryEnabled || _selectedReviewSeed?.storeId == store) {
+    if (!localInventoryEnabled) {
       return Future.value(true);
     }
     if (data.inventoryLoaded) return Future.value(true);
@@ -657,14 +657,32 @@ class WorkSession extends ChangeNotifier {
           return false;
         }
         if (saved != null) {
+          final seed = _selectedReviewSeed;
+          final untouchedReviewBaseline =
+              !_productionSession &&
+              seed != null &&
+              seed.storeId == store &&
+              data.inventoryMutations == 0 &&
+              data.workspaceStockMovements.isEmpty &&
+              jsonEncode(
+                    data.workspaceCatalogueItems
+                        .map((p) => p.toInventoryJson())
+                        .toList(),
+                  ) ==
+                  jsonEncode(
+                    seed.products.map((p) => p.toInventoryJson()).toList(),
+                  );
           // Never overwrite in-session/server inventory with an older local copy.
-          if (data.workspaceCatalogueItems.isNotEmpty ||
-              data.workspaceStockMovements.isNotEmpty) {
+          if (!untouchedReviewBaseline &&
+              (data.workspaceCatalogueItems.isNotEmpty ||
+                  data.workspaceStockMovements.isNotEmpty)) {
             throw const WorkGatewayException(
               'Saved stock needs reconciliation before editing. Existing records have been kept.',
             );
           }
-          data.workspaceCatalogueItems.addAll(saved.products);
+          data.workspaceCatalogueItems
+            ..clear()
+            ..addAll(saved.products);
           data.workspaceStockMovements.addAll(saved.movements);
           data.inventoryRevision = saved.revision;
           retailerProductAdded = saved.products.isNotEmpty;
@@ -688,8 +706,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void _queueInventorySave() {
-    if (!localInventoryEnabled ||
-        _selectedReviewSeed?.storeId == activeWorkspace?.id) {
+    if (!localInventoryEnabled) {
       return;
     }
     final data = _storeData;
@@ -1448,6 +1465,17 @@ class WorkSession extends ChangeNotifier {
   Future<({String orderId, WorkspaceCustomerInvoice? invoice})?>
   submitWorkspaceCounterBill({String? expectedReview}) async {
     if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
+    final inventoryData = _storeData;
+    if (localInventoryEnabled) {
+      final saved = await inventoryData.inventoryWrites;
+      if (_disposed || !identical(inventoryData, _storeData)) return null;
+      if (!saved || inventoryData.inventoryError != null) {
+        showError(
+          'Save Store stock successfully before creating this invoice. Your bill is kept.',
+        );
+        return null;
+      }
+    }
     if (workspaceFinance != null) {
       final ledgerData = _storeData;
       if (ledgerData.customerCollectionGateway is! WorkCustomerInvoiceGateway) {
@@ -2672,6 +2700,26 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     final quantities = inventory.quantities!;
+    // A durable catalogue snapshot may precede later invoice movements.
+    // Accept only a proven chronological prefix, never unrelated stock edits.
+    final localMovements = data.workspaceStockMovements.reversed
+        .where((m) => inventory.openingQuantities.containsKey(m.productId))
+        .toList();
+    final prefixQuantities = Map<String, int>.of(inventory.openingQuantities);
+    var matchesPrefix = localMovements.length <= inventory.movements.length;
+    for (var i = 0; matchesPrefix && i < localMovements.length; i++) {
+      final movement = localMovements[i];
+      matchesPrefix =
+          movement.contentIdentity == inventory.movements[i].contentIdentity;
+      prefixQuantities[movement.productId] =
+          prefixQuantities[movement.productId]! + movement.quantityDelta;
+    }
+    if (matchesPrefix &&
+        prefixQuantities.entries.every(
+          (entry) => products[entry.key] == entry.value,
+        )) {
+      return true;
+    }
     if (quantities.entries.every(
       (product) => products[product.key] == product.value,
     )) {
@@ -2928,6 +2976,11 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     try {
+      if (_selectedReviewSeed?.storeId == store &&
+          !await loadWorkspaceInventory(retry: true)) {
+        throw StateError('Recover saved product details before the ledger.');
+      }
+      if (!_isStoreScopeCurrent(data, store, account)) return false;
       final saved = await data.ledgerCheckpointStore!.read(account, store);
       if (!_isStoreScopeCurrent(data, store, account)) return false;
       if (saved != null) {

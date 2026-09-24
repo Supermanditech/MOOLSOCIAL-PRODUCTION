@@ -979,6 +979,186 @@ void main() {
 
     group('enabled fixture mode', () {
       test(
+        'selected Store retains imported stock and photo identity through invoice restart',
+        () async {
+          final account = _CommandAccountStore();
+          final native = _OrderJournalStorage();
+          WorkSession open() => WorkSession(
+            gateway: ReviewWorkGateway(),
+            contactDraftStore: account,
+            inventoryStore: SecureWorkInventoryStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+            reviewStoreSelectionStore: SecureWorkReviewStoreSelectionStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+          );
+          final first = open()..activeWorkspace = _commandStore;
+          expect(
+            first.loadStoreReviewSeed(12, now: DateTime.utc(2026, 9, 19)),
+            isTrue,
+          );
+          expect(await first.storeReviewSelectionSaved, isTrue);
+          expect(await first.recoverCustomerLedger(), isTrue);
+          expect(await first.loadWorkspaceInventory(), isTrue);
+          final original = first.workspaceCatalogueItems.first;
+          final edited = original.copyWith(
+            sellingPrice: 270,
+            cataloguePhoto: WorkspaceCataloguePhoto(
+              assetId: 'qa-exact-pack',
+              revision: '1',
+              source: 'https://example.test/qa-exact-pack.jpg',
+              publisherWorkspaceId: 'qa-catalogue',
+              canonicalId: original.canonicalId,
+              brand: original.brand,
+              variant: original.variant,
+              pack: original.pack,
+              barcode: original.barcode,
+              file: const BuyV2MediaFileMetadata(
+                mimeType: 'image/jpeg',
+                byteLength: 100,
+                width: 100,
+                height: 100,
+                normalized: true,
+              ),
+              status: WorkspaceCataloguePhotoStatus.testOnly,
+            ),
+          );
+          first.addOrUpdateWorkspaceProduct(edited);
+          expect(await first.workspaceInventorySaved, isTrue);
+          final imported = WorkspaceProductImport.parse(
+            'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n'
+            'QA Rice,QA,1 kg,80,101,100,QA-RICE\n'
+            'QA Tea,QA,500 g,80,108,0,QA-TEA',
+            catalogue: const [],
+            owned: const [],
+          ).rows.map((row) => row.product!).toList();
+          first.importWorkspaceProducts(imported, addOnly: true);
+          expect(await first.workspaceInventorySaved, isTrue);
+          final storeId = first.activeWorkspace!.id;
+          final saved = await SecureWorkInventoryStore(
+            accountScope: () => account.accountScope,
+            storage: native,
+          ).read(account.accountScope!, storeId, qa: true);
+          expect(
+            saved,
+            isNotNull,
+            reason: 'Selected review Stores must not bypass durable stock.',
+          );
+          final before = first.workspaceCatalogueItems
+              .map((p) => p.toInventoryJson())
+              .toList();
+          first.dispose();
+
+          final second = open();
+          await second.loadInitialWorkspaceState();
+          expect(second.customerLedgerRecoveryError, isNull);
+          expect(
+            second.workspaceCatalogueItems
+                .map((p) => p.toInventoryJson())
+                .toList(),
+            before,
+          );
+          expect(second.startNewWorkspaceOrder(), isTrue);
+          await second.loadWorkspaceCounterDraft();
+          second.adjustWorkspaceOrderQuantity(imported.first.id, 2);
+          second.updateWorkspaceCounterDetails(
+            customer: '9000091934',
+            payment: 'Cash',
+          );
+          final bill = await second.submitWorkspaceCounterBill();
+          expect(bill?.invoice, isNotNull);
+          final after = second.workspaceCatalogueItems
+              .map((p) => p.toInventoryJson())
+              .toList();
+          second.dispose();
+
+          final third = open();
+          await third.loadInitialWorkspaceState();
+          expect(third.customerLedgerRecoveryError, isNull);
+          expect(
+            third.workspaceCatalogueItems
+                .map((p) => p.toInventoryJson())
+                .toList(),
+            after,
+          );
+          expect(
+            third.workspaceInvoices.single.toLedgerJson(),
+            bill!.invoice!.toLedgerJson(),
+          );
+          expect(
+            third.workspaceCatalogueItems.first.cataloguePhoto!.toJson(),
+            edited.cataloguePhoto!.toJson(),
+          );
+          final inventoryKey = native.values.keys.singleWhere(
+            (key) => key.contains('workspace.inventory.'),
+          );
+          final preserved = native.values[inventoryKey]!;
+          third.dispose();
+
+          // Missing legacy metadata must not be fabricated from ledger quantities.
+          native.values.remove(inventoryKey);
+          final missing = open();
+          await missing.loadInitialWorkspaceState();
+          expect(missing.customerLedgerRecoveryError, isNotNull);
+          expect(
+            missing.workspaceCatalogueItems.any(
+              (p) => p.id == imported.first.id,
+            ),
+            isFalse,
+          );
+          expect(native.values.containsKey(inventoryKey), isFalse);
+          missing.dispose();
+
+          native.values[inventoryKey] = '{corrupt';
+          final corrupt = open();
+          await corrupt.loadInitialWorkspaceState();
+          expect(corrupt.customerLedgerRecoveryError, isNotNull);
+          expect(native.values[inventoryKey], '{corrupt');
+          native.values[inventoryKey] = preserved;
+          expect(await corrupt.recoverCustomerLedger(), isTrue);
+          expect(corrupt.customerLedgerRecoveryError, isNull);
+          corrupt.dispose();
+
+          native.values[inventoryKey] = preserved;
+          final retry = open();
+          addTearDown(retry.dispose);
+          await retry.loadInitialWorkspaceState();
+          expect(retry.customerLedgerRecoveryError, isNull);
+          expect(
+            retry.workspaceCatalogueItems
+                .map((p) => p.toInventoryJson())
+                .toList(),
+            after,
+          );
+          expect(retry.startNewWorkspaceOrder(), isTrue);
+          await retry.loadWorkspaceCounterDraft();
+          retry.adjustWorkspaceOrderQuantity(imported.first.id, 1);
+          retry.updateWorkspaceCounterDetails(
+            customer: '9000091934',
+            payment: 'Cash',
+          );
+          native.failWrite = true;
+          retry.addOrUpdateWorkspaceProduct(
+            retry.workspaceCatalogueItems.first.copyWith(sellingPrice: 271),
+          );
+          expect(await retry.workspaceInventorySaved, isFalse);
+          final invoiceCount = retry.workspaceInvoices.length;
+          expect(await retry.submitWorkspaceCounterBill(), isNull);
+          expect(retry.workspaceInvoices.length, invoiceCount);
+          expect(retry.workspaceOrderQuantities[imported.first.id], 1);
+          native.failWrite = false;
+          expect(await retry.retryWorkspaceInventorySave(), isTrue);
+          expect(
+            (await retry.submitWorkspaceCounterBill())?.invoice,
+            isNotNull,
+          );
+        },
+      );
+
+      test(
         'encrypted selection retains original seed and rejects corrupt/cross-account data',
         () async {
           final account = _CommandAccountStore();
