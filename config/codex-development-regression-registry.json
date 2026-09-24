@@ -105264,8 +105264,8 @@
           ],
           "archive": {
             "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-            "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
-            "bytes": 44299869
+            "sha256": "927e9a22fdb2b6ed02579a0be11fc2577f4b5fd6e3bd10aab3aedc7cc51da571",
+            "bytes": 44311707
           }
         },
         "resolvedFixtureCauses": [
@@ -105306,8 +105306,8 @@
           "device": "No APK built or installed.",
           "archive": {
             "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-            "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
-            "bytes": 44299869
+            "sha256": "927e9a22fdb2b6ed02579a0be11fc2577f4b5fd6e3bd10aab3aedc7cc51da571",
+            "bytes": 44311707
           }
         }
       },
@@ -105328,9 +105328,35 @@
         ],
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd",
-          "bytes": 44299869
+          "sha256": "927e9a22fdb2b6ed02579a0be11fc2577f4b5fd6e3bd10aab3aedc7cc51da571",
+          "bytes": 44311707
         }
+      },
+      "productPageDefinitionAudit20260924": {
+        "status": "definitions_repaired_implementation_pending",
+        "tickets": [
+          "BUY-PDP-REF-20260924-01",
+          "BUY-PDP-REF-20260924-02",
+          "BUY-PDP-REF-20260924-03",
+          "BUY-PDP-REF-20260924-04",
+          "BUY-PDP-REF-20260924-05",
+          "BUY-PDP-REF-20260924-06"
+        ],
+        "revision": 2,
+        "archive": {
+          "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+          "sha256": "927e9a22fdb2b6ed02579a0be11fc2577f4b5fd6e3bd10aab3aedc7cc51da571",
+          "bytes": 44311707
+        },
+        "entry": "flipkart-reference-20260924-v2/definition.md",
+        "findings": [
+          "Initial requirements lacked definitive replacement and connected wiring contracts; repaired in same tickets.",
+          "COD client Shop/5000 heuristic, unavailable production adapter and Store advance-only statement require coordinated resolution in ticket 03.",
+          "Existing scattered product/return/compliance/continuation content must be replaced or moved, not appended."
+        ],
+        "newRuntimeTests": 0,
+        "selectedEntriesUnchanged": 23,
+        "providerConnectorEntry": "flipkart-reference-20260924-v2/provider-connectors.md"
       }
     }
   ],

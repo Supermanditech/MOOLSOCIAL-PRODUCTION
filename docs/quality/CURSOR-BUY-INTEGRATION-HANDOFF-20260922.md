@@ -1,143 +1,136 @@
 # Cursor Buy integration handoff and new-baseline request — 22 September 2026
 
-## Flipkart Redmi reference and six product-page tickets — 24 September 2026
+## Definitive product-page ticket audit — 24 September 2026, revision 2
 
-Status: registered/open; implementation not started. Source reviewed: Buy `8715a458`; Store read-only contract checkpoint `ac8d7cee`. Device `TG8HCYTGGQT885OF`, 720×1600 screenshot pixels. Reference is the actual Foot Print slides page opened from the existing one-item Flipkart Cart. Original Cart item, size 8, quantity 1 and price 380 were observed again at the end; no purchase, payment, rating, wishlist edit or support message was performed.
+Status: the SAME six BUY-PDP-REF-20260924-01 through -06 tickets remain open and unimplemented. This revision replaces the initial active specification, not accepted application code. No new implementation, test pass, APK or device qualification is claimed. Existing 23 selected entries are unchanged.
 
-The 29 PNG captures include transient loading and two failed accessibility dumps (20/21), with successful pixel evidence retained. WebView content was inspected visually. Raw reference images are evidence only, not MoolSocial production assets.
+Audit baseline: Buy 75727e249593ca92d45d06878928e4d014ec4288; Store read-only 20932c3869f360b71cd09d0b840368a86ee89b9d. Reference: 29 retained Redmi Flipkart captures, 720×1600 physical pixels, density 320 (360×800 dp). Captures 20/21 have failed accessibility dumps but valid pixel evidence. Original one-item Cart was restored; no order or payment was made.
 
-### Shared scope and acceptance
+### Definitive shared screen contract
 
-- Reuse the existing MoolSocial native product page and underlying facts; no copied Flipkart product values, assets, ratings or commercial promises.
-- Founder requests reference design/UI/UX parity for these specified sections, across Buy, Wholesale, Bulk and Offers. Later implementation must compare actual native captures with the reference at equivalent viewport/state.
-- Keep observed reference behavior separate from requested additions and provider/backend dependencies. These are six open requirement tickets, not six newly proven runtime defects.
-- For every implementation: inspect child/impacted code, register findings before retry, fix in-scope children, rerun parent/affected checks; no closure from screenshots alone.
-- No new manufacturer/distributor workspace, payments backend, production offer, purchase/message, APK or implementation is authorized by this registration.
-- Existing MoolSocial card Add placement remains accepted; reference product-page sticky CTA layout is scoped to product detail, not a blanket reversion of catalogue cards.
+Use the existing native BuyV2ProductView, with the same composition for Buy/Shop, Wholesale, Bulk product offers, MoolSocial/Supplier Offers and Visit Store product entry. Bulk remains an existing capability/pack context, not a new wholesale workspace. Preserve channel-specific MOQ, increments, tiers, restrictions and permissions. Do not apply this redesign to Medicine or other deferred transactions.
 
-### BUY-PDP-REF-20260924-01 — 1. Multiple SKU photos
+Vertical order: existing navigation → photo gallery → applicable variant controls → brand/title/selected pack and price → delivery and seller panel → Return/Cash on Delivery/Customer support row → Similar products → Product highlights → All details tabs → existing ratings/reviews where supplied → Recently viewed → More products for you. Purchase actions remain fixed above the bottom safe area; content bottom padding includes their full measured height. Hide unavailable optional sections without blank containers.
 
-Large full-width swipeable photo region; pale neutral background; rounded lower corners; thin segmented page indicator; Save and Share stacked at right; rating/count badge at lower left. Size selection follows gallery; two fixed purchase actions remain at screen bottom.
+Reference-derived implementation targets (chosen measurements, not a claim of exact original font extraction): 360 dp baseline; 16 dp content gutter, 8 dp internal gaps, 20 dp section separation; body 14 sp, secondary 12 sp, headings 18 sp semibold, main price 28 sp bold. Gallery is full width with a 4:5 frame and 16 dp lower corner radius, image contained without crop. Thin segmented indicator below image. Save/Share at upper right and factual rating badge at lower left. Interactive targets at least 48 dp even when glyphs/visual buttons are smaller. Sticky action visual height 44 dp with accessible padded hit area, two equal columns, 8 dp gap and 16 dp gutters. Use existing MoolSocial color/type tokens nearest the reference; do not copy Flipkart identity, assets, advertisements or product values. At 320 dp/200% text, wrap or stack instead of clipping; section order remains unchanged. Verify actual native screenshots against retained references at matching width/state.
 
-**Reuse/current gap:** Existing mediaAssets, BuyV2ProductContentSnapshot.media, media admission rules and PageView in buy_v2_views.dart already support multiple media. This is source population and presentation parity, not a second gallery system.
+Sticky actions: left `Go to cart`; right `Buy now` for eligible retail offers. Buy now uses existing selection, quantity, eligibility and checkout handlers; no second cart or silent removal of unrelated lines. Existing Wholesale/Bulk trade action labels and procurement guards remain authoritative. Catalogue cards keep the already approved Add-on-right layout; do not restore the old full-width bottom Add. Remove a redundant PDP Add when the migrated purchase dock owns that action. Disabled actions expose the actual eligibility reason.
 
-| Subsection | Required content and behavior |
+One inline owner per fact: price in price summary; Store identity in seller panel; delivery promise in delivery panel; returns in assurance row/sheet; technical attributes in highlights or specifications; legal producer details in Manufacturer info. Sheets may repeat a value only as needed for its breakdown or policy context. Partition highlights/specifications by stable attribute key, retaining all source facts once. Manufacturer and seller are different identities, not duplicate names to merge. Never deduplicate facts or products merely by visible text.
+
+### 01 — Photos and composition
+
+Owner: apps/mobile/lib/ui_v2/buy/buy_v2_views.dart: BuyV2ProductView, _BuyV2ProductGallery, _ProductContentMediaSurface. Reuse content.media/mediaAssets, admission rules, PageView and Save/Share handlers. Replace the current inset gradient/bordered hero layout with the shared composition; do not append another gallery.
+
+Photo order and primary index come from the approved Store/SKU/variant/pack media revision. Swipe updates the segment and accessible `Photo {index} of {count}`. One image has no misleading pagination. No approved image shows the existing explicitly labelled illustration, not a fabricated photo. Failed remote media shows `Image unavailable` and a retry icon; loading retains geometry. Variant changes replace the complete media set atomically; late responses cannot show the previous SKU. No duplicated cover images to simulate multiple photos. Preserve existing supported video/accessibility behavior. Fullscreen zoom was not inspected and is not claimed as reference behavior.
+
+Evidence: captures 02-product, 03-gallery. Verify 0/1/many images, swipe versus page scrolling, retry, revision changes, variant switching, save/share identities, both page shells, and enlarged text with purchase dock visible.
+
+### 02 — Variants, prices, delivery and seller
+
+Owners: buy_v2_views.dart (_ProductVariantSelector, _WholesaleTradePriceSummary, _ProductStoreSummary, _ProductOfferDecisionPanel, _PublicProductOrderInformation), buy_v2_session.dart and existing models/content contracts. Move the variant selector above identity/price. Move the existing Store summary and scattered delivery facts into ONE panel; preserve trade information once. Do not append a second Store card or duplicate quick actions.
+
+| Placement | Exact label/template and data | Tap/state outcome |
+| --- | --- | --- |
+| Below gallery | `Select {dimension}`; selected option; `Size chart` only with category chart data | Exact SKU/variant/pack change refreshes media, quote, stock and eligibility together; unavailable choices disabled with reason. Size chart opens scrollable modal, Close/Back returns without changing selection. |
+| Chart | Category supplied column labels/units and measurement instructions | Footwear reference columns UK/India, Foot Length (cm), Euro, US (Men) are examples only; never put shoe conversions on groceries. Long rows scroll/wrap accessibly. |
+| Identity | Optional real brand, product title, selected variant and pack once | No generic `Store product`, no repeated Store name or repeated pack subtitle. |
+| Price | `{discount}% off`, struck MRP when valid, current `{currency}{amount}`, unit/pack basis; factual tax treatment | Tap opens `Price details`: MRP, Discount, Total, then actual cart-dependent fee explanation. Missing/invalid MRP suppresses discount; arithmetic uses existing money rules. Preserve MOQ/tier/minimum total for trade. |
+| Optional below price | `Price dropped by {amount}` with comparable previous price and effective date | Only verified price history of the same SKU/pack; MRP markdown is not a price drop. No fabricated sold count. This addition was requested but not observed in reference. |
+| Delivery panel top | `Deliver to {location/PIN}` and `Change` | Existing location/address flow; return to same SKU and refresh quote/serviceability. Latest response wins. |
+| Delivery panel body | Actual service/date/charge or `Check delivery availability` | Never imply a date/Quick ETA when unknown. Retry a failed lookup without discarding variant/cart. |
+| Seller area | Authoritative Store name; rating/count/tenure only when supplied; `Visit store`, `Compare prices`, `Ask` | Existing Store catalogue, comparison and contextual question handlers. Back restores PDP selection/scroll. No copied ratings/tenure or duplicate Ask row. |
+
+Evidence: 04-price, 06-price-details, 08-size-chart. Verify small/large monetary values, no discount, price rise/drop, chart absent, long Store names, address changes, stale replies, stock changes, Wholesale MOQ/tier/increment, and Cart quote consistency. Reference Cart/PDP discount percentages conflict; do not reproduce that rounding inconsistency.
+
+### 03 — Return, COD and support, including complete COD wiring
+
+Owner: buy_v2_views.dart existing protection/return/payment surfaces; buy_v2_session.dart choosePayment, submitOrder, _submitOrderAsync, _handleOrderPlacement; buy_v2_content_contracts.dart commerce/payment contracts; buy_v2_invoice.dart and buy_v2_saved_products_store.dart for downstream payment state. Coordinate Store work_services.dart/work_models.dart/work_session.dart changes with that lane. Do not edit Store from Buy ownership.
+
+Replace the hero return fact and old inline Return _DecisionPanel with one compact three-control assurance row. `Returns` (or source window, e.g. `{days}-day returns`) opens the policy sheet; `Cash on Delivery` opens eligibility/payment information; `Customer support` opens existing contextual help. No extra inline policy card. Return sheet has only supported Replacement/Refund/Exchange remedies, actual conditions/exclusions, and `How to return` linked to the actual order flow. Missing policy says `Return policy unavailable`, never unconditional returns. COD sheet uses supported payment tabs and amount/timing/fee facts. Support sheet has actual help topics and an explicit help action; no invented 24×7 promise, auto-call or auto-message. Close/Back returns to the same product state.
+
+Current gaps verified in code: COD eligibility is client-only Shop/all-lines plus <=₹5,000; checkout hides COD for collectionCheckoutSelected. Default _BuyV2UnavailableCommerceAdapter cannot place production orders. Device-review adapter is synthetic. Store's older public handoff says retail is full advance. The founder's request now requires conditional COD end to end; the old full-advance statement and client cap cannot be treated as an approved authoritative COD contract. Coordinate and record actual Store/location/amount/fee/collector rules before dependent implementation. Wholesale/Bulk COD is capability-driven, not automatically enabled. Payment-on-delivery timing is not itself proof of a cash payment method. Keep QR/Store collection restrictions separate from delivery cash collection.
+
+| Stage | Required observable result and authoritative boundary |
 | --- | --- |
-| Gallery | Ordered approved photo list, primary photo, image labels, exact Store/SKU/variant/pack, source and media revision. Swipe both ways; indicator tracks current page. Bind every Buy, Wholesale, Bulk and Offers entry to the same selected SKU media. |
-| Image states | One image: no misleading pagination. Multiple: retain order and current selection. Empty/loading/failed/rejected image: truthful state and retry; no repeated cover masquerading as different photos. Changing variant replaces its media atomically. |
-| Composition | Match captured image proportions, spacing, control placement and page-indicator treatment in the existing native product page. Retain MoolSocial identity, actual product assets and existing Save/Share handlers. Preserve fixed action safe area and scrolling beneath it. |
-| Detail viewer | Full-screen/zoom behavior was not inspected; do not label it reference-proven. Preserve existing accessible media/video behavior and decide any extension explicitly within implementation. |
+| PDP/Cart eligibility | Server/Store-approved policy bound to Store, customer, SKU/pack, address, quote revision and expiry. Mixed-Store/mixed-eligibility handling explicitly defined; no stale client-only allowance. |
+| Payment selection | Select `Cash on Delivery`; show amount due now and amount due on delivery from quote, including authorized fees. A pure COD order has no invented advance. Revalidate after address/quantity/offer changes; explain withdrawal and require valid reselection. |
+| Place order | Existing idempotency/reconciliation path; confirmed authoritative order, payment `Cash due on delivery`, never `Paid in full` merely because placement succeeded. Unknown/timeout retains pending identity and resolves before retry. |
+| Store acceptance/packing | Store receives exact order, payable amount and payment method; acceptance, stock and cancellation transitions agree with Buy. No parallel shadow order. |
+| Delivery assignment/handover | Authorized Biker/Bulk collector sees only assigned collectible order/shipment and current amount. Assignment changes/revocation checked server-side; recipient identity and permissions enforced. |
+| Cash collection | Authoritative receipt with order/Store/customer/shipment/collector identity, currency, amount in minor units, revision, timestamp and idempotency key. Duplicate taps/replays produce one receipt. Offline submission stays pending; neither delivery completion nor client tap alone proves payment. Partial collection only if explicitly supported. |
+| Buyer receipt/invoice | Confirmed receipt updates order payment status, balance, invoice/receipt and persisted recovery state consistently. Cash collected and seller settled remain separate states. |
+| Store ledger/reconciliation | Exactly-once posting against correct order/invoice/account; collected cash, amount due and settlement remain reconcilable. Existing WorkCustomerCollectionGateway/ledger checkpoint contracts are reuse candidates; StoreReviewCustomerCollectionGateway is test-only evidence, not a production collection service. |
+| Failure/cancel/return | Refused delivery/uncollected cancellation does not generate a cash refund; confirmed collected amounts follow authorized return/refund policy with independent idempotent records. Stale, duplicate, wrong-account and wrong-collector events rejected. |
 
-**Dependencies:** Approved Store/catalogue multi-photo source, order and exact-pack bindings; live media publication remains provider work.
+Dependencies remain on ticket 03: R6633-D11 payment handoff, D08/D09 delivery/quote coordination, authoritative COD policy/placement/collection/ledger adapters and Store full-advance contract amendment. Exact backend/delivery owners and policy values must be registered by the owning lane before execution; they are unresolved, not guessed. Acceptance requires real sandbox backend/Store/delivery reconciliation in addition to local tests. Review data cannot satisfy end-to-end closure.
 
-**Acceptance:** 0/1/many photos, broken image, same-SKU revision and variant change; Swipe versus page scroll, Save/Share, Cart/Back, no wrong-pack media; All four channels; 320/390 widths, 200-percent text, screen reader and reduced motion
+Evidence: 11-return-policy-loaded, 14-cod-loaded, 17-support. Flipkart COD information was viewed; no COD checkout was performed. Test allowed/denied/expired COD, collection exclusion, mixed cart, process restart, network timeout before/after server commit, duplicate placement/collection, wrong identity, cancellation before/after collection, invoice/ledger balances, refund recovery, and no false paid state.
 
-**Reference captures:** 02-product.png, 03-gallery.png.
+### 04 — Similar products
 
-### BUY-PDP-REF-20260924-02 — 2. Variants, prices and delivery
+Replace Shop/Wholesale _ProductContinuationSection (`You may also like` / `More for business restocking`) with ONE `Similar products` horizontal rail between assurance row and highlights. Reuse session.productContinuationsFor and existing product card/open handlers, after validating related-product semantics. Preserve unrelated category behavior.
 
-Size chips plus Size Chart; brand and selected product/color/size; green discount percentage, struck-through MRP and bold selling price; tap price opens bottom sheet. Delivery panel has location, delivery date, seller rating/tenure and other-sellers entry.
+At 360 dp use 148 dp cards with 8 dp gap and next-card peek; image, optional actual rating, two-line title, exact variant/pack, price/MRP/discount and actual delivery date. No fake empty card. Current exact SKU excluded; alternatives retain their own Store/SKU/variant/pack. Source failure has compact Retry; successful empty result collapses. Tap opens existing PDP; Back restores original selected variant, scroll and rail offset, with unchanged cart. Evidence 19-similar-highlights, 20-highlights. Test 0/1/many, duplicates, unpublished records, own-Store versus other-Store identity, nested Back and horizontal/vertical gestures.
 
-**Reuse/current gap:** Existing variant selection, product facts/eligibility, commercial offers, price, Store address and Cart quote owners. Read current Store mapping contracts before extending shared fields.
+### 05 — Highlights and All details
 
-| Subsection | Required content and behavior |
+Replace _ProductContentSections' three independent _ProductContentCard blocks with `Product highlights` followed by `All details`. Move PDP BuyV2ProductCompliancePanel facts into `Manufacturer info`; retain reusable compliance component for other callers. No standalone duplicate specifications/description/compliance card remains on this PDP.
+
+Highlights: source-ordered label-above-value cells in two columns, thin horizontal separators, expandable only when additional facts exist. All details: tabs `Specifications`, `Description`, `Manufacturer info`, active dark-filled tab, horizontal tab scrolling at narrow widths. Specifications uses `General` only where applicable, source-labelled two-column fields; stack at large text. Description uses approved paragraphs, not copied promotional reference prose. Manufacturer info: Generic name/Country of origin paired when supplied; manufacturer, packer, importer names and addresses full-width, then applicable license/date/consumer-care facts. Store address cannot substitute for producer address. Partition fields already shown in highlights; never repeat brand/title/pack mechanically in new tables. Preserve legally required facts and category units.
+
+Retain active tab/expansion/reading position for same SKU; reset for another SKU; late revisions cannot overwrite current identity. Missing fields are omitted; entire missing details section says `Product details unavailable` once with Retry only if retryable. Evidence 20-highlights, 22-all-details, 23-specifications, 24-description, 25-manufacturer. Test long addresses/labels, category-specific rows, empty/partial content, all tabs, stale responses, screen readers, 200% text and bottom dock clearance.
+
+### 06 — Recently viewed and More products for you
+
+After existing ratings/reviews (one existing instance), add `Recently viewed` with View-all arrow and the same horizontal card geometry as ticket 04; then `More products for you` in a two-column grid, 8 dp gap, equal flexible width. Stack to one column when enlarged text cannot fit. Existing catalogue `More products` is not this PDP section and must not be globally renamed.
+
+Reuse session.recentlyViewedProductsFor and existing history/account persistence; open the existing history entry via View-all. Reuse bounded discovery for further products, with truthful generic recommendations if no personalization contract exists. Exact Store/SKU/variant/pack key governs deduplication: exclude current SKU and suppress repeated cards across Similar/Recently viewed/More on this PDP (precedence Similar → Recent → More); View-all history still includes full valid history. No invented history/rating/sponsorship. No blank section on empty results. Failed source shows compact Retry; pagination retains already loaded products and stable position.
+
+Evidence 26-lower-page, 27-recommendations, 28-more-products. Test recency, repeated view, clear/remove/account switch, persisted restart, stale/unpublished history, pagination/retry, product/Cart/Back continuity and accessible grid. No advertising system, new reviews engine or Q&A feature is implied by captured surroundings.
+
+### Mandatory Store/provider workspace connectors — founder clarification
+
+Applies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.
+
+Reuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.
+
+| Data | Authoritative producer / required consumer connection |
 | --- | --- |
-| Variant dimensions | Use category-applicable size, color, pack quantity, weight/volume and unit. Show selected, unavailable and out-of-stock states. A variant selects an exact SKU, not a label-only local price change. Preserve Wholesale/Bulk MOQ, order increments and tiers. |
-| Size chart table | Observed columns: UK/India, Foot Length (cm), Euro, US (Men), plus measurement guidance. Reuse table layout for category-supplied dimension/unit charts; do not attach footwear conversion values to grocery packs. Sheet title, plain Close, scrollable rows and readable headers. |
-| Price summary | MRP/list price, discount percent, actual current selling amount, pack/unit basis and applicable tax wording. Use current MoolSocial monetary contracts and explicit minor-unit conversion. Price-details sheet: MRP inclusive of taxes, discount amount, separator, total; explain cart-dependent fees/discounts using actual quote inputs. |
-| Price drop | Requested by founder but no historical drop block observed on this product. Record previous comparable selling price, effective dates and current price from a verified history source before showing a drop badge. MRP discount is not proof of a historical price drop; do not copy the reference cart/PDP percentage mismatch. |
-| Delivery/seller table | Location/PIN/change entry; authoritative eligible service/date/charge; Store name/ID, verified rating/count and tenure only if supplied; other-seller entry. Location/variant/Store change refreshes serviceability and price together. Unknown or stale facts do not promise COD, Quick ETA or a delivery date. |
+| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |
+| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |
+| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |
+| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |
+| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |
 
-**Dependencies:** Existing R6633-D05 comparison and D08/D09 delivery/quote contracts; Authoritative price history and current quote/serviceability; Store classification and pack mapping
+Contract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.
 
-**Acceptance:** Variant changes bind image/price/stock/cart identity; Back restores selection; MRP/discount/price arithmetic, missing MRP, zero discount, price rise/drop and large values; Unsupported size chart, stale location response, unavailable delivery, Wholesale tiers/MOQ
+Expose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.
 
-**Reference captures:** 04-price.png, 06-price-details.png, 08-size-chart.png.
+Acceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.
 
-### BUY-PDP-REF-20260924-03 — 3. Return, COD and support
+### Connected wiring and impacted-code closure matrix — mandatory for every ticket
 
-Horizontal compact icon-label controls open sheets. Return sheet distinguishes replacement/refund/exchange and conditions; COD sheet has payment-option tabs; support sheet explains supported help topics and entry location.
+Both product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.
 
-**Reuse/current gap:** Existing BuyV2ProductProtection, return-policy/compliance facts, payment selection and contextual Shop chat/support; reuse same sheets/handlers where suitable.
-
-| Subsection | Required content and behavior |
+| Entry/interaction | Required return and state assertion |
 | --- | --- |
-| Return summary and remedies | Use product/Store policy window, returnable/non-returnable state, applicable replacement/refund/exchange, conditions, exclusions, policy revision and initiation path. Reference condition categories: damaged, defective, wrong item and change-of-mind only where actual MoolSocial policy permits. |
-| Return process | Show actual order/support route and supported steps: issue selection, eligibility checks, evidence where required, approval, pickup and refund status/timeline when supplied. No blanket 10-day or unconditional-refund promise copied from the example. |
-| COD/payment options | Available/unavailable state from exact order/location/Store eligibility; explain amount payable, applicable fee and payment timing. Reference COD/UPI tab layout can present supported MoolSocial options. Do not enable COD or credit merely because the reference shows it. |
-| Customer support | Product/order/Store context, reachable existing help/support entry and truthful supported topics: tracking, returns, refunds, delivery and payments. Display operating hours/channels only from actual service data; no invented 24x7 promise or automatic call/message. |
+| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |
+| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |
+| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |
+| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |
+| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |
+| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |
+| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |
+| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |
+| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |
+| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |
 
-**Dependencies:** R6633-D11 payment handoff; authoritative returns/COD/support policy and access; Store default/per-product return-policy mapping
+For each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.
 
-**Acceptance:** Returnable/non-returnable/missing policy; independently enabled remedies; COD allowed/denied/expired after address change; no paid-state mutation; Open/Close/Back of each sheet, return to correct SKU and Cart; no accidental purchase or support message
+No implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.
 
-**Reference captures:** 11-return-policy-loaded.png, 14-cod-loaded.png, 16-support-row.png, 17-support.png.
-
-### BUY-PDP-REF-20260924-04 — 4. Similar products
-
-Horizontal cards with a partially visible next card: product image, rating badge, shortened title, discount, crossed MRP/current price and delivery date; rail sits between assurance controls and product highlights.
-
-**Reuse/current gap:** Reuse existing product cards and catalogue/recommendation/session access; confirm provider semantics instead of duplicating a recommendation engine.
-
-| Subsection | Required content and behavior |
-| --- | --- |
-| Cards and ordering | Match captured rail placement, image proportions, spacing and typography; show image, title/variant/pack, real rating where present, current offer price/discount and eligible delivery date. |
-| Product identity | Similar means alternatives, not identical-pack comparison. Each card retains its own Store/SKU/variant/pack. Do not share mutable selected-variant/cart state between cards. |
-| Loading and navigation | Use bounded source-backed results, deduplicate exact identities, suppress unavailable/unpublished records, retain rail offset on return, open the existing product route and preserve original Cart. Empty results collapse cleanly. |
-
-**Dependencies:** Authoritative related-product discovery; existing R6633-D05 remains price comparison, not this rail
-
-**Acceptance:** 0/1/many alternatives, duplicates, invalid identity, unavailable stock and source retry; Tap a different Store/variant, Back preserves original selection/rail offset/Cart; Normal/enlarged text and horizontal versus vertical scrolling
-
-**Reference captures:** 19-similar-highlights.png, 20-highlights.png.
-
-### BUY-PDP-REF-20260924-05 — 5. Highlights, specifications, description, manufacturer info
-
-Expandable Product highlights uses label-above-value two-column cells and thin separators. All details expands to a horizontally scrollable three-tab row; active tab dark-filled. Specifications has a General section; Description is body copy; Manufacturer info mixes two-column and full-width rows.
-
-**Reuse/current gap:** BuyV2ProductContentSnapshot already has highlights/specifications/description; BuyV2ProductCompliance already has manufacturer/packer/importer/origin/quantity/date/consumer-care fields. Codex Store toBuyPublicContent projection exists separately and must be integrated, not copied into Buy.
-
-| Subsection | Required content and behavior |
-| --- | --- |
-| Highlights table | Category-appropriate key fields, ordered by supplied schema. Reference examples: color, strap material, sole material. Grocery/Wholesale/Bulk should use applicable pack, net quantity, grade/material and other existing factual attributes, never footwear defaults. |
-| Specifications table | Observed General fields: Brand, Color, Ideal For, Strap Material, Weight, Pack of, Sole Material, Net Quantity, Article Number, Character, Brand Color, Euro Size, Pattern, Size, Type, UK/India Size. Implement reusable supplied label/value rows with units, not hard-coded shoe fields. Preserve independent pack count versus net quantity. |
-| Description | Use existing approved product description verbatim as product data; readable wrapping, paragraph spacing and safe content rendering. Do not copy the reference seller description into MoolSocial. |
-| Manufacturer info table | Observed: Generic Name and Country of Origin side-by-side; manufacturer name/address and packer name/address as full-width rows. Reuse existing compliance manufacturer/packer/importer/origin/consumer-care and applicable date/license fields; missing address cannot be replaced with Store address or invented text. |
-| Expansion/tab behavior | Retain section expansion, active tab and reading position for the current SKU; reset appropriately for another SKU. Long labels/addresses wrap, tables stack at narrow/enlarged text, sticky purchase actions never cover final rows. Empty/loading/unavailable content remains truthful. |
-
-**Dependencies:** Current Store/public content projection and approved revision delivery; Category field ownership and structured manufacturer/packer addresses if existing strings are insufficient
-
-**Acceptance:** All tabs and expansion/Back, short/long/empty content, no duplicate summary facts; Wrong Store/SKU/variant/pack content rejected, stale responses do not overwrite new selection; Manufacturer distinct from seller; category-specific fields, long addresses, 200-percent text
-
-**Reference captures:** 20-highlights.png, 22-all-details.png, 23-specifications.png, 24-description.png, 25-manufacturer.png.
-
-### BUY-PDP-REF-20260924-06 — 6. Recently viewed and further recommendations
-
-Recently Viewed heading with View-all arrow and horizontal product cards; following More products for you uses two columns with large images, optional rating/count badge, title and list/current price. Sponsored example cards carry an AD label.
-
-**Reuse/current gap:** Existing recentlyViewedProductsFor, bounded saved history and product-card/catalogue owners; public product-page placement/adapters need reconciliation. Existing recent-history tests remain authoritative.
-
-| Subsection | Required content and behavior |
-| --- | --- |
-| Recently Viewed | Reuse real browsing history, recency order and exact product identity. Match captured heading/arrow and card layout; retain existing clear/remove/account-scope behavior. No invented history or duplicate cards from repeated views. |
-| More products for you | Reuse existing discovery/card route with bounded results and two-column reference layout at normal width; adaptive single column where needed for accessibility. Display actual image, title, variant/pack, price and rating data. Personalization must not be claimed when only general related products exist. |
-| Navigation and visibility | View-all/open product/Back retain source page, scroll, variant and Cart. Filter unpublished/unavailable records according to current catalogue policy; clear previous-account history on account change. Empty/error/retry and load-more states must not leave blank card space. |
-| Ads and scope | Observed sponsored badge is recorded as a reference condition only. Show such a badge only for an existing authorized sponsored source; no advertising system, gift-card banner or shopping assistant feature is added by these six tickets. |
-
-**Dependencies:** Current catalogue visibility and discovery adapters; account-scoped history persistence where required
-
-**Acceptance:** History order/dedup/remove/clear/restore/account switch and unpublished item; Recommendation pagination/retry, product/Cart/Back continuity, distinct Store/SKU identity; Normal two-column and enlarged-text adaptive layouts; truthful rating/sponsorship
-
-**Reference captures:** 26-lower-page.png, 27-recommendations.png, 28-more-products.png.
-
-### Observed extras and unverified items
-
-Ratings/reviews, Q&A and advertising appear between details and recent products. They are captured as surrounding context, not silently added as new implementation tickets. Size Chart first showed a loader and then a real table. Full-screen photo zoom, price-history drop, unavailable variants and delivery-detail sub-sheet internals were not verified. This report does not claim those interactions were observed. MRP discount and sale price were observed; the Cart displayed 61 percent while the product page displayed 62 percent for the same shown MRP/current price. Reuse correct MoolSocial arithmetic instead of copying that inconsistency.
-
-Store synchronization: manufacturer metadata is product information, not activation of a manufacturer workspace. Public fields remain bound to Store ID, canonical product, variant, pack and source revision. Private purchase cost, banking and settlement data must never enter public content.
-
-Evidence archive: `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`, SHA256 `044caed9e50b66bce285be5cea4da2e87b2c8760f7fdd6b8fa0ccbfe76cba7dd`, 44,299,869 bytes; prior entries preserved.
-
+Evidence: `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`, SHA256 `927e9a22fdb2b6ed02579a0be11fc2577f4b5fd6e3bd10aab3aedc7cc51da571`; revision-1 and all prior archive entries preserved.
 
 ## Visit Store Close surround — R6634-C10-A02 — 24 September 2026
 
