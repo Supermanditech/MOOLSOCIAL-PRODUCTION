@@ -531,6 +531,10 @@ $storeDeviceGateIds = @(
   'final-clean-and-live-remote'
 )
 if ($gateProfile -ceq 'uaw_runtime_ui_review_debug') {
+  # Aggregate host counts never qualify a Store journey or its installed APK.
+  & (Join-Path $PSScriptRoot 'check-store-journey-qualification.ps1') `
+    -State $state -RepositoryRoot $repositoryRoot `
+    -SourceFingerprint $SourceFingerprint -RuntimeDefine $RuntimeDefine -Phase $Phase
   foreach ($id in $storeDeviceGateIds) {
     $deviceGateEntries = @($state.postBuildGates | Where-Object { $_.id -ceq $id })
     Assert-Gate ($deviceGateEntries.Count -eq 1) "Required Store device gate '$id' is missing or duplicated."

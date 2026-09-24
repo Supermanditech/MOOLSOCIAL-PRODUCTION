@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4603,
-    "sha256": "B6DCC7135D469FC8B5A0C1C0BC134E0DF220ACDD89CBB1F4A23701B3594DC2E6"
+    "sha256": "1F16754FDEC963CD8FE4F4C49764386CB7683C859F6E84E86DBBD96813AAD83F"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -35,6 +35,9 @@
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
+        "scripts/check-apk-regression-gate-state.ps1",
+        "scripts/check-store-journey-qualification.ps1",
+        "scripts/test-store-journey-qualification.ps1",
         "apps/mobile/lib/features/work/screens/work_invoice_pdf_screen.dart",
         "apps/mobile/lib/features/work/widgets/store_settings_widgets.dart",
         "apps/mobile/lib/features/work/work_invoice_pdf.dart",
@@ -2070,6 +2073,9 @@
         "commitPrefix": "ui",
         "baseRule": "approved_codex_ui_checkpoint",
         "allowedOwnerRoots": [
+          "scripts/check-apk-regression-gate-state.ps1",
+          "scripts/check-store-journey-qualification.ps1",
+          "scripts/test-store-journey-qualification.ps1",
           "apps/mobile/lib/ui_v2/work/",
           "apps/mobile/lib/features/work/",
           "apps/mobile/test/ui_v2/work/",

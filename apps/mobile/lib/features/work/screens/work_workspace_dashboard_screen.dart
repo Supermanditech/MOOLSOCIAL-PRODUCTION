@@ -1411,6 +1411,7 @@ class _WorkWorkspaceDashboardScreenState
                     key: _salesKey,
                     session: session,
                     salesOnly: true,
+                    showNewSaleAction: false,
                     onNewSale: () {
                       if (session.prepareWorkspaceOrder(
                         source: 'Counter',
@@ -3899,6 +3900,9 @@ class _StoreControlDashboard extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final enlarged = MediaQuery.textScalerOf(context).scale(14) > 23;
+          // Enlarged text has its own fallback below. Do not make a fitting
+          // compact portrait scroll merely because its text is scaled.
+          final shortViewport = constraints.maxHeight < 260;
           final actionsBelow = _storeActionsBelowContent(context);
           final collection =
               (reviewedOrder ?? session.currentWorkspaceOrder)
@@ -4006,7 +4010,7 @@ class _StoreControlDashboard extends StatelessWidget {
           // Keep narrow/enlarged actions reachable above navigation while the
           // working content scrolls independently; no tall empty action strip.
           if (actionsBelow) {
-            if (enlarged || collectionNeedsScroll) {
+            if (enlarged || collectionNeedsScroll || shortViewport) {
               return Column(
                 children: [
                   Expanded(
@@ -4016,7 +4020,11 @@ class _StoreControlDashboard extends StatelessWidget {
                       child: Column(
                         children: [
                           SizedBox(
-                            height: collection ? 1260 : 760,
+                            height: collection
+                                ? 1260
+                                : enlarged
+                                ? 760
+                                : 520,
                             child: Column(
                               children: [
                                 pulse,
@@ -4063,14 +4071,18 @@ class _StoreControlDashboard extends StatelessWidget {
               ),
             ],
           );
-          if (workingCentre != null || (!enlarged && !collectionNeedsScroll)) {
+          if (!enlarged && !collectionNeedsScroll && !shortViewport) {
             return content;
           }
           return SingleChildScrollView(
             key: const Key('work-dashboard-enlarged-scroll'),
             child: SizedBox(
               height: constraints.maxHeight.clamp(
-                collection ? (enlarged ? 1260 : 980) : 760,
+                collection
+                    ? (enlarged ? 1260 : 980)
+                    : enlarged
+                    ? 760
+                    : 520,
                 double.infinity,
               ),
               child: content,
@@ -11341,11 +11353,13 @@ class _StoreStatementSurface extends StatefulWidget {
   const _StoreStatementSurface({
     required this.session,
     this.salesOnly = false,
+    this.showNewSaleAction = true,
     this.onNewSale,
     super.key,
   });
   final WorkSession session;
   final bool salesOnly;
+  final bool showNewSaleAction;
   final VoidCallback? onNewSale;
   @override
   State<_StoreStatementSurface> createState() => _StoreStatementSurfaceState();
@@ -11543,7 +11557,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     final content = Column(
       key: const Key('work-store-statement'),
       children: [
-        if (widget.salesOnly && !largeText)
+        if (widget.salesOnly && widget.showNewSaleAction && !largeText)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
@@ -11565,7 +11579,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                       children: [
                         title,
                         periodControl,
-                        if (widget.salesOnly && largeText)
+                        if (widget.salesOnly &&
+                            widget.showNewSaleAction &&
+                            largeText)
                           TextButton.icon(
                             key: const Key('work-sales-new-counter-sale'),
                             onPressed: widget.onNewSale,

@@ -674,15 +674,13 @@ class _StorePaymentTermsProbe implements BuyV2CommercialPaymentTermsAdapter {
 Future<void> openCounterSaleFromSales(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('work-store-sell')));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(
-    find.byKey(const Key('work-sales-new-counter-sale')),
-  );
+  await tester.ensureVisible(find.byKey(const Key('work-quick-counter-sale')));
   await tester.pumpAndSettle();
   expect(
-    find.byKey(const Key('work-sales-new-counter-sale')).hitTestable(),
+    find.byKey(const Key('work-quick-counter-sale')).hitTestable(),
     findsOneWidget,
   );
-  await tester.tap(find.byKey(const Key('work-sales-new-counter-sale')));
+  await tester.tap(find.byKey(const Key('work-quick-counter-sale')));
   await tester.pumpAndSettle();
 }
 
@@ -1198,6 +1196,17 @@ void main() {
   const storeReviewRuntime =
       bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
       bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+  if (storeReviewRuntime) {
+    // Native transport substitutes only: exercise the real runtime bindings.
+    // These host tests do not qualify encrypted Android storage or real stock.
+    setUp(() {
+      FlutterSecureStorage.setMockInitialValues({});
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+    });
+  }
   test(
     'RESTOCK01 review catalogue uses exact existing Store and refuses external actions',
     () async {
@@ -8926,6 +8935,76 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  if (storeReviewRuntime) {
+    testWidgets('STORE-PARITY landscape whole screen', (tester) async {
+      for (final scale in [1.0, 1.4, 2.0]) {
+        final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
+          ..seedVerifiedWorkspace();
+        expect(work.loadStoreReviewSeed(1000), isTrue);
+        await mount(
+          tester,
+          route: '/app/buy',
+          work: work,
+          viewport: const Size(806, 360),
+          textScale: scale,
+          uiReviewOnly: true,
+        );
+        final router =
+            tester.widget<MaterialApp>(find.byType(MaterialApp)).routerConfig!
+                as GoRouter;
+        router.go('/app/work/workspace/dashboard');
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(WorkWorkspaceDashboardScreen),
+          findsOneWidget,
+          reason: router.routeInformationProvider.value.uri.toString(),
+        );
+        expect(tester.takeException(), isNull, reason: 'Whole Store at $scale');
+        final action = find.byKey(const Key('work-quick-add-products'));
+        await reveal(tester, action);
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    });
+    testWidgets('STORE-PARITY single Sales action', (tester) async {
+      for (final scale in [1.0, 2.0]) {
+        await mount(
+          tester,
+          route: '/app/buy',
+          work: storeViewFixture(),
+          textScale: scale,
+          uiReviewOnly: true,
+        );
+        final router =
+            tester.widget<MaterialApp>(find.byType(MaterialApp)).routerConfig!
+                as GoRouter;
+        router.go('/app/work/workspace/dashboard');
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(WorkWorkspaceDashboardScreen),
+          findsOneWidget,
+          reason: router.routeInformationProvider.value.uri.toString(),
+        );
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        expect(find.text('Counter sale'), findsOneWidget);
+        final action = find.byKey(const Key('work-quick-counter-sale'));
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        expect(action.hitTestable(), findsOneWidget);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-sale-customer-sheet')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    });
+  }
+
   for (final scale in [1.0, 1.4, 2.0]) {
     testWidgets('ADDENTRY01 upstream dashboard landscape AP-S1-001 $scale', (
       tester,
@@ -16423,15 +16502,13 @@ void main() {
           await captureStoreView(tester, 'pos-sales-records-$scale');
           await reveal(
             tester,
-            find.byKey(const Key('work-sales-new-counter-sale')),
+            find.byKey(const Key('work-quick-counter-sale')),
           );
           expect(
-            find.byKey(const Key('work-sales-new-counter-sale')).hitTestable(),
+            find.byKey(const Key('work-quick-counter-sale')).hitTestable(),
             findsOneWidget,
           );
-          await tester.tap(
-            find.byKey(const Key('work-sales-new-counter-sale')),
-          );
+          await tester.tap(find.byKey(const Key('work-quick-counter-sale')));
           await tester.pumpAndSettle();
         }
         await captureStoreView(tester, 'pos-empty-sale-$entry-$scale');
@@ -17293,6 +17370,12 @@ void main() {
       textScale: 1.4,
       bottomInset: 24,
     );
+    if (storeReviewRuntime) {
+      // The explicitly labelled review-data toolbar takes additional height.
+      // Verify real scrolling, not suppression of that label or smaller text.
+      expect(find.byKey(const Key('store-review-seed-menu')), findsOneWidget);
+      await reveal(tester, find.text('Accept'));
+    }
     expect(find.text('Accept').hitTestable(), findsOneWidget);
     expect(find.text('Reject').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -30724,7 +30807,7 @@ void main() {
         expect(work.currentWorkspaceOrderId, selected);
         expect(find.byKey(const Key('work-sale-customer-sheet')), findsNothing);
         expect(
-          find.byKey(const Key('work-sales-new-counter-sale')),
+          find.byKey(const Key('work-quick-counter-sale')),
           findsOneWidget,
         );
         expect(work.noticeMessage, contains('current order update'));
@@ -30804,6 +30887,31 @@ void main() {
         // Recovery uses real controls; do not fix selection directly in tests.
         await tester.tap(find.byKey(const Key('work-counter-close')));
         await tester.pumpAndSettle();
+        if (storeReviewRuntime) {
+          // Runtime binds an account: a conflicted selected order cannot be
+          // persisted as this Counter draft. Leaving risks data loss and must
+          // offer recovery, not silently discard the bill to satisfy a fixture.
+          expect(
+            find.byKey(const Key('work-order-discard-dialog')),
+            findsOneWidget,
+          );
+          await tester.tap(find.text('Keep editing'));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-order-discard-dialog')),
+            findsNothing,
+          );
+          expect(work.currentWorkspaceOrder, same(incoming));
+          expect(work.workspaceOrderCustomer, '9829012345');
+          expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+          expect(work.workspaceInvoices, isEmpty);
+          expect(
+            find.byKey(const Key('work-order-review-summary')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          return;
+        }
         expect(
           find.byKey(const Key('work-order-discard-dialog')),
           findsNothing,
