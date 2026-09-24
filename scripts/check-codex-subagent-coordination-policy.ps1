@@ -2931,6 +2931,8 @@ if ($ProductionLane -ceq 'baseline') {
           'scripts/test-public-auth-sideload-build-controls.ps1',
           'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
           # 2026-09-24 approved integrated Cart reference successors only.
+          # Founder-authorized Saved-only correction; exact delta checked below.
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
           'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
           'apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-360x800-android-cart.png',
           'apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-430x932-ios-cart.png',
@@ -2984,6 +2986,23 @@ if ($ProductionLane -ceq 'baseline') {
           'scripts/check-codex-subagent-coordination-policy.ps1',
           'scripts/check-approved-ui-locks.ps1'
         )
+      if ($addProductApprovedFrontendOwner -and $effectiveOwner -ceq
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart') {
+        $savedControlBase = @(& git -C $root show (
+          'fbd4f91c88f932456c25d954906fc02329fcaa76:' + $effectiveOwner
+        ))
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Saved-control baseline missing.'
+        $savedOriginal = ($savedControlBase -join "`n").TrimEnd("`n")
+        $savedNeedle = 'compactEdgeControls: compact && alignMediaAtTop,'
+        Assert-Coordination ([regex]::Matches($savedOriginal,
+          [regex]::Escape($savedNeedle)).Count -eq 1) 'Saved-control caller is ambiguous.'
+        $savedCorrected = $savedOriginal.Replace($savedNeedle,
+          "compactEdgeControls:`n                        compact && alignMediaAtTop && !savedContext,")
+        $savedLive = [IO.File]::ReadAllText((Join-Path $root $effectiveOwner)).Replace("`r`n", "`n").TrimEnd("`n")
+        Assert-Coordination (
+          $savedLive -ceq $savedOriginal -or $savedLive -ceq $savedCorrected
+        ) 'Only the founder-authorized Saved-control caller correction is admitted.'
+      }
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
           $allowedOwner = $true

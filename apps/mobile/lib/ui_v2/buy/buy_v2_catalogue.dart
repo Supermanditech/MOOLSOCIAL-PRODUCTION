@@ -12037,7 +12037,8 @@ class BuyV2ProductCard extends StatelessWidget {
                   top: compact ? 0 : 2,
                   right: 2,
                   child: _ProductSaveButton(
-                    compactEdgeControls: compact && alignMediaAtTop,
+                    compactEdgeControls:
+                        compact && alignMediaAtTop && !savedContext,
                     session: session,
                     product: product,
                     showRemoveLabel: savedContext,

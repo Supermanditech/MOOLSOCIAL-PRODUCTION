@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4603,
-    "sha256": "7CE7DFD050E92C76D3A6AB660EC7E59B67AB82D0792DF262976ABE0B8C0BC6F4"
+    "sha256": "D88895F3F611C1E52D4EBAA32EDD1C03A5F1A44D881BD39714A104869453F281"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -46,6 +46,7 @@
         "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",
         "apps/mobile/test/work_invoice_pdf_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/store-integrated-cart-20260924-v1/cart-430x932-ios-cart.png",
         "apps/mobile/test/work_production_gateway_test.dart",
