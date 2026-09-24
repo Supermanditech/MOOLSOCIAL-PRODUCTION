@@ -15314,6 +15314,27 @@ void main() {
               'The complete five-lakh value including paise fits without horizontal scrolling.',
         );
         painter.dispose();
+        await tester.enterText(input, '1000000.00');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(work.workspaceCounterDiscountMinor, 100000000);
+        expect(work.workspaceCounterPayableMinor, 900000000);
+        final tenLakhPainter = TextPainter(
+          text: TextSpan(
+            text: '1000000.00',
+            style: tester.widget<EditableText>(editable).style,
+          ),
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(tester.element(input)),
+        )..layout();
+        expect(tenLakhPainter.width, lessThanOrEqualTo(
+          tester.state<EditableTextState>(editable).renderEditable.size.width),
+          reason: 'Ten lakh including paise remains fully visible.');
+        tenLakhPainter.dispose();
+        expect(find.text('Bill discount'), findsOneWidget);
+        await captureStoreView(tester,
+            'large-bill-ten-lakh-${display.$1}-${display.$2}');
+        await tester.enterText(input, '500000.00');
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
         await captureStoreView(
@@ -15477,6 +15498,8 @@ void main() {
         );
         final input = find.byKey(const Key('work-counter-discount-value'));
         void expectCompactDiscountRow() {
+          expect(find.text('Bill discount'), findsOneWidget,
+              reason: 'The purpose stays visible after entering a value.');
           if (display.scale != 1.0) return;
           final controls = [
             find.byKey(const Key('work-counter-discount-percentage')),
@@ -15499,7 +15522,7 @@ void main() {
         expect(tester.widget<TextField>(input).decoration!.labelText, isNull);
         expect(
           tester.widget<TextField>(input).decoration!.hintText,
-          'Discount',
+          '0.00',
         );
         expect(tester.widget<TextField>(input).controller!.text, isEmpty);
         tester.view.viewInsets = FakeViewPadding(
@@ -15531,6 +15554,7 @@ void main() {
         expect(work.workspaceCounterPayableMinor, 23760);
         expect(tester.testTextInput.isVisible, isFalse);
         await tester.tap(input);
+        expect(find.text('Bill discount'), findsOneWidget);
         await tester.pumpAndSettle();
         expect(tester.testTextInput.isVisible, isTrue);
         expect(
@@ -15547,7 +15571,7 @@ void main() {
         expectCompactDiscountRow();
         expect(
           tester.widget<TextField>(input).decoration!.hintText,
-          'Discount',
+          '0.00',
         );
         await press('work-counter-discount-apply');
         expect(work.workspaceCounterDiscount.kind, 'fixed');

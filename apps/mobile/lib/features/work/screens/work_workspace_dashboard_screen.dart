@@ -28719,6 +28719,11 @@ class _CounterBillDiscountEditorState
     crossAxisAlignment: CrossAxisAlignment.stretch,
     mainAxisSize: MainAxisSize.min,
     children: [
+      const Text(
+        'Bill discount',
+        key: Key('work-counter-discount-label'),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
       LayoutBuilder(
         builder: (context, constraints) {
           // Subscribe to keyboard changes as well as text scale. Otherwise the
@@ -28746,7 +28751,7 @@ class _CounterBillDiscountEditorState
               widget.onInvalid();
             },
             decoration: InputDecoration(
-              hintText: 'Discount',
+              hintText: '0.00',
               prefixText: kind == 'fixed' ? '₹ ' : null,
               suffixText: kind == 'percentage' ? '%' : null,
               border: InputBorder.none,
@@ -28772,7 +28777,7 @@ class _CounterBillDiscountEditorState
               filled: false,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
+                horizontal: 4,
                 vertical: 10,
               ),
             ),
@@ -28815,10 +28820,6 @@ class _CounterBillDiscountEditorState
                 ),
             ],
           );
-          const label = Text(
-            'Discount',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          );
           final expandedInput =
               MediaQuery.textScalerOf(context).scale(14) > 20 || error != null;
           if (!expandedInput && constraints.maxWidth >= 260) {
@@ -28836,12 +28837,7 @@ class _CounterBillDiscountEditorState
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  const Expanded(child: label),
-                  modes,
-                ],
-              ),
+              Align(alignment: Alignment.centerLeft, child: modes),
               Row(
                 children: [
                   Expanded(

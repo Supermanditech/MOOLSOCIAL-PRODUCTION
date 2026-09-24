@@ -107,6 +107,16 @@ targets. Enlarged-text/error recovery must stay readable rather than shrinking
 type or clipping the amount. This supersedes the older two-row fixed-amount
 composition; prior 31-finding approval remains subject to OPPO closure.
 
+Follow-up to the compact-row preview: founder asks how the user will recognise
+the discount. Show a persistent, restrained "Bill discount" section label above
+the controls; a hint alone disappears after entry and is insufficient. Keep one
+label, the compact control row and no enclosing decorative box. This replaces
+hint-only identification, not the latest compactness requirement.
+
+Founder explicitly checks a one-crore bill with five-lakh and ten-lakh fixed
+discounts. Preserve full amount/paise readability at320dp and enlarged text,
+accurate payable totals and validation; compactness must not clip large entries.
+
 Latest local-render review: founder rejects solid-blue Add/Edit actions, thumbnail
 frames and the entire discount composition. Use subtle tonal Add actions with a
 plus; a checkmark/owned label distinguishes Store-added items from shortlisted
