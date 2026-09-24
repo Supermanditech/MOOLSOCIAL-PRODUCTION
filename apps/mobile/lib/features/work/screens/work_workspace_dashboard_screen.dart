@@ -13151,7 +13151,14 @@ class _WorkspaceCatalogueSurfaceState
           if (!storeUnchanged()) {
             return 'Your store changed. Open Add product again.';
           }
-          final result = await _importCatalogue(csvOnly: true);
+          final result = await _importCatalogue(
+            csvOnly: true,
+            onSaved: () {
+              if (pageContext.mounted && storeUnchanged()) {
+                Navigator.of(pageContext).pop(true);
+              }
+            },
+          );
           if (pageContext.mounted) setPageState(() {});
           return result;
         },
@@ -13542,7 +13549,10 @@ class _WorkspaceCatalogueSurfaceState
     );
   }
 
-  Future<String?> _importCatalogue({bool csvOnly = false}) async {
+  Future<String?> _importCatalogue({
+    bool csvOnly = false,
+    VoidCallback? onSaved,
+  }) async {
     final identity = widget.session.counterDraftIdentity;
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
@@ -13769,6 +13779,7 @@ class _WorkspaceCatalogueSurfaceState
         return 'Import cancelled. No products were added.';
       }
       setState(() {});
+      onSaved?.call();
       return '$savedCount products saved to Store stock. Nothing was published.';
     } on FormatException catch (error) {
       return error.message;

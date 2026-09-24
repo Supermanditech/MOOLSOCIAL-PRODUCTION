@@ -9085,7 +9085,10 @@ void main() {
         expect(added.stock, 5);
         expect(added.sellingPrice, 50);
         expect(added.publicListing, isFalse);
-        expect(find.textContaining('1 products saved'), findsWidgets);
+        expect(
+          find.byKey(const Key('work-dashboard-catalogue-screen')),
+          findsOneWidget,
+        );
       } else {
         expect(work.workspaceCatalogueItems, before);
       }
@@ -9101,7 +9104,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(picker.calls, 2);
       }
-      expect(find.byType(StoreAddProductEntryScreen), findsOneWidget);
+      expect(
+        find.byType(StoreAddProductEntryScreen),
+        scenario == 'import' ? findsNothing : findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
   }
@@ -10772,162 +10778,280 @@ void main() {
     );
   }
 
-  for (final display in [(360.0, 806.0, 1.0), (320.0, 640.0, 2.0)]) {
-    testWidgets(
-      'LOCALSTOCK UI real catalogue tap save restart stock POS review $display',
-      (tester) async {
-        Future<void> capture(String name) => captureStoreView(
-          tester,
-          display.$3 == 1 ? name : '$name-large-text',
-        );
-        FlutterSecureStorage.setMockInitialValues({});
-        final media = await installCataloguePhotoClient(tester);
-        var photo = photoFixture();
-        const directory = String.fromEnvironment(
-          'MOOL_CATALOGUE_TEST_IMAGE_DIR',
-        );
-        if (directory.isNotEmpty) {
-          final bytes = (await tester.runAsync(
-            () => File('$directory/sunflower-oil-1l-test.png').readAsBytes(),
-          ))!;
-          final dimensions = (await tester.runAsync(() async {
-            final codec = await ui.instantiateImageCodec(bytes);
-            final frame = await codec.getNextFrame();
-            final dimensions = (frame.image.width, frame.image.height);
-            frame.image.dispose();
-            codec.dispose();
-            return dimensions;
-          }))!;
-          photo = photoFixture(
-            file: BuyV2MediaFileMetadata(
-              mimeType: 'image/png',
-              byteLength: bytes.length,
-              width: dimensions.$1,
-              height: dimensions.$2,
-              normalized: true,
-              frameCount: 1,
-            ),
+  for (final entryPath in ['catalogue', 'manual', 'csv']) {
+    for (final display in [(360.0, 806.0, 1.0), (320.0, 640.0, 2.0)]) {
+      testWidgets(
+        'LOCALSTOCK UI $entryPath tap save restart stock POS review $display',
+        (tester) async {
+          Future<void> capture(String name) => captureStoreView(
+            tester,
+            '$entryPath-${display.$3 == 1 ? name : '$name-large-text'}',
           );
-          media.client.responses[Uri.parse(photo.source)] = bytes;
-        }
-        final reference = workspaceMasterCatalogue.first.copyWith(
-          cataloguePhoto: photo,
-        );
-        final account = _ContactDraftFixtureStore();
-        WorkSession fresh() =>
-            WorkSession(
-                contactDraftStore: account,
-                counterDraftStore: _CounterDraftFixtureStore(),
-                catalogueReference: [reference],
-                inventoryStore: SecureWorkInventoryStore(
-                  accountScope: () => account.accountScope,
-                ),
-              )
-              ..selectedProfile = workProfiles.first
-              ..workspaceId = 'qa-entered-stock'
-              ..activeWorkspace = const WorkWorkspace(
-                id: 'qa-entered-stock',
-                name: 'QA Store · entered stock',
-                profileLabel: 'Grocery / Kirana Shop',
-                profileId: 'retailer-grocery',
-                area: 'Local QA',
-                verified: true,
-              )
-              ..reviewStage = WorkReviewStage.live
-              ..initialWorkspaceStateLoaded = true
-              ..retailerSetupSaved = true;
-        var work = fresh();
-        expect(await work.loadWorkspaceInventory(), isTrue);
-        expect(work.workspaceCatalogueItems, isEmpty);
-        expect(work.workspaceOrders, isEmpty);
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.$1, display.$2),
-          textScale: display.$3,
-        );
-        await capture('qa-real-flow-01-empty-store');
-        await openAddProductsFromHome(tester);
-        await awaitCataloguePhoto(
-          tester,
-          () => tester
-              .widgetList<RawImage>(find.byType(RawImage))
-              .any((i) => i.image != null),
-        );
-        await capture('qa-real-flow-02-catalogue');
-        await tester.tap(find.byKey(Key('work-catalogue-add-${reference.id}')));
-        await tester.pumpAndSettle();
-        for (final entry in [
-          ('work-product-purchase-price', '200'),
-          ('work-product-selling-price', '260'),
-          ('work-product-stock', '8'),
-        ]) {
-          final field = find.byKey(Key(entry.$1));
-          await reveal(tester, field);
-          await tester.enterText(field, entry.$2);
-        }
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await capture('qa-real-flow-03-retailer-review');
-        await tester.tap(find.byKey(const Key('work-product-save')));
-        await tester.pumpAndSettle();
-        expect(await work.workspaceInventorySaved, isTrue);
-        expect(work.workspaceCatalogueItems.single.stock, 8);
-        expect(work.workspaceCatalogueItems.single.sellingPrice, 260);
-        expect(
-          work.workspaceCatalogueItems.single.cataloguePhoto!.toJson(),
-          photo.toJson(),
-        );
-        await awaitCataloguePhoto(
-          tester,
-          () => tester
-              .widgetList<RawImage>(find.byType(RawImage))
-              .any((i) => i.image != null),
-        );
-        await capture('qa-real-flow-04-saved-stock');
-        final savedProduct = work.workspaceCatalogueItems.single
-            .toInventoryJson();
-        await tester.pumpWidget(const SizedBox.shrink());
-        work = fresh();
-        expect(await work.loadWorkspaceInventory(), isTrue);
-        expect(
-          work.workspaceCatalogueItems.single.toInventoryJson(),
-          savedProduct,
-        );
-        expect(work.workspaceOrders, isEmpty);
-        expect(work.workspaceInvoices, isEmpty);
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.$1, display.$2),
-          textScale: display.$3,
-        );
-        await openCounterSaleFromSales(tester);
-        await enterSaleCustomer(tester, '9000092301', name: 'QA customer');
-        final add = find.byKey(Key('work-order-add-${reference.id}'));
-        await reveal(tester, add);
-        await awaitCataloguePhoto(
-          tester,
-          () => tester
-              .widgetList<RawImage>(find.byType(RawImage))
-              .any((i) => i.image != null),
-        );
-        await capture('qa-real-flow-05-pos-restored-stock');
-        await tester.tap(add);
-        await tester.pumpAndSettle();
-        expect(work.workspaceOrderQuantities[reference.id], 1);
-        await tester.tap(find.byKey(const Key('work-order-review')));
-        await tester.pumpAndSettle();
-        await capture('qa-real-flow-06-review-bill');
-        expect(work.workspaceCatalogueItems.single.stock, 8);
-        expect(work.workspaceInvoices, isEmpty);
-        expect(work.workspaceFinance, isNull);
-        expect(tester.takeException(), isNull);
-        media.restore();
-      },
-    );
+          FlutterSecureStorage.setMockInitialValues({});
+          final media = await installCataloguePhotoClient(tester);
+          // Brand-source product facts, not the catalogue's illustrative prices,
+          // barcode or seed quantities. All commerce entered below is QA-only.
+          const base = WorkspaceCatalogueItem(
+            id: 'salt-tata-1kg',
+            canonicalId: 'salt-tata-iodised',
+            categoryId: 'salt-spices',
+            brand: 'Tata',
+            title: 'Tata Salt',
+            variant: 'Iodised salt',
+            pack: '1 kg pack',
+            sku: 'QA-TATA-1KG',
+            barcode: '',
+            purchasePrice: 0,
+            sellingPrice: 0,
+            stock: 0,
+            unitPrice: '',
+            deliveryPromise: 'Store pickup or local delivery',
+            origin: 'India',
+            visualLabel: 'Tata Salt 1 kg pack',
+            visualKind: 'catalogue-packshot',
+            publicListing: false,
+          );
+          var photo = WorkspaceCataloguePhoto(
+            assetId: 'tata-salt-1kg-evaluation',
+            revision: '20260923',
+            source:
+                'https://www.tatanutrikorner.com/cdn/shop/files/Tata_Salt_-_North_Central_Recyclable_AH-IN-JB-RP-BH-PU-SG_1_Kg_FOP-removebg-preview.png?v=1745827173&width=416',
+            publisherWorkspaceId: 'test-moolsocial-catalogue',
+            canonicalId: base.canonicalId,
+            brand: base.brand,
+            variant: base.variant,
+            pack: base.pack,
+            barcode: base.barcode,
+            file: photoFixture().file,
+            status: WorkspaceCataloguePhotoStatus.testOnly,
+          );
+          const directory = String.fromEnvironment(
+            'MOOL_CATALOGUE_TEST_IMAGE_DIR',
+          );
+          if (directory.isNotEmpty) {
+            final bytes = (await tester.runAsync(
+              () => File('$directory/iodised-salt-1kg-test.png').readAsBytes(),
+            ))!;
+            final dimensions = (await tester.runAsync(() async {
+              final codec = await ui.instantiateImageCodec(bytes);
+              final frame = await codec.getNextFrame();
+              final dimensions = (frame.image.width, frame.image.height);
+              frame.image.dispose();
+              codec.dispose();
+              return dimensions;
+            }))!;
+            photo = WorkspaceCataloguePhoto.fromJson({
+              ...photo.toJson(),
+              'file': {
+                'mimeType': 'image/png',
+                'byteLength': bytes.length,
+                'width': dimensions.$1,
+                'height': dimensions.$2,
+                'normalized': true,
+                'frameCount': 1,
+              },
+            })!;
+            media.client.responses[Uri.parse(photo.source)] = bytes;
+          }
+          final reference = base.copyWith(cataloguePhoto: photo);
+          const csv =
+              'title,brand,variant,pack,canonicalId,purchasePrice,sellingPrice,stock,sku,publicListing\n'
+              'Tata Salt,Tata,Iodised salt,1 kg pack,salt-tata-iodised,28,32,8,QA-TATA-1KG,false';
+          final previousPicker = FilePickerPlatform.instance;
+          FilePickerPlatform.instance = _EntryFilePicker()
+            ..file = _EntryCsvFile(csv);
+          addTearDown(() => FilePickerPlatform.instance = previousPicker);
+          final account = _ContactDraftFixtureStore();
+          WorkSession fresh() =>
+              WorkSession(
+                  contactDraftStore: account,
+                  counterDraftStore: _CounterDraftFixtureStore(),
+                  catalogueReference: [reference],
+                  inventoryStore: SecureWorkInventoryStore(
+                    accountScope: () => account.accountScope,
+                  ),
+                )
+                ..selectedProfile = workProfiles.first
+                ..workspaceId = 'qa-entered-$entryPath'
+                ..activeWorkspace = WorkWorkspace(
+                  id: 'qa-entered-$entryPath',
+                  name: 'QA Store · $entryPath stock',
+                  profileLabel: 'Grocery / Kirana Shop',
+                  profileId: 'retailer-grocery',
+                  area: 'Local QA',
+                  verified: true,
+                )
+                ..reviewStage = WorkReviewStage.live
+                ..initialWorkspaceStateLoaded = true
+                ..retailerSetupSaved = true;
+          var work = fresh();
+          expect(await work.loadWorkspaceInventory(), isTrue);
+          expect(work.workspaceCatalogueItems, isEmpty);
+          expect(work.workspaceOrders, isEmpty);
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+          );
+          await capture('qa-real-flow-01-empty-store');
+          await openAddProductsFromHome(tester);
+          await awaitCataloguePhoto(
+            tester,
+            () => tester
+                .widgetList<RawImage>(find.byType(RawImage))
+                .any((i) => i.image != null),
+          );
+          await capture('qa-real-flow-02-catalogue');
+          if (entryPath == 'csv') {
+            await chooseAddProductMode(tester, 'import');
+            await tester.tap(
+              find.byKey(const Key('work-add-product-choose-csv')),
+            );
+            await tester.pumpAndSettle();
+            expect(work.workspaceCatalogueItems, isEmpty);
+            await capture('qa-real-flow-03-retailer-review');
+            await tester.tap(find.byKey(const Key('work-import-save')));
+            await tester.pumpAndSettle();
+          } else {
+            if (entryPath == 'manual') {
+              await chooseAddProductMode(tester, 'enter');
+              await tester.enterText(
+                find.byKey(const Key('work-product-title')),
+                base.title,
+              );
+              final details = find.byKey(
+                const Key('work-product-details-section'),
+              );
+              await reveal(tester, details);
+              await tester.tap(details);
+              await tester.pumpAndSettle();
+              for (final entry in [
+                ('work-product-brand', base.brand),
+                ('work-product-variant', base.variant),
+                ('work-product-pack', base.pack),
+                ('work-product-sku', base.sku),
+              ]) {
+                final field = find.byKey(Key(entry.$1));
+                await reveal(tester, field);
+                await tester.enterText(field, entry.$2);
+              }
+            } else {
+              await tester.tap(
+                find.byKey(Key('work-catalogue-add-${reference.id}')),
+              );
+              await tester.pumpAndSettle();
+            }
+            for (final entry in [
+              ('work-product-purchase-price', '28'),
+              ('work-product-selling-price', '32'),
+              ('work-product-stock', '8'),
+            ]) {
+              final field = find.byKey(Key(entry.$1));
+              await reveal(tester, field);
+              await tester.enterText(field, entry.$2);
+            }
+            await tester.testTextInput.receiveAction(TextInputAction.done);
+            await tester.pumpAndSettle();
+            await capture('qa-real-flow-03-retailer-review');
+            await tester.tap(find.byKey(const Key('work-product-save')));
+            await tester.pumpAndSettle();
+          }
+          expect(await work.workspaceInventorySaved, isTrue);
+          expect(
+            find.byKey(const Key('work-dashboard-catalogue-screen')),
+            findsOneWidget,
+          );
+          expect(work.workspaceCatalogueItems.single.stock, 8);
+          expect(work.workspaceCatalogueItems.single.sellingPrice, 32);
+          expect(work.workspaceCatalogueItems.single.purchasePrice, 28);
+          expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
+          expect(work.workspaceCatalogueItems.single.barcode, isEmpty);
+          if (entryPath == 'manual') {
+            expect(work.workspaceCatalogueItems.single.cataloguePhoto, isNull);
+          } else {
+            expect(
+              work.workspaceCatalogueItems.single.cataloguePhoto!.toJson(),
+              photo.toJson(),
+            );
+            await awaitCataloguePhoto(
+              tester,
+              () => tester
+                  .widgetList<RawImage>(find.byType(RawImage))
+                  .any((i) => i.image != null),
+            );
+          }
+          await capture('qa-real-flow-04-saved-stock');
+          final savedProduct = work.workspaceCatalogueItems.single
+              .toInventoryJson();
+          final savedId = work.workspaceCatalogueItems.single.id;
+          const exportDirectory = String.fromEnvironment(
+            'MOOL_ENTERED_STOCK_EVIDENCE_DIR',
+          );
+          if (exportDirectory.isNotEmpty && display.$3 == 1) {
+            await tester.runAsync(() async {
+              await File(
+                '$exportDirectory/$entryPath-saved-record.json',
+              ).writeAsString(
+                const JsonEncoder.withIndent('  ').convert({
+                  'entryPath': entryPath,
+                  'productFactSource':
+                      'https://www.tatanutrikorner.com/products/nutri-tata-salt-packed-1-kg-11010101-nutri',
+                  'qa': true,
+                  'productionMigrationAllowed': false,
+                  'media': entryPath == 'manual'
+                      ? 'not supplied'
+                      : 'testOnly; production rights pending',
+                  'savedInventoryProduct': savedProduct,
+                }),
+              );
+            });
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+          work = fresh();
+          expect(await work.loadWorkspaceInventory(), isTrue);
+          expect(
+            work.workspaceCatalogueItems.single.toInventoryJson(),
+            savedProduct,
+          );
+          expect(work.workspaceOrders, isEmpty);
+          expect(work.workspaceInvoices, isEmpty);
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+          );
+          await openCounterSaleFromSales(tester);
+          await enterSaleCustomer(tester, '9000092301', name: 'QA customer');
+          final add = find.byKey(Key('work-order-add-$savedId'));
+          await reveal(tester, add);
+          if (entryPath != 'manual') {
+            await awaitCataloguePhoto(
+              tester,
+              () => tester
+                  .widgetList<RawImage>(find.byType(RawImage))
+                  .any((i) => i.image != null),
+            );
+          }
+          await capture('qa-real-flow-05-pos-restored-stock');
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(work.workspaceOrderQuantities[savedId], 1);
+          expect(work.workspaceCounterPayableMinor, 3200);
+          await tester.tap(find.byKey(const Key('work-order-review')));
+          await tester.pumpAndSettle();
+          await capture('qa-real-flow-06-review-bill');
+          expect(work.workspaceCatalogueItems.single.stock, 8);
+          expect(work.workspaceInvoices, isEmpty);
+          expect(work.workspaceFinance, isNull);
+          expect(tester.takeException(), isNull);
+          media.restore();
+        },
+      );
+    }
   }
 
   for (final display in [(360.0, 806.0, 1.0), (320.0, 640.0, 2.0)]) {
