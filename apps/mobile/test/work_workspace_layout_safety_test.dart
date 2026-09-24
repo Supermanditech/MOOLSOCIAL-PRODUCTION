@@ -8892,15 +8892,19 @@ void main() {
       await tester.tap(open);
       await tester.pumpAndSettle();
       await chooseAddProductMode(tester, 'enter');
+      final imageAction = find.byKey(const Key('work-product-photo-choose'));
+      expect(imageAction.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(imageAction).bottom,
+        lessThanOrEqualTo(
+          tester.getRect(find.byKey(const Key('work-product-title'))).top,
+        ),
+      );
       await tester.enterText(
         find.byKey(const Key('work-product-title')),
         'Own SKU draft',
       );
       tester.testTextInput.hide();
-      await tester.pumpAndSettle();
-      final reference = find.byKey(const Key('work-product-reference'));
-      await tester.ensureVisible(reference);
-      await tester.tap(reference);
       await tester.pumpAndSettle();
       final choose = find.byKey(const Key('work-product-photo-choose'));
       await tester.ensureVisible(choose);
@@ -8928,6 +8932,7 @@ void main() {
 
   for (final scenario in <(String, int?)>[
     ('manual', null),
+    ('manual-reselect', null),
     ('csv', null),
     ('manual', 4),
     ('manual', 7),
@@ -9035,10 +9040,6 @@ void main() {
           tester.testTextInput.hide();
         }
         await tester.pumpAndSettle();
-        final reference = find.byKey(const Key('work-product-reference'));
-        await reveal(tester, reference);
-        await tester.tap(reference);
-        await tester.pumpAndSettle();
         final choose = find.byKey(const Key('work-product-photo-choose'));
         await tester.ensureVisible(choose);
         await tester.tap(choose);
@@ -9062,6 +9063,94 @@ void main() {
         await tester.tap(find.byKey(const Key('work-product-photo-confirm')));
         await tester.pumpAndSettle();
         expect(work.workspaceCatalogueItems, isEmpty);
+        if (sample != null && entryPath == 'manual') {
+          final editorScroll = tester.state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byKey(const Key('work-product-editor-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          editorScroll.position.jumpTo(0);
+          await tester.pumpAndSettle();
+          expect(choose.hitTestable(), findsOneWidget);
+          await awaitCataloguePhoto(
+            tester,
+            () => tester
+                .widgetList<RawImage>(
+                  find.descendant(
+                    of: find.byKey(const Key('work-product-fast-editor')),
+                    matching: find.byType(RawImage),
+                  ),
+                )
+                .any((image) => image.image != null),
+          );
+          await captureStoreView(tester, 'r6641-${sample.id}-photo-editor');
+        }
+        if (entryPath == 'manual-reselect') {
+          final brand = find.byKey(const Key('work-product-brand'));
+          await reveal(tester, brand);
+          await tester.enterText(brand, 'Corrected own brand');
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-product-save')));
+          await tester.pumpAndSettle();
+          expect(work.workspaceCatalogueItems, isEmpty);
+          await reveal(tester, choose);
+          expect(
+            find.byKey(const Key('work-product-photo-needs-review')),
+            findsOneWidget,
+          );
+          final remove = find.byKey(const Key('work-product-photo-remove'));
+          expect(remove, findsOneWidget);
+          await tester.ensureVisible(remove);
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-product-photo-needs-review')),
+            findsNothing,
+          );
+          await reveal(tester, choose);
+          expect(choose.hitTestable(), findsOneWidget);
+          await tester.tap(choose);
+          await awaitCataloguePhoto(
+            tester,
+            () => find
+                .byKey(const Key('work-product-photo-confirm'))
+                .evaluate()
+                .isNotEmpty,
+            timeout: const Duration(seconds: 15),
+          );
+          await tester.tap(find.byKey(const Key('work-product-photo-confirm')));
+          await tester.pumpAndSettle();
+          expect(picker.calls, 2);
+        }
+        if (entryPath == 'manual' && sample == null) {
+          // r66.41: a photo chosen before completing identity fields must
+          // never disappear silently when the retailer saves the product.
+          final brand = find.byKey(const Key('work-product-brand'));
+          await reveal(tester, brand);
+          await tester.enterText(brand, 'Corrected own brand');
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-product-save')));
+          await tester.pumpAndSettle();
+          expect(work.workspaceCatalogueItems, isEmpty);
+          expect(
+            find.text(
+              'Product details changed. Choose the image for this exact pack again, or remove it before saving.',
+            ),
+            findsOneWidget,
+          );
+          // Reverting the identity recovers the retained selection without
+          // another picker request or any weakening of exact-SKU matching.
+          await reveal(tester, brand);
+          await tester.enterText(brand, 'QA own brand');
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
+          expect(picker.calls, 1);
+        }
         await tester.tap(find.byKey(const Key('work-product-save')));
         await tester.pumpAndSettle();
         if (entryPath == 'csv') {
@@ -9370,6 +9459,76 @@ void main() {
       expect(review.hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final activity in ['order', 'invoice']) {
+    testWidgets(
+      'R6641 landscape Store home $activity retains usable content at 1.6x',
+      (tester) async {
+        final work = storeViewFixture();
+        if (activity == 'invoice') {
+          work.workspaceOrderStage = 'Completed';
+          work.workspaceInvoices.add(
+            WorkspaceCustomerInvoice(
+              id: 'INV-LANDSCAPE-QA',
+              orderId: 'SALE-1042',
+              customer: 'Meena',
+              items: 'Grocery purchases',
+              amount: 860,
+              payment: 'Cash',
+              issuedAt: DateTime(2026, 9, 24),
+            ),
+          );
+        }
+        await mount(
+          tester,
+          route: '/app/buy',
+          work: work,
+          viewport: const Size(806, 360),
+          textScale: 1.6,
+          uiReviewOnly: true,
+        );
+        final router =
+            tester.widget<MaterialApp>(find.byType(MaterialApp)).routerConfig!
+                as GoRouter;
+        router.go('/app/work/workspace/dashboard');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final header = find.byKey(const Key('work-dashboard-inline-header'));
+        expect(tester.getSize(header).height, lessThanOrEqualTo(70));
+        for (final key in [
+          'work-dashboard-search',
+          'work-dashboard-profile',
+          'work-dashboard-workspace-switcher',
+        ]) {
+          expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+        }
+        final content = find.byKey(const Key('work-workspace-dashboard'));
+        expect(tester.getSize(content).height, greaterThanOrEqualTo(160));
+        final sale = find.byKey(const Key('work-quick-counter-sale'));
+        await reveal(tester, sale);
+        expect(sale.hitTestable(), findsOneWidget);
+        final contentRect = tester.getRect(content);
+        final saleRect = tester.getRect(sale);
+        expect(saleRect.top, greaterThanOrEqualTo(contentRect.top));
+        expect(saleRect.bottom, lessThanOrEqualTo(contentRect.bottom));
+        await captureStoreView(tester, 'r6641-home-landscape-$activity-1.6');
+        final review = find.byKey(
+          Key(
+            activity == 'invoice'
+                ? 'work-invoice-open'
+                : 'work-activity-order-review',
+          ),
+        );
+        await reveal(tester, review);
+        expect(review.hitTestable(), findsOneWidget);
+        await captureStoreView(
+          tester,
+          'r6641-home-landscape-$activity-action-1.6',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final scenario in ['cancel', 'import', 'failure', 'store switch']) {
@@ -15327,13 +15486,19 @@ void main() {
           textDirection: TextDirection.ltr,
           textScaler: MediaQuery.textScalerOf(tester.element(input)),
         )..layout();
-        expect(tenLakhPainter.width, lessThanOrEqualTo(
-          tester.state<EditableTextState>(editable).renderEditable.size.width),
-          reason: 'Ten lakh including paise remains fully visible.');
+        expect(
+          tenLakhPainter.width,
+          lessThanOrEqualTo(
+            tester.state<EditableTextState>(editable).renderEditable.size.width,
+          ),
+          reason: 'Ten lakh including paise remains fully visible.',
+        );
         tenLakhPainter.dispose();
         expect(find.text('Bill discount'), findsOneWidget);
-        await captureStoreView(tester,
-            'large-bill-ten-lakh-${display.$1}-${display.$2}');
+        await captureStoreView(
+          tester,
+          'large-bill-ten-lakh-${display.$1}-${display.$2}',
+        );
         await tester.enterText(input, '500000.00');
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
@@ -15498,8 +15663,11 @@ void main() {
         );
         final input = find.byKey(const Key('work-counter-discount-value'));
         void expectCompactDiscountRow() {
-          expect(find.text('Bill discount'), findsOneWidget,
-              reason: 'The purpose stays visible after entering a value.');
+          expect(
+            find.text('Bill discount'),
+            findsOneWidget,
+            reason: 'The purpose stays visible after entering a value.',
+          );
           if (display.scale != 1.0) return;
           final controls = [
             find.byKey(const Key('work-counter-discount-percentage')),
@@ -15520,10 +15688,7 @@ void main() {
 
         expectCompactDiscountRow();
         expect(tester.widget<TextField>(input).decoration!.labelText, isNull);
-        expect(
-          tester.widget<TextField>(input).decoration!.hintText,
-          '0.00',
-        );
+        expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
         expect(tester.widget<TextField>(input).controller!.text, isEmpty);
         tester.view.viewInsets = FakeViewPadding(
           bottom: display.label == 'landscape' ? 120 : 280,
@@ -15569,10 +15734,7 @@ void main() {
         await press('work-counter-discount-fixed');
         expect(work.workspaceCounterDiscount.kind, 'percentage');
         expectCompactDiscountRow();
-        expect(
-          tester.widget<TextField>(input).decoration!.hintText,
-          '0.00',
-        );
+        expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
         await press('work-counter-discount-apply');
         expect(work.workspaceCounterDiscount.kind, 'fixed');
         expect(work.workspaceCounterPayableMinor, 25400);
@@ -17358,6 +17520,23 @@ void main() {
         );
         await tester.pumpAndSettle();
         await captureStoreView(tester, 'counter-d01-basket-$entry-$scale');
+        final selectedAdd = find.byKey(
+          const Key('work-order-add-oil-fortune-1l'),
+        );
+        final selectedStyle = tester.widget<IconButton>(selectedAdd).style!;
+        expect(
+          selectedStyle.foregroundColor!.resolve({}),
+          isNot(Colors.white),
+          reason: 'Selected quantity must not restore a solid-blue + button.',
+        );
+        expect(
+          selectedStyle.backgroundColor!.resolve({}),
+          isNot(MoolColors.navy),
+        );
+        expect(
+          tester.getSize(selectedAdd).shortestSide,
+          greaterThanOrEqualTo(48),
+        );
         await reveal(tester, find.byKey(const Key('work-order-review')));
         await tester.tap(find.byKey(const Key('work-order-review')));
         await tester.pumpAndSettle();

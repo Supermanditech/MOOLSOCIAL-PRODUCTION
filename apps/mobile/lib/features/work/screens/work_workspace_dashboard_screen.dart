@@ -1080,6 +1080,10 @@ class _WorkWorkspaceDashboardScreenState
         (_view == _WorkspaceControlView.operation && !stockSectionRoot) ||
         _view == _WorkspaceControlView.alerts ||
         _reviewedOrder != null;
+    final shortHomeHeader =
+        _view == _WorkspaceControlView.dashboard &&
+        MediaQuery.sizeOf(context).width >= 700 &&
+        MediaQuery.sizeOf(context).height <= 450;
     final namePainter =
         TextPainter(
           text: TextSpan(
@@ -1093,15 +1097,17 @@ class _WorkWorkspaceDashboardScreenState
           textScaler: MediaQuery.textScalerOf(context),
         )..layout(
           maxWidth:
-              (MediaQuery.sizeOf(context).width -
+              ((shortHomeHeader
+                          ? (MediaQuery.sizeOf(context).width - 40) / 2
+                          : MediaQuery.sizeOf(context).width) -
                       (procurementOpen ? 137 : 127) -
                       (hasHeaderBack ? (procurementOpen ? 51 : 47) : 0))
                   .clamp(64.0, double.infinity),
         );
     final storeHeaderHeight =
-        (compactOperation ? 0 : 47) +
+        (compactOperation || shortHomeHeader ? 0 : 47) +
         (namePainter.height + 8).clamp(
-          procurementOpen ? 48.0 : 44.0,
+          procurementOpen || shortHomeHeader ? 48.0 : 44.0,
           double.infinity,
         );
     namePainter.dispose();
@@ -1223,6 +1229,7 @@ class _WorkWorkspaceDashboardScreenState
           : storeRootSurface
           ? _WorkspaceDashboardHeader(
               compact: compactOperation,
+              singleLine: shortHomeHeader,
               session: session,
               workspace: workspace,
               profile: profile,
@@ -1682,11 +1689,26 @@ class _WorkWorkspaceDashboardScreenState
                 ),
               ],
             ],
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              child: Text(
-                'Review data',
-                semanticsLabel: 'Review APK test data. No real transactions.',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical:
+                      MediaQuery.sizeOf(context).width >= 700 &&
+                          MediaQuery.sizeOf(context).height <= 450
+                      ? 0
+                      : 14,
+                ),
+                child: const Align(
+                  alignment: Alignment.centerLeft,
+                  heightFactor: 1,
+                  child: Text(
+                    'Review data',
+                    semanticsLabel:
+                        'Review APK test data. No real transactions.',
+                  ),
+                ),
               ),
             ),
           ),
@@ -3088,6 +3110,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     this.backSize = 44,
     this.keepSearchUtilities = false,
     this.compact = false,
+    this.singleLine = false,
     required this.searchController,
     required this.searchFocusNode,
     required this.onSwitchWorkspace,
@@ -3112,6 +3135,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final double backSize;
   final bool keepSearchUtilities;
   final bool compact;
+  final bool singleLine;
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
   final VoidCallback onSwitchWorkspace;
@@ -3126,287 +3150,298 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget headerPart(Widget child) =>
+        singleLine ? Expanded(child: child) : child;
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      child: Column(
+      child: Flex(
+        direction: singleLine ? Axis.horizontal : Axis.vertical,
         key: const Key('work-dashboard-inline-header'),
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              if (onBack != null) ...[
-                SizedBox(
-                  width: backSize,
-                  height: backSize,
-                  child: IconButton(
-                    key: backKey,
-                    tooltip: 'Back',
-                    onPressed: onBack,
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      size: 20,
-                      color: MoolColors.navy,
+          headerPart(
+            Row(
+              children: [
+                if (onBack != null) ...[
+                  SizedBox(
+                    width: backSize,
+                    height: backSize,
+                    child: IconButton(
+                      key: backKey,
+                      tooltip: 'Back',
+                      onPressed: onBack,
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        size: 20,
+                        color: MoolColors.navy,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                ],
+                Expanded(
+                  child: Semantics(
+                    container: true,
+                    button: true,
+                    label:
+                        '${workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
+                    child: InkWell(
+                      key: const Key('work-dashboard-workspace-switcher'),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: onSwitchWorkspace,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.storefront_outlined,
+                              size: 15,
+                              color: MoolColors.navy,
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: DefaultTextStyle(
+                                style: DefaultTextStyle.of(context).style
+                                    .copyWith(
+                                      color: MoolColors.navy,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                child: Text(
+                                  workspace.name,
+                                  key: const Key('work-store-full-name'),
+                                  textScaler: nameTextScaler,
+                                  style: nameTextStyle,
+                                  softWrap: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 17,
+                              color: MoolColors.muted,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 3),
-              ],
-              Expanded(
-                child: Semantics(
-                  container: true,
+                const SizedBox(width: 6),
+                Semantics(
                   button: true,
+                  excludeSemantics: true,
+                  onTap: onSettings,
                   label:
-                      '${workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
-                  child: InkWell(
-                    key: const Key('work-dashboard-workspace-switcher'),
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: onSwitchWorkspace,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.storefront_outlined,
-                            size: 15,
-                            color: MoolColors.navy,
+                      '${session.workspaceStoreState == WorkspaceStoreState.open
+                          ? 'Open'
+                          : session.workspaceStoreState == WorkspaceStoreState.paused
+                          ? 'Paused'
+                          : 'Off'}, ${session.workspaceVisibleToCustomers ? 'public storefront' : 'private storefront'}. Store status',
+                  child: Material(
+                    key: const Key('work-dashboard-settings'),
+                    color: compact
+                        ? Colors.transparent
+                        : MoolColors.navy.withValues(alpha: .06),
+                    borderRadius: BorderRadius.circular(999),
+                    child: InkWell(
+                      excludeFromSemantics: true,
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: onSettings,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minHeight: 48,
+                          minWidth: 48,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 4 : 9,
+                            vertical: 6,
                           ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: DefaultTextStyle(
-                              style: DefaultTextStyle.of(context).style
-                                  .copyWith(
-                                    color: MoolColors.navy,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                              child: Text(
-                                workspace.name,
-                                key: const Key('work-store-full-name'),
-                                textScaler: nameTextScaler,
-                                style: nameTextStyle,
-                                softWrap: true,
+                          child: _StoreValueMotion(
+                            value:
+                                '${session.workspaceStoreState}:${session.workspaceVisibleToCustomers}',
+                            motionKey: const Key('work-store-status-motion'),
+                            child: SizedBox(
+                              width: compact ? 32 : 40,
+                              child: Icon(
+                                session.workspaceStoreState ==
+                                        WorkspaceStoreState.open
+                                    ? Icons.radio_button_checked_rounded
+                                    : session.workspaceStoreState ==
+                                          WorkspaceStoreState.paused
+                                    ? Icons.pause_circle_outline_rounded
+                                    : Icons.power_settings_new_rounded,
+                                size: 18,
+                                color: MoolColors.navy,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 17,
-                            color: MoolColors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!compact) SizedBox(height: 3, width: singleLine ? 8 : 0),
+          if (!compact)
+            headerPart(
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      key: const Key('work-dashboard-inline-search-band'),
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Color(0xFFDCE2F2)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: searchOpen
+                                ? TextField(
+                                    key: const Key(
+                                      'work-dashboard-search-field',
+                                    ),
+                                    controller: searchController,
+                                    focusNode: searchFocusNode,
+                                    autofocus: false,
+                                    onChanged: onSearchChanged,
+                                    textInputAction: TextInputAction.search,
+                                    style: const TextStyle(
+                                      color: MoolColors.navy,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: searchHint,
+                                      hintStyle: const TextStyle(
+                                        color: MoolColors.muted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.search_rounded,
+                                        color: MoolColors.navy,
+                                        size: 21,
+                                      ),
+                                      prefixIconConstraints:
+                                          const BoxConstraints(
+                                            minWidth: 42,
+                                            minHeight: 44,
+                                          ),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      filled: false,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                    ),
+                                  )
+                                : Semantics(
+                                    key: const Key('work-dashboard-search'),
+                                    button: true,
+                                    label:
+                                        'Search orders, products, customers or invoices',
+                                    child: InkWell(
+                                      onTap: onSearch,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.search_rounded,
+                                              color: MoolColors.navy,
+                                              size: 21,
+                                            ),
+                                            const SizedBox(width: 9),
+                                            Expanded(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  searchHint,
+                                                  maxLines: 1,
+                                                  style: const TextStyle(
+                                                    color: MoolColors.muted,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                           ),
+                          if (searchOpen && searchController.text.isNotEmpty)
+                            IconButton(
+                              key: const Key('work-dashboard-search-clear'),
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                searchController.clear();
+                                onSearchChanged('');
+                              },
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              constraints: const BoxConstraints.tightFor(
+                                width: 40,
+                                height: 44,
+                              ),
+                              padding: EdgeInsets.zero,
+                            ),
+                          if (!searchOpen || keepSearchUtilities)
+                            _HeaderSearchUtility(
+                              key: const Key('work-dashboard-scan'),
+                              tooltip: 'Scan product barcode',
+                              onTap: onScan,
+                              icon: Icons.qr_code_scanner_rounded,
+                            ),
+                          if (searchOpen && !keepSearchUtilities)
+                            IconButton(
+                              key: const Key('work-dashboard-search-close'),
+                              tooltip: 'Finish search',
+                              onPressed: onCloseSearch,
+                              icon: const Icon(Icons.check_rounded, size: 21),
+                              color: MoolColors.navy,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 44,
+                                height: 44,
+                              ),
+                              padding: EdgeInsets.zero,
+                            ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Semantics(
-                button: true,
-                excludeSemantics: true,
-                onTap: onSettings,
-                label:
-                    '${session.workspaceStoreState == WorkspaceStoreState.open
-                        ? 'Open'
-                        : session.workspaceStoreState == WorkspaceStoreState.paused
-                        ? 'Paused'
-                        : 'Off'}, ${session.workspaceVisibleToCustomers ? 'public storefront' : 'private storefront'}. Store status',
-                child: Material(
-                  key: const Key('work-dashboard-settings'),
-                  color: compact
-                      ? Colors.transparent
-                      : MoolColors.navy.withValues(alpha: .06),
-                  borderRadius: BorderRadius.circular(999),
-                  child: InkWell(
-                    excludeFromSemantics: true,
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: onSettings,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minHeight: 48,
-                        minWidth: 48,
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: compact ? 4 : 9,
-                          vertical: 6,
-                        ),
-                        child: _StoreValueMotion(
-                          value:
-                              '${session.workspaceStoreState}:${session.workspaceVisibleToCustomers}',
-                          motionKey: const Key('work-store-status-motion'),
-                          child: SizedBox(
-                            width: compact ? 32 : 40,
-                            child: Icon(
-                              session.workspaceStoreState ==
-                                      WorkspaceStoreState.open
-                                  ? Icons.radio_button_checked_rounded
-                                  : session.workspaceStoreState ==
-                                        WorkspaceStoreState.paused
-                                  ? Icons.pause_circle_outline_rounded
-                                  : Icons.power_settings_new_rounded,
-                              size: 18,
-                              color: MoolColors.navy,
-                            ),
-                          ),
-                        ),
-                      ),
+                  if (!searchOpen || keepSearchUtilities) ...[
+                    const SizedBox(width: 6),
+                    _DashboardAlertButton(
+                      count: _workspaceAlerts(session).length,
+                      onPressed: onAlerts,
                     ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (!compact) const SizedBox(height: 3),
-          if (!compact)
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    key: const Key('work-dashboard-inline-search-band'),
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFDCE2F2)),
-                      ),
+                    const SizedBox(width: 4),
+                    MoolGlobalProfileShortcutV2(
+                      keyName: 'work-dashboard-profile',
+                      onPressed: onProfile,
+                      freeStanding: true,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: searchOpen
-                              ? TextField(
-                                  key: const Key('work-dashboard-search-field'),
-                                  controller: searchController,
-                                  focusNode: searchFocusNode,
-                                  autofocus: false,
-                                  onChanged: onSearchChanged,
-                                  textInputAction: TextInputAction.search,
-                                  style: const TextStyle(
-                                    color: MoolColors.navy,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: searchHint,
-                                    hintStyle: const TextStyle(
-                                      color: MoolColors.muted,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    prefixIcon: const Icon(
-                                      Icons.search_rounded,
-                                      color: MoolColors.navy,
-                                      size: 21,
-                                    ),
-                                    prefixIconConstraints: const BoxConstraints(
-                                      minWidth: 42,
-                                      minHeight: 44,
-                                    ),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    filled: false,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 10,
-                                    ),
-                                  ),
-                                )
-                              : Semantics(
-                                  key: const Key('work-dashboard-search'),
-                                  button: true,
-                                  label:
-                                      'Search orders, products, customers or invoices',
-                                  child: InkWell(
-                                    onTap: onSearch,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.search_rounded,
-                                            color: MoolColors.navy,
-                                            size: 21,
-                                          ),
-                                          const SizedBox(width: 9),
-                                          Expanded(
-                                            child: FittedBox(
-                                              fit: BoxFit.scaleDown,
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                searchHint,
-                                                maxLines: 1,
-                                                style: const TextStyle(
-                                                  color: MoolColors.muted,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                        ),
-                        if (searchOpen && searchController.text.isNotEmpty)
-                          IconButton(
-                            key: const Key('work-dashboard-search-clear'),
-                            tooltip: 'Clear search',
-                            onPressed: () {
-                              searchController.clear();
-                              onSearchChanged('');
-                            },
-                            icon: const Icon(Icons.close_rounded, size: 20),
-                            constraints: const BoxConstraints.tightFor(
-                              width: 40,
-                              height: 44,
-                            ),
-                            padding: EdgeInsets.zero,
-                          ),
-                        if (!searchOpen || keepSearchUtilities)
-                          _HeaderSearchUtility(
-                            key: const Key('work-dashboard-scan'),
-                            tooltip: 'Scan product barcode',
-                            onTap: onScan,
-                            icon: Icons.qr_code_scanner_rounded,
-                          ),
-                        if (searchOpen && !keepSearchUtilities)
-                          IconButton(
-                            key: const Key('work-dashboard-search-close'),
-                            tooltip: 'Finish search',
-                            onPressed: onCloseSearch,
-                            icon: const Icon(Icons.check_rounded, size: 21),
-                            color: MoolColors.navy,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 44,
-                              height: 44,
-                            ),
-                            padding: EdgeInsets.zero,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (!searchOpen || keepSearchUtilities) ...[
-                  const SizedBox(width: 6),
-                  _DashboardAlertButton(
-                    count: _workspaceAlerts(session).length,
-                    onPressed: onAlerts,
-                  ),
-                  const SizedBox(width: 4),
-                  MoolGlobalProfileShortcutV2(
-                    keyName: 'work-dashboard-profile',
-                    onPressed: onProfile,
-                    freeStanding: true,
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
         ],
       ),
@@ -16492,6 +16527,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         _reject(issue.message, field: issue.field);
         return;
       }
+      if (_privatePhoto != null && _matchingPhoto == null) {
+        _reject(
+          'Product details changed. Choose the image for this exact pack again, or remove it before saving.',
+        );
+        return;
+      }
       if (!_categories.containsKey(_category.text.trim())) {
         _reject('Choose a category from the list.', field: 'categoryId');
         return;
@@ -17031,6 +17072,61 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           'work-product-fast-editor',
                           'Product, price & stock',
                           [
+                            if (widget.session.catalogueManagesProductPhoto(
+                              product,
+                            ))
+                              const Text(
+                                'MoolSocial manages this catalogue image.',
+                              )
+                            else if (widget.importRow != null)
+                              const Text(
+                                'Save corrections, then choose an image in product review.',
+                              )
+                            else ...[
+                              if (_privatePhoto != null &&
+                                  _matchingPhoto == null)
+                                const Text(
+                                  'Product details changed · choose the image again',
+                                  key: Key('work-product-photo-needs-review'),
+                                ),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  TextButton.icon(
+                                    key: const Key('work-product-photo-choose'),
+                                    onPressed:
+                                        _choosingPhoto || _savingInventory
+                                        ? null
+                                        : _chooseProductPhoto,
+                                    icon: const Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 20,
+                                    ),
+                                    label: Text(
+                                      _choosingPhoto
+                                          ? 'Checking image…'
+                                          : _privatePhoto == null
+                                          ? 'Choose image'
+                                          : 'Replace image',
+                                    ),
+                                  ),
+                                  if (_privatePhoto != null)
+                                    TextButton(
+                                      key: const Key(
+                                        'work-product-photo-remove',
+                                      ),
+                                      onPressed:
+                                          _choosingPhoto || _savingInventory
+                                          ? null
+                                          : () => setState(() {
+                                              _privatePhoto = null;
+                                              _error = null;
+                                            }),
+                                      child: const Text('Remove image'),
+                                    ),
+                                ],
+                              ),
+                            ],
                             _field(
                               'title',
                               'work-product-title',
@@ -17419,53 +17515,6 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   ? 'Photo not available for this pack'
                                   : 'Catalogue photo',
                             ),
-                            if (widget.session.catalogueManagesProductPhoto(
-                              product,
-                            ))
-                              const Text(
-                                'MoolSocial manages this catalogue image.',
-                              )
-                            else if (widget.importRow != null)
-                              const Text(
-                                'Save corrections, then choose an image in product review.',
-                              )
-                            else
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  TextButton.icon(
-                                    key: const Key('work-product-photo-choose'),
-                                    onPressed:
-                                        _choosingPhoto || _savingInventory
-                                        ? null
-                                        : _chooseProductPhoto,
-                                    icon: const Icon(
-                                      Icons.add_photo_alternate_outlined,
-                                      size: 20,
-                                    ),
-                                    label: Text(
-                                      _choosingPhoto
-                                          ? 'Checking image…'
-                                          : _matchingPhoto == null
-                                          ? 'Choose image'
-                                          : 'Replace image',
-                                    ),
-                                  ),
-                                  if (_matchingPhoto != null)
-                                    TextButton(
-                                      key: const Key(
-                                        'work-product-photo-remove',
-                                      ),
-                                      onPressed:
-                                          _choosingPhoto || _savingInventory
-                                          ? null
-                                          : () => setState(
-                                              () => _privatePhoto = null,
-                                            ),
-                                      child: const Text('Remove image'),
-                                    ),
-                                ],
-                              ),
                             if (widget
                                     .product
                                     .compliance
@@ -28370,10 +28419,8 @@ class _SaleProductTile extends StatelessWidget {
           style: IconButton.styleFrom(
             disabledForegroundColor: const Color(0xFF68758A),
             disabledBackgroundColor: const Color(0xFFE6EAF1),
-            foregroundColor: quantity > 0 ? Colors.white : _counterSalePrimary,
-            backgroundColor: quantity > 0
-                ? _counterSalePrimary
-                : _counterSaleTint,
+            foregroundColor: _counterSalePrimary,
+            backgroundColor: _counterSaleTint,
           ),
           icon: const Icon(Icons.add_rounded, size: 20),
         ),
@@ -28383,7 +28430,7 @@ class _SaleProductTile extends StatelessWidget {
       key: Key('work-sale-product-${product.id}'),
       padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: quantity > 0 ? _counterSaleTint : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
       child: LayoutBuilder(
