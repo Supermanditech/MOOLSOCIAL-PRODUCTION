@@ -2581,3 +2581,16 @@ feel, remaining device-only variants and cold-process fidelity distinct from
 local/attached-restart proof. Seller GST automatic mapping remains a separate
 open founder addition; backend and successor-APK closure remain deferred. No
 full-sweep/founder-acceptance claim is made by this evidence checkpoint.
+
+### CSV search-first header — 2026-09-25
+
+Founder rejected the filename row and Ready/Check strip competing with search.
+Review import now starts with full-width inline search. A toolbar filter opens
+checked Ready/Check options with live counts; the title tooltip retains the
+imported filename without a dedicated row. Existing query, correction, selection
+and persistence behavior is unchanged. Connected CSV suite:36/36 passed;
+source/test analysis clean; diff whitespace check clean. Evidence log:
+task outputs/csv-search-header-tests.txt. Narrow2x and landscape1.6 layouts are
+included in local tests. Device visual approval remains pending: OPPO connected
+but moved to another app while reconnecting the debug session. No import saved,
+invoice issued, payment recorded, APK built or device data cleared for this change.

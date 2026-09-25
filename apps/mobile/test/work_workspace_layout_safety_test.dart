@@ -772,6 +772,17 @@ Future<void> chooseAddProductMode(WidgetTester tester, String mode) async {
 }
 
 void main() {
+  Future<void> openImportFilters(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-import-status-filter')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> chooseImportIssues(WidgetTester tester) async {
+    await openImportFilters(tester);
+    await tester.tap(find.byKey(const Key('work-import-issues')));
+    await tester.pumpAndSettle();
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       'R6638 Store scanner fallback validates and returns only a code $scale',
@@ -10150,8 +10161,7 @@ void main() {
         tester,
         'csv-review-ready-${display.$1.toInt()}-${display.$3}',
       );
-      await tester.tap(find.byKey(const Key('work-import-issues')));
-      await tester.pumpAndSettle();
+      await chooseImportIssues(tester);
       await captureStoreView(
         tester,
         'csv-review-fields-${display.$1.toInt()}-${display.$3}',
@@ -10650,16 +10660,29 @@ void main() {
         tester,
         'csv-ready-${display.$1.toInt()}-${display.$3}',
       );
+      expect(find.text('store-products.csv'), findsNothing);
+      expect(
+        find.byTooltip('Imported file: store-products.csv'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-import-ready')), findsNothing);
+      expect(
+        find.byKey(const Key('work-import-search')).hitTestable(),
+        findsOneWidget,
+      );
+      await openImportFilters(tester);
       for (final key in ['work-import-ready', 'work-import-issues']) {
-        final chip = tester.widget<ChoiceChip>(find.byKey(Key(key)));
-        expect(chip.selectedColor, const Color(0xFFF0F1F7));
-        expect(chip.labelStyle!.color, const Color(0xFF252B38));
-        expect(chip.showCheckmark, isTrue);
+        final choice = tester.widget<CheckedPopupMenuItem<bool>>(
+          find.byKey(Key(key)),
+        );
+        expect(choice.checked, key == 'work-import-ready');
         expect(
           tester.getSize(find.byKey(Key(key))).height,
           greaterThanOrEqualTo(48),
         );
       }
+      await tester.tap(find.byKey(const Key('work-import-ready')));
+      await tester.pumpAndSettle();
       expect(
         tester
             .widget<Text>(find.text('Premium basmati rice, extra long grain'))
@@ -10694,8 +10717,7 @@ void main() {
           .controller!
           .jumpTo(0);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('work-import-issues')));
-      await tester.tap(find.byKey(const Key('work-import-issues')));
+      await chooseImportIssues(tester);
       await tester.pumpAndSettle();
       await captureStoreView(
         tester,
@@ -10743,8 +10765,7 @@ void main() {
       expect(work.workspaceCatalogueItems, before);
       await captureStoreView(tester, 'csv-connected-review-$action');
       if (action == 'cancel') {
-        await tester.tap(find.byKey(const Key('work-import-issues')));
-        await tester.pumpAndSettle();
+        await chooseImportIssues(tester);
         await captureStoreView(tester, 'csv-connected-attention');
       }
       if (action == 'cancel') {
@@ -10849,8 +10870,7 @@ void main() {
       await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
       await tester.pumpAndSettle();
       if (action != 'all invalid') {
-        await tester.tap(find.byKey(const Key('work-import-issues')));
-        await tester.pumpAndSettle();
+        await chooseImportIssues(tester);
       } else {
         expect(find.byKey(const Key('work-import-save')), findsNothing);
       }
@@ -11048,29 +11068,36 @@ void main() {
         await tester.tap(find.byKey(const Key('work-import-clear-search')));
         await tester.pumpAndSettle();
         await captureStoreView(tester, 'csv29-ready-$scale');
+        await openImportFilters(tester);
         expect(
           tester
-              .widget<ChoiceChip>(find.byKey(const Key('work-import-ready')))
-              .labelStyle!
-              .color,
-          const Color(0xFF252B38),
+              .widget<CheckedPopupMenuItem<bool>>(
+                find.byKey(const Key('work-import-ready')),
+              )
+              .checked,
+          isTrue,
         );
         await tester.tap(find.byKey(const Key('work-import-issues')));
         await tester.pumpAndSettle();
+        await openImportFilters(tester);
         expect(
           tester
-              .widget<ChoiceChip>(find.byKey(const Key('work-import-issues')))
-              .labelStyle!
-              .color,
-          const Color(0xFF252B38),
+              .widget<CheckedPopupMenuItem<bool>>(
+                find.byKey(const Key('work-import-issues')),
+              )
+              .checked,
+          isTrue,
         );
         expect(
           tester
-              .widget<ChoiceChip>(find.byKey(const Key('work-import-ready')))
-              .labelStyle!
-              .color,
-          const Color(0xFF252B38),
+              .widget<CheckedPopupMenuItem<bool>>(
+                find.byKey(const Key('work-import-ready')),
+              )
+              .checked,
+          isFalse,
         );
+        await tester.tap(find.byKey(const Key('work-import-issues')));
+        await tester.pumpAndSettle();
         await tester.enterText(search, 'SUGAR-1');
         await tester.pumpAndSettle();
         expect(
@@ -11158,12 +11185,17 @@ void main() {
 
     await show('$header\nRice,Local,1 kg,40,50,-1');
     expect(find.byKey(const Key('work-import-save')), findsNothing);
+    await openImportFilters(tester);
     expect(
       tester
-          .widget<ChoiceChip>(find.byKey(const Key('work-import-issues')))
-          .selected,
+          .widget<CheckedPopupMenuItem<bool>>(
+            find.byKey(const Key('work-import-issues')),
+          )
+          .checked,
       isTrue,
     );
+    await tester.tap(find.byKey(const Key('work-import-issues')));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Check stock quantity'), findsOneWidget);
     expect(calls, 0);
     await show(

@@ -714,7 +714,35 @@ class _StoreProductImportReviewScreenState
         appBar: AppBar(
           toolbarHeight: 48,
           titleSpacing: 0,
-          title: const Text('Review import'),
+          title: Tooltip(
+            message: 'Imported file: ${widget.fileName}',
+            child: const Text('Review import'),
+          ),
+          actions: [
+            PopupMenuButton<bool>(
+              key: const Key('work-import-status-filter'),
+              enabled: !_busy,
+              tooltip:
+                  'Filter products: ${_issuesOnly ? 'Check · $attention' : 'Ready · $ready'}',
+              icon: const Icon(Icons.filter_list_rounded),
+              onSelected: (issuesOnly) =>
+                  setState(() => _issuesOnly = issuesOnly),
+              itemBuilder: (context) => [
+                CheckedPopupMenuItem<bool>(
+                  key: const Key('work-import-ready'),
+                  value: false,
+                  checked: !_issuesOnly,
+                  child: Text('Ready · $ready'),
+                ),
+                CheckedPopupMenuItem<bool>(
+                  key: const Key('work-import-issues'),
+                  value: true,
+                  checked: _issuesOnly,
+                  child: Text('Check · $attention'),
+                ),
+              ],
+            ),
+          ],
           titleTextStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: MoolColors.navy,
             fontWeight: FontWeight.w700,
@@ -735,15 +763,6 @@ class _StoreProductImportReviewScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              widget.fileName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: MoolColors.muted,
-                              ),
-                            ),
                             TextField(
                               key: const Key('work-import-search'),
                               controller: _search,
@@ -790,56 +809,6 @@ class _StoreProductImportReviewScreenState
                                   vertical: 12,
                                 ),
                               ),
-                            ),
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                ChoiceChip(
-                                  key: const Key('work-import-ready'),
-                                  showCheckmark: true,
-                                  checkmarkColor: const Color(0xFF252B38),
-                                  selectedColor: const Color(0xFFF0F1F7),
-                                  backgroundColor: Colors.transparent,
-                                  side: BorderSide.none,
-                                  labelStyle: const TextStyle(
-                                    color: Color(0xFF252B38),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  label: Text('Ready · $ready'),
-                                  selected: !_issuesOnly,
-                                  onSelected: _busy
-                                      ? null
-                                      : (_) =>
-                                            setState(() => _issuesOnly = false),
-                                ),
-                                ChoiceChip(
-                                  key: const Key('work-import-issues'),
-                                  showCheckmark: true,
-                                  checkmarkColor: const Color(0xFF252B38),
-                                  selectedColor: const Color(0xFFF0F1F7),
-                                  backgroundColor: Colors.transparent,
-                                  side: BorderSide.none,
-                                  labelStyle: const TextStyle(
-                                    color: Color(0xFF252B38),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  label: Text(
-                                    MediaQuery.textScalerOf(context).scale(1) >
-                                            1.5
-                                        ? 'Check · $attention'
-                                        : 'Needs attention · $attention',
-                                  ),
-                                  selected: _issuesOnly,
-                                  onSelected: _busy
-                                      ? null
-                                      : (_) =>
-                                            setState(() => _issuesOnly = true),
-                                ),
-                              ],
                             ),
                             const SizedBox(height: 6),
                             if (!_issuesOnly && visible.isNotEmpty)
