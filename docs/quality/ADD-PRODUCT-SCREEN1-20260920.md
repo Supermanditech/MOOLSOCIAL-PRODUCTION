@@ -2877,3 +2877,29 @@ customer, invoice or payment values changed. These targeted retests supplement
 the inventory's earlier device passes; not every search/configuration was newly
 replayed in this turn. Setup chooser remains source-reviewed, not replayed on
 this already activated Store. Pending register remains open, no new APK.
+
+## Store home audit — 26 September 2026, awaiting founder review
+
+Audit-only request. Source e1cdf7b5 on attached OPPO, portrait 720x1612/font1.0.
+No application edits or other-screen audit. Full report/screenshots retained in
+task outputs/store-home-audit-20260926.md and opened for founder review.
+
+| Reference | Finding | Status |
+| --- | --- | --- |
+| HOME-01 | Solid navy finance strip and invoice CTA, heavy blue typography conflict with restrained palette | Observed visual; proposed fix pending approval |
+| HOME-02 | 350dp invoice-card height/Expanded body reserve blank space above CTA | Observed layout/source confirmed; pending approval |
+| HOME-03 | Always-open 92dp home rail takes about26% of width; Add products initially below viewport, no collapse control | Observed usability; proposed Actions-tab redesign pending approval |
+| HOME-04 | Bare Cash under invoice total lacks method/collection-state distinction | Observed presentation gap; do not infer payment received or due |
+| HOME-05 | Latest invoice uses firstOrNull; recovery appends whereas creation prepends | Source-backed ordering suspicion; reproduce before asserting/fixing defect |
+| HOME-06 | Empty sharedChannels gives invoice handoff priority over lower home activities while delivery backend is deferred | Source-backed priority concern; define honest fallback, no fabricated delivery |
+
+Founder proposal: one labelled wallet/stack-style Actions tab, explicit expand/
+collapse, remain expanded until manually collapsed, central content resizes rather
+than being covered. Recommended initial collapsed state/session persistence are
+proposals, not approved behaviour. Preserve routes, data, accessibility and centre
+state; no architecture replacement. Separate requested follow-up removes related
+rails from Sales/dues/statements/purchases/expenses working screens, preserving
+their navigation and essential actions; those screens were not audited here.
+Landscape/large-text/empty/error/live-order variants remain unverified in this
+audit. No records changed or APK built. Existing pending list stays active.
+Await founder review before implementation of HOME-01 through HOME-06/proposals.
