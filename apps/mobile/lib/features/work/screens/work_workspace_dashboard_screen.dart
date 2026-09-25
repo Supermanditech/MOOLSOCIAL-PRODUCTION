@@ -3730,7 +3730,6 @@ class _StoreControlDashboard extends StatelessWidget {
               (ready
                   ? _StoreActivityDeck(
                       key: const Key('store-stable-working-centre'),
-                      flushRight: !actionsExpanded && !actionsBelow,
                       stickyActions: !actionsExpanded && !actionsBelow
                           ? () => actions
                           : null,
@@ -3751,7 +3750,7 @@ class _StoreControlDashboard extends StatelessWidget {
                       onProducts: onAddProducts,
                     ));
           // At enlarged text, the selected detail owns the working area.
-          // Closing restores all unchanged dashboard rails; no new route.
+          // Closing restores the home dashboard; no new route.
           if (workingCentre == null &&
               enlarged &&
               reviewedOrder != null &&
@@ -3884,7 +3883,9 @@ class _StoreControlDashboard extends StatelessWidget {
               ),
             ],
           );
-          Widget withStickyTab(Widget body) => actionsExpanded || ready
+          // Setup has no activity-card shell to host the notched control.
+          // Keep its action access separate from the approved live-home card.
+          Widget withSetupActionAccess(Widget body) => actionsExpanded || ready
               ? body
               : Stack(
                   fit: StackFit.expand,
@@ -3898,15 +3899,15 @@ class _StoreControlDashboard extends StatelessWidget {
                             double.infinity,
                           ) /
                           2,
-                      width: 49,
+                      width: _quickActionsTabWidth,
                       child: actions,
                     ),
                   ],
                 );
           if (!enlarged && !collectionNeedsScroll && !shortViewport) {
-            return withStickyTab(content);
+            return withSetupActionAccess(content);
           }
-          return withStickyTab(
+          return withSetupActionAccess(
             SingleChildScrollView(
               key: const Key('work-dashboard-enlarged-scroll'),
               child: SizedBox(
@@ -3972,7 +3973,7 @@ class _StoreActionEdge extends StatelessWidget {
             ? double.infinity
             : expanded
             ? (readableWidth > normalWidth ? readableWidth : normalWidth) + 20
-            : 49,
+            : _quickActionsTabWidth,
         height: horizontal
             ? (MediaQuery.textScalerOf(context).scale(11) * 2.55 + 22).clamp(
                 54.0,
@@ -4729,7 +4730,6 @@ class _StorePulseMetric extends StatelessWidget {
 
 class _StoreActivityDeck extends StatelessWidget {
   const _StoreActivityDeck({
-    this.flushRight = false,
     this.stickyActions,
     required this.session,
     required this.onOrders,
@@ -4742,7 +4742,6 @@ class _StoreActivityDeck extends StatelessWidget {
     super.key,
   });
   final WorkSession session;
-  final bool flushRight;
   final Widget Function()? stickyActions;
   final WorkspaceOrderRecord? reviewedOrder;
   final VoidCallback onOrders;
@@ -4842,7 +4841,7 @@ class _StoreActivityDeck extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(
         12,
         MediaQuery.sizeOf(context).height < 650 ? 6 : 14,
-        flushRight ? 0 : 12,
+        stickyActions != null ? 0 : 12,
         MediaQuery.sizeOf(context).height < 650 ? 6 : 14,
       ),
       child: LayoutBuilder(
@@ -4878,7 +4877,6 @@ class _StoreActivityDeck extends StatelessWidget {
             _PackingActivityCard() => largeText ? 480.0 : 410.0,
             _PickupReadyActivityCard() => 300.0,
             _DeliveryActivityCard() => largeText ? 680.0 : 420.0,
-            _InvoiceReadyActivityCard() => 350.0,
             _ => 420.0,
           };
           // Short viewports must scroll the whole card, including its actions.
@@ -5046,8 +5044,9 @@ class _StoreRecentSale extends StatelessWidget {
   }
 }
 
+const _quickActionsTabWidth = 49.0;
 const _quickActionsContourGap = 6.0;
-const _quickActionsNotchWidth = 49.0 + _quickActionsContourGap;
+const _quickActionsNotchWidth = _quickActionsTabWidth + _quickActionsContourGap;
 
 double _quickActionsNotchHeight(BuildContext context) {
   final label = TextPainter(
@@ -5076,7 +5075,9 @@ class _ActivityDeckShell extends StatelessWidget {
   final Widget? stickyActions;
   @override
   Widget build(BuildContext context) {
-    final notchHeight = _quickActionsNotchHeight(context);
+    final notchHeight = stickyActions == null
+        ? 0.0
+        : _quickActionsNotchHeight(context);
     final surface = Material(
       color: Colors.white,
       elevation: 3,
@@ -5128,7 +5129,12 @@ class _ActivityDeckShell extends StatelessWidget {
       fit: shrinkWrap ? StackFit.loose : StackFit.expand,
       children: [
         surface,
-        Positioned(right: 0, bottom: 0, width: 49, child: stickyActions!),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          width: _quickActionsTabWidth,
+          child: stickyActions!,
+        ),
       ],
     );
   }

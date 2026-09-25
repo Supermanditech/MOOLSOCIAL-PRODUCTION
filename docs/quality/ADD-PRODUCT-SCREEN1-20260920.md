@@ -3142,3 +3142,18 @@ the tab and retained central surface; analysis clean. Evidence:
 outputs/home-contour-gap-20260926.txt and outputs/home-contour-gap-20260926.png.
 Hot reload succeeded; OPPO portrait screenshot visually inspected. No APK,
 transaction, backend or Cursor changes; prior outstanding device checks remain.
+
+## HOME-03 founder approval and source cleanup
+
+Founder approved the bottom-right contour passage. Removed redundant flushRight
+state, unreachable old invoice-height switch arm and stale rail-restoration
+comment. Consolidated tab width and explicitly named the live setup-only action
+fallback. No trial/backup Store source files found; obsolete rail classes/keys
+and old wording remain absent. Kept regression guards, adaptive/setup access,
+historical evidence and Git history; no file/data deletion or history rewrite.
+Hot reload succeeded and outputs/home-cleanup-20260926.png was inspected:
+approved OPPO portrait design unchanged. Analysis clean. This cleanup does not
+close pending physical landscape/enlarged-text or exact-APK verification.
+All40 selected layout/atomic regressions passed; log:
+outputs/home-cleanup-regression-20260926.txt. Source removals remain recoverable
+from Git; no local evidence or previous development history was erased.
