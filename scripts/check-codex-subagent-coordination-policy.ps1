@@ -460,7 +460,7 @@ function Test-RedmiV6HistoricalEvidenceCommit([string]$Commit, [string]$Subject)
 function Test-CursorBuyReadyHistoricalSubject([string]$Commit, [string]$Subject) {
   # Preserve these exact founder-authorized commits during the 22 Sep handoff.
   # The bootstrap has its own exact parent/subject/owner validation. This only
-  # reconciles seven subsequent labels; no future subject or safety gate changes.
+  # reconciles eight subsequent labels; no future subject or safety gate changes.
   if ($root.Replace('\','/').TrimEnd('/') -cne
         'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921' -or
       $AgentRole -cne 'primary' -or $AgentTask -cne '/root' -or
@@ -472,6 +472,7 @@ function Test-CursorBuyReadyHistoricalSubject([string]$Commit, [string]$Subject)
     return $false
   }
   $historicalSubjects = @{
+    '5dc6885ada1fe0cd23f3d5d0a2bc62fe56cc0abd' = 'docs(buy): define connected product page and provider contracts'
     '19127ea6a7c389eeda000016af672409f2defcff' = 'feat(buy): qualify public storefront and all-store pickup choices'
     'd5279222466211f0526c625e58b8da5dc0d78218' = 'fix(buy): reserve full Saved action clearance in SKU cards'
     'eb7a14e9f984fa322e8a6468a97249104fe28776' = 'fix(buy): qualify exact storefront source for Redmi review'

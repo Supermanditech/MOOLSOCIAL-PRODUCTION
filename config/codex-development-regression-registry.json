@@ -106865,7 +106865,14 @@
         "copyAnalysisRecovery": "Focusedcopy tests pass afterfixtureidentityalignment. Analysis flagged null-awarecollectionelement style andmissingbraces in testfixture; fixed without behavior change. One optionalrg used repositoryrelativepathfrommobilecwd andfoundnothing; no conclusiondrawn.",
         "tradeTestEncodingRecovery": "The280->240 height edit read theWholesale test without explicitUTF8 onWindows, converting three middle-dot separators to mojibake. Final556 replay batch12failed exactMOQtext beforeheightcheck. Preservebadbytes andfailedlog; replace only thethree U+00C2 U+00B7 sequences withU+00B7, assert resultingtestequalsHEAD UTF8plusonlyheightchange. Allfuture textIO explicitUTF8. Runtime unchanged; freshsource-bound replay required.",
         "tradeToolbarRecovery": "After UTF8 repair,targetedWholesale test reaches nextobsolete assumption: scrollingonlygallery doesnotmountSave nowinpreviouslazytoolbar. Explicitly revealSave before assertingitsunique presence; preservegalleryheight/containment andall commerce assertions. New normal/enlarged toolbar geometry tests independently prove actionsoutsidephotos.",
-        "preservationReadbackRecovery": "Preservation command output was unavailable after context truncation. Did not rerun append operation. Scalar readback confirmed final archive SHA b4ee0e08605e915bf66c47bb1e1f3f444d05660b863295dabe64a9f33c66321c, proof, manifest source and pause entry; final handoff exists. Use bounded scalar readback before any retry."
+        "preservationReadbackRecovery": "Preservation command output was unavailable after context truncation. Did not rerun append operation. Scalar readback confirmed final archive SHA b4ee0e08605e915bf66c47bb1e1f3f444d05660b863295dabe64a9f33c66321c, proof, manifest source and pause entry; final handoff exists. Use bounded scalar readback before any retry.",
+        "remoteCheckpointRecovery": {
+          "observed": "Handoff rejected previously pushed 5dc6885ada1fe0cd23f3d5d0a2bc62fe56cc0abd because its docs(buy) label differs from the lane format. An initial optional lookup also used a nonexistent script name and emitted truncated search results; no mutation resulted.",
+          "cause": "Historical subject allowlist stopped at seven older commits; pre_commit validates new staged work, whereas handoff checks full history.",
+          "prevention": "Retain existing history. Reconcile only the exact eighth historical SHA and exact subject under existing root, actor, branch, phase, ticket and baseline restrictions. Verify positive case and wrong subject/SHA/phase/branch rejection. Continue enforcing the normal prefix for every new commit.",
+          "evidence": "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/refined-polish-remote-handoff.log",
+          "authorization": "Founder requested local and remote same, then resume. No force push, rebase, runtime acceptance or ticket closure."
+        }
       }
     }
   ],
