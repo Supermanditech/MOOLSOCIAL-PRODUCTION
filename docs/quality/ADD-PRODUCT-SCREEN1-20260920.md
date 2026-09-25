@@ -2963,3 +2963,33 @@ founder; physical landscape/enlarged-text evidence remains pending. Keep bounded
 goal and tickets open for that verification and founder review. Prior pending
 list remains unchanged, including exact-APK closure, GSTIN/backend delivery,
 physical printing, wholesale eligibility and cross-account/cold-restart coverage.
+
+## HOME-03 named-stack refinement — founder approved, 26 September 2026
+
+Founder explicitly approved wallet-reference compact named tabs and delegated
+the wording choice: remove the generic Actions heading so it cannot be mistaken
+for settings. This supersedes hiding names behind the initial collapsed toggle.
+All nine shortcut names now exist in compact view and each uses its original
+callback; scrolling, not expansion, reveals names beyond the viewport. The
+48dp minimum targets, restrained brand icons and light layered backgrounds remain.
+The icon-only labelled-for-accessibility toggle switches detail/spacing and
+centre width; it does not gate access. No change to working-screen rail removal.
+
+HOME-03-C2 was found and fixed during implementation: named tabs overflowed the
+old fixed-height horizontal strip at enlarged text (up to47px). Strip height and
+tab width now adapt to the text scaler; no label shrinking or hidden overflow.
+The focused9-check rerun passed, followed by39 selected layout/atomic regressions
+including empty states, promotion prerequisites, rail-free routes, complete
+Counter Sale journeys and the earlier home corrections. Analysis of changed
+dashboard/test files passed. Evidence: task outputs/home-named-stack-adaptive-
+20260926.txt and outputs/home-named-stack-regression-20260926.txt.
+
+OPPO hot reload succeeded (4/3196 libraries,2198ms). Portrait screenshot inspected:
+outputs/store-named-stack-20260926.png. Compact Counter sale directly reopened the
+existing20-unit draft; closed without changing its contents. Add products opened
+the catalogue directly; returned without saving. Rail scroll exposed Promote
+store and Post requirement without expansion and did not move central content.
+Native hierarchy retrieval briefly returned null during navigation; a fresh
+read confirmed each actual destination, without retrying taps or transactions.
+Physical landscape/enlarged-text verification and founder visual acceptance of
+the implemented refinement remain open. No APK, backend or Cursor integration.

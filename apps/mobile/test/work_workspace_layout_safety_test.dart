@@ -2055,7 +2055,21 @@ void main() {
       final rail = find.byKey(const Key('work-store-action-edge'));
       final centre = find.byKey(const Key('work-store-activity-deck'));
       expect(toggle.hitTestable(), findsOneWidget);
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
+      expect(find.text('Actions'), findsNothing);
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
+      for (final label in [
+        'Counter sale',
+        'Share store link',
+        'Buy stock',
+        'Track purchases',
+        'Buy together',
+        'Add products',
+        'Create offer',
+        'Promote store',
+        'Post requirement',
+      ]) {
+        expect(find.text(label), findsOneWidget);
+      }
       final before = tester.getSize(centre).width;
       await tester.tap(toggle);
       await tester.pumpAndSettle();
@@ -2071,7 +2085,7 @@ void main() {
       expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
       await tester.tap(toggle);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
       expect(tester.getSize(centre).width, before);
       expect(tester.takeException(), isNull);
     });
@@ -4380,7 +4394,7 @@ void main() {
       );
       if (below) {
         expect(tester.getSize(actions).width, display.$1);
-        expect(tester.getSize(actions).height, 54);
+        expect(tester.getSize(actions).height, inInclusiveRange(54, 90));
       }
       final add = find.byKey(const Key('work-quick-add-products'));
       await reveal(tester, add);
