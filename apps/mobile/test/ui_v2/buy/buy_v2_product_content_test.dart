@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -145,6 +146,124 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('store details copy preserves full text and retries $scale', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      const name = 'Sardarpura Family Grocery and Household Supplies';
+      const address =
+          'Shop 12, First Floor, Main Market Road, Sardarpura, '
+          'Jodhpur, Rajasthan 342003';
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: _PricingFactsAdapter()..partner = name,
+        marketplaceTrustAdapter: const _PricingTrustAdapter(
+          partnerName: name,
+          partnerLocation: address,
+        ),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      var failCopy = true;
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            if (failCopy) {
+              throw PlatformException(code: 'clipboard-unavailable');
+            }
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await mountReferenceGallery(tester, session, 's-milk');
+      final copy = find.byKey(const ValueKey('buy-product-copy-store-s-milk'));
+      await revealProductControl(tester, session, copy);
+      for (final (key, text) in [
+        ('buy-product-store-full-name-s-milk', name),
+        ('buy-product-store-full-address-s-milk', address),
+      ]) {
+        final field = find.byKey(ValueKey(key));
+        expect(tester.widget<Text>(field).data, text);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: field, matching: find.byType(RichText)),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(
+          tester.getRect(field).right,
+          lessThanOrEqualTo(tester.getRect(copy).left),
+        );
+      }
+      expect(tester.getSize(copy).width, greaterThanOrEqualTo(48));
+      expect(tester.getSize(copy).height, greaterThanOrEqualTo(48));
+      await tester.tap(copy);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Could not copy store details. Try again.'),
+        findsOneWidget,
+      );
+      expect(copied, isNull);
+      failCopy = false;
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await tester.tap(copy);
+      await tester.pumpAndSettle();
+      expect(copied, '$name\n$address');
+      expect(find.text('Store details copied'), findsOneWidget);
+      expect(session.selectedProductId, 's-milk');
+      expect(session.cartLines, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('refined product toolbar keeps actions outside photos $scale', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      for (final id in ['s-milk', 'w-atta']) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        await mountReferenceGallery(tester, session, id);
+        final save = find.byKey(ValueKey('buy-product-action-save-$id'));
+        final share = find.byKey(ValueKey('buy-product-action-share-$id'));
+        final photo = find.byKey(ValueKey('buy-product-gallery-$id'));
+        final saveBounds = tester.getRect(save);
+        final shareBounds = tester.getRect(share);
+        final photoBounds = tester.getRect(photo);
+        expect(saveBounds.bottom, lessThanOrEqualTo(photoBounds.top));
+        expect(shareBounds.bottom, lessThanOrEqualTo(photoBounds.top));
+        expect(shareBounds.left, greaterThanOrEqualTo(saveBounds.right));
+        for (final bounds in [saveBounds, shareBounds]) {
+          expect(bounds.width, greaterThanOrEqualTo(48));
+          expect(bounds.height, greaterThanOrEqualTo(48));
+          expect(bounds.left, greaterThanOrEqualTo(0));
+          expect(
+            bounds.right,
+            lessThanOrEqualTo(tester.view.physicalSize.width),
+          );
+        }
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(session.isSaved(id), isTrue);
+        expect(session.selectedProductId, id);
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        session.dispose();
+        core.dispose();
+      }
+    });
+
     testWidgets('public polish assurance layout preserves action rows $scale', (
       tester,
     ) async {
@@ -3383,8 +3502,14 @@ final class _PricingContentAdapter implements BuyV2ProductContentAdapter {
 }
 
 final class _PricingTrustAdapter implements BuyV2MarketplaceTrustAdapter {
-  const _PricingTrustAdapter({this.returnSummary});
+  const _PricingTrustAdapter({
+    this.returnSummary,
+    this.partnerLocation,
+    this.partnerName,
+  });
   final String? returnSummary;
+  final String? partnerLocation;
+  final String? partnerName;
   @override
   BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product p) =>
       BuyV2MarketplaceTrustSnapshot(
@@ -3392,8 +3517,9 @@ final class _PricingTrustAdapter implements BuyV2MarketplaceTrustAdapter {
         state: BuyV2MarketplaceTrustState.ready,
         sourceId: 'local-store-reputation-contract',
         returnSummary: returnSummary,
-        partnerName: p.seller,
+        partnerName: partnerName ?? p.seller,
         partnerType: p.sellerType,
+        partnerLocation: partnerLocation,
         productRating: 4.2,
         productRatingCount: 17,
         partnerRating: 4.6,
@@ -3404,6 +3530,7 @@ final class _PricingTrustAdapter implements BuyV2MarketplaceTrustAdapter {
 
 final class _PricingFactsAdapter implements BuyV2ProductFactsAdapter {
   int? price;
+  String? partner;
   String? orderability;
   final eligibilityByProduct = <String, BuyV2OfferEligibility>{};
   BuyV2OfferEligibility? eligibility;
@@ -3413,6 +3540,7 @@ final class _PricingFactsAdapter implements BuyV2ProductFactsAdapter {
           .snapshotFor(product)
           .copyWith(
             price: price,
+            partner: partner,
             eligibility: eligibilityByProduct[product.id] ?? eligibility,
             orderabilityLabel: orderability,
           );

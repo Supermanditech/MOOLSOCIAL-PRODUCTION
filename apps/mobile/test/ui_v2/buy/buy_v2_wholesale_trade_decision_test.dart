@@ -155,15 +155,14 @@ void main() {
       ValueKey('buy-product-gallery-${product.id}'),
     );
     await reveal(tester, product, imageViewport, delta: -180);
-    expect(tester.getSize(imageViewport).height, closeTo(280, .1));
+    expect(tester.getSize(imageViewport).height, closeTo(240, .1));
     expect(
       tester.getRect(imageViewport).bottom,
       lessThanOrEqualTo(tester.getRect(gallery).bottom),
     );
-    expect(
-      find.byKey(ValueKey('buy-product-action-save-${product.id}')),
-      findsOneWidget,
-    );
+    final save = find.byKey(ValueKey('buy-product-action-save-${product.id}'));
+    await reveal(tester, product, save, delta: -180);
+    expect(save, findsOneWidget);
     await captureR66Visual(tester, 'r669-trade-gallery-and-decision');
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     await reveal(tester, product, add);

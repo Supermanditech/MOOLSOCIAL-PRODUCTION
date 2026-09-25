@@ -673,13 +673,22 @@ class BuyV2ProductView extends StatelessWidget {
             ),
             style: TextButton.styleFrom(
               minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
             ),
             onPressed: () => onOpenPartnerCatalogue!(product),
-            icon: const Icon(Icons.storefront_outlined, size: 16),
+            icon: const Icon(
+              Icons.storefront_outlined,
+              size: 18,
+              color: Color(0xFF326C76),
+            ),
             label: Text(
               wholesale ? 'Visit supplier' : 'Visit store',
-              style: const TextStyle(fontSize: 11),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: BuyV2Colors.ink,
+                height: 1.2,
+              ),
             ),
           )
         : null;
@@ -756,6 +765,39 @@ class BuyV2ProductView extends StatelessWidget {
                                   : onReturn ?? session.closeProduct,
                             ),
                           ),
+                          if (automaticFulfilment) ...[
+                            IconButton(
+                              key: ValueKey(
+                                'buy-product-action-${session.isSaved(product.id) ? 'saved' : 'save'}-${product.id}',
+                              ),
+                              tooltip: session.isSaved(product.id)
+                                  ? 'Saved'
+                                  : 'Save',
+                              onPressed: () => session.toggleSaved(product.id),
+                              icon: Icon(
+                                session.isSaved(product.id)
+                                    ? Icons.bookmark_rounded
+                                    : Icons.bookmark_border_rounded,
+                              ),
+                            ),
+                            IconButton(
+                              key: ValueKey(
+                                'buy-product-action-share-${product.id}',
+                              ),
+                              tooltip: 'Share',
+                              onPressed: () => unawaited(
+                                _shareBuyV2Product(
+                                  context,
+                                  session: session,
+                                  product: product,
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.ios_share_outlined,
+                                color: Color(0xFF326C76),
+                              ),
+                            ),
+                          ],
                           ?trailingAction,
                         ],
                       ),
@@ -1633,34 +1675,100 @@ class _ProductStoreSummary extends StatelessWidget {
       _ => null,
     };
     final identity = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Store · ${_sellerTypeLabel(product.sellerType)}',
-          style: context.buyMeta.copyWith(fontSize: 11),
-        ),
-        Text(
-          product.customerSeller(facts.partner),
-          style: context.buyBody.copyWith(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (status != null)
-          Text(
-            status,
-            style: context.buyMeta.copyWith(
-              fontSize: 11,
-              color: facts.storeOperatingState == BuyV2StoreOperatingState.open
-                  ? BuyV2Colors.green
-                  : BuyV2Colors.muted,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 3,
+          children: [
+            Text(
+              'Store · ${_sellerTypeLabel(product.sellerType)}',
+              style: context.buyMeta.copyWith(fontSize: 11, height: 1.35),
             ),
-          ),
-        if (_nonBlankComplianceValue(location) case final value?)
-          Text(
-            value,
-            style: context.buyMeta.copyWith(fontSize: 11, height: 1.3),
-          ),
+            if (status != null)
+              Text(
+                status,
+                style: context.buyMeta.copyWith(
+                  fontSize: 11,
+                  height: 1.35,
+                  color:
+                      facts.storeOperatingState == BuyV2StoreOperatingState.open
+                      ? BuyV2Colors.green
+                      : BuyV2Colors.muted,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    product.customerSeller(facts.partner),
+                    key: ValueKey('buy-product-store-full-name-${product.id}'),
+                    softWrap: true,
+                    style: context.buyBody.copyWith(
+                      fontSize: 14,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (_nonBlankComplianceValue(location) case final value?) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      value,
+                      key: ValueKey(
+                        'buy-product-store-full-address-${product.id}',
+                      ),
+                      softWrap: true,
+                      style: context.buyMeta.copyWith(
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(
+              key: ValueKey('buy-product-copy-store-${product.id}'),
+              tooltip: 'Copy store details',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              icon: const Icon(
+                Icons.copy_outlined,
+                size: 16,
+                color: BuyV2Colors.muted,
+              ),
+              onPressed: () async {
+                final details = [
+                  product.customerSeller(facts.partner),
+                  ?_nonBlankComplianceValue(location),
+                ].join('\n');
+                try {
+                  await Clipboard.setData(ClipboardData(text: details));
+                  if (!context.mounted) return;
+                  HapticFeedback.selectionClick();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Store details copied')),
+                  );
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not copy store details. Try again.'),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       ],
     );
     return LayoutBuilder(
@@ -1702,7 +1810,7 @@ class _ProductInfoRow extends StatelessWidget {
     final valueText = Text(
       value.trim(),
       style: context.buyBody.copyWith(
-        fontSize: 12,
+        fontSize: 13,
         height: 1.3,
         color: color,
         fontWeight: FontWeight.w600,
@@ -1722,7 +1830,7 @@ class _ProductInfoRow extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: constraints.maxWidth * .29, child: labelText),
+              SizedBox(width: constraints.maxWidth * .26, child: labelText),
               const SizedBox(width: 10),
               Expanded(child: valueText),
             ],
@@ -1858,10 +1966,10 @@ class _PublicProductOrderInformationState
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF1EFFB), Color(0xFFF6FAF8)],
+          colors: [Color(0xFFFFFFFF), Color(0xFFF5F8FA)],
         ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BuyV2Colors.line),
+        border: Border.all(color: const Color(0xFFE1E7EE), width: .75),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1869,8 +1977,8 @@ class _PublicProductOrderInformationState
           Text(
             'Delivery & seller',
             style: context.buyBody.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
           LayoutBuilder(
@@ -1906,7 +2014,7 @@ class _PublicProductOrderInformationState
               );
             },
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 1),
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0)
               const Divider(height: 1, thickness: .5, color: BuyV2Colors.line),
@@ -2383,13 +2491,13 @@ class _ProductQuickActionButton extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: 18, color: BuyV2Colors.navy),
+                  Icon(icon, size: 18, color: const Color(0xFF326C76)),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       label,
                       style: context.buyMeta.copyWith(
-                        color: BuyV2Colors.navy,
+                        color: BuyV2Colors.ink,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
@@ -2996,48 +3104,54 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (saving)
-          Wrap(
-            key: ValueKey('buy-product-discount-${product.id}'),
-            spacing: 8,
-            children: [
-              Text(
-                buyV2Money(mrp),
-                style: context.buyMeta.copyWith(
-                  decoration: TextDecoration.lineThrough,
-                ),
+        Wrap(
+          spacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (saving)
+              Wrap(
+                key: ValueKey('buy-product-discount-${product.id}'),
+                spacing: 8,
+                children: [
+                  Text(
+                    buyV2Money(mrp),
+                    style: context.buyMeta.copyWith(
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  Text(
+                    '${((mrp - facts.price) * 100) ~/ mrp}% off',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '${((mrp - facts.price) * 100) ~/ mrp}% off',
-                style: context.buyMeta.copyWith(
-                  color: BuyV2Colors.green,
+            TextButton.icon(
+              key: ValueKey('buy-product-price-details-${product.id}'),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                setState(() => _detailsExpanded = !_detailsExpanded);
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(48, 48),
+                textStyle: const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
+                foregroundColor: const Color(0xFF326C76),
+                visualDensity: VisualDensity.compact,
               ),
-            ],
-          ),
-        TextButton.icon(
-          key: ValueKey('buy-product-price-details-${product.id}'),
-          onPressed: () {
-            HapticFeedback.selectionClick();
-            setState(() => _detailsExpanded = !_detailsExpanded);
-          },
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            minimumSize: const Size(48, 48),
-            textStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+              icon: Icon(
+                _detailsExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 18,
+              ),
+              label: const Text('Price details'),
             ),
-            foregroundColor: BuyV2Colors.navy,
-            visualDensity: VisualDensity.compact,
-          ),
-          icon: Icon(
-            _detailsExpanded ? Icons.expand_less : Icons.expand_more,
-            size: 18,
-          ),
-          label: const Text('Price details'),
+          ],
         ),
         if (_detailsExpanded)
           Container(
@@ -3047,7 +3161,7 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               gradient: const LinearGradient(
-                colors: [Color(0xFFF0EFFA), Color(0xFFFAFAFF)],
+                colors: [Color(0xFFF3F7F9), Color(0xFFFAFCFD)],
               ),
             ),
             child: Column(
@@ -3285,12 +3399,13 @@ class _ProductAssuranceControls extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(icon, size: 18),
+              Icon(icon, size: 18, color: const Color(0xFF326C76)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   label,
                   style: const TextStyle(
+                    color: BuyV2Colors.ink,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     height: 1.2,
@@ -3304,7 +3419,7 @@ class _ProductAssuranceControls extends StatelessWidget {
       return Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFF4F2FB), Color(0xFFF8FAFC)],
+            colors: [Color(0xFFFAFBFD), Color(0xFFF3F7F8)],
           ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: BuyV2Colors.line, width: .5),
@@ -5595,7 +5710,7 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
     final galleryHeight = referenceLayout
-        ? (viewportHeight * (largeText ? .28 : .36)).clamp(144.0, 280.0)
+        ? (viewportHeight * (largeText ? .28 : .31)).clamp(144.0, 240.0)
         : widget.compact
         ? viewportHeight < 650 || largeText
               ? (viewportHeight * .23).clamp(128.0, 160.0)
@@ -5736,41 +5851,6 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                       ),
                     ),
                   ),
-                ),
-              ),
-            if (referenceLayout)
-              Positioned(
-                right: 4,
-                top: 4,
-                child: Column(
-                  children: [
-                    IconButton(
-                      key: ValueKey(
-                        'buy-product-action-${widget.session.isSaved(product.id) ? 'saved' : 'save'}-${product.id}',
-                      ),
-                      tooltip: widget.session.isSaved(product.id)
-                          ? 'Saved'
-                          : 'Save',
-                      onPressed: () => widget.session.toggleSaved(product.id),
-                      icon: Icon(
-                        widget.session.isSaved(product.id)
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_border_rounded,
-                      ),
-                    ),
-                    IconButton(
-                      key: ValueKey('buy-product-action-share-${product.id}'),
-                      tooltip: 'Share',
-                      onPressed: () => unawaited(
-                        _shareBuyV2Product(
-                          context,
-                          session: widget.session,
-                          product: product,
-                        ),
-                      ),
-                      icon: const Icon(Icons.ios_share_outlined),
-                    ),
-                  ],
                 ),
               ),
             if (referenceLayout && widget.rating != null)
@@ -6249,11 +6329,11 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(field.label, style: context.buyMeta.copyWith(fontSize: 12)),
+          Text(field.label, style: context.buyMeta.copyWith(fontSize: 11)),
           const SizedBox(height: 4),
           Text(
             product.customerContent(field.value),
-            style: context.buyBody.copyWith(fontSize: 12, height: 1.4),
+            style: context.buyBody.copyWith(fontSize: 13, height: 1.4),
           ),
         ],
       ),
@@ -6262,7 +6342,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(
         text,
-        style: context.buyBody.copyWith(fontSize: 12, height: 1.4),
+        style: context.buyBody.copyWith(fontSize: 13, height: 1.4),
       ),
     );
     return Column(
@@ -6304,7 +6384,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Text(
                 value,
-                style: context.buyBody.copyWith(fontSize: 12, height: 1.4),
+                style: context.buyBody.copyWith(fontSize: 13, height: 1.4),
               ),
             ),
           if (highlights.length > 4)
@@ -6354,7 +6434,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFF4F2FB), Color(0xFFFAFCFA)],
+                colors: [Color(0xFFFFFFFF), Color(0xFFF5F8FA)],
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: BuyV2Colors.line),
@@ -6411,14 +6491,14 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                                 gradient: _tab == index
                                     ? const LinearGradient(
                                         colors: [
-                                          Color(0xFFE3DFF7),
-                                          Color(0xFFF0F4FA),
+                                          Color(0xFFE5EFF1),
+                                          Color(0xFFF2F6F9),
                                         ],
                                       )
                                     : null,
                                 borderRadius: BorderRadius.circular(8),
                                 border: _tab == index
-                                    ? Border.all(color: const Color(0xFFAAA3CE))
+                                    ? Border.all(color: const Color(0xFFAAC5CA))
                                     : null,
                               ),
                               child: Text(label),
@@ -6445,7 +6525,10 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                         padding: const EdgeInsets.only(top: 12),
                         child: Text(
                           specifications[index].groupLabel!,
-                          style: context.buyTitle.copyWith(fontSize: 14),
+                          style: context.buyTitle.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     if (enlarged)
@@ -6457,19 +6540,21 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
+                              flex: 2,
                               child: Text(
                                 specifications[index].label,
-                                style: context.buyMeta.copyWith(fontSize: 12),
+                                style: context.buyMeta.copyWith(fontSize: 11),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
+                              flex: 3,
                               child: Text(
                                 product.customerContent(
                                   specifications[index].value,
                                 ),
                                 style: context.buyBody.copyWith(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   height: 1.4,
                                 ),
@@ -6662,7 +6747,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
           children: [
             Text(
               'Additional benefits unavailable',
-              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -6693,14 +6778,17 @@ class _ProductBenefitsPreview extends StatelessWidget {
             children: [
               const Icon(
                 Icons.local_offer_outlined,
-                color: BuyV2Colors.navy,
+                color: Color(0xFF326C76),
                 size: 19,
               ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
                   'Additional checkout benefits',
-                  style: context.buyTitle.copyWith(fontSize: 14),
+                  style: context.buyTitle.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -6708,7 +6796,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             'Separate from the listed seller price. Eligibility is checked again at Checkout.',
-            style: context.buyMeta.copyWith(fontSize: 8),
+            style: context.buyMeta.copyWith(fontSize: 11, height: 1.35),
           ),
           const SizedBox(height: 8),
           if (visibleBenefits.isEmpty)
@@ -6750,9 +6838,11 @@ class _ProductBenefitPreviewTile extends StatelessWidget {
       key: ValueKey('buy-product-benefit-${benefit.id}'),
       padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(
-        color: BuyV2Colors.softBlue.withValues(alpha: .58),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFF4F8FA)],
+        ),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: const Color(0x22000080)),
+        border: Border.all(color: const Color(0xFFE1E7EE)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6763,7 +6853,7 @@ class _ProductBenefitPreviewTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   benefit.title,
-                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+                  style: context.buyBody.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               if (benefit.savingAmount > 0)
@@ -6771,7 +6861,7 @@ class _ProductBenefitPreviewTile extends StatelessWidget {
                   'Save ${buyV2Money(benefit.savingAmount)}',
                   style: context.buyBody.copyWith(
                     color: BuyV2Colors.green,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
             ],
@@ -6789,9 +6879,10 @@ class _ProductBenefitPreviewTile extends StatelessWidget {
                 'Until ${MaterialLocalizations.of(context).formatShortDate(validUntil)}',
             ].join(' · '),
             style: context.buyMeta.copyWith(
-              color: BuyV2Colors.navy,
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
+              color: BuyV2Colors.muted,
+              fontSize: 11,
+              height: 1.35,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -6971,7 +7062,7 @@ class _ProductReviewsPanel extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFF4F2FB), Color(0xFFFAFCFA)],
+          colors: [Color(0xFFFFFFFF), Color(0xFFF5F8FA)],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: BuyV2Colors.line, width: .5),
@@ -7048,6 +7139,7 @@ class _ProductReviewsPanel extends StatelessWidget {
                     key: ValueKey('buy-review-product-${product.id}'),
                     style: TextButton.styleFrom(
                       minimumSize: const Size(48, 48),
+                      foregroundColor: BuyV2Colors.ink,
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       textStyle: const TextStyle(
                         fontSize: 12,
@@ -7055,7 +7147,13 @@ class _ProductReviewsPanel extends StatelessWidget {
                       ),
                     ),
                     onPressed: onReview,
-                    icon: const Icon(Icons.rate_review_outlined, size: 17),
+                    icon: Icon(
+                      Icons.rate_review_outlined,
+                      size: 17,
+                      color: onReview == null
+                          ? BuyV2Colors.muted
+                          : const Color(0xFF326C76),
+                    ),
                     label: Text(
                       review == null ? 'Write review' : 'Edit review',
                     ),
@@ -7064,6 +7162,7 @@ class _ProductReviewsPanel extends StatelessWidget {
                     key: ValueKey('buy-report-product-${product.id}'),
                     style: TextButton.styleFrom(
                       minimumSize: const Size(48, 48),
+                      foregroundColor: BuyV2Colors.ink,
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       textStyle: const TextStyle(
                         fontSize: 12,
@@ -7076,6 +7175,9 @@ class _ProductReviewsPanel extends StatelessWidget {
                           ? Icons.check_circle_outline_rounded
                           : Icons.flag_outlined,
                       size: 17,
+                      color: reported || onReport == null
+                          ? BuyV2Colors.muted
+                          : const Color(0xFF326C76),
                     ),
                     label: Text(reported ? 'Reported' : 'Report issue'),
                   ),
@@ -18813,7 +18915,7 @@ class _DecisionPanel extends StatelessWidget {
         decoration: softSurface
             ? BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFF4F2FB), Color(0xFFFAFCFA)],
+                  colors: [Color(0xFFFFFFFF), Color(0xFFF5F8FA)],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: BuyV2Colors.line, width: .5),
