@@ -1402,6 +1402,143 @@ void main() {
       }
 
       test(
+        'ledger recovery retains invoice then product-entry history across restarts',
+        () async {
+          final account = _CommandAccountStore();
+          final native = _OrderJournalStorage();
+          WorkSession open() => WorkSession(
+            gateway: ReviewWorkGateway(),
+            contactDraftStore: account,
+            inventoryStore: SecureWorkInventoryStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+            reviewStoreSelectionStore: SecureWorkReviewStoreSelectionStore(
+              accountScope: () => account.accountScope,
+              storage: native,
+            ),
+          );
+          Future<void> invoice(WorkSession session, String productId) async {
+            expect(session.startNewWorkspaceOrder(), isTrue);
+            await session.loadWorkspaceCounterDraft();
+            session.adjustWorkspaceOrderQuantity(productId, 1);
+            session.updateWorkspaceCounterDetails(
+              customer: '9000091934',
+              payment: 'Cash',
+            );
+            expect(
+              (await session.submitWorkspaceCounterBill())?.invoice,
+              isNotNull,
+            );
+          }
+
+          final first = open()..activeWorkspace = _commandStore;
+          expect(
+            first.loadStoreReviewSeed(0, now: DateTime.utc(2026, 9, 19)),
+            isTrue,
+          );
+          expect(await first.storeReviewSelectionSaved, isTrue);
+          expect(await first.recoverCustomerLedger(), isTrue);
+          expect(await first.loadWorkspaceInventory(), isTrue);
+          final oil = workspaceMasterCatalogue.first.copyWith(stock: 6);
+          first.addOrUpdateWorkspaceProduct(oil);
+          expect(await first.workspaceInventorySaved, isTrue);
+          await invoice(first, oil.id);
+          first.dispose();
+
+          final second = open();
+          await second.loadInitialWorkspaceState();
+          expect(second.customerLedgerRecoveryError, isNull);
+          expect(
+            second.workspaceStockMovements.map((m) => m.quantityDelta),
+            [-1, 6],
+            reason: 'Recovered history stays newest-first.',
+          );
+          // Emulate the old APK hydration order before another product save.
+          // This legacy snapshot must recover too, not only newly fixed saves.
+          final legacyOrder = second.workspaceStockMovements.reversed.toList();
+          second.workspaceStockMovements
+            ..clear()
+            ..addAll(legacyOrder);
+          final rice = WorkspaceProductImport.parse(
+            'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n'
+            'QA Rice,QA,1 kg,80,101,100,QA-RESTART-RICE',
+            catalogue: const [],
+            owned: const [],
+          ).rows.single.product!;
+          second.importWorkspaceProducts([rice], addOnly: true);
+          expect(await second.workspaceInventorySaved, isTrue);
+          await invoice(second, rice.id);
+          final expectedProducts = second.workspaceCatalogueItems
+              .map((p) => p.toInventoryJson())
+              .toList();
+          final expectedInvoices = {
+            for (final i in second.workspaceInvoices) i.id: i.toLedgerJson(),
+          };
+          second.dispose();
+
+          final third = open();
+          addTearDown(third.dispose);
+          await third.loadInitialWorkspaceState();
+          expect(third.customerLedgerRecoveryError, isNull);
+          expect(
+            third.workspaceCatalogueItems
+                .map((p) => p.toInventoryJson())
+                .toList(),
+            expectedProducts,
+          );
+          expect({
+            for (final i in third.workspaceInvoices) i.id: i.toLedgerJson(),
+          }, expectedInvoices);
+          expect(await third.recoverCustomerLedger(), isTrue);
+          expect(third.workspaceInvoices.length, 2);
+          expect(third.workspaceStockMovements.map((m) => m.quantityDelta), [
+            -1,
+            100,
+            -1,
+            6,
+          ]);
+
+          final inventoryKey = native.values.keys.singleWhere(
+            (key) => key.contains('workspace.inventory.'),
+          );
+          final preserved = native.values[inventoryKey]!;
+          for (final damage in ['gap', 'changed', 'duplicate', 'quantity']) {
+            final altered = jsonDecode(preserved) as Map<String, dynamic>;
+            final movements = altered['movements'] as List;
+            switch (damage) {
+              case 'gap':
+                movements.removeAt(1);
+              case 'changed':
+                (movements.first as Map)['reason'] = 'Conflicting content';
+              case 'duplicate':
+                movements.add(
+                  Map<String, dynamic>.from(movements.first as Map),
+                );
+              case 'quantity':
+                ((altered['products'] as List).first as Map)['stock'] = 4;
+            }
+            final damaged = jsonEncode(altered);
+            native.values[inventoryKey] = damaged;
+            final rejected = open();
+            await rejected.loadInitialWorkspaceState();
+            expect(
+              rejected.customerLedgerRecoveryError,
+              isNotNull,
+              reason: damage,
+            );
+            expect(
+              native.values[inventoryKey],
+              damaged,
+              reason: 'Do not rewrite conflicting evidence: $damage',
+            );
+            rejected.dispose();
+            native.values[inventoryKey] = preserved;
+          }
+        },
+      );
+
+      test(
         'selected Store retains imported stock and photo identity through invoice restart',
         () async {
           final account = _CommandAccountStore();

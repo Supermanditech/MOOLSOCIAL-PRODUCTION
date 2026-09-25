@@ -2714,16 +2714,22 @@ class WorkSession extends ChangeNotifier {
     }
     final quantities = inventory.quantities!;
     // A durable catalogue snapshot may precede later invoice movements.
-    // Accept only a proven chronological prefix, never unrelated stock edits.
-    final localMovements = data.workspaceStockMovements.reversed
+    // Older hydration appended recovered events to a newest-first list. Prove
+    // membership/content against checkpoint order, not incidental list order.
+    // A gap, duplicate or changed event must not become a valid prefix.
+    final localMovements = data.workspaceStockMovements
         .where((m) => inventory.openingQuantities.containsKey(m.productId))
         .toList();
+    final localById = {
+      for (final movement in localMovements) movement.id: movement,
+    };
+    if (localById.length != localMovements.length) return false;
     final prefixQuantities = Map<String, int>.of(inventory.openingQuantities);
     var matchesPrefix = localMovements.length <= inventory.movements.length;
     for (var i = 0; matchesPrefix && i < localMovements.length; i++) {
-      final movement = localMovements[i];
+      final movement = inventory.movements[i];
       matchesPrefix =
-          movement.contentIdentity == inventory.movements[i].contentIdentity;
+          localById[movement.id]?.contentIdentity == movement.contentIdentity;
       prefixQuantities[movement.productId] =
           prefixQuantities[movement.productId]! + movement.quantityDelta;
     }
@@ -2763,15 +2769,17 @@ class WorkSession extends ChangeNotifier {
         );
       }
     }
-    final known = {
-      for (final movement in data.workspaceStockMovements)
-        movement.id: movement,
-    };
-    for (final movement in inventory.movements.reversed) {
-      if (!known.containsKey(movement.id)) {
-        data.workspaceStockMovements.add(movement);
-      }
-    }
+    final recordedIds = inventory.movements.map((m) => m.id).toSet();
+    final unrecorded = data.workspaceStockMovements
+        .where((m) => !recordedIds.contains(m.id))
+        .toList();
+    // Keep local additions, then the checkpoint's authoritative newest-first
+    // history. Appending only missing events inverted receipt/sale order and
+    // made the next saved inventory snapshot fail recovery after restart.
+    data.workspaceStockMovements
+      ..clear()
+      ..addAll(unrecorded)
+      ..addAll(inventory.movements.reversed);
     data.ledgerInventory = inventory;
   }
 

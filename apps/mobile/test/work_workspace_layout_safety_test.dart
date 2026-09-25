@@ -17254,6 +17254,27 @@ void main() {
         );
         expect(work.workspaceOrderTotal, 3000);
         expect(work.workspaceInvoices, isEmpty);
+        final create = find.byKey(const Key('work-order-save'));
+        await reveal(tester, create);
+        await tester.tap(create);
+        await tester.pumpAndSettle();
+        expect(work.workspaceInvoices, hasLength(1));
+        final invoice = work.workspaceInvoices.single;
+        final order = work.workspaceOrders.singleWhere(
+          (order) => order.id == invoice.orderId,
+        );
+        expect(order.itemSnapshots, hasLength(30));
+        expect(order.itemSnapshots.map((item) => item.productId).toSet(), {
+          for (var i = 0; i < 30; i++) 'polish-cart-$i',
+        });
+        expect(
+          order.itemSnapshots.fold<int>(
+            0,
+            (sum, item) => sum + item.lineTotalPaise,
+          ),
+          300000,
+        );
+        expect(invoice.payableMinor, 300000);
         expect(tester.takeException(), isNull);
       },
     );
