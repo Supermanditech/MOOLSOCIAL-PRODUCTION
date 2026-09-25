@@ -2715,7 +2715,8 @@ class WorkSession extends ChangeNotifier {
     final quantities = inventory.quantities!;
     // A durable catalogue snapshot may precede later invoice movements.
     // Older hydration appended recovered events to a newest-first list. Prove
-    // membership/content against checkpoint order, not incidental list order.
+    // membership/content against each SKU's checkpoint order, not incidental
+    // list order. Other SKUs may have receipts saved during blocked recovery.
     // A gap, duplicate or changed event must not become a valid prefix.
     final localMovements = data.workspaceStockMovements
         .where((m) => inventory.openingQuantities.containsKey(m.productId))
@@ -2724,16 +2725,28 @@ class WorkSession extends ChangeNotifier {
       for (final movement in localMovements) movement.id: movement,
     };
     if (localById.length != localMovements.length) return false;
+    final remaining = <String, int>{};
+    for (final movement in localMovements) {
+      remaining.update(
+        movement.productId,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
     final prefixQuantities = Map<String, int>.of(inventory.openingQuantities);
     var matchesPrefix = localMovements.length <= inventory.movements.length;
-    for (var i = 0; matchesPrefix && i < localMovements.length; i++) {
-      final movement = inventory.movements[i];
+    for (final movement in inventory.movements) {
+      if (!matchesPrefix) break;
+      final count = remaining[movement.productId] ?? 0;
+      if (count == 0) continue;
       matchesPrefix =
           localById[movement.id]?.contentIdentity == movement.contentIdentity;
+      remaining[movement.productId] = count - 1;
       prefixQuantities[movement.productId] =
           prefixQuantities[movement.productId]! + movement.quantityDelta;
     }
     if (matchesPrefix &&
+        remaining.values.every((count) => count == 0) &&
         prefixQuantities.entries.every(
           (entry) => products[entry.key] == entry.value,
         )) {

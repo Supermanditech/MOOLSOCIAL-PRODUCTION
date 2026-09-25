@@ -1503,6 +1503,32 @@ void main() {
             (key) => key.contains('workspace.inventory.'),
           );
           final preserved = native.values[inventoryKey]!;
+          // A product can be added while another product's older ledger is
+          // unrecovered. Its receipt is later in the checkpoint, but each SKU's
+          // retained movements and quantity still prove its own complete prefix.
+          final interleaved = jsonDecode(preserved) as Map<String, dynamic>;
+          (interleaved['movements'] as List).removeWhere(
+            (m) => m['productId'] == oil.id && m['quantityDelta'] == -1,
+          );
+          ((interleaved['products'] as List).singleWhere(
+                    (p) => p['id'] == oil.id,
+                  )
+                  as Map)['stock'] =
+              6;
+          native.values[inventoryKey] = jsonEncode(interleaved);
+          final interleavedRecovery = open();
+          await interleavedRecovery.loadInitialWorkspaceState();
+          expect(interleavedRecovery.customerLedgerRecoveryError, isNull);
+          expect(
+            {
+              for (final p in interleavedRecovery.workspaceCatalogueItems)
+                p.id: p.stock,
+            },
+            {oil.id: 5, rice.id: 99},
+          );
+          expect(interleavedRecovery.workspaceInvoices.length, 2);
+          interleavedRecovery.dispose();
+          native.values[inventoryKey] = preserved;
           for (final damage in ['gap', 'changed', 'duplicate', 'quantity']) {
             final altered = jsonDecode(preserved) as Map<String, dynamic>;
             final movements = altered['movements'] as List;
