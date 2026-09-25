@@ -17975,6 +17975,21 @@ void main() {
         await tester.tap(existingInvoice);
         await tester.pumpAndSettle();
         expect(find.byType(BottomSheet), findsNothing);
+        if (scale == 1) {
+          final invoiceViewport = find.byKey(
+            const Key('work-active-content-area'),
+          );
+          final workArea = tester.getRect(
+            find.byKey(const Key('work-active-counter-layout')),
+          );
+          expect(
+            tester.getRect(invoiceViewport).bottom,
+            greaterThanOrEqualTo(workArea.bottom - 24),
+            reason:
+                'Invoice must use available height above navigation, not '
+                'reserve unused summary flex space.',
+          );
+        }
         expect(
           find.byKey(const Key('work-paid-invoice-receipt')),
           findsOneWidget,

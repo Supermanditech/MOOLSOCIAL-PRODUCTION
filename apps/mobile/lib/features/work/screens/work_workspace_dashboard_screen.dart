@@ -4010,14 +4010,17 @@ class _StoreControlDashboard extends StatelessWidget {
                 height: height,
                 child: Column(
                   children: [
-                    Flexible(
-                      fit: FlexFit.loose,
+                    // Cap the summary on short screens without reserving an
+                    // unused flex share below the invoice/working content.
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: height / 2),
                       child: SingleChildScrollView(
                         child: Offstage(offstage: keyboard, child: pulse),
                       ),
                     ),
                     Expanded(
                       child: Flex(
+                        key: const Key('work-active-content-area'),
                         direction: actionsBelow
                             ? Axis.vertical
                             : Axis.horizontal,

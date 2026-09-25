@@ -2349,3 +2349,29 @@ duplicate delivery, account/Store isolation, and provider-confirmed delivery
 states. Frontend must not claim queued/sent/delivered from a saved preference,
 PDF generation, or opening another app. No backend queue, provider connection,
 message dispatch or simulated success was added in this frontend follow-up.
+
+### Two-flow polish: reopened invoice height (2026-09-25)
+
+The OPPO reopened Counter Sale invoice used a short scrolling region while
+leaving roughly400px unused above navigation. Existing active working-centre
+layout reserved a loose flex share for the much shorter financial summary.
+Replaced that reservation with a maximum-height constraint; existing summary,
+invoice, navigation and data owners remain unchanged. Short screens still cap
+the summary and allow scrolling; no new route, backend or APK.
+
+Before regression: connected cash-sale/reopen test measured invoice bottom507
+against expected minimum789 at412x915. The first assertion measured naturally
+short one-item content; final regression measures the allocated working area,
+while retained20-item OPPO evidence verifies actual long-content space use.
+Final19 tests pass:12 receipt/customer variants,3 thirty-item cart viewports and
+4 full cash-sale/reopen journeys. Evidence lives in the task output directory:
+invoice-height-connected-tests.txt; before oppo-invoice-navigation.png; after
+oppo-invoice-height-verified.png. Attached debug reload accepted1library in2309ms.
+Invoice now extends to navigation, with original identity and due1761 preserved.
+No additional device invoice or receipt was created. The preliminary
+oppo-invoice-height-after.png captured Store home, not invoice proof.
+
+The whole Add Products/Counter Sale visual polish remains open. In particular,
+receipt-sheet compactness, remaining text/size refinements and device viewport
+coverage are not approved merely because functional tests pass. Final ticket
+closure still requires a separately authorized checksum-verified successor APK.
