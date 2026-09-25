@@ -27668,6 +27668,45 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('STORESEARCH home one unboxed expanding search $scale', (
+      tester,
+    ) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 800),
+        textScale: scale,
+      );
+      final band = find.byKey(const Key('work-dashboard-inline-search-band'));
+          expect(tester.widget(band), isA<SizedBox>());
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      expect(field, findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      final decoration = tester.widget<TextField>(field).decoration!;
+      expect(decoration.filled, isFalse);
+      expect(decoration.border, InputBorder.none);
+      expect(decoration.focusedBorder, InputBorder.none);
+          expect(tester.widget(band), isA<SizedBox>());
+      expect(
+        find.byKey(const Key('work-dashboard-search-results')),
+        findsOneWidget,
+      );
+      await tester.enterText(field, 'zzznomatch');
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.enterText(field, '');
+      await tester.pumpAndSettle();
+      expect(work.workspaceRecentSearches('store'), contains('zzznomatch'));
+      expect(find.byType(TextField), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final display in [(360.0, 1.0), (320.0, 2.0)]) {
     testWidgets('Stock unboxed search and full screen categories $display', (
       tester,

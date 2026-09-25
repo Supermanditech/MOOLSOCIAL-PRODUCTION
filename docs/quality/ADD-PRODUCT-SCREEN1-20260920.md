@@ -2797,3 +2797,83 @@ checks Git preservation, not blanket functional acceptance or backend completion
 Local screenshots/session logs remain outside Git as previously distinguished;
 no local artifacts or history were deleted. Divider-discovery hints are deferred
 at founder direction; no further feature implementation or APK in this audit.
+
+## Active pending register — founder retained, 25 September 2026
+
+Use this list when reporting pending work; retain items until explicit evidence
+or founder deferral changes their status. These are coverage/dependency groups,
+not a claim of eleven new confirmed application defects.
+
+| Reference | Pending item | Closure needed |
+| --- | --- | --- |
+| PENDING-01 | Counter Sale final New sale action | Safe actual-device replay; local tests are not device proof |
+| PENDING-02 | CSV bulk selection and remaining error variants | Actual OPPO interaction without unintended import writes |
+| PENDING-03 | Optical barcode match | Actual supported optical matching evidence |
+| PENDING-04 | Accessibility/focus and tactile haptics | Remaining device accessibility checks and human tactile feedback |
+| PENDING-05 | Wholesale product picker | Eligible real route/offers; never fabricate provider availability |
+| PENDING-06 | Latest-source enlarged-text, cross-Store/account and cold process restore | Complete device coverage and separately qualified exact successor APK |
+| PENDING-07 | Seller GSTIN/status automatic invoice mapping | Store-scoped authoritative contract; frontend mapping distinct from backend tax authority |
+| PENDING-08 | Restock/Cursor dependencies | Final handoff and separately authorized integration; deferred |
+| PENDING-09 | Automatic invoice delivery | Backend integration deferred; no false sent state |
+| PENDING-10 | Physical printing | Compatible printer/device verification; local document tests are insufficient |
+| PENDING-11 | Floating-keyboard overlap | Recorded limitation, not declared repaired by docked-keyboard passes |
+
+Latest Stock divider, fixed separators, typography, exact-field editor links and
+populated Saved searches have attached-device evidence. CSV corrected wording is
+device-verified and founder-approved. None substitutes for exact-APK closure.
+Divider discovery hint is intentionally deferred, not a new implementation task.
+
+## Store search inventory — 25 September 2026
+
+Inventory covers implemented Store routes and Store-linked search selectors,
+including shared document/category owners. Contract: one visible search input,
+no outer box/underline, existing results on empty focus, up to five contextual
+Store-session recent terms if available, live matches while typing, clear/recall
+without business writes. Category/business-type selectors show available choices
+directly rather than manufacturing history. No query automatically adds stock.
+
+Paths below are relative to apps/mobile/lib. Prior device evidence remains valid
+only for the specific unchanged behaviours it exercised, not every variant.
+
+| Surface | Source owner / input key | Inventory disposition |
+| --- | --- | --- |
+| Store-wide products/orders/customers/invoices/purchases/activity | features/work/screens/work_workspace_dashboard_screen.dart / work-dashboard-search-field | One shared expanded results surface; outer bottom border found and corrected in this follow-up; previous filter/clear/recall pass |
+| Stock and Stock statement route | features/work/screens/store_add_product_sheet.dart / work-add-products-search | One input, borderless including focus; Stock-only history; device filter/clear/recall passed |
+| Catalogue and Saved shortlist | same owner / work-add-products-search | Same input switches views, not duplicate searches; recent terms and live results; populated Saved device pass |
+| Stock categories | features/work/widgets/store_catalogue_categories.dart / work-catalogue-category-search | Inline direct category choices/filter/clear, no history; device verified |
+| Catalogue categories | same shared category owner / work-catalogue-category-search | Same direct-choice contract; separate catalogue route must not be inferred solely from Stock proof |
+| CSV review | features/work/screens/store_add_product_sheet.dart / work-import-search | Inline existing rows and scoped recents; device filter/clear/recall passed; bulk/error variants remain pending |
+| Counter Sale item picker | features/work/screens/work_workspace_dashboard_screen.dart / work-counter-product-search | Inline and contextual; device filter/clear/recall with retained cart passed |
+| Customer Book | same dashboard owner / work-customer-search | Inline scoped recents; complete-term backspace and recall device pass |
+| Customer statements | features/work/work_downloads.dart / customer-statement-search | Inline scoped recents; device backspace/recall pass |
+| Invoices / Reports & Downloads documents | shared/commerce/commerce_downloads_screen.dart / downloads-search; Store wrapper in dashboard | Borderless input; customer/stock statement view replaces documents input, not duplicates it; device recall pass |
+| Wholesale product/commodity picker | dashboard / work-group-buy-product-search | Borderless and contextual in source; device route unavailable without eligible offers, PENDING-05 |
+| Restock/procurement | dashboard shell + Buy owner | Separate inherited Buy workflow, PENDING-08; no whole-Store completion claim or unauthorized Buy edits |
+| Workspace setup business-type selector | features/work/screens/work_onboarding_screens.dart / work-workspace-search | Already inline; lists/filter business choices directly, no Store inventory history before Store selection; no application submission during audit |
+
+Counter Sale customer mobile/name inputs are form/identity fields with matching
+suggestions, not duplicate search controls; do not remove their validation boxes
+under a search-only request. Ordinary product forms and date filters likewise
+remain intact. Paid-work search in work_earn_screens.dart, public Shop/Buy and
+native Android file-picker search are not Store-owned search surfaces.
+
+Search follow-up verification: 65 selected checks pass, including normal/2x
+single-input expanded Store search, history recovery, Stock duplicate-header
+absence and affected catalogue/CSV/POS tests. Final log:
+outputs/store-search-inventory-final.txt; Dart analysis clean. Initial new test
+was placed before its local fixture helpers and failed compilation; moved after
+the helpers, then reproduced the actual outer-border failure at both scales in
+store-search-inventory-before-r2.txt. Removed border and replaced the empty
+Container with SizedBox to satisfy analysis; no suppressed checks.
+
+OPPO reattached/hot-restarted, then final source hot-reload succeeded. Store-wide
+empty focus showed saved records; rice filtered live, Clear exposed rice recent
+term, recall restored it and Finish returned home. Final source capture:
+outputs/store-search-final.png; earlier detailed capture store-search-no-line.png.
+Catalogue category route separately verified: all categories on empty focus,
+oil narrowed to Oils & ghee, clear restored all choices, no category history.
+Image outputs/catalogue-category-inline.png visually inspected. No stock,
+customer, invoice or payment values changed. These targeted retests supplement
+the inventory's earlier device passes; not every search/configuration was newly
+replayed in this turn. Setup chooser remains source-reviewed, not replayed on
+this already activated Store. Pending register remains open, no new APK.

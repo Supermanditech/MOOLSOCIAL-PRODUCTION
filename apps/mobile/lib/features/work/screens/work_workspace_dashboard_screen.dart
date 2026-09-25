@@ -3301,14 +3301,9 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Container(
+                    child: SizedBox(
                       key: const Key('work-dashboard-inline-search-band'),
                       height: 44,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Color(0xFFDCE2F2)),
-                        ),
-                      ),
                       child: Row(
                         children: [
                           Expanded(
