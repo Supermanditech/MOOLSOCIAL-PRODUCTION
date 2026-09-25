@@ -3873,27 +3873,48 @@ class _StoreControlDashboard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: desk),
-                    actions,
+                    if (actionsExpanded) actions,
                   ],
                 ),
               ),
             ],
           );
+          Widget withStickyTab(Widget body) => actionsExpanded
+              ? body
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    body,
+                    Positioned(
+                      right: 0,
+                      top:
+                          (constraints.maxHeight - 120).clamp(
+                            0.0,
+                            double.infinity,
+                          ) /
+                          2,
+                      width: 49,
+                      child: actions,
+                    ),
+                  ],
+                );
           if (!enlarged && !collectionNeedsScroll && !shortViewport) {
-            return content;
+            return withStickyTab(content);
           }
-          return SingleChildScrollView(
-            key: const Key('work-dashboard-enlarged-scroll'),
-            child: SizedBox(
-              height: constraints.maxHeight.clamp(
-                collection
-                    ? (enlarged ? 1260 : 980)
-                    : enlarged
-                    ? 760
-                    : 520,
-                double.infinity,
+          return withStickyTab(
+            SingleChildScrollView(
+              key: const Key('work-dashboard-enlarged-scroll'),
+              child: SizedBox(
+                height: constraints.maxHeight.clamp(
+                  collection
+                      ? (enlarged ? 1260 : 980)
+                      : enlarged
+                      ? 760
+                      : 520,
+                  double.infinity,
+                ),
+                child: content,
               ),
-              child: content,
             ),
           );
         },
@@ -3938,7 +3959,7 @@ class _StoreActionEdge extends StatelessWidget {
         17;
     return Material(
       key: const Key('work-store-supply-material'),
-      color: Colors.white,
+      color: expanded ? Colors.white : Colors.transparent,
       textStyle: DefaultTextStyle.of(context).style,
       child: Container(
         key: const Key('work-store-action-edge'),
@@ -3953,11 +3974,13 @@ class _StoreActionEdge extends StatelessWidget {
                 double.infinity,
               )
             : null,
-        decoration: BoxDecoration(
-          border: horizontal
-              ? const Border(top: BorderSide(color: Color(0xFFE5E8F1)))
-              : const Border(left: BorderSide(color: Color(0xFFE5E8F1))),
-        ),
+        decoration: !expanded
+            ? null
+            : BoxDecoration(
+                border: horizontal
+                    ? const Border(top: BorderSide(color: Color(0xFFE5E8F1)))
+                    : const Border(left: BorderSide(color: Color(0xFFE5E8F1))),
+              ),
         child: Flex(
           direction: expanded && !horizontal ? Axis.vertical : Axis.horizontal,
           verticalDirection: VerticalDirection.up,
@@ -3970,13 +3993,13 @@ class _StoreActionEdge extends StatelessWidget {
               child: Semantics(
                 expanded: expanded,
                 button: true,
-                label: expanded ? 'Hide Sell & manage' : 'Show Sell & manage',
+                label: expanded ? 'Hide Quick actions' : 'Show Quick actions',
                 excludeSemantics: true,
                 onTap: onToggle,
                 child: Tooltip(
                   message: expanded
-                      ? 'Hide Sell & manage'
-                      : 'Show Sell & manage',
+                      ? 'Hide Quick actions'
+                      : 'Show Quick actions',
                   child: InkWell(
                     key: const Key('work-home-actions-toggle'),
                     onTap: onToggle,
@@ -4013,7 +4036,7 @@ class _StoreActionEdge extends StatelessWidget {
                                 RotatedBox(
                                   quarterTurns: horizontal ? 0 : 3,
                                   child: const Text(
-                                    'Sell & manage',
+                                    'Quick actions',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,

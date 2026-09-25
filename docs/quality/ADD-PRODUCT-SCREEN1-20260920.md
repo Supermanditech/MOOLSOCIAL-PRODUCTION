@@ -3066,3 +3066,23 @@ boundary increased from348 to444 physical pixels (48dp recovered); screenshot
 outputs/home-sell-manage-expanded-20260926.png inspected. Collapsed wording
 captured in outputs/home-sell-manage-collapsed-20260926.png. Existing outstanding
 physical landscape/enlarged-text checks remain open; no data changes or APK.
+
+## HOME-03 Quick actions sticky edge correction
+
+Founder chose Quick actions and requested removal of the entire collapsed
+vertical lane. Normal portrait now uses a localized sticky edge tab over the
+right margin, without reserving a full-height column or drawing its divider.
+Central content regains full width. Expanded named actions, internal collapse
+control, session choice, destinations and adaptive short-screen layout remain.
+The tab overlays a small edge area; the observed central text and View stock
+label remain readable. No bottom navigation changes or new persistence.
+
+All40 selected layout/atomic regression checks passed; focused10 also passed
+and analysis was clean. Evidence: outputs/home-sticky-regression-20260926.txt.
+OPPO hot-loaded portrait screenshot inspected:
+outputs/home-sticky-quick-actions-20260926.png. Collapsed centre right boundary
+is668 physical pixels; opening the actions gives444, with no extra handle lane.
+Current OPPO state confirmed collapsed. One later Hide-target lookup found no
+target because the current screen was already collapsed; no fallback tap made.
+Physical landscape/enlarged-text verification remains pending. No APK or data
+transaction; prior outstanding tickets are not closed by this visual correction.

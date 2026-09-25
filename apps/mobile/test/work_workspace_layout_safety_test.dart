@@ -2056,7 +2056,7 @@ void main() {
       final centre = find.byKey(const Key('work-store-activity-deck'));
       expect(toggle.hitTestable(), findsOneWidget);
       expect(find.text('Actions'), findsNothing);
-      expect(find.text('Sell & manage'), findsOneWidget);
+      expect(find.text('Quick actions'), findsOneWidget);
       expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
       expect(
         find.byKey(const Key('work-store-quick-actions-scroll')),
@@ -2065,10 +2065,7 @@ void main() {
       final before = tester.getSize(centre).width;
       expect(
         before,
-        tester
-                .getSize(find.byKey(const Key('work-workspace-dashboard')))
-                .width -
-            (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1 ? 49 : 0),
+        tester.getSize(find.byKey(const Key('work-workspace-dashboard'))).width,
       );
       await tester.tap(toggle);
       await tester.pumpAndSettle();
@@ -2087,7 +2084,7 @@ void main() {
       }
       expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
       if (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1) {
-        expect(find.text('Sell & manage'), findsNothing);
+        expect(find.text('Quick actions'), findsNothing);
         expect(
           tester.getRect(rail).right -
               tester
