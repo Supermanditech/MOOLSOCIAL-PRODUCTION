@@ -17160,6 +17160,105 @@ void main() {
     );
   }
 
+  for (final display in [
+    (size: const Size(360, 806), scale: 1.0),
+    (size: const Size(320, 640), scale: 2.0),
+    (size: const Size(806, 360), scale: 1.6),
+  ]) {
+    testWidgets(
+      'POSPOLISH thirty item category cart preserves bill on toggles ${display.size} ${display.scale}',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        work.workspaceCatalogueItems
+          ..clear()
+          ..addAll(
+            List.generate(
+              30,
+              (i) => WorkspaceCatalogueItem(
+                id: 'polish-cart-$i',
+                canonicalId: 'polish-cart-$i',
+                categoryId: 'category-${i ~/ 10}',
+                brand: 'Evaluation',
+                title: 'QA product $i',
+                variant: '',
+                pack: '1 kg',
+                sku: 'QA-$i',
+                barcode: '',
+                purchasePrice: 80,
+                sellingPrice: 100,
+                unitPrice: '100/kg',
+                stock: 5,
+                deliveryPromise: '',
+                origin: '',
+                visualLabel: '',
+                visualKind: '',
+                publicListing: false,
+              ),
+            ),
+          );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: display.size,
+          textScale: display.scale,
+        );
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9000092502', name: 'Large cart QA');
+        for (final product in work.workspaceCatalogueItems) {
+          work.workspaceOrderQuantities[product.id] = 1;
+        }
+        work.notifyListeners();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        final category = find.byKey(
+          const Key('work-review-category-category-0'),
+        );
+        await captureStoreView(
+          tester,
+          'category-cart-entry-${display.size.width}-${display.scale}',
+        );
+        await reveal(tester, category);
+        expect(category, findsOneWidget);
+        expect(
+          find.byKey(const Key('work-review-item-polish-cart-0')),
+          findsNothing,
+        );
+        expect(work.workspaceOrderTotal, 3000);
+        await captureStoreView(
+          tester,
+          'category-cart-collapsed-${display.size.width}-${display.scale}',
+        );
+        await reveal(tester, category);
+        await tester.tap(category);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-review-item-polish-cart-0')),
+          findsOneWidget,
+        );
+        await captureStoreView(
+          tester,
+          'category-cart-expanded-${display.size.width}-${display.scale}',
+        );
+        await reveal(tester, category);
+        await tester.tap(category);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-review-item-polish-cart-0')),
+          findsNothing,
+        );
+        expect(
+          work.workspaceOrderQuantities.values.fold<int>(0, (a, b) => a + b),
+          30,
+        );
+        expect(work.workspaceOrderTotal, 3000);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('POSPOLISH quantity haptics confirm changes only', (
     tester,
   ) async {

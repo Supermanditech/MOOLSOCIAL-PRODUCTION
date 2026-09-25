@@ -26605,6 +26605,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   String? _invoiceAccount, _invoiceStore;
   String? _reviewedBill;
   String? _reviewedOrderId;
+  final Set<String> _expandedCartCategories = {};
   bool _saving = false, _restoring = false, _openingDraft = false;
   bool _editingDiscount = false;
   String? _customerInput;
@@ -26636,6 +26637,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _clearScannerBuffer();
       _invoice = null;
       _collection = null;
+      _expandedCartCategories.clear();
       _saving = false;
       _editingDiscount = false;
       _error = null;
@@ -26861,6 +26863,29 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
         )
         .toList(growable: false);
+    final groups = <String, List<WorkspaceCatalogueItem>>{};
+    for (final product in products) {
+      (groups[product.categoryId] ??= []).add(product);
+    }
+    final grouped = products.length > 6;
+    final rows = <({String? category, WorkspaceCatalogueItem? product})>[
+      if (!grouped)
+        for (final product in products) (category: null, product: product)
+      else
+        for (final group in groups.entries) ...[
+          (category: group.key, product: null),
+          if (_expandedCartCategories.contains(group.key))
+            for (final product in group.value)
+              (category: null, product: product),
+        ],
+    ];
+    final categoryLabels = {
+      for (final category in [
+        ...BuyV2Catalogue.shopCategories,
+        ...BuyV2Catalogue.wholesaleCategories,
+      ])
+        category.id: category.label,
+    };
     final amountWidth = products.fold<double>(48, (width, product) {
       final painter = TextPainter(
         text: TextSpan(
@@ -26953,7 +26978,78 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final product = products[index];
+                final row = rows[index];
+                if (row.category case final String categoryId) {
+                  final items = groups[categoryId]!;
+                  final expanded = _expandedCartCategories.contains(categoryId);
+                  final subtotal = items.fold<int>(
+                    0,
+                    (sum, item) =>
+                        sum +
+                        item.sellingPrice *
+                            widget.session.workspaceOrderQuantities[item.id]!,
+                  );
+                  final label =
+                      categoryLabels[categoryId] ??
+                      (categoryId.trim().isEmpty
+                          ? 'Other products'
+                          : categoryId
+                                .split('-')
+                                .map(
+                                  (part) => part.isEmpty
+                                      ? part
+                                      : '${part[0].toUpperCase()}${part.substring(1)}',
+                                )
+                                .join(' '));
+                  return Semantics(
+                    expanded: expanded,
+                    child: TextButton(
+                      key: ValueKey('work-review-category-$categoryId'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: MoolColors.muted,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        minimumSize: const Size(0, 48),
+                        alignment: Alignment.centerLeft,
+                      ),
+                      onPressed: () => setState(() {
+                        if (expanded) {
+                          _expandedCartCategories.remove(categoryId);
+                        } else {
+                          _expandedCartCategories.add(categoryId);
+                        }
+                      }),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  label,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '${items.length} ${items.length == 1 ? 'item' : 'items'} · ₹${_formatStoreAmount(subtotal)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: MoolColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            expanded ? Icons.expand_less : Icons.expand_more,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                final product = row.product!;
                 final quantity =
                     widget.session.workspaceOrderQuantities[product.id]!;
                 return Container(
@@ -27058,7 +27154,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     },
                   ),
                 );
-              }, childCount: products.length),
+              }, childCount: rows.length),
             ),
           ),
           ...trailing,
@@ -27199,6 +27295,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     );
     final continuousReview =
         products.length <= 3 ||
+        MediaQuery.sizeOf(context).height < 500 ||
         (MediaQuery.sizeOf(context).width < 600 &&
             MediaQuery.textScalerOf(context).scale(14) > 18.2);
     return Column(
