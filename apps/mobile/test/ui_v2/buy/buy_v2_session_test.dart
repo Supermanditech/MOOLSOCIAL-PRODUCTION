@@ -2018,13 +2018,21 @@ void main() {
       );
       expect(session.openProduct(phones.first.id), isTrue);
       expect(
-        session
-            .productVariantsFor(session.selectedProduct!)
-            .map((p) => p.id)
-            .toSet(),
-        ids,
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
       );
+      final firstChoices = session.productVariantsFor(session.selectedProduct!);
+      expect(firstChoices, hasLength(4));
+      final reachable = firstChoices.map((p) => p.id).toSet();
       expect(session.selectProductVariant(phones[3].id), isTrue);
+      expect(
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
+      );
+      final nextChoices = session.productVariantsFor(session.selectedProduct!);
+      expect(nextChoices, hasLength(4));
+      reachable.addAll(nextChoices.map((p) => p.id));
+      expect(reachable, ids);
       expect(
         session.selectedProduct!.mediaAssets.first.source,
         phones[3].mediaAssets.first.source,
@@ -4931,6 +4939,38 @@ void main() {
       expect(session.quantityFor(id), 0);
       expect(session.setCartQuantity(id, '1000'), isFalse);
       expect(session.quantityFor(id), 0);
+    },
+  );
+
+  test(
+    'CAT04 plus uses quantity validation for numeric and wholesale limits',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      const id = 'w-notebook';
+      expect(session.addProduct(id), isTrue);
+      final price = session.product(id).price;
+      final maximum =
+          (BigInt.from(9007199254740991) ~/
+                  (BigInt.from(price) * BigInt.from(10000)))
+              .toInt();
+      expect(session.setCartQuantity(id, '$maximum'), isTrue);
+      session.increase(id);
+      expect(session.quantityFor(id), maximum);
+      expect(session.notice, contains('too large'));
+      expect(session.setCartQuantity(id, '1000'), isTrue);
+      session.businessVerified = false;
+      session.increase(id);
+      expect(session.quantityFor(id), 1000);
+      expect(session.notice, contains('business profile'));
+      session.decrease(id);
+      expect(session.quantityFor(id), 999);
+      session.businessVerified = true;
+      session.increase(id);
+      expect(session.quantityFor(id), 1000);
+      expect(session.cartLines.single.product.id, id);
     },
   );
 

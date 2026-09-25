@@ -243,6 +243,137 @@ abstract interface class BuyV2CataloguePageSource {
   Future<List<BuyV2Product>> resolveProducts(Set<String> productIds);
 }
 
+/// Complete dimension choices for one selected SKU, plus only its selectable
+/// neighbours. Providers resolve combinations; clients never build a Cartesian
+/// catalogue or infer missing choices from the current discovery page.
+abstract interface class BuyV2VariantFamilySource {
+  Future<BuyV2VariantFamilySnapshot> loadVariantFamily(
+    BuyV2Product selected,
+    BuyV2CatalogueQuery context,
+  );
+}
+
+class BuyV2VariantFamilySnapshot {
+  BuyV2VariantFamilySnapshot({
+    required this.productId,
+    required this.canonicalId,
+    required this.storeId,
+    required this.destination,
+    required this.queryKey,
+    required this.sourceId,
+    required this.revision,
+    required this.observedAt,
+    required this.validUntil,
+    required this.complete,
+    required this.selectedAvailable,
+    required Iterable<BuyV2VariantAttribute> options,
+    required Iterable<BuyV2Product> candidates,
+  }) : options = List.unmodifiable(options),
+       candidates = List.unmodifiable(candidates);
+
+  final String productId;
+  final String canonicalId;
+  final String storeId;
+  final BuyV2Destination destination;
+  final String queryKey;
+  final String sourceId;
+  final String revision;
+  final DateTime observedAt;
+  final DateTime validUntil;
+  final bool complete;
+  /// Publication membership, not a stock or delivery promise. Offer facts and
+  /// checkout still authorize availability for the selected location.
+  final bool selectedAvailable;
+  final List<BuyV2VariantAttribute> options;
+  final List<BuyV2Product> candidates;
+
+  bool isValidFor(
+    BuyV2Product selected,
+    BuyV2CatalogueQuery context,
+    DateTime now,
+  ) {
+    bool identity(String value) =>
+        value.trim().isNotEmpty && value.trim() == value;
+    if (!complete ||
+        !selected.hasStructuredVariants ||
+        !identity(productId) ||
+        !identity(canonicalId) ||
+        !identity(storeId) ||
+        productId != selected.id ||
+        canonicalId != selected.canonicalId ||
+        storeId != selected.storeId ||
+        destination != selected.destination ||
+        context.storeId != storeId ||
+        context.destination != destination ||
+        queryKey != context.key ||
+        !identity(sourceId) ||
+        !identity(revision) ||
+        observedAt.isAfter(now) ||
+        !now.isBefore(validUntil) ||
+        !observedAt.isBefore(validUntil)) {
+      return false;
+    }
+    final dimensions = {
+      for (final a in selected.variantAttributes) a.dimensionId: a,
+    };
+    final choices = <(String, String), BuyV2VariantAttribute>{};
+    for (final option in options) {
+      if (!option.isValid ||
+          dimensions[option.dimensionId]?.kind != option.kind ||
+          choices.containsKey((option.dimensionId, option.optionId))) {
+        return false;
+      }
+      choices[(option.dimensionId, option.optionId)] = option;
+    }
+    if (selectedAvailable &&
+        selected.variantAttributes.any(
+          (a) => !choices.containsKey((a.dimensionId, a.optionId)),
+        )) {
+      return false;
+    }
+    final ids = <String>{};
+    final combinations = <String>{};
+    for (final candidate in candidates) {
+      if (!identity(candidate.id) ||
+          !ids.add(candidate.id) ||
+          !candidate.hasStructuredVariants ||
+          !candidate.isFromSameStoreAs(selected) ||
+          candidate.destination != destination ||
+          candidate.canonicalId != canonicalId ||
+          candidate.categoryId != selected.categoryId ||
+          candidate.offerClass != selected.offerClass ||
+          !candidate.catalogueListing ||
+          candidate.variantAttributes.length != dimensions.length) {
+        return false;
+      }
+      var changed = 0;
+      final combination = <String, String>{};
+      for (final attribute in candidate.variantAttributes) {
+        final dimension = dimensions[attribute.dimensionId];
+        if (dimension == null ||
+            dimension.kind != attribute.kind ||
+            !choices.containsKey((attribute.dimensionId, attribute.optionId))) {
+          return false;
+        }
+        if (dimension.optionId != attribute.optionId) changed++;
+        combination[attribute.dimensionId] = attribute.optionId;
+      }
+      final ordered = combination.keys.toList()..sort();
+      if (changed > 1 ||
+          (candidate.id == selected.id && changed != 0) ||
+          (candidate.id != selected.id && changed == 0) ||
+          !combinations.add(
+            jsonEncode([
+              for (final id in ordered) [id, combination[id]],
+            ]),
+          )) {
+        return false;
+      }
+    }
+    return selectedAvailable == ids.contains(selected.id);
+  }
+}
+
 /// A published placement owns an exact Store listing and current source facts.
 /// Being returned by an offersOnly product filter is not publication evidence.
 @immutable

@@ -3517,11 +3517,34 @@ class _ProductVariantSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (product.hasStructuredVariants) {
-      return _StructuredProductVariants(
-        session: session,
-        product: product,
-        variants: variants,
-        sizeChart: sizeChart,
+      final loading = session.variantFamilyLoadingFor(product);
+      final message = session.variantFamilyMessageFor(product);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StructuredProductVariants(
+            session: session,
+            product: product,
+            variants: variants,
+            sizeChart: sizeChart,
+          ),
+          if (loading || message != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                loading ? 'Loading options…' : message!,
+                key: ValueKey('buy-variant-family-status-${product.id}'),
+                style: context.buyBody.copyWith(fontSize: 11),
+              ),
+            ),
+          if (session.variantWithdrawn(product))
+            Text(
+              variants.isEmpty
+                  ? 'This product is no longer available.'
+                  : 'This option is no longer available. Choose another option.',
+              style: context.buyBody.copyWith(fontSize: 11),
+            ),
+        ],
       );
     }
     return BuyV2CartAvoidanceRegion(
@@ -3619,6 +3642,15 @@ class _StructuredProductVariants extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 12),
                 child: _dimension(context, selected, largeText, viewport),
               ),
+            if (session.hasVariantFamilySourceFor(product))
+              IconButton(
+                key: ValueKey('buy-variant-family-refresh-${product.id}'),
+                tooltip: 'Refresh product options',
+                onPressed: session.variantFamilyLoadingFor(product)
+                    ? null
+                    : () => unawaited(session.refreshVariantFamily(product)),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+              ),
             if (sizeChart != null)
               TextButton(
                 key: ValueKey('buy-product-size-chart-${product.id}'),
@@ -3653,6 +3685,12 @@ class _StructuredProductVariants extends StatelessWidget {
     double viewport,
   ) {
     final options = <String, BuyV2VariantAttribute>{};
+    for (final option in session.variantOptionsFor(product)) {
+      if (option.dimensionId == selected.dimensionId &&
+          option.kind == selected.kind) {
+        options[option.optionId] = option;
+      }
+    }
     for (final variant in variants.where(
       (item) => item.hasStructuredVariants && item.isFromSameStoreAs(product),
     )) {
@@ -3724,7 +3762,7 @@ class _StructuredProductVariants extends StatelessWidget {
                       ),
                       onPressed: null,
                       child: Text(
-                        '${option.optionLabel}\nCombination unavailable',
+                        '${option.optionLabel}\n${session.variantFamilyLoadingFor(product) ? 'Checking…' : 'Combination unavailable'}',
                       ),
                     ),
                   ),

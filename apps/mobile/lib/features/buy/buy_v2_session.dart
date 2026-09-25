@@ -952,7 +952,8 @@ bool buyV2MatchesStoreSearch(String query, String content) {
       terms.every((term) => words.any((word) => word.startsWith(term)));
 }
 
-class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
+class BuyV2DevelopmentCatalogueSource
+    implements BuyV2CataloguePageSource, BuyV2VariantFamilySource {
   BuyV2DevelopmentCatalogueSource({
     required this.destination,
     this.providerCount = 100000,
@@ -1154,6 +1155,62 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
   final List<BuyV2Product> _templates;
   int productObjectsCreated = 0;
   int storeObjectsCreated = 0;
+  int variantFamilyRequests = 0;
+
+  @override
+  Future<BuyV2VariantFamilySnapshot> loadVariantFamily(
+    BuyV2Product selected,
+    BuyV2CatalogueQuery context,
+  ) async {
+    variantFamilyRequests++;
+    final store = _storeIndex(selected.storeId);
+    if (store == null ||
+        selected.destination != destination ||
+        context.storeId != selected.storeId) {
+      throw const FormatException('Variant Store identity mismatch');
+    }
+    final options = <(String, String), BuyV2VariantAttribute>{};
+    final candidates = <BuyV2Product>[];
+    for (var sku = 0; sku < _templates.length && sku < skusPerStore; sku++) {
+      final template = _templates[sku];
+      if (template.canonicalId != selected.canonicalId ||
+          !template.hasStructuredVariants ||
+          template.offerClass != selected.offerClass) {
+        continue;
+      }
+      for (final attribute in template.variantAttributes) {
+        options[(attribute.dimensionId, attribute.optionId)] = attribute;
+      }
+      final changed = template.variantAttributes
+          .where(
+            (attribute) => !selected.variantAttributes.any(
+              (current) =>
+                  current.dimensionId == attribute.dimensionId &&
+                  current.optionId == attribute.optionId,
+            ),
+          )
+          .length;
+      if (changed <= 1) candidates.add(_product(store, sku));
+    }
+    final observed = now();
+    return BuyV2VariantFamilySnapshot(
+      productId: selected.id,
+      canonicalId: selected.canonicalId,
+      storeId: selected.storeId!,
+      destination: destination,
+      queryKey: context.key,
+      sourceId: version,
+      revision: _snapshotId,
+      observedAt: observed,
+      validUntil: observed.add(const Duration(minutes: 15)),
+      complete: true,
+      selectedAvailable: candidates.any(
+        (candidate) => candidate.id == selected.id,
+      ),
+      options: options.values,
+      candidates: candidates,
+    );
+  }
 
   String get _snapshotId =>
       '$version-${destination.name}-$providerCount-$skusPerStore'
@@ -2987,6 +3044,7 @@ class BuyV2Session extends ChangeNotifier {
     this.collectionPurchaseStore,
     this.catalogueNow = DateTime.now,
     this.cataloguePageSource,
+    this.variantFamilySource,
     this.publishedCatalogueSource,
     this.shoppingAreaSource,
     Map<String, String> catalogueAreas = const {},
@@ -4134,6 +4192,10 @@ class BuyV2Session extends ChangeNotifier {
         _pagedProducts[product.id] = product;
       }
     }
+    for (final product
+        in _variantFamily?.candidates ?? const <BuyV2Product>[]) {
+      _pagedProducts[product.id] = product;
+    }
     final storeIds = <String>{};
     for (final lease in _catalogueStorePagers.values) {
       for (final store in lease.pager.cachedItems) {
@@ -4145,6 +4207,7 @@ class BuyV2Session extends ChangeNotifier {
       }
     }
     final retained = <String>{
+      ...?_variantFamily?.candidates.map((product) => product.id),
       ..._cart.keys,
       ..._recentlyViewedProductIds,
       ..._comparedProductOrigins,
@@ -4170,6 +4233,7 @@ class BuyV2Session extends ChangeNotifier {
     );
     _pagedStores.removeWhere((id, _) => !storeIds.contains(id));
     retained.addAll(_catalogueProducts.map((product) => product.id));
+    _variantWithdrawnIds.removeWhere((id) => !retained.contains(id));
     _productFacts.removeWhere((id, _) => !retained.contains(id));
     _productContent.removeWhere((id, _) => !retained.contains(id));
     _productContentMediaInputs.removeWhere((id, _) => !retained.contains(id));
@@ -4841,6 +4905,7 @@ class BuyV2Session extends ChangeNotifier {
   String? _collectionBrowseStoreId;
   final DateTime Function() catalogueNow;
   final BuyV2CataloguePageSource? cataloguePageSource;
+  final BuyV2VariantFamilySource? variantFamilySource;
   final BuyV2PublishedCatalogueSource? publishedCatalogueSource;
   final BuyV2ShoppingAreaSource? shoppingAreaSource;
   BuyV2PublishedCatalogueSource? _devicePublishedCatalogueSource;
@@ -9005,8 +9070,171 @@ class BuyV2Session extends ChangeNotifier {
   /// This is deliberately independent of Cart contents, customer history,
   /// popularity, serviceability and provider state. It is a local catalogue
   /// ordering helper, not a personalized or clinical recommendation owner.
+  BuyV2VariantFamilySnapshot? _variantFamily;
+  final Set<String> _variantWithdrawnIds = {};
+  int _variantFamilyEpoch = 0;
+  String? _variantFamilyRequestProductId;
+  String? _variantFamilyContextKey;
+  bool _variantFamilyLoading = false;
+  String? _variantFamilyMessage;
+
+  BuyV2VariantFamilySource? _variantSourceFor(BuyV2Product current) {
+    if (!current.hasStructuredVariants || current.storeId == null) return null;
+    if (variantFamilySource != null) return variantFamilySource;
+    final source = _sourceForCatalogue(current.destination);
+    return source is BuyV2VariantFamilySource
+        ? source as BuyV2VariantFamilySource
+        : null;
+  }
+
+  BuyV2CatalogueQuery _variantContext(BuyV2Product current) => catalogueQuery(
+    storeId: current.storeId,
+    catalogueDestination: current.destination,
+    refinements: BuyV2DiscoveryRefinements(),
+  );
+
+  bool hasVariantFamilySourceFor(BuyV2Product current) =>
+      _variantSourceFor(current) != null;
+
+  BuyV2VariantFamilySnapshot? variantFamilyFor(BuyV2Product current) {
+    final snapshot = _variantFamily;
+    return snapshot != null &&
+            snapshot.isValidFor(
+              current,
+              _variantContext(current),
+              catalogueNow(),
+            )
+        ? snapshot
+        : null;
+  }
+
+  bool variantFamilyLoadingFor(BuyV2Product current) =>
+      _variantFamilyLoading &&
+      _variantFamilyRequestProductId == current.id &&
+      _variantFamilyContextKey == _variantContext(current).key;
+
+  /// Retain the validated family's choice labels while the new exact SKU's
+  /// neighbours load. The old neighbours cannot authorize a new selection.
+  List<BuyV2VariantAttribute> variantOptionsFor(BuyV2Product current) {
+    final snapshot = _variantFamily;
+    return snapshot != null &&
+            snapshot.canonicalId == current.canonicalId &&
+            snapshot.storeId == current.storeId &&
+            snapshot.destination == current.destination &&
+            snapshot.queryKey == _variantContext(current).key &&
+            catalogueNow().isBefore(snapshot.validUntil)
+        ? snapshot.options
+        : const [];
+  }
+
+  String? variantFamilyMessageFor(BuyV2Product current) {
+    if (_variantFamilyRequestProductId != current.id) return null;
+    if (_variantFamilyMessage != null) return _variantFamilyMessage;
+    final previous = _variantFamily;
+    if (previous != null &&
+        (previous.queryKey != _variantContext(current).key ||
+            !catalogueNow().isBefore(previous.validUntil))) {
+      return 'Product options need refreshing.';
+    }
+    return null;
+  }
+
+  bool variantWithdrawn(BuyV2Product current) =>
+      _variantWithdrawnIds.contains(current.id);
+
+  Future<bool> refreshVariantFamily(
+    BuyV2Product current, {
+    bool force = true,
+  }) async {
+    final source = _variantSourceFor(current);
+    if (_collectionDisposed ||
+        source == null ||
+        selectedProductId != current.id) {
+      return false;
+    }
+    if (!force && variantFamilyFor(current) != null) return true;
+    final context = _variantContext(current);
+    if (variantFamilyLoadingFor(current)) return false;
+    final epoch = ++_variantFamilyEpoch;
+    final procurementEpoch = _procurementEpoch;
+    bool active() =>
+        !_collectionDisposed &&
+        epoch == _variantFamilyEpoch &&
+        procurementEpoch == _procurementEpoch &&
+        selectedProductId == current.id &&
+        _variantContext(current).key == context.key;
+    _variantFamilyRequestProductId = current.id;
+    _variantFamilyContextKey = context.key;
+    _variantFamilyLoading = true;
+    _variantFamilyMessage = null;
+    notifyListeners();
+    try {
+      final next = await _withCatalogueRequest(
+        () => source
+            .loadVariantFamily(current, context)
+            .timeout(const Duration(seconds: 15)),
+        isCurrent: active,
+      );
+      if (!active()) return false;
+      final previous = _variantFamily;
+      if (!next.isValidFor(current, context, catalogueNow()) ||
+          (previous != null &&
+              previous.canonicalId == next.canonicalId &&
+              previous.storeId == next.storeId &&
+              previous.queryKey == next.queryKey &&
+              next.observedAt.isBefore(previous.observedAt))) {
+        throw const FormatException(
+          'Variant family identity or revision mismatch',
+        );
+      }
+      for (final candidate in next.candidates) {
+        _validatePagedProduct(candidate, context);
+        final known = findProduct(candidate.id);
+        if (known != null &&
+            (known.canonicalId != candidate.canonicalId ||
+                known.destination != candidate.destination ||
+                !known.isFromSameStoreAs(candidate))) {
+          throw const FormatException('Variant listing identity changed');
+        }
+      }
+      _variantFamily = next;
+      if (!next.selectedAvailable) _variantWithdrawnIds.add(current.id);
+      for (final candidate in next.candidates) {
+        _variantWithdrawnIds.remove(candidate.id);
+        _pagedProducts[candidate.id] = candidate;
+        _productFacts.remove(candidate.id);
+        _productContent.remove(candidate.id);
+        _marketplaceTrust.remove(candidate.id);
+      }
+      _retainCataloguePages(notify: false);
+      return true;
+    } on Object {
+      if (active()) {
+        _variantFamilyMessage = 'Product options could not be refreshed.';
+      }
+      return false;
+    } finally {
+      if (epoch == _variantFamilyEpoch && !_collectionDisposed) {
+        _variantFamilyLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  void _requestVariantFamily(BuyV2Product current) {
+    if (_variantSourceFor(current) == null) return;
+    unawaited(
+      Future<void>.microtask(() async {
+        await refreshVariantFamily(current, force: false);
+      }),
+    );
+  }
+
   List<BuyV2Product> productVariantsFor(BuyV2Product current) {
     if (current.destination == BuyV2Destination.orders) return const [];
+    if (hasVariantFamilySourceFor(current)) {
+      return variantFamilyFor(current)?.candidates ?? [current];
+    }
     final legacyOptions = <(String, String)>{};
     return List.unmodifiable(
       _knownCatalogueProducts
@@ -9508,6 +9736,13 @@ class BuyV2Session extends ChangeNotifier {
               clearStoreCollection: store.collection == null,
             );
     });
+    if (variantWithdrawn(product)) {
+      return cached.copyWith(
+        orderabilityLabel: 'Unavailable',
+        stale: true,
+        clearEligibility: true,
+      );
+    }
     if (isStoreProcurement ||
         product.destination == BuyV2Destination.medicine) {
       return cached;
@@ -10002,6 +10237,7 @@ class BuyV2Session extends ChangeNotifier {
     if (liveCartBenefitsEnabled) {
       unawaited(refreshProductBenefits(item.id));
     }
+    _requestVariantFamily(item);
     return true;
   }
 
@@ -10058,6 +10294,7 @@ class BuyV2Session extends ChangeNotifier {
     if (liveCartBenefitsEnabled) {
       unawaited(refreshProductBenefits(next.id));
     }
+    _requestVariantFamily(next);
     return true;
   }
 
@@ -11747,6 +11984,12 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!_allowProcurementProduct(item)) return false;
+    if (variantWithdrawn(item)) {
+      notice =
+          'This product option is no longer available. Choose another option.';
+      notifyListeners();
+      return false;
+    }
     final facts = productFactsFor(item);
     if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
       final nextOpening = facts.nextOpeningLabel?.trim();
@@ -11979,24 +12222,15 @@ class BuyV2Session extends ChangeNotifier {
       addProduct(id);
       return;
     }
-    if (isStoreProcurement) {
-      final product = findProduct(id);
-      if (product == null || !_allowProcurementProduct(product)) return;
-    }
     final approvedMaximum = _prescriptionApprovedQuantities[id];
     if (approvedMaximum != null && current.quantity >= approvedMaximum) {
       notice = 'Prescription quantity reached for ${current.product.title}.';
       notifyListeners();
       return;
     }
-    _cart[id] = current.copyWith(quantity: current.quantity + 1);
-    _pruneCartSelections();
-    _acknowledgeCart(
-      '${current.product.customerTitle} · ${current.quantity + 1} in cart',
-      destination: current.product.destination,
-    );
-    _persistCustomerState();
-    notifyListeners();
+    // Button and typed entry must enforce the same quantity, availability and
+    // eligibility rules before mutating the exact-SKU line.
+    setCartQuantity(id, '${current.quantity + 1}');
   }
 
   void decrease(String id) {

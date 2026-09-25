@@ -2469,6 +2469,79 @@ void main() {
   );
 
   testWidgets(
+    'CAT03 gallery resets last of seven for replacement and withdrawal',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final adapter = _ReferenceMediaAdapter()..count = 7;
+      final session = BuyV2Session(core: core, productContentAdapter: adapter);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('s-milk');
+      final quantity = session.quantityFor('s-milk');
+      await mountReferenceGallery(tester, session, 's-milk');
+      final gallery = find.byKey(const ValueKey('buy-product-gallery-s-milk'));
+      for (var index = 1; index < 7; index++) {
+        await tester.drag(gallery, const Offset(-300, 0));
+        await tester.pumpAndSettle();
+        expect(find.text('${index + 1} of 7'), findsOneWidget);
+      }
+      adapter.count = 1;
+      adapter.revision++;
+      expect(session.refreshProductContent('s-milk'), isTrue);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-product-gallery-count')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-product-gallery-asset-s-milk-r1-0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-product-gallery-asset-s-milk-r0-6')),
+        findsNothing,
+      );
+      adapter.count = 0;
+      expect(session.refreshProductContent('s-milk'), isTrue);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-product-illustration-s-milk')),
+        findsOneWidget,
+      );
+      expect(session.selectedProductId, 's-milk');
+      expect(session.quantityFor('s-milk'), quantity);
+      adapter.count = 7;
+      expect(session.refreshProductContent('s-milk'), isTrue);
+      await tester.pumpAndSettle();
+      for (var index = 1; index < 7; index++) {
+        await tester.drag(gallery, const Offset(-300, 0));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('7 of 7'), findsOneWidget);
+      adapter.count = 1;
+      expect(session.selectProductVariant('s-milk-500ml'), isTrue);
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, 's-milk-500ml');
+      expect(
+        find.byKey(
+          const ValueKey('buy-product-gallery-asset-s-milk-500ml-r1-0'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-product-gallery-s-milk')),
+        findsNothing,
+      );
+      expect(session.quantityFor('s-milk'), quantity);
+      expect(session.quantityFor('s-milk-500ml'), 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'reference gallery refresh binds provider media revision without stale page',
     (tester) async {
       final core = BuySession();

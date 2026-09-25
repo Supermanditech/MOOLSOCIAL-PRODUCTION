@@ -2829,3 +2829,48 @@ Hot reload also resets local product navigation to Buy Home: reproduced with a z
 Next sequential work: catalogue02. Existing compact selectors and 1/3/4/12-option tests are reusable; productVariantsFor currently enumerates only known catalogue products, so later-page family completeness/revision and exact resolution still need public-side wiring. No claim of complete catalogue01-08 qualification.
 
 Interim preservation qualification:561 unique selected scenarios/591 case references passed in15 batches at source `6c6c0dd20a0d039451da96276193d446a7c859fcb4b5bbe51fadb2b099a8e3c7`; analysis clean for all5 modified source/test owners. Exact child test group names reconciled; unchanged first7 batches retained with membership/fingerprint assertions. Full191 content/variant tests also passed. This is an interim implementation checkpoint, not closure of the eight parents or founder approval. Generated evidence remains local/ignored under the source-only recovery policy.
+
+### Catalogue02 public family loading — implementation in progress
+
+Added optional BuyV2VariantFamilySource to existing public contracts. A snapshot binds selectedSKU,canonicalfamily,Store,channel,query/location/permission context,source revision andvalidity; it supplies complete choice metadata andonly the exact SKUs reachable by changingonedimension. No client-side Cartesian generation or whole-catalogue loading. Existing request limiter,product caches,compactradio/optionrows andCart owners reused. Late/foreign/incomplete/duplicate/stale data fails without replacing selection. Withdrawn variants cannot Add untilaffirmative refresh; offerfacts stillownstock/delivery authorization.
+
+Development source implements this frontend seam using existing explicitlyreview-only catalogue templates, not Store workspace implementation. Local tests cover3colours/5storage,6colour/6size/6storage at1x/2x,1through6and12choices,failedrefresh/retry,withdrawal/removal/republication,late replies andlogicalmillion-SKU lookup bounds. Full entry-path qualification/native/founder review remain open. Latest Store read/mapping/provider scope file remains deferred untilvisualapproval.
+
+### CAT02 Redmi bounded replay — 26 September 2026
+
+Founder clarified that only provider-supplied, published product options should appear; absent colour/size/storage dimensions stay hidden. Test fixtures do not authorize default live choices.
+
+Local content/variant impact run: 202 tests passed (`catalogue-02-impact-final.jsonl`); analysis clean (`catalogue-02-analysis-qualified.txt`). Native Offers -> shared product -> colour/storage -> Add -> Cart -> Back retained Ultramarine / 256 GB, correct image and INR70,000 review price. Test-added quantity was removed; Saved entries were not changed. Gallery reached image 2 of 2 on the repeated swipe. Initial Cart thumbnail placeholder resolved on repeat observation, so no persistent missing-photo defect is claimed. Local-only proof: `apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/catalogue-02-native-observation.json`.
+
+CAT02 remains open for full entry-path qualification and founder approval; CAT03 onward remain in scope. Current implementation is uncommitted; previous pushed checkpoint remains b30ca05eda708586b5580daf22c9619421ed818c. No APK or Store-side mapping performed. Earlier lost screenshot output was recovered by reading the existing image; an incorrect read-only ADB serial probe failed without affecting either device.
+
+### CAT03 gallery lifecycle audit — 26 September 2026
+
+Added explicit last-of-seven -> one -> zero and exact 500ml variant replacement regression. Original Cart quantity stays intact and old photo keys disappear. Existing shared gallery passed without a production-code change. 9 surrounding gallery tests passed; changed test owner analysis clean. Local evidence: `catalogue-03-gallery-impact.jsonl` and `catalogue-03-test-analysis.txt` under the existing ignored Redmi audit directory. CAT03 remains open for the remaining binding/race and full entry-path matrix; founder approval is not inferred.
+
+### CAT04 quantity validation child — 26 September 2026
+
+Registered `BUY-CATALOGUE-20260925-04-A01`: quantity plus bypassed typed-entry validation. Failing numeric-bound regression reproduced before repair; plus now uses `setCartQuantity`, retaining prescription messaging. Revoked wholesale eligibility rejects increases while valid decreases remain possible. All 486 session tests passed after updating the impacted phone-family test to await bounded family choices and prove all six exact variants remain reachable. Analysis clean. Logs: `catalogue-04-plus-before.jsonl`, `catalogue-04-session-impact-qualified.jsonl`, `catalogue-04-child-analysis-qualified.txt` in the ignored Redmi audit directory. Child locally verified, native qualification and current checkpoint pending. Parent04 pack/units/steps/tiers and later tickets remain open.
+
+### Founder amendment: real review catalogue — 26 September 2026
+
+Founder requires real product examples for each applicable field/variant type on review screens, with reusable data for later backend work; synthetic visible products/prices do not satisfy this requirement. Existing review-only phone fixtures are not real seller inventory and must not be presented as such. Preserve automated boundary-test fixtures as test evidence; the new requirement concerns visible review data. Source provenance and exact product/variant IDs must be retained. Never invent missing photos, specifications, colours/sizes/storage, seller prices, stock, MOQ, tax or delivery. Awaiting founder choice between existing Store data read permission (mapping/integration still deferred) and manufacturer catalogue facts with unavailable seller terms. Keep all catalogue tickets open until applicable real-data review coverage is established; no backend readiness inferred from a frontend sample.
+
+### Real-product source reconnaissance — 26 September 2026
+
+Public manufacturer facts gathered while Store read/mapping remains deferred; these are candidate review examples, not published MoolSocial offers or confirmed stock.
+
+- Apple iPhone16 technical archive: https://support.apple.com/en-in/121029 — five finishes (Black, White, Pink, Teal, Ultramarine), capacities128/256/512GB; physical dimensions71.6x147.6x7.80mm, mass170g. Current India sales specs https://www.apple.com/in/iphone-16/specs/ list128GB. Preserve this distinction: historical model options do not prove current seller combinations or availability. Exact Store SKU identities, sale prices, stock and each photo binding remain required.
+- Amul official milk catalogue https://shop.amul.com/en/browse/milk — Calci+1L packs4/12, Calci+250mL packs8/32; Moti450mL pack24. Suitable real composition examples; do not confuse individual net content with outer-pack count. Published shop MRP is not a MoolSocial Store offer price or delivery promise. Exact product-page specifications/media still need verification before runtime use. Old Taaza URL redirected to homepage and is not accepted as current pack proof.
+
+Coverage still missing: real apparel size/material options, exact colour/media bindings, supplier-owned MOQ/steps/tiers and sellable offers. No synthetic runtime catalogue was replaced during the source-frozen checkpoint run. This is public-side source reconnaissance, not the postponed Store integration scope document.
+
+### Founder clarification: labelled test supplier — 26 September 2026
+
+Founder permits supplier/product records for real testing, replaceable or removable before go-live. Public review catalogue should use traceable real product facts under an explicitly identified test supplier, with clearly test-only commercial terms where needed for Add/Cart journeys. These are not live seller offers. Keep test identity/provenance separable from real provider records and preserve the same public data contracts for replacement. No actual production account creation, backend write, payment or fulfilment is authorized by this frontend task; Store mapping remains deferred until visual approval. Earlier source-choice question no longer blocks preparation of the local labelled review catalogue.
+
+Founder explicitly approved the labelled test supplier/account approach ("exactly approved"). Use real product facts plus disclosed test commercial terms in the existing public review environment; keep records removable/replacable before launch. No further source-choice confirmation is required for this approach.
+
+### Public catalogue preservation checkpoint — 26 September 2026
+
+582 unique selected scenarios / 614 case references passed in 16 batches at source fingerprint `0587b869d29322a8dff7a6877e56e5d4cf0df381f7068d4d6814c3e2fe00aa18`. Analysis clean across six changed owners. CAT02 provider-family loading, CAT03 gallery lifecycle tests and CAT04-A01 quantity validation are preserved together; this is not completion of eight parents. Real-data catalogue replacement, remaining pack/tier work, all-entry-path qualification and founder review remain pending. Runtime source was frozen during replay; evidence logs stay local under source-only backup policy.

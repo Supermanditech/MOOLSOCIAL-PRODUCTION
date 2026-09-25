@@ -195,6 +195,90 @@ Future<void> capturePack(WidgetTester tester, String label) async {
   }
 }
 
+final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
+  _VariantFamilyAdapter(this.products);
+  final List<BuyV2Product> products;
+  String fault = '';
+  final Set<String> withdrawn = {};
+  int requests = 0;
+  Future<BuyV2VariantFamilySnapshot> Function(
+    BuyV2Product,
+    BuyV2CatalogueQuery,
+  )?
+  handler;
+
+  BuyV2VariantFamilySnapshot snapshot(
+    BuyV2Product current,
+    BuyV2CatalogueQuery context,
+  ) {
+    final choices = <(String, String), BuyV2VariantAttribute>{};
+    for (final product in products) {
+      if (fault == 'removed-choice' && withdrawn.contains(product.id)) continue;
+      for (final option in product.variantAttributes) {
+        choices[(option.dimensionId, option.optionId)] = option;
+      }
+    }
+    final candidates = products
+        .where(
+          (product) =>
+              !withdrawn.contains(product.id) &&
+              product.variantAttributes
+                      .where(
+                        (a) => !current.variantAttributes.any(
+                          (v) =>
+                              v.dimensionId == a.dimensionId &&
+                              v.optionId == a.optionId,
+                        ),
+                      )
+                      .length <=
+                  1,
+        )
+        .toList();
+    if (fault == 'foreign') {
+      candidates[0] = candidates[0].copyWith(storeId: 'foreign-store');
+    }
+    if (fault == 'duplicate') candidates.add(candidates.first);
+    if (fault == 'ambiguous') {
+      candidates.add(candidates.first.copyWith(id: 'same-options-other-id'));
+    }
+    final now = DateTime.now();
+    return BuyV2VariantFamilySnapshot(
+      productId: current.id,
+      canonicalId: current.canonicalId,
+      storeId: current.storeId!,
+      destination: current.destination,
+      queryKey: fault == 'context' ? 'wrong-context' : context.key,
+      sourceId: 'family-test',
+      revision: 'family-test-1',
+      observedAt: fault == 'stale'
+          ? now.subtract(const Duration(days: 1))
+          : now,
+      validUntil: fault == 'expired'
+          ? now.subtract(const Duration(seconds: 1))
+          : now.add(const Duration(hours: 1)),
+      complete: fault != 'incomplete',
+      selectedAvailable: !withdrawn.contains(current.id),
+      options: [
+        ...choices.values,
+        if (fault == 'options') choices.values.first,
+      ],
+      candidates: candidates,
+    );
+  }
+
+  @override
+  Future<BuyV2VariantFamilySnapshot> loadVariantFamily(
+    BuyV2Product selected,
+    BuyV2CatalogueQuery context,
+  ) async {
+    requests++;
+    if (fault == 'offline') throw StateError('Offline test source');
+    return handler == null
+        ? snapshot(selected, context)
+        : await handler!(selected, context);
+  }
+}
+
 void main() {
   List<BuyV2Product> structuredFamily() {
     final base = BuyV2Catalogue.products.first;
@@ -231,6 +315,411 @@ void main() {
           ),
     ];
   }
+
+  List<BuyV2Product> completeFamily() {
+    final base = structuredFamily().first;
+    return [
+      for (var colour = 0; colour < 3; colour++)
+        for (var storage = 0; storage < 5; storage++)
+          base.copyWith(
+            id: 'complete-$colour-$storage',
+            price: 10000 + colour * 100 + storage * 1000,
+            variant: 'Colour $colour / Storage $storage',
+            variantAttributes: [
+              BuyV2VariantAttribute(
+                dimensionId: 'colour',
+                dimensionLabel: 'Colour',
+                optionId: '$colour',
+                optionLabel: 'Colour $colour',
+                kind: BuyV2VariantDimensionKind.colour,
+                swatchArgb: 0xff224466 + colour * 3000,
+              ),
+              BuyV2VariantAttribute(
+                dimensionId: 'storage',
+                dimensionLabel: 'Storage',
+                optionId: '$storage',
+                optionLabel: '${128 * (storage + 1)} GB',
+                kind: BuyV2VariantDimensionKind.storage,
+              ),
+            ],
+          ),
+    ];
+  }
+
+  test(
+    'CAT02 complete family resolves later-page choices without changing other options',
+    () async {
+      final family = completeFamily();
+      final adapter = _VariantFamilyAdapter(family);
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        variantFamilySource: adapter,
+        commerceAdapter: _MediaCommerce(family.first),
+        reviewDataEnabled: false,
+        productFactsAdapter: QualifiedTestProductFacts(
+          family.map((p) => p.id).toSet(),
+        ),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      expect(session.findProduct('complete-0-4'), isNull);
+      session.openProduct(family.first.id);
+      expect(await session.refreshVariantFamily(family.first), isTrue);
+      final snapshot = session.variantFamilyFor(session.selectedProduct!)!;
+      expect(
+        snapshot.options.where((o) => o.dimensionId == 'colour').length,
+        3,
+      );
+      expect(
+        snapshot.options.where((o) => o.dimensionId == 'storage').length,
+        5,
+      );
+      expect(
+        snapshot.candidates.length,
+        7,
+      ); // Selected plus 2 colours and 4 storage choices, not 15 combinations.
+      final target = session.selectedProduct!.resolveVariantOption(
+        session.productVariantsFor(session.selectedProduct!),
+        'storage',
+        '4',
+      )!;
+      expect(target.id, 'complete-0-4');
+      expect(session.selectProductVariant(target.id), isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
+      );
+      expect(session.selectedProduct!.variantAttributes.first.optionId, '0');
+      expect(session.addProduct(target.id), isTrue);
+      expect(session.cartLines.single.product.id, target.id);
+      expect(session.cartLines.single.product.price, target.price);
+    },
+  );
+
+  test(
+    'CAT02 development family lookup stays bounded in a million SKU catalogue',
+    () async {
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final source = BuyV2DevelopmentCatalogueSource(
+          destination: destination,
+          providerCount: 1000,
+          skusPerStore: 1000,
+          includeVariantReviewFixtures: true,
+        );
+        final context = BuyV2CatalogueQuery(
+          destination: destination,
+          regionId: 'jodhpur',
+          storeId: source.storeIdAt(0),
+          query: 'iphone',
+        );
+        final page = await source.loadProducts(context, pageSize: 1);
+        expect(page.items.length, 1);
+        final before = source.productObjectsCreated;
+        final family = await source.loadVariantFamily(
+          page.items.single,
+          context,
+        );
+        expect(
+          family.isValidFor(page.items.single, context, DateTime.now()),
+          isTrue,
+        );
+        expect(
+          family.options
+              .where((option) => option.dimensionId == 'colour')
+              .length,
+          2,
+        );
+        expect(
+          family.options
+              .where((option) => option.dimensionId == 'storage')
+              .length,
+          3,
+        );
+        expect(family.candidates.length, 4);
+        expect(source.productObjectsCreated - before, 4);
+        expect(source.variantFamilyRequests, 1);
+      }
+    },
+  );
+
+  test(
+    'CAT02 rejects incomplete foreign duplicate and stale family responses',
+    () async {
+      final family = completeFamily();
+      final adapter = _VariantFamilyAdapter(family);
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        variantFamilySource: adapter,
+        commerceAdapter: _MediaCommerce(family.first),
+        reviewDataEnabled: false,
+        productFactsAdapter: QualifiedTestProductFacts(
+          family.map((p) => p.id).toSet(),
+        ),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      session.openProduct(family.first.id);
+      expect(await session.refreshVariantFamily(family.first), isTrue);
+      for (final fault in [
+        'incomplete',
+        'foreign',
+        'duplicate',
+        'ambiguous',
+        'options',
+        'context',
+        'stale',
+        'expired',
+        'offline',
+      ]) {
+        adapter.fault = fault;
+        expect(
+          await session.refreshVariantFamily(family.first),
+          isFalse,
+          reason: fault,
+        );
+        expect(session.selectedProductId, family.first.id);
+        expect(session.productVariantsFor(family.first).length, 7);
+        expect(session.variantFamilyMessageFor(family.first), isNotNull);
+      }
+      adapter.fault = '';
+      final oldResponse = Completer<BuyV2VariantFamilySnapshot>();
+      late BuyV2CatalogueQuery oldContext;
+      var delayed = false;
+      adapter.handler = (selected, context) {
+        if (!delayed && selected.id == family.first.id) {
+          delayed = true;
+          oldContext = context;
+          return oldResponse.future;
+        }
+        return Future.value(adapter.snapshot(selected, context));
+      };
+      final oldRequest = session.refreshVariantFamily(family.first);
+      await Future<void>.delayed(Duration.zero);
+      expect(session.selectProductVariant('complete-0-4'), isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(
+        session.variantFamilyFor(session.selectedProduct!)?.productId,
+        'complete-0-4',
+      );
+      oldResponse.complete(adapter.snapshot(family.first, oldContext));
+      expect(await oldRequest, isFalse);
+      expect(session.selectedProductId, 'complete-0-4');
+      expect(
+        session.variantFamilyFor(session.selectedProduct!)?.productId,
+        'complete-0-4',
+      );
+      adapter.handler = null;
+      adapter.fault = 'removed-choice';
+      adapter.withdrawn.addAll(
+        family.where((p) => p.id.endsWith('-4')).map((p) => p.id),
+      );
+      expect(
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
+      );
+      expect(session.addProduct('complete-0-4'), isFalse);
+      expect(
+        session.productFactsFor(session.selectedProduct!).orderabilityLabel,
+        'Unavailable',
+      );
+      adapter.withdrawn.clear();
+      adapter.fault = '';
+      expect(
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
+      );
+      expect(session.variantWithdrawn(session.selectedProduct!), isFalse);
+      expect(session.addProduct(session.selectedProductId!), isTrue);
+    },
+  );
+
+  testWidgets(
+    'CAT02 shared selectors show complete family and preserve cart on retry',
+    (tester) async {
+      for (final scale in [1.0, 2.0]) {
+        final family = completeFamily();
+        final adapter = _VariantFamilyAdapter(family);
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          variantFamilySource: adapter,
+          commerceAdapter: _MediaCommerce(family.first),
+          reviewDataEnabled: false,
+          productFactsAdapter: QualifiedTestProductFacts(
+            family.map((p) => p.id).toSet(),
+          ),
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await session.restoreCommerce();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(session: session, productId: family.first.id),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final option = find.byKey(
+          const ValueKey('buy-product-option-storage-4'),
+        );
+        final scroll = find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${family.first.id}')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          find.byKey(
+            ValueKey('buy-product-variants-${family.first.canonicalId}'),
+          ),
+          160,
+          scrollable: scroll,
+        );
+        await tester.ensureVisible(option);
+        await tester.pumpAndSettle();
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, 'complete-0-4');
+        expect(session.addProduct(session.selectedProductId!), isTrue);
+        session.openCart();
+        await tester.pumpAndSettle();
+        session.goBack();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, 'complete-0-4');
+        expect(session.cartLines.single.product.id, 'complete-0-4');
+        adapter.fault = 'offline';
+        await session.refreshVariantFamily(session.selectedProduct!);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, 'complete-0-4');
+        expect(session.cartLines.single.product.id, 'complete-0-4');
+        adapter.fault = '';
+        expect(
+          await session.refreshVariantFamily(session.selectedProduct!),
+          isTrue,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          session.variantFamilyMessageFor(session.selectedProduct!),
+          isNull,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+
+  testWidgets('CAT02 six colour size and storage choices stay reachable', (
+    tester,
+  ) async {
+    for (final scale in [1.0, 2.0]) {
+      final base = structuredFamily().first;
+      final family = [
+        for (var colour = 0; colour < 6; colour++)
+          for (var size = 0; size < 6; size++)
+            for (var storage = 0; storage < 6; storage++)
+              base.copyWith(
+                id: 'six-$colour-$size-$storage',
+                variant: '$colour / $size / $storage',
+                price: 10000 + storage * 1000 + size * 100 + colour * 10,
+                variantAttributes: [
+                  BuyV2VariantAttribute(
+                    dimensionId: 'colour',
+                    dimensionLabel: 'Colour',
+                    optionId: '$colour',
+                    optionLabel: 'Colour $colour',
+                    kind: BuyV2VariantDimensionKind.colour,
+                    swatchArgb: 0xff3366aa + colour * 8000,
+                  ),
+                  BuyV2VariantAttribute(
+                    dimensionId: 'size',
+                    dimensionLabel: 'Size',
+                    optionId: '$size',
+                    optionLabel: ['XS', 'S', 'M', 'L', 'XL', 'XXL'][size],
+                    kind: BuyV2VariantDimensionKind.size,
+                  ),
+                  BuyV2VariantAttribute(
+                    dimensionId: 'storage',
+                    dimensionLabel: 'Storage',
+                    optionId: '$storage',
+                    optionLabel: '${128 * (storage + 1)} GB',
+                    kind: BuyV2VariantDimensionKind.storage,
+                  ),
+                ],
+              ),
+      ];
+      final adapter = _VariantFamilyAdapter(family);
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        variantFamilySource: adapter,
+        commerceAdapter: _MediaCommerce(family.first),
+        reviewDataEnabled: false,
+        productFactsAdapter: QualifiedTestProductFacts(
+          family.map((p) => p.id).toSet(),
+        ),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await session.restoreCommerce();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session, productId: family.first.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final dimension in ['colour', 'size', 'storage']) {
+        final current = session.selectedProduct!;
+        expect(session.variantFamilyFor(current)!.options.length, 18);
+        expect(session.variantFamilyFor(current)!.candidates.length, 16);
+        final section = find.byKey(
+          ValueKey('buy-product-variants-${current.canonicalId}'),
+        );
+        final scroll = find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${current.id}')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(section, 140, scrollable: scroll);
+        final option = find.byKey(ValueKey('buy-product-option-$dimension-5'));
+        await tester.ensureVisible(option);
+        await tester.pumpAndSettle();
+        expect(option.hitTestable(), findsOneWidget);
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        expect(
+          session.selectedProduct!.variantAttributes
+              .firstWhere((a) => a.dimensionId == dimension)
+              .optionId,
+          '5',
+        );
+        expect(tester.takeException(), isNull);
+      }
+      expect(session.selectedProductId, 'six-5-5-5');
+      expect(session.addProduct(session.selectedProductId!), isTrue);
+      expect(session.cartLines.single.product.id, 'six-5-5-5');
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
 
   test(
     'structured variants preserve dimensions and reject ambiguous or foreign offers',
@@ -506,7 +995,7 @@ void main() {
       },
     );
   }
-  for (final count in [1, 3, 4, 12]) {
+  for (final count in [1, 2, 3, 4, 5, 6, 12]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('many variant options keep selection visible $count $scale', (
         tester,
