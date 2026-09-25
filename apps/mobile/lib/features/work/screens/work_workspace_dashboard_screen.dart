@@ -4821,7 +4821,13 @@ class _StoreActivityDeck extends StatelessWidget {
         onOpen: onGroupBulk,
       );
     } else if (session.workspaceLowStockCount > 0) {
-      content = _StockActivityCard(session: session, onOpen: onStock);
+      content = _StockActivityCard(
+        session: session,
+        onOpen: onStock,
+        bottomNotchHeight: stickyActions == null
+            ? 0
+            : _quickActionsNotchHeight(context),
+      );
     } else if (session.workspaceSettlementBalance > 0) {
       content = _MoneyActivityCard(session: session, onOpen: onMoney);
     } else if (session.latestWorkspaceInvoice case final invoice?) {
@@ -5040,6 +5046,20 @@ class _StoreRecentSale extends StatelessWidget {
   }
 }
 
+double _quickActionsNotchHeight(BuildContext context) {
+  final label = TextPainter(
+    text: const TextSpan(
+      text: 'Quick actions',
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  final height = label.width + 33 + 8;
+  label.dispose();
+  return height;
+}
+
 class _ActivityDeckShell extends StatelessWidget {
   const _ActivityDeckShell({
     required this.child,
@@ -5053,16 +5073,7 @@ class _ActivityDeckShell extends StatelessWidget {
   final Widget? stickyActions;
   @override
   Widget build(BuildContext context) {
-    final label = TextPainter(
-      text: const TextSpan(
-        text: 'Quick actions',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-      ),
-      textDirection: TextDirection.ltr,
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout();
-    final notchHeight = label.width + 33 + 8;
-    label.dispose();
+    final notchHeight = _quickActionsNotchHeight(context);
     final surface = Material(
       color: Colors.white,
       elevation: 3,
@@ -5081,7 +5092,11 @@ class _ActivityDeckShell extends StatelessWidget {
             key: stickyActions == null
                 ? null
                 : const Key('work-home-notch-content'),
-            padding: EdgeInsets.only(right: stickyActions == null ? 0 : 53),
+            padding: EdgeInsets.only(
+              right: stickyActions == null || child is _StockActivityCard
+                  ? 0
+                  : 53,
+            ),
             child: child,
           ),
           Positioned(
@@ -5110,13 +5125,7 @@ class _ActivityDeckShell extends StatelessWidget {
       fit: shrinkWrap ? StackFit.loose : StackFit.expand,
       children: [
         surface,
-        Positioned(
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: 49,
-          child: Center(child: stickyActions),
-        ),
+        Positioned(right: 0, bottom: 0, width: 49, child: stickyActions!),
       ],
     );
   }
@@ -5136,14 +5145,8 @@ class _QuickActionsNotch extends ShapeBorder {
     final notch = Path()
       ..addRRect(
         RRect.fromRectAndCorners(
-          Rect.fromLTWH(
-            rect.right - 53,
-            rect.center.dy - height / 2,
-            54,
-            height,
-          ),
+          Rect.fromLTWH(rect.right - 53, rect.bottom - height, 54, height + 1),
           topLeft: const Radius.circular(16),
-          bottomLeft: const Radius.circular(16),
         ),
       );
     return Path.combine(PathOperation.difference, outer, notch);
@@ -8481,9 +8484,14 @@ class _WorkspaceHandoverSheetState extends State<_WorkspaceHandoverSheet> {
 }
 
 class _StockActivityCard extends StatelessWidget {
-  const _StockActivityCard({required this.session, required this.onOpen});
+  const _StockActivityCard({
+    required this.session,
+    required this.onOpen,
+    this.bottomNotchHeight = 0,
+  });
   final WorkSession session;
   final VoidCallback onOpen;
+  final double bottomNotchHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -8522,16 +8530,34 @@ class _StockActivityCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 8),
-          const Text(
-            'Check quantities and replenish what your customers need.',
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 13,
-              height: 1.4,
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: bottomNotchHeight > 0 ? bottomNotchHeight - 14 : 0,
+            ),
+            child: Padding(
+              key: const Key('work-stock-lower-content'),
+              padding: EdgeInsets.only(right: bottomNotchHeight > 0 ? 53 : 0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Check quantities and replenish what your customers need.',
+                    style: TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: onOpen,
+                    child: const Text('View stock'),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          TextButton(onPressed: onOpen, child: const Text('View stock')),
         ],
       ),
     );

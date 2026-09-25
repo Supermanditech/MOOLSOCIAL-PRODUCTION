@@ -2071,7 +2071,7 @@ void main() {
         expect(card, findsOneWidget);
         final rect = tester.getRect(card);
         final tabRect = tester.getRect(toggle);
-        expect(tabRect.center.dy, closeTo(rect.center.dy, 1));
+        expect(tabRect.bottom, closeTo(rect.bottom, 1));
         final surface = tester
             .widgetList<Material>(
               find.descendant(of: card, matching: find.byType(Material)),
@@ -2079,10 +2079,11 @@ void main() {
             .first;
         final shape = surface.shape!.getOuterPath(Offset.zero & rect.size);
         expect(
-          shape.contains(Offset(rect.width - 2, rect.height / 2)),
+          shape.contains(Offset(rect.width - 2, rect.height - 20)),
           isFalse,
         );
         expect(shape.contains(Offset(rect.width / 2, rect.height / 2)), isTrue);
+        expect(shape.contains(Offset(rect.width - 2, 24)), isTrue);
         final content = tester.getRect(
           find.byKey(const Key('work-home-notch-content')),
         );

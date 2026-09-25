@@ -3114,3 +3114,19 @@ outputs/home-notch-20260926.png inspected on OPPO portrait, and opening the
 panel verified. A subsequent Hide lookup found no target; no fallback tap or
 transaction performed. Physical landscape/enlarged and exact-APK closure remain
 pending; this is founder-preview evidence, not release qualification.
+
+## HOME-03 bottom-right notch refinement
+
+Founder moved the sticky tab/cut-out to the final bottom-right of the card.
+The shell now anchors the tab at its bottom and subtracts the matching corner
+from the outline. Stock activity headings, product name and pack/quantity regain
+full width; only its lower description/button reserve53dp beside the notch.
+A minimum lower-region height keeps the notch below the upper text. Other
+activity content retains its protective inset; expanded/adaptive behavior stays.
+Analysis clean. OPPO hot reload succeeded and screenshot
+outputs/home-bottom-notch-20260926.png inspected: upper text right boundary692,
+lower text/button586, tab starts622 physical pixels and ends at card bottom.
+No stock edits, transactions, APK, backend or other-worktree integration.
+Existing pending physical landscape/enlarged/exact-APK checks remain open.
+All40 selected layout/atomic checks passed, including bottom alignment and
+upper/lower notch-path assertions. Log: outputs/home-bottom-notch-regression-20260926.txt.
