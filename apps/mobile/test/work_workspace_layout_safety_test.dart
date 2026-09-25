@@ -11207,6 +11207,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Check stock quantity'), findsOneWidget);
     expect(calls, 0);
+    await openImportFilters(tester);
+    await tester.tap(find.byKey(const Key('work-import-ready')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No products are ready. Open filters and select Check.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Needs attention'), findsNothing);
+    expect(find.byKey(const Key('work-import-save')), findsNothing);
     await show(
       '$header\n${List.generate(10000, (i) => 'Product $i,Local,1kg,10,20,1').join('\n')}',
     );

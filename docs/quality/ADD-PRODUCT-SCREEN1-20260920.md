@@ -2607,3 +2607,14 @@ Corrected to centre alignment, retaining minimum48dp checks. Rerun evidence:
 task outputs/csv-compact-actions-tests-rerun.txt; analysis clean.
 OPPO debug attachment is still waiting; this is local verification, not device
 visual acceptance or APK closure. No data or financial action was performed.
+
+### CSV-HEADER-COPY-01 wording fix
+
+Founder approved the shown CSV layouts at78e9abf1, then requested this child fix.
+Empty Ready guidance now reads: No products are ready. Open filters and select Check.
+Layout and import handlers are unchanged. Regression test opens Ready from an
+all-invalid import, asserts the exact guidance and absence of obsolete Needs
+attention wording, and keeps saving unavailable. Local CSV run is recorded in
+task outputs/csv-header-copy-tests.txt. OPPO hot-reload session disconnected;
+phone was in another app, so no device interaction was continued. Wording device
+verification and exact-APK closure remain pending, distinct from prior layout approval.

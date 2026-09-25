@@ -920,7 +920,7 @@ class _StoreProductImportReviewScreenState
                                             ? 'No rows need attention.'
                                             : 'No issues match your search.')
                                       : (terms.isEmpty
-                                            ? 'No products are ready. Check Needs attention.'
+                                            ? 'No products are ready. Open filters and select Check.'
                                             : 'No products match your search.'),
                                 ),
                               ),
