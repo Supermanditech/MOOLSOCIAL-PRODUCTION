@@ -15188,7 +15188,10 @@ void main() {
       final recordReceipt = find.byKey(const Key('collection-confirm'));
       await reveal(tester, recordReceipt);
       expect(
-        find.descendant(of: recordReceipt, matching: find.text('Record receipt')),
+        find.descendant(
+          of: recordReceipt,
+          matching: find.text('Record receipt'),
+        ),
         findsOneWidget,
       );
       await captureStoreView(tester, 'counter-d01-record-cash-$scale');
@@ -15648,6 +15651,7 @@ void main() {
       (size: const Size(320, 740), scale: 1.0, label: 'narrow'),
       (size: const Size(360, 806), scale: 1.4, label: 'large-text'),
       (size: const Size(806, 360), scale: 1.0, label: 'landscape'),
+      (size: const Size(806, 360), scale: 1.6, label: 'landscape-large-text'),
     ]) {
       testWidgets('COUNTERDISCOUNT journey $method ${display.label}', (
         tester,
@@ -15772,7 +15776,7 @@ void main() {
             findsOneWidget,
             reason: 'The purpose stays visible after entering a value.',
           );
-          if (display.scale != 1.0) return;
+          if (display.scale != 1.0 && display.size.width < 600) return;
           final controls = [
             find.byKey(const Key('work-counter-discount-percentage')),
             find.byKey(const Key('work-counter-discount-fixed')),
@@ -15791,11 +15795,23 @@ void main() {
         }
 
         expectCompactDiscountRow();
+        if (display.label == 'landscape-large-text') {
+          final cash = find.byKey(const Key('work-sale-payment-cash'));
+          for (final method in ['upi', 'bank transfer']) {
+            final choice = find.byKey(Key('work-sale-payment-$method'));
+            expect(
+              (tester.getCenter(choice).dy - tester.getCenter(cash).dy).abs(),
+              lessThan(2),
+              reason: 'Wide enlarged-text payment choices share one row.',
+            );
+            expect(tester.getSize(choice).height, greaterThanOrEqualTo(48));
+          }
+        }
         expect(tester.widget<TextField>(input).decoration!.labelText, isNull);
         expect(tester.widget<TextField>(input).decoration!.hintText, '0.00');
         expect(tester.widget<TextField>(input).controller!.text, isEmpty);
         tester.view.viewInsets = FakeViewPadding(
-          bottom: display.label == 'landscape' ? 120 : 280,
+          bottom: display.size.width > display.size.height ? 120 : 280,
         );
         addTearDown(tester.view.resetViewInsets);
         await tester.pumpAndSettle();

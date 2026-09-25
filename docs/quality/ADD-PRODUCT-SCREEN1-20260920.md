@@ -2454,3 +2454,27 @@ Founder report reconciled in task outputs/store-pos-polish-founder-review-202609
 Remaining: enlarged Counter Sale and other unverified action variants, CSV-photo
 device continuity, scoped seller GST mapping/deferred backend, and founder visual
 approval. Full sweep is not complete and successor-APK closure remains excluded.
+
+### Wide enlarged-text discount/payment compactness (2026-09-25)
+
+Actual OPPO font1.6 landscape showed discount modes, value and Apply stacked
+despite wide available space; payment choices also consumed three rows. Existing
+discount/payment owners now admit a single row when scaled width is sufficient
+(360 times effective text scale), retaining narrow fallback and error expansion.
+No reduced text scale, changed48dp action targets or financial behavior.
+
+Added landscape806x360/font1.6 to all Cash/UPI/Bank COUNTERDISCOUNT journeys,
+asserting discount alignment and payment alignment/targets. Before compact-lane
+test fails in discount-wide-font-before.txt. First after run revealed a test
+inset selector using exact label landscape: the new label inherited280dp portrait
+IME. Fixed test to derive orientation from viewport; retained120dp landscape
+and280dp portrait. Failed evidence retained, not reported as an app regression.
+
+Final discount matrix15/15 passes (discount-wide-font-after-v2.txt); broader61/61
+passes (discount-wide-connected.txt); focused source/test analysis clean. Actual
+OPPO reload4libraries/2974ms, same20-item1773 draft: discount one lane, payment
+radios one lane, disclaimer and Create invoice reachable. Visually inspected
+oppo-discount-wide-font16-complete.png and oppo-payment-wide-font16-after.png
+against oppo-review20-landscape-font16.png. No discount applied, invoice/payment
+created or stock changed. Rotation restoredfree; founder's font1.6 retained.
+These files are in task outputs; full sweep/founder approval remain open.

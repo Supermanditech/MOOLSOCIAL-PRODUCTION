@@ -29036,8 +29036,12 @@ class _CounterBillDiscountEditorState
                 ),
             ],
           );
+          final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+          // Large text needs stacking on narrow phones, not on a wide counter.
+          // Reserve scaled space for both modes, a readable value and Apply.
           final expandedInput =
-              MediaQuery.textScalerOf(context).scale(14) > 20 || error != null;
+              error != null ||
+              (textScale > 20 / 14 && constraints.maxWidth < 360 * textScale);
           if (!expandedInput && constraints.maxWidth >= 260) {
             return Row(
               children: [
@@ -29409,7 +29413,12 @@ class _OrderCompletionChoices extends StatelessWidget {
             children: [
               for (final method in const ['Cash', 'UPI', 'Bank Transfer'])
                 SizedBox(
-                  width: MediaQuery.textScalerOf(context).scale(12) > 18
+                  width:
+                      MediaQuery.textScalerOf(context).scale(12) > 18 &&
+                          constraints.maxWidth <
+                              360 *
+                                  MediaQuery.textScalerOf(context).scale(12) /
+                                  12
                       ? constraints.maxWidth
                       : constraints.maxWidth / 3,
                   child: Padding(
