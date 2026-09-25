@@ -2729,3 +2729,21 @@ outputs/saved-populated-search.png. Wholesale selection remains device-unverifie
 because the actual route has no eligible group offers; no offer/provider was
 fabricated. Backend, Cursor integration and new APK remain out of this change.
 Founder approval and future exact-APK qualification remain open.
+
+### Stock numeric-column separators — 25 September 2026
+
+Founder requested movable or fixed vertical lines for each numeric column.
+Added fixed subtle 1-logical-pixel separators between Stock, Selling price,
+Purchase price, MRP and Reorder level, using the existing row widths. Header
+and rows stay aligned during horizontal scroll and Product-divider resizing.
+Lines ignore pointer input; Product remains movable and cell editing unchanged.
+
+58 affected tests passed; Dart analysis and diff checks clean. Alignment is
+asserted at normal/enlarged text, after resizing and after horizontal reveal;
+the existing exact-field/cancel/save checks remain. First run's two failures
+were in the new assertion counting inactive framework IgnorePointer ancestors;
+corrected to assert the active ignoring wrapper, then reran all 58 successfully.
+Logs: task outputs/stock-column-lines-tests.txt and stock-column-lines-tests-r2.txt.
+Hot reload succeeded on OPPO. Visual verification pending: phone was in another
+app, so further device interaction paused and founder asked to return to Stock.
+No product writes, APK, backend or Cursor changes.

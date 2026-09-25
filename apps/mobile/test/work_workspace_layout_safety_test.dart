@@ -27561,13 +27561,37 @@ void main() {
       await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
       final divider = find.byKey(const Key('work-stock-column-resize'));
+      void expectAlignedColumnLines() {
+        for (var i = 0; i < 4; i++) {
+          final lines = find.byKey(ValueKey('work-stock-column-line-$i'));
+          expect(lines.evaluate().length, greaterThan(1));
+          final headerX = tester.getTopLeft(lines.first).dx;
+          for (var row = 1; row < lines.evaluate().length; row++) {
+            expect(tester.getTopLeft(lines.at(row)).dx, closeTo(headerX, .01));
+          }
+          expect(tester.getSize(lines.first).width, 1);
+          expect(
+            find.ancestor(
+              of: lines.first,
+              matching: find.byWidgetPredicate(
+                (widget) => widget is IgnorePointer && widget.ignoring,
+              ),
+            ),
+            findsOneWidget,
+          );
+        }
+      }
+
+      expectAlignedColumnLines();
       final beforeX = tester.getCenter(divider).dx;
       await tester.drag(divider, const Offset(65, 0));
       await tester.pumpAndSettle();
       expect(tester.getCenter(divider).dx, greaterThan(beforeX + 40));
+      expectAlignedColumnLines();
       await tester.drag(divider, const Offset(-65, 0));
       await tester.pumpAndSettle();
       expect(tester.getCenter(divider).dx, closeTo(beforeX, 2));
+      expectAlignedColumnLines();
       final original = work.workspaceCatalogueItems.first;
       final movements = work.workspaceStockMovements.length;
       for (final pair in [
@@ -27582,6 +27606,7 @@ void main() {
         );
         await reveal(tester, cell);
         if (pair.$1 == 'mrp') {
+          expectAlignedColumnLines();
           expect(
             find.descendant(
               of: cell,

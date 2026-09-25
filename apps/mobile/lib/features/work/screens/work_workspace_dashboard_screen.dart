@@ -14188,6 +14188,7 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
                               key: const Key('work-stock-statement-header'),
                               horizontal: _horizontal,
                               frozenWidth: frozen,
+                              columnWidths: widths,
                               height: 36 * scale,
                               background: const Color(0xFFF1F4FF),
                               identity: const Padding(
@@ -14341,6 +14342,7 @@ class _StockFrozenRow extends StatelessWidget {
     super.key,
     required this.horizontal,
     required this.frozenWidth,
+    required this.columnWidths,
     required this.height,
     required this.identity,
     required this.data,
@@ -14348,6 +14350,7 @@ class _StockFrozenRow extends StatelessWidget {
   });
   final ScrollController horizontal;
   final double frozenWidth;
+  final List<double> columnWidths;
   final double height;
   final Widget identity;
   final Widget data;
@@ -14373,6 +14376,21 @@ class _StockFrozenRow extends StatelessWidget {
               ),
             ),
           ),
+          for (var i = 0; i < columnWidths.length - 1; i++)
+            Positioned(
+              left:
+                  frozenWidth +
+                  columnWidths.take(i + 1).fold<double>(0, (a, b) => a + b),
+              top: 0,
+              bottom: 0,
+              width: 1,
+              child: IgnorePointer(
+                child: ColoredBox(
+                  key: ValueKey('work-stock-column-line-$i'),
+                  color: const Color(0xFFE6E9F1),
+                ),
+              ),
+            ),
           Positioned(
             left: horizontal.hasClients ? horizontal.offset : 0,
             top: 0,
@@ -14614,6 +14632,7 @@ class _WorkspaceProductRow extends StatelessWidget {
         child: _StockFrozenRow(
           horizontal: horizontal!,
           frozenWidth: frozenWidth,
+          columnWidths: statementWidths,
           height: statementHeight,
           identity: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
