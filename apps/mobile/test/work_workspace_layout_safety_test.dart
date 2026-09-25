@@ -9367,6 +9367,11 @@ void main() {
     await tester.tap(open);
     await tester.pumpAndSettle();
     await chooseAddProductMode(tester, 'enter');
+    final save = find.byKey(const Key('work-product-save'));
+    final saveStyle = tester.widget<FilledButton>(save).style!;
+    expect(saveStyle.backgroundColor!.resolve({}), const Color(0xFFF0F1F7));
+    expect(saveStyle.foregroundColor!.resolve({}), MoolColors.navy);
+    expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
     final title = find.byKey(const Key('work-product-title'));
     final price = find.byKey(const Key('work-product-selling-price'));
     await tester.enterText(title, 'Unsaved product');

@@ -17094,6 +17094,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                             ))
                               const Text(
                                 'MoolSocial manages this catalogue image.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: MoolColors.muted,
+                                ),
                               )
                             else if (widget.importRow != null)
                               const Text(
@@ -17589,7 +17593,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           ),
                         Row(
                           children: [
-                            IconButton.outlined(
+                            IconButton(
                               key: const Key('work-product-cancel'),
                               tooltip: 'Cancel changes',
                               onPressed: _finish,
@@ -17601,8 +17605,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 key: const Key('work-product-save'),
                                 style: FilledButton.styleFrom(
                                   minimumSize: const Size(48, 48),
-                                  backgroundColor: MoolColors.navy,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: const Color(0xFFF0F1F7),
+                                  foregroundColor: MoolColors.navy,
                                 ),
                                 onPressed: _save,
                                 child: Text(

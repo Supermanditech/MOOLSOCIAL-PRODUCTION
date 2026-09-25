@@ -2405,3 +2405,22 @@ Store-scoped authoritative registration and applicability before populating sell
 GSTIN; never infer tax amounts/status from onboarding text or alter old invoices.
 Official CBIC invoice/composition guidance was checked; this is not a claim that
 local review documents meet all tax-invoice issuance requirements.
+
+### Shared product editor restrained actions (2026-09-25)
+
+Actual OPPO catalogue→Black tea review exposed solid navy Save and large image
+ownership note. Shared catalogue/manual/import editor now retains48dp Save with
+subdued background/navy label, free cancel icon and12sp muted catalogue-image
+note. No form hierarchy, fields, data or save/cancel behavior changed. Before
+product-polish-palette-before.txt fails on the previous navy background;32
+Add entry/review, CSV and numeric checks pass in product-polish-palette-after.txt.
+Analysis clean. OPPO reload1library/3895ms, review visually checked, Cancel returned
+to catalogue without adding stock. Before oppo-catalogue-review-current.png;
+after oppo-product-editor-polished.png in task outputs. Full visual sweep and
+founder approval remain open.
+
+GST source audit: WorkSession.submitGstProof assigns session.gstin after submitting
+the certificate to the application review case. This does not establish an
+authoritative selected-Store registration/status. Do not copy that unscoped
+value into seller invoices. Store-scoped registration mapping remains open;
+backend implementation and production tax-invoice certification stay deferred.
