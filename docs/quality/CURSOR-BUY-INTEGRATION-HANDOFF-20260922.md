@@ -2808,3 +2808,24 @@ Founder clarified that recovery needs app source and rebuild inputs, not old gen
 Rewrote the 16 still-unpublished commits (15 migrated commits plus preservation metadata) to omit the two generated evidence ZIPs and the archive-specific LFS rule. Original and intermediate histories remain in verified external bundles and local archive refs. Every apps tree is identical before/after; source, assets, platform configuration, lockfiles, build/test scripts, contracts and ticket notes are retained. The two cart PNGs are referenced by regression tests, so they remain test inputs. No new APK was in this batch. Older already-published artifacts are untouched; this is not a global purge.
 
 Source-only mapped tip:56497c5e062767e226cea6b0f82f90cb6559d854. Full mapping and exclusions:CURSOR-BUY-SOURCE-RECOVERY-20260926.json. Exact ZIP paths are ignored and physically retained locally for existing historical QA checks; local gates remain fail-closed and are not weakened to manufacture acceptance. Signing keys/service credentials need separate secure recovery and are never copied into Git. Final metadata checkpoint and normal push/readback are pending. Existing556-case source qualification and68/24/44 ticket counts are unchanged.
+
+
+## Public catalogue implementation resumed — 26 September 2026
+
+Founder scope: implement public portions of BUY-CATALOGUE-20260925-01 through -08, sequentially, using existing SKU/product/information/cart/saved journeys across applicable public channels. Store workspace implementation and latest Store mapping are deferred until public visual approval and successful Redmi hot reload. No new APK. Backend remains deferred.
+
+Start with -01: typed category-applicable public facts in existing content contracts/session/tables; validate schema, stable IDs, units, duplicate/private/inapplicable fields and distinguish missing from false/zero. Existing variant, offer, compliance and fulfilment owners retain their responsibilities. Controlled fixtures exercise frontend contracts without representing production data. Local tests and Redmi/founder approval remain separate. Source-only Git preservation applies; generated archives stay local.
+
+### Catalogue01 public implementation and device scope
+
+Typed category facts now use stable IDs, public/product-or-variant applicability, explicit number/measurement/boolean/text/list types, schema validation and existing information tables. Unknown optional facts stay hidden; false and zero remain visible; typed IDs suppress stale legacy duplicates. Offer and lot facts are excluded from product-fact projection. Required invalid facts reject content readiness. No production provider or Store workspace changed.
+
+Three CAT01 checks and the full191 content/variant scenarios passed after repairing test-only BUY-CATALOGUE-20260925-03-A01: supplier-photo replay now reveals the relocated toolbar before asserting Save/Share, then returns to the image for zoom/variant/Cart coverage. Parent01 remains open for the full category/channel matrix and native/founder qualification. Catalogue02-08 remain open.
+
+Existing Redmi debug APK accepted hot reload (45 libraries/7882ms). A narrow Shop tomato product/Add/Cart/Back smoke check retained product,500g pack,quantity1 andINR37; removed only the test-added quantity. Source-only evidence stays under ignored apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/catalogue-01-*. No new APK.
+
+Hot reload also resets local product navigation to Buy Home: reproduced with a zero-library reload; existing app-level debug reassemble recreates the router and BuyV2Session. Tracked as a review-lifecycle observation on catalogue08, not a confirmed release defect or a reason to edit shared auth/app ownership without admission. Reopen the visible product after reload before coordinate interaction. Latest Store-to-public mapping and provider implementation handoff remain deferred until founder visual approval, as requested.
+
+Next sequential work: catalogue02. Existing compact selectors and 1/3/4/12-option tests are reusable; productVariantsFor currently enumerates only known catalogue products, so later-page family completeness/revision and exact resolution still need public-side wiring. No claim of complete catalogue01-08 qualification.
+
+Interim preservation qualification:561 unique selected scenarios/591 case references passed in15 batches at source `6c6c0dd20a0d039451da96276193d446a7c859fcb4b5bbe51fadb2b099a8e3c7`; analysis clean for all5 modified source/test owners. Exact child test group names reconciled; unchanged first7 batches retained with membership/fingerprint assertions. Full191 content/variant tests also passed. This is an interim implementation checkpoint, not closure of the eight parents or founder approval. Generated evidence remains local/ignored under the source-only recovery policy.

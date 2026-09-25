@@ -6,7 +6,7 @@
   "ticket": {
     "id": "UAW-CURSOR-BUY-READY-20260921",
     "classification": "mvp_supporting",
-    "customerOutcome": "Existing commerce product pages show account-owned Recently viewed and current public More products for you, with exact identity, truthful availability and preserved product/Cart returns.",
+    "customerOutcome": "Public buyers inspect category-applicable product facts, exact variants and media, then preserve exact SKU/pack choices into Cart across existing Buy, Wholesale, Bulk, Offers and Store entry paths.",
     "classificationReason": "Complete founder-selected pending frontend acceptance within existing Buy launch journey; backend dependencies remain separately pending.",
     "minimumCompleteScope": [
       "C06-A01 impacted Create route child: normalize retired home entry to existing post editor so Back uses draft preservation",
@@ -23,7 +23,8 @@
       "Active BUY-PDP-REF-20260924-03: return-policy and contextual-help presentation in existing owners; authoritative COD policy/placement/collection/ledger remains required and unresolved on the same ticket.",
       "Active PDP04 replaces the existing commerce continuation rail, reusing published catalogue/content/facts and navigation; actual related-publication integration remains required on04.",
       "Active PDP05 replaces existing commerce content/compliance card composition; optional source attribute and producer-address fields reuse existing contracts. Actual Store publication remains required on05.",
-      "Active PDP06: reuse recent-history/session/catalogue and shared product cards for lower product-page rail/grid. No invented history, personalization or sponsorship; preserve existing history/account persistence. Actual Store publication remains required."
+      "Active PDP06: reuse recent-history/session/catalogue and shared product cards for lower product-page rail/grid. No invented history, personalization or sponsorship; preserve existing history/account persistence. Actual Store publication remains required.",
+      "Founder26Sep public-only catalogue01-08: implement and test shared public journey sequentially; first step typed category facts and impacted gallery replay; latest Store mapping/provider scope waits for successful Redmi hot reload and founder visual approval. Backend and new APK deferred."
     ],
     "explicitExclusions": [
       "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized by latest founder instruction; production promotion excluded.",
@@ -125,7 +126,7 @@
         "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
       ],
       "manifestPath": "config/buy-founder-regression.json",
-      "manifestSha256": "d92d544c2c4540507f1c02cb3969aedd6a123f89787174056c478833bca9b832",
+      "manifestSha256": "0d76b12ba14cb22ff537b5b11798cede199ce2cb113b99c42ca9fa4d1a6b26ca",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,

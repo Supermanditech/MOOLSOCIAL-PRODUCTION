@@ -1483,6 +1483,20 @@ void main() {
               expect(raw.image!.width, width);
               expect(raw.image!.height, height);
               expect(tester.getSize(gallery).height, greaterThan(0));
+              // Save/Share live above the photo. Scrolling a short viewport to
+              // the gallery can evict that row from the lazy product list.
+              final productScroll = find
+                  .descendant(
+                    of: find.byKey(PageStorageKey('buy-product-$id')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first;
+              await tester.scrollUntilVisible(
+                find.byKey(ValueKey('buy-product-action-save-$id')),
+                -120,
+                scrollable: productScroll,
+              );
+              await tester.pump();
               expect(
                 find.byKey(ValueKey('buy-product-action-save-$id')),
                 findsOneWidget,
@@ -1500,6 +1514,8 @@ void main() {
                 ),
               );
               expect(tester.takeException(), isNull);
+              await tester.ensureVisible(gallery);
+              await tester.pump();
               await capturePack(tester, 'r669-supplier-product-$id-$scale');
             }
 

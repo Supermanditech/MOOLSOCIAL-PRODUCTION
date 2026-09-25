@@ -6055,7 +6055,8 @@ class _ProductContentSections extends StatelessWidget {
               seenHighlights.add(normalized(value)),
         )
         .toList(growable: false);
-    final specifications = content.specifications
+    final specifications = content
+        .specificationsFor(product)
         .where(
           (value) =>
               value.label.toLowerCase() != 'brand' ||
@@ -6219,8 +6220,8 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
             _nonBlankComplianceValue(product.compliance?.netQuantity) != null);
     final legalFields = ready
         ? [
-            ...content.highlightFields,
-            ...content.specifications,
+            ...content.highlightsFor(product),
+            ...content.specificationsFor(product),
           ].where(legalOwner).toList()
         : <BuyV2ProductSpecification>[];
     String normalized(String value) =>
@@ -6243,13 +6244,15 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         '${normalized(field.label)}:${normalized(field.value)}';
     final seen = <String>{};
     final highlights = ready
-        ? content.highlightFields
+        ? content
+              .highlightsFor(product)
               .where(meaningful)
               .where((field) => seen.add(identity(field)))
               .toList()
         : <BuyV2ProductSpecification>[];
     final specifications = ready
-        ? content.specifications
+        ? content
+              .specificationsFor(product)
               .where(meaningful)
               .where((field) => seen.add(identity(field)))
               .toList()
@@ -6304,7 +6307,10 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         hasCompliance;
     final hasSuppliedFacts =
         content.highlights.any((value) => value.trim().isNotEmpty) ||
-        [...content.highlightFields, ...content.specifications].any(
+        [
+          ...content.highlightsFor(product),
+          ...content.specificationsFor(product),
+        ].any(
           (field) =>
               field.label.trim().isNotEmpty && field.value.trim().isNotEmpty,
         ) ||

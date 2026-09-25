@@ -18,6 +18,191 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
+  test(
+    'CAT01 category facts preserve applicability false zero and unknown',
+    () {
+      final product = BuyV2Catalogue.products.first;
+      final facts = BuyV2CategoryFacts(
+        categoryId: product.categoryId,
+        fields: [
+          const BuyV2CategoryAttribute(
+            id: 'sugar',
+            label: 'Added sugar',
+            type: BuyV2AttributeType.measurement,
+            value: 0,
+            unit: 'g',
+          ),
+          const BuyV2CategoryAttribute(
+            id: 'organic',
+            label: 'Organic',
+            type: BuyV2AttributeType.boolean,
+            value: false,
+          ),
+          const BuyV2CategoryAttribute(
+            id: 'unknown',
+            label: 'Not supplied',
+            type: BuyV2AttributeType.text,
+          ),
+          const BuyV2CategoryAttribute(
+            id: 'private',
+            label: 'Purchase cost',
+            type: BuyV2AttributeType.number,
+            value: 24,
+            isPublic: false,
+          ),
+          const BuyV2CategoryAttribute(
+            id: 'lot',
+            label: 'Lot cost',
+            type: BuyV2AttributeType.number,
+            value: 5,
+            scope: BuyV2AttributeScope.lot,
+          ),
+          const BuyV2CategoryAttribute(
+            id: 'offer',
+            label: 'Seller margin',
+            type: BuyV2AttributeType.number,
+            value: 8,
+            scope: BuyV2AttributeScope.offer,
+          ),
+          const BuyV2CategoryAttribute(
+            id: 'size',
+            label: 'Waist',
+            type: BuyV2AttributeType.measurement,
+            value: 32,
+            unit: 'in',
+            categoryIds: {'not-this-category'},
+          ),
+        ],
+      );
+      expect(facts.isValidFor(product), isTrue);
+      expect(facts.specificationsFor(product).map((f) => f.value), [
+        '0 g',
+        'No',
+      ]);
+      final snapshot = BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.ready,
+        sourceId: 'test',
+        categoryFacts: facts,
+        specifications: const [
+          BuyV2ProductSpecification(
+            attributeId: 'unknown',
+            label: 'Old value',
+            value: 'Stale',
+          ),
+        ],
+        highlightFields: const [
+          BuyV2ProductSpecification(
+            attributeId: 'private',
+            label: 'Old private value',
+            value: '24',
+          ),
+        ],
+      );
+      expect(snapshot.specificationsFor(product).map((f) => f.value), [
+        '0 g',
+        'No',
+      ]);
+      expect(snapshot.highlightsFor(product), isEmpty);
+    },
+  );
+
+  test(
+    'CAT01 invalid schemas duplicate identities and required types fail closed',
+    () {
+      final core = BuySession();
+      final adapter = _ContentAdapter();
+      final session = BuyV2Session(core: core, productContentAdapter: adapter);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = session.product('s-milk');
+      const valid = BuyV2CategoryAttribute(
+        id: 'material',
+        label: 'Material',
+        type: BuyV2AttributeType.text,
+        value: 'Cotton',
+      );
+      final invalidFields = [
+        [valid, valid],
+        [
+          const BuyV2CategoryAttribute(
+            id: 'x',
+            label: 'X',
+            type: BuyV2AttributeType.unknown,
+            value: 'new',
+            requiredForDisplay: true,
+          ),
+        ],
+        [
+          const BuyV2CategoryAttribute(
+            id: 'x',
+            label: 'X',
+            type: BuyV2AttributeType.measurement,
+            value: 5,
+            requiredForDisplay: true,
+          ),
+        ],
+        [
+          const BuyV2CategoryAttribute(
+            id: 'x',
+            label: 'X',
+            type: BuyV2AttributeType.number,
+            value: double.nan,
+            requiredForDisplay: true,
+          ),
+        ],
+        [
+          const BuyV2CategoryAttribute(
+            id: 'x',
+            label: 'X',
+            type: BuyV2AttributeType.boolean,
+            value: 'false',
+            requiredForDisplay: true,
+          ),
+        ],
+      ];
+      for (final fields in invalidFields) {
+        adapter.categoryFacts = BuyV2CategoryFacts(
+          categoryId: product.categoryId,
+          fields: fields,
+        );
+        expect(session.refreshProductContent(product.id), isFalse);
+        expect(adapter.categoryFacts!.specificationsFor(product), isEmpty);
+      }
+      for (final facts in [
+        BuyV2CategoryFacts(
+          categoryId: product.categoryId,
+          fields: [valid],
+          schemaVersion: 2,
+        ),
+        const BuyV2CategoryFacts(categoryId: 'wrong-category', fields: [valid]),
+      ]) {
+        adapter.categoryFacts = facts;
+        expect(session.refreshProductContent(product.id), isFalse);
+      }
+      adapter.categoryFacts = BuyV2CategoryFacts(
+        categoryId: product.categoryId,
+        fields: [
+          const BuyV2CategoryAttribute(
+            id: 'material',
+            label: 'Tissu',
+            type: BuyV2AttributeType.text,
+            value: 'Cotton',
+          ),
+        ],
+      );
+      expect(session.refreshProductContent(product.id), isTrue);
+      expect(
+        session
+            .productContentFor(product)
+            .specificationsFor(product)
+            .first
+            .attributeId,
+        'material',
+      );
+    },
+  );
+
   testWidgets('PDP03-A01 shared help matches Store display names and search', (
     tester,
   ) async {
@@ -144,6 +329,86 @@ void main() {
     }
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'CAT01 category facts render once in the shared product journey',
+    (tester) async {
+      final core = BuySession();
+      final adapter = _ContentAdapter();
+      final session = BuyV2Session(core: core, productContentAdapter: adapter);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = session.product('s-milk');
+      adapter.categoryFacts = BuyV2CategoryFacts(
+        categoryId: product.categoryId,
+        fields: const [
+          BuyV2CategoryAttribute(
+            id: 'protein',
+            label: 'Protein per serving',
+            type: BuyV2AttributeType.measurement,
+            value: 3.5,
+            unit: 'g',
+          ),
+          BuyV2CategoryAttribute(
+            id: 'organic',
+            label: 'Organic certification',
+            type: BuyV2AttributeType.boolean,
+            value: false,
+          ),
+          BuyV2CategoryAttribute(
+            id: 'cost',
+            label: 'Private acquisition cost',
+            type: BuyV2AttributeType.number,
+            value: 18,
+            isPublic: false,
+          ),
+        ],
+      );
+      adapter.specifications = const [
+        BuyV2ProductSpecification(
+          attributeId: 'protein',
+          label: 'Outdated protein',
+          value: '2 g',
+        ),
+      ];
+      for (final scale in [1.0, 2.0]) {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        await mountReferenceGallery(tester, session, product.id);
+        final tab = find.byKey(
+          ValueKey('buy-product-details-tab-0-${product.id}'),
+        );
+        await revealProductControl(tester, session, tab);
+        await tester.tap(tab);
+        await tester.pumpAndSettle();
+        await revealProductControl(
+          tester,
+          session,
+          find.text('Protein per serving'),
+        );
+        expect(find.text('Protein per serving'), findsOneWidget);
+        expect(find.text('3.5 g'), findsOneWidget);
+        expect(find.text('No'), findsOneWidget);
+        expect(find.text('Outdated protein'), findsNothing);
+        expect(find.text('Private acquisition cost'), findsNothing);
+        expect(session.addProduct(product.id), isTrue);
+        final quantity = session.quantityFor(product.id);
+        session.openCart();
+        await tester.pumpAndSettle();
+        session.goBack();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, product.id);
+        expect(session.quantityFor(product.id), quantity);
+        await revealProductControl(
+          tester,
+          session,
+          find.text('Protein per serving'),
+        );
+        expect(find.text('3.5 g'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    },
+  );
 
   for (final scale in [1.0, 2.0]) {
     testWidgets('store details copy preserves full text and retries $scale', (
@@ -3658,6 +3923,7 @@ final class _ReferenceMediaAdapter implements BuyV2ProductContentAdapter {
 }
 
 final class _ContentAdapter implements BuyV2ProductContentAdapter {
+  BuyV2CategoryFacts? categoryFacts;
   bool available = true;
   BuyV2ProductContentState state = BuyV2ProductContentState.ready;
   bool retryable = false;
@@ -3693,6 +3959,7 @@ final class _ContentAdapter implements BuyV2ProductContentAdapter {
       sourceId: 'product-content-test',
       observedAt: observedAt,
       highlightFields: highlightFields,
+      categoryFacts: categoryFacts,
       media: [
         for (final id in const ['front', 'pack'])
           BuyV2ProductMediaAsset(

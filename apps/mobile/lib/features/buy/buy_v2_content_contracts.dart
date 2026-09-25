@@ -640,6 +640,135 @@ abstract interface class BuyV2ProductFactsAdapter {
 
 enum BuyV2ProductContentState { ready, loading, offline, unavailable }
 
+enum BuyV2AttributeType {
+  text,
+  number,
+  boolean,
+  measurement,
+  textList,
+  unknown,
+}
+
+/// Product information is separate from selectable options and seller terms.
+enum BuyV2AttributeScope { product, variant, offer, lot }
+
+class BuyV2CategoryAttribute {
+  const BuyV2CategoryAttribute({
+    required this.id,
+    required this.label,
+    required this.type,
+    this.value,
+    this.unit,
+    this.groupLabel,
+    this.categoryIds = const {},
+    this.scope = BuyV2AttributeScope.product,
+    this.isPublic = true,
+    this.requiredForDisplay = false,
+  });
+
+  final String id;
+  final String label;
+  final BuyV2AttributeType type;
+  final Object? value;
+  final String? unit;
+  final String? groupLabel;
+  final Set<String> categoryIds;
+  final BuyV2AttributeScope scope;
+  final bool isPublic;
+  final bool requiredForDisplay;
+
+  bool appliesTo(String categoryId) =>
+      isPublic &&
+      (scope == BuyV2AttributeScope.product ||
+          scope == BuyV2AttributeScope.variant) &&
+      (categoryIds.isEmpty || categoryIds.contains(categoryId));
+
+  bool get hasValidValue {
+    final supplied = value;
+    if (unit != null && (unit!.trim().isEmpty || unit != unit!.trim())) {
+      return false;
+    }
+    if (type != BuyV2AttributeType.measurement && unit != null) return false;
+    return switch (type) {
+      BuyV2AttributeType.text =>
+        supplied is String && supplied.trim().isNotEmpty,
+      BuyV2AttributeType.number => supplied is num && supplied.isFinite,
+      BuyV2AttributeType.boolean => supplied is bool,
+      BuyV2AttributeType.measurement =>
+        supplied is num && supplied.isFinite && unit != null,
+      BuyV2AttributeType.textList =>
+        supplied is List<String> &&
+            supplied.isNotEmpty &&
+            supplied.every((item) => item.trim().isNotEmpty),
+      BuyV2AttributeType.unknown => false,
+    };
+  }
+
+  BuyV2ProductSpecification get specification {
+    final supplied = value;
+    final display = switch (type) {
+      BuyV2AttributeType.boolean => supplied == true ? 'Yes' : 'No',
+      BuyV2AttributeType.measurement => '$supplied $unit',
+      BuyV2AttributeType.textList => (supplied as List<String>).join(', '),
+      _ => '$supplied',
+    };
+    return BuyV2ProductSpecification(
+      attributeId: id,
+      label: label,
+      value: display,
+      groupLabel: groupLabel,
+    );
+  }
+}
+
+/// An adapter supplies a versioned public schema for the selected category.
+/// Unknown optional fields stay hidden; invalid required facts reject readiness.
+class BuyV2CategoryFacts {
+  const BuyV2CategoryFacts({
+    required this.categoryId,
+    required this.fields,
+    this.schemaVersion = 1,
+  });
+
+  final String categoryId;
+  final int schemaVersion;
+  final List<BuyV2CategoryAttribute> fields;
+
+  bool isValidFor(BuyV2Product product) {
+    if (schemaVersion != 1 ||
+        categoryId != product.categoryId ||
+        categoryId.trim().isEmpty) {
+      return false;
+    }
+    final ids = <String>{};
+    for (final field in fields) {
+      if (field.id.trim().isEmpty ||
+          field.id != field.id.trim() ||
+          !ids.add(field.id)) {
+        return false;
+      }
+      if (!field.appliesTo(categoryId)) continue;
+      if (field.label.trim().isEmpty ||
+          (field.groupLabel != null && field.groupLabel!.trim().isEmpty) ||
+          (field.requiredForDisplay && !field.hasValidValue)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  List<BuyV2ProductSpecification> specificationsFor(BuyV2Product product) =>
+      !isValidFor(product)
+      ? const []
+      : List.unmodifiable(
+          fields
+              .where(
+                (field) => field.appliesTo(categoryId) && field.hasValidValue,
+              )
+              .map((field) => field.specification),
+        );
+}
+
 @immutable
 class BuyV2ProductSpecification {
   // Public legal attribute IDs consumed by the existing compliance owner:
@@ -941,6 +1070,7 @@ class BuyV2ProductContentSnapshot {
     this.highlights = const [],
     this.highlightFields = const [],
     this.specifications = const [],
+    this.categoryFacts,
     this.description,
     this.customerMessage,
     this.observedAt,
@@ -956,6 +1086,31 @@ class BuyV2ProductContentSnapshot {
   final List<String> highlights;
   final List<BuyV2ProductSpecification> highlightFields;
   final List<BuyV2ProductSpecification> specifications;
+  final BuyV2CategoryFacts? categoryFacts;
+
+  /// Typed IDs own their fields, including unknown values: never revive an old
+  /// legacy value for the same ID when the current provider cannot confirm it.
+  List<BuyV2ProductSpecification> specificationsFor(BuyV2Product product) {
+    final facts = categoryFacts;
+    if (facts == null) return specifications;
+    if (!facts.isValidFor(product)) return const [];
+    final ownedIds = facts.fields.map((field) => field.id).toSet();
+    return [
+      ...facts.specificationsFor(product),
+      ...specifications.where((field) => !ownedIds.contains(field.attributeId)),
+    ];
+  }
+
+  List<BuyV2ProductSpecification> highlightsFor(BuyV2Product product) {
+    final facts = categoryFacts;
+    if (facts == null) return highlightFields;
+    if (!facts.isValidFor(product)) return const [];
+    final ownedIds = facts.fields.map((field) => field.id).toSet();
+    return highlightFields
+        .where((field) => !ownedIds.contains(field.attributeId))
+        .toList();
+  }
+
   final String? description;
   final String? customerMessage;
   final DateTime? observedAt;

@@ -9648,7 +9648,10 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Product product,
     BuyV2ProductContentSnapshot snapshot,
   ) {
-    if (snapshot.productId != product.id || snapshot.sourceId.trim().isEmpty) {
+    if (snapshot.productId != product.id ||
+        snapshot.sourceId.trim().isEmpty ||
+        (snapshot.categoryFacts != null &&
+            !snapshot.categoryFacts!.isValidFor(product))) {
       return false;
     }
     final mediaIds = <String>{};
