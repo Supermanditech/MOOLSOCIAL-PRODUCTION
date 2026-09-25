@@ -10641,8 +10641,8 @@ _resolveCompactProductGridLayout({
   double cartQuantityWidth = 0,
   bool inlinePriceAction = true,
 }) {
-  // Founder review: three complete cards across normal phone layouts.
-  // Enlarged text retains the measured adaptive layout for readable facts.
+  // Start compact, then reduce columns to keep the complete price and inline
+  // purchase controls readable before and after Add, including enlarged text.
   final viewportWidth = constraints.maxWidth + (scrollIndicatorInset ? 8 : 0);
   final minimumWidth = textScale > 1.6 ? 260.0 : 134.0;
   var columns = storeProcurement && textScale <= 1.25
@@ -10673,7 +10673,10 @@ _resolveCompactProductGridLayout({
   while (columns > 1) {
     final width = widthFor(columns);
     final priceWidth = inlinePriceAction
-        ? width - 22 - _compactGlanceActionWidth(width) - 4
+        ? width -
+              22 -
+              _compactGlanceActionWidth(width).clamp(80.0, double.infinity) -
+              4
         : width - 26;
     if (minimumPriceWidths.every((price) => price <= priceWidth)) break;
     columns--;
@@ -10844,10 +10847,13 @@ double _productGlanceCardHeight(
       cardWidth < 130 &&
       MediaQuery.textScalerOf(context).scale(1) <= 1.25;
   final reservedActionWidth = savedContext && !compactSavedAction ? 68.0 : 42.0;
-  final inlineAdd = session.quantityFor(product.id) == 0;
-  final actionReserve = inlineAdd
-      ? _compactGlanceActionWidth(cardWidth) + 4
-      : 0.0;
+  const inlineAdd = true;
+  final quantity = session.quantityFor(product.id);
+  final actionReserve =
+      (quantity == 0
+          ? _compactGlanceActionWidth(cardWidth)
+          : _inlineQuantityWidth(context, quantity)) +
+      4;
   var priceHeight = 0.0;
   var height =
       _compactProductVisualLayout(
@@ -10858,7 +10864,6 @@ double _productGlanceCardHeight(
       ).photoInset +
       70 +
       12 +
-      (inlineAdd ? 0 : BuyV2Metrics.minimumTap) +
       8 +
       4;
   for (final (index, field) in _productGlanceFields(
@@ -12448,7 +12453,7 @@ class BuyV2ProductCard extends StatelessWidget {
               ? _QuantityStepper(
                   key: ValueKey('buy-quantity-${product.id}'),
                   quantity: quantity,
-                  stacked: stackedQuantity,
+                  stacked: compact ? false : stackedQuantity,
                 )
               : SizedBox(
                   key: ValueKey('buy-add-shell-${product.id}'),
@@ -12568,8 +12573,8 @@ class BuyV2ProductCard extends StatelessWidget {
       ),
     );
     final quantityTargets = _QuantityStepperTargets(
-      stacked: stackedQuantity,
-      visualInset: compact ? 6 : 9,
+      stacked: compact ? false : stackedQuantity,
+      visualInset: compact ? 0 : 9,
       productId: product.id,
       productTitle: product.customerTitle,
       quantity: quantity,
@@ -12593,6 +12598,16 @@ class BuyV2ProductCard extends StatelessWidget {
           session.setCartQuantity(product.id, '${quantity + 1}');
         }
       },
+    );
+    final inlineQuantity = SizedBox(
+      width: _inlineQuantityWidth(context, quantity),
+      height: BuyV2Metrics.minimumTap,
+      child: Stack(
+        children: [
+          Positioned.fill(child: cartAction),
+          Positioned.fill(child: quantityTargets),
+        ],
+      ),
     );
     if (comparisonSummary != null) {
       return Container(
@@ -12636,50 +12651,29 @@ class BuyV2ProductCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (quantity == 0)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = MediaQuery.textScalerOf(context).scale(1);
-                  if (constraints.maxWidth >= 300 && scale <= 1.3) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: comparisonSummary!),
-                        const SizedBox(width: 8),
-                        cartAction,
-                      ],
-                    );
-                  }
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final action = quantity == 0 ? cartAction : inlineQuantity;
+                final scale = MediaQuery.textScalerOf(context).scale(1);
+                if (constraints.maxWidth >= 300 && scale <= 1.3) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      comparisonSummary!,
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: cartAction,
-                      ),
+                      Expanded(child: comparisonSummary!),
+                      const SizedBox(width: 8),
+                      action,
                     ],
                   );
-                },
-              )
-            else ...[
-              comparisonSummary!,
-              SizedBox(
-                height:
-                    BuyV2Metrics.minimumTap +
-                    (stackedQuantity
-                        ? _gridQuantityLabelHeight(
-                            MediaQuery.textScalerOf(context).scale(1),
-                          )
-                        : 0),
-                child: Stack(
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Positioned.fill(child: cartAction),
-                    Positioned.fill(child: quantityTargets),
+                    comparisonSummary!,
+                    Align(alignment: Alignment.centerRight, child: action),
                   ],
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ],
         ),
       );
@@ -12759,7 +12753,9 @@ class BuyV2ProductCard extends StatelessWidget {
                                   session: session,
                                   product: product,
                                   storeContext: storeContext,
-                                  action: quantity == 0 ? cartAction : null,
+                                  action: quantity == 0
+                                      ? cartAction
+                                      : inlineQuantity,
                                 )
                               else ...[
                                 if (!compact &&
@@ -12977,7 +12973,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                 ),
                                 if (!compact) const SizedBox(height: 6),
                               ],
-                              if (!compact || quantity > 0) cartAction,
+                              if (!compact) cartAction,
                             ],
                           ),
                         ),
@@ -12997,7 +12993,7 @@ class BuyV2ProductCard extends StatelessWidget {
                     beforeToggle: beforeSave,
                   ),
                 ),
-                if (quantity > 0)
+                if (!compact && quantity > 0)
                   Positioned(
                     left: 0,
                     right: 0,
@@ -13022,6 +13018,27 @@ class BuyV2ProductCard extends StatelessWidget {
 
 String _sellerTypeLabel(String source) => _publicProviderType(source);
 
+double _inlineQuantityWidth(BuildContext context, int quantity) =>
+    (buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width + 68)
+        .clamp(80.0, double.infinity)
+        .toDouble();
+
+double _compactQuantityWidth(
+  BuildContext context,
+  double available,
+  int quantity,
+) {
+  final label = buyV2ValueTextSize(
+    context,
+    '$quantity',
+    _gridQuantityStyle,
+  ).width;
+  return (label + 96)
+      .clamp(132.0, double.infinity)
+      .clamp(0.0, available)
+      .toDouble();
+}
+
 class _QuantityStepper extends StatelessWidget {
   const _QuantityStepper({
     super.key,
@@ -13033,7 +13050,17 @@ class _QuantityStepper extends StatelessWidget {
   final bool stacked;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Align(
+      alignment: Alignment.centerRight,
+      child: SizedBox(
+        width: _compactQuantityWidth(context, constraints.maxWidth, quantity),
+        child: _buildVisual(context),
+      ),
+    ),
+  );
+
+  Widget _buildVisual(BuildContext context) {
     final labelHeight = _gridQuantityLabelHeight(
       MediaQuery.textScalerOf(context).scale(1),
     );
@@ -13049,76 +13076,87 @@ class _QuantityStepper extends StatelessWidget {
       ),
     );
     return ExcludeSemantics(
-      child: Container(
+      child: SizedBox(
         height: BuyV2Metrics.minimumTap + (stacked ? labelHeight : 0),
-        decoration: BoxDecoration(
-          color: BuyV2Colors.softBlue,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: const Color(0x23000080)),
-        ),
-        child: stacked
-            ? Column(
-                children: [
-                  SizedBox(height: labelHeight - 2, child: value),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Center(
-                            child: Icon(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              top: 6,
+              bottom: 6,
+              child: DecoratedBox(
+                key: const ValueKey('buy-compact-quantity-pill'),
+                decoration: BoxDecoration(
+                  color: BuyV2Colors.softBlue,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0x23000080)),
+                ),
+              ),
+            ),
+            stacked
+                ? Column(
+                    children: [
+                      SizedBox(height: labelHeight - 2, child: value),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Center(
+                                child: Icon(
+                                  Icons.remove,
+                                  size: 17,
+                                  color: BuyV2Colors.navy,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Center(
+                                child: Icon(
+                                  Icons.add,
+                                  size: 17,
+                                  color: BuyV2Colors.navy,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final side = _gridQuantitySideWidth(
+                        constraints.maxWidth,
+                        buyV2ValueTextSize(
+                          context,
+                          '$quantity',
+                          _gridQuantityStyle,
+                        ).width,
+                      );
+                      return Row(
+                        children: [
+                          SizedBox(
+                            width: side,
+                            child: const Icon(
                               Icons.remove,
                               size: 17,
                               color: BuyV2Colors.navy,
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: Center(
-                            child: Icon(
+                          Expanded(child: value),
+                          SizedBox(
+                            width: side,
+                            child: const Icon(
                               Icons.add,
                               size: 17,
                               color: BuyV2Colors.navy,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      );
+                    },
                   ),
-                ],
-              )
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final side = _gridQuantitySideWidth(
-                    constraints.maxWidth,
-                    buyV2ValueTextSize(
-                      context,
-                      '$quantity',
-                      _gridQuantityStyle,
-                    ).width,
-                  );
-                  return Row(
-                    children: [
-                      SizedBox(
-                        width: side,
-                        child: const Icon(
-                          Icons.remove,
-                          size: 17,
-                          color: BuyV2Colors.navy,
-                        ),
-                      ),
-                      Expanded(child: value),
-                      SizedBox(
-                        width: side,
-                        child: const Icon(
-                          Icons.add,
-                          size: 17,
-                          color: BuyV2Colors.navy,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+          ],
+        ),
       ),
     );
   }
@@ -13149,7 +13187,26 @@ class _QuantityStepperTargets extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: EdgeInsets.only(right: visualInset),
+        child: SizedBox(
+          width: _compactQuantityWidth(
+            context,
+            constraints.maxWidth - visualInset * 2,
+            quantity,
+          ),
+          height: constraints.maxHeight,
+          child: _buildTargets(context),
+        ),
+      ),
+    ),
+  );
+
+  Widget _buildTargets(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      const visualInset = 0.0;
       const target = BuyV2Metrics.minimumTap;
       final sideWidth = stacked
           ? target

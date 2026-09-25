@@ -10,6 +10,7 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
@@ -113,6 +114,13 @@ void main() {
         await tester.tap(primary);
         await tester.pumpAndSettle();
         expect(session.quantityFor(product.id), 1);
+        final quantityPill = find.descendant(
+          of: hero,
+          matching: find.byKey(
+            const ValueKey('buy-compact-product-quantity-pill'),
+          ),
+        );
+        expect(tester.getSize(quantityPill).height, 32);
         final plus = find.descendant(
           of: hero,
           matching: find.byTooltip('Add one'),
@@ -164,6 +172,165 @@ void main() {
         ),
       ),
     );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final amount in [1000, 10000, 100000, 1000000, 10000000, 10000001]) {
+      testWidgets('A04 product price $amount complete at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        for (final id in ['s-tomato', 'w-oil']) {
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            productFactsAdapter: _ProductDetailFacts(price: amount),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          expect(session.openProduct(id), isTrue);
+          await tester.pumpWidget(
+            app(session, size: const Size(320, 844), textScale: scale),
+          );
+          await tester.pumpAndSettle();
+          for (final added in [false, true]) {
+            if (added) {
+              expect(session.addProduct(id), isTrue);
+              await tester.pumpAndSettle();
+            }
+            final price = find.byKey(ValueKey('buy-product-hero-price-$id'));
+            await reveal(tester, id, price);
+            expect(tester.widget<Text>(price).data, buyV2Money(amount));
+            final rich = find.descendant(
+              of: price,
+              matching: find.byType(RichText),
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(rich);
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(
+              boxes.map((b) => b.top).toSet(),
+              hasLength(1),
+              reason: '$id added=$added',
+            );
+            for (final box in boxes) {
+              expect(box.right, lessThanOrEqualTo(paragraph.size.width + .5));
+            }
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(tester.takeException(), isNull);
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      });
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final amount in [1000, 10000, 100000, 1000000, 10000000, 10000001]) {
+      testWidgets('A04 Offers to cart price $amount complete at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        for (final id in ['s-tomato', 'w-oil']) {
+          final core = BuySession();
+          final product = BuyV2Catalogue.products
+              .firstWhere((p) => p.id == id)
+              .copyWith(
+                price: amount,
+                storeId: 'product-detail-test-store',
+                offerClass: id == 'w-oil'
+                    ? BuyV2OfferClass.wholesale
+                    : BuyV2OfferClass.retail,
+              );
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: false,
+            commerceAdapter: _ProductDetailCommerce(product),
+            productFactsAdapter: _ProductDetailFacts(),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await session.restoreCommerce();
+          expect(session.product(id).price, amount);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: BuyV2Screen(
+                session: session,
+                initialOffersActive: true,
+                offersSource: _LargePriceOffers(id),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final add = find.byKey(ValueKey('buy-add-$id'));
+          await tester.scrollUntilVisible(
+            add,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-offers')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          final price = find.byKey(ValueKey('buy-price-highlight-$id'));
+          void expectOneLine(Finder owner) {
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: owner, matching: find.byType(RichText)).first,
+            );
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(boxes, isNotEmpty);
+            expect(boxes.map((b) => b.top).toSet(), hasLength(1));
+            expect(paragraph.didExceedMaxLines, isFalse);
+            for (final box in boxes) {
+              expect(box.right, lessThanOrEqualTo(paragraph.size.width + .5));
+            }
+          }
+
+          expectOneLine(price);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          expectOneLine(price);
+          session.openCart(scope: BuyV2CartScope.all);
+          await tester.pumpAndSettle();
+          final line = find.byKey(ValueKey('buy-cart-line-total-motion-$id'));
+          await tester.ensureVisible(line);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: line,
+              matching: find.text(buyV2Money(amount * product.minimumOrder)),
+            ),
+            findsOneWidget,
+          );
+          expectOneLine(line);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      });
+    }
   }
 
   for (final id in ['w-oil', 'm-paracetamol-500']) {
@@ -687,12 +854,15 @@ Future<void> _captureR66Product(WidgetTester tester, String label) async {
 }
 
 final class _ProductDetailFacts implements BuyV2ProductFactsAdapter {
+  _ProductDetailFacts({this.price});
+  final int? price;
   bool available = true;
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
       const BuyV2CatalogueProductFactsAdapter()
           .snapshotFor(product)
           .copyWith(
+            price: price,
             orderabilityLabel: available
                 ? 'Available now'
                 : 'Currently unavailable',
@@ -759,9 +929,29 @@ final class _ProductDetailCommerce implements BuyV2CommerceAdapter {
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
     products: [product],
+    businessVerified: true,
   );
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError(
     'Unexpected commerce mutation in product detail test',
   );
+}
+
+final class _LargePriceOffers implements BuyV2LivePublishedOffersSource {
+  _LargePriceOffers(this.productId);
+  final String productId;
+  @override
+  List<BuyV2PublishedOffer> get publishedOffers => [
+    BuyV2PublishedOffer(
+      productId: productId,
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Store offer',
+    ),
+  ];
+  @override
+  Future<BuyV2PublishedOffersSnapshot> load() async =>
+      BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.ready,
+        offers: publishedOffers,
+      );
 }

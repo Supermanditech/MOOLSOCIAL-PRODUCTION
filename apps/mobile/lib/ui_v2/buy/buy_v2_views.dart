@@ -928,6 +928,16 @@ class BuyV2ProductView extends StatelessWidget {
                                           product: product,
                                           facts: facts,
                                           decision: offerDecision!,
+                                          actionWidth:
+                                              !session.businessVerified ||
+                                                  !offerDecision.canAdd
+                                              ? double.infinity
+                                              : quantity > 0
+                                              ? _productQuantityWidth(
+                                                  context,
+                                                  quantity,
+                                                )
+                                              : 88,
                                           action: !session.businessVerified
                                               ? TextButton(
                                                   key: ValueKey(
@@ -996,18 +1006,10 @@ class BuyV2ProductView extends StatelessWidget {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
-                                                Text(
-                                                  buyV2Money(facts.price),
-                                                  key: ValueKey(
-                                                    'buy-product-hero-price-${product.id}',
-                                                  ),
-                                                  style: context.buyTitle
-                                                      .copyWith(
-                                                        color: BuyV2Colors.navy,
-                                                        fontSize: shop
-                                                            ? 28
-                                                            : 25,
-                                                      ),
+                                                _ProductHeroPrice(
+                                                  productId: product.id,
+                                                  amount: facts.price,
+                                                  fontSize: shop ? 28 : 25,
                                                 ),
                                                 Text(
                                                   !shop ||
@@ -1071,9 +1073,15 @@ class BuyV2ProductView extends StatelessWidget {
                                             if (constraints.maxWidth >=
                                                 actionWidth +
                                                     16 +
-                                                    MediaQuery.textScalerOf(
+                                                    buyV2ValueTextSize(
                                                       context,
-                                                    ).scale(130)) {
+                                                      buyV2Money(facts.price),
+                                                      context.buyTitle.copyWith(
+                                                        fontSize: shop
+                                                            ? 28
+                                                            : 25,
+                                                      ),
+                                                    ).width) {
                                               return Row(
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.center,
@@ -4059,18 +4067,57 @@ class _WholesaleTradeDecisionPanelState
   }
 }
 
+/// Keep the monetary value intact even with enlarged system text. The parent
+/// first gives long prices the full row; only then reduce display size to fit.
+class _ProductHeroPrice extends StatelessWidget {
+  const _ProductHeroPrice({
+    required this.productId,
+    required this.amount,
+    required this.fontSize,
+  });
+  final String productId;
+  final int amount;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final label = buyV2Money(amount);
+      final style = context.buyTitle.copyWith(
+        color: BuyV2Colors.navy,
+        fontSize: fontSize,
+      );
+      final width = buyV2ValueTextSize(context, label, style).width;
+      final ratio = width > 0 && constraints.maxWidth.isFinite
+          ? ((constraints.maxWidth - 1) / width).clamp(0.0, 1.0)
+          : 1.0;
+      return Text(
+        label,
+        key: ValueKey('buy-product-hero-price-$productId'),
+        style: style.copyWith(
+          fontSize: (fontSize * ratio).clamp(12.0, fontSize),
+        ),
+        maxLines: 1,
+        softWrap: false,
+      );
+    },
+  );
+}
+
 class _WholesaleTradePriceSummary extends StatelessWidget {
   const _WholesaleTradePriceSummary({
     required this.product,
     required this.facts,
     required this.decision,
     required this.action,
+    required this.actionWidth,
   });
 
   final BuyV2Product product;
   final BuyV2ProductFactsSnapshot facts;
   final BuyV2ProductOfferDecision decision;
   final Widget action;
+  final double actionWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -4078,13 +4125,10 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          buyV2Money(facts.price),
-          key: ValueKey('buy-product-hero-price-${product.id}'),
-          style: context.buyTitle.copyWith(
-            color: BuyV2Colors.navy,
-            fontSize: 25,
-          ),
+        _ProductHeroPrice(
+          productId: product.id,
+          amount: facts.price,
+          fontSize: 25,
         ),
         Text('${product.pack} · ${product.unitPrice}', style: context.buyMeta),
       ],
@@ -4096,7 +4140,14 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             if (MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
-                constraints.maxWidth < 270) {
+                constraints.maxWidth <
+                    actionWidth +
+                        8 +
+                        buyV2ValueTextSize(
+                          context,
+                          buyV2Money(facts.price),
+                          context.buyTitle.copyWith(fontSize: 25),
+                        ).width) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -19250,70 +19301,80 @@ class _CompactProductStepper extends StatelessWidget {
     return SizedBox(
       width: _productQuantityWidth(context, quantity),
       height: 44,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: BuyV2Colors.softBlue,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0x28000080)),
-        ),
-        child: Row(
-          children: [
-            SizedBox.square(
-              dimension: 44,
-              child: IconButton(
-                tooltip: quantity <= minimumOrder
-                    ? 'Remove from Cart'
-                    : 'Remove one',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 44,
-                  height: 44,
-                ),
-                onPressed: onDecrease,
-                icon: const Icon(Icons.remove, size: 20),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            top: 6,
+            bottom: 6,
+            child: DecoratedBox(
+              key: const ValueKey('buy-compact-product-quantity-pill'),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0x28000080)),
               ),
             ),
-            Expanded(
-              child: TextButton(
-                key: const ValueKey('buy-product-edit-quantity'),
-                style: TextButton.styleFrom(
+          ),
+          Row(
+            children: [
+              SizedBox.square(
+                dimension: 44,
+                child: IconButton(
+                  tooltip: quantity <= minimumOrder
+                      ? 'Remove from Cart'
+                      : 'Remove one',
                   padding: EdgeInsets.zero,
-                  minimumSize: const Size(44, 44),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                  onPressed: onDecrease,
+                  icon: const Icon(Icons.remove, size: 20),
                 ),
-                onPressed: onEdit,
-                child: Semantics(
-                  label: 'Edit quantity, ${_packCountLabel(quantity)} in Cart',
-                  excludeSemantics: true,
-                  child: BuyV2FiniteValueTransition(
-                    key: const ValueKey('buy-product-quantity-value-motion'),
-                    incomingOnly: true,
-                    stateKey: quantity,
-                    text: '$quantity',
-                    ownerSize: buyV2ValueTextSize(
-                      context,
-                      '$quantity',
-                      _productQuantityStyle,
+              ),
+              Expanded(
+                child: TextButton(
+                  key: const ValueKey('buy-product-edit-quantity'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(44, 44),
+                  ),
+                  onPressed: onEdit,
+                  child: Semantics(
+                    label:
+                        'Edit quantity, ${_packCountLabel(quantity)} in Cart',
+                    excludeSemantics: true,
+                    child: BuyV2FiniteValueTransition(
+                      key: const ValueKey('buy-product-quantity-value-motion'),
+                      incomingOnly: true,
+                      stateKey: quantity,
+                      text: '$quantity',
+                      ownerSize: buyV2ValueTextSize(
+                        context,
+                        '$quantity',
+                        _productQuantityStyle,
+                      ),
+                      style: _productQuantityStyle,
                     ),
-                    style: _productQuantityStyle,
                   ),
                 ),
               ),
-            ),
-            SizedBox.square(
-              dimension: 44,
-              child: IconButton(
-                tooltip: 'Add one',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 44,
-                  height: 44,
+              SizedBox.square(
+                dimension: 44,
+                child: IconButton(
+                  tooltip: 'Add one',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                  onPressed: onIncrease,
+                  icon: const Icon(Icons.add, size: 20),
                 ),
-                onPressed: onIncrease,
-                icon: const Icon(Icons.add, size: 20),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -21648,58 +21709,76 @@ class _CartLine extends StatelessWidget {
       ],
     );
 
-    final quantityControl = Container(
+    final quantityControl = SizedBox(
       height: (quantitySize.height + 8).clamp(44.0, double.infinity).toDouble(),
-      decoration: BoxDecoration(
-        color: BuyV2Colors.softBlue,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          IconButton(
-            tooltip: wholesale
-                ? line.quantity <= product.minimumOrder
-                      ? 'Remove ${product.customerTitle} from Cart'
-                      : 'Remove one trade pack'
-                : 'Remove one',
-            onPressed: () => session.decrease(product.id),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            icon: const Icon(Icons.remove, size: 15),
-          ),
-          TextButton(
-            key: ValueKey('buy-cart-edit-quantity-${product.id}'),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(44, 44),
-            ),
-            onPressed: () => showBuyV2QuantityEditor(context, session, product),
-            child: Semantics(
-              label:
-                  'Edit quantity of ${product.customerTitle}, ${_packCountLabel(line.quantity)} in Cart',
-              excludeSemantics: true,
-              child: BuyV2FiniteValueTransition(
-                key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
-                incomingOnly: true,
-                stateKey: line.quantity,
-                text: '${line.quantity}',
-                ownerSize: Size(
-                  quantitySize.width.clamp(44.0, double.infinity).toDouble(),
-                  quantitySize.height.clamp(28.0, double.infinity).toDouble(),
-                ),
-                style: quantityStyle,
+          Positioned.fill(
+            top: 6,
+            bottom: 6,
+            child: DecoratedBox(
+              key: ValueKey('buy-cart-quantity-pill-${product.id}'),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
-          IconButton(
-            tooltip: wholesale ? 'Add one trade pack' : 'Add one',
-            onPressed: () => session.increase(product.id),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            icon: const Icon(Icons.add, size: 15),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: wholesale
+                    ? line.quantity <= product.minimumOrder
+                          ? 'Remove ${product.customerTitle} from Cart'
+                          : 'Remove one trade pack'
+                    : 'Remove one',
+                onPressed: () => session.decrease(product.id),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                icon: const Icon(Icons.remove, size: 15),
+              ),
+              TextButton(
+                key: ValueKey('buy-cart-edit-quantity-${product.id}'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(44, 44),
+                ),
+                onPressed: () =>
+                    showBuyV2QuantityEditor(context, session, product),
+                child: Semantics(
+                  label:
+                      'Edit quantity of ${product.customerTitle}, ${_packCountLabel(line.quantity)} in Cart',
+                  excludeSemantics: true,
+                  child: BuyV2FiniteValueTransition(
+                    key: ValueKey(
+                      'buy-cart-line-quantity-motion-${product.id}',
+                    ),
+                    incomingOnly: true,
+                    stateKey: line.quantity,
+                    text: '${line.quantity}',
+                    ownerSize: Size(
+                      quantitySize.width
+                          .clamp(44.0, double.infinity)
+                          .toDouble(),
+                      quantitySize.height
+                          .clamp(28.0, double.infinity)
+                          .toDouble(),
+                    ),
+                    style: quantityStyle,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: wholesale ? 'Add one trade pack' : 'Add one',
+                onPressed: () => session.increase(product.id),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                icon: const Icon(Icons.add, size: 15),
+              ),
+            ],
           ),
         ],
       ),

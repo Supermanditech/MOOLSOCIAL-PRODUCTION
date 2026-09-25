@@ -243,6 +243,13 @@ void main() {
           of: card,
           matching: find.byKey(const ValueKey('buy-quantity-s-tomato')),
         );
+        final quantityPill = find.descendant(
+          of: quantity,
+          matching: find.byKey(const ValueKey('buy-compact-quantity-pill')),
+        );
+        expect(tester.getSize(quantityPill).width, lessThanOrEqualTo(132));
+        expect(tester.getSize(quantityPill).height, 32);
+
         expect(
           tester.getRect(photo).overlaps(tester.getRect(quantity)),
           isFalse,

@@ -415,7 +415,16 @@ void main() {
             expect(rect.height, greaterThan(70));
             expect(rect.height, closeTo(rect.width, 1));
           }
-          expect(firstRects[1].top, closeTo(firstRects.first.top, 1));
+          if (size.width == 320) {
+            expect(
+              firstRects[1].top,
+              greaterThan(firstRects.first.bottom),
+              reason:
+                  'Narrow Offers keeps complete prices and inline quantity readable in one column.',
+            );
+          } else {
+            expect(firstRects[1].top, closeTo(firstRects.first.top, 1));
+          }
           if (size.width <= 390) {
             expect(firstRects[2].top, greaterThan(firstRects.first.bottom));
           } else {

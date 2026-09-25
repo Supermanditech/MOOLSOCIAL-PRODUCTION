@@ -1109,9 +1109,8 @@ void main() {
                 ),
             ];
             final currentRects = cards(topGrid, firstPage.items);
-            for (final rect in currentRects) {
-              expect(rect.top, closeTo(currentRects.first.top, 1));
-            }
+            expect(currentRects[1].top, closeTo(currentRects.first.top, 1));
+            expect(currentRects[2].top, greaterThan(currentRects.first.bottom));
             final viewport = tester.getRect(scroll);
             final gesture = await tester.startGesture(
               Offset(280, viewport.top + 230),
@@ -1125,7 +1124,10 @@ void main() {
             final previewRects = cards(incoming, nextPage.items);
             expect(previewRects[1].top, closeTo(previewRects[0].top, 1));
             expect(previewRects[2].top, greaterThan(previewRects[0].top));
-            expect(previewRects[0].width, greaterThan(currentRects[0].width));
+            expect(
+              previewRects[0].width,
+              greaterThanOrEqualTo(currentRects[0].width),
+            );
             previewId = nextPage.items.first.id;
             previewWidth = previewRects.first.width;
             final highlight = find.descendant(
@@ -1551,12 +1553,14 @@ void main() {
                   ),
                 )
                 .toList();
-            expect(rects[1].top, closeTo(rects[0].top, 1));
-            expect(rects[1].left, greaterThan(rects[0].right));
             final columns =
-                destination == BuyV2Destination.wholesale || width == 320
-                ? 2
-                : 3;
+                destination == BuyV2Destination.wholesale && width == 320
+                ? 1
+                : 2;
+            if (columns > 1) {
+              expect(rects[1].top, closeTo(rects[0].top, 1));
+              expect(rects[1].left, greaterThan(rects[0].right));
+            }
             if (columns == 3) {
               expect(rects[2].top, closeTo(rects[0].top, 1));
               expect(rects[2].left, greaterThan(rects[1].right));
@@ -4769,7 +4773,7 @@ void main() {
       ];
       final firstRow = previewCards.take(3).map(tester.getRect).toList();
       expect(firstRow[1].top, closeTo(firstRow[0].top, .5));
-      expect(firstRow[2].top, closeTo(firstRow[0].top, .5));
+      expect(firstRow[2].top, greaterThan(firstRow[0].bottom));
       expect(
         tester.getRect(previewCards[3]).top,
         greaterThan(firstRow[0].bottom),
@@ -4803,7 +4807,7 @@ void main() {
         await tester.ensureVisible(card);
         await tester.pumpAndSettle();
         expect(card, findsOneWidget);
-        expect(tester.getSize(card).width, inInclusiveRange(90, 390 / 3));
+        expect(tester.getSize(card).width, inInclusiveRange(134, 390 / 2));
         final title = find.descendant(
           of: card,
           matching: find.text(product.customerTitle),

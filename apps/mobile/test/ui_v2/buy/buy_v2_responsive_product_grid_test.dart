@@ -18,6 +18,107 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final scale in [1.0, 2.0]) {
+    for (final amount in [
+      1000,
+      10000,
+      100000,
+      1000000,
+      10000000,
+      100001,
+      1000001,
+      10000001,
+    ]) {
+      testWidgets('A04 full price $amount beside quantity scale $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 711);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        for (final destination in [
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+        ]) {
+          final original = BuyV2Catalogue.products.firstWhere(
+            (p) => p.destination == destination,
+          );
+          final product = original.copyWith(price: amount);
+          for (final added in [false, true]) {
+            if (added) {
+              expect(session.addProduct(product.id), isTrue);
+              expect(session.quantityFor(product.id), greaterThan(0));
+            }
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!,
+                ),
+                home: Scaffold(
+                  body: SingleChildScrollView(
+                    child: BuyV2ProgressiveProductGrid(
+                      session: session,
+                      products: [
+                        product,
+                        original.copyWith(id: '${original.id}-other'),
+                      ],
+                      storageKey: 'large-price-${destination.name}',
+                      semanticLabel: 'Products',
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final highlight = find.byKey(
+              ValueKey('buy-price-highlight-${product.id}'),
+            );
+            final paragraphFinder = find.descendant(
+              of: highlight,
+              matching: find.byType(RichText),
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(
+              paragraphFinder,
+            );
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(boxes, isNotEmpty);
+            expect(
+              boxes.map((b) => b.top).toSet(),
+              hasLength(1),
+              reason:
+                  'Full monetary value must stay on one line: $destination, added=$added',
+            );
+            expect(paragraph.didExceedMaxLines, isFalse);
+            for (final box in boxes) {
+              expect(box.left, greaterThanOrEqualTo(-0.1));
+              expect(box.right, lessThanOrEqualTo(paragraph.size.width + .5));
+            }
+            final row = find.byKey(
+              ValueKey('buy-price-action-row-${product.id}'),
+            );
+            expect(
+              tester.getRect(highlight).right,
+              lessThanOrEqualTo(tester.getRect(row).right),
+            );
+            expect(tester.takeException(), isNull);
+          }
+        }
+      });
+    }
+  }
+
   for (final count in [1, 4, 8, 9]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
@@ -696,7 +797,7 @@ void main() {
                 )..layout();
                 expect(
                   measured.width,
-                  lessThanOrEqualTo(paragraph.size.width + .1),
+                  lessThanOrEqualTo(paragraph.size.width + .5),
                   reason: 'Featured badge words must remain intact: $word',
                 );
                 measured.dispose();
@@ -1001,7 +1102,7 @@ void main() {
         final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
         expect(firstCard, findsOneWidget, reason: '$size first card');
         final firstRect = tester.getRect(firstCard);
-        final columns = size.width == 320 ? 2 : 3;
+        const columns = 2;
         expect(
           firstRect.width,
           closeTo((size.width - 20 - (columns - 1) * 7) / columns, .1),
@@ -1117,6 +1218,35 @@ void main() {
           reason: '$size must not leave a dead block below SKU details',
         );
         expect(tester.takeException(), isNull, reason: '$size overflow');
+        await tester.tap(add);
+        expect(session.quantityFor(products[0].id), products[0].minimumOrder);
+        // This isolated grid has no screen/session ListenableBuilder owner.
+        await tester.pumpWidget(
+          app(session: session, products: products, size: size, textScale: 1),
+        );
+        await tester.pumpAndSettle();
+        final quantity = find.descendant(
+          of: firstCard,
+          matching: find.byKey(ValueKey('buy-quantity-${products[0].id}')),
+        );
+        final priceRow = find.byKey(
+          ValueKey('buy-price-action-row-${products[0].id}'),
+        );
+        expect(
+          find.descendant(of: priceRow, matching: quantity),
+          findsOneWidget,
+        );
+        expect(
+          tester.getRect(quantity).left,
+          greaterThanOrEqualTo(tester.getRect(price).right),
+        );
+        expect(
+          tester.getRect(firstCard).height,
+          lessThanOrEqualTo(firstRect.height + 1),
+          reason:
+              'Adding must not create a quantity footer or increase the SKU card height',
+        );
+        expect(tester.takeException(), isNull);
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
