@@ -2613,3 +2613,86 @@ Fresh focused replay closes a coverage gap in the selected cumulative ledger: al
 PDP05-A03 is local_passed with targeted Redmi verification, founder approval separate. Counts now56 references=19 originals+37follow-ups;20 follow-ups verified and36 pending full qualification=19 originals+17follow-ups. No original parent fully closed. Temporary probe source and30screens480–509 retained under product-details-recovery-qualified-20260925/ in existing archive, SHA256de92dcbe678c50cbaa18cd73bd40bbdf871a55ccb88252d0ee7a2ff69120f277. Hot reload returned review app to home, so restoration alone was not accepted as retry evidence; the one-failure probe avoided reload between error and recovery. Short transitional captures501/499 are not relied on for route acceptance; settled509 proves Bulk return. Repeated Bulk review catalogue cards visible503 remain an observation for existing catalogue/discovery audit, not silently marked corrected.
 
 Flutter test regenerated package_graph.json with ordering-only changes; package names, versions and dependencies verified identical. Generated output retained in the evidence archive; original tracked graph restored. No dependency change.
+
+
+### Provider-driven variant and gallery expansion — 25 September 2026
+
+Founder request: support the actual provider-supplied product portfolio across Buy/Shop, Wholesale, Bulk, Offers and Store; arbitrary applicable colour/size/storage choices and multiple variant photos. Research/registration authorized; new implementation requires exact selection/owner admission. Backend remains deferred. This is a provider implementation handoff, NOT an instruction to merge or integrate Cursor/Buy worktrees. Codex should implement Store-owned data entry/validation/publication seams in its own authorized lane, then return schema mapping, source commit and tests. Current Store implementation has not been freshly audited in this appendix; provider items below are requirements to reconcile, not assertions that every field is absent.
+
+Decision: a million SKUs requires consistent IDs, category applicability and bounded queries. Do not put every possible field on every product form or load the whole catalogue on a phone. Product families describe shared facts; variants identify selectable sellable configurations; Store offers own commercial terms. Lot/serial fulfilment facts remain separate. Category examples do not activate deferred categories, regulated products or manufacturer/distributor accounts.
+
+Research basis (primary references, accessed25September2026):
+- [Google product data specification](https://support.google.com/merchants/answer/7052112?hl=en): stable item identity, explicit variant grouping, product images and separate commercial fields. This is feed guidance, not a universal legal checklist.
+- [Schema.org ProductGroup](https://schema.org/ProductGroup): a family declares which dimensions distinguish its variants. [Product](https://schema.org/Product) and [Offer](https://schema.org/Offer) distinguish product characteristics from the commercial offer.
+- [Shopify high-variant guidance](https://shopify.dev/docs/storefronts/themes/product-merchandising/variants/support-high-variant-products): fetching every variant is unsuitable for large families; resolve relevant options/combinations on demand. Its platform limits are not MoolSocial limits.
+- [GS1 attribute implementation guide](https://ref.gs1.org/guidelines/gdm-implementation/1.0.0/): shared product attributes support listing, ordering, logistics and customer information. Consult the current applicable standard before claiming GS1 conformance.
+The contract and UI decisions below are MoolSocial engineering recommendations based on founder requirements and current code, not copied vendor requirements.
+
+#### Field ownership and proposed contract
+
+Exact wire names are proposed until reconciled with Store; reuse equivalent existing fields rather than duplicate them.
+
+| Entity / owner | Fields and types to map | Public use / boundary |
+|---|---|---|
+| Product family, authorized catalogue editor | familyId:string; categoryId:string; schemaVersion:int; brand/model; localized title/description; GTIN/MPN where applicable; revision:string; publication state | Shared identity and facts; never use display names as keys. Retailer Store branch identity remains independent of manufacturer/brand. |
+| Attribute definition, category schema owner | attributeId; localized label; type(enum/multi-enum/string/number/boolean/measurement/date); unit; option IDs/labels; scope(family/variant/offer/lot); required/applicable rule; selectable/filterable/searchable/display flags; order | Drives category-specific editor and public sections. Distinguish missing from zero/false/not-applicable. Allow controlled extensions, not arbitrary executable UI/schema expressions. |
+| Variant / exact SKU, authorized Store catalogue editor | skuId; familyId; selected attributeId->optionId map; packId; barcode; condition; status; revision | One exact combination, no duplicate combination in same identity scope. Preserve other choices when changing one dimension; do not invent the full Cartesian matrix. |
+| Media, authorized Store catalogue editor | assetId; exact family/SKU applicability; ordered image IDs; primary; rendition URLs; dimensions/mime; alt text; media revision; publication/admission status; explicit shared-image fallback | Variant gallery/thumbnail/hero update together. Different colour usually needs different applicable imagery; size/storage may share images only when provider declares applicability. No stale previous-SKU image; no unsupported seller upload considered approved. |
+| Store offer, authorized Retailer/Grocery Store owner | offerId; storeId/branchId; skuId; channel; currency; precise price amount/basis; MRP/compare-price basis; promotion validity; quantity tiers; revision; observedAt/validUntil | Current displayed price belongs to exact seller/channel/pack. Discount and price-drop claims require valid comparable source values/history. Internal cost/margin/supplier invoices stay private. |
+| Sale quantity and pack, Store owner | selling unit; net content value/unit; units-per-pack; inner/case hierarchy; min/max order; quantity step; unit-price basis; variable-weight flag and settlement status | Explain piece versus case versus weight. Validate conversions; never multiply an unverified conversion or present estimated weight as final billed quantity. Variable-weight checkout rules need a separate authoritative contract before activation. |
+| Availability and fulfilment, authorized Store operations | published/orderable status; stock state; permitted quantity; location/channel scope; lead time; supported delivery/collection; charges/conditions; COD eligibility; snapshot revision/expiry | Unknown is not sold out or available. Do not expose private bin-level stock or promise delivery from a product label. Existing eligibility/checkout checks remain authoritative. |
+| Assurance and declarations, authorized catalogue/policy owners | applicable returns/warranty IDs and terms; manufacturer/packer/importer; origin; net quantity; customer-care; category declarations; policy revision | One compact details/assurance owner. Show provided verified declarations; do not invent compliance badges. Applicable jurisdiction/category validation must be confirmed separately, not inferred from this research. |
+| Lot/serial inventory and order snapshot, Store fulfilment | lot/batch; actual manufacture/expiry dates; serial where applicable; reserved/fulfilled quantity; immutable purchased SKU/options/pack/price snapshot | Batch facts are not selectable variants by default. Public pre-purchase shelf-life promises must have an actual allocation rule. Preserve historical invoice/order facts when catalogue changes. |
+
+#### Portfolio examples and how they should appear
+
+Only display fields supplied and applicable to the selected category. The following are modelling examples; deferred categories remain disabled until authorized.
+
+| Portfolio | Possible selectable dimensions | Details rather than selector boxes |
+|---|---|---|
+| Grocery / packaged household goods | weight/volume, pack count, flavour, formulation, grade when separately sold | ingredients, allergens, nutrition, storage instructions, shelf-life basis, manufacturer and net content |
+| Clothing / footwear | colour, size, fit, length, material/pattern only when sold as distinct SKUs | size system/chart, measurements, composition, care instructions |
+| Electronics / appliances | colour, storage, RAM, capacity, connectivity, configuration when separately sold | model, compatibility, voltage/power, dimensions, included accessories, warranty |
+| Beauty / personal care | shade, fragrance, formulation, volume, pack | ingredients, suitability, directions and supplied warnings; no inferred health claims |
+| Home / hardware / stationery | dimensions, finish, material, thread/gauge, pages, ruling, set count | assembly, fit/compatibility, technical measurements and care |
+| Bundled / bulk offers | exact pack or approved bundle configuration | component quantities and substitutions policy, case/unit conversion, MOQ and tier basis |
+
+A feature becomes a selector only when changing it identifies a separately orderable configuration. Six colours and six sizes do not prove36 sellable SKUs. Three published colours must yield three options; five storage options must yield five, with unavailable combinations explained and Add disabled. With many options, show a compact horizontally scrollable row or searchable choice view as appropriate, selected value always identifiable and reachable at200percent text. Do not add boxes for irrelevant dimensions. Public product facts, price summary and details must not repeat the same content.
+
+#### Eight public tickets and matching provider deliverables
+
+All eight are registered in config/buy-founder-regression.json as open, unimplemented and locally untested. They extend existing parents; earlier implemented pieces must be reused. Tickets are not selected for code mutation by this research update.
+
+| Public ticket | Outcome and existing owner | Codex Store deliverable / dependency |
+|---|---|---|
+| BUY-CATALOGUE-20260925-01 | Typed category attributes and applicability; reuse BuyV2Product/BuyV2ProductSpecification and details renderer | Category editor/validation schema with stable IDs, types, units, required/applicable rules and public/private classification; field mapping to current Store owners |
+| BUY-CATALOGUE-20260925-02 | Complete family/option selector; reuse productVariantsFor and resolveVariantOption | Family option discovery plus exact-combination resolution independent of catalogue pages; revision/completeness/cursors and sparse-combination availability |
+| BUY-CATALOGUE-20260925-03 | Exact selected-SKU ordered gallery; reuse media binding/policy and gallery | Multiple uploads, ordering, primary image, exact variant applicability, approved shared fallback, publication/media revision |
+| BUY-CATALOGUE-20260925-04 | Correct pack/unit/MOQ/tier display and selection; reuse product/offer/cart contracts | Validated pack hierarchy, quantity steps/bounds, precise price basis and conversion; no inferred variable-weight settlement |
+| BUY-CATALOGUE-20260925-05 | Relevant category details/size chart/compatibility and declarations shown once | Structured supplied facts and policy links, category validation and required-field publication errors; do not force every category into one giant form |
+| BUY-CATALOGUE-20260925-06 | One consistent selected offer and honest stock/price/fulfilment refresh | Revision-bound SKU+Store+channel+location snapshot; update/conflict/unavailable responses, actual promotion/stock/policy validity |
+| BUY-CATALOGUE-20260925-07 | Bounded million-SKU discovery, scoped search/facets and cache | Indexed server queries/pagination/facet contract, snapshot revisions, expired-cursor recovery, exact-ID lookup; provider indexing/capacity tests separately required |
+| BUY-CATALOGUE-20260925-08 | Same selection/cart identity across all five entry paths and saved/order returns | Stable identities through edits/unpublish, publication events/revisions and immutable purchase snapshots; never recycle SKU IDs |
+
+Dependency order:01 schema mapping;02/03/04/05 on that mapping;06 reconciles authoritative offer facts;07 builds on indexed query/facet contract;08 verifies connected journeys over all preceding contracts. Store implementation must follow its own ownership/admission gates. A manufacturer/supplier supplying content does not automatically obtain Retailer publishing or stock permissions.
+
+#### Current Buy code evidence and known gaps
+
+- apps/mobile/lib/features/buy/buy_v2_models.dart has BuyV2VariantAttribute with dimensionId/optionId and colour,size,storage,pack,other kinds. resolveVariantOption requires same family,destination,Store and other selected dimensions; ambiguous matches return no result. Reuse it.
+- apps/mobile/lib/features/buy/buy_v2_session.dart productVariantsFor currently uses _knownCatalogueProducts. This cannot prove full-family completeness when options live on unloaded pages. Ticket02 must add a bounded family/option contract rather than loading the million-SKU catalogue or presenting a partial subset as complete.
+- apps/mobile/lib/features/buy/buy_v2_content_contracts.dart already owns media/size chart/price history/content states, published offers, eligibility and catalogue pages. BuyV2CataloguePage has queryKey,snapshotId,cursors,totalCount; existing page and exact-ID request bounds remain intact. Extend existing owners, not another catalogue.
+- Shared apps/mobile/lib/ui_v2/buy/buy_v2_views.dart builds dimension selectors from attributes, not Offers-only UI. Current focused variant tests chiefly cover two colours/two storage options. More-than-six choices, additional size dimension and every entry path still need explicit qualification.
+- Existing BuyV2ProductCompliance has manufacturer/packer/importer/origin/net-content/date/customer-care fields. Map these before introducing duplicates. Store-side completeness is not asserted by this Buy audit.
+
+#### Acceptance, scale and error contract
+
+Public fixtures must cover1,2,3,4,5,6,12 options per relevant dimension; exact3colour/5storage family; sparse combinations; long/localized labels; normal/200percent text; multiple photos with unequal gallery lengths; late response after rapid selection; withdrawn media/SKU; expired offer; Back, Cart and process restore. Repeat across Buy,Wholesale,Bulk,Offers,Store without copying screens. One scoped server response must identify query/family,Store/channel/location where applicable,revision/completeness,selected combination and recovery state. Names/labels are not identity. Backend actions remain deferred and cannot be simulated as production success.
+
+For million-SKU qualification, generate a logical on-demand source without a million resident objects. Verify bounded pages, cache eviction, thumbnail loading, exact-ID restoration and cancellation/ignoring stale results. Measure Redmi time to first usable results, frame jank, memory, bytes and request counts. Publish measured results and agreed budgets before capacity acceptance. Backend indexing/load tests are a distinct future gate; a local synthetic pass does not prove production scale.
+
+Codex return checklist: existing Store field->agreed public field mapping; schema examples for grocery,phone and size/colour product; editable versus computed/private ownership; publication validation failures; family/option API contract; media applicability and revision behavior; change/unpublish lifecycle; source commit and tests. Do not merge Cursor worktree, copy credentials or activate backend from this note.
+
+Reconciliation after registration:64 references=19 originals+45 children/follow-ups.20 follow-ups retain targeted verification;44 references pending full qualification, including these8 new unimplemented/untested requirement tickets. Original parents still open; founder acceptance separate. Quantity child audit remains pending and resumes after this registration checkpoint.
+
+
+Founder follow-up: apply all eight tickets across Buy/Shop,Wholesale,Bulk,Offers,Store and every applicable public surface. Sequential frontend implementation is now explicitly authorized, subject to exact ticket selection/owner andcontract gates. Each ticket has a mandatory all-surfaces case including Cart,Saved andproduct-return navigation. Earlier registration-only wording describes the initial research request and is superseded by this authorization; ticket status remains open/unimplemented/untested. Reuse shared owners;display only provider-supported applicable fields,never force phone selectors onto groceries. Provider work remains Codex Store-lane handoff;no worktree integration requested.

@@ -6996,7 +6996,8 @@
       "children": [
         "BUY-PDP-REF-20260924-01-A01",
         "BUY-PDP-REF-20260924-01-A02",
-        "BUY-PDP-REF-20260924-01-A03"
+        "BUY-PDP-REF-20260924-01-A03",
+        "BUY-CATALOGUE-20260925-03"
       ],
       "dependencies": [
         "Approved Store/catalogue multi-photo source, order and exact-pack bindings; live media publication remains provider work.",
@@ -7126,6 +7127,39 @@
         },
         "caseCount": 6,
         "scope": "Exact registered acceptance cases only; native/provider/founder status remains separate."
+      },
+      "founderVariantGalleryExpansion20260925": {
+        "date": "2026-09-25",
+        "status": "registered_pending_implementation_and_qualification",
+        "authority": "Founder requests provider-driven variable colour/size/storage counts, multiple photos and variant-dependent changes across all public commerce paths; Store implementation notes for Codex handoff.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Product page",
+          "Cart exact selected SKU and return"
+        ],
+        "requirements": [
+          "Render actual published provider options, not hardcoded iPhone/demo counts:3 colours means3;5 storage options means5. Cover1,2,3,4,5,6 and more than6 options.",
+          "Render only dimensions applicable to product:colour,size,storage,pack and other named attributes. No invented dimensions or duplicate selectors.",
+          "Resolve one exact same-Store same-family SKU preserving other selections. Sparse/unavailable combinations cannot silently change other options or authorize Add.",
+          "Selecting a valid option updates gallery, thumbnail selection, title/variant summary,current price,MRP/discount,unit/pack price,stock,MOQ,delivery,returns/specifications and cart identity together.",
+          "Show ordered multiple approved images per SKU;reset/clamp photo position when media set changes. No prior variant image leakage. Family image fallback only when explicitly permitted;otherwise honest placeholder/error/retry.",
+          "All provider-published family options must be discoverable beyond current catalogue page. Define complete-family loading/error/retry and availability boundary;never present an incomplete loaded-page subset as full options.",
+          "Compact scrollable selectors with visible selection, option-specific price and availability,accessible touch targets,long labels and200percent text. No fixed six-option ceiling."
+        ],
+        "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+        "testsRequired": [
+          "All5 entry paths -> product selection -> Cart -> Back",
+          "6plus colours,6plus sizes,6plus storage;provider exact3colour/5storage fixture",
+          "Sparse matrix,disabled/withdrawn variant,duplicate IDs/crossStore isolation",
+          "Multiple photos anddifferent photo counts per variant,selected last photo -> short gallery",
+          "Family options beyond initial catalogue page;loading/error/retry",
+          "Normal/enlarged text,navigation/cart persistence and child-impact checks"
+        ],
+        "boundary": "Extend existing PDP01/PDP02 acceptance, not duplicate tickets or claim already tested. Store workspace changes remain a Codex provider-lane handoff; backend deferred."
       }
     },
     {
@@ -7303,7 +7337,11 @@
         "BUY-PDP-REF-20260924-02-A02",
         "BUY-PDP-REF-20260924-02-A03",
         "BUY-PDP-REF-20260924-02-A04",
-        "BUY-PDP-REF-20260924-02-A05"
+        "BUY-PDP-REF-20260924-02-A05",
+        "BUY-CATALOGUE-20260925-02",
+        "BUY-CATALOGUE-20260925-04",
+        "BUY-CATALOGUE-20260925-06",
+        "BUY-CATALOGUE-20260925-08"
       ],
       "dependencies": [
         "Existing R6633-D05 comparison and D08/D09 delivery/quote contracts",
@@ -7502,6 +7540,39 @@
         },
         "caseCount": 7,
         "scope": "Exact registered acceptance cases only; native/provider/founder status remains separate."
+      },
+      "founderVariantGalleryExpansion20260925": {
+        "date": "2026-09-25",
+        "status": "registered_pending_implementation_and_qualification",
+        "authority": "Founder requests provider-driven variable colour/size/storage counts, multiple photos and variant-dependent changes across all public commerce paths; Store implementation notes for Codex handoff.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Product page",
+          "Cart exact selected SKU and return"
+        ],
+        "requirements": [
+          "Render actual published provider options, not hardcoded iPhone/demo counts:3 colours means3;5 storage options means5. Cover1,2,3,4,5,6 and more than6 options.",
+          "Render only dimensions applicable to product:colour,size,storage,pack and other named attributes. No invented dimensions or duplicate selectors.",
+          "Resolve one exact same-Store same-family SKU preserving other selections. Sparse/unavailable combinations cannot silently change other options or authorize Add.",
+          "Selecting a valid option updates gallery, thumbnail selection, title/variant summary,current price,MRP/discount,unit/pack price,stock,MOQ,delivery,returns/specifications and cart identity together.",
+          "Show ordered multiple approved images per SKU;reset/clamp photo position when media set changes. No prior variant image leakage. Family image fallback only when explicitly permitted;otherwise honest placeholder/error/retry.",
+          "All provider-published family options must be discoverable beyond current catalogue page. Define complete-family loading/error/retry and availability boundary;never present an incomplete loaded-page subset as full options.",
+          "Compact scrollable selectors with visible selection, option-specific price and availability,accessible touch targets,long labels and200percent text. No fixed six-option ceiling."
+        ],
+        "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+        "testsRequired": [
+          "All5 entry paths -> product selection -> Cart -> Back",
+          "6plus colours,6plus sizes,6plus storage;provider exact3colour/5storage fixture",
+          "Sparse matrix,disabled/withdrawn variant,duplicate IDs/crossStore isolation",
+          "Multiple photos anddifferent photo counts per variant,selected last photo -> short gallery",
+          "Family options beyond initial catalogue page;loading/error/retry",
+          "Normal/enlarged text,navigation/cart persistence and child-impact checks"
+        ],
+        "boundary": "Extend existing PDP01/PDP02 acceptance, not duplicate tickets or claim already tested. Store workspace changes remain a Codex provider-lane handoff; backend deferred."
       }
     },
     {
@@ -8162,7 +8233,9 @@
       "children": [
         "BUY-PDP-REF-20260924-05-A01",
         "BUY-PDP-REF-20260924-05-A02",
-        "BUY-PDP-REF-20260924-05-A03"
+        "BUY-PDP-REF-20260924-05-A03",
+        "BUY-CATALOGUE-20260925-01",
+        "BUY-CATALOGUE-20260925-05"
       ],
       "dependencies": [
         "Current Store/public content projection and approved revision delivery",
@@ -8477,7 +8550,8 @@
         "BUY-PDP-REF-20260924-06-A01",
         "BUY-PDP-REF-20260924-06-A02",
         "BUY-PDP-REF-20260924-06-A03",
-        "BUY-PDP-REF-20260924-06-A04"
+        "BUY-PDP-REF-20260924-06-A04",
+        "BUY-CATALOGUE-20260925-07"
       ],
       "dependencies": [
         "Current catalogue visibility and discovery adapters; account-scoped history persistence where required",
@@ -12878,6 +12952,596 @@
         "founderApproval": "pending"
       },
       "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-01",
+      "title": "Category-specific typed product attributes",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-05"
+      ],
+      "children": [],
+      "founderRequirement": "Separate product facts, selectable dimensions, seller offer terms and lot/fulfilment facts; use category applicability and typed units, not one giant universal form.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Separate product facts, selectable dimensions, seller offer terms and lot/fulfilment facts; use category applicability and typed units, not one giant universal form.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-01-1",
+          "route": "Category rendering",
+          "state": "food/apparel/electronics/household fixtures",
+          "expected": "Only applicable supplied facts appear once; unknown is distinct from false/zero; required missing facts fail publication/readiness honestly.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-01-2",
+          "route": "Attribute schema",
+          "state": "unknown schema,duplicate keys,units and translated labels",
+          "expected": "Stable IDs survive label changes; invalid or unknown required types fail closed without crashing or exposing internal fields.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-01-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": []
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-02",
+      "title": "Complete provider variant families and scalable selectors",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-02"
+      ],
+      "children": [],
+      "founderRequirement": "Expose actual provider option sets beyond loaded catalogue pages; preserve exact SKU and all unmodified selections.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Expose actual provider option sets beyond loaded catalogue pages; preserve exact SKU and all unmodified selections.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-02-1",
+          "route": "Many options",
+          "state": "1 through6 and12 choices per applicable dimension;3colour/5storage family",
+          "expected": "Exact provider counts and selected state; all options reachable at1x/2x; no fixed six cap or fabricated Cartesian combinations.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-02-2",
+          "route": "Sparse and paged family",
+          "state": "variant on later page;missing,duplicate,foreignStore and withdrawn combinations",
+          "expected": "Bounded family/option resolution with completeness/revision; unavailable combination disables Add; retry preserves selection; no automatic option substitution.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-02-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-03",
+      "title": "Exact variant multi-image gallery",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-01"
+      ],
+      "children": [],
+      "founderRequirement": "Bind each ordered photo gallery to exact supplier/Store/SKU and media revision; switch it atomically with variants.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Bind each ordered photo gallery to exact supplier/Store/SKU and media revision; switch it atomically with variants.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-03-1",
+          "route": "Photo changes",
+          "state": "colour/size/storage change;7photos to1photo;last photo selected",
+          "expected": "Correct new hero and thumbnails; index resets/clamps; no previous variant flash or wrong image cache reuse.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-03-2",
+          "route": "Photo failures",
+          "state": "zero photos,withdrawn media,failed image,slow earlier response",
+          "expected": "Honest fallback/retry,late response cannot overwrite selected SKU; shared family photo only with explicit provider applicability.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-03-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-04",
+      "title": "Pack units quantity and wholesale price basis",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-02"
+      ],
+      "children": [],
+      "founderRequirement": "Keep SKU option identity separate from order quantity,case composition and quoted unit; support authorized pack/MOQ/tier metadata.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Keep SKU option identity separate from order quantity,case composition and quoted unit; support authorized pack/MOQ/tier metadata.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-04-1",
+          "route": "Pack decisions",
+          "state": "piece,500g,1kg,case10x500g;quantity steps andMOQ",
+          "expected": "Display sell unit/net content/case quantity clearly;unit conversion and quantity step validated;Cart stores exact chosen pack.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-04-2",
+          "route": "Trade pricing",
+          "state": "tier boundary,missing conversion,large price andfreight/tax unknown",
+          "expected": "No false landed totals or made-up unit price; display provider basis andvalidity;pendingvariable-weight settlement cannot be treated as final.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-04-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-05",
+      "title": "Category facts specifications and purchase guidance",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-05"
+      ],
+      "children": [],
+      "founderRequirement": "Render compact category-dependent highlights/specifications,compatibility,size charts,care,ingredients and supplied compliance without duplicating summary.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Render compact category-dependent highlights/specifications,compatibility,size charts,care,ingredients and supplied compliance without duplicating summary.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-05-1",
+          "route": "Details content",
+          "state": "food ingredients/allergens;clothing size system/care;electronics compatibility/warranty",
+          "expected": "Distinct relevant fields grouped once;valid units/labels;no claims inferred from names/images;size chart bound to product.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-05-2",
+          "route": "Missing and extended text",
+          "state": "long localized values,200percent,missing required declaration,provider correction",
+          "expected": "Optional absent sections collapse;required unavailable information remains truthful;revision replaces oldfacts and preservesnavigation.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-05-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-06",
+      "title": "Selected offer stock price and fulfilment consistency",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-02"
+      ],
+      "children": [],
+      "founderRequirement": "Variant selection updates exact seller offer price,MRP,stock/orderability,MOQ,delivery,returns and eligibility as one revision-bound result.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Variant selection updates exact seller offer price,MRP,stock/orderability,MOQ,delivery,returns and eligibility as one revision-bound result.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-06-1",
+          "route": "Offer race",
+          "state": "rapid A-B-A selection,late replies,changedStore/channel/location",
+          "expected": "Only latest matching SKU/offer/location revision updates UI;stock unknown differs from soldout;no mixed photos/prices.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-06-2",
+          "route": "Checkout refresh",
+          "state": "expired price/discount,stock change,return policy change",
+          "expected": "Show changes and revalidate before proceeding;no invented savings,COD,deliverypromise or automaticpaid checkout;frontendpendingstates preserved.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-06-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-07",
+      "title": "Million-SKU bounded discovery and category facets",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-06"
+      ],
+      "children": [],
+      "founderRequirement": "Reuse cursor/snapshot catalogue paging and add applicable remote facets;never download or enumerate whole catalogue/family on device.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "Reuse cursor/snapshot catalogue paging and add applicable remote facets;never download or enumerate whole catalogue/family on device.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-07-1",
+          "route": "Scale fixture",
+          "state": "logical1000000SKU source withbounded on-demand pages;rapidquery/filter changes",
+          "expected": "Respect existing page/request limits;bounded retained pages/images;no total-size allocation;discard latequery results;exactIDreturnaftereviction.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-07-2",
+          "route": "Facet truth",
+          "state": "category-specific facets,zeroresults,unknown totals,withdrawals,cursor expiry",
+          "expected": "Provider supplies scoped facetvalues/counts andquery revision;no globalcounts fromloaded page;refresh/retry preservesvalidfilters andStore scope.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-07-3",
+          "route": "Measurement",
+          "state": "longscroll/search/variantselection onRedmi",
+          "expected": "Recordfirstusableframe,framejank,peakmemory,network/page counts andcache size;no million-SKU productioncapacityclaimfromsyntheticlocalpass.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-07-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
+    },
+    {
+      "id": "BUY-CATALOGUE-20260925-08",
+      "title": "Variant identity through all entry paths cart and saved state",
+      "kind": "requirement_ticket",
+      "status": "open",
+      "parents": [
+        "BUY-PDP-REF-20260924-02"
+      ],
+      "children": [],
+      "founderRequirement": "One variant experience across Buy,Wholesale,Bulk,Offers,Store;carry exactSKU/Store/offer/options/pack throughcart,saved,orders andreturn.",
+      "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"
+      ],
+      "implementationAuthorized": true,
+      "founderApproval": null,
+      "executionAssessment": {
+        "actor": "Public buyer of an authorized Retailer/Grocery Store listing",
+        "classification": "mvp_supporting",
+        "reason": "Founder requested broad portfolio catalogue research and concrete public/provider tickets.",
+        "reuse": "Extend existing BuyV2Product,content/offer/catalogue contracts,shared productpage andcurrent tests;no duplicate screens/state owners.",
+        "scope": "One variant experience across Buy,Wholesale,Bulk,Offers,Store;carry exactSKU/Store/offer/options/pack throughcart,saved,orders andreturn.",
+        "exclusions": "No Store worktree merge/edit,new actor/category activation,backend/provisioning orAPK. Provider-side implementation remains Codex handoff. Nonlaunch category examples deferred.",
+        "dependencies": "Provider field/schema contract and exact owner admission before implementation;execute in stated dependency order.",
+        "verification": "Specified local/native cases plus impacted child checks;full provider integration separately deferred.",
+        "authority": "Founder explicitly directs application across Buy,Wholesale,Offers,Store and all applicable surfaces on25September2026. Sequential frontend implementation authorized;exact selection/claims andprovider contract gates still apply.",
+        "publicSurfaces": [
+          "Buy/Shop",
+          "Wholesale",
+          "Bulk",
+          "Offers",
+          "Store-specific catalogue",
+          "Shared product page",
+          "Cart",
+          "Saved",
+          "Product-return navigation"
+        ],
+        "applicability": "All applicable surfaces are mandatory acceptance;render only category/provider-supported fields. Reuse shared owners,not separate screen copies."
+      },
+      "cases": [
+        {
+          "id": "BUY-CATALOGUE-20260925-08-1",
+          "route": "Cross-surface journey",
+          "state": "all5entrypaths -> select ->Add ->Cart ->Back;processrestore",
+          "expected": "Exact selected variant/photos/pricebasis/quantity retained;no duplicate productroute or crossStore substitution.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-08-2",
+          "route": "Lifecycle changes",
+          "state": "renamed option,unpublished variant,stale saved/cart reference,source revision conflict",
+          "expected": "Stable IDs survive label changes;withdrawn item unavailable withexplicit recovery;order/invoice snapshots remain historical;no silent remap.",
+          "local": null,
+          "device": null
+        },
+        {
+          "id": "BUY-CATALOGUE-20260925-08-all-surfaces",
+          "route": "Buy/Shop,Wholesale,Bulk,Offers,Store -> product -> Cart/Saved -> Back",
+          "state": "Same provider family andchannel-qualified exactSKU atnormal/enlarged text;category-specific fieldavailability",
+          "expected": "Same applicable field/variant/media/offer contract across every entrypath;unsupported fields hidden;exact selection andcart/return preserved;no duplicated screen logic.",
+          "local": null,
+          "device": null
+        }
+      ],
+      "providerHandoff": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md#provider-driven-variant-and-gallery-expansion--25-september-2026",
+      "planningStatus": "registered_unimplemented_untested",
+      "dependsOn": [
+        "BUY-CATALOGUE-20260925-01"
+      ]
     }
   ],
   "visualReview20260923": {
@@ -14596,7 +15260,15 @@
       "R6633-D05-A01",
       "BUY-PDP-REF-20260924-02-A04",
       "BUY-PDP-REF-20260924-02-A05",
-      "BUY-STORE-CATEGORY-20260925-01"
+      "BUY-STORE-CATEGORY-20260925-01",
+      "BUY-CATALOGUE-20260925-01",
+      "BUY-CATALOGUE-20260925-02",
+      "BUY-CATALOGUE-20260925-03",
+      "BUY-CATALOGUE-20260925-04",
+      "BUY-CATALOGUE-20260925-05",
+      "BUY-CATALOGUE-20260925-06",
+      "BUY-CATALOGUE-20260925-07",
+      "BUY-CATALOGUE-20260925-08"
     ],
     "latestLocalBehaviorQualification": {
       "ticket": "BUY-PDP-REF-20260924-06",
@@ -14644,8 +15316,8 @@
         "bytes": 244706440
       }
     },
-    "newChildStatus": "37 follow-ups:19 implemented/local-tested/targeted-Redmi-verified;18 pending required complete qualification, including partial-native A04.19 original parents also pending complete frontend acceptance.56 references total;37 pending qualification; founder approval separate.",
-    "totalReferencesIncludingNewChildren": 56,
+    "newChildStatus": "45 follow-ups:20 targeted verified;25 pending qualification including8 new registered/unimplemented research tickets.19 original references pending.64total/44pending;founder approval separate.",
+    "totalReferencesIncludingNewChildren": 64,
     "founderApprovalSequence": "Founder amendment20260925: show actual screens on connected Redmi using existing debug app via Flutter attach/hot reload, screen by screen across original19 and applicable children. Do not substitute a new APK without explicit authority and required gates. Check attachability, target identity and source/config compatibility first.",
     "latestProgress": "Current source547 distinct qualified scenarios, zero failures/skips. A04 requested price repairs, A05 address select/edit/cancel restoration, Store category partial-to-full drag verified. Founder approval and remaining goal references stay open; backend deferred.",
     "nextTicketAdmission": {
@@ -14869,9 +15541,9 @@
       "sourceCommit": "4a62a78bf93cbe13ced7a7299a717e96ec9f4e92",
       "sourceSha256": "435877446cf304112efeaa1866fa5b038868812afdca418bb722f992c52d1803",
       "countingUnit": "Distinct original ticket references plus distinct additional children/follow-ups; D08-C1,D09-C1,D10-C2 are already in original19 and not counted twice.",
-      "totalReferences": 56,
+      "totalReferences": 64,
       "originalReferences": 19,
-      "additionalChildrenAndFollowups": 37,
+      "additionalChildrenAndFollowups": 45,
       "implementedLocalAndTargetedRedmiVerifiedFollowups": [
         "BUY-PDP-REF-20260924-04-A01",
         "BUY-PDP-REF-20260924-05-A01",
@@ -14932,10 +15604,18 @@
         "R6633-D06-B-A01",
         "R6634-C08",
         "R6633-D09-A01",
-        "BUY-PDP-REF-20260924-02-A04"
+        "BUY-PDP-REF-20260924-02-A04",
+        "BUY-CATALOGUE-20260925-01",
+        "BUY-CATALOGUE-20260925-02",
+        "BUY-CATALOGUE-20260925-03",
+        "BUY-CATALOGUE-20260925-04",
+        "BUY-CATALOGUE-20260925-05",
+        "BUY-CATALOGUE-20260925-06",
+        "BUY-CATALOGUE-20260925-07",
+        "BUY-CATALOGUE-20260925-08"
       ],
       "verifiedFollowupCount": 20,
-      "pendingFullQualificationCount": 36,
+      "pendingFullQualificationCount": 44,
       "fullyClosedOriginalParents": 0,
       "founderApproval": "separate_pending; targeted device proof is not full acceptance",
       "backend": "deferred; not described as an unimplemented frontend fix",
@@ -14950,7 +15630,17 @@
         "intentionalExclusions": "Generated build/temp logs and unrelated private phone images442–443 remain ignored; no source or ticket work excluded.",
         "latestPreservation": "PDP05-A03 targeted qualification:16 fresh local cases, native summary/unique/error-retry proof, all temporary runtime probes restored."
       },
-      "verification": "547 unique current-source local scenarios passed;8 Store parity/navigation cases included. Pending qualification is not a count of entirely unimplemented defects."
+      "verification": "547 unique current-source local scenarios passed;8 Store parity/navigation cases included. Pending qualification is not a count of entirely unimplemented defects.",
+      "newRegisteredUnimplemented20260925": [
+        "BUY-CATALOGUE-20260925-01",
+        "BUY-CATALOGUE-20260925-02",
+        "BUY-CATALOGUE-20260925-03",
+        "BUY-CATALOGUE-20260925-04",
+        "BUY-CATALOGUE-20260925-05",
+        "BUY-CATALOGUE-20260925-06",
+        "BUY-CATALOGUE-20260925-07",
+        "BUY-CATALOGUE-20260925-08"
+      ]
     }
   }
 }
