@@ -2056,6 +2056,7 @@ void main() {
       final centre = find.byKey(const Key('work-store-activity-deck'));
       expect(toggle.hitTestable(), findsOneWidget);
       expect(find.text('Actions'), findsNothing);
+      expect(find.text('Sell & manage'), findsOneWidget);
       expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
       expect(
         find.byKey(const Key('work-store-quick-actions-scroll')),
@@ -2086,6 +2087,15 @@ void main() {
       }
       expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
       if (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1) {
+        expect(find.text('Sell & manage'), findsNothing);
+        expect(
+          tester.getRect(rail).right -
+              tester
+                  .getRect(find.byKey(const Key('work-quick-counter-sale')))
+                  .right,
+          lessThan(12),
+          reason: 'No reserved handle lane beside expanded tabs.',
+        );
         expect(tester.getSize(centre).width, lessThan(before));
         expect(
           tester.getRect(centre).right,

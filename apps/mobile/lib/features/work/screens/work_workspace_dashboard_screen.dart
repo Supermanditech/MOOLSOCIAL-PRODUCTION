@@ -3945,7 +3945,7 @@ class _StoreActionEdge extends StatelessWidget {
         width: horizontal
             ? double.infinity
             : expanded
-            ? (readableWidth > normalWidth ? readableWidth : normalWidth) + 68
+            ? (readableWidth > normalWidth ? readableWidth : normalWidth) + 20
             : 49,
         height: horizontal
             ? (MediaQuery.textScalerOf(context).scale(11) * 2.55 + 22).clamp(
@@ -3959,7 +3959,8 @@ class _StoreActionEdge extends StatelessWidget {
               : const Border(left: BorderSide(color: Color(0xFFE5E8F1))),
         ),
         child: Flex(
-          direction: Axis.horizontal,
+          direction: expanded && !horizontal ? Axis.vertical : Axis.horizontal,
+          verticalDirection: VerticalDirection.up,
           textDirection: TextDirection.rtl,
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.end,
@@ -3969,13 +3970,13 @@ class _StoreActionEdge extends StatelessWidget {
               child: Semantics(
                 expanded: expanded,
                 button: true,
-                label: expanded
-                    ? 'Hide Store shortcuts'
-                    : 'Show Store shortcuts',
+                label: expanded ? 'Hide Sell & manage' : 'Show Sell & manage',
                 excludeSemantics: true,
                 onTap: onToggle,
                 child: Tooltip(
-                  message: expanded ? 'Hide shortcuts' : 'Show shortcuts',
+                  message: expanded
+                      ? 'Hide Sell & manage'
+                      : 'Show Sell & manage',
                   child: InkWell(
                     key: const Key('work-home-actions-toggle'),
                     onTap: onToggle,
@@ -3985,9 +3986,11 @@ class _StoreActionEdge extends StatelessWidget {
                         minHeight: 48,
                       ),
                       child: DecoratedBox(
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF0F1F7),
-                          borderRadius: BorderRadius.horizontal(
+                        decoration: BoxDecoration(
+                          color: expanded
+                              ? Colors.transparent
+                              : const Color(0xFFF0F1F7),
+                          borderRadius: const BorderRadius.horizontal(
                             left: Radius.circular(12),
                           ),
                         ),
@@ -4006,17 +4009,18 @@ class _StoreActionEdge extends StatelessWidget {
                                 size: 21,
                                 color: MoolColors.navy,
                               ),
-                              RotatedBox(
-                                quarterTurns: horizontal ? 0 : 3,
-                                child: const Text(
-                                  'Shortcuts',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: MoolColors.navy,
+                              if (!expanded)
+                                RotatedBox(
+                                  quarterTurns: horizontal ? 0 : 3,
+                                  child: const Text(
+                                    'Sell & manage',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: MoolColors.navy,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ),

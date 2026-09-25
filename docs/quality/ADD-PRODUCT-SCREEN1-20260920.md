@@ -3048,3 +3048,21 @@ verified; screenshot pairs outputs/home-edge-preview-20260926.png and
 outputs/home-edge-open-20260926.png inspected. Left OPPO on collapsed Store home.
 No records changed or APK built. Await founder visual review; existing physical
 landscape/enlarged-text and previous pending items remain open.
+
+## HOME-03 expanded-lane correction and Sell & manage wording
+
+Founder rejected wasted expanded handle space and authorized its removal.
+Expanded vertical panel now returns48dp to the centre and places the accessible
+collapse chevron inside its bottom; no separate handle column or duplicated
+edge label. Collapsed midpoint tab remains, relabelled Sell & manage following
+the request for wording that communicates main retail operations. Labels,
+destinations, session choice and short-screen adaptive layout remain intact.
+
+All40 selected layout/atomic regression checks passed, including a new assertion
+that expanded action rows extend to the panel edge without an empty handle lane.
+Analysis clean. Evidence: outputs/home-sell-manage-regression-20260926.txt.
+OPPO hot reload and manual open/close verified. Expanded centre content's right
+boundary increased from348 to444 physical pixels (48dp recovered); screenshot
+outputs/home-sell-manage-expanded-20260926.png inspected. Collapsed wording
+captured in outputs/home-sell-manage-collapsed-20260926.png. Existing outstanding
+physical landscape/enlarged-text checks remain open; no data changes or APK.
