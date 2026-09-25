@@ -18,7 +18,7 @@ import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
 import 'buy_v2_catalogue.dart'
     show
-        BuyV2ProgressiveProductGrid,
+        BuyV2ProductCard,
         BuyV2ProductEdgeControls,
         showBuyV2RecentlyViewed,
         showBuyV2ShoppingHelp;
@@ -2730,47 +2730,37 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                 const Text(
                   'No other suppliers match this pack, quantity and delivery choice.',
                 ),
-              BuyV2ProgressiveProductGrid(
-                session: widget.session,
-                products: [for (final offer in page.offers) offer.product],
-                storageKey: 'comparison',
-                semanticLabel:
-                    'Compare the same product and pack across suppliers',
-                vertical: true,
-                initialAddQuantity:
-                    query.requestedQuantityMilli ~/
-                    query.identity.packQuantityMilli,
-                onOpenProduct: (product) {
-                  if (!_opening) {
-                    unawaited(
-                      _openProduct(
-                        page.offers.firstWhere(
-                          (offer) => offer.product.id == product.id,
+              Column(
+                key: const ValueKey('buy-vertical-product-grid-comparison'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final offer in page.offers)
+                    Padding(
+                      key: ValueKey('buy-product-compare-${offer.product.id}'),
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: BuyV2ProductCard(
+                        session: widget.session,
+                        product: offer.product,
+                        compact: true,
+                        initialAddQuantity:
+                            query.requestedQuantityMilli ~/
+                            query.identity.packQuantityMilli,
+                        onOpenProduct: (_) {
+                          if (!_opening) unawaited(_openProduct(offer));
+                        },
+                        beforeSave: () => _beforeSave(offer),
+                        beforeCartChange: (quantity) =>
+                            _beforeCartChange(offer, quantity),
+                        comparisonSummary: _ProductComparisonPrices(
+                          offer: offer,
+                          query: query,
+                          page: page,
+                          now: widget.session.catalogueNow(),
+                          dateLabel: _date,
                         ),
                       ),
-                    );
-                  }
-                },
-                beforeSave: (product) => _beforeSave(
-                  page.offers.firstWhere(
-                    (offer) => offer.product.id == product.id,
-                  ),
-                ),
-                beforeCartChange: (product, quantity) => _beforeCartChange(
-                  page.offers.firstWhere(
-                    (offer) => offer.product.id == product.id,
-                  ),
-                  quantity,
-                ),
-                productSupplement: (product) => _ProductComparisonPrices(
-                  offer: page.offers.firstWhere(
-                    (offer) => offer.product.id == product.id,
-                  ),
-                  query: query,
-                  page: page,
-                  now: widget.session.catalogueNow(),
-                  dateLabel: _date,
-                ),
+                    ),
+                ],
               ),
               if (page.previousCursor != null || page.nextCursor != null)
                 Wrap(
@@ -2827,12 +2817,25 @@ class _ProductComparisonPrices extends StatelessWidget {
       offer: offer,
       now: now,
     );
-    if (!result.available) return const SizedBox.shrink();
+    if (!result.available) {
+      return const Text('Offer changed. Refresh comparison.');
+    }
     final badges = [
       if (page.isLowestItemPrice(offer, result)) 'Lowest item price',
       if (page.isLowestDelivered(offer, result)) 'Lowest delivered cost',
     ];
-    final style = context.buyMeta.copyWith(fontSize: 9, height: 1.2);
+    final start = offer.arrivalStart?.toLocal();
+    final end = offer.arrivalEnd?.toLocal();
+    final sameDay =
+        start != null &&
+        end != null &&
+        start.year == end.year &&
+        start.month == end.month &&
+        start.day == end.day;
+    final arrival = start == null || end == null
+        ? 'Arrival time not confirmed'
+        : 'Arrives ${dateLabel(start)} – ${sameDay ? MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end)) : dateLabel(end)}';
+    final style = context.buyMeta.copyWith(fontSize: 12, height: 1.3);
     return Padding(
       padding: const EdgeInsets.fromLTRB(5, 7, 5, 3),
       child: Column(
@@ -2858,12 +2861,7 @@ class _ProductComparisonPrices extends StatelessWidget {
                 : '${_comparisonMoney(result.payableMinor!)} delivered',
             style: style,
           ),
-          Text(
-            offer.arrivalEnd == null
-                ? 'Arrival time not confirmed'
-                : 'Arrives ${dateLabel(offer.arrivalStart!)} – ${dateLabel(offer.arrivalEnd!)}',
-            style: style,
-          ),
+          Text(arrival, style: style),
           if (badges.isNotEmpty)
             Text(
               badges.join(' · '),
@@ -6079,7 +6077,9 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         highlights.isEmpty &&
         legacyHighlights.isEmpty) {
       return SizedBox.shrink(
-        key: ValueKey('buy-product-content-${content.state.name}-${product.id}'),
+        key: ValueKey(
+          'buy-product-content-${content.state.name}-${product.id}',
+        ),
       );
     }
     final visibleHighlights = _expanded

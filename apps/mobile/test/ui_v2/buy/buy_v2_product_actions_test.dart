@@ -1372,6 +1372,31 @@ void main() {
       ),
       findsOneWidget,
     );
+    final comparisonSheet = find.byKey(
+      const ValueKey('buy-product-comparison-sheet'),
+    );
+    expect(
+      find.descendant(
+        of: comparisonSheet,
+        matching: find.text(session.product('s-milk').customerTitle),
+      ),
+      findsOneWidget,
+      reason: 'Product identity belongs to one shared comparison header.',
+    );
+    expect(
+      find.descendant(of: comparisonSheet, matching: find.byType(Image)),
+      findsNothing,
+      reason: 'Supplier comparison must not repeat the product photo.',
+    );
+    final comparisonCard = find.byKey(
+      const ValueKey('buy-comparison-card-review-compare-s-milk-1'),
+    );
+    expect(comparisonCard, findsOneWidget);
+    expect(
+      tester.getSize(comparisonCard).width,
+      greaterThanOrEqualTo(tester.getSize(comparisonSheet).width - 32),
+      reason: 'Supplier facts use a full-width compact row.',
+    );
     expect(
       find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
       findsOneWidget,

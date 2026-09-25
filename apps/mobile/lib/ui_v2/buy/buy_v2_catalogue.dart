@@ -12364,6 +12364,7 @@ class BuyV2ProductCard extends StatelessWidget {
     this.beforeCartChange,
     this.initialAddQuantity,
     this.beforeSave,
+    this.comparisonSummary,
   });
 
   final BuyV2Session session;
@@ -12376,6 +12377,7 @@ class BuyV2ProductCard extends StatelessWidget {
   final Future<bool> Function(int)? beforeCartChange;
   final int? initialAddQuantity;
   final bool Function()? beforeSave;
+  final Widget? comparisonSummary;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
@@ -12565,6 +12567,123 @@ class BuyV2ProductCard extends StatelessWidget {
         ),
       ),
     );
+    final quantityTargets = _QuantityStepperTargets(
+      stacked: stackedQuantity,
+      visualInset: compact ? 6 : 9,
+      productId: product.id,
+      productTitle: product.customerTitle,
+      quantity: quantity,
+      minimumOrder: product.minimumOrder,
+      onEdit: () => showBuyV2QuantityEditor(
+        context,
+        session,
+        product,
+        beforeSave: beforeCartChange,
+      ),
+      onDecrease: () async {
+        final next = quantity <= product.minimumOrder ? 0 : quantity - 1;
+        if (await beforeCartChange?.call(next) != false) {
+          session.decrease(product.id);
+        }
+      },
+      onIncrease: () async {
+        if (beforeCartChange == null) {
+          session.increase(product.id);
+        } else if (await beforeCartChange!(quantity + 1)) {
+          session.setCartQuantity(product.id, '${quantity + 1}');
+        }
+      },
+    );
+    if (comparisonSummary != null) {
+      return Container(
+        key: ValueKey('buy-comparison-card-${product.id}'),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF4F2FB), Color(0xFFFAFCFA)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: BuyV2Colors.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    key: ValueKey('buy-comparison-open-${product.id}'),
+                    onPressed: openProduct,
+                    style: TextButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: Text(
+                      product.customerSeller(product.seller),
+                      style: context.buyBody.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                _ProductSaveButton(
+                  compactEdgeControls: true,
+                  session: session,
+                  product: product,
+                  beforeToggle: beforeSave,
+                ),
+              ],
+            ),
+            if (quantity == 0)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final scale = MediaQuery.textScalerOf(context).scale(1);
+                  if (constraints.maxWidth >= 300 && scale <= 1.3) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: comparisonSummary!),
+                        const SizedBox(width: 8),
+                        cartAction,
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      comparisonSummary!,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: cartAction,
+                      ),
+                    ],
+                  );
+                },
+              )
+            else ...[
+              comparisonSummary!,
+              SizedBox(
+                height:
+                    BuyV2Metrics.minimumTap +
+                    (stackedQuantity
+                        ? _gridQuantityLabelHeight(
+                            MediaQuery.textScalerOf(context).scale(1),
+                          )
+                        : 0),
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: cartAction),
+                    Positioned.fill(child: quantityTargets),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
     return BuyV2IntentDepth(
       key: ValueKey('buy-product-depth-${product.id}'),
       spatial: true,
@@ -12890,38 +13009,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                 MediaQuery.textScalerOf(context).scale(1),
                               )
                             : 0),
-                    child: _QuantityStepperTargets(
-                      stacked: stackedQuantity,
-                      visualInset: compact ? 6 : 9,
-                      productId: product.id,
-                      productTitle: product.customerTitle,
-                      quantity: quantity,
-                      minimumOrder: product.minimumOrder,
-                      onEdit: () => showBuyV2QuantityEditor(
-                        context,
-                        session,
-                        product,
-                        beforeSave: beforeCartChange,
-                      ),
-                      onDecrease: () async {
-                        final next = quantity <= product.minimumOrder
-                            ? 0
-                            : quantity - 1;
-                        if (await beforeCartChange?.call(next) != false) {
-                          session.decrease(product.id);
-                        }
-                      },
-                      onIncrease: () async {
-                        if (beforeCartChange == null) {
-                          session.increase(product.id);
-                        } else if (await beforeCartChange!(quantity + 1)) {
-                          session.setCartQuantity(
-                            product.id,
-                            '${quantity + 1}',
-                          );
-                        }
-                      },
-                    ),
+                    child: quantityTargets,
                   ),
               ],
             ),
