@@ -2773,3 +2773,27 @@ captured and visually inspected outputs/stock-typography.png. Names and numeric
 values display the shared charcoal style, muted metadata and warning colours
 remain distinct, and separators/layout remain intact. No product values changed.
 Founder review and exact rebuilt-APK qualification remain open.
+
+## Founder-requested 20-hour Git reconciliation — 25 September 2026, 22:32 IST
+
+Window: 2026-09-25 02:32 through 22:32 IST. Development checkpoint:
+63564c5842f008f012d9b1acf5ecc3a8af8f10ba on
+work/codex-ui/add-product-screen1-20260920. Fresh origin ls-remote matched exactly.
+All 24 HEAD reflog commits in the window are ancestors of this checkpoint;
+no dropped window commits found. The incremental range from the preceding
+e921a7b1 checkpoint contains 10 changed application/test/evidence files.
+
+Verified empty staged/unstaged/untracked status, empty stash list, and no ignored
+or untracked application source/tests. Read-only checks of the older Codex
+counter-sale, store-product-catalogue, store-buy-baseline-fixes and
+store-buy-contract-followup worktrees found clean status and no HEAD reflog
+activity in this window. No Cursor tree was modified or integrated.
+
+Retained work includes numeric entry/haptics, grouped large carts, ledger recovery,
+invoice/receipt polish, removal of manual PDF sharing, CSV layout/copy/guidance,
+contextual Store search, shared Stock editor links, movable Product divider,
+fixed numeric separators and standardized Stock typography. This reconciliation
+checks Git preservation, not blanket functional acceptance or backend completion.
+Local screenshots/session logs remain outside Git as previously distinguished;
+no local artifacts or history were deleted. Divider-discovery hints are deferred
+at founder direction; no further feature implementation or APK in this audit.
