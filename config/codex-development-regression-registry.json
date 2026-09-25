@@ -106872,6 +106872,12 @@
           "prevention": "Retain existing history. Reconcile only the exact eighth historical SHA and exact subject under existing root, actor, branch, phase, ticket and baseline restrictions. Verify positive case and wrong subject/SHA/phase/branch rejection. Continue enforcing the normal prefix for every new commit.",
           "evidence": "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/refined-polish-remote-handoff.log",
           "authorization": "Founder requested local and remote same, then resume. No force push, rebase, runtime acceptance or ticket closure."
+        },
+        "remoteEvidenceSizeFailure": {
+          "observed": "Handoff passed at dff0b231; GitHub rejected normal push with GH001 because 11 historical evidence ZIP blobs exceed 100 MB (174.67 to 272.52 MB). Remote remains 5dc6885a.",
+          "cause": "Cumulative binary archive was repeatedly committed locally without validating remote per-blob size limits. Removing or splitting HEAD alone cannot remove oversized ancestor blobs.",
+          "prevention": "Check unpushed blob sizes before push. Preserve original commits and evidence. Do not force push, amend, rebase or migrate history without explicit founder authorization superseding the no-rewrite rule. Prepare exact unpublished range and retained backup before any approved LFS migration. No identical push retry.",
+          "scope": "Existing current and historical evidence remain intact; app runtime and source qualification unchanged."
         }
       }
     }
