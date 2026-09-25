@@ -2500,3 +2500,31 @@ and806x360/1.6x cases. Evidence: task outputs/
 polish-stress-recovery-category-aware.txt. These are fixture-based automated
 checks, not OPPO genuine-stock verification. Full sweep and device closure remain
 open; no new APK, device invoice/payment, stock mutation or Cursor change.
+
+### CSV restrained-colour polish and connected verification (2026-09-25)
+
+OPPO font1.6 inspection found solid navy Choose CSV and selected Check controls,
+plus navy product titles. Within the existing CSV entry/review owner, Choose and
+Save now use the approved light F0F1F7 surface with252B38 text. Selection chips
+use the same light surface and a visible checkmark; product titles are neutral,
+issue explanations muted. Import, selection, correction, validation and save
+callbacks, keys, stock ownership and geometry are unchanged.
+
+Expanded CSV20 review matrix to806x360/font1.6; retained360/1 and320/2. Assertions
+cover neutral title, light actions/chips, selected checkmark and48dp chip targets.
+First combined run33pass/3fail: two CSV29 checks expected the superseded white
+selected text; new landscape case tapped immediately after ensureVisible without
+pumping the changed scroll position. Updated exact colour expectations and added
+pumpAndSettle plus an explicit hitTestable assertion before Edit. No tap-warning
+suppression or weakened business assertions. Final connected36/36 passed across
+CSV20/21/24/29/34/37 and ADDENTRY02, including failed-save retention, correction,
+duplicates, changed Store/stock and malformed input. Logs in task outputs:
+csv-subdued-connected.txt and csv-subdued-connected-v2.txt.
+
+Live OPPO attach65637 reloaded5libraries/4033ms. Returned normally to Add products
+and CSV; visually inspected csv-subdued-entry-verified.png and
+csv-subdued-review.png at1.6: light Choose/Check and neutral titles now rendered.
+The earlier csv-subdued-entry.png captured Store home and is NOT CSV evidence.
+Back cancelled the review with No products were added. No stock/invoice/payment
+write, APK build/install or Cursor change. CSV photo continuity remains open;
+these retained evaluation rows and colour checks do not prove production media.

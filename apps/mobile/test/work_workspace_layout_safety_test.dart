@@ -10573,7 +10573,11 @@ void main() {
     });
   }
 
-  for (final display in [(360.0, 806.0, 1.0), (320.0, 568.0, 2.0)]) {
+  for (final display in [
+    (360.0, 806.0, 1.0),
+    (320.0, 568.0, 2.0),
+    (806.0, 360.0, 1.6),
+  ]) {
     testWidgets('CSV20 review screen selection edit and attention $display', (
       tester,
     ) async {
@@ -10619,8 +10623,38 @@ void main() {
         tester,
         'csv-ready-${display.$1.toInt()}-${display.$3}',
       );
+      for (final key in ['work-import-ready', 'work-import-issues']) {
+        final chip = tester.widget<ChoiceChip>(find.byKey(Key(key)));
+        expect(chip.selectedColor, const Color(0xFFF0F1F7));
+        expect(chip.labelStyle!.color, const Color(0xFF252B38));
+        expect(chip.showCheckmark, isTrue);
+        expect(
+          tester.getSize(find.byKey(Key(key))).height,
+          greaterThanOrEqualTo(48),
+        );
+      }
+      expect(
+        tester
+            .widget<Text>(find.text('Premium basmati rice, extra long grain'))
+            .style!
+            .color,
+        const Color(0xFF252B38),
+      );
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('work-import-save')))
+            .style!
+            .backgroundColor!
+            .resolve({}),
+        const Color(0xFFF0F1F7),
+      );
       expect(saved, isNull);
       await tester.ensureVisible(find.byKey(const Key('work-import-edit-2')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-import-edit-2')).hitTestable(),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('work-import-edit-2')));
       await tester.pumpAndSettle();
       expect(find.textContaining('₹105'), findsOneWidget);
@@ -10992,7 +11026,7 @@ void main() {
               .widget<ChoiceChip>(find.byKey(const Key('work-import-ready')))
               .labelStyle!
               .color,
-          Colors.white,
+          const Color(0xFF252B38),
         );
         await tester.tap(find.byKey(const Key('work-import-issues')));
         await tester.pumpAndSettle();
@@ -11001,14 +11035,14 @@ void main() {
               .widget<ChoiceChip>(find.byKey(const Key('work-import-issues')))
               .labelStyle!
               .color,
-          Colors.white,
+          const Color(0xFF252B38),
         );
         expect(
           tester
               .widget<ChoiceChip>(find.byKey(const Key('work-import-ready')))
               .labelStyle!
               .color,
-          MoolColors.navy,
+          const Color(0xFF252B38),
         );
         await tester.enterText(search, 'SUGAR-1');
         await tester.pumpAndSettle();

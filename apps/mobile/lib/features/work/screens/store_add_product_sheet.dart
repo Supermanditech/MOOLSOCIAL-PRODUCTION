@@ -340,6 +340,10 @@ class _StoreAddProductEntryScreenState
         const SizedBox(height: 14),
         FilledButton.icon(
           key: const Key('work-add-product-choose-csv'),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFF0F1F7),
+            foregroundColor: const Color(0xFF252B38),
+          ),
           onPressed: _importing || _templateBusy ? null : _import,
           icon: const Icon(Icons.upload_file_outlined, size: 20),
           label: Padding(
@@ -792,11 +796,13 @@ class _StoreProductImportReviewScreenState
                               children: [
                                 ChoiceChip(
                                   key: const Key('work-import-ready'),
-                                  showCheckmark: false,
-                                  labelStyle: TextStyle(
-                                    color: !_issuesOnly
-                                        ? Colors.white
-                                        : MoolColors.navy,
+                                  showCheckmark: true,
+                                  checkmarkColor: const Color(0xFF252B38),
+                                  selectedColor: const Color(0xFFF0F1F7),
+                                  backgroundColor: Colors.transparent,
+                                  side: BorderSide.none,
+                                  labelStyle: const TextStyle(
+                                    color: Color(0xFF252B38),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -810,11 +816,13 @@ class _StoreProductImportReviewScreenState
                                 ),
                                 ChoiceChip(
                                   key: const Key('work-import-issues'),
-                                  showCheckmark: false,
-                                  labelStyle: TextStyle(
-                                    color: _issuesOnly
-                                        ? Colors.white
-                                        : MoolColors.navy,
+                                  showCheckmark: true,
+                                  checkmarkColor: const Color(0xFF252B38),
+                                  selectedColor: const Color(0xFFF0F1F7),
+                                  backgroundColor: Colors.transparent,
+                                  side: BorderSide.none,
+                                  labelStyle: const TextStyle(
+                                    color: Color(0xFF252B38),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -981,7 +989,7 @@ class _StoreProductImportReviewScreenState
                                               style: const TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w700,
-                                                color: MoolColors.navy,
+                                                color: Color(0xFF252B38),
                                               ),
                                             ),
                                             const SizedBox(height: 4),
@@ -1114,7 +1122,7 @@ class _StoreProductImportReviewScreenState
                                                       'Review this row.',
                                                   style: const TextStyle(
                                                     fontSize: 12,
-                                                    color: MoolColors.navy,
+                                                    color: MoolColors.muted,
                                                   ),
                                                 ),
                                               ),
@@ -1223,6 +1231,10 @@ class _StoreProductImportReviewScreenState
                     children: [
                       FilledButton(
                         key: const Key('work-import-save'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFF0F1F7),
+                          foregroundColor: const Color(0xFF252B38),
+                        ),
                         onPressed: _busy || _selected.isEmpty ? null : _save,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
