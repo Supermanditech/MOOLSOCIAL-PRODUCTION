@@ -2618,3 +2618,15 @@ attention wording, and keeps saving unavailable. Local CSV run is recorded in
 task outputs/csv-header-copy-tests.txt. OPPO hot-reload session disconnected;
 phone was in another app, so no device interaction was continued. Wording device
 verification and exact-APK closure remain pending, distinct from prior layout approval.
+
+### CSV tabular guidance — founder approved on OPPO
+
+Existing expandable required/optional/pack guidance now uses Product field and
+CSV column headings, neutral text, aligned wrapping rows and subtle separators.
+At enlarged text on narrow widths, each field and column remain paired vertically.
+No mappings, import logic, entry actions or architecture changed. CSV suite36/36
+passed (task outputs/csv-tabular-guide-tests.txt); source/test analysis clean.
+Hot reload succeeded on OPPO. Live hierarchy confirms aligned pack-field mappings;
+screenshot task outputs/csv-guide-table.png. Founder explicitly said “approved i
+seen on oppo”. Approval covers this guidance design; no new APK or whole-sweep
+closure. No import saved, payment recorded or inventory modified.

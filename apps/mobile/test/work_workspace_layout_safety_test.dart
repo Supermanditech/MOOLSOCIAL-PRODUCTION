@@ -11160,6 +11160,19 @@ void main() {
     await tester.tap(find.byKey(const Key('work-csv-required-columns')));
     await tester.pumpAndSettle();
     expect(find.text('purchasePrice'), findsOneWidget);
+    final requiredGuide = find.byKey(const Key('work-csv-required-columns'));
+    expect(
+      find.descendant(of: requiredGuide, matching: find.text('Product field')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: requiredGuide, matching: find.text('CSV column')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: requiredGuide, matching: find.text('purchasePrice')),
+      findsOneWidget,
+    );
     expect(find.textContaining('Purchase price stays private'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

@@ -291,40 +291,99 @@ class _StoreAddProductEntryScreenState
     );
   }
 
-  Widget _columnGuide(bool required, {bool packFacts = false}) => Column(
-    children: [
-      for (final entry in WorkspaceProductImport.templateLabels.entries)
-        if (WorkspaceProductImport.requiredColumns.contains(entry.key) ==
-                required &&
-            WorkspaceProductImport.packFieldLabels.containsKey(entry.key) ==
-                packFacts)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
-            child: LayoutBuilder(
-              builder: (context, size) {
-                final label = Text(
-                  entry.value,
-                  style: const TextStyle(fontSize: 12, color: MoolColors.navy),
-                );
-                final name = Text(
-                  entry.key,
-                  style: const TextStyle(fontSize: 11, color: MoolColors.muted),
-                );
-                return MediaQuery.textScalerOf(context).scale(1) > 1.5
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [label, name],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(child: label),
-                          Expanded(child: name),
-                        ],
-                      );
-              },
-            ),
+  Widget _columnGuide(bool required, {bool packFacts = false}) => LayoutBuilder(
+    builder: (context, constraints) {
+      final stacked =
+          MediaQuery.textScalerOf(context).scale(1) > 1.5 &&
+          constraints.maxWidth < 460;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            color: const Color(0xFFF5F5F8),
+            child: stacked
+                ? const Text(
+                    'Product field · CSV column',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF252B38),
+                    ),
+                  )
+                : const Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Product field',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF252B38),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'CSV column',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF252B38),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
-    ],
+          for (final entry in WorkspaceProductImport.templateLabels.entries)
+            if (WorkspaceProductImport.requiredColumns.contains(entry.key) ==
+                    required &&
+                WorkspaceProductImport.packFieldLabels.containsKey(entry.key) ==
+                    packFacts)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFEBECF0), width: 0.5),
+                  ),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, size) {
+                    final label = Text(
+                      entry.value,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF252B38),
+                      ),
+                    );
+                    final name = Text(
+                      entry.key,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: MoolColors.muted,
+                      ),
+                    );
+                    return stacked
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [label, const SizedBox(height: 3), name],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: label),
+                              const SizedBox(width: 12),
+                              Expanded(child: name),
+                            ],
+                          );
+                  },
+                ),
+              ),
+        ],
+      );
+    },
   );
 
   Widget _csvPanel() => SingleChildScrollView(
