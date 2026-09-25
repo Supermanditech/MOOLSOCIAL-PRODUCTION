@@ -106810,6 +106810,12 @@
         "reason": "Existing Buy customer-state codec must retain exact pending PO request/revision/account binding; no new persistence owner or backend. Prior claim has no live agent according to collaboration list. Preserve its other owners.",
         "authority": "Founder all19 and children frontend continuation",
         "verification": "Existing codec tests, restart recovery and rejected owner/request/revision changes."
+      },
+      "deviceGateArchiveResume20260925": {
+        "finding": "Standalone device memory gate omitted EvidenceArchiveRoot and rejected historical archived zero-byte preimage. Subsequent umbrella projection exceeded output budget; no device action or source mutation occurred.",
+        "prevention": "Use existing supported workspace archive root for historical evidence resolution; project exact named registry fields rather than entire accumulated umbrella.",
+        "archiveRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904",
+        "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
       }
     }
   ],

@@ -6572,8 +6572,8 @@
         "device": "pending_successor_redmi",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -6654,8 +6654,8 @@
         "device": "pending_successor_redmi",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -6668,8 +6668,8 @@
       "founderRequirement": "Remove the circular surround from the top-right Close after Visit Store; preserve accessible target, Close/Back and Store/cart state.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "store-close-20260924/reproduction.txt"
       },
       "owners": [
@@ -6879,8 +6879,8 @@
         "device": "No APK built or installed.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -6895,8 +6895,8 @@
       "founderRequirement": "1. Multiple SKU photos: Multi-photo SKU gallery and reference product-page composition",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924/captures/02-product.png"
       },
       "owners": [
@@ -7031,8 +7031,8 @@
       "wiringAndImpactedCodeContract": "— mandatory for every ticket\n\nBoth product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.\n\n| Entry/interaction | Required return and state assertion |\n| --- | --- |\n| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |\n| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |\n| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |\n| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |\n| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |\n| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |\n| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |\n| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |\n| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |\n| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |\n\nFor each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.\n\nNo implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.",
       "definitionEvidence": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924-v2/definition.md"
       },
       "providerConnectorContract": "### Mandatory Store/provider workspace connectors — founder clarification\n\nApplies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.\n\nReuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.\n\n| Data | Authoritative producer / required consumer connection |\n| --- | --- |\n| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |\n| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |\n| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |\n| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |\n| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |\n\nContract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.\n\nExpose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.\n\nAcceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.\n",
@@ -7057,8 +7057,8 @@
         "git": "No commit/checkpoint: full ticket acceptance including provider case remains incomplete.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       },
       "founderMultiVariantDesign20260925": {
@@ -7139,8 +7139,8 @@
       "founderRequirement": "2. Variants, prices and delivery: Variant, price, price details and delivery/seller panel",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924/captures/04-price.png"
       },
       "owners": [
@@ -7343,8 +7343,8 @@
       "wiringAndImpactedCodeContract": "— mandatory for every ticket\n\nBoth product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.\n\n| Entry/interaction | Required return and state assertion |\n| --- | --- |\n| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |\n| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |\n| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |\n| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |\n| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |\n| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |\n| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |\n| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |\n| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |\n| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |\n\nFor each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.\n\nNo implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.",
       "definitionEvidence": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924-v2/definition.md"
       },
       "providerConnectorContract": "### Mandatory Store/provider workspace connectors — founder clarification\n\nApplies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.\n\nReuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.\n\n| Data | Authoritative producer / required consumer connection |\n| --- | --- |\n| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |\n| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |\n| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |\n| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |\n| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |\n\nContract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.\n\nExpose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.\n\nAcceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.\n",
@@ -7373,8 +7373,8 @@
         "git": "No commit, checkpoint or push; full ticket remains open.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         },
         "previousArchiveSha256": "ecfa1d44b86ab1e25518af855925f4182799dda5abbe1fc5f016fea7e7a8ce2e"
       },
@@ -7515,8 +7515,8 @@
       "founderRequirement": "Return/COD/support controls plus complete authorized COD placement, delivery cash collection, receipt, invoice and Store ledger reconciliation; no false paid state.",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924/captures/11-return-policy-loaded.png"
       },
       "owners": [
@@ -7684,8 +7684,8 @@
       "wiringAndImpactedCodeContract": "— mandatory for every ticket\n\nBoth product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.\n\n| Entry/interaction | Required return and state assertion |\n| --- | --- |\n| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |\n| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |\n| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |\n| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |\n| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |\n| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |\n| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |\n| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |\n| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |\n| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |\n\nFor each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.\n\nNo implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.",
       "definitionEvidence": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924-v2/definition.md"
       },
       "providerConnectorContract": "### Mandatory Store/provider workspace connectors — founder clarification\n\nApplies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.\n\nReuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.\n\n| Data | Authoritative producer / required consumer connection |\n| --- | --- |\n| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |\n| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |\n| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |\n| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |\n| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |\n\nContract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.\n\nExpose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.\n\nAcceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.\n",
@@ -7727,8 +7727,8 @@
         "helpReuse": "Founder no-duplication clarification: reuse existing Shopping Help and order Help/Chat. Both Shop and Wholesale order visits preserve exact product, mixed Cart, source query and product scroll.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         },
         "previousArchiveSha256": "ccfbc9fdc97dfb3f9a187ed0ed85d8fc87d618db9cc186e845ddc21a280e4596"
       },
@@ -7810,8 +7810,8 @@
       "founderRequirement": "4. Similar products: Similar Products horizontal rail",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924/captures/19-similar-highlights.png"
       },
       "owners": [
@@ -7944,8 +7944,8 @@
       "wiringAndImpactedCodeContract": "— mandatory for every ticket\n\nBoth product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.\n\n| Entry/interaction | Required return and state assertion |\n| --- | --- |\n| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |\n| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |\n| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |\n| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |\n| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |\n| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |\n| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |\n| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |\n| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |\n| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |\n\nFor each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.\n\nNo implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.",
       "definitionEvidence": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924-v2/definition.md"
       },
       "providerConnectorContract": "### Mandatory Store/provider workspace connectors — founder clarification\n\nApplies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.\n\nReuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.\n\n| Data | Authoritative producer / required consumer connection |\n| --- | --- |\n| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |\n| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |\n| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |\n| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |\n| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |\n\nContract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.\n\nExpose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.\n\nAcceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.\n",
@@ -7980,8 +7980,8 @@
         "git": "No commit/checkpoint/push; full parent remains open.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         },
         "previousArchiveSha256": "eef82dcc2228ea45b04fafa48cce0f7d72a1e385687a016ed644871c703b6539"
       },
@@ -8007,8 +8007,8 @@
       "founderRequirement": "5. Highlights, specifications, description, manufacturer info: Product highlights and All details with three tabs",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924/captures/20-highlights.png"
       },
       "owners": [
@@ -8204,8 +8204,8 @@
       "wiringAndImpactedCodeContract": "— mandatory for every ticket\n\nBoth product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.\n\n| Entry/interaction | Required return and state assertion |\n| --- | --- |\n| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |\n| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |\n| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |\n| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |\n| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |\n| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |\n| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |\n| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |\n| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |\n| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |\n\nFor each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.\n\nNo implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.",
       "definitionEvidence": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924-v2/definition.md"
       },
       "providerConnectorContract": "### Mandatory Store/provider workspace connectors — founder clarification\n\nApplies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.\n\nReuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.\n\n| Data | Authoritative producer / required consumer connection |\n| --- | --- |\n| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |\n| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |\n| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |\n| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |\n| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |\n\nContract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.\n\nExpose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.\n\nAcceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.\n",
@@ -8221,8 +8221,8 @@
         "previousArchiveSha256": "e04d00062ea34dd910201e5b8223f4b1704ea5bf7c621168a7c898cf95000a2b",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       },
       "localBehaviorQualification20260924": {
@@ -8246,8 +8246,8 @@
         "previousArchiveSha256": "f5610421d4bc6bb7070c1445edc8568a8a7d00ccba7000c39e5ab1687d6c6e6e",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       },
       "founderMultiVariantDesign20260925": {
@@ -8364,8 +8364,8 @@
       "founderRequirement": "6. Recently viewed and further recommendations: Recently Viewed rail and More products for you grid",
       "reproduction": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924/captures/26-lower-page.png"
       },
       "owners": [
@@ -8516,8 +8516,8 @@
       "wiringAndImpactedCodeContract": "— mandatory for every ticket\n\nBoth product shells in apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart must be wired: embedded product at the existing BuyV2ProductView call around 2498, main product view around 2819. Reuse onVisitComparisonProduct, onOpenPartnerCatalogue, onAskSeller, session.openProduct/openLinkedProduct and current Cart handlers. Line numbers are audit hints; symbols own the change.\n\n| Entry/interaction | Required return and state assertion |\n| --- | --- |\n| Buy/Shop, category, search, saved | Same source route/query/filter/scroll after Back; selected Store/SKU/variant/pack preserved; no duplicate route stack. |\n| Wholesale and Bulk | Same mode, pack, MOQ, increment, price tier and procurement restrictions; no retail-only amount or payment eligibility leak. |\n| MoolSocial/Supplier Offers | Same offer/Store identity and offer-list offset on return; no fixture in production; expired offer handled truthfully. |\n| Visit Store / Store category | Store data matches provider revision; correct Store catalogue/back stack; name/address/partnership shown once. |\n| Cart line → PDP → Cart | Correct exact line selection; quantity and other lines retained; deliberate variant changes follow existing cart semantics; no silent replacement or extra add. |\n| Compare / alternate seller | Exact comparable product/pack; return to original PDP and comparison state; no redirect loop. |\n| Similar / Recent / More | New identity/media/content/price together, Back restores prior product and section offset; no shared mutable variant state. |\n| Save / Share / Ask / Support | Existing authenticated permissions and stable product identity; cancellation returns correctly; no automatic external message. |\n| Address / quote / payment / checkout | Stale responses discarded; authoritative eligibility rechecked; cart/order state survives pending handoff, error/retry and restart. |\n| Orders / invoices / Store / delivery / ledger | Payment state and identity agree end to end; unauthorized or unverified events cannot mark paid or collected. |\n\nFor each affected owner: trace callers, update superseded layout expectations while preserving behavioral assertions, run targeted existing regressions plus necessary new behavior cases, run analyzer and required repository gates. Inspect and register child defects before retest; repair in-scope children and replay parent plus affected navigation/state checks. Record exact tests/counts/source fingerprint and unresolved dependencies. No ticket closes on visual approval alone, and no backend dependency may be relabelled as frontend completion. Native founder captures, full connected local checks and later checksum-matched Redmi journeys are separate evidence gates.\n\nNo implementation or fresh tests occurred in this definition audit. Six ticket definitions are now explicit; source/backend behavior still must be implemented and verified under their recorded dependencies.",
       "definitionEvidence": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528,
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544,
         "entry": "flipkart-reference-20260924-v2/definition.md"
       },
       "providerConnectorContract": "### Mandatory Store/provider workspace connectors — founder clarification\n\nApplies to all six BUY-PDP-REF-20260924 tickets and their Buy, Wholesale, Bulk, Offers, Visit Store and Cart consumers. Information must come from the authoritative owning workspace/publication path, including manufacturer, supplier and retailer roles where supported. Do not hard-code final product information or build a second Buy catalogue. Recording a manufacturer/supplier source role does not activate a new operational workspace outside approved launch scope.\n\nReuse and complete existing content/media/compliance snapshots, offer/quote adapters and Store toBuyPublicContent projection before introducing another interface. Keep a documented, typed producer-to-consumer boundary so the Store lane can connect its published data without rewriting the UI. Each field mapping must name the exact producer model/projection, public DTO field, Buy adapter, consumer and test. If a producer field or production adapter is missing, leave its explicit contract and tracked dependency on the SAME ticket; do not report an empty connector, TODO or review fixture as functioning production integration.\n\n| Data | Authoritative producer / required consumer connection |\n| --- | --- |\n| Product identity, category, variants, size charts, pack and media | Approved product owner/public catalogue projection; preserve manufacturer-origin identity separately from supplier/retailer offer ownership. Gallery, selector and product facts consume the same published product revision. |\n| Description, highlights, specifications, manufacturer/packer/importer information | Approved product metadata from the owning workspace; Store publishes permitted public fields. Map structured units/addresses without substituting seller data or repeating fields across sections. |\n| Selling Store name/address/partnership, offer price/MRP, stock, MOQ/tiers, tax treatment | Actual selling retailer/supplier offer and Store identity; Buy cards, PDP, comparison, Cart and quote agree on exact offer/pack. Counter Sale/private procurement records are not public offer authority merely because they contain a price. |\n| Delivery, returns, COD and support | Authorized policy/serviceability/quote providers associated with the selling Store and destination; eligibility and payment/collection status are verified operational facts, never inferred from descriptive manufacturer data. |\n| Price drop, related/discovery products, ratings | Existing approved public history/discovery/rating source; absent source remains a named dependency, never fabricated data. Recently viewed stays account-scoped browsing history referencing current published identities. |\n\nContract keys: provider/workspace role and ID, selling Store ID, canonical product ID, SKU/variant/pack ID, offer ID where applicable, schema/source revision and effective/expiry times. Document each field's type, units/currency, nullability, provenance and public visibility. Join by stable identities, not names. Resolve conflicting sources by documented field ownership; do not let late or lower-revision data overwrite current selection. Product manufacturer, publishing workspace and selling Store can be different actors.\n\nExpose loading, empty, unpublished/unavailable, stale, denied and retryable-error states through the existing adapters. Provider revisions refresh the affected UI consistently; Cart/payment uses authoritative quote revalidation rather than trusting cached PDP facts. Preserve selected variant and navigation when still valid, and explain invalidated selections. Enforce workspace/account authorization at publication/backend boundaries; never publish purchase cost, private ledger, bank or settlement data. Account/Store switching must not leak cached private content.\n\nAcceptance requires producer projection tests, adapter contract tests and connected UI tests using distinguishable manufacturer/supplier/retailer/Store identities, two stores selling the same product, different packs, partial fields, stale/out-of-order updates, unpublished offers and permission failures. Controlled fixtures may test these contracts locally, but must be isolated from production. Before closure, the owning Store/backend lane must prove actual publication → connector → Buy/Wholesale/Bulk/Offers/PDP/Cart flow; COD additionally requires the ticket-03 operational lifecycle. Register mapping/integration child defects on their parent and repair affected consumers before qualifying them.\n",
@@ -8544,8 +8544,8 @@
         "previousArchiveSha256": "399c9256bafc46d234c6ec110afab5f93ffc00a63fbdc17cc52286d808218ca7",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       },
       "localBehaviorQualification20260924": {
@@ -8590,8 +8590,8 @@
         "previousArchiveSha256": "a563184e4f03144af54ae90c0e77ed758742085d65029c4bddea5de32d1f5548",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       },
       "founderMultiVariantDesign20260925": {
@@ -8722,8 +8722,8 @@
         "git": "No commit/checkpoint: full ticket acceptance including provider case remains incomplete.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -8796,8 +8796,8 @@
         "git": "No commit/checkpoint: full ticket acceptance including provider case remains incomplete.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -8870,8 +8870,8 @@
         "git": "No commit/checkpoint: full ticket acceptance including provider case remains incomplete.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -8947,8 +8947,8 @@
         "git": "No commit, checkpoint or push; full ticket remains open.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         },
         "previousArchiveSha256": "ecfa1d44b86ab1e25518af855925f4182799dda5abbe1fc5f016fea7e7a8ce2e"
       }
@@ -9024,8 +9024,8 @@
         "git": "No commit, checkpoint or push; full ticket remains open.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         },
         "previousArchiveSha256": "ecfa1d44b86ab1e25518af855925f4182799dda5abbe1fc5f016fea7e7a8ce2e"
       }
@@ -9097,8 +9097,8 @@
         "git": "No commit/checkpoint/push; full parent remains open.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         },
         "previousArchiveSha256": "eef82dcc2228ea45b04fafa48cce0f7d72a1e385687a016ed644871c703b6539"
       },
@@ -9174,8 +9174,8 @@
         "previousArchiveSha256": "f5610421d4bc6bb7070c1445edc8568a8a7d00ccba7000c39e5ab1687d6c6e6e",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       },
       "nativeFollowup20260925": {
@@ -9285,8 +9285,8 @@
         "previousArchiveSha256": "f5610421d4bc6bb7070c1445edc8568a8a7d00ccba7000c39e5ab1687d6c6e6e",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -9381,8 +9381,8 @@
         "previousArchiveSha256": "a563184e4f03144af54ae90c0e77ed758742085d65029c4bddea5de32d1f5548",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -9476,8 +9476,8 @@
         "previousArchiveSha256": "a563184e4f03144af54ae90c0e77ed758742085d65029c4bddea5de32d1f5548",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-          "bytes": 232480528
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+          "bytes": 235600544
         }
       }
     },
@@ -10992,7 +10992,7 @@
         "sourceCommit": "d05f6619649151e9993cebbecfc0728aab0df565",
         "sourceSha256": "435877446cf304112efeaa1866fa5b038868812afdca418bb722f992c52d1803",
         "verified": "Store atta summary-only details collapse at normal/enlarged449/451; Store category and original product restored452/453. Review phone128 distinct highlight/specification/description/manufacturer retained458–463, including manufacturer200percent. Phone256 separate entry has70500 price and256GB plusExtended kit465/466. No Cart mutation.",
-        "pending": "Complete256 description/manufacturer return; unavailable/error native trigger remains separate; do not close yet.",
+        "pending": "Missing/loading/error/retry native trigger and remaining entry-path coverage; keep ticket open.",
         "observation": "Tap aimed at Description based on466 instead opened atta467 from phone context. Cause unconfirmed; no failure repair claimed. Code only admits same-category Similar products; phone review-devices cannot match atta, so possible stale screen/scroll state in More/Recently viewed below details, not proven Similar insertion. Refresh screenshot immediately before next coordinate action.",
         "evidence": {
           "path": "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/467-phone-256-description.png",
@@ -11001,11 +11001,14 @@
         "filenameCorrection": "460 filename says unavailable but actual frame contains manufacturer facts; treat observed pixels as authority.",
         "archive": {
           "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-          "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
+          "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
           "prefix": "product-details-native-checkpoint-20260925/",
           "screens": "447-468",
           "status": "partial native audit; ticket remains pending"
-        }
+        },
+        "followupNativeEvidence": "Frames469-479: Back from nested atta restores phone Recently viewed; fresh471 Description tap gives correct256-specific description472; manufacturer473 names site256; full manufacturer476 and description478 readable at200percent; normal font and iphone search restored479. No cart action.",
+        "observationDisposition": "Fresh Description interaction passed. Returned viewport470 is Recently viewed containing atta, supporting stale-coordinate hypothesis; no reproduced Description route defect and no unsupported root-cause claim.",
+        "followupArchivePrefix": "product-details-native-followup-20260925/"
       }
     },
     {
@@ -13304,8 +13307,8 @@
     ],
     "archive": {
       "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-      "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-      "bytes": 232480528
+      "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+      "bytes": 235600544
     }
   },
   "storeCloseQualification20260924": {
@@ -13322,8 +13325,8 @@
     "device": "No APK built or installed.",
     "archive": {
       "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-      "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-      "bytes": 232480528
+      "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+      "bytes": 235600544
     }
   },
   "productPageReference20260924": {
@@ -13338,8 +13341,8 @@
     ],
     "archive": {
       "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-      "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-      "bytes": 232480528
+      "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+      "bytes": 235600544
     },
     "reportEntry": "flipkart-reference-20260924-v2/definition.md",
     "screenshotCount": 29,
@@ -14619,8 +14622,8 @@
       "previousArchiveSha256": "a563184e4f03144af54ae90c0e77ed758742085d65029c4bddea5de32d1f5548",
       "archive": {
         "path": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "sha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
-        "bytes": 232480528
+        "sha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+        "bytes": 235600544
       }
     },
     "newChildStatus": "37 follow-ups:19 implemented/local-tested/targeted-Redmi-verified;18 pending required complete qualification, including partial-native A04.19 original parents also pending complete frontend acceptance.56 references total;37 pending qualification; founder approval separate.",
@@ -14925,7 +14928,7 @@
         "untracked": 0,
         "ignoredSourceTestConfigScriptsAndQualityFiles": 0,
         "evidenceArchive": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
-        "archiveSha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
+        "archiveSha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
         "intentionalExclusions": "Generated build/temp logs and unrelated private phone images442–443 remain ignored; no source or ticket work excluded.",
         "latestPreservation": "Native audit screenshots447-468 and partial PDP05-A03 findings checkpointed; no new closure or source change."
       },
