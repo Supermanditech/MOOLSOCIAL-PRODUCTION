@@ -4605,7 +4605,7 @@ void main() {
           await reveal(tester, priceAction);
           await tester.tap(priceAction);
           await tester.pumpAndSettle();
-          final field = find.byKey(const Key('work-quick-price'));
+          final field = find.byKey(const Key('work-product-selling-price'));
           expect(
             find.descendant(of: field, matching: find.text('10000000000')),
             findsOneWidget,
@@ -27547,7 +27547,7 @@ void main() {
   });
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('R6617 stock quantity safe keyboard and validation $scale', (
+    testWidgets('STOCKEDIT exact field and resizable columns $scale', (
       tester,
     ) async {
       final work = liveStore();
@@ -27555,73 +27555,80 @@ void main() {
         tester,
         route: '/app/work/workspace/dashboard',
         work: work,
-        viewport: const Size(320, 568),
+        viewport: const Size(360, 800),
         textScale: scale,
-        bottomInset: 24,
       );
       await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
-      final edit = find.byKey(const Key('work-catalogue-stock-oil-fortune-1l'));
-      await reveal(tester, edit);
-      await tester.tap(edit);
+      final divider = find.byKey(const Key('work-stock-column-resize'));
+      final beforeX = tester.getCenter(divider).dx;
+      await tester.drag(divider, const Offset(65, 0));
       await tester.pumpAndSettle();
-      final field = find.byKey(const Key('work-quick-stock'));
-      final save = find.byKey(const Key('work-quick-stock-save'));
-      final before = work.workspaceCatalogueItems.first.stock;
+      expect(tester.getCenter(divider).dx, greaterThan(beforeX + 40));
+      await tester.drag(divider, const Offset(-65, 0));
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(divider).dx, closeTo(beforeX, 2));
+      final original = work.workspaceCatalogueItems.first;
       final movements = work.workspaceStockMovements.length;
-      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
-      await tester.pumpAndSettle();
-      await tester.enterText(field, '-1');
-      await tester.ensureVisible(save);
-      await tester.pumpAndSettle();
-      expect(save.hitTestable(), findsOneWidget);
-      expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(348));
-      await tester.tap(save);
-      await tester.pumpAndSettle();
-      expect(find.text('Enter a valid available quantity.'), findsOneWidget);
-      expect(work.workspaceCatalogueItems.first.stock, before);
-      expect(work.workspaceStockMovements, hasLength(movements));
-      await tester.ensureVisible(save);
-      await tester.pumpAndSettle();
-      await captureStoreView(tester, 'stock-keyboard-open-error-$scale');
-      await tester.enterText(field, '4');
-      tester.view.viewInsets = const FakeViewPadding();
-      tester.testTextInput.hide();
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(save);
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(field).controller!.text, '4');
-      expect(find.text('Enter a valid available quantity.'), findsNothing);
-      final reasonField = find.byKey(const Key('work-quick-stock-reason'));
-      final reasonText = find.descendant(
-        of: reasonField,
-        matching: find.text('Counted in store'),
-      );
-      expect(reasonText, findsOneWidget);
-      expect(
-        tester.getBottomRight(reasonText).dy,
-        lessThanOrEqualTo(tester.getBottomRight(reasonField).dy),
-      );
-      expect(save.hitTestable(), findsOneWidget);
-      expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
-      expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(544));
-      expect(tester.takeException(), isNull);
-      await captureStoreView(tester, 'stock-keyboard-closed-$scale');
-      await tester.tap(save);
-      await tester.pumpAndSettle();
-      expect(field, findsNothing);
-      expect(work.workspaceCatalogueItems.first.stock, 4);
-      expect(work.workspaceStockMovements, hasLength(movements + 1));
-      expect(work.workspaceStockMovements.first.reason, 'Counted in store');
-      await tester.tap(edit);
-      await tester.pumpAndSettle();
-      await tester.enterText(field, '7');
-      tester.testTextInput.hide();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(field, findsNothing);
-      expect(work.workspaceCatalogueItems.first.stock, 4);
-      expect(work.workspaceStockMovements, hasLength(movements + 1));
+      for (final pair in [
+        ('stock', 'stock'),
+        ('price', 'selling-price'),
+        ('purchase', 'purchase-price'),
+        ('mrp', 'mrp'),
+        ('reorder', 'low-stock-threshold'),
+      ]) {
+        final cell = find.byKey(
+          Key('work-catalogue-${pair.$1}-${original.id}'),
+        );
+        await reveal(tester, cell);
+        if (pair.$1 == 'mrp') {
+          expect(
+            find.descendant(
+              of: cell,
+              matching: find.text(
+                original.mrp == null ? 'Not set' : '₹${original.mrp}',
+              ),
+            ),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(cell);
+        await tester.pumpAndSettle();
+        expect(find.text('Edit product'), findsOneWidget);
+        expect(find.byKey(const Key('work-quick-stock')), findsNothing);
+        expect(find.byKey(const Key('work-quick-price')), findsNothing);
+        final field = find.byKey(Key('work-product-${pair.$2}'));
+        final editable = tester.widget<EditableText>(
+          find.descendant(of: field, matching: find.byType(EditableText)),
+        );
+        expect(editable.focusNode.hasFocus, isTrue);
+        expect(field.hitTestable(), findsOneWidget);
+        if (pair.$1 == 'stock') {
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          await tester.pumpAndSettle();
+          await tester.enterText(field, '');
+          final save = find.byKey(const Key('work-product-save'));
+          await tester.ensureVisible(save);
+          await tester.pumpAndSettle();
+          expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(580));
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(find.text('Edit product'), findsOneWidget);
+          expect(work.workspaceCatalogueItems.first.stock, original.stock);
+          expect(work.workspaceStockMovements, hasLength(movements));
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.enterText(field, '7');
+        }
+        tester.testTextInput.hide();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.workspaceCatalogueItems.first.stock, original.stock);
+        expect(
+          work.workspaceCatalogueItems.first.sellingPrice,
+          original.sellingPrice,
+        );
+        expect(work.workspaceStockMovements, hasLength(movements));
+      }
       expect(tester.takeException(), isNull);
     });
   }
@@ -27784,8 +27791,11 @@ void main() {
     await reveal(tester, priceCell);
     await tester.tap(priceCell);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('work-quick-price')), '265');
-    await tester.tap(find.byKey(const Key('work-quick-price-save')));
+    await tester.enterText(
+      find.byKey(const Key('work-product-selling-price')),
+      '265',
+    );
+    await tester.tap(find.byKey(const Key('work-product-save')));
     await tester.pumpAndSettle();
     expect(work.workspaceCatalogueItems.first.sellingPrice, 265);
 
@@ -27795,11 +27805,14 @@ void main() {
     await reveal(tester, stockCell);
     await tester.tap(stockCell);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('work-quick-stock')), '4');
-    await tester.tap(find.byKey(const Key('work-quick-stock-save')));
+    await tester.enterText(find.byKey(const Key('work-product-stock')), '4');
+    await tester.tap(find.byKey(const Key('work-product-save')));
     await tester.pumpAndSettle();
     expect(work.workspaceCatalogueItems.first.stock, 4);
-    expect(work.workspaceStockMovements.first.reason, 'Counted in store');
+    expect(
+      work.workspaceStockMovements.first.reason,
+      'Product quantity updated',
+    );
 
     final editProduct = find.byKey(
       const Key('work-catalogue-edit-oil-fortune-1l'),

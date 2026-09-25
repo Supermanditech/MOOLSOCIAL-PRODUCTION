@@ -2689,3 +2689,43 @@ and does not expose its product picker; source support is not device proof. No
 provider/offer fabricated to unlock it. Restock/Buy integration remains deferred.
 Full enlarged-text, restart and cross-account device coverage remain pending.
 No stock, invoices, payments or publication records were changed by these tests.
+
+## Stock editor continuity and adjustable column — 25 September 2026
+
+Founder requested a draggable Product divider and direct stock/price/MRP links
+to the existing product editor, with the separate quick-edit popups removed.
+Implemented in the Store owner only: Product width is adjustable between 30%
+and 80%, with semantic increase/decrease actions and double-tap reset. Stock,
+selling price, purchase price, MRP and reorder cells route to the shared editor
+and focus their corresponding field. Deleted both old quick-edit implementations;
+the existing editor validation and stock-movement persistence remain authoritative.
+
+Local qualification: 58 affected tests passed, including normal/enlarged text,
+divider alignment, five exact-field links, invalid stock with keyboard visible,
+cancel without changes, existing save/stock movement, CSV and contextual search.
+Dart analysis and diff checks clean. Task output:
+outputs/stock-editor-divider-regression-r2.txt. The initial run exposed a missing
+Semantics increasedValue/decreasedValue contract; fixed and covered before device
+verification. No failures hidden or tests skipped to qualify this change.
+
+OPPO r66.41 debug attachment was re-established; hot restart loaded the new code.
+On-device Product divider dragged from 45% to 69%, then 35%; headers and rows
+remained aligned. Sunflower oil Stock 3, selling 260, purchase 230 and MRP cells
+each opened Edit product with the intended numeric field focused and the Save
+action above the keyboard. Cancelled every editor without saving product changes.
+
+Child STOCKEDIT-MRP-01: device testing revealed Stock displayed selling price as
+MRP when the stored MRP was null. Removed that fallback in both Stock treatments;
+unset MRP now says Not set, while explicit MRP remains unchanged. Regression
+assertion added; hot-reloaded OPPO confirmed Not set and existing 121/128 values.
+Evidence: task outputs/stock-divider-wide.png, stock-exact-editor.png and
+stock-mrp-not-set.png. Hot-loaded verification is not a rebuilt-APK closure.
+
+Populated Saved verification completed on OPPO: temporarily shortlisted Basmati
+rice, filtered Saved, searched rice, cleared, recalled rice from recent searches,
+and observed the same shortlisted item. Removed the temporary bookmark afterward;
+no Store stock or commercial records changed. Evidence:
+outputs/saved-populated-search.png. Wholesale selection remains device-unverified
+because the actual route has no eligible group offers; no offer/provider was
+fabricated. Backend, Cursor integration and new APK remain out of this change.
+Founder approval and future exact-APK qualification remain open.

@@ -13225,7 +13225,7 @@ class _WorkspaceCatalogueSurfaceState
     );
   }
 
-  Future<void> _edit(WorkspaceCatalogueItem product) async {
+  Future<void> _edit(WorkspaceCatalogueItem product, {String? field}) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (pageContext) => Scaffold(
@@ -13235,6 +13235,7 @@ class _WorkspaceCatalogueSurfaceState
               session: widget.session,
               product: product,
               embeddedPage: true,
+              initialField: field,
               onDone: () => Navigator.of(pageContext).pop(),
               onSaved: () => Navigator.of(pageContext).pop(),
             ),
@@ -13242,7 +13243,10 @@ class _WorkspaceCatalogueSurfaceState
         ),
       ),
     );
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _restoreStockAction(product.id);
+    }
   }
 
   Future<bool> _scan() async {
@@ -13263,265 +13267,6 @@ class _WorkspaceCatalogueSurfaceState
         .firstOrNull;
     await _edit(product ?? _blankProduct(barcode: code.trim()));
     return true;
-  }
-
-  Future<void> _changePrice(WorkspaceCatalogueItem product) async {
-    final price = TextEditingController(text: '${product.sellingPrice}');
-    final mrp = TextEditingController(text: product.mrp?.toString() ?? '');
-    String? error;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          final bottom = MediaQuery.viewInsetsOf(context).bottom;
-          return AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.fromLTRB(18, 0, 18, bottom + 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Change customer price',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: MoolColors.navy,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  '${product.title} · ${product.pack}',
-                  style: const TextStyle(color: MoolColors.muted),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: const Key('work-quick-price'),
-                        controller: price,
-                        autofocus: true,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Selling price',
-                          prefixText: '₹ ',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        key: const Key('work-quick-mrp'),
-                        controller: mrp,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
-                          labelText: 'MRP',
-                          prefixText: '₹ ',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    error!,
-                    style: const TextStyle(
-                      color: Color(0xFFB42318),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    key: const Key('work-quick-price-save'),
-                    onPressed: () {
-                      final sellingPrice = int.tryParse(price.text.trim());
-                      final maximumPrice = int.tryParse(mrp.text.trim());
-                      if (sellingPrice == null || sellingPrice <= 0) {
-                        setSheetState(
-                          () => error = 'Enter the price customers will pay.',
-                        );
-                        return;
-                      }
-                      if (maximumPrice != null && maximumPrice < sellingPrice) {
-                        setSheetState(
-                          () => error = 'MRP cannot be below selling price.',
-                        );
-                        return;
-                      }
-                      widget.session.addOrUpdateWorkspaceProduct(
-                        product.copyWith(
-                          sellingPrice: sellingPrice,
-                          mrp: maximumPrice,
-                          unitPrice: '₹$sellingPrice/${product.pack}',
-                        ),
-                      );
-                      Navigator.of(sheetContext).pop();
-                    },
-                    child: const Text('Update customer price'),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-    unawaited(
-      Future<void>.delayed(const Duration(milliseconds: 320), () {
-        price.dispose();
-        mrp.dispose();
-      }),
-    );
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _updateStock(WorkspaceCatalogueItem product) async {
-    final quantity = TextEditingController(text: '${product.stock}');
-    var reason = 'Counted in store';
-    String? error;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          final bottom = MediaQuery.viewInsetsOf(context).bottom;
-          return AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.fromLTRB(18, 0, 18, bottom + 18),
-            child: SafeArea(
-              top: false,
-              maintainBottomViewPadding: true,
-              child: SingleChildScrollView(
-                key: const Key('work-quick-stock-scroll'),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Update available quantity',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '${product.title} · ${product.pack}',
-                      style: const TextStyle(color: MoolColors.muted),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const Key('work-quick-stock'),
-                      controller: quantity,
-                      autofocus: true,
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantity',
-                        prefixIcon: Icon(Icons.inventory_2_outlined),
-                      ),
-                      onChanged: (value) {
-                        final parsed = int.tryParse(value.trim());
-                        if (error != null && parsed != null && parsed >= 0) {
-                          setSheetState(() => error = null);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      key: const Key('work-quick-stock-reason'),
-                      isExpanded: true,
-                      isDense: false,
-                      itemHeight: null,
-                      initialValue: reason,
-                      decoration: const InputDecoration(labelText: 'Reason'),
-                      items:
-                          const [
-                                'Counted in store',
-                                'Goods received',
-                                'Customer return',
-                                'Damage or expiry',
-                                'Correction',
-                              ]
-                              .map(
-                                (value) => DropdownMenuItem(
-                                  value: value,
-                                  child: Text(value),
-                                ),
-                              )
-                              .toList(growable: false),
-                      onChanged: (value) {
-                        if (value != null) setSheetState(() => reason = value);
-                      },
-                    ),
-                    if (error != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        error!,
-                        style: const TextStyle(
-                          color: Color(0xFFB42318),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        key: const Key('work-quick-stock-save'),
-                        onPressed: () {
-                          final parsed = int.tryParse(quantity.text.trim());
-                          if (parsed == null || parsed < 0) {
-                            setSheetState(
-                              () => error = 'Enter a valid available quantity.',
-                            );
-                            return;
-                          }
-                          final kind = switch (reason) {
-                            'Goods received' =>
-                              WorkspaceStockMovementKind.goodsReceived,
-                            'Customer return' =>
-                              WorkspaceStockMovementKind.returned,
-                            'Damage or expiry' =>
-                              WorkspaceStockMovementKind.damageOrExpiry,
-                            _ => WorkspaceStockMovementKind.adjustment,
-                          };
-                          if (widget.session.updateWorkspaceStock(
-                            productId: product.id,
-                            quantity: parsed,
-                            reason: reason,
-                            kind: kind,
-                          )) {
-                            Navigator.of(sheetContext).pop();
-                          }
-                        },
-                        child: const Text('Save quantity'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-    unawaited(
-      Future<void>.delayed(const Duration(milliseconds: 320), quantity.dispose),
-    );
-    if (mounted) {
-      setState(() {});
-      _restoreStockAction(product.id);
-    }
   }
 
   void _togglePublic(WorkspaceCatalogueItem product) {
@@ -13921,8 +13666,12 @@ class _WorkspaceCatalogueSurfaceState
                                 () => GlobalKey(),
                               ),
                               onEdit: () => _edit(product),
-                              onChangePrice: () => _changePrice(product),
-                              onUpdateStock: () => _updateStock(product),
+                              onChangePrice: () =>
+                                  _edit(product, field: 'sellingPrice'),
+                              onUpdateStock: () =>
+                                  _edit(product, field: 'stock'),
+                              onEditField: (field) =>
+                                  _edit(product, field: field),
                               onTogglePublic: () => _togglePublic(product),
                             ),
                   ),
@@ -14362,6 +14111,7 @@ class _StoreStockStatementTable extends StatefulWidget {
 
 class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
   final _horizontal = ScrollController();
+  double? _productWidth;
   @override
   void dispose() {
     _horizontal.dispose();
@@ -14407,128 +14157,176 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, box) {
-              final frozen = (box.maxWidth * .45).clamp(144.0, 240.0);
+              final minimum = box.maxWidth * .30;
+              final maximum = box.maxWidth * .80;
+              final frozen =
+                  (_productWidth ?? (box.maxWidth * .45).clamp(144.0, 240.0))
+                      .clamp(minimum, maximum);
+              void resize(double delta) => setState(() {
+                _productWidth = (frozen + delta).clamp(minimum, maximum);
+              });
               final total = frozen + widths.reduce((a, b) => a + b);
-              return Scrollbar(
-                controller: _horizontal,
-                thumbVisibility: true,
-                interactive: true,
-                thickness: 2,
-                radius: const Radius.circular(1),
-                scrollbarOrientation: ScrollbarOrientation.bottom,
-                child: SingleChildScrollView(
-                  key: const Key('work-stock-horizontal'),
-                  controller: _horizontal,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: total,
-                    height: box.maxHeight,
-                    child: Column(
-                      children: [
-                        _StockFrozenRow(
-                          key: const Key('work-stock-statement-header'),
-                          horizontal: _horizontal,
-                          frozenWidth: frozen,
-                          height: 36 * scale,
-                          background: const Color(0xFFF1F4FF),
-                          identity: const Padding(
-                            padding: EdgeInsets.only(left: 10),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'Product',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: MoolColors.muted,
-                                  fontWeight: FontWeight.w600,
+              return Stack(
+                children: [
+                  Scrollbar(
+                    controller: _horizontal,
+                    thumbVisibility: true,
+                    interactive: true,
+                    thickness: 2,
+                    radius: const Radius.circular(1),
+                    scrollbarOrientation: ScrollbarOrientation.bottom,
+                    child: SingleChildScrollView(
+                      key: const Key('work-stock-horizontal'),
+                      controller: _horizontal,
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: total,
+                        height: box.maxHeight,
+                        child: Column(
+                          children: [
+                            _StockFrozenRow(
+                              key: const Key('work-stock-statement-header'),
+                              horizontal: _horizontal,
+                              frozenWidth: frozen,
+                              height: 36 * scale,
+                              background: const Color(0xFFF1F4FF),
+                              identity: const Padding(
+                                padding: EdgeInsets.only(left: 10),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Product',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: MoolColors.muted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                          data: Row(
-                            children: [
-                              for (var i = 0; i < widths.length; i++)
-                                SizedBox(
-                                  width: widths[i],
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    child: Text(
-                                      const [
-                                        'Stock',
-                                        'Selling price',
-                                        'Purchase price',
-                                        'MRP',
-                                        'Reorder level',
-                                      ][i],
-                                      key: Key('work-stock-heading-$i'),
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: MoolColors.muted,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: NotificationListener<ScrollNotification>(
-                            onNotification: (n) {
-                              if (n.metrics.axis == Axis.vertical &&
-                                  n is ScrollUpdateNotification &&
-                                  n.metrics.extentAfter < 160) {
-                                widget.loadMore();
-                              }
-                              return false;
-                            },
-                            child: CustomScrollView(
-                              key: const Key('work-catalogue-list'),
-                              controller: widget.vertical,
-                              keyboardDismissBehavior:
-                                  ScrollViewKeyboardDismissBehavior.onDrag,
-                              slivers: [
-                                SliverList.builder(
-                                  itemCount: widget.visibleCount,
-                                  itemBuilder: (_, i) => widget.rowBuilder(
-                                    widget.products[i],
-                                    _horizontal,
-                                    frozen,
-                                    widths,
-                                    56 * scale,
-                                  ),
-                                ),
-                                if (widget.visibleCount <
-                                    widget.products.length)
-                                  SliverToBoxAdapter(
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: SizedBox(
-                                        width: frozen,
-                                        child: TextButton(
-                                          key: const Key(
-                                            'work-catalogue-load-more',
+                              data: Row(
+                                children: [
+                                  for (var i = 0; i < widths.length; i++)
+                                    SizedBox(
+                                      width: widths[i],
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        child: Text(
+                                          const [
+                                            'Stock',
+                                            'Selling price',
+                                            'Purchase price',
+                                            'MRP',
+                                            'Reorder level',
+                                          ][i],
+                                          key: Key('work-stock-heading-$i'),
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: MoolColors.muted,
+                                            fontWeight: FontWeight.w600,
                                           ),
-                                          onPressed: widget.loadMore,
-                                          child: const Text('Load more'),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                const SliverToBoxAdapter(
-                                  child: SizedBox(height: 12),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: NotificationListener<ScrollNotification>(
+                                onNotification: (n) {
+                                  if (n.metrics.axis == Axis.vertical &&
+                                      n is ScrollUpdateNotification &&
+                                      n.metrics.extentAfter < 160) {
+                                    widget.loadMore();
+                                  }
+                                  return false;
+                                },
+                                child: CustomScrollView(
+                                  key: const Key('work-catalogue-list'),
+                                  controller: widget.vertical,
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  slivers: [
+                                    SliverList.builder(
+                                      itemCount: widget.visibleCount,
+                                      itemBuilder: (_, i) => widget.rowBuilder(
+                                        widget.products[i],
+                                        _horizontal,
+                                        frozen,
+                                        widths,
+                                        56 * scale,
+                                      ),
+                                    ),
+                                    if (widget.visibleCount <
+                                        widget.products.length)
+                                      SliverToBoxAdapter(
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: SizedBox(
+                                            width: frozen,
+                                            child: TextButton(
+                                              key: const Key(
+                                                'work-catalogue-load-more',
+                                              ),
+                                              onPressed: widget.loadMore,
+                                              child: const Text('Load more'),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    const SliverToBoxAdapter(
+                                      child: SizedBox(height: 12),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: frozen - 12,
+                    top: 0,
+                    bottom: 4,
+                    width: 24,
+                    child: Semantics(
+                      label: 'Product column width',
+                      value: '${(frozen / box.maxWidth * 100).round()} percent',
+                      increasedValue:
+                          '${((frozen + 24).clamp(minimum, maximum) / box.maxWidth * 100).round()} percent',
+                      decreasedValue:
+                          '${((frozen - 24).clamp(minimum, maximum) / box.maxWidth * 100).round()} percent',
+                      onIncrease: () => resize(24),
+                      onDecrease: () => resize(-24),
+                      child: GestureDetector(
+                        key: const Key('work-stock-column-resize'),
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragUpdate: (details) =>
+                            resize(details.delta.dx),
+                        onDoubleTap: () => setState(() => _productWidth = null),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.resizeColumn,
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: SizedBox(
+                              height: 36 * scale,
+                              child: const Icon(
+                                Icons.drag_indicator,
+                                size: 16,
+                                color: MoolColors.muted,
+                              ),
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               );
             },
           ),
@@ -14605,6 +14403,7 @@ class _WorkspaceProductRow extends StatelessWidget {
     required this.onEdit,
     this.onChangePrice,
     this.onUpdateStock,
+    this.onEditField,
     this.onTogglePublic,
     this.stockActionKey,
     this.statement = false,
@@ -14620,6 +14419,7 @@ class _WorkspaceProductRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback? onChangePrice;
   final VoidCallback? onUpdateStock;
+  final ValueChanged<String>? onEditField;
   final VoidCallback? onTogglePublic;
   final Key? stockActionKey;
   final bool statement;
@@ -14909,19 +14709,21 @@ class _WorkspaceProductRow extends StatelessWidget {
                 2,
                 'work-catalogue-purchase-${product.id}',
                 '₹${_formatStoreAmount(product.purchasePrice)}',
-                onTap: onEdit,
+                onTap: () => onEditField?.call('purchasePrice'),
               ),
               cell(
                 3,
                 'work-catalogue-mrp-${product.id}',
-                '₹${_formatStoreAmount(product.mrp ?? product.sellingPrice)}',
-                onTap: onEdit,
+                product.mrp == null
+                    ? 'Not set'
+                    : '₹${_formatStoreAmount(product.mrp!)}',
+                onTap: () => onEditField?.call('mrp'),
               ),
               cell(
                 4,
                 'work-catalogue-reorder-${product.id}',
                 counted ? '${product.lowStockThreshold}' : 'Not applicable',
-                onTap: onEdit,
+                onTap: () => onEditField?.call('lowStockThreshold'),
               ),
             ],
           ),
@@ -15043,8 +14845,9 @@ class _WorkspaceProductRow extends StatelessWidget {
               ),
               child: _StoreMoneyLine(
                 leading: const Text('MRP', style: TextStyle(fontSize: 12)),
-                value:
-                    '₹${_formatStoreAmount(product.mrp ?? product.sellingPrice)}',
+                value: product.mrp == null
+                    ? 'Not set'
+                    : '₹${_formatStoreAmount(product.mrp!)}',
                 style: moneyStyle.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
@@ -15916,6 +15719,7 @@ class _CatalogueProductEditor extends StatefulWidget {
     required this.session,
     required this.product,
     this.embeddedPage = false,
+    this.initialField,
     this.onDone,
     this.onSaved,
     this.onDraftReviewed,
@@ -15927,6 +15731,7 @@ class _CatalogueProductEditor extends StatefulWidget {
   final WorkSession session;
   final WorkspaceCatalogueItem product;
   final bool embeddedPage;
+  final String? initialField;
   final VoidCallback? onDone;
   final VoidCallback? onSaved;
   final ValueChanged<WorkspaceCatalogueItem>? onDraftReviewed;
@@ -16101,6 +15906,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         widget.session.workspaceCatalogueItems.any(
           (item) => item.id == widget.product.id,
         );
+    if (widget.initialField case final field?) {
+      _expanded[_fieldSection(field)] = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _fieldFocus[field]?.requestFocus();
+        _revealImportIssue(field);
+      });
+    }
     if (widget.importRow case final row?) {
       final fields = _importControllers;
       for (final entry in row.rawValues.entries) {
