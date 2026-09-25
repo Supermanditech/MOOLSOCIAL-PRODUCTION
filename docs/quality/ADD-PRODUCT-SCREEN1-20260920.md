@@ -3130,3 +3130,15 @@ No stock edits, transactions, APK, backend or other-worktree integration.
 Existing pending physical landscape/enlarged/exact-APK checks remain open.
 All40 selected layout/atomic checks passed, including bottom alignment and
 upper/lower notch-path assertions. Log: outputs/home-bottom-notch-regression-20260926.txt.
+
+## HOME-03 thin contour passage
+
+Founder approved bottom-right placement and requested visible separation around
+the tab. Added a narrow background passage with6dp nominal side clearance and
+rounded top/bottom contour around the tab. Lower content safety inset follows
+the notch width; upper stock text and manual action state remain unchanged.
+All10 focused HOME/AP030 checks pass, including passage exclusion beside/above
+the tab and retained central surface; analysis clean. Evidence:
+outputs/home-contour-gap-20260926.txt and outputs/home-contour-gap-20260926.png.
+Hot reload succeeded; OPPO portrait screenshot visually inspected. No APK,
+transaction, backend or Cursor changes; prior outstanding device checks remain.

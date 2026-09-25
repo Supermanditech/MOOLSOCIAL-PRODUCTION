@@ -2084,6 +2084,19 @@ void main() {
         );
         expect(shape.contains(Offset(rect.width / 2, rect.height / 2)), isTrue);
         expect(shape.contains(Offset(rect.width - 2, 24)), isTrue);
+        final localTab = tabRect.shift(-rect.topLeft);
+        expect(
+          shape.contains(Offset(localTab.left - 2, localTab.center.dy)),
+          isFalse,
+        );
+        expect(
+          shape.contains(Offset(localTab.center.dx, localTab.top - 2)),
+          isFalse,
+        );
+        expect(
+          shape.contains(Offset(localTab.left - 10, localTab.center.dy)),
+          isTrue,
+        );
         final content = tester.getRect(
           find.byKey(const Key('work-home-notch-content')),
         );

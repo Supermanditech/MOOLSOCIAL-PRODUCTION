@@ -5046,6 +5046,9 @@ class _StoreRecentSale extends StatelessWidget {
   }
 }
 
+const _quickActionsContourGap = 6.0;
+const _quickActionsNotchWidth = 49.0 + _quickActionsContourGap;
+
 double _quickActionsNotchHeight(BuildContext context) {
   final label = TextPainter(
     text: const TextSpan(
@@ -5055,7 +5058,7 @@ double _quickActionsNotchHeight(BuildContext context) {
     textDirection: TextDirection.ltr,
     textScaler: MediaQuery.textScalerOf(context),
   )..layout();
-  final height = label.width + 33 + 8;
+  final height = label.width + 33 + 8 + _quickActionsContourGap;
   label.dispose();
   return height;
 }
@@ -5095,7 +5098,7 @@ class _ActivityDeckShell extends StatelessWidget {
             padding: EdgeInsets.only(
               right: stickyActions == null || child is _StockActivityCard
                   ? 0
-                  : 53,
+                  : _quickActionsNotchWidth,
             ),
             child: child,
           ),
@@ -5145,8 +5148,14 @@ class _QuickActionsNotch extends ShapeBorder {
     final notch = Path()
       ..addRRect(
         RRect.fromRectAndCorners(
-          Rect.fromLTWH(rect.right - 53, rect.bottom - height, 54, height + 1),
-          topLeft: const Radius.circular(16),
+          Rect.fromLTWH(
+            rect.right - _quickActionsNotchWidth,
+            rect.bottom - height,
+            _quickActionsNotchWidth + _quickActionsContourGap,
+            height + _quickActionsContourGap,
+          ),
+          topLeft: const Radius.circular(12 + _quickActionsContourGap),
+          bottomLeft: const Radius.circular(12 + _quickActionsContourGap),
         ),
       );
     return Path.combine(PathOperation.difference, outer, notch);
@@ -8536,7 +8545,9 @@ class _StockActivityCard extends StatelessWidget {
             ),
             child: Padding(
               key: const Key('work-stock-lower-content'),
-              padding: EdgeInsets.only(right: bottomNotchHeight > 0 ? 53 : 0),
+              padding: EdgeInsets.only(
+                right: bottomNotchHeight > 0 ? _quickActionsNotchWidth : 0,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
