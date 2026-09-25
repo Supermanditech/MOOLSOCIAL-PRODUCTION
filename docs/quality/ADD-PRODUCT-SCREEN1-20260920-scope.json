@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "491C149699C08C4E4B95393B1444661918678C5FBD8FE1160E38DFE1BBD7419A",
+      "manifestSha256": "D5367A14502774B4E02AB6CE61046F7931FF62B449745336C39A06237E58EFA1",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -79,7 +79,8 @@
       "Founder-authorized exact variant and pack presentation, shared product metadata editor and public-field disposition; preserve one-time Store setup and system ownership, defer backend and pause for revised editor approval",
       "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review",
       "23 September founder-authorized continuation: implement the 31 grouped r66.38 Store/catalogue/Counter Sale findings, fix related child defects during local tests, and present all affected actual screens together for founder approval before a new APK",
-      "24 September founder bounded extension v1: shared contextual A4/58/80 mm printing, evidence-backed orphan-history recovery, and manual-photo stock-to-POS continuity; local tests and Git preservation before guarded APK; no automatic installation"
+      "24 September founder bounded extension v1: shared contextual A4/58/80 mm printing, evidence-backed orphan-history recovery, and manual-photo stock-to-POS continuity; local tests and Git preservation before guarded APK; no automatic installation",
+      "26 September Store home authority v1: HOME-01–04 correction, reproduce HOME-05/06, explicit wallet Actions expand/manual collapse with central reflow, remove working-screen contextual rails while preserving actions, local and OPPO hot-reload tests"
     ],
     "explicitExclusions": [
       "CSV batch-review redesign pending its screenwise approval",

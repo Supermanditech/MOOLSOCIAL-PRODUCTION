@@ -2903,3 +2903,63 @@ their navigation and essential actions; those screens were not audited here.
 Landscape/large-text/empty/error/live-order variants remain unverified in this
 audit. No records changed or APK built. Existing pending list stays active.
 Await founder review before implementation of HOME-01 through HOME-06/proposals.
+
+## Store home implementation authority v1 — 26 September 2026
+
+Founder now authorizes this bounded implementation plus OPPO hot-reload testing,
+including removal of contextual rails from other Store working screens (not
+removal of screens). This supersedes the audit-only hold immediately above.
+HOME-01–04 are implementation targets; reproduce HOME-05/06 before correction.
+Actions starts collapsed, expands on tap, stays expanded until manual collapse
+within the Store session, and reflows central content without covering it.
+
+Classification: mvp_supporting, bounded Store usability/accessibility correction.
+Reuse the existing dashboard, action callbacks, session and canonical working
+screens. No new route, backend owner or duplicated business rule. Removing rails
+must preserve essential navigation and actions through their existing owners.
+No Cursor integration, backend, APK, data clearing or financial transactions.
+Local tests cover width reflow, manual collapse, retained centre state, action
+reachability, short invoice content, truthful method/status wording and compact,
+landscape/enlarged text. OPPO hot-reload evidence remains separate from exact-APK
+qualification and founder acceptance. Earlier pending tickets remain open.
+Implementation and verification are pending; this entry is authority, not closure.
+
+## Store home bounded implementation checkpoint — 26 September 2026
+
+Status: implemented/local checks passed; partial OPPO hot-load verification.
+Not founder acceptance, exact-APK qualification, or closure of earlier tickets.
+
+| Reference | Implementation and evidence | Remaining |
+| --- | --- | --- |
+| HOME-01 | Neutral finance surface/amounts and restrained invoice CTA; OPPO portrait finance visually inspected | Device enlarged text |
+| HOME-02 | Invoice natural-height card, reachable View invoice; local compactness test | Invoice home variant physical check |
+| HOME-02-C1 | When invoice priority was corrected, OPPO exposed the same tall blank/solid CTA pattern on Check stock. Natural-height stock card, neutral product name and text action now hot-loaded; dedicated compactness/action/nonmutation test passed | Device landscape/enlarged text |
+| HOME-03 | Labelled wallet-style Actions toggle; collapsed initially, explicit manual collapse, Store-scoped session state; centre reflows without overlay. OPPO expanded/collapsed and Sales-return persistence checked | Physical landscape/enlarged text; exact APK |
+| HOME-04 | Explicit Payment method wording, no inferred receipt or delivery success; local invoice test passed | Physical invoice-home variant |
+| HOME-05 | Test reproduced restored insertion-order error before fix. Latest invoice now selected by issuedAt without mutating history; regression passed | Exact APK |
+| HOME-06 | Test reproduced unsent invoice displacing active group activity. Invoice is now fallback after actionable home activity; no sharedChannels/delivery-state fabrication | Broader live activity variants |
+| HOME-RAIL-01 | Removed contextual working-screen rail implementation, not the screens. Existing Sales Counter sale action restored; canonical navigation retained. OPPO portrait checked Sales, dues, statement, incoming stock, purchase/expense registers and settlement | Physical landscape/enlarged text; exact APK |
+
+Local evidence: 29 selected checks passed in the combined layout/atomic run, plus
+one dedicated HOME-02-C1 stock-card check passed. Covers manual toggle/reflow,
+compact/landscape/2x text, action reachability, latest-invoice ordering, home
+priority, full-width working screens, offer validation/requirement navigation,
+Restock filter isolation, keyboard/draft recovery, invoice register and complete
+Counter Sale test journeys at 1x/2x. Old rail expectations were replaced with
+canonical navigation, retaining business/draft/nonmutation assertions. This is a
+selected regression run, not an assertion that the entire repository suite ran.
+
+Task evidence: outputs/home-rail-regression-final-20260926.txt (29 passed),
+outputs/store-home-current-20260926.png, outputs/store-home-expenses-20260926.png,
+outputs/store-home-review-20260926.png. Dart analysis of both changed application
+files and both changed test files passed. No APK built or installed, no app data
+cleared, no Store records/transactions changed, no Cursor edits or integration.
+
+OPPO debug session required one hot restart after removal of a stateful rail
+class; subsequent hot reload succeeded. Device shows existing review data, not
+production inventory. Android denied debug WRITE_SETTINGS rotation changes;
+neither rotation setting changed. Requested physical landscape rotation from
+founder; physical landscape/enlarged-text evidence remains pending. Keep bounded
+goal and tickets open for that verification and founder review. Prior pending
+list remains unchanged, including exact-APK closure, GSTIN/backend delivery,
+physical printing, wholesale eligibility and cross-account/cold-restart coverage.

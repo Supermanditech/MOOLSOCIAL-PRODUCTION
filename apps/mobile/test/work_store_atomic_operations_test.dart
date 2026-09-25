@@ -550,6 +550,34 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  test(
+    'HOME latest invoice follows issue time not restored insertion order',
+    () {
+      final work = WorkSession()..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      WorkspaceCustomerInvoice invoice(String id, DateTime issuedAt) =>
+          WorkspaceCustomerInvoice(
+            id: id,
+            orderId: id,
+            customer: 'Customer',
+            items: 'Goods',
+            amount: 250,
+            payment: 'Cash',
+            issuedAt: issuedAt,
+          );
+      final older = invoice('INV-OLDER', DateTime.utc(2026, 9, 24));
+      final newer = invoice('INV-NEWER', DateTime.utc(2026, 9, 26));
+      work.workspaceInvoices.addAll([older, newer]);
+      expect(work.latestWorkspaceInvoice?.id, 'INV-NEWER');
+      expect(work.workspaceInvoices.map((record) => record.id), [
+        'INV-OLDER',
+        'INV-NEWER',
+      ]);
+      work.workspaceInvoices.clear();
+      expect(work.latestWorkspaceInvoice, isNull);
+    },
+  );
+
   group('PRIVATEPHOTO scoped durable media', () {
     TestWidgetsFlutterBinding.ensureInitialized();
     late Directory directory;

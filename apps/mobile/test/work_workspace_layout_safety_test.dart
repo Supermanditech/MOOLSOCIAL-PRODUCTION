@@ -713,13 +713,15 @@ class _StorePaymentTermsProbe implements BuyV2CommercialPaymentTermsAdapter {
 Future<void> openCounterSaleFromSales(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('work-store-sell')));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.byKey(const Key('work-quick-counter-sale')));
+  await tester.ensureVisible(
+    find.byKey(const Key('work-sales-new-counter-sale')),
+  );
   await tester.pumpAndSettle();
   expect(
-    find.byKey(const Key('work-quick-counter-sale')).hitTestable(),
+    find.byKey(const Key('work-sales-new-counter-sale')).hitTestable(),
     findsOneWidget,
   );
-  await tester.tap(find.byKey(const Key('work-quick-counter-sale')));
+  await tester.tap(find.byKey(const Key('work-sales-new-counter-sale')));
   await tester.pumpAndSettle();
 }
 
@@ -1665,6 +1667,7 @@ void main() {
     bool uiReviewOnly = false,
     BuyV2CustomerStateStore? consumerStateStore,
     bool settle = true,
+    bool openHomeActions = true,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = viewport;
@@ -1742,6 +1745,14 @@ void main() {
       ),
     );
     if (settle) await tester.pumpAndSettle();
+    // Existing action journeys start by deliberately opening the new home tab.
+    // HOME tests opt out to prove the actual collapsed entry state separately.
+    final actions = find.byKey(const Key('work-home-actions-toggle'));
+    if (settle && openHomeActions && actions.evaluate().isNotEmpty) {
+      await tester.ensureVisible(actions);
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+    }
   }
 
   WorkSession storeViewFixture([
@@ -1863,6 +1874,17 @@ void main() {
   }
 
   Future<void> reveal(WidgetTester tester, Finder finder) async {
+    final actions = find.byKey(const Key('work-home-actions-toggle'));
+    if (finder.evaluate().isEmpty &&
+        actions.evaluate().isNotEmpty &&
+        find
+            .byKey(const Key('work-store-quick-actions-scroll'))
+            .evaluate()
+            .isEmpty) {
+      await tester.ensureVisible(actions);
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+    }
     final salesRecords = find.byKey(const ValueKey('work-finance-payments'));
     final vertical = find.byWidgetPredicate(
       (widget) =>
@@ -2011,6 +2033,153 @@ void main() {
     await tester.tap(find.byKey(const Key('downloads-stock-statement')));
     await tester.pumpAndSettle();
   }
+
+  for (final display in [
+    (360.0, 720.0, 1.0),
+    (720.0, 360.0, 1.0),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('HOME rail reflow and manual collapse $display', (
+      tester,
+    ) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+        openHomeActions: false,
+      );
+      final toggle = find.byKey(const Key('work-home-actions-toggle'));
+      final rail = find.byKey(const Key('work-store-action-edge'));
+      final centre = find.byKey(const Key('work-store-activity-deck'));
+      expect(toggle.hitTestable(), findsOneWidget);
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
+      final before = tester.getSize(centre).width;
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
+      if (display.$1 >= 360 && display.$3 == 1) {
+        expect(tester.getSize(centre).width, lessThan(before));
+        expect(
+          tester.getRect(centre).right,
+          lessThanOrEqualTo(tester.getRect(rail).left),
+        );
+      }
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
+      expect(tester.getSize(centre).width, before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('HOME compact invoice and method wording', (tester) async {
+    final work = liveStore();
+    work.workspaceInvoices.add(
+      WorkspaceCustomerInvoice(
+        id: 'INV-HOME',
+        orderId: 'ORDER-HOME',
+        customer: 'Customer',
+        items: 'Goods',
+        amount: 250,
+        payment: 'Cash',
+        issuedAt: DateTime(2026, 9, 26),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 720),
+    );
+    expect(find.text('Payment method: Cash'), findsOneWidget);
+    expect(find.text('Cash'), findsNothing);
+    expect(find.text('Send invoice'), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const Key('work-activity-invoice'))).height,
+      lessThan(300),
+    );
+    expect(
+      find.byKey(const Key('work-invoice-open')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Material>(
+            find.byKey(const Key('work-store-finance-material')),
+          )
+          .color,
+      Colors.white,
+    );
+    expect(work.workspaceInvoices.single.sharedChannels, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'HOME stock child stays compact with reachable canonical action',
+    (tester) async {
+      final work = liveStore();
+      final product = work.workspaceCatalogueItems.first.copyWith(stock: 3);
+      work.workspaceCatalogueItems
+        ..clear()
+        ..add(product);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 720),
+        textScale: 1,
+        openHomeActions: false,
+      );
+      final card = find.byKey(const Key('work-activity-stock'));
+      expect(card, findsOneWidget);
+      expect(tester.getSize(card).height, lessThan(300));
+      expect(
+        tester.widget<Text>(find.text(product.title)).style!.color,
+        const Color(0xFF252B38),
+      );
+      final action = find.widgetWithText(TextButton, 'View stock');
+      expect(action.hitTestable(), findsOneWidget);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
+      expect(work.workspaceCatalogueItems.single.stock, 3);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('HOME unsent invoice does not displace active group work', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrderStage = 'Completed';
+    work.currentWorkspaceOrderId = null;
+    work.workspaceOrders.clear();
+    work.workspaceInvoices.add(
+      WorkspaceCustomerInvoice(
+        id: 'INV-UNSENT',
+        orderId: 'ORDER-UNSENT',
+        customer: 'Customer',
+        items: 'Goods',
+        amount: 250,
+        payment: 'Cash',
+        issuedAt: DateTime(2026, 9, 26),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 720),
+    );
+    expect(find.byKey(const Key('work-activity-group-bulk')), findsOneWidget);
+    expect(work.workspaceInvoices.single.sharedChannels, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   Future<void> openStoreStockStatement(WidgetTester tester) async {
     await openStoreStockReports(tester);
@@ -4082,251 +4251,112 @@ void main() {
     (320.0, 568.0, 1.4),
     (320.0, 568.0, 2.0),
   ]) {
-    testWidgets('S09 DF04 compact first-tap access $display', (tester) async {
-      final work = liveStore();
-      await mount(
-        tester,
-        route: '/app/work/workspace/dashboard',
-        work: work,
-        viewport: Size(display.$1, display.$2),
-        textScale: display.$3,
-        bottomInset: 24,
-      );
-      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
-      final statement = find.byKey(const Key('work-pulse-sales'));
-      await reveal(tester, statement);
-      await tester.tap(statement);
-      await tester.pumpAndSettle();
-      final rail = find.byKey(const Key('work-contextual-shortcuts'));
-      expect(rail.hitTestable(), findsOneWidget);
-      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
-      final surface = find.byKey(const Key('work-first-tap-working-surface'));
-      expect(
-        find.byKey(const Key('work-dashboard-inline-search-band')),
-        findsNothing,
-      );
-      if (display.$1 < 360 || (display.$3 > 1.3 && display.$1 < 600)) {
-        expect(tester.getSize(rail).height, lessThanOrEqualTo(54));
-        expect(
-          tester
-              .widget<SingleChildScrollView>(
-                find.byKey(const Key('work-contextual-shortcut-scroll')),
-              )
-              .scrollDirection,
-          Axis.horizontal,
-        );
-        expect(tester.getSize(surface).width, display.$1);
-        expect(
-          tester.getRect(surface).bottom,
-          lessThanOrEqualTo(tester.getRect(rail).top),
-        );
-      } else {
-        expect(tester.getSize(rail).width, lessThanOrEqualTo(56));
-        expect(tester.getSize(rail).height, lessThanOrEqualTo(196));
-        expect(
-          tester.getSize(rail).height,
-          lessThan(tester.getSize(surface).height),
-        );
-        expect(
-          tester
-              .widget<SingleChildScrollView>(
-                find.byKey(const Key('work-contextual-shortcut-scroll')),
-              )
-              .scrollDirection,
-          Axis.vertical,
-        );
-        expect(
-          tester.getRect(surface).right,
-          lessThanOrEqualTo(tester.getRect(rail).left),
-        );
-        expect(tester.getRect(surface).top, tester.getRect(rail).top);
-      }
-      expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
-      expect(find.byKey(const Key('work-shortcut-restock')), findsNothing);
-      expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
-      final selected = find.byKey(const Key('work-shortcut-statement'));
-      expect(tester.widget<InkWell>(selected).onTap, isNull);
-      final semantics = tester.ensureSemantics();
-      try {
-        expect(
-          tester.getSemantics(
-            find.byKey(const Key('work-shortcut-state-statement')),
-          ),
-          matchesSemantics(
-            label: 'View statement',
-            isButton: true,
-            hasEnabledState: true,
-            isEnabled: false,
-            hasSelectedState: true,
-            isSelected: true,
-          ),
-        );
-      } finally {
-        semantics.dispose();
-      }
-      await captureStoreView(
-        tester,
-        'rail-statement-${display.$1}-${display.$3}',
-      );
-      for (final action in [
-        ('dues', 'Dues', 'work-store-dues'),
-        ('payments', 'Settle', 'work-money-destination'),
-      ]) {
-        final target = find.byKey(Key('work-shortcut-${action.$1}'));
-        await reveal(tester, target);
-        expect(target.hitTestable(), findsOneWidget);
-        expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
-        final text = find.descendant(
-          of: target,
-          matching: find.text(action.$2),
-        );
-        final paragraph = tester.renderObject<RenderParagraph>(text);
-        expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
-        expect((paragraph.text as TextSpan).style!.fontFamily, isNot('Ahem'));
-        expect((paragraph.text as TextSpan).style!.fontFamily, isNotNull);
-        expect(paragraph.didExceedMaxLines, isFalse);
-        expect(
-          paragraph.getBoxesForSelection(
-            TextSelection(baseOffset: 0, extentOffset: action.$2.length),
-          ),
-          hasLength(1),
-        );
-        await tester.tap(target);
-        await tester.pumpAndSettle();
-        expect(find.byKey(Key(action.$3)), findsOneWidget);
-        expect(tester.widget<InkWell>(target).onTap, isNull);
-        await captureStoreView(
+    testWidgets(
+      'S09 DF04 full-width working screens and canonical actions $display',
+      (tester) async {
+        final work = liveStore();
+        await mount(
           tester,
-          'rail-${action.$1}-${display.$1}-${display.$3}',
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+          bottomInset: 24,
         );
-        expect(tester.takeException(), isNull);
-      }
-      await tester.tap(find.byKey(const Key('work-store-home')));
-      await tester.pumpAndSettle();
-      final shareStore = find.byKey(const Key('work-quick-store-link'));
-      await reveal(tester, shareStore);
-      await tester.tap(shareStore);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-link')), findsNothing);
-      expect(
-        find.byKey(const Key('work-store-link-unavailable')),
-        findsNothing,
-      );
-      expect(tester.widget<InkWell>(shareStore).onTap, isNull);
-      expect(find.byKey(const Key('work-shortcut-dues')), findsNothing);
-      expect(find.byKey(const Key('work-shortcut-restock')), findsNothing);
-      await captureStoreView(tester, 'rail-share-${display.$1}-${display.$3}');
-      if (display.$3 >= 2) {
-        final scroll = find.byKey(const Key('work-dashboard-enlarged-scroll'));
-        await tester.drag(scroll, const Offset(0, -330));
+        for (final action in [
+          ('work-pulse-sales', 'work-store-statement'),
+          ('work-pulse-dues', 'work-store-dues'),
+          ('work-pulse-settlement', 'work-money-destination'),
+          ('work-incoming-purchases', 'work-store-track-stock'),
+          ('work-quick-create-offer', 'work-store-offers-screen'),
+        ]) {
+          final target = find.byKey(Key(action.$1));
+          await reveal(tester, target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+          expect(find.byKey(Key(action.$2)), findsOneWidget);
+          if (action.$2 == 'work-store-offers-screen') {
+            final offerScroll = find
+                .descendant(
+                  of: find.byKey(Key(action.$2)),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            expect(
+              tester.getSize(find.byKey(Key(action.$2))).height,
+              greaterThan(display.$2 * .55),
+            );
+            await tester.scrollUntilVisible(
+              find.byKey(const Key('work-offer-order-cap')),
+              120,
+              scrollable: offerScroll,
+              maxScrolls: 30,
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('Order limit'), findsOneWidget);
+            final publish = find.byKey(const Key('work-offer-publish'));
+            await tester.scrollUntilVisible(
+              publish,
+              120,
+              scrollable: offerScroll,
+              maxScrolls: 30,
+            );
+            await tester.pumpAndSettle();
+            expect(publish.hitTestable(), findsOneWidget);
+            expect(tester.widget<FilledButton>(publish).onPressed, isNull);
+          }
+          expect(
+            find.byKey(const Key('work-contextual-shortcuts')),
+            findsNothing,
+          );
+          expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
+          expect(
+            tester
+                .getSize(
+                  find.byKey(const Key('work-first-tap-working-surface')),
+                )
+                .width,
+            display.$1,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byKey(const Key('work-store-home')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-quick-counter-sale')),
+            findsOneWidget,
+            reason:
+                'Returning home must retain the explicitly expanded Actions choice.',
+          );
+        }
+        final share = find.byKey(const Key('work-quick-store-link'));
+        await reveal(tester, share);
+        expect(tester.widget<InkWell>(share).onTap, isNull);
+        final requirement = find.byKey(const Key('work-quick-requirement'));
+        await reveal(tester, requirement);
+        await tester.tap(requirement);
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('work-quick-store-link')).hitTestable(),
+          find.byKey(const Key('work-requirement-selector')),
           findsOneWidget,
         );
-        await captureStoreView(
-          tester,
-          'share-content-scrolled-${display.$1}-${display.$3}',
-        );
-        await tester.tap(find.byKey(const Key('work-quick-store-link')));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('work-store-link-unavailable')),
-          findsNothing,
+          find.byKey(const Key('work-store-activity-deck')),
+          findsOneWidget,
         );
-      }
-      await reveal(tester, find.byKey(const Key('work-quick-create-offer')));
-      await tester.tap(find.byKey(const Key('work-quick-create-offer')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-offers-screen')), findsOneWidget);
-      expect(
-        tester
-            .widget<InkWell>(find.byKey(const Key('work-shortcut-storeLink')))
-            .onTap,
-        isNull,
-      );
-      expect(
-        tester
-            .getSize(find.byKey(const Key('work-store-offers-screen')))
-            .height,
-        greaterThan(display.$2 * .55),
-        reason:
-            'Offers must retain useful editing space, not only avoid overflow',
-      );
-      for (final caption in ['Share', 'Offers', 'Post']) {
-        final paragraph = tester.renderObject<RenderParagraph>(
-          find.descendant(of: rail, matching: find.text(caption)),
-        );
-        expect(
-          paragraph.getBoxesForSelection(
-            TextSelection(baseOffset: 0, extentOffset: caption.length),
-          ),
-          hasLength(1),
-          reason: '$caption must remain whole at ${display.$3}x',
-        );
-      }
-      await captureStoreView(
-        tester,
-        'rail-promote-${display.$1}-${display.$3}',
-      );
-      final offerScroll = find
-          .descendant(
-            of: find.byKey(const Key('work-store-offers-screen')),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      final orderLimit = find.byKey(const Key('work-offer-order-cap'));
-      await tester.scrollUntilVisible(
-        orderLimit,
-        120,
-        scrollable: offerScroll,
-        maxScrolls: 30,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Order limit'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('work-offer-publish')),
-        120,
-        scrollable: offerScroll,
-        maxScrolls: 30,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-offer-publish')).hitTestable(),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const Key('work-offer-publish')))
-            .onPressed,
-        isNull,
-      );
-      await captureStoreView(
-        tester,
-        'rail-offer-limit-${display.$1}-${display.$3}',
-      );
-      final post = find.byKey(const Key('work-shortcut-paidWork'));
-      await reveal(tester, post);
-      await tester.tap(post);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-requirement-selector')),
-        findsOneWidget,
-      );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-offers-screen')), findsOneWidget);
-      expect(work.workspaceOffers, isEmpty);
-      expect(work.workspaceInvoices, isEmpty);
-      expect(work.workspaceOrders, isEmpty);
-      expect(work.workspaceAcceptingOrders, isTrue);
-      expect(work.workspaceVisibleToCustomers, isTrue);
-      await tester.tap(find.byKey(const Key('work-store-home')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
-      expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(work.workspaceOffers, isEmpty);
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
+        final sale = find.byKey(const Key('work-sales-new-counter-sale'));
+        await reveal(tester, sale);
+        expect(sale.hitTestable(), findsOneWidget);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrders, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final display in [(320.0, 1.0), (360.0, 1.0), (412.0, 2.0)]) {
@@ -4499,7 +4529,10 @@ void main() {
       buy.chooseFilter('freight');
       await openTrackedPurchases(tester);
       await tester.pumpAndSettle();
-      final restock = find.byKey(const Key('work-shortcut-restock'));
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      final restock = find.byKey(const Key('work-quick-buy'));
       await reveal(tester, restock);
       await tester.tap(restock);
       await tester.pumpAndSettle();
@@ -9654,7 +9687,8 @@ void main() {
         await tester.tap(find.byKey(const Key('work-store-sell')));
         await tester.pumpAndSettle();
         expect(find.text('Counter sale'), findsOneWidget);
-        final action = find.byKey(const Key('work-quick-counter-sale'));
+        expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
+        final action = find.byKey(const Key('work-sales-new-counter-sale'));
         await tester.ensureVisible(action);
         await tester.pumpAndSettle();
         expect(action.hitTestable(), findsOneWidget);
@@ -17804,13 +17838,15 @@ void main() {
           await captureStoreView(tester, 'pos-sales-records-$scale');
           await reveal(
             tester,
-            find.byKey(const Key('work-quick-counter-sale')),
+            find.byKey(const Key('work-sales-new-counter-sale')),
           );
           expect(
-            find.byKey(const Key('work-quick-counter-sale')).hitTestable(),
+            find.byKey(const Key('work-sales-new-counter-sale')).hitTestable(),
             findsOneWidget,
           );
-          await tester.tap(find.byKey(const Key('work-quick-counter-sale')));
+          await tester.tap(
+            find.byKey(const Key('work-sales-new-counter-sale')),
+          );
           await tester.pumpAndSettle();
         }
         await captureStoreView(tester, 'pos-empty-sale-$entry-$scale');
@@ -18351,7 +18387,7 @@ void main() {
               .stock,
           stock - 1,
         );
-        expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
+        expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
         expect(
           tester.getRect(find.byKey(const Key('work-store-sell'))),
           dashboardBottom,
@@ -27681,7 +27717,7 @@ void main() {
         textScale: scale,
       );
       final band = find.byKey(const Key('work-dashboard-inline-search-band'));
-          expect(tester.widget(band), isA<SizedBox>());
+      expect(tester.widget(band), isA<SizedBox>());
       await tester.tap(find.byKey(const Key('work-dashboard-search')));
       await tester.pumpAndSettle();
       final field = find.byKey(const Key('work-dashboard-search-field'));
@@ -27691,7 +27727,7 @@ void main() {
       expect(decoration.filled, isFalse);
       expect(decoration.border, InputBorder.none);
       expect(decoration.focusedBorder, InputBorder.none);
-          expect(tester.widget(band), isA<SizedBox>());
+      expect(tester.widget(band), isA<SizedBox>());
       expect(
         find.byKey(const Key('work-dashboard-search-results')),
         findsOneWidget,

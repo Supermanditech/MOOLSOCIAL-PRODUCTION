@@ -505,6 +505,7 @@ class _WorkWorkspaceDashboardScreenState
   final _saleSearchController = TextEditingController();
   final Map<String, Map<String, String>> _requirementDrafts = {};
   final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
+  final Set<Object> _expandedHomeActions = {};
   bool _requirementPickerOpen = false;
   _WorkspaceControlView _view = _WorkspaceControlView.dashboard;
   bool _draftAcceptingOrders = true;
@@ -1378,30 +1379,7 @@ class _WorkWorkspaceDashboardScreenState
       navigationOverBody: false,
       resizeToAvoidBottomInset: _view != _WorkspaceControlView.procurement,
       bottomAction: bottomAction,
-      body: _StoreFirstTapAccess(
-        keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
-        enabled:
-            _view == _WorkspaceControlView.operation &&
-            !saleOpen &&
-            !salesOpen &&
-            _operation != _WorkspaceOperation.orders &&
-            _operation != _WorkspaceOperation.deliverySettings &&
-            _operation != _WorkspaceOperation.staff,
-        active: _view == _WorkspaceControlView.procurement
-            ? (_trackedPurchase == null ? 'restock' : 'sourcing')
-            : _operation.name,
-        procurement: _view == _WorkspaceControlView.procurement
-            ? _activeProcurement
-            : null,
-        onSelect: (operation) => unawaited(
-          _navigateFromCounterDraft(() {
-            if (operation == null) {
-              _showProcurement();
-            } else {
-              _showOperation(operation);
-            }
-          }),
-        ),
+      body: _StoreWorkingSurface(
         child: _withReviewSeedControls(switch (saleOpen || salesOpen
             ? _WorkspaceControlView.dashboard
             : _view) {
@@ -1409,6 +1387,19 @@ class _WorkWorkspaceDashboardScreenState
             session: session,
             workspace: workspace,
             homeContentScroll: _homeContentScroll,
+            actionsExpanded: _expandedHomeActions.contains(
+              session.workspaceStockHistoryScope()?.key ?? workspace.id,
+            ),
+            onToggleActions: () {
+              final scope =
+                  session.workspaceStockHistoryScope()?.key ?? workspace.id;
+              setState(() {
+                if (!_expandedHomeActions.remove(scope)) {
+                  _expandedHomeActions.add(scope);
+                }
+              });
+              unawaited(HapticFeedback.selectionClick());
+            },
             onNavigate: (action) =>
                 unawaited(_navigateFromCounterDraft(action)),
             workingCentre: saleOpen
@@ -1418,7 +1409,7 @@ class _WorkWorkspaceDashboardScreenState
                     key: _salesKey,
                     session: session,
                     salesOnly: true,
-                    showNewSaleAction: false,
+                    showNewSaleAction: true,
                     onNewSale: () {
                       if (session.prepareWorkspaceOrder(
                         source: 'Counter',
@@ -3483,241 +3474,21 @@ bool _storeActionsBelowContent(BuildContext context) {
       (width < 600 && MediaQuery.textScalerOf(context).scale(1) > 1.3);
 }
 
-class _StoreFirstTapAccess extends StatefulWidget {
-  const _StoreFirstTapAccess({
-    required this.enabled,
-    required this.keyboardVisible,
-    required this.active,
-    required this.onSelect,
-    required this.child,
-    this.procurement,
-  });
-
-  final bool enabled;
-  final bool keyboardVisible;
-  final String active;
-  final BuyV2Session? procurement;
-  final ValueChanged<_WorkspaceOperation?> onSelect;
+// Working screens own their actions; no hidden contextual rail remains.
+class _StoreWorkingSurface extends StatelessWidget {
+  const _StoreWorkingSurface({required this.child});
   final Widget child;
 
   @override
-  State<_StoreFirstTapAccess> createState() => _StoreFirstTapAccessState();
-}
-
-class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
-  final _scroll = ScrollController();
-  final _activeKey = GlobalKey();
-  static const _actions = [
-    (
-      'statement',
-      'Records',
-      'View statement',
-      Icons.receipt_long_outlined,
-      _WorkspaceOperation.statement,
+  Widget build(BuildContext context) => Material(
+    key: const Key('work-first-tap-working-surface'),
+    color: Colors.white,
+    textStyle: DefaultTextStyle.of(context).style,
+    child: DefaultTextStyle.merge(
+      style: const TextStyle(color: MoolColors.ink),
+      child: child,
     ),
-    (
-      'dues',
-      'Dues',
-      'Collect dues',
-      Icons.account_balance_wallet_outlined,
-      _WorkspaceOperation.dues,
-    ),
-    (
-      'payments',
-      'Settle',
-      'Settle payments',
-      Icons.payments_outlined,
-      _WorkspaceOperation.payments,
-    ),
-    ('restock', 'Buy stock', 'Restock', Icons.shopping_bag_outlined, null),
-    (
-      'sourcing',
-      'Track',
-      'Track purchases',
-      Icons.local_shipping_outlined,
-      _WorkspaceOperation.sourcing,
-    ),
-    (
-      'groupBuying',
-      'Group',
-      'Group bulk buying',
-      Icons.group_outlined,
-      _WorkspaceOperation.groupBuying,
-    ),
-    (
-      'storeLink',
-      'Share',
-      'Share Store link',
-      Icons.link_rounded,
-      _WorkspaceOperation.storeLink,
-    ),
-    (
-      'offers',
-      'Offers',
-      'Promote Store',
-      Icons.local_offer_outlined,
-      _WorkspaceOperation.offers,
-    ),
-    (
-      'paidWork',
-      'Post',
-      'Post requirement',
-      Icons.post_add_rounded,
-      _WorkspaceOperation.paidWork,
-    ),
-  ];
-
-  // Bottom Store/Orders/Sales/Stock remains the section switcher. This rail
-  // exposes only related tools; settings and other forms keep their full width.
-  List<String> get _contextActions => switch (widget.active) {
-    'statement' || 'dues' || 'payments' => ['statement', 'dues', 'payments'],
-    'catalogue' || 'stockStatement' => const [],
-    'sourcing' || 'groupBuying' => ['restock', 'sourcing', 'groupBuying'],
-    'storeLink' ||
-    'offers' ||
-    'paidWork' => ['storeLink', 'offers', 'paidWork'],
-    _ => const [],
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _revealActive();
-  }
-
-  @override
-  void didUpdateWidget(covariant _StoreFirstTapAccess oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.active != widget.active ||
-        oldWidget.enabled != widget.enabled) {
-      _revealActive();
-    }
-  }
-
-  void _revealActive() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !widget.enabled) return;
-      final activeContext = _activeKey.currentContext;
-      if (activeContext != null) {
-        // Only a navigation change reveals its selection, never a live update.
-        Scrollable.ensureVisible(activeContext, alignment: .5);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final actions = _actions
-        .where((action) => _contextActions.contains(action.$1))
-        .toList();
-    if (!widget.enabled || actions.isEmpty) return widget.child;
-    final typing = widget.keyboardVisible;
-    final stacked = _storeActionsBelowContent(context);
-    final shortcuts = LayoutBuilder(
-      builder: (context, railConstraints) => Material(
-        key: const Key('work-contextual-shortcuts'),
-        color: Colors.white,
-        textStyle: DefaultTextStyle.of(context).style,
-        child: Container(
-          height: stacked ? 54 : null,
-          width: stacked ? double.infinity : 56,
-          decoration: BoxDecoration(
-            border: stacked
-                ? const Border(top: BorderSide(color: Color(0xFFE5E8F1)))
-                : const Border(left: BorderSide(color: Color(0xFFE5E8F1))),
-          ),
-          child: Semantics(
-            container: true,
-            label: 'Related Store actions',
-            child: Scrollbar(
-              controller: _scroll,
-              thumbVisibility: true,
-              thickness: 2,
-              child: SingleChildScrollView(
-                key: const Key('work-contextual-shortcut-scroll'),
-                controller: _scroll,
-                scrollDirection: stacked ? Axis.horizontal : Axis.vertical,
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                child: Flex(
-                  direction: stacked ? Axis.horizontal : Axis.vertical,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final action in actions)
-                      Padding(
-                        key: action.$1 == widget.active ? _activeKey : null,
-                        padding: EdgeInsets.only(bottom: stacked ? 0 : 2),
-                        child: SizedBox(
-                          width: stacked ? null : 52,
-                          child: _StoreEdgeAction(
-                            compact: true,
-                            horizontal: stacked,
-                            keyName: 'work-shortcut-${action.$1}',
-                            stateKey: Key('work-shortcut-state-${action.$1}'),
-                            icon: action.$4,
-                            label: action.$2,
-                            semanticLabel: action.$1 == 'storeLink'
-                                ? 'Share store link — unavailable'
-                                : action.$3,
-                            selected: action.$1 == widget.active,
-                            onTap:
-                                action.$1 == widget.active ||
-                                    action.$1 == 'storeLink'
-                                ? null
-                                : () => widget.onSelect(action.$5),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    return ColoredBox(
-      color: Colors.white,
-      child: Flex(
-        direction: stacked ? Axis.vertical : Axis.horizontal,
-        crossAxisAlignment: stacked
-            ? CrossAxisAlignment.stretch
-            : CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: widget.procurement != null
-                ? widget.child
-                : Material(
-                    key: const Key('work-first-tap-working-surface'),
-                    color: Colors.white,
-                    textStyle: DefaultTextStyle.of(context).style,
-                    child: DefaultTextStyle.merge(
-                      style: const TextStyle(color: MoolColors.ink),
-                      child: widget.child,
-                    ),
-                  ),
-          ),
-          if (widget.procurement case final procurement?)
-            AnimatedBuilder(
-              animation: procurement,
-              child: shortcuts,
-              builder: (context, child) => Offstage(
-                // Do not offer a cross-task exit in checkout or payment recovery.
-                offstage: typing || procurement.view != BuyV2View.catalogue,
-                child: child,
-              ),
-            )
-          else
-            Offstage(offstage: typing, child: shortcuts),
-        ],
-      ),
-    );
-  }
+  );
 }
 
 String? _storeOrderWorkFilter(WorkspaceOrderRecord order) {
@@ -3903,6 +3674,8 @@ class _StoreControlDashboard extends StatelessWidget {
     this.workingCentre,
     this.homeContentScroll,
     this.onNavigate,
+    required this.actionsExpanded,
+    required this.onToggleActions,
   });
 
   final WorkSession session;
@@ -3916,6 +3689,8 @@ class _StoreControlDashboard extends StatelessWidget {
   final Widget? workingCentre;
   final ScrollController? homeContentScroll;
   final ValueChanged<VoidCallback>? onNavigate;
+  final bool actionsExpanded;
+  final VoidCallback onToggleActions;
 
   void _navigate(VoidCallback action) {
     if (onNavigate case final navigate?) {
@@ -3987,6 +3762,8 @@ class _StoreControlDashboard extends StatelessWidget {
           );
           final actions = _StoreActionEdge(
             session: session,
+            expanded: actionsExpanded,
+            onToggle: onToggleActions,
             onCounterSale: onNewSale,
             onStoreLink: () => _navigate(onDeliverOrder),
             onAddProducts: () => _navigate(onAddProducts),
@@ -4029,16 +3806,7 @@ class _StoreControlDashboard extends StatelessWidget {
                         crossAxisAlignment: actionsBelow
                             ? CrossAxisAlignment.stretch
                             : CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: desk),
-                          Offstage(
-                            offstage: keyboard,
-                            child: SizedBox(
-                              height: actionsBelow ? 54 : null,
-                              child: actions,
-                            ),
-                          ),
-                        ],
+                        children: [Expanded(child: desk)],
                       ),
                     ),
                   ],
@@ -4136,6 +3904,8 @@ class _StoreControlDashboard extends StatelessWidget {
 class _StoreActionEdge extends StatelessWidget {
   const _StoreActionEdge({
     required this.session,
+    required this.expanded,
+    required this.onToggle,
     required this.onRestock,
     required this.onPurchases,
     required this.onGroup,
@@ -4150,6 +3920,8 @@ class _StoreActionEdge extends StatelessWidget {
   final VoidCallback onRestock, onPurchases, onGroup;
   final VoidCallback onCounterSale, onStoreLink, onAddProducts;
   final VoidCallback onCreateOffer, onPromote, onRequirement;
+  final bool expanded;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -4171,6 +3943,8 @@ class _StoreActionEdge extends StatelessWidget {
         key: const Key('work-store-action-edge'),
         width: horizontal
             ? double.infinity
+            : !expanded
+            ? 60
             : readableWidth > normalWidth
             ? readableWidth
             : normalWidth,
@@ -4180,125 +3954,219 @@ class _StoreActionEdge extends StatelessWidget {
               ? const Border(top: BorderSide(color: Color(0xFFE5E8F1)))
               : const Border(left: BorderSide(color: Color(0xFFE5E8F1))),
         ),
-        child: SingleChildScrollView(
-          key: const Key('work-store-quick-actions-scroll'),
-          scrollDirection: horizontal ? Axis.horizontal : Axis.vertical,
-          padding: EdgeInsets.symmetric(
-            vertical: horizontal ? 2 : 12,
-            horizontal: 4,
-          ),
-          child: Flex(
-            direction: horizontal ? Axis.horizontal : Axis.vertical,
-            children:
-                [
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-counter-sale',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.point_of_sale_outlined,
-                        label: 'Counter sale',
-                        onTap: onCounterSale,
+        child: Flex(
+          direction: horizontal ? Axis.horizontal : Axis.vertical,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              expanded: expanded,
+              button: true,
+              label: expanded
+                  ? 'Collapse Store actions'
+                  : 'Expand Store actions',
+              excludeSemantics: true,
+              onTap: onToggle,
+              child: Tooltip(
+                message: expanded ? 'Collapse actions' : 'Expand actions',
+                child: InkWell(
+                  key: const Key('work-home-actions-toggle'),
+                  onTap: onToggle,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minWidth: 60,
+                      minHeight: 48,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
                       ),
-                      const Divider(height: 16, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-store-link',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.link_rounded,
-                        label: 'Share store link',
-                        semanticLabel: 'Share store link — unavailable',
-                        onTap: null,
+                      child: Flex(
+                        direction: horizontal ? Axis.horizontal : Axis.vertical,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            expanded
+                                ? Icons.unfold_less_rounded
+                                : Icons.style_outlined,
+                            size: 21,
+                            color: MoolColors.navy,
+                          ),
+                          if (horizontal) const SizedBox(width: 6),
+                          const Text(
+                            'Actions',
+                            style: TextStyle(
+                              color: Color(0xFF252B38),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                      const Divider(height: 16, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-buy',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.inventory_2_outlined,
-                        label: 'Buy stock',
-                        onTap: onRestock,
-                        detail: session.workspaceLowStockCount > 0
-                            ? '${session.workspaceLowStockCount} low stock'
-                            : null,
-                      ),
-                      const Divider(height: 24, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-incoming-purchases',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.local_shipping_outlined,
-                        label: 'Track purchases',
-                        onTap: onPurchases,
-                        detail: session.workspaceIncomingPurchaseCount > 0
-                            ? session.workspacePurchasesComplete
-                                  ? '${session.workspaceIncomingPurchaseCount} incoming'
-                                  : '${session.workspaceIncomingPurchaseCount} loaded'
-                            : null,
-                      ),
-                      const Divider(height: 24, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-group-buy',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.groups_2_outlined,
-                        label: 'Buy together',
-                        onTap: onGroup,
-                        detail: deal == null
-                            ? session.workspaceGroupOffersConnected
-                                  ? '${session.workspaceGroupOffers.length} offers'
-                                  : null
-                            : session.workspaceGroupOffersConnected
-                            ? '${session.workspaceGroupOffers.length} offers\n${deal.productName}'
-                            : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
-                        progress: deal == null || deal.targetQuantity <= 0
-                            ? null
-                            : (deal.securedQuantity / deal.targetQuantity)
-                                  .clamp(0, 1),
-                      ),
-                      const Divider(height: 16, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-add-products',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.add_box_outlined,
-                        label: 'Add products',
-                        onTap: onAddProducts,
-                      ),
-                      const Divider(height: 16, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-create-offer',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.local_offer_outlined,
-                        label: 'Create offer',
-                        onTap: onCreateOffer,
-                      ),
-                      const Divider(height: 16, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-promote-store',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.campaign_outlined,
-                        label: 'Promote store',
-                        onTap: onPromote,
-                      ),
-                      const Divider(height: 16, indent: 16, endIndent: 16),
-                      _StoreEdgeAction(
-                        keyName: 'work-quick-requirement',
-                        compact: horizontal,
-                        horizontal: horizontal,
-                        icon: Icons.post_add_rounded,
-                        label: 'Post requirement',
-                        onTap: onRequirement,
-                      ),
-                    ]
-                    .map<Widget>(
-                      (child) => horizontal && child is Divider
-                          ? const SizedBox(width: 8)
-                          : child,
-                    )
-                    .toList(),
-          ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (expanded)
+              Flexible(
+                child: SingleChildScrollView(
+                  key: const Key('work-store-quick-actions-scroll'),
+                  scrollDirection: horizontal ? Axis.horizontal : Axis.vertical,
+                  padding: EdgeInsets.symmetric(
+                    vertical: horizontal ? 2 : 12,
+                    horizontal: 4,
+                  ),
+                  child: Flex(
+                    direction: horizontal ? Axis.horizontal : Axis.vertical,
+                    children:
+                        [
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-counter-sale',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.point_of_sale_outlined,
+                                label: 'Counter sale',
+                                onTap: onCounterSale,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-store-link',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.link_rounded,
+                                label: 'Share store link',
+                                semanticLabel: 'Share store link — unavailable',
+                                onTap: null,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-buy',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Buy stock',
+                                onTap: onRestock,
+                                detail: session.workspaceLowStockCount > 0
+                                    ? '${session.workspaceLowStockCount} low stock'
+                                    : null,
+                              ),
+                              const Divider(
+                                height: 24,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-incoming-purchases',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.local_shipping_outlined,
+                                label: 'Track purchases',
+                                onTap: onPurchases,
+                                detail:
+                                    session.workspaceIncomingPurchaseCount > 0
+                                    ? session.workspacePurchasesComplete
+                                          ? '${session.workspaceIncomingPurchaseCount} incoming'
+                                          : '${session.workspaceIncomingPurchaseCount} loaded'
+                                    : null,
+                              ),
+                              const Divider(
+                                height: 24,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-group-buy',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.groups_2_outlined,
+                                label: 'Buy together',
+                                onTap: onGroup,
+                                detail: deal == null
+                                    ? session.workspaceGroupOffersConnected
+                                          ? '${session.workspaceGroupOffers.length} offers'
+                                          : null
+                                    : session.workspaceGroupOffersConnected
+                                    ? '${session.workspaceGroupOffers.length} offers\n${deal.productName}'
+                                    : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
+                                progress:
+                                    deal == null || deal.targetQuantity <= 0
+                                    ? null
+                                    : (deal.securedQuantity /
+                                              deal.targetQuantity)
+                                          .clamp(0, 1),
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-add-products',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.add_box_outlined,
+                                label: 'Add products',
+                                onTap: onAddProducts,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-create-offer',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.local_offer_outlined,
+                                label: 'Create offer',
+                                onTap: onCreateOffer,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-promote-store',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.campaign_outlined,
+                                label: 'Promote store',
+                                onTap: onPromote,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-requirement',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.post_add_rounded,
+                                label: 'Post requirement',
+                                onTap: onRequirement,
+                              ),
+                            ]
+                            .map<Widget>(
+                              (child) => horizontal && child is Divider
+                                  ? const SizedBox(width: 8)
+                                  : child,
+                            )
+                            .toList(),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -4311,9 +4179,7 @@ class _StoreEdgeAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.stateKey,
     this.semanticLabel,
-    this.selected,
     this.detail,
     this.progress,
     this.compact = false,
@@ -4323,18 +4189,14 @@ class _StoreEdgeAction extends StatelessWidget {
   final String? detail;
   final IconData icon;
   final VoidCallback? onTap;
-  final Key? stateKey;
   final String? semanticLabel;
-  final bool? selected;
   final double? progress;
   final bool compact, horizontal;
 
   @override
   Widget build(BuildContext context) => Semantics(
-    key: stateKey,
     button: true,
     label: semanticLabel ?? (detail == null ? label : '$label, $detail'),
-    selected: selected,
     enabled: onTap != null,
     onTap: onTap,
     excludeSemantics: true,
@@ -4354,14 +4216,6 @@ class _StoreEdgeAction extends StatelessWidget {
             minWidth: 48,
           ),
           child: Container(
-            decoration: BoxDecoration(
-              color: selected == true
-                  ? (compact
-                        ? MoolColors.navy.withValues(alpha: .07)
-                        : MoolColors.navy)
-                  : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
             padding: EdgeInsets.symmetric(
               horizontal: horizontal
                   ? 12
@@ -4379,7 +4233,7 @@ class _StoreEdgeAction extends StatelessWidget {
                 if (!horizontal)
                   DecoratedBox(
                     decoration: BoxDecoration(
-                      color: compact || selected == true
+                      color: compact
                           ? Colors.transparent
                           : MoolColors.navy.withValues(alpha: .06),
                       borderRadius: BorderRadius.circular(7),
@@ -4391,11 +4245,7 @@ class _StoreEdgeAction extends StatelessWidget {
                           : MediaQuery.textScalerOf(context).scale(11) > 16
                           ? 18
                           : 25,
-                      color: onTap == null && selected != true
-                          ? MoolColors.muted
-                          : selected == true && !compact
-                          ? Colors.white
-                          : MoolColors.navy,
+                      color: onTap == null ? MoolColors.muted : MoolColors.navy,
                     ),
                   ),
                 if (!horizontal)
@@ -4415,11 +4265,7 @@ class _StoreEdgeAction extends StatelessWidget {
                         ? 1.1
                         : 1.3,
                     fontWeight: FontWeight.w700,
-                    color: onTap == null && selected != true
-                        ? MoolColors.muted
-                        : selected == true && !compact
-                        ? Colors.white
-                        : MoolColors.navy,
+                    color: onTap == null ? MoolColors.muted : MoolColors.navy,
                   ),
                 ),
                 if (detail != null && !horizontal) ...[
@@ -4605,12 +4451,12 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
       label: 'Store finances',
       child: Material(
         key: const Key('work-store-finance-material'),
-        color: MoolColors.navy,
+        color: Colors.white,
         textStyle: DefaultTextStyle.of(context).style,
         child: Container(
           key: const Key('work-live-status-bubbles'),
           decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xFF3232A0))),
+            border: Border(bottom: BorderSide(color: Color(0xFFE5E8F1))),
           ),
           child: _StoreAdaptiveRail(
             // Reserve each column's own readable label and amount width.
@@ -4672,7 +4518,7 @@ class _StorePulseDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SizedBox(
       height: 28,
-      child: VerticalDivider(width: 1, thickness: 1, color: Color(0xFF4242A5)),
+      child: VerticalDivider(width: 1, thickness: 1, color: Color(0xFFE5E8F1)),
     );
   }
 }
@@ -4698,7 +4544,7 @@ class _StorePulseMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accent = Colors.white;
+    const accent = Color(0xFF252B38);
     final enlarged = MediaQuery.textScalerOf(context).scale(1) >= 2;
     return Expanded(
       flex: flex,
@@ -4809,7 +4655,7 @@ class _StorePulseMetric extends StatelessWidget {
                     contextLabel,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: Color(0xFFDADAF5),
+                      color: MoolColors.muted,
                       fontSize: 10,
                     ),
                   ),
@@ -4818,7 +4664,7 @@ class _StorePulseMetric extends StatelessWidget {
                     label,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: MoolColors.navy,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -4917,11 +4763,6 @@ class _StoreActivityDeck extends StatelessWidget {
         ),
         _ => _OrderAttentionActivityCard(onReview: onReviewOrder),
       };
-    } else if (session.latestWorkspaceInvoice?.needsCustomerHandoff == true) {
-      content = _InvoiceReadyActivityCard(
-        session: session,
-        invoice: session.latestWorkspaceInvoice!,
-      );
     } else if (session.activeGroupBuy != null) {
       content = _GroupBulkActivityCard(
         groupBuy: session.activeGroupBuy!,
@@ -4931,6 +4772,10 @@ class _StoreActivityDeck extends StatelessWidget {
       content = _StockActivityCard(session: session, onOpen: onStock);
     } else if (session.workspaceSettlementBalance > 0) {
       content = _MoneyActivityCard(session: session, onOpen: onMoney);
+    } else if (session.latestWorkspaceInvoice case final invoice?) {
+      // An absent delivery receipt is not a pending retailer action. Keep the
+      // latest invoice available without outranking current operational work.
+      content = _InvoiceReadyActivityCard(session: session, invoice: invoice);
     } else {
       content = _StoreReadyActivity(session: session);
     }
@@ -4945,6 +4790,18 @@ class _StoreActivityDeck extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
+          if (content is _InvoiceReadyActivityCard ||
+              content is _StockActivityCard) {
+            return SingleChildScrollView(
+              key: const Key('work-store-activity-scroll'),
+              child: _ActivityDeckShell(
+                state:
+                    '${content.runtimeType}:${session.latestWorkspaceInvoice?.id}',
+                shrinkWrap: true,
+                child: content,
+              ),
+            );
+          }
           final desiredHeight = switch (content) {
             WorkCollectionLiveCard(:final controller) =>
               switch (controller?.snapshot?.state.name) {
@@ -5130,9 +4987,14 @@ class _StoreRecentSale extends StatelessWidget {
 }
 
 class _ActivityDeckShell extends StatelessWidget {
-  const _ActivityDeckShell({required this.child, required this.state});
+  const _ActivityDeckShell({
+    required this.child,
+    required this.state,
+    this.shrinkWrap = false,
+  });
   final Widget child;
   final String state;
+  final bool shrinkWrap;
   @override
   Widget build(BuildContext context) => Material(
     color: Colors.white,
@@ -5144,7 +5006,7 @@ class _ActivityDeckShell extends StatelessWidget {
     ),
     clipBehavior: Clip.antiAlias,
     child: Stack(
-      fit: StackFit.expand,
+      fit: shrinkWrap ? StackFit.loose : StackFit.expand,
       children: [
         child,
         Positioned(
@@ -6984,93 +6846,70 @@ class _InvoiceReadyActivityCard extends StatelessWidget {
   });
   final WorkSession session;
   final WorkspaceCustomerInvoice invoice;
-  bool get _counterInvoice => session.workspaceOrders.any(
-    (order) => order.id == invoice.orderId && order.source == 'Counter',
-  );
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) => Padding(
     key: const Key('work-activity-invoice'),
-    children: [
-      Expanded(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Row(
-                children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    color: MoolColors.navy,
-                    size: 22,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Invoice ready',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                invoice.customer,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 14,
+    padding: const EdgeInsets.all(14),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.receipt_long_outlined, color: MoolColors.navy, size: 22),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Invoice ready',
+                style: TextStyle(
+                  color: Color(0xFF252B38),
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                invoice.id,
-                style: const TextStyle(color: MoolColors.muted, fontSize: 12),
-              ),
-              const Divider(height: 20),
-              _StoreMoneyText(
-                '₹${_formatStoreMinorAmount(invoice.payableMinor)}',
-                summary: true,
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                invoice.payment,
-                style: const TextStyle(color: MoolColors.muted, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ),
-      const Divider(height: 1),
-      Padding(
-        padding: const EdgeInsets.all(10),
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            key: const Key('work-invoice-open'),
-            onPressed: () =>
-                _showWorkspaceInvoiceSheet(context, session, invoice),
-            icon: Icon(
-              _counterInvoice
-                  ? Icons.receipt_long_outlined
-                  : Icons.send_outlined,
-              size: 18,
             ),
-            label: Text(_counterInvoice ? 'View invoice' : 'Send invoice'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          invoice.customer,
+          style: const TextStyle(
+            color: Color(0xFF252B38),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
         ),
-      ),
-    ],
+        const SizedBox(height: 4),
+        Text(
+          invoice.id,
+          style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+        ),
+        const Divider(height: 20),
+        _StoreMoneyText(
+          '₹${_formatStoreMinorAmount(invoice.payableMinor)}',
+          summary: true,
+          style: const TextStyle(
+            color: Color(0xFF252B38),
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Payment method: ${invoice.payment}',
+          style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          key: const Key('work-invoice-open'),
+          onPressed: () =>
+              _showWorkspaceInvoiceSheet(context, session, invoice),
+          icon: const Icon(Icons.receipt_long_outlined, size: 18),
+          label: const Text('View invoice'),
+        ),
+      ],
+    ),
   );
 }
 
@@ -8518,65 +8357,50 @@ class _StockActivityCard extends StatelessWidget {
     final product = session.workspaceCatalogueItems
         .where((item) => item.stock <= 5)
         .firstOrNull;
-    return Column(
+    return Padding(
       key: const Key('work-activity-stock'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Check stock',
-                  style: TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  product?.title ?? 'Your Store stock',
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (product != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    '${product.stock} available · ${product.pack}',
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                const Divider(height: 22),
-                const Text(
-                  'Check quantities and replenish what your customers need.',
-                  style: TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Check stock',
+            style: TextStyle(
+              color: Color(0xFF252B38),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.all(10),
-          child: FilledButton(
-            onPressed: onOpen,
-            child: const Text('View stock'),
+          const SizedBox(height: 12),
+          Text(
+            product?.title ?? 'Your Store stock',
+            style: const TextStyle(
+              color: Color(0xFF252B38),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+          if (product != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${product.stock} available · ${product.pack}',
+              style: const TextStyle(color: MoolColors.muted, fontSize: 13),
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Text(
+            'Check quantities and replenish what your customers need.',
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onOpen, child: const Text('View stock')),
+        ],
+      ),
     );
   }
 }

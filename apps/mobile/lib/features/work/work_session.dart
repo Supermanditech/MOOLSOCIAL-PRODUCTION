@@ -6679,8 +6679,17 @@ class WorkSession extends ChangeNotifier {
       workspacePackingComplete &&
       !workspaceOrderHasPackingIssue(currentWorkspaceOrderId ?? '');
 
-  WorkspaceCustomerInvoice? get latestWorkspaceInvoice =>
-      workspaceInvoices.firstOrNull;
+  WorkspaceCustomerInvoice? get latestWorkspaceInvoice {
+    // Recovery appends records; list position is not chronological authority.
+    // Do not reorder the stored history merely to select the home summary.
+    WorkspaceCustomerInvoice? latest;
+    for (final invoice in workspaceInvoices) {
+      if (latest == null || invoice.issuedAt.isAfter(latest.issuedAt)) {
+        latest = invoice;
+      }
+    }
+    return latest;
+  }
 
   int get workspaceSettlementEligible {
     if (!workspaceFinanceUsesLegacyReview) return 0;
