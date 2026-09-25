@@ -280,6 +280,184 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
 }
 
 void main() {
+  BuyV2Product packProduct({BuyV2PackTerms? terms}) =>
+      BuyV2Catalogue.products.first.copyWith(
+        id: 'case-review',
+        storeId: 'case-store',
+        minimumOrder: 2,
+        packTerms:
+            terms ??
+            const BuyV2PackTerms(
+              skuId: 'case-review',
+              revision: '1',
+              sellUnit: 'Case',
+              containedUnits: 10,
+              netContentMilli: 500000,
+              contentUnit: 'g',
+              quantityStep: 3,
+            ),
+      );
+
+  Future<BuyV2Session> packSession(BuyV2Product product) async {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: _MediaCommerce(product),
+      reviewDataEnabled: false,
+      productFactsAdapter: QualifiedTestProductFacts({product.id}),
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    await session.restoreCommerce();
+    return session;
+  }
+
+  test(
+    'CAT04 provider pack terms preserve composition and legal quantities',
+    () async {
+      final product = packProduct();
+      expect(product.pack, '10 × 500 g · Case');
+      expect(product.unitPrice, isEmpty);
+      final session = await packSession(product);
+      expect(session.addProduct(product.id), isTrue);
+      expect(session.quantityFor(product.id), 2);
+      session.increase(product.id);
+      expect(session.quantityFor(product.id), 5);
+      expect(session.setCartQuantity(product.id, '4'), isFalse);
+      expect(session.quantityFor(product.id), 5);
+      expect(session.setCartQuantity(product.id, '8'), isTrue);
+      session.decrease(product.id);
+      expect(session.quantityFor(product.id), 5);
+      expect(session.addProduct(product.id), isTrue);
+      expect(session.quantityFor(product.id), 8);
+      expect(
+        session.cartLines.single.product.packTerms,
+        same(product.packTerms),
+      );
+      expect(session.cartTotal, product.price * 8);
+      expect(session.setCartQuantity(product.id, '2'), isTrue);
+      session.decrease(product.id);
+      expect(session.cartLines, isEmpty);
+      for (final (value, unit, label) in [
+        (500000, 'g', '500 g'),
+        (1000, 'kg', '1 kg'),
+        (1000, 'piece', '1 piece'),
+      ]) {
+        final terms = BuyV2PackTerms(
+          skuId: 'one',
+          revision: '1',
+          sellUnit: 'Pack',
+          netContentMilli: value,
+          contentUnit: unit,
+        );
+        expect(terms.isValidFor('one'), isTrue);
+        expect(terms.label, '$label · Pack');
+      }
+    },
+  );
+
+  test(
+    'CAT04 pack validation rejects missing units and unconfirmed measurement',
+    () async {
+      for (final terms in [
+        const BuyV2PackTerms(skuId: 'other', revision: '1', sellUnit: 'Case'),
+        const BuyV2PackTerms(
+          skuId: 'case-review',
+          revision: '1',
+          sellUnit: 'Case',
+          quantityStep: 0,
+        ),
+        const BuyV2PackTerms(
+          skuId: 'case-review',
+          revision: '1',
+          sellUnit: 'Case',
+          netContentMilli: 500000,
+        ),
+        const BuyV2PackTerms(
+          skuId: 'case-review',
+          revision: '1',
+          sellUnit: 'Case',
+          contentUnit: 'g',
+        ),
+        const BuyV2PackTerms(
+          skuId: 'case-review',
+          revision: '1',
+          sellUnit: 'Case',
+          netContentMilli: 500,
+          contentUnit: 'piece',
+        ),
+        const BuyV2PackTerms(
+          skuId: 'case-review',
+          revision: '1',
+          sellUnit: 'Case',
+          requiresMeasurement: true,
+        ),
+      ]) {
+        final product = packProduct(terms: terms);
+        final session = await packSession(product);
+        expect(session.addProduct(product.id), isFalse);
+        expect(session.cartLines, isEmpty);
+        expect(session.productFactsFor(product).stale, isTrue);
+      }
+    },
+  );
+
+  testWidgets(
+    'CAT04 pack step controls preserve exact SKU in product and Cart',
+    (tester) async {
+      for (final scale in [1.0, 2.0]) {
+        final product = packProduct();
+        final session = await packSession(product);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(session: session, productId: product.id),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
+        await tester.scrollUntilVisible(
+          add,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(product.id), 2);
+        expect(find.text('Minimum 2 packs · Step 3'), findsOneWidget);
+        await tester.tap(find.byTooltip('Add 3 packs'));
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(product.id), 5);
+        session.openCart();
+        await tester.pumpAndSettle();
+        expect(session.cartLines.single.product.id, product.id);
+        expect(find.textContaining('10 × 500 g'), findsWidgets);
+        final cartIncrease = find.byTooltip('Add 3 packs');
+        await tester.ensureVisible(cartIncrease);
+        await tester.pumpAndSettle();
+        await tester.tap(cartIncrease);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(product.id), 8);
+        session.goBack();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, product.id);
+        expect(session.quantityFor(product.id), 8);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+
   List<BuyV2Product> structuredFamily() {
     final base = BuyV2Catalogue.products.first;
     return [

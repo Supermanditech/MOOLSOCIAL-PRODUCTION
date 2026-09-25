@@ -430,6 +430,79 @@ class BuyV2VariantAttribute {
               swatchArgb! <= 0xffffffff));
 }
 
+/// Provider definition of one sellable SKU, independent of order quantity.
+/// Net content describes each contained unit, never the entire outer case.
+class BuyV2PackTerms {
+  const BuyV2PackTerms({
+    required this.skuId,
+    required this.revision,
+    required this.sellUnit,
+    this.containedUnits = 1,
+    this.netContentMilli,
+    this.contentUnit,
+    this.quantityStep = 1,
+    this.requiresMeasurement = false,
+    this.unitPriceLabel,
+  });
+
+  final String skuId;
+  final String revision;
+  final String sellUnit;
+  final int containedUnits;
+  final int? netContentMilli;
+  final String? contentUnit;
+  final int quantityStep;
+  final bool requiresMeasurement;
+  final String? unitPriceLabel;
+
+  bool isValidFor(String id) =>
+      skuId == id &&
+      [
+        skuId,
+        revision,
+        sellUnit,
+      ].every((value) => value.trim().isNotEmpty && value.trim() == value) &&
+      containedUnits > 0 &&
+      quantityStep > 0 &&
+      containedUnits <= 9007199254740991 &&
+      quantityStep <= 9007199254740991 &&
+      ((netContentMilli == null && contentUnit == null) ||
+          (netContentMilli != null &&
+              netContentMilli! > 0 &&
+              {
+                'g',
+                'kg',
+                'mL',
+                'L',
+                'mm',
+                'cm',
+                'm',
+                'piece',
+              }.contains(contentUnit) &&
+              (contentUnit != 'piece' || netContentMilli! % 1000 == 0) &&
+              BigInt.from(netContentMilli!) * BigInt.from(containedUnits) <=
+                  BigInt.from(9007199254740991))) &&
+      (unitPriceLabel == null ||
+          (unitPriceLabel!.trim().isNotEmpty &&
+              unitPriceLabel!.trim() == unitPriceLabel));
+
+  String get label {
+    final amount = netContentMilli;
+    if (amount == null) {
+      return containedUnits == 1
+          ? sellUnit
+          : '$containedUnits units · $sellUnit';
+    }
+    final fraction = (amount % 1000)
+        .toString()
+        .padLeft(3, '0')
+        .replaceFirst(RegExp(r'0+$'), '');
+    final number = '${amount ~/ 1000}${fraction.isEmpty ? '' : '.$fraction'}';
+    final content = '$number $contentUnit';
+    return '${containedUnits == 1 ? content : '$containedUnits × $content'} · $sellUnit';
+  }
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -460,6 +533,7 @@ class BuyV2Product {
     this.composition,
     this.regulatoryNote,
     this.minimumOrder = 1,
+    this.packTerms,
     this.offerClass,
     this.reviewDeliveryOptions = const {},
     this.returnPolicy,
@@ -533,6 +607,13 @@ class BuyV2Product {
   final String title;
   final String variant;
   final String pack;
+  final BuyV2PackTerms? packTerms;
+  bool get hasValidPackTerms =>
+      packTerms == null ||
+      (packTerms!.isValidFor(id) &&
+          pack == packTerms!.label &&
+          unitPrice == (packTerms!.unitPriceLabel ?? ''));
+  int get quantityStep => packTerms?.quantityStep ?? 1;
   final int price;
   final String unitPrice;
   final String badge;
@@ -582,6 +663,7 @@ class BuyV2Product {
     String? sellerType,
     String? confirmedOn,
     int? minimumOrder,
+    BuyV2PackTerms? packTerms,
     BuyV2OfferClass? offerClass,
     Set<BuyV2DeliveryOption>? reviewDeliveryOptions,
     bool? catalogueListing,
@@ -601,9 +683,12 @@ class BuyV2Product {
     variantAttributes: variantAttributes ?? this.variantAttributes,
     title: title ?? this.title,
     variant: variant ?? this.variant,
-    pack: pack ?? this.pack,
+    pack: packTerms?.label ?? pack ?? this.pack,
+    packTerms: packTerms ?? this.packTerms,
     price: price ?? this.price,
-    unitPrice: unitPrice ?? this.unitPrice,
+    unitPrice: packTerms != null
+        ? packTerms.unitPriceLabel ?? ''
+        : unitPrice ?? this.unitPrice,
     badge: badge ?? this.badge,
     seller: seller ?? this.seller,
     sellerType: sellerType ?? this.sellerType,

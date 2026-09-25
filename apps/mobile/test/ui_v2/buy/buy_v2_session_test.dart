@@ -2103,7 +2103,20 @@ void main() {
         isNot(phones[3].mediaAssets.first.source),
       );
       expect(
-        await review.resolveProducts({review.productIdAt(0, count * 2 + 6)}),
+        // Six phone variants plus the explicit pack-composition review SKU.
+        await review.resolveProducts({review.productIdAt(0, count * 2 + 7)}),
+        isEmpty,
+      );
+      final pack = (await review.resolveProducts({
+        review.productIdAt(0, count + 6),
+      })).single;
+      expect(pack.title, 'Amul Calci+ Milk');
+      expect(pack.pack, '4 × 1 L · Case');
+      expect(pack.hasValidPackTerms, isTrue);
+      expect(pack.quantityStep, 3);
+      expect(pack.seller, startsWith('Test supplier'));
+      expect(
+        await review.resolveProducts({review.productIdAt(0, count * 2 + 13)}),
         isEmpty,
       );
     },

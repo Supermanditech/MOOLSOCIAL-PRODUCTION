@@ -1059,9 +1059,12 @@ class BuyV2ProductView extends StatelessWidget {
                                                   fontSize: shop ? 28 : 25,
                                                 ),
                                                 Text(
-                                                  !shop ||
-                                                          facts.price ==
-                                                              product.price
+                                                  product
+                                                              .unitPrice
+                                                              .isNotEmpty &&
+                                                          (!shop ||
+                                                              facts.price ==
+                                                                  product.price)
                                                       ? '${product.pack} · ${product.unitPrice}'
                                                       : product.pack,
                                                   style: context.buyMeta
@@ -1070,6 +1073,17 @@ class BuyV2ProductView extends StatelessWidget {
                                                             FontWeight.w800,
                                                       ),
                                                 ),
+                                                if (product.packTerms != null &&
+                                                    (product.minimumOrder > 1 ||
+                                                        product.quantityStep >
+                                                            1))
+                                                  Text(
+                                                    'Minimum ${_packCountLabel(product.minimumOrder)} · Step ${product.quantityStep}',
+                                                    key: ValueKey(
+                                                      'buy-product-pack-rule-${product.id}',
+                                                    ),
+                                                    style: context.buyMeta,
+                                                  ),
                                                 if (!shop &&
                                                     product.mrp != null &&
                                                     product.mrp! > facts.price)
@@ -2148,7 +2162,7 @@ class BuyV2ProductCompliancePanel extends StatelessWidget {
           label: 'MRP (incl. taxes)',
           value: buyV2Money(product.mrp!),
         ),
-      if (!summaryAlreadyShown)
+      if (!summaryAlreadyShown && product.unitPrice.isNotEmpty)
         _DecisionRow(
           icon: Icons.price_check_outlined,
           label: 'Unit price',
@@ -19258,6 +19272,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                 key: ValueKey('buy-product-quantity-${product.id}'),
                 quantity: quantity,
                 minimumOrder: product.minimumOrder,
+                quantityStep: product.quantityStep,
                 onEdit: onEdit,
                 onDecrease: onDecrease,
                 onIncrease: onIncrease,
@@ -19376,13 +19391,15 @@ class _ProductOwnedActionPanel extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 3),
-        Text(
-          product.unitPrice,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: context.buyMeta.copyWith(fontSize: 9),
-        ),
+        if (product.unitPrice.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Text(
+            product.unitPrice,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: context.buyMeta.copyWith(fontSize: 9),
+          ),
+        ],
         if (deliveryDecision case final delivery?) ...[
           const SizedBox(height: 3),
           Text(
@@ -19575,7 +19592,9 @@ class _QuantityEditorState extends State<_QuantityEditor> {
             decoration: InputDecoration(
               labelText: 'Number of packs',
               helperText:
-                  'Minimum ${_packCountLabel(widget.product.minimumOrder)}',
+                  'Minimum ${_packCountLabel(widget.product.minimumOrder)}'
+                  '${widget.product.quantityStep > 1 ? ' · Step ${widget.product.quantityStep}' : ''}',
+              helperMaxLines: 3,
               errorText: _error,
               errorMaxLines: 4,
               border: const OutlineInputBorder(),
@@ -19614,6 +19633,7 @@ class _CompactProductStepper extends StatelessWidget {
     super.key,
     required this.quantity,
     required this.minimumOrder,
+    required this.quantityStep,
     required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
@@ -19621,6 +19641,7 @@ class _CompactProductStepper extends StatelessWidget {
 
   final int quantity;
   final int minimumOrder;
+  final int quantityStep;
   final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
@@ -19651,7 +19672,9 @@ class _CompactProductStepper extends StatelessWidget {
                 child: IconButton(
                   tooltip: quantity <= minimumOrder
                       ? 'Remove from Cart'
-                      : 'Remove one',
+                      : quantityStep == 1
+                      ? 'Remove one'
+                      : 'Remove $quantityStep packs',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints.tightFor(
                     width: 44,
@@ -19691,7 +19714,9 @@ class _CompactProductStepper extends StatelessWidget {
               SizedBox.square(
                 dimension: 44,
                 child: IconButton(
-                  tooltip: 'Add one',
+                  tooltip: quantityStep == 1
+                      ? 'Add one'
+                      : 'Add $quantityStep packs',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints.tightFor(
                     width: 44,
@@ -22057,7 +22082,11 @@ class _CartLine extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: wholesale
+                tooltip: product.quantityStep > 1
+                    ? line.quantity <= product.minimumOrder
+                          ? 'Remove ${product.customerTitle} from Cart'
+                          : 'Remove ${product.quantityStep} packs'
+                    : wholesale
                     ? line.quantity <= product.minimumOrder
                           ? 'Remove ${product.customerTitle} from Cart'
                           : 'Remove one trade pack'
@@ -22100,7 +22129,11 @@ class _CartLine extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: wholesale ? 'Add one trade pack' : 'Add one',
+                tooltip: product.quantityStep > 1
+                    ? 'Add ${product.quantityStep} packs'
+                    : wholesale
+                    ? 'Add one trade pack'
+                    : 'Add one',
                 onPressed: () => session.increase(product.id),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,

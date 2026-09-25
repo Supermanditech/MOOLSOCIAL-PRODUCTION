@@ -12251,6 +12251,7 @@ class _FeaturedProductAction extends StatelessWidget {
                 productTitle: product.customerTitle,
                 quantity: quantity,
                 minimumOrder: product.minimumOrder,
+                quantityStep: product.quantityStep,
                 onEdit: () =>
                     showBuyV2QuantityEditor(context, session, product),
                 onDecrease: () => session.decrease(product.id),
@@ -12306,12 +12307,15 @@ List<_ProductGlanceField> _productGlanceFields(
         fontWeight: FontWeight.w900,
       ),
     ),
-    (text: product.unitPrice, style: detail),
-    if (product.destination == BuyV2Destination.wholesale)
+    if (product.unitPrice.isNotEmpty) (text: product.unitPrice, style: detail),
+    if (product.destination == BuyV2Destination.wholesale ||
+        (product.packTerms != null &&
+            (product.minimumOrder > 1 || product.quantityStep > 1)))
       (
         text:
             'Minimum ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'} · '
-            '${buyV2Money(facts.price * product.minimumOrder)} total',
+            '${buyV2Money(facts.price * product.minimumOrder)} total'
+            '${product.quantityStep > 1 ? ' · Step ${product.quantityStep}' : ''}',
         style: detail.copyWith(color: BuyV2Colors.navy),
       ),
     if (!storeContext)
@@ -12642,6 +12646,7 @@ class BuyV2ProductCard extends StatelessWidget {
       productTitle: product.customerTitle,
       quantity: quantity,
       minimumOrder: product.minimumOrder,
+      quantityStep: product.quantityStep,
       onEdit: () => showBuyV2QuantityEditor(
         context,
         session,
@@ -12649,7 +12654,12 @@ class BuyV2ProductCard extends StatelessWidget {
         beforeSave: beforeCartChange,
       ),
       onDecrease: () async {
-        final next = quantity <= product.minimumOrder ? 0 : quantity - 1;
+        final next = quantity <= product.minimumOrder
+            ? 0
+            : (quantity - product.quantityStep).clamp(
+                product.minimumOrder,
+                quantity,
+              );
         if (await beforeCartChange?.call(next) != false) {
           session.decrease(product.id);
         }
@@ -12657,8 +12667,11 @@ class BuyV2ProductCard extends StatelessWidget {
       onIncrease: () async {
         if (beforeCartChange == null) {
           session.increase(product.id);
-        } else if (await beforeCartChange!(quantity + 1)) {
-          session.setCartQuantity(product.id, '${quantity + 1}');
+        } else if (await beforeCartChange!(quantity + product.quantityStep)) {
+          session.setCartQuantity(
+            product.id,
+            '${quantity + product.quantityStep}',
+          );
         }
       },
     );
@@ -13234,6 +13247,7 @@ class _QuantityStepperTargets extends StatelessWidget {
     required this.productTitle,
     required this.quantity,
     required this.minimumOrder,
+    required this.quantityStep,
     required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
@@ -13245,6 +13259,7 @@ class _QuantityStepperTargets extends StatelessWidget {
   final String productTitle;
   final int quantity;
   final int minimumOrder;
+  final int quantityStep;
   final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
@@ -13345,7 +13360,11 @@ class _QuantityStepperTargets extends StatelessWidget {
             height: target,
             child: action(
               'Decrease',
-              quantity <= minimumOrder ? 'Remove from Cart' : 'Remove one',
+              quantity <= minimumOrder
+                  ? 'Remove from Cart'
+                  : quantityStep == 1
+                  ? 'Remove one'
+                  : 'Remove $quantityStep packs',
               onDecrease,
             ),
           ),
@@ -13354,7 +13373,11 @@ class _QuantityStepperTargets extends StatelessWidget {
             bottom: 0,
             width: sideWidth,
             height: target,
-            child: action('Increase', 'Add one', onIncrease),
+            child: action(
+              'Increase',
+              quantityStep == 1 ? 'Add one' : 'Add $quantityStep packs',
+              onIncrease,
+            ),
           ),
         ],
       );

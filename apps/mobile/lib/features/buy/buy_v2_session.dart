@@ -1131,6 +1131,45 @@ class BuyV2DevelopmentCatalogueSource
                 ),
             ],
           ),
+      BuyV2Product(
+        id: 'review-amul-calci-1l-four',
+        canonicalId: 'amul-calci-milk-1l-case-four',
+        storeId: 'review-pack-store',
+        destination: destination,
+        categoryId: 'review-pack-food',
+        brand: 'Amul',
+        title: 'Amul Calci+ Milk',
+        variant: '1 L · Pack of 4',
+        pack: '4 × 1 L · Case',
+        price: 400,
+        unitPrice: 'Test price / case',
+        badge: 'Test supplier',
+        seller: 'Test supplier',
+        sellerType: 'Retailer',
+        deliveryPromise: 'Delivery for review only',
+        origin: 'Manufacturer catalogue reference',
+        confirmedOn: 'Test price · not a live offer',
+        visualLabel: 'Product photo unavailable',
+        visualKind: 'unavailable',
+        minimumOrder: 2,
+        packTerms: const BuyV2PackTerms(
+          skuId: 'review-amul-calci-1l-four',
+          revision: 'test-supplier-20260926',
+          sellUnit: 'Case',
+          containedUnits: 4,
+          netContentMilli: 1000,
+          contentUnit: 'L',
+          quantityStep: 3,
+          unitPriceLabel: 'Test price / case',
+        ),
+        reviewDeliveryOptions: const {
+          BuyV2DeliveryOption.quick,
+          BuyV2DeliveryOption.scheduled,
+        },
+        offerClass: destination == BuyV2Destination.shop
+            ? BuyV2OfferClass.retail
+            : BuyV2OfferClass.wholesale,
+      ),
     ];
   }
 
@@ -1234,7 +1273,7 @@ class BuyV2DevelopmentCatalogueSource
 
   String _region(int store) => regions[store % regions.length];
   String _name(int store) =>
-      'Mool Market ${(store + 1).toString().padLeft(6, '0')}';
+      '${includeVariantReviewFixtures ? 'Test supplier' : 'Mool Market'} ${(store + 1).toString().padLeft(6, '0')}';
   String _area(int store) =>
       '${_region(store)} · Market ${store ~/ regions.length + 1}';
 
@@ -1299,6 +1338,19 @@ class BuyV2DevelopmentCatalogueSource
     final base = _templates[sku % _templates.length];
     return base.copyWith(
       id: productIdAt(store, sku),
+      packTerms: base.packTerms == null
+          ? null
+          : BuyV2PackTerms(
+              skuId: productIdAt(store, sku),
+              revision: base.packTerms!.revision,
+              sellUnit: base.packTerms!.sellUnit,
+              containedUnits: base.packTerms!.containedUnits,
+              netContentMilli: base.packTerms!.netContentMilli,
+              contentUnit: base.packTerms!.contentUnit,
+              quantityStep: base.packTerms!.quantityStep,
+              requiresMeasurement: base.packTerms!.requiresMeasurement,
+              unitPriceLabel: base.packTerms!.unitPriceLabel,
+            ),
       canonicalId: base.canonicalId,
       storeId: storeIdAt(store),
       title: base.title,
@@ -1358,7 +1410,10 @@ class BuyV2DevelopmentCatalogueSource
   }) {
     final base = _templates[sku % _templates.length];
     // Review combinations are unique SKUs, not repeated load-test rows.
-    if (base.hasStructuredVariants && sku >= _templates.length) return false;
+    if ((base.hasStructuredVariants || base.packTerms != null) &&
+        sku >= _templates.length) {
+      return false;
+    }
     if (query.categoryId != 'all' && base.categoryId != query.categoryId) {
       return false;
     }
@@ -1368,7 +1423,10 @@ class BuyV2DevelopmentCatalogueSource
     if (query.maximumPrice != null && base.price > query.maximumPrice!) {
       return false;
     }
-    if (query.offersOnly && sku % 5 != 0 && !base.hasStructuredVariants) {
+    if (query.offersOnly &&
+        sku % 5 != 0 &&
+        !base.hasStructuredVariants &&
+        base.packTerms == null) {
       return false;
     }
     final fulfilment = buyV2CatalogueFulfilmentModeFor(base);
@@ -1575,7 +1633,8 @@ class BuyV2DevelopmentCatalogueSource
       final sku = int.parse(suffix) - 1;
       if (sku < 0 || sku >= skusPerStore) continue;
       if (sku >= _templates.length &&
-          _templates[sku % _templates.length].hasStructuredVariants) {
+          (_templates[sku % _templates.length].hasStructuredVariants ||
+              _templates[sku % _templates.length].packTerms != null)) {
         continue;
       }
       final origin = _product(store, sku);
@@ -3910,6 +3969,7 @@ class BuyV2Session extends ChangeNotifier {
         product.title.trim().isEmpty ||
         product.pack.trim().isEmpty ||
         product.minimumOrder < 1 ||
+        !product.hasValidPackTerms ||
         (previous != null && previous.storeId != storeId)) {
       throw const FormatException('Catalogue listing identity mismatch');
     }
@@ -9736,7 +9796,9 @@ class BuyV2Session extends ChangeNotifier {
               clearStoreCollection: store.collection == null,
             );
     });
-    if (variantWithdrawn(product)) {
+    if (variantWithdrawn(product) ||
+        !product.hasValidPackTerms ||
+        product.packTerms?.requiresMeasurement == true) {
       return cached.copyWith(
         orderabilityLabel: 'Unavailable',
         stale: true,
@@ -11984,6 +12046,14 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!_allowProcurementProduct(item)) return false;
+    if (!item.hasValidPackTerms ||
+        item.packTerms?.requiresMeasurement == true) {
+      notice = item.packTerms?.requiresMeasurement == true
+          ? 'Final weight and price must be confirmed before ordering.'
+          : 'Pack information could not be confirmed. Refresh this product.';
+      notifyListeners();
+      return false;
+    }
     if (variantWithdrawn(item)) {
       notice =
           'This product option is no longer available. Choose another option.';
@@ -12017,8 +12087,16 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final current = _cart[id];
-    final addedQuantity = quantity ?? item.minimumOrder;
-    if (addedQuantity < item.minimumOrder ||
+    final addedQuantity =
+        quantity ??
+        (current != null && item.packTerms != null
+            ? item.quantityStep
+            : item.minimumOrder);
+    final proposedQuantity = (current?.quantity ?? 0) + addedQuantity;
+    if (addedQuantity <= 0 ||
+        (item.packTerms == null && addedQuantity < item.minimumOrder) ||
+        proposedQuantity < item.minimumOrder ||
+        (proposedQuantity - item.minimumOrder) % item.quantityStep != 0 ||
         BigInt.from(addedQuantity) > BigInt.from(9007199254740991)) {
       notice = 'Choose a valid number of packs.';
       notifyListeners();
@@ -12157,8 +12235,17 @@ class BuyV2Session extends ChangeNotifier {
     final item = isStoreProcurement
         ? findProduct(id) ?? line.product
         : line.product;
+    if (!item.hasValidPackTerms) {
+      return 'Pack information could not be confirmed. Refresh this product.';
+    }
+    if (item.packTerms?.requiresMeasurement == true) {
+      return 'Final weight and price must be confirmed before ordering.';
+    }
     if (quantity < item.minimumOrder) {
       return 'Minimum order: ${item.minimumOrder} ${item.minimumOrder == 1 ? 'pack' : 'packs'}.';
+    }
+    if ((quantity - item.minimumOrder) % item.quantityStep != 0) {
+      return 'Choose ${item.minimumOrder} packs, then steps of ${item.quantityStep}.';
     }
     final approvedMaximum = _prescriptionApprovedQuantities[id];
     if (approvedMaximum != null && quantity > approvedMaximum) {
@@ -12230,7 +12317,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     // Button and typed entry must enforce the same quantity, availability and
     // eligibility rules before mutating the exact-SKU line.
-    setCartQuantity(id, '${current.quantity + 1}');
+    setCartQuantity(id, '${current.quantity + current.product.quantityStep}');
   }
 
   void decrease(String id) {
@@ -12246,9 +12333,13 @@ class BuyV2Session extends ChangeNotifier {
         destination: current.product.destination,
       );
     } else {
-      _cart[id] = current.copyWith(quantity: current.quantity - 1);
+      final next = math.max(
+        minimum,
+        current.quantity - current.product.quantityStep,
+      );
+      _cart[id] = current.copyWith(quantity: next);
       _acknowledgeCart(
-        '${current.product.customerTitle} · ${current.quantity - 1} in cart',
+        '${current.product.customerTitle} · $next in cart',
         destination: current.product.destination,
       );
     }
