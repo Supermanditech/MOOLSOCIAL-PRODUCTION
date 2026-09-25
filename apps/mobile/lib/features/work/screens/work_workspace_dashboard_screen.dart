@@ -14337,6 +14337,14 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
   }
 }
 
+const _stockStatementPrimaryStyle = TextStyle(
+  fontSize: 12,
+  height: 1.2,
+  fontWeight: FontWeight.w600,
+  color: Color(0xFF30343B),
+  fontFeatures: [FontFeature.tabularFigures()],
+);
+
 class _StockFrozenRow extends StatelessWidget {
   const _StockFrozenRow({
     super.key,
@@ -14601,11 +14609,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                 Text(
                   value,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: MoolColors.navy,
-                  ),
+                  style: _stockStatementPrimaryStyle,
                 ),
                 if (note != null) ...[
                   const SizedBox(height: 4),
@@ -14676,12 +14680,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                                 product.title,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w700,
-                                  color: MoolColors.ink,
-                                ),
+                                style: _stockStatementPrimaryStyle,
                               ),
                               const SizedBox(height: 3),
                               Text(

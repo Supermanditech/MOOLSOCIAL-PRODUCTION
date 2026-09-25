@@ -2747,3 +2747,29 @@ Logs: task outputs/stock-column-lines-tests.txt and stock-column-lines-tests-r2.
 Hot reload succeeded on OPPO. Visual verification pending: phone was in another
 app, so further device interaction paused and founder asked to return to Stock.
 No product writes, APK, backend or Cursor changes.
+
+OPPO follow-up: founder returned device to Stock. Captured and inspected fixed
+separators in default view and horizontally scrolled Purchase/MRP view; header
+and rows remained aligned after Product width adjustment (45% to 41/42%).
+MRP tap still focused its field in the shared editor; cancelled without saving.
+Task evidence: outputs/stock-lines-before.png, stock-lines-scrolled.png and
+stock-lines-resized.png. This closes the pending hot-loaded separator visual
+check only; founder approval and exact rebuilt-APK qualification stay separate.
+
+### Stock statement text standardization — 25 September 2026
+
+Founder explicitly included product names in standardizing Stock text. Names,
+stock and all numeric values now reuse one 12px, 1.2 line-height, semibold charcoal
+style with tabular figures. Headers remain 11px semibold muted text; pack/SKU
+and stock notes remain 10px secondary text, with semantic warning colour intact.
+No global theme, widths, actions or data changes. Existing text scaling retained.
+58 affected checks pass (outputs/stock-typography-tests-r2.txt); analysis clean.
+New assertions require identical name/value styles. Two initial large-value tests
+expected the former 14px size; updated to 12px without removing exact-value or
+untruncated rendering assertions. OPPO debug reattachment required restarting the
+app from Stock, with no editor open; no APK reinstall or data clearing.
+Reattachment and hot restart succeeded. Returned through Work/Workspace to Stock;
+captured and visually inspected outputs/stock-typography.png. Names and numeric
+values display the shared charcoal style, muted metadata and warning colours
+remain distinct, and separators/layout remain intact. No product values changed.
+Founder review and exact rebuilt-APK qualification remain open.

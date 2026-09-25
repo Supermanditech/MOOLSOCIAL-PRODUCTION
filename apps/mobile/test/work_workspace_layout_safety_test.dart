@@ -4585,7 +4585,7 @@ void main() {
         );
         if (amount.$1 >= 10000000000 && display.$3 == 2) {
           final paragraph = tester.renderObject<RenderParagraph>(exactPrice);
-          expect((paragraph.text as TextSpan).style!.fontSize, 14);
+          expect((paragraph.text as TextSpan).style!.fontSize, 12);
           await captureStoreView(tester, 'r665-catalogue-measure-${amount.$1}');
         }
         expectStatementMoneyUntruncated(tester, exactPrice);
@@ -27594,6 +27594,12 @@ void main() {
       expectAlignedColumnLines();
       final original = work.workspaceCatalogueItems.first;
       final movements = work.workspaceStockMovements.length;
+      final nameStyle = tester
+          .widget<Text>(find.text(original.title).first)
+          .style!;
+      expect(nameStyle.fontSize, 12);
+      expect(nameStyle.fontWeight, FontWeight.w600);
+      expect(nameStyle.color, const Color(0xFF30343B));
       for (final pair in [
         ('stock', 'stock'),
         ('price', 'selling-price'),
@@ -27605,6 +27611,10 @@ void main() {
           Key('work-catalogue-${pair.$1}-${original.id}'),
         );
         await reveal(tester, cell);
+        final valueText = tester.widget<Text>(
+          find.descendant(of: cell, matching: find.byType(Text)).first,
+        );
+        expect(valueText.style, nameStyle);
         if (pair.$1 == 'mrp') {
           expectAlignedColumnLines();
           expect(
