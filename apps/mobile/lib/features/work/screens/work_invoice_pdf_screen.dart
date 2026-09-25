@@ -426,14 +426,6 @@ class _WorkInvoicePdfScreenState extends State<WorkInvoicePdfScreen> {
                         icon: const Icon(Icons.download_outlined),
                         label: const Text('Save PDF'),
                       ),
-                      FilledButton.icon(
-                        key: const Key('invoice-pdf-share'),
-                        onPressed: _acting || _rendering
-                            ? null
-                            : () => _fileAction(true),
-                        icon: const Icon(Icons.share_outlined),
-                        label: const Text('Share PDF'),
-                      ),
                       if (_acting)
                         const SizedBox(
                           width: 24,

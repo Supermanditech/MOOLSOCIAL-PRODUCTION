@@ -27658,11 +27658,24 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             ),
           ),
           if (_stage == 'invoice')
-            FilledButton.icon(
-              key: const Key('work-sale-next'),
-              onPressed: _nextSale,
-              icon: const Icon(Icons.add),
-              label: const Text('Start next sale'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('work-sale-next'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  onPressed: _nextSale,
+                  icon: const Icon(Icons.add),
+                  label: const Text('New sale'),
+                ),
+              ),
             ),
         ],
       );

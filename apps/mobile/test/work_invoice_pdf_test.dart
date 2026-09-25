@@ -667,26 +667,21 @@ void main() {
       expect(find.text('Invoice saved.'), findsOneWidget);
     },
   );
-  testWidgets('share cancellation failure and handoff never imply delivery', (
-    tester,
-  ) async {
-    final actions = Actions();
-    await open(tester, Source(() async => document()), actions: actions);
-    await tester.pumpAndSettle();
-    actions.result = () async => WorkPdfActionResult.cancelled;
-    await tap(tester, 'invoice-pdf-share');
-    expect(find.text('Sharing cancelled.'), findsOneWidget);
-    actions.result = () async => throw Exception('share');
-    await tap(tester, 'invoice-pdf-share');
-    expect(
-      find.text('Could not share the PDF. Please try again.'),
-      findsOneWidget,
-    );
-    actions.result = () async => WorkPdfActionResult.completed;
-    await tap(tester, 'invoice-pdf-share');
-    expect(find.text('File handed to the selected app.'), findsOneWidget);
-    expect(request().invoice.sharedChannels, isEmpty);
-  });
+  testWidgets(
+    'manual PDF sharing is absent and never implies automatic delivery',
+    (tester) async {
+      final actions = Actions();
+      await open(tester, Source(() async => document()), actions: actions);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('invoice-pdf-share')), findsNothing);
+      expect(find.byTooltip('Share PDF'), findsNothing);
+      expect(find.text('Share PDF'), findsNothing);
+      expect(actions.shares, 0);
+      expect(find.byKey(const Key('invoice-pdf-save')), findsOneWidget);
+      expect(find.byKey(const Key('invoice-pdf-print')), findsOneWidget);
+      expect(request().invoice.sharedChannels, isEmpty);
+    },
+  );
   testWidgets('pending actions prevent duplicates and pagination works', (
     tester,
   ) async {

@@ -2316,3 +2316,36 @@ No catalogue-block/editor/import redesign before Screen 1 approval. No shared
 catalogue backend, media pipeline, payment, Store setup, Counter Sale redesign,
 APK, live messages/payments, production release or acceptance tag. The exact
 checkpoint admission does not approve a missing central baseline.
+
+## Counter Sale invoice delivery follow-up — 25 September 2026
+
+Founder direction: remove manual PDF sharing entirely, including a secondary
+icon. After creating an invoice, New sale is the primary next action; it starts
+a fresh customer/cart without changing the saved invoice or recording payment.
+PDF saving and printing remain available. Collapsed cart categories must never
+filter invoice/PDF/print item lines.
+
+Automatic delivery is required but backend implementation remains deferred.
+Existing frontend connection points, to reuse rather than duplicate:
+
+- `work_session.dart`: `storeInvoiceDeliveryScope` and scoped
+  `loadInvoiceDeliveryPreference` / `saveInvoiceDeliveryPreference`.
+- `work_services.dart`: `SecureWorkInvoiceDeliveryPreferenceStore` persists the
+  account/Store-owned preference. It is not a message queue or delivery proof.
+- `work_models.dart`: `WorkspaceInvoiceDeliveryMode.automatic` expresses the
+  selected automatic route; existing explicit/off choices remain preserved.
+- Saved `WorkspaceCustomerInvoice` identity and its matching order's immutable
+  `itemSnapshots` provide the complete document input. Bind account, Store,
+  invoice ID and order ID; monetary snapshot values ending in Paise/Minor are
+  integer paise. Never derive document items from visible/expanded cart rows.
+- `work_invoice_pdf.dart`: `WorkInvoicePdfRequest` and `WorkInvoicePdfSource`
+  are the existing scoped document boundary. Local review documents remain
+  preview-only; they are not production-issued tax invoices.
+
+Backend acceptance later must implement authorized recipient resolution
+(MoolSocial Chat for members, WhatsApp otherwise), valid channel permission,
+durable/idempotent send after successful invoice recording, retry without
+duplicate delivery, account/Store isolation, and provider-confirmed delivery
+states. Frontend must not claim queued/sent/delivered from a saved preference,
+PDF generation, or opening another app. No backend queue, provider connection,
+message dispatch or simulated success was added in this frontend follow-up.

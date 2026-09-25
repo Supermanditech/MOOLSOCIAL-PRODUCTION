@@ -17275,6 +17275,18 @@ void main() {
           300000,
         );
         expect(invoice.payableMinor, 300000);
+        final next = find.byKey(const Key('work-sale-next'));
+        expect(find.text('New sale'), findsOneWidget);
+        expect(next.hitTestable(), findsOneWidget);
+        final nextBounds = tester.getRect(next);
+        expect(nextBounds.height, greaterThanOrEqualTo(48));
+        expect(nextBounds.bottom, lessThanOrEqualTo(display.size.height - 12));
+        await tester.tap(next);
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderCustomer, isEmpty);
+        expect(work.workspaceOrderQuantities, isEmpty);
+        expect(work.workspaceInvoices.single.id, invoice.id);
+        expect(work.workspaceCatalogueItems.every((p) => p.stock == 4), isTrue);
         expect(tester.takeException(), isNull);
       },
     );
