@@ -2424,3 +2424,33 @@ the certificate to the application review case. This does not establish an
 authoritative selected-Store registration/status. Do not copy that unscoped
 value into seller invoices. Store-scoped registration mapping remains open;
 backend implementation and production tax-invoice certification stay deferred.
+
+### Connected receipt-test reconciliation and device sweep (2026-09-25)
+
+Broader connected run revealed two stale COUNTERD01 receipt-label expectations
+at scales1/2:59passes,2failures in polish-connected-reconciliation.txt. Tests now
+locate collection-confirm and explicitly require Record receipt. Exact dues
+reduction, unchanged sales/invoice/order/stock and reopen assertions remain.
+No application or approved design change. Identical selector rerun passes61/61
+in polish-connected-reconciliation-after.txt; focused test analysis reports no
+issues and diff check passes. Logs live in the task outputs directory.
+
+Actual retained20-item draft1773 was inspected in landscape: category expansion,
+tabular item lines, totals and payment controls scroll with Create invoice above
+Android navigation. Floating Gboard overlaps some controls; its visible Done
+dismisses safely. This is not docked-IME proof. Product editor normal-landscape
+sections and unsaved long-description wrapping inspected; Cancel never saved.
+
+Founder changed OPPO font_scale to1.6. Initial screen showed old editor styling
+despite live attach; zero-library reload alone did not qualify current source.
+Compiler paths confirmed authorized Store worktree. Attached hot restart3796ms
+then normal navigation restored subdued Save/free Cancel/catalogue note at1.6,
+shown in oppo-editor-font16-restart.png. Earlier oppo-editor-font16.png is stale
+runtime evidence and excluded from latest-style acceptance. Exact cause remains
+unproven; require visible current-source anchors after external Settings return.
+No new APK/install, invoice/payment, stock reset or Cursor changes. Font1.6 kept.
+
+Founder report reconciled in task outputs/store-pos-polish-founder-review-20260925.md.
+Remaining: enlarged Counter Sale and other unverified action variants, CSV-photo
+device continuity, scoped seller GST mapping/deferred backend, and founder visual
+approval. Full sweep is not complete and successor-APK closure remains excluded.

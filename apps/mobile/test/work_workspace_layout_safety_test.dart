@@ -15185,9 +15185,14 @@ void main() {
         find.byKey(const Key('collection-amount')),
         (amount / 100).toStringAsFixed(2),
       );
-      await reveal(tester, find.text('Confirm collection'));
+      final recordReceipt = find.byKey(const Key('collection-confirm'));
+      await reveal(tester, recordReceipt);
+      expect(
+        find.descendant(of: recordReceipt, matching: find.text('Record receipt')),
+        findsOneWidget,
+      );
       await captureStoreView(tester, 'counter-d01-record-cash-$scale');
-      await tester.tap(find.text('Confirm collection'));
+      await tester.tap(recordReceipt);
       await tester.pumpAndSettle();
       expect(work.workspaceFinance!.duesMinor, seed.finance.duesMinor - amount);
       expect(
