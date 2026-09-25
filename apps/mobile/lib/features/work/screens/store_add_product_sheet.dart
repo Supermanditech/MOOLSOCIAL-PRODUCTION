@@ -84,7 +84,8 @@ class _StoreRecentSearchesState extends State<StoreRecentSearches> {
   void _queryChanged() {
     final next = widget.controller.text;
     if (next.isEmpty && _previous.isNotEmpty && _focused) _remember(_previous);
-    _previous = next;
+    // Backspacing to empty completes the original search, not its last letter.
+    if (next.isEmpty || !_previous.startsWith(next)) _previous = next;
   }
 
   void _externalFocus() => _focus(widget.focusNode!.hasFocus);
@@ -1561,6 +1562,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
   }
 
   void _focusChanged() {
+    if (!_searchFocus.hasFocus) _rememberQuery();
     if (mounted) setState(() {});
   }
 
@@ -1972,6 +1974,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                                           ),
                                           tooltip: 'Clear search and filters',
                                           onPressed: () => _resetBrowse(() {
+                                            _rememberQuery();
                                             _search.clear();
                                             _barcode = '';
                                             _scanError = null;
@@ -2262,12 +2265,17 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                           for (final term in _history.take(5))
                             Padding(
                               padding: const EdgeInsets.only(right: 6),
-                              child: ActionChip(
-                                avatar: const Icon(Icons.history, size: 16),
-                                label: Text(term),
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: MoolColors.ink,
+                                  minimumSize: const Size(48, 48),
+                                ),
+                                icon: const Icon(Icons.history, size: 16),
+                                label: Text(term, maxLines: 1),
                                 onPressed: () {
                                   _resetBrowse(() => _search.text = term);
-                                  _searchFocus.unfocus();
+                                  _rememberQuery();
+                                  _searchFocus.requestFocus();
                                 },
                               ),
                             ),

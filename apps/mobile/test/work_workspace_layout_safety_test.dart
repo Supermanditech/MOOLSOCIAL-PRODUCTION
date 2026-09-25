@@ -811,6 +811,14 @@ void main() {
     expect(changed, 'Rice 6');
     expect(controller.text, 'Rice 6');
     expect(find.byType(TextButton), findsNothing);
+    await tester.enterText(find.byType(TextField), '1941');
+    await tester.enterText(find.byType(TextField), '194');
+    await tester.enterText(find.byType(TextField), '19');
+    await tester.enterText(find.byType(TextField), '1');
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pump();
+    expect(history.first, '1941');
+    expect(history, isNot(contains('1')));
     current = false;
     await tester.enterText(find.byType(TextField), 'Other Store');
     focus.unfocus();
@@ -821,6 +829,40 @@ void main() {
     controller.dispose();
     focus.dispose();
   });
+  for (final stockOnly in [false, true]) {
+    testWidgets('STORESEARCH catalogue stock clear and recall $stockOnly', (
+      tester,
+    ) async {
+      final history = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreAddProductSheet(
+            catalogue: const [],
+            ownedProducts: const [],
+            createProduct: (_) =>
+                throw StateError('Search must not create stock'),
+            scanBarcode: () async => null,
+            stockOnly: stockOnly,
+            recentSearches: history,
+          ),
+        ),
+      );
+      final input = find.byKey(const Key('work-add-products-search'));
+      await tester.enterText(input, 'Rice');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-catalogue-clear')));
+      await tester.pumpAndSettle();
+      expect(history, ['Rice']);
+      final recent = find.widgetWithText(TextButton, 'Rice');
+      expect(recent, findsOneWidget);
+      await tester.tap(recent);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(input).controller!.text, 'Rice');
+      expect(recent, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   Future<void> openImportFilters(WidgetTester tester) async {
     await tester.tap(find.byKey(const Key('work-import-status-filter')));
     await tester.pumpAndSettle();
@@ -12165,7 +12207,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(search);
         await tester.pumpAndSettle();
-        expect(find.widgetWithText(ActionChip, 'Fortune'), findsOneWidget);
+        expect(find.widgetWithText(TextButton, 'Fortune'), findsOneWidget);
         await captureStoreView(tester, 'batch2b-search-history-$suffix');
         tester.view.viewInsets = const FakeViewPadding(bottom: 240);
         await tester.pumpAndSettle();
@@ -12174,7 +12216,7 @@ void main() {
         await captureStoreView(tester, 'batch2b-search-keyboard-$suffix');
         tester.view.viewInsets = const FakeViewPadding();
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(ActionChip, 'Fortune'));
+        await tester.tap(find.widgetWithText(TextButton, 'Fortune'));
         await tester.pumpAndSettle();
         expect(find.text('1 product'), findsOneWidget);
         await tester.tap(find.byKey(const Key('work-add-products-scan')));

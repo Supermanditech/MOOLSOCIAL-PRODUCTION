@@ -2660,3 +2660,32 @@ Account/Store browsing isolation, stale scope, five-term limit, recall, typing,
 CSV and normal/enlarged layout tests included. OPPO was in another app, so device
 interaction paused. No new APK, import, invoice or payment. Founder/device review
 and exact APK qualification remain pending.
+# Contextual search follow-up — 25 September 2026
+
+Founder requested fixing the full listed Store search set. Two observed children
+were corrected in existing owners: Catalogue/Stock now remember a query on clear
+and focus loss, with unboxed recent-term buttons; shared contextual search retains
+the full term when backspacing to empty rather than recording its final character.
+Shared correction applies to CSV, POS, Customers, statements, documents and the
+existing wholesale picker. No backend, Cursor integration or APK work.
+
+Local qualification: 43 passed, three capture-only skips; Dart analysis and diff
+checks clean. Retained task output: outputs/store-search-fix-final.txt. Initial
+run retained old ActionChip expectations in two tests; corrected to the approved
+TextButton treatment. One statement-export timing failure did not recur in either
+subsequent combined run; retained first log, not discarded as an invented pass.
+
+OPPO hot-reload checks: Stock salt filter/clear/recall; Catalogue rice
+filter/clear/recall and empty Saved guidance; POS tea filter/clear/recall with the
+20-unit ₹1,616 draft unchanged; CSV 0002 filter/clear/recall then cancel without
+save; Customer Book 1941 backspace-to-empty/recall; documents 1700
+filter/backspace-to-empty/recall; customer statements 1941 filter/clear/recall.
+Old one-character term from the failing Customer test remains in session history;
+no user history was deleted to hide it. Store-wide and Stock-category checks are
+recorded in the preceding task evidence.
+
+Not full device closure: wholesale route currently shows no eligible group offers
+and does not expose its product picker; source support is not device proof. No
+provider/offer fabricated to unlock it. Restock/Buy integration remains deferred.
+Full enlarged-text, restart and cross-account device coverage remain pending.
+No stock, invoices, payments or publication records were changed by these tests.
