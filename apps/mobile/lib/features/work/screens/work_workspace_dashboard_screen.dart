@@ -3471,6 +3471,7 @@ class _HeaderSearchUtility extends StatelessWidget {
 bool _storeActionsBelowContent(BuildContext context) {
   final width = MediaQuery.sizeOf(context).width;
   return width < 360 ||
+      MediaQuery.sizeOf(context).height <= 450 ||
       (width < 600 && MediaQuery.textScalerOf(context).scale(1) > 1.3);
 }
 
@@ -3714,7 +3715,8 @@ class _StoreControlDashboard extends StatelessWidget {
           // Enlarged text has its own fallback below. Do not make a fitting
           // compact portrait scroll merely because its text is scaled.
           final shortViewport = constraints.maxHeight < 260;
-          final actionsBelow = _storeActionsBelowContent(context);
+          final actionsBelow =
+              !actionsExpanded || _storeActionsBelowContent(context);
           final collection =
               (reviewedOrder ?? session.currentWorkspaceOrder)
                   ?.isCustomerCollection ==
@@ -3926,7 +3928,7 @@ class _StoreActionEdge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deal = session.activeGroupBuy;
-    final horizontal = _storeActionsBelowContent(context);
+    final horizontal = !expanded || _storeActionsBelowContent(context);
     final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
     final readableWidth =
         _storeRailWordWidth(
@@ -3946,10 +3948,10 @@ class _StoreActionEdge extends StatelessWidget {
             : (readableWidth > normalWidth ? readableWidth : normalWidth) +
                   (expanded ? 40 : 20),
         height: horizontal
-            ? (MediaQuery.textScalerOf(context).scale(11) * 2.55 + 22).clamp(
-                54.0,
-                double.infinity,
-              )
+            ? !expanded
+                  ? 48
+                  : (MediaQuery.textScalerOf(context).scale(11) * 2.55 + 22)
+                        .clamp(54.0, double.infinity)
             : null,
         decoration: BoxDecoration(
           border: horizontal
@@ -3958,18 +3960,18 @@ class _StoreActionEdge extends StatelessWidget {
         ),
         child: Flex(
           direction: horizontal ? Axis.horizontal : Axis.vertical,
+          verticalDirection: VerticalDirection.up,
+          mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
           children: [
             Semantics(
               expanded: expanded,
               button: true,
-              label: expanded
-                  ? 'Show compact shortcuts'
-                  : 'Show shortcut details',
+              label: expanded ? 'Hide Store shortcuts' : 'Show Store shortcuts',
               excludeSemantics: true,
               onTap: onToggle,
               child: Tooltip(
-                message: expanded ? 'Compact view' : 'Show details',
+                message: expanded ? 'Hide shortcuts' : 'Show shortcuts',
                 child: InkWell(
                   key: const Key('work-home-actions-toggle'),
                   onTap: onToggle,
@@ -3989,8 +3991,8 @@ class _StoreActionEdge extends StatelessWidget {
                         children: [
                           Icon(
                             expanded
-                                ? Icons.unfold_less_rounded
-                                : Icons.style_outlined,
+                                ? Icons.chevron_right_rounded
+                                : Icons.chevron_left_rounded,
                             size: 21,
                             color: MoolColors.navy,
                           ),
@@ -4001,162 +4003,166 @@ class _StoreActionEdge extends StatelessWidget {
                 ),
               ),
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                key: const Key('work-store-quick-actions-scroll'),
-                scrollDirection: horizontal ? Axis.horizontal : Axis.vertical,
-                padding: EdgeInsets.symmetric(
-                  vertical: horizontal ? 2 : 12,
-                  horizontal: 4,
-                ),
-                child: Flex(
-                  direction: horizontal ? Axis.horizontal : Axis.vertical,
-                  children:
-                      [
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-counter-sale',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.point_of_sale_outlined,
-                              label: 'Counter sale',
-                              onTap: onCounterSale,
-                            ),
-                            const Divider(
-                              height: 16,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-store-link',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.link_rounded,
-                              label: 'Share store link',
-                              semanticLabel: 'Share store link — unavailable',
-                              onTap: null,
-                            ),
-                            const Divider(
-                              height: 16,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-buy',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.inventory_2_outlined,
-                              label: 'Buy stock',
-                              onTap: onRestock,
-                              detail: session.workspaceLowStockCount > 0
-                                  ? '${session.workspaceLowStockCount} low stock'
-                                  : null,
-                            ),
-                            const Divider(
-                              height: 24,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-incoming-purchases',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.local_shipping_outlined,
-                              label: 'Track purchases',
-                              onTap: onPurchases,
-                              detail: session.workspaceIncomingPurchaseCount > 0
-                                  ? session.workspacePurchasesComplete
-                                        ? '${session.workspaceIncomingPurchaseCount} incoming'
-                                        : '${session.workspaceIncomingPurchaseCount} loaded'
-                                  : null,
-                            ),
-                            const Divider(
-                              height: 24,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-group-buy',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.groups_2_outlined,
-                              label: 'Buy together',
-                              onTap: onGroup,
-                              detail: deal == null
-                                  ? session.workspaceGroupOffersConnected
-                                        ? '${session.workspaceGroupOffers.length} offers'
-                                        : null
-                                  : session.workspaceGroupOffersConnected
-                                  ? '${session.workspaceGroupOffers.length} offers\n${deal.productName}'
-                                  : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
-                              progress: deal == null || deal.targetQuantity <= 0
-                                  ? null
-                                  : (deal.securedQuantity / deal.targetQuantity)
-                                        .clamp(0, 1),
-                            ),
-                            const Divider(
-                              height: 16,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-add-products',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.add_box_outlined,
-                              label: 'Add products',
-                              onTap: onAddProducts,
-                            ),
-                            const Divider(
-                              height: 16,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-create-offer',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.local_offer_outlined,
-                              label: 'Create offer',
-                              onTap: onCreateOffer,
-                            ),
-                            const Divider(
-                              height: 16,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-promote-store',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.campaign_outlined,
-                              label: 'Promote store',
-                              onTap: onPromote,
-                            ),
-                            const Divider(
-                              height: 16,
-                              indent: 16,
-                              endIndent: 16,
-                            ),
-                            _StoreEdgeAction(
-                              keyName: 'work-quick-requirement',
-                              compact: horizontal,
-                              horizontal: horizontal,
-                              icon: Icons.post_add_rounded,
-                              label: 'Post requirement',
-                              onTap: onRequirement,
-                            ),
-                          ]
-                          .map<Widget>(
-                            (child) => child is _StoreEdgeAction
-                                ? child.asNamedTab(expanded)
-                                : horizontal
-                                ? const SizedBox(width: 4)
-                                : const SizedBox(height: 4),
-                          )
-                          .toList(),
+            if (expanded)
+              Flexible(
+                child: SingleChildScrollView(
+                  key: const Key('work-store-quick-actions-scroll'),
+                  scrollDirection: horizontal ? Axis.horizontal : Axis.vertical,
+                  padding: EdgeInsets.symmetric(
+                    vertical: horizontal ? 2 : 12,
+                    horizontal: 4,
+                  ),
+                  child: Flex(
+                    direction: horizontal ? Axis.horizontal : Axis.vertical,
+                    children:
+                        [
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-counter-sale',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.point_of_sale_outlined,
+                                label: 'Counter sale',
+                                onTap: onCounterSale,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-store-link',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.link_rounded,
+                                label: 'Share store link',
+                                semanticLabel: 'Share store link — unavailable',
+                                onTap: null,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-buy',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Buy stock',
+                                onTap: onRestock,
+                                detail: session.workspaceLowStockCount > 0
+                                    ? '${session.workspaceLowStockCount} low stock'
+                                    : null,
+                              ),
+                              const Divider(
+                                height: 24,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-incoming-purchases',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.local_shipping_outlined,
+                                label: 'Track purchases',
+                                onTap: onPurchases,
+                                detail:
+                                    session.workspaceIncomingPurchaseCount > 0
+                                    ? session.workspacePurchasesComplete
+                                          ? '${session.workspaceIncomingPurchaseCount} incoming'
+                                          : '${session.workspaceIncomingPurchaseCount} loaded'
+                                    : null,
+                              ),
+                              const Divider(
+                                height: 24,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-group-buy',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.groups_2_outlined,
+                                label: 'Buy together',
+                                onTap: onGroup,
+                                detail: deal == null
+                                    ? session.workspaceGroupOffersConnected
+                                          ? '${session.workspaceGroupOffers.length} offers'
+                                          : null
+                                    : session.workspaceGroupOffersConnected
+                                    ? '${session.workspaceGroupOffers.length} offers\n${deal.productName}'
+                                    : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
+                                progress:
+                                    deal == null || deal.targetQuantity <= 0
+                                    ? null
+                                    : (deal.securedQuantity /
+                                              deal.targetQuantity)
+                                          .clamp(0, 1),
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-add-products',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.add_box_outlined,
+                                label: 'Add products',
+                                onTap: onAddProducts,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-create-offer',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.local_offer_outlined,
+                                label: 'Create offer',
+                                onTap: onCreateOffer,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-promote-store',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.campaign_outlined,
+                                label: 'Promote store',
+                                onTap: onPromote,
+                              ),
+                              const Divider(
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-requirement',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.post_add_rounded,
+                                label: 'Post requirement',
+                                onTap: onRequirement,
+                              ),
+                            ]
+                            .map<Widget>(
+                              (child) => child is _StoreEdgeAction
+                                  ? child.asNamedTab(expanded)
+                                  : horizontal
+                                  ? const SizedBox(width: 4)
+                                  : const SizedBox(height: 4),
+                            )
+                            .toList(),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -4175,7 +4181,6 @@ class _StoreEdgeAction extends StatelessWidget {
     this.progress,
     this.compact = false,
     this.horizontal = false,
-    this.namedTab = false,
     this.showDetails = false,
   });
   final String keyName, label;
@@ -4185,7 +4190,7 @@ class _StoreEdgeAction extends StatelessWidget {
   final String? semanticLabel;
   final double? progress;
   final bool compact, horizontal;
-  final bool namedTab, showDetails;
+  final bool showDetails;
 
   _StoreEdgeAction asNamedTab(bool expanded) => _StoreEdgeAction(
     keyName: keyName,
@@ -4197,7 +4202,6 @@ class _StoreEdgeAction extends StatelessWidget {
     progress: progress,
     compact: compact,
     horizontal: horizontal,
-    namedTab: true,
     showDetails: expanded,
   );
 
@@ -4301,137 +4305,7 @@ class _StoreEdgeAction extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) => namedTab
-      ? _buildNamedTab(context)
-      : Semantics(
-          button: true,
-          label: semanticLabel ?? (detail == null ? label : '$label, $detail'),
-          enabled: onTap != null,
-          onTap: onTap,
-          excludeSemantics: true,
-          child: Tooltip(
-            message: semanticLabel ?? label,
-            child: InkWell(
-              key: Key(keyName),
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: horizontal
-                      ? 48
-                      : compact
-                      ? 56
-                      : 64,
-                  minWidth: 48,
-                ),
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontal
-                        ? 12
-                        : compact
-                        ? 1
-                        : 4,
-                    vertical: compact
-                        ? 6
-                        : MediaQuery.textScalerOf(context).scale(11) > 16
-                        ? 2
-                        : 8,
-                  ),
-                  child: Column(
-                    children: [
-                      if (!horizontal)
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: compact
-                                ? Colors.transparent
-                                : MoolColors.navy.withValues(alpha: .06),
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                          child: Icon(
-                            icon,
-                            size: compact
-                                ? 21
-                                : MediaQuery.textScalerOf(context).scale(11) >
-                                      16
-                                ? 18
-                                : 25,
-                            color: onTap == null
-                                ? MoolColors.muted
-                                : MoolColors.navy,
-                          ),
-                        ),
-                      if (!horizontal)
-                        SizedBox(
-                          height: compact
-                              ? 3
-                              : MediaQuery.textScalerOf(context).scale(11) > 16
-                              ? 2
-                              : 7,
-                        ),
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: compact ? (horizontal ? 12 : 10) : 11,
-                          height:
-                              MediaQuery.textScalerOf(context).scale(11) > 16
-                              ? 1.1
-                              : 1.3,
-                          fontWeight: FontWeight.w700,
-                          color: onTap == null
-                              ? MoolColors.muted
-                              : MoolColors.navy,
-                        ),
-                      ),
-                      if (detail != null && !horizontal) ...[
-                        const SizedBox(height: 8),
-                        _StoreValueMotion(
-                          value: detail!,
-                          child: Text(
-                            detail!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              height: 1.4,
-                              color: MoolColors.muted,
-                              fontFeatures: [FontFeature.tabularFigures()],
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (progress != null && !horizontal) ...[
-                        const SizedBox(height: 8),
-                        Semantics(
-                          label: 'Group quantity confirmed',
-                          value: '${(progress! * 100).round()} percent',
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween<double>(
-                              begin: progress!,
-                              end: progress!,
-                            ),
-                            duration: MoolMotion.accessible(
-                              context,
-                              MoolMotion.standard,
-                            ),
-                            curve: MoolMotion.change,
-                            builder: (context, value, _) =>
-                                LinearProgressIndicator(
-                                  value: value,
-                                  minHeight: 3,
-                                  color: MoolColors.navy,
-                                  backgroundColor: const Color(0xFFE8EBF6),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
+  Widget build(BuildContext context) => _buildNamedTab(context);
 }
 
 double _storeRailWordWidth(
@@ -9961,102 +9835,6 @@ class _StoreContextButton extends StatelessWidget {
 }
 
 // ignore: unused_element
-class _StoreQuickActionBar extends StatelessWidget {
-  const _StoreQuickActionBar({
-    required this.onNewSale,
-    required this.onDelivery,
-    required this.onBuy,
-    required this.onGroupBuy,
-  });
-
-  final VoidCallback onNewSale;
-  final VoidCallback onDelivery;
-  final VoidCallback onBuy;
-  final VoidCallback onGroupBuy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const Key('work-store-quick-actions'),
-      height: 58,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        children: [
-          _StoreQuickAction(
-            keyName: 'work-quick-new-sale',
-            icon: Icons.point_of_sale_outlined,
-            label: 'New Sale',
-            onPressed: onNewSale,
-          ),
-          _StoreQuickAction(
-            keyName: 'work-quick-delivery',
-            icon: Icons.delivery_dining_outlined,
-            label: 'Deliver Order',
-            onPressed: onDelivery,
-          ),
-          _StoreQuickAction(
-            keyName: 'work-quick-buy',
-            icon: Icons.shopping_bag_outlined,
-            label: 'Buy Stock',
-            onPressed: onBuy,
-          ),
-          _StoreQuickAction(
-            keyName: 'work-quick-group-buy',
-            icon: Icons.groups_2_outlined,
-            label: 'Group Bulk',
-            onPressed: onGroupBuy,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StoreQuickAction extends StatelessWidget {
-  const _StoreQuickAction({
-    required this.keyName,
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String keyName;
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        key: Key(keyName),
-        borderRadius: BorderRadius.circular(10),
-        onTap: onPressed,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: MoolColors.navy, size: 19),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
 class _GroupBuyTodayRow extends StatelessWidget {
   const _GroupBuyTodayRow({required this.groupBuy, required this.onPressed});
 
@@ -13885,62 +13663,6 @@ class _VerifiedProductMatch extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
-class _StockContextRail extends StatelessWidget {
-  const _StockContextRail({
-    required this.lowStockOnly,
-    // ignore: unused_element_parameter
-    this.groupBuySelected = false,
-    required this.onProducts,
-    required this.onLowStock,
-    required this.onPurchases,
-    required this.onGroupBuy,
-  });
-
-  final bool lowStockOnly;
-  final bool groupBuySelected;
-  final VoidCallback onProducts;
-  final VoidCallback onLowStock;
-  final VoidCallback onPurchases;
-  final VoidCallback onGroupBuy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const Key('work-stock-context-rail'),
-      height: 44,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFDCE2F2))),
-      ),
-      child: Row(
-        children: [
-          _StoreContextButton(
-            label: 'Products',
-            selected: !lowStockOnly && !groupBuySelected,
-            onPressed: !lowStockOnly && !groupBuySelected ? null : onProducts,
-          ),
-          _StoreContextButton(
-            label: 'Low stock',
-            selected: lowStockOnly && !groupBuySelected,
-            onPressed: lowStockOnly && !groupBuySelected ? null : onLowStock,
-          ),
-          _StoreContextButton(
-            label: 'Purchases',
-            selected: false,
-            onPressed: onPurchases,
-          ),
-          _StoreContextButton(
-            label: 'Group Bulk',
-            selected: groupBuySelected,
-            onPressed: groupBuySelected ? null : onGroupBuy,
-          ),
-        ],
       ),
     );
   }

@@ -2993,3 +2993,37 @@ Native hierarchy retrieval briefly returned null during navigation; a fresh
 read confirmed each actual destination, without retrying taps or transactions.
 Physical landscape/enlarged-text verification and founder visual acceptance of
 the implemented refinement remain open. No APK, backend or Cursor integration.
+
+## HOME-03 true collapse and obsolete-rail cleanup — 26 September 2026
+
+Latest founder approval supersedes spacing-only collapse: home starts with its
+stack hidden, gives the centre all available dashboard width, and provides a
+small bottom-edge reopen chevron. Open retains named scrollable tabs; manual
+collapse removes those widgets entirely. No automatic collapse. Removed the
+top wallet icon as explicitly requested. The existing per-Store session choice
+is retained across navigation. Working-screen contextual rails remain removed.
+
+Deleted unused _StoreQuickActionBar/_StoreQuickAction and _StockContextRail, and
+deleted the old _StoreEdgeAction renderer rather than keeping a hidden fallback.
+_StoreFirstTapAccess and old contextual shortcut keys were already removed.
+A source regression now checks all application Dart files for obsolete classes
+and key identifiers, alongside route-level absence and retained-action tests.
+The existing horizontal Today/Customers/Money/Grow navigation on fallback
+operation pages is not the removed right rail and remains to preserve navigation.
+
+HOME-03-C3: host landscape reproduced the bottom collapse control scrolling off
+the viewport. Short screens now use the existing pinned horizontal shortcut
+layout; named targets and hide/show stay reachable. Tests require a hittable
+collapse control, absent hidden-tab widgets and full available dashboard width
+after collapse. A test initially compared against physical screen width instead
+of the available landscape dashboard pane; corrected that assertion without
+changing the existing surrounding responsive layout.
+
+OPPO portrait: hot reload succeeded; inspected outputs/home-true-collapsed-
+20260926.png and home-true-open-20260926.png. Expanded, scrolled to Promote store
+and Post requirement, then manually collapsed. Centre content right boundary
+changed from404 to668 physical pixels; no top action icon or hidden named tabs
+remained after collapse. No records, stock, payments or invoices were changed.
+Latest final host evidence: outputs/home-true-collapse-qualified-20260926.txt.
+Analysis passed. Physical landscape/enlarged-text verification remains pending;
+no new APK and no claim of complete device qualification or prior-ticket closure.

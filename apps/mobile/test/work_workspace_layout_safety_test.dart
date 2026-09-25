@@ -2056,7 +2056,18 @@ void main() {
       final centre = find.byKey(const Key('work-store-activity-deck'));
       expect(toggle.hitTestable(), findsOneWidget);
       expect(find.text('Actions'), findsNothing);
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
+      expect(
+        find.byKey(const Key('work-store-quick-actions-scroll')),
+        findsNothing,
+      );
+      final before = tester.getSize(centre).width;
+      expect(
+        before,
+        tester.getSize(find.byKey(const Key('work-workspace-dashboard'))).width,
+      );
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
       for (final label in [
         'Counter sale',
         'Share store link',
@@ -2070,11 +2081,8 @@ void main() {
       ]) {
         expect(find.text(label), findsOneWidget);
       }
-      final before = tester.getSize(centre).width;
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
-      if (display.$1 >= 360 && display.$3 == 1) {
+      if (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1) {
         expect(tester.getSize(centre).width, lessThan(before));
         expect(
           tester.getRect(centre).right,
@@ -2083,13 +2091,42 @@ void main() {
       }
       await tester.pump(const Duration(seconds: 4));
       expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
+      expect(toggle.hitTestable(), findsOneWidget);
       await tester.tap(toggle);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
+      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
+      expect(
+        find.byKey(const Key('work-store-quick-actions-scroll')),
+        findsNothing,
+      );
       expect(tester.getSize(centre).width, before);
       expect(tester.takeException(), isNull);
     });
   }
+
+  test('HOME obsolete Store rails cannot be restored in application sources', () {
+    final files = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.dart'));
+    for (final file in files) {
+      final source = file.readAsStringSync();
+      for (final obsolete in [
+        '_StoreFirstTapAccess',
+        '_StoreQuickActionBar',
+        '_StockContextRail',
+        'work-contextual-shortcuts',
+        'work-shortcut-restock',
+      ]) {
+        expect(
+          source.contains(obsolete),
+          isFalse,
+          reason:
+              '${file.path} must not restore the removed Store rail: $obsolete',
+        );
+      }
+    }
+  });
 
   testWidgets('HOME compact invoice and method wording', (tester) async {
     final work = liveStore();
