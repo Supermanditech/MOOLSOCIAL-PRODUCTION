@@ -1,0 +1,197 @@
+{
+  "commitsVerified": 15,
+  "uniqueArchiveVersions": 11,
+  "publishedBuyRefUnchanged": true,
+  "concurrentStoreAdvance": {
+    "refs/heads/work/codex-ui/add-product-screen1-20260920": {
+      "before": "e1cdf7b504a592d2ca233ac3b2b0a9252abd99e2",
+      "after": "cad74a7961c192424701d0b0524ffd1b39d0469e"
+    },
+    "refs/remotes/origin/work/codex-ui/add-product-screen1-20260920": {
+      "before": "e1cdf7b504a592d2ca233ac3b2b0a9252abd99e2",
+      "after": "cad74a7961c192424701d0b0524ffd1b39d0469e"
+    }
+  },
+  "publishedBase": "5dc6885ada1fe0cd23f3d5d0a2bc62fe56cc0abd",
+  "head": "a766591aceeadb8dcc53d08b0fa1d191e99d47e2",
+  "mapping": [
+    {
+      "old": "6a10613b0573e42b0b0d41c9501bbca9a3932448",
+      "new": "eeb714b79e72fce101828d33b3231709dcfe3cee",
+      "archiveSha256": "52c259400743ebb9273d9dec6f47ad79d01fa395859534a9a3ce631e91159a69",
+      "archiveBytes": 183151708,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "ebec91c2d73af5847f5a9e8fee4177bee6fef232",
+      "new": "66ef29a9aba97b5d6e244b45c8df27a2aea30351",
+      "archiveSha256": "ee416917f1bd97b9c666cac63055fdd5fac73c3fe8c2d929640a7a5982c90b9c",
+      "archiveBytes": 188709665,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "64a948ff34a0d37cd73c36214218894fc1864072",
+      "new": "cb5bbc84a641d8d9a922dd02b26232636a6e4978",
+      "archiveSha256": "c5f0641323dfd32edf677a5f5f9b5651a251fb43e8e4d8280e407ad6dc1064b6",
+      "archiveBytes": 210855107,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "4a62a78bf93cbe13ced7a7299a717e96ec9f4e92",
+      "new": "b1f7eb59905e05bfe96ce55c963529f8b75980d7",
+      "archiveSha256": "4ddbd4333a2d3a8635411598d9b9340114004efd829062b31d03ca11af7eb516",
+      "archiveBytes": 225646890,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "d05f6619649151e9993cebbecfc0728aab0df565",
+      "new": "af46649e9f3307898c7e64a5885bfd21ea95ed34",
+      "archiveSha256": "4ddbd4333a2d3a8635411598d9b9340114004efd829062b31d03ca11af7eb516",
+      "archiveBytes": 225646890,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "5413c8faedb13ea00bbf72c85f52885bdc183871",
+      "new": "fc96e6e82bb43995bbadbd258a4e5d5c47924d1e",
+      "archiveSha256": "273b7d9c4410b8497c571e6e6885184cd15cbbef59a252a36b1ce6fdf02afda8",
+      "archiveBytes": 232480528,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "a28956175c372a3a0290cd02965c826003f00dda",
+      "new": "b34107580ff036623d7966e74027dd0965fc2237",
+      "archiveSha256": "8fe91340a23a491e7bf67693efc8ba47844d238c3eebc2dfe56b02a160aac373",
+      "archiveBytes": 235600544,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "9fde20ef00b0ebbc18486fab75a5219dcdb1c98d",
+      "new": "74a5ef825d6603c1c92d0cab7e0c36315a39f8a8",
+      "archiveSha256": "de92dcbe678c50cbaa18cd73bd40bbdf871a55ccb88252d0ee7a2ff69120f277",
+      "archiveBytes": 244706440,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "a9f419c7dc7f84687f732472feb103ab3a738348",
+      "new": "c4b1ed4a14f887f9f4a461894e727a74de5fdad9",
+      "archiveSha256": "de92dcbe678c50cbaa18cd73bd40bbdf871a55ccb88252d0ee7a2ff69120f277",
+      "archiveBytes": 244706440,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "d681a1c6942439c363d7195679aff980b0759306",
+      "new": "aa913497c8a4dee830d981d228f1fb384c53ce3d",
+      "archiveSha256": "079da55f59351dff1d9e57ae2241c99239d996f4e33928a0e33cec1bc98f2ad4",
+      "archiveBytes": 252190506,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "50f09192f56a0bff0db6a772c7d6ada497b69538",
+      "new": "8a4bec6d534ea80cfdc684a65598f3ef4d7b6d02",
+      "archiveSha256": "c9d9be0f03f83f017e790732912ec26fa3448af23fc5100fda4388919dccbc67",
+      "archiveBytes": 262251210,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "97035d1b55da31ac51507f68c15ec278487274eb",
+      "new": "eea65f4fe9a22d0516a7a9b0b7a1599674ebf33c",
+      "archiveSha256": "33e916c63753b8cb0109fdd128e433ee71ed3866ccd8f82b1b36c42c796d464d",
+      "archiveBytes": 274827842,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "8bd814fc39461292a303a9a1ba1984bb095168c4",
+      "new": "9cdfb124ac9f3b6f487cbe3118b0cc44b599cedb",
+      "archiveSha256": "b4ee0e08605e915bf66c47bb1e1f3f444d05660b863295dabe64a9f33c66321c",
+      "archiveBytes": 285753548,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "dff0b2310601499b1ff5485883697f583149b3b6",
+      "new": "6462a4c6956a98b663ce0c012f4c815a69124be1",
+      "archiveSha256": "b4ee0e08605e915bf66c47bb1e1f3f444d05660b863295dabe64a9f33c66321c",
+      "archiveBytes": 285753548,
+      "otherFilesIdentical": true
+    },
+    {
+      "old": "ec2d19722f0b8c68c7f8755a062dda7aae786595",
+      "new": "a766591aceeadb8dcc53d08b0fa1d191e99d47e2",
+      "archiveSha256": "b4ee0e08605e915bf66c47bb1e1f3f444d05660b863295dabe64a9f33c66321c",
+      "archiveBytes": 285753548,
+      "otherFilesIdentical": true
+    }
+  ],
+  "authority": "Founder approval 2026-09-26: execute the proposed production-discipline preservation/LFS migration.",
+  "classification": "mvp_supporting; protect accepted Buy source and evidence, no runtime changes",
+  "originalHead": "ec2d19722f0b8c68c7f8755a062dda7aae786595",
+  "backupDirectory": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRESERVATION\\cursor-buy-pre-lfs-20260926",
+  "backupRef": "archive/cursor-buy-pre-lfs-20260926",
+  "backupManifest": {
+    "head": "ec2d19722f0b8c68c7f8755a062dda7aae786595",
+    "publishedBase": "5dc6885ada1fe0cd23f3d5d0a2bc62fe56cc0abd",
+    "verifiedFiles": [
+      {
+        "name": "pre-lfs-original-history-dff0b231.bundle",
+        "bytes": 286307981,
+        "sha256": "c624bbb7f92fe40ec489ff0c946d10126a09412302252c3b82dd5ea645b5b5e1"
+      },
+      {
+        "name": "pre-lfs-blocker-record-ec2d1972.bundle",
+        "bytes": 2631,
+        "sha256": "6821429a2f1be28d8ceeb7f7794bb55851920971d634498cedacb10763fa4e69"
+      },
+      {
+        "name": "resume-lfs-migration-inventory.json",
+        "bytes": 2127,
+        "sha256": "d4fc0daa8583644aebce2a513d9cef41ec12800b0fed6dcc8dc11dffe7468a31"
+      },
+      {
+        "name": "resume-636-current.png",
+        "bytes": 455742,
+        "sha256": "bd1ee9a4ca3c79760da909fafcf1fc415807c2b2eb5863802dc6ea5b786da8b6"
+      },
+      {
+        "name": "resume-637-current-source.png",
+        "bytes": 484635,
+        "sha256": "6fada04e27c05b0c22f198440315aabb6c424adf60e64f6e6b8b3744f5c0a2c6"
+      },
+      {
+        "name": "resume-638-shop-quantity.png",
+        "bytes": 487153,
+        "sha256": "ff929f144e7f464bc71fac35a7ffdaa353c000ec383354d2e089d042d8a6244a"
+      },
+      {
+        "name": "resume-639-product.png",
+        "bytes": 511567,
+        "sha256": "95b739c9f9b86209f140b7e8bdd146f30d5fbb3383e210bed463d883ccf293e2"
+      }
+    ],
+    "authority": "Founder authorized unpublished-only LFS migration with backups on 2026-09-26"
+  },
+  "supplementalEvidence": {
+    "path": "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip",
+    "bytes": 1925840,
+    "sha256": "ecbbe5518814d20d82adc24546ec4ee21cd50194c99cc642c6b0102b8fc6d6e5",
+    "entries": [
+      "resume-636-current.png",
+      "resume-637-current-source.png",
+      "resume-638-shop-quantity.png",
+      "resume-639-product.png",
+      "verify-migration.py",
+      "verification-incident.txt",
+      "commit-map.csv",
+      "migration-verification.json",
+      "preservation-manifest.json"
+    ]
+  },
+  "runtimeTests": "Existing 556 unique scenarios remain source-identical; no runtime change requiring a new Flutter replay.",
+  "billingReadback": "Unavailable: current credential lacks user scope. No account/budget/credential changes.",
+  "remoteStatus": "Pending final checkpoint gates and normal fast-forward push; never claim parity until remote readback.",
+  "ordinaryBlobAudit": {
+    "ordinaryBlobsOver100MiB": 0,
+    "maxOrdinaryBlobBytes": 6459788,
+    "applicationTreeUnchanged": true,
+    "appsTree": "36bf5550274969d11604c6ef27e4d5e457fb1e35"
+  },
+  "lfsCurrentFsck": "passed exit 0"
+}

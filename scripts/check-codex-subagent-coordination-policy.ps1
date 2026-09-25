@@ -1169,6 +1169,9 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  '.gitattributes',
+  'docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json',
+  'docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip',
   'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',

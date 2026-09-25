@@ -74,3 +74,7 @@ artifacts/review-runtime/
 !artifacts/device/moolsocial-production-workspace-ready-device.png
 !artifacts/device/moolsocial-production-retailer-setup-device.png
 !artifacts/device/moolsocial-production-retailer-live-device.png
+
+# Founder: generated Buy review evidence remains local, outside source recovery.
+/docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip
+/docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip

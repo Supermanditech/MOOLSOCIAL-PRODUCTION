@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "A40258E6817C5A30F72183B2ACEF32862A7D779EECE1E9B186EF3EAE1354E968"
+    "sha256": "213FC44E5F62827A855C766A59628755107AAC0187504D2AB1A64BDF27317E62"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -163,7 +163,10 @@
         "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
         "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
-        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-430x932-ios-cart.png"
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        ".gitattributes",
+        "docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json",
+        "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip"
       ]
     },
     {
