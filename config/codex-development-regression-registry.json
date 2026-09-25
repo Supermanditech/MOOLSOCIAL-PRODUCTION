@@ -106844,6 +106844,20 @@
         "rootCause": "Path.write_text omittedencoding;laterformatwasnotconditionallygated.",
         "recovery": "Preservedfailed1byte inignoredcomparison-restore-encoding-failed-session.bin;restored entire previouslyclean ownerfromHEADd681a1c6 bytes487004 SHA837873f22193fea0cf2b7ca1d08c22f5adf1808279547ec769e4ee8854a40fa1.",
         "prevention": "ExplicitUTF8 read/write;prepare encodedbytes beforewrite;separatedependentformat/testcalls;readback beforeproceed."
+      },
+      "publicPolishScope20260925": {
+        "incident": "Read-only case projection assumed every research case had testName; catalogue02 has unimplemented requirement cases and raised KeyError.",
+        "prevention": "Use explicit executable-case predicate and get for optional fields. Research-only cases cannot be counted as tested.",
+        "recovery": "Register public-only polish as separate requirement, reuse executable cases by exact identity; preserve original research requirements.",
+        "formatterCwdRecovery": "Formatter was invoked from apps/mobile with repository-relative apps/mobile path; no file was formatted. Analysis command used correct lib path. Retry formatter from verified repository root; dependent commands must not proceed from an unchecked format outcome.",
+        "generatedGraphRecovery": "Flutter analyze without --no-pub reordered equatable/web entries in tracked apps/mobile/.dart_tool/package_graph.json. Admission rejected owner outside claim. Restore only this generated file after preserving current bytes and verifying identical package graph ignoring package order against clean50f09192. Future analysis uses --no-pub. No dependency change authorized.",
+        "nativeChildAndReadBoundary": "Frame572 reproduced service third-action wrap: Container border inset reduced inner width but control widths used outer LayoutBuilder width. Register BUY-PUBLIC-POLISH-20260925-01-A01 and add geometry/interaction regressions. A275-line combined source read exceeded3500tokens; omitted content not assumed read, use bounded single-section reads. First550 replay is preliminary, final acceptance must use post-child-fix fingerprint.",
+        "diagnosticEncoding": "The expected-failure Flutter diagnostic contained box-drawing Unicode; printing directly to cp1252 failed. Use json.dumps(ensure_ascii=True) for bounded diagnostic text. Original test log preserved; no test outcome inferred from diagnostic transport failure.",
+        "atomicPatchRecovery": "Second-pass source edit was precomputed in memory; its generic next-class boundary matched the current class and assertion stopped before any write. Fix boundary search to begin after the full start marker. All replacements must assert before writing and be read back. No partial runtime edit was persisted.",
+        "visitStoreTiming": "Frame578 still showed product after first Visit Store tap; second diagnostic tap at602,818 landed on Store atta Add after navigation completed. Frame579 confirms correct Mool Market11 and exactlyone atta279 audit addition. Treat as automation timing, not proven navigation defect. Remove only this audit item; wait and capture fresh settled frame before subsequent coordinates; retain578/579.",
+        "searchTiming": "Frame590 shows hone rather than intended iphone: input began immediately after tapping search before focus/route settled. No-match result is not valid catalogue evidence. Capture settled search field before text input; correct only current audit query and verify rendered text. Retain590.",
+        "imageTransportRecovery": "Frame599 was captured successfully but image tool output exceeded remaining model context. No pixels or state inferred from truncated output. Reopen existing599 in a separate bounded call before coordinates.",
+        "boundedHandoffRead": "Combined runner and handoff read narrowly exceeded output budget. No omitted text used as evidence; runner terminal results and exact JSON records are authoritative; use bounded scalar projections."
       }
     }
   ],

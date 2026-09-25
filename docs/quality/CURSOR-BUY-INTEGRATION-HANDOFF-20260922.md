@@ -2737,3 +2737,20 @@ All 15 batches completed with exit 0: **550 unique required scenarios / 564 case
 Reconciled total: **66 references = 19 originals + 47 children/follow-ups; 22 targeted-verified follow-ups and 44 pending full qualification** (19 originals + 25 follow-ups). Pending qualification does not mean all those items are entirely unimplemented. Backend remains deferred.
 
 Preserved 87 new evidence entries, including 36 native frames 534–569, original failures, focused retries, analysis, cumulative logs and native proof, under `quantity-recovery-qualified-20260925/` in `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`. Archive size 262251210 bytes; SHA-256 `c9d9be0f03f83f017e790732912ec26fa3448af23fc5100fda4388919dccbc67`. Existing archive entries were preserved; every new entry was read back byte-for-byte. The Git checkpoint gate and commit are the next step; no APK was built.
+
+
+## 2026-09-25 — public-side polish and service alignment
+
+Founder clarified public Buy, Wholesale, Bulk, Offers and Store browsing first. Store workspace Counter Sale/Add Product is excluded. Registered BUY-PUBLIC-POLISH-20260925-01 and its observed service-row child -A01; both implemented, locally passed and targeted Redmi verified, with founder approval still pending.
+
+Shared product presentation now uses compact title/price/Add, proportional label columns, aligned address and seller actions, restrained gradient Add/selector/detail/terms/service/review surfaces, readable specification and review typography, and consistent recommendation text measurement. Price disclosure stays inline and uses selection haptics; no physical haptic-feel acceptance is claimed. Provider identities, policies and commerce callbacks remain intact. Pack-only selection loses only redundant explanatory copy. Store identity occupies full width with Compare/Ask/Visit in one normal-text row; enlarged text deliberately stacks accessible actions.
+
+Child -A01 was reproduced in native frame572 and a failing normal-scale regression: service controls used outer width, ignoring the border inset, so the third action wrapped. Width allocation now accounts for the inset. Both normal/enlarged geometry and COD-action return checks pass. Original failing evidence is retained.
+
+Final replay: **552 unique selected scenarios /582 ticket-case references passed in15 terminal-success batches**, no missing cases or failures, source fingerprint `cdcf234da9bf6f44761bcc19b08f83cb364086fef7026008df8e3b9fe38dd5ea` unchanged before/after. Focused source/test analysis passed. Earlier550 first-pass replay is superseded and not added to552. Every selected case binds the exact final successful log and fingerprint.
+
+Redmi hot reload3761ms; native frames570–605 cover Offers product/comparison/return, Store browsing, Buy phone gallery and detail tabs, Wholesale inline price/terms, Bulk MOQ/terms and filter gradients. Normal and200percent text verified; font restored1.0. Cart empty at this sweep start and end; only one automation-added atta was removed. Delayed navigation/input incidents are recorded, not mislabeled application defects. Bulk home remains open. No real purchase, support message, new APK, backend work, Store-worktree change or publication.
+
+**68 tracked references =19 originals +49 children/follow-ups;24 targeted-verified follow-ups and44 pending full qualification.** None of the19 original parents is declared fully closed. The8 catalogue research requirements, complete variant families/provider data and founder acceptance remain open; this presentation sweep does not close them.
+
+Archived 125 new files under `public-polish-qualified-20260925/` in `docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip`; 274827842bytes, SHA256 `33e916c63753b8cb0109fdd128e433ee71ed3866ccd8f82b1b36c42c796d464d`. All previous entries retained and every new entry read back byte-for-byte. Includes screenshots, native proof, original child failure, passing retries, final replay and analysis. Git preservation gate/commit is the remaining checkpoint step.

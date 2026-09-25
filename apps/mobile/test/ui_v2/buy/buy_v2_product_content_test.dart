@@ -144,6 +144,54 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('public polish assurance layout preserves action rows $scale', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await mountReferenceGallery(tester, session, 's-milk');
+      final strip = find.byKey(const ValueKey('buy-product-assurance-s-milk'));
+      await revealProductControl(tester, session, strip);
+      final controls = [
+        for (final id in ['returns', 'payment', 'support'])
+          find.byKey(ValueKey('buy-product-assurance-$id-s-milk')),
+      ];
+      final rects = controls.map(tester.getRect).toList();
+      final bounds = tester.getRect(strip);
+      for (final rect in rects) {
+        expect(rect.width, greaterThanOrEqualTo(48));
+        expect(rect.height, greaterThanOrEqualTo(48));
+        expect(rect.left, greaterThanOrEqualTo(bounds.left));
+        expect(rect.right, lessThanOrEqualTo(bounds.right + .1));
+      }
+      if (scale == 1) {
+        expect(rects[1].top, closeTo(rects[0].top, .1));
+        expect(rects[2].top, closeTo(rects[0].top, .1));
+      } else {
+        expect(rects[1].top, greaterThanOrEqualTo(rects[0].bottom));
+        expect(rects[2].top, greaterThanOrEqualTo(rects[1].bottom));
+      }
+      await tester.ensureVisible(controls[1]);
+      await tester.pumpAndSettle();
+      await tester.tap(controls[1]);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Cash on Delivery availability is not confirmed.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Close').last);
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, 's-milk');
+      expect(session.cartLines, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'reference assurance returns preserve supplied policy and remedies',
     (tester) async {
