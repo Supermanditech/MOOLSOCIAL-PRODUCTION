@@ -3096,3 +3096,21 @@ All10 focused HOME/AP030 checks passed, including a right-margin assertion;
 analysis clean. OPPO hot reload succeeded and screenshot
 outputs/home-aligned-20260926.png was visually inspected: card and sticky tab
 reach the same outer edge, with readable text and View stock. No APK/data change.
+
+## HOME-03 actual card cut-out for Quick actions
+
+Founder clarified and approved a notch matching the sticky tab rather than an
+overlay. Collapsed portrait activity shell now subtracts a rounded notch from
+its actual Material shape; border, clipping and shadow follow the cut-out.
+The tab is centered on the card, not the whole dashboard, so both scroll and
+reflow together. A53dp inner content inset protects text and button hit areas;
+the remainder of the outer card stays full width. Expanded and short/enlarged
+fallback layouts remain unchanged. No new route, data owner or business action.
+
+All40 selected layout/atomic regression checks passed, including notch path
+exclusion, tab/card alignment, open-close and responsive layouts. Analysis clean.
+Evidence: outputs/home-notch-regression-20260926.txt. Hot reload succeeded;
+outputs/home-notch-20260926.png inspected on OPPO portrait, and opening the
+panel verified. A subsequent Hide lookup found no target; no fallback tap or
+transaction performed. Physical landscape/enlarged and exact-APK closure remain
+pending; this is founder-preview evidence, not release qualification.

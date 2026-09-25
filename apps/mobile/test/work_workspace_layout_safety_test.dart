@@ -2067,6 +2067,26 @@ void main() {
         final padding = tester.widget<Padding>(centre).padding as EdgeInsets;
         expect(padding.right, 0);
         expect(padding.left, 12);
+        final card = find.byKey(const Key('work-home-notched-card'));
+        expect(card, findsOneWidget);
+        final rect = tester.getRect(card);
+        final tabRect = tester.getRect(toggle);
+        expect(tabRect.center.dy, closeTo(rect.center.dy, 1));
+        final surface = tester
+            .widgetList<Material>(
+              find.descendant(of: card, matching: find.byType(Material)),
+            )
+            .first;
+        final shape = surface.shape!.getOuterPath(Offset.zero & rect.size);
+        expect(
+          shape.contains(Offset(rect.width - 2, rect.height / 2)),
+          isFalse,
+        );
+        expect(shape.contains(Offset(rect.width / 2, rect.height / 2)), isTrue);
+        final content = tester.getRect(
+          find.byKey(const Key('work-home-notch-content')),
+        );
+        expect(content.right, rect.right);
       }
       expect(
         before,

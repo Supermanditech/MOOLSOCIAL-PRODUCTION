@@ -3724,12 +3724,16 @@ class _StoreControlDashboard extends StatelessWidget {
               collection &&
               (constraints.maxHeight < 580 ||
                   MediaQuery.textScalerOf(context).scale(14) > 18);
+          late final Widget actions;
           final desk =
               workingCentre ??
               (ready
                   ? _StoreActivityDeck(
                       key: const Key('store-stable-working-centre'),
                       flushRight: !actionsExpanded && !actionsBelow,
+                      stickyActions: !actionsExpanded && !actionsBelow
+                          ? () => actions
+                          : null,
                       session: session,
                       reviewedOrder: reviewedOrder,
                       onOrders: onOrders,
@@ -3762,7 +3766,7 @@ class _StoreControlDashboard extends StatelessWidget {
             onSettlement: () =>
                 _navigate(() => onOpenOperation(_WorkspaceOperation.payments)),
           );
-          final actions = _StoreActionEdge(
+          actions = _StoreActionEdge(
             session: session,
             expanded: actionsExpanded,
             onToggle: onToggleActions,
@@ -3880,7 +3884,7 @@ class _StoreControlDashboard extends StatelessWidget {
               ),
             ],
           );
-          Widget withStickyTab(Widget body) => actionsExpanded
+          Widget withStickyTab(Widget body) => actionsExpanded || ready
               ? body
               : Stack(
                   fit: StackFit.expand,
@@ -4726,6 +4730,7 @@ class _StorePulseMetric extends StatelessWidget {
 class _StoreActivityDeck extends StatelessWidget {
   const _StoreActivityDeck({
     this.flushRight = false,
+    this.stickyActions,
     required this.session,
     required this.onOrders,
     required this.onReviewOrder,
@@ -4738,6 +4743,7 @@ class _StoreActivityDeck extends StatelessWidget {
   });
   final WorkSession session;
   final bool flushRight;
+  final Widget Function()? stickyActions;
   final WorkspaceOrderRecord? reviewedOrder;
   final VoidCallback onOrders;
   final VoidCallback onReviewOrder, onCloseOrder, onStock, onMoney, onGroupBulk;
@@ -4841,6 +4847,7 @@ class _StoreActivityDeck extends StatelessWidget {
             return SingleChildScrollView(
               key: const Key('work-store-activity-scroll'),
               child: _ActivityDeckShell(
+                stickyActions: stickyActions?.call(),
                 state:
                     '${content.runtimeType}:${session.latestWorkspaceInvoice?.id}',
                 shrinkWrap: true,
@@ -4889,6 +4896,7 @@ class _StoreActivityDeck extends StatelessWidget {
                 ? desiredHeight
                 : desiredHeight.clamp(0, constraints.maxHeight),
             child: _ActivityDeckShell(
+              stickyActions: stickyActions?.call(),
               state:
                   '${selectedOrder?.id}:${selectedOrder?.stage}:${content.runtimeType}',
               child: openIssueCount == 0
@@ -5037,44 +5045,123 @@ class _ActivityDeckShell extends StatelessWidget {
     required this.child,
     required this.state,
     this.shrinkWrap = false,
+    this.stickyActions,
   });
   final Widget child;
   final String state;
   final bool shrinkWrap;
+  final Widget? stickyActions;
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    elevation: 3,
-    shadowColor: const Color(0x24000080),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: Color(0xFFCCD2ED)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Stack(
-      fit: shrinkWrap ? StackFit.loose : StackFit.expand,
-      children: [
-        child,
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: IgnorePointer(
-            child: ExcludeSemantics(
-              child: _StoreValueMotion(
-                value: state,
-                motionKey: const Key('work-store-state-motion'),
-                child: const SizedBox(
-                  height: 3,
-                  child: ColoredBox(color: MoolColors.navy),
+  Widget build(BuildContext context) {
+    final label = TextPainter(
+      text: const TextSpan(
+        text: 'Quick actions',
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final notchHeight = label.width + 33 + 8;
+    label.dispose();
+    final surface = Material(
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: const Color(0x24000080),
+      shape: stickyActions != null
+          ? _QuickActionsNotch(notchHeight)
+          : RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFFCCD2ED)),
+            ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: shrinkWrap ? StackFit.loose : StackFit.expand,
+        children: [
+          Padding(
+            key: stickyActions == null
+                ? null
+                : const Key('work-home-notch-content'),
+            padding: EdgeInsets.only(right: stickyActions == null ? 0 : 53),
+            child: child,
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: ExcludeSemantics(
+                child: _StoreValueMotion(
+                  value: state,
+                  motionKey: const Key('work-store-state-motion'),
+                  child: const SizedBox(
+                    height: 3,
+                    child: ColoredBox(color: MoolColors.navy),
+                  ),
                 ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+    if (stickyActions == null) return surface;
+    return Stack(
+      key: const Key('work-home-notched-card'),
+      fit: shrinkWrap ? StackFit.loose : StackFit.expand,
+      children: [
+        surface,
+        Positioned(
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: 49,
+          child: Center(child: stickyActions),
         ),
       ],
-    ),
-  );
+    );
+  }
+}
+
+class _QuickActionsNotch extends ShapeBorder {
+  const _QuickActionsNotch(this.height);
+  final double height;
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
+  @override
+  ShapeBorder scale(double t) => _QuickActionsNotch(height * t);
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    final outer = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, const Radius.circular(16)));
+    final notch = Path()
+      ..addRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(
+            rect.right - 53,
+            rect.center.dy - height / 2,
+            54,
+            height,
+          ),
+          topLeft: const Radius.circular(16),
+          bottomLeft: const Radius.circular(16),
+        ),
+      );
+    return Path.combine(PathOperation.difference, outer, notch);
+  }
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) =>
+      getOuterPath(rect, textDirection: textDirection);
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    canvas.drawPath(
+      getOuterPath(rect.deflate(.5), textDirection: textDirection),
+      Paint()
+        ..color = const Color(0xFFCCD2ED)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
 }
 
 void _advanceDeskOrder(WorkSession session, {String? expectedOrderId}) {
