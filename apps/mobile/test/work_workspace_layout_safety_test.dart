@@ -2063,6 +2063,11 @@ void main() {
         findsNothing,
       );
       final before = tester.getSize(centre).width;
+      if (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1) {
+        final padding = tester.widget<Padding>(centre).padding as EdgeInsets;
+        expect(padding.right, 0);
+        expect(padding.left, 12);
+      }
       expect(
         before,
         tester.getSize(find.byKey(const Key('work-workspace-dashboard'))).width,

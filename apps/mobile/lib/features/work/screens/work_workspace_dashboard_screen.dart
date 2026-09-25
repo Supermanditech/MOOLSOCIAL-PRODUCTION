@@ -3729,6 +3729,7 @@ class _StoreControlDashboard extends StatelessWidget {
               (ready
                   ? _StoreActivityDeck(
                       key: const Key('store-stable-working-centre'),
+                      flushRight: !actionsExpanded && !actionsBelow,
                       session: session,
                       reviewedOrder: reviewedOrder,
                       onOrders: onOrders,
@@ -4724,6 +4725,7 @@ class _StorePulseMetric extends StatelessWidget {
 
 class _StoreActivityDeck extends StatelessWidget {
   const _StoreActivityDeck({
+    this.flushRight = false,
     required this.session,
     required this.onOrders,
     required this.onReviewOrder,
@@ -4735,6 +4737,7 @@ class _StoreActivityDeck extends StatelessWidget {
     super.key,
   });
   final WorkSession session;
+  final bool flushRight;
   final WorkspaceOrderRecord? reviewedOrder;
   final VoidCallback onOrders;
   final VoidCallback onReviewOrder, onCloseOrder, onStock, onMoney, onGroupBulk;
@@ -4827,7 +4830,7 @@ class _StoreActivityDeck extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(
         12,
         MediaQuery.sizeOf(context).height < 650 ? 6 : 14,
-        12,
+        flushRight ? 0 : 12,
         MediaQuery.sizeOf(context).height < 650 ? 6 : 14,
       ),
       child: LayoutBuilder(

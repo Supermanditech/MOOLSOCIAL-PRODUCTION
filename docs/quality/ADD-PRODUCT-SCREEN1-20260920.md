@@ -3086,3 +3086,13 @@ Current OPPO state confirmed collapsed. One later Hide-target lookup found no
 target because the current screen was already collapsed; no fallback tap made.
 Physical landscape/enlarged-text verification remains pending. No APK or data
 transaction; prior outstanding tickets are not closed by this visual correction.
+
+## HOME-03 founder-approved perimeter alignment
+
+Collapsed normal-portrait activity cards now remove only their outer right
+12dp margin, aligning with the Quick actions screen edge. Inner padding,
+left margin, expanded panel spacing and short/enlarged layouts are unchanged.
+All10 focused HOME/AP030 checks passed, including a right-margin assertion;
+analysis clean. OPPO hot reload succeeded and screenshot
+outputs/home-aligned-20260926.png was visually inspected: card and sticky tab
+reach the same outer edge, with readable text and View stock. No APK/data change.
