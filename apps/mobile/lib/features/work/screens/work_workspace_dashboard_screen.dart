@@ -23398,7 +23398,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
             if (!_needsReference &&
                 amountError == null &&
                 constraints.maxWidth >= 300 &&
-                MediaQuery.textScalerOf(context).scale(14) <= 20) {
+                MediaQuery.textScalerOf(context).scale(14) <= 16.8) {
               return Row(
                 children: [
                   Expanded(child: input),

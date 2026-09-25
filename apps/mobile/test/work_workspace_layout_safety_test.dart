@@ -15972,6 +15972,16 @@ void main() {
                 .text,
             '237.60',
           );
+          if (display.scale > 1.2) {
+            final input = find.byKey(const Key('collection-amount'));
+            final action = find.byKey(const Key('collection-confirm'));
+            expect(
+              tester.getRect(action).top,
+              greaterThanOrEqualTo(tester.getRect(input).bottom),
+              reason:
+                  'Enlarged receipt labels must not compete with the action for row width.',
+            );
+          }
           await capture('09-receipt');
           // Confirm the prefilled bill amount without retyping it.
           await press('collection-confirm');
