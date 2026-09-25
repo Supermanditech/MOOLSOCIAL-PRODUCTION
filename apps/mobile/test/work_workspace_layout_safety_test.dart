@@ -772,6 +772,55 @@ Future<void> chooseAddProductMode(WidgetTester tester, String mode) async {
 }
 
 void main() {
+  testWidgets('STORESEARCH recent terms recall cap typing and stale scope', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    final focus = FocusNode();
+    final history = <String>[];
+    var current = true;
+    var changed = '';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoreRecentSearches(
+            controller: controller,
+            focusNode: focus,
+            history: history,
+            isCurrent: () => current,
+            onChanged: (value) => changed = value,
+            child: TextField(controller: controller, focusNode: focus),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 7; i++) {
+      focus.requestFocus();
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Rice $i');
+      focus.unfocus();
+      await tester.pump();
+    }
+    expect(history, ['Rice 6', 'Rice 5', 'Rice 4', 'Rice 3', 'Rice 2']);
+    controller.clear();
+    focus.requestFocus();
+    await tester.pump();
+    expect(find.byType(TextButton), findsNWidgets(5));
+    await tester.tap(find.widgetWithText(TextButton, 'Rice 6'));
+    await tester.pump();
+    expect(changed, 'Rice 6');
+    expect(controller.text, 'Rice 6');
+    expect(find.byType(TextButton), findsNothing);
+    current = false;
+    await tester.enterText(find.byType(TextField), 'Other Store');
+    focus.unfocus();
+    await tester.pump();
+    expect(history, isNot(contains('Other Store')));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+    focus.dispose();
+  });
   Future<void> openImportFilters(WidgetTester tester) async {
     await tester.tap(find.byKey(const Key('work-import-status-filter')));
     await tester.pumpAndSettle();
@@ -12197,6 +12246,9 @@ void main() {
     final first = work.activeWorkspace!;
     work.workspaceCatalogueShortlist.add('first-store-pack');
     work.workspaceCatalogueSearchHistory.add('first-store-search');
+    work.workspaceRecentSearches('customers').add('first customer');
+    work.workspaceRecentSearches('stock').add('first product');
+    expect(work.workspaceRecentSearches('documents'), isEmpty);
     work.notifyWorkspaceCatalogueBrowsingChanged();
     work.activeWorkspace = WorkWorkspace(
       id: 'second-store',
@@ -12208,9 +12260,13 @@ void main() {
     );
     expect(work.workspaceCatalogueShortlist, isEmpty);
     expect(work.workspaceCatalogueSearchHistory, isEmpty);
+    expect(work.workspaceRecentSearches('customers'), isEmpty);
+    expect(work.workspaceRecentSearches('stock'), isEmpty);
     work.activeWorkspace = first;
     expect(work.workspaceCatalogueShortlist, {'first-store-pack'});
     expect(work.workspaceCatalogueSearchHistory, ['first-store-search']);
+    expect(work.workspaceRecentSearches('customers'), ['first customer']);
+    expect(work.workspaceRecentSearches('stock'), ['first product']);
     work.dispose();
   });
 
@@ -27573,6 +27629,13 @@ void main() {
         'stock-category-full-${display.$1}-${display.$2}',
       );
       final input = find.byKey(const Key('work-catalogue-category-search'));
+      final decoration = tester.widget<TextField>(input).decoration!;
+      expect(decoration.filled, isFalse);
+      expect(decoration.enabledBorder, InputBorder.none);
+      expect(decoration.focusedBorder, InputBorder.none);
+      expect(decoration.disabledBorder, InputBorder.none);
+      expect(decoration.errorBorder, InputBorder.none);
+      expect(decoration.focusedErrorBorder, InputBorder.none);
       expect(
         tester.widget<TextField>(input).decoration!.border,
         InputBorder.none,

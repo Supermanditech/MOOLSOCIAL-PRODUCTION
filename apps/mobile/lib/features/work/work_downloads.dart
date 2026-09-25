@@ -6,6 +6,7 @@ import 'work_invoice_pdf.dart';
 import 'work_session.dart';
 import 'work_models.dart';
 import 'work_stock_export.dart';
+import 'screens/store_add_product_sheet.dart' show StoreRecentSearches;
 
 /// Adapter over the existing ledger, not a second transaction or payment owner.
 /// Dated reports need the provider's opening-balance coverage date. A first
@@ -271,8 +272,10 @@ class StoreCustomerReportsPanel extends StatefulWidget {
     this.coverageStarts = const {},
     this.saveFile = saveStoreStockFile,
     this.scopeChanges,
+    this.recentSearches,
   });
   final String accountId, storeId, storeName;
+  final List<String>? recentSearches;
   final List<WorkspaceCustomerLedger> ledgers;
   final Map<String, DateTime> coverageStarts;
   final bool allCustomersComplete;
@@ -285,6 +288,7 @@ class StoreCustomerReportsPanel extends StatefulWidget {
 }
 
 class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
+  final _recentSearches = <String>[];
   final _search = TextEditingController(),
       _from = TextEditingController(),
       _to = TextEditingController();
@@ -702,18 +706,27 @@ class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
             key: const Key('customer-outstanding-open'),
             child: const Text('All-customer outstanding'),
           ),
-          TextField(
-            key: const Key('customer-statement-search'),
+          StoreRecentSearches(
             controller: _search,
+            history: widget.recentSearches ?? _recentSearches,
+            isCurrent: widget.isCurrent,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontSize: 13, letterSpacing: 0),
-            decoration: const InputDecoration(
-              hintText: 'Search customer name or ID',
-              prefixIcon: Icon(Icons.search),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: UnderlineInputBorder(),
-              filled: false,
+            child: TextField(
+              key: const Key('customer-statement-search'),
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 13, letterSpacing: 0),
+              decoration: const InputDecoration(
+                hintText: 'Search customer name or ID',
+                prefixIcon: Icon(Icons.search),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
+              ),
             ),
           ),
           if (matches.isEmpty)

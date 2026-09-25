@@ -1489,13 +1489,20 @@ class _WorkWorkspaceDashboardScreenState
             onOpenOperation: _showOperation,
             onBuyStock: _showProcurement,
           ),
-          _WorkspaceControlView.search => _WorkspaceSearchSurface(
-            session: session,
-            query: session.workspaceSearchQuery,
-            scrollController: _searchScroll,
-            onClear: _clearSearch,
-            onOpenRecord: (record) =>
-                _openSearchRecord(record, workspace.id, openScopedRoute),
+          _WorkspaceControlView.search => StoreRecentSearches(
+            controller: _searchController,
+            focusNode: _searchFocus,
+            history: session.workspaceRecentSearches('store'),
+            onChanged: session.updateWorkspaceSearch,
+            expandChild: true,
+            child: _WorkspaceSearchSurface(
+              session: session,
+              query: session.workspaceSearchQuery,
+              scrollController: _searchScroll,
+              onClear: _clearSearch,
+              onOpenRecord: (record) =>
+                  _openSearchRecord(record, workspace.id, openScopedRoute),
+            ),
           ),
           _WorkspaceControlView.status => Form(
             key: _settingsForm,
@@ -12397,6 +12404,13 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                       title: 'Reports & Downloads',
                       ownerLabel: workspace?.name ?? 'Your Store',
                       onExit: () => Navigator.of(downloadContext).pop(),
+                      searchPresentation: (field) => StoreRecentSearches(
+                        controller: field.controller!,
+                        history: session.workspaceRecentSearches('documents'),
+                        isCurrent: current,
+                        onChanged: (value) => field.onChanged?.call(value),
+                        child: field,
+                      ),
                       customerStatementBuilder: workspace == null
                           ? null
                           : (_) => AnimatedBuilder(
@@ -12408,6 +12422,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                                   workspace.id,
                                 )),
                                 accountId: account ?? '',
+                                recentSearches: session.workspaceRecentSearches(
+                                  'customer-statements',
+                                ),
                                 storeId: workspace.id,
                                 storeName: workspace.name,
                                 scopeChanges: session,
@@ -13639,6 +13656,9 @@ class _WorkspaceCatalogueSurfaceState
       final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (reviewContext) => StoreProductImportReviewScreen(
+            recentSearches: widget.session.workspaceRecentSearches(
+              'csv:${picked.name}',
+            ),
             fileName: picked.name,
             review: review,
             correctRow: (row, readyProducts) async {
@@ -13873,6 +13893,7 @@ class _WorkspaceCatalogueSurfaceState
               ),
               embedded: true,
               stockOnly: true,
+              recentSearches: widget.session.workspaceRecentSearches('stock'),
               catalogue: const [],
               ownedProducts: List.of(widget.session.workspaceCatalogueItems),
               createProduct: (barcode) => _blankProduct(barcode: barcode),
@@ -18196,7 +18217,12 @@ class _WorkspaceGroupBuyingSurfaceState
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => _GroupBuyProductPicker(products: _availableProducts),
+      builder: (_) => _GroupBuyProductPicker(
+        products: _availableProducts,
+        recentSearches: widget.session.workspaceRecentSearches(
+          'wholesale-products',
+        ),
+      ),
     );
     if (selected == null || !mounted) return;
     setState(() {
@@ -18509,7 +18535,11 @@ class _WorkspaceGroupBuyingSurfaceState
 }
 
 class _GroupBuyProductPicker extends StatefulWidget {
-  const _GroupBuyProductPicker({required this.products});
+  const _GroupBuyProductPicker({
+    required this.products,
+    required this.recentSearches,
+  });
+  final List<String> recentSearches;
 
   final List<WorkspaceCatalogueItem> products;
 
@@ -18545,14 +18575,26 @@ class _GroupBuyProductPickerState extends State<_GroupBuyProductPicker> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                key: const Key('work-group-buy-product-search'),
+              child: StoreRecentSearches(
                 controller: _query,
-                autofocus: true,
+                history: widget.recentSearches,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Search wholesale product or commodity',
-                  prefixIcon: Icon(Icons.search_rounded),
+                child: TextField(
+                  key: const Key('work-group-buy-product-search'),
+                  controller: _query,
+                  autofocus: true,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    hintText: 'Search wholesale product or commodity',
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
                 ),
               ),
             ),
@@ -20690,15 +20732,27 @@ class _CustomersDestinationSurfaceState
           ),
           const SizedBox(height: 8),
           if (widget.customerId == null)
-            TextField(
-              key: const Key('work-customer-search'),
+            StoreRecentSearches(
               controller: _search,
+              history: widget.session.workspaceRecentSearches('customers'),
               onChanged: widget.session.updateWorkspaceCustomerSearch,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                hintText: 'Search name or mobile',
-                prefixIcon: Icon(Icons.search_rounded),
-                isDense: true,
+              child: TextField(
+                key: const Key('work-customer-search'),
+                controller: _search,
+                onChanged: widget.session.updateWorkspaceCustomerSearch,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: 'Search name or mobile',
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  prefixIcon: Icon(Icons.search_rounded),
+                  isDense: true,
+                ),
               ),
             ),
           const SizedBox(height: 6),
@@ -27829,57 +27883,68 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             textField: true,
             label: 'Search store products',
             onTap: _productSearchFocus.requestFocus,
-            child: TextField(
-              key: const Key('work-counter-product-search'),
+            child: StoreRecentSearches(
               controller: _productSearch,
               focusNode: _productSearchFocus,
+              history: widget.session.workspaceRecentSearches(
+                'counter-products',
+              ),
               onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _productSearchFocus.unfocus(),
-              textInputAction: TextInputAction.search,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                hintText: MediaQuery.textScalerOf(context).scale(13) > 17
-                    ? 'Search'
-                    : 'Search Store stock',
-                isDense: true,
-                filled: false,
-                prefixIcon: const Icon(Icons.search_rounded, size: 21),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (query.isNotEmpty)
+              child: TextField(
+                key: const Key('work-counter-product-search'),
+                controller: _productSearch,
+                focusNode: _productSearchFocus,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _productSearchFocus.unfocus(),
+                textInputAction: TextInputAction.search,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  hintText: MediaQuery.textScalerOf(context).scale(13) > 17
+                      ? 'Search'
+                      : 'Search Store stock',
+                  isDense: true,
+                  filled: false,
+                  prefixIcon: const Icon(Icons.search_rounded, size: 21),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (query.isNotEmpty)
+                        IconButton(
+                          key: const Key('work-counter-search-clear'),
+                          tooltip: 'Clear search',
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(_productSearch.clear);
+                            _productSearchFocus.requestFocus();
+                          },
+                        ),
                       IconButton(
-                        key: const Key('work-counter-search-clear'),
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.clear),
+                        key: const Key('work-counter-camera-scan'),
+                        tooltip: 'Scan product',
                         onPressed: () {
-                          setState(_productSearch.clear);
-                          _productSearchFocus.requestFocus();
+                          _productSearchFocus.unfocus();
+                          _scanProduct();
                         },
+                        icon: const Icon(Icons.qr_code_scanner, size: 20),
                       ),
-                    IconButton(
-                      key: const Key('work-counter-camera-scan'),
-                      tooltip: 'Scan product',
-                      onPressed: () {
-                        _productSearchFocus.unfocus();
-                        _scanProduct();
-                      },
-                      icon: const Icon(Icons.qr_code_scanner, size: 20),
-                    ),
-                    IconButton(
-                      key: const Key('work-counter-usb-scan'),
-                      tooltip: _usbScanMode
-                          ? 'Stop attached scanner'
-                          : 'Use attached scanner',
-                      onPressed: _toggleUsbScanner,
-                      isSelected: _usbScanMode,
-                      icon: const Icon(Icons.barcode_reader, size: 20),
-                    ),
-                  ],
+                      IconButton(
+                        key: const Key('work-counter-usb-scan'),
+                        tooltip: _usbScanMode
+                            ? 'Stop attached scanner'
+                            : 'Use attached scanner',
+                        onPressed: _toggleUsbScanner,
+                        isSelected: _usbScanMode,
+                        icon: const Icon(Icons.barcode_reader, size: 20),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -30468,7 +30533,6 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   WorkSession session,
   String normalized,
 ) {
-  if (normalized.isEmpty) return const [];
   bool matches(String value) => value.toLowerCase().contains(normalized);
   final records = <_WorkspaceSearchRecord>[];
   for (final product in session.workspaceCatalogueItems) {

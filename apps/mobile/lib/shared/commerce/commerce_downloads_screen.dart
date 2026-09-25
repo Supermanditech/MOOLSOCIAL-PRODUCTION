@@ -16,6 +16,7 @@ class CommerceDownloadsScreen extends StatefulWidget {
     this.onStockStatement,
     this.stockStatementBuilder,
     this.customerStatementBuilder,
+    this.searchPresentation,
     this.save = saveCommerceDownloadFile,
   });
   final CommerceDownloadScope scope;
@@ -27,6 +28,7 @@ class CommerceDownloadsScreen extends StatefulWidget {
   final VoidCallback? onStockStatement;
   final WidgetBuilder? stockStatementBuilder;
   final WidgetBuilder? customerStatementBuilder;
+  final Widget Function(TextField)? searchPresentation;
   final Future<bool> Function(CommerceDownloadFile) save;
   @override
   State<CommerceDownloadsScreen> createState() =>
@@ -34,6 +36,8 @@ class CommerceDownloadsScreen extends StatefulWidget {
 }
 
 class _CommerceDownloadsScreenState extends State<CommerceDownloadsScreen> {
+  Widget _presentSearch(TextField field) =>
+      widget.searchPresentation?.call(field) ?? field;
   static const navy = Color(0xff000080);
   final _search = TextEditingController();
   final _from = TextEditingController(), _to = TextEditingController();
@@ -721,32 +725,34 @@ class _CommerceDownloadsScreenState extends State<CommerceDownloadsScreen> {
                 !_stale)
               widget.stockStatementBuilder!(context)
             else ...[
-              TextField(
-                key: const Key('downloads-search'),
-                controller: _search,
-                enabled: !_stale,
-                style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 21),
-                  prefixIconConstraints: BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 44,
+              _presentSearch(
+                TextField(
+                  key: const Key('downloads-search'),
+                  controller: _search,
+                  enabled: !_stale,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search, size: 21),
+                    prefixIconConstraints: BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 44,
+                    ),
+                    hintText: 'Search invoice, order or name',
+                    contentPadding: EdgeInsets.symmetric(vertical: 13),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    filled: false,
                   ),
-                  hintText: 'Search invoice, order or name',
-                  contentPadding: EdgeInsets.symmetric(vertical: 13),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
-                  errorBorder: InputBorder.none,
-                  focusedErrorBorder: InputBorder.none,
-                  filled: false,
+                  onChanged: (_) {
+                    if (_period != 'Custom' || _start != null) {
+                      _load();
+                    }
+                  },
                 ),
-                onChanged: (_) {
-                  if (_period != 'Custom' || _start != null) {
-                    _load();
-                  }
-                },
               ),
               Container(
                 decoration: BoxDecoration(

@@ -9,6 +9,150 @@ import '../widgets/store_product_thumbnail.dart';
 import '../work_models.dart';
 import '../work_stock_export.dart';
 
+/// Store-owned, context-specific browsing terms; never inventory or backend data.
+class StoreRecentSearches extends StatefulWidget {
+  const StoreRecentSearches({
+    super.key,
+    required this.controller,
+    required this.history,
+    required this.onChanged,
+    required this.child,
+    this.focusNode,
+    this.isCurrent,
+    this.expandChild = false,
+  });
+  final TextEditingController controller;
+  final List<String> history;
+  final ValueChanged<String> onChanged;
+  final Widget child;
+  final FocusNode? focusNode;
+  final bool Function()? isCurrent;
+  final bool expandChild;
+  @override
+  State<StoreRecentSearches> createState() => _StoreRecentSearchesState();
+}
+
+class _StoreRecentSearchesState extends State<StoreRecentSearches> {
+  bool _focused = false;
+  String _previous = '';
+  @override
+  void initState() {
+    super.initState();
+    _previous = widget.controller.text;
+    _focused = widget.focusNode?.hasFocus ?? false;
+    widget.controller.addListener(_queryChanged);
+    widget.focusNode?.addListener(_externalFocus);
+  }
+
+  @override
+  void didUpdateWidget(StoreRecentSearches oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.history, widget.history)) {
+      _focused = false;
+      _previous = '';
+    }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_queryChanged);
+      widget.controller.addListener(_queryChanged);
+      _previous = widget.controller.text;
+    }
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_externalFocus);
+      widget.focusNode?.addListener(_externalFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_queryChanged);
+    widget.focusNode?.removeListener(_externalFocus);
+    super.dispose();
+  }
+
+  void _remember(String term) {
+    term = term.trim();
+    if (term.isEmpty || widget.isCurrent?.call() == false) return;
+    widget.history.removeWhere(
+      (value) => value.toLowerCase() == term.toLowerCase(),
+    );
+    widget.history.insert(0, term);
+    if (widget.history.length > 5) {
+      widget.history.removeRange(5, widget.history.length);
+    }
+  }
+
+  void _queryChanged() {
+    final next = widget.controller.text;
+    if (next.isEmpty && _previous.isNotEmpty && _focused) _remember(_previous);
+    _previous = next;
+  }
+
+  void _externalFocus() => _focus(widget.focusNode!.hasFocus);
+  void _focus(bool value) {
+    if (!value && _focused) _remember(widget.controller.text);
+    if (mounted) setState(() => _focused = value);
+  }
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    canRequestFocus: false,
+    onFocusChange: widget.focusNode == null ? _focus : null,
+    child: ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) {
+        final show =
+            (widget.focusNode?.hasFocus ?? _focused) &&
+            value.text.trim().isEmpty &&
+            widget.history.isNotEmpty &&
+            widget.isCurrent?.call() != false;
+        final recent = show
+            ? SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final term in widget.history.take(5).toList())
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: MoolColors.ink,
+                          minimumSize: const Size(48, 48),
+                        ),
+                        onPressed: () {
+                          if (widget.isCurrent?.call() == false) return;
+                          widget.controller.value = TextEditingValue(
+                            text: term,
+                            selection: TextSelection.collapsed(
+                              offset: term.length,
+                            ),
+                          );
+                          _remember(term);
+                          widget.onChanged(term);
+                        },
+                        icon: const Icon(Icons.history_rounded, size: 16),
+                        label: Text(
+                          term,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              )
+            : const SizedBox.shrink();
+        return Column(
+          mainAxisSize: widget.expandChild
+              ? MainAxisSize.max
+              : MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: widget.expandChild
+              ? [recent, Expanded(child: widget.child)]
+              : [widget.child, recent],
+        );
+      },
+    ),
+  );
+}
+
 // Share the entry's mode callback without introducing another route or draft.
 class _StoreAddModeScope extends InheritedWidget {
   const _StoreAddModeScope({
@@ -579,8 +723,10 @@ class StoreProductImportReviewScreen extends StatefulWidget {
     required this.editProduct,
     required this.saveProducts,
     this.correctRow,
+    this.recentSearches,
   });
   final String fileName;
+  final List<String>? recentSearches;
   final WorkspaceProductImport review;
   final Future<WorkspaceCatalogueItem?> Function(WorkspaceCatalogueItem)
   editProduct;
@@ -600,6 +746,7 @@ class _StoreProductImportReviewScreenState
   final _scroll = ScrollController();
   final _search = TextEditingController();
   final _expandedIssues = <int>{};
+  final _recentSearches = <String>[];
   String _query = '';
   @override
   void dispose() {
@@ -849,50 +996,58 @@ class _StoreProductImportReviewScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            TextField(
-                              key: const Key('work-import-search'),
+                            StoreRecentSearches(
                               controller: _search,
-                              enabled: !_busy,
-                              style: const TextStyle(fontSize: 14),
+                              history: widget.recentSearches ?? _recentSearches,
                               onChanged: (value) =>
                                   setState(() => _query = value),
-                              decoration: InputDecoration(
-                                hintText:
-                                    MediaQuery.textScalerOf(context).scale(1) >
-                                        1.5
-                                    ? 'Search CSV'
-                                    : 'Search product, SKU or row',
-                                hintStyle: const TextStyle(
-                                  fontSize: 13,
-                                  color: MoolColors.muted,
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.search_rounded,
-                                  size: 20,
-                                ),
-                                suffixIcon: _query.isEmpty
-                                    ? null
-                                    : IconButton(
-                                        key: const Key(
-                                          'work-import-clear-search',
+                              child: TextField(
+                                key: const Key('work-import-search'),
+                                controller: _search,
+                                enabled: !_busy,
+                                style: const TextStyle(fontSize: 14),
+                                onChanged: (value) =>
+                                    setState(() => _query = value),
+                                decoration: InputDecoration(
+                                  hintText:
+                                      MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(1) >
+                                          1.5
+                                      ? 'Search CSV'
+                                      : 'Search product, SKU or row',
+                                  hintStyle: const TextStyle(
+                                    fontSize: 13,
+                                    color: MoolColors.muted,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.search_rounded,
+                                    size: 20,
+                                  ),
+                                  suffixIcon: _query.isEmpty
+                                      ? null
+                                      : IconButton(
+                                          key: const Key(
+                                            'work-import-clear-search',
+                                          ),
+                                          tooltip: 'Clear search',
+                                          onPressed: () {
+                                            _search.clear();
+                                            setState(() => _query = '');
+                                          },
+                                          icon: const Icon(
+                                            Icons.close_rounded,
+                                            size: 18,
+                                          ),
                                         ),
-                                        tooltip: 'Clear search',
-                                        onPressed: () {
-                                          _search.clear();
-                                          setState(() => _query = '');
-                                        },
-                                        icon: const Icon(
-                                          Icons.close_rounded,
-                                          size: 18,
-                                        ),
-                                      ),
-                                filled: false,
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 12,
+                                  filled: false,
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1411,11 +1566,11 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
 
   void _rememberQuery() {
     final query = _search.text.trim();
-    if (query.isEmpty || widget.stockOnly) return;
+    if (query.isEmpty) return;
     if (widget.isStoreCurrent?.call() == false) return;
     _history.removeWhere((old) => old.toLowerCase() == query.toLowerCase());
     _history.insert(0, query);
-    if (_history.length > 6) _history.removeRange(6, _history.length);
+    if (_history.length > 5) _history.removeRange(5, _history.length);
     widget.onBrowseChanged?.call();
   }
 
@@ -2086,7 +2241,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                       ],
                     ),
                   ),
-                if (!widget.stockOnly && _searchFocus.hasFocus) ...[
+                if (_searchFocus.hasFocus) ...[
                   const Padding(
                     padding: EdgeInsets.fromLTRB(12, 4, 12, 4),
                     child: Align(
@@ -2104,7 +2259,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         children: [
-                          for (final term in _history)
+                          for (final term in _history.take(5))
                             Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: ActionChip(

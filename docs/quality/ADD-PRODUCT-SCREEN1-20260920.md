@@ -2630,3 +2630,33 @@ Hot reload succeeded on OPPO. Live hierarchy confirms aligned pack-field mapping
 screenshot task outputs/csv-guide-table.png. Founder explicitly said “approved i
 seen on oppo”. Approval covers this guidance design; no new APK or whole-sweep
 closure. No import saved, payment recorded or inventory modified.
+
+### Contextual Store search — implementation, not full device closure
+
+Founder requested inline searches throughout Store, with at most five contextual
+recent terms on empty focus, existing records beneath, live matches while typing,
+and category lists without separate category history. Implemented using the
+existing Store-scoped browse state, separately keyed for Store, stock, customers,
+Counter Sale products, CSV file, wholesale-product picker, documents and customer
+statements. Catalogue retains its existing history with a five-term cap. Recents
+are frontend session state across navigation, not durable backend search history.
+Recall only updates query; it never adds products or performs a transaction.
+
+Store search now shows existing searchable records for an empty query rather
+than an instruction-only empty screen. Category search already explicitly had
+no borders/fill; tests now cover all decoration states. Removed inherited boxes
+from customer/wholesale-product search and focused statement underline. Ordinary
+form inputs unchanged. Shared document screen gets an optional presentation hook
+used only by Store; other consumers retain default behavior.
+
+Targeted first run:41 passed/3 pre-existing capture skips. Expanded run additionally
+exposed two DASH10 Restock tests expecting absent buy-empty-products-scroll.
+Both failures reproduced with the new procurement wrapper removed (task outputs/
+store-search-restock-without-wrapper.txt); wrapper remains excluded. Restock
+recent-history extension and its Buy-side baseline reconciliation remain OPEN,
+not silently declared implemented. No Cursor integration or Buy edits.
+Final owned-scope rerun: task outputs/store-contextual-search-qualified.txt.
+Account/Store browsing isolation, stale scope, five-term limit, recall, typing,
+CSV and normal/enlarged layout tests included. OPPO was in another app, so device
+interaction paused. No new APK, import, invoice or payment. Founder/device review
+and exact APK qualification remain pending.

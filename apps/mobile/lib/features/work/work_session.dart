@@ -420,6 +420,7 @@ class _StoreOperationalData {
       const WorkspaceStorePublicationDetails();
   final Set<String> catalogueShortlist = {};
   final List<String> catalogueSearchHistory = [];
+  final Map<String, List<String>> contextualSearchHistory = {};
   final List<WorkspaceStockMovement> workspaceStockMovements = [];
   int stockMovementSequence = 0;
   _StockHistoryState? stockHistory;
@@ -5980,6 +5981,9 @@ class WorkSession extends ChangeNotifier {
   Set<String> get workspaceCatalogueShortlist => _storeData.catalogueShortlist;
   List<String> get workspaceCatalogueSearchHistory =>
       _storeData.catalogueSearchHistory;
+  List<String> workspaceRecentSearches(String context) => context == 'catalogue'
+      ? workspaceCatalogueSearchHistory
+      : _storeData.contextualSearchHistory.putIfAbsent(context, () => []);
   // Frontend browsing state is Store-scoped and survives route changes. A
   // dedicated durable shortlist adapter is deferred; never overwrite inventory
   // through the legacy whole-Store save merely because a bookmark was tapped.
