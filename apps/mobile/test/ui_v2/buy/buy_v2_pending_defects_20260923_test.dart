@@ -76,7 +76,12 @@ void _founderVisualCases() {
           final refresh = find.byKey(const ValueKey('buy-comparison-refresh'));
           expect(refresh.hitTestable(), findsOneWidget);
           expect(tester.getSize(refresh).height, greaterThanOrEqualTo(44));
-          final title = tester.getRect(find.text('Compare prices'));
+          final title = tester.getRect(
+            find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.text('Compare prices'),
+            ),
+          );
           expect(
             tester.getRect(refresh).center.dy,
             closeTo(title.center.dy, 2),
@@ -538,7 +543,523 @@ Future<void> _fillGst(
   await tester.pumpAndSettle();
 }
 
+class _RescheduleLayoutAdapter implements BuyV2DeliveryExceptionAdapter {
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> loadException({
+    required String orderId,
+  }) async => const BuyV2DeliveryExceptionSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    customerMessage: 'Test delivery times',
+    exceptionId: 'test-reschedule',
+    kind: BuyV2DeliveryExceptionKind.rescheduleAvailable,
+    headline: 'Choose delivery time',
+    detail: 'Select an available slot.',
+    rescheduleSlots: ['Review afternoon slot'],
+  );
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> rescheduleDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String slot,
+  }) => loadException(orderId: orderId);
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> disputeProofOfDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String proofReference,
+  }) => loadException(orderId: orderId);
+}
+
+class _ReceiptReviewStateStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'test-receipt-review';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+
+class _UnresolvedCollectionStoreSession extends BuyV2Session {
+  _UnresolvedCollectionStoreSession({required super.core});
+
+  @override
+  BuyV2Product? findProduct(String id) =>
+      super.findProduct(id)?.copyWith(storeId: 'unresolved-collection-store');
+}
+
 void main() {
+  test('D08 assigned device fixture preserves independent delivery fields', () {
+    const enabled = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+    for (final review in [false, true]) {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: review,
+        customerStateStore: _ReceiptReviewStateStore(),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final assigned = session.orders.where(
+        (o) => o.id == 'REVIEW-ASSIGNED-01',
+      );
+      if (!enabled || !review) {
+        expect(assigned, isEmpty);
+      } else {
+        final order = assigned.single;
+        expect(order.partner, 'Review grocery store');
+        expect(order.deliveryPartnerName, 'Review courier');
+        expect(order.deliveryServiceLevel, 'Review scheduled service');
+        expect(order.promisedByLabel, 'Review afternoon window');
+        expect(order.trackingReference, 'REVIEW-TRACKING-01');
+        expect(order.lines.single.quantity, 2);
+        expect(order.lines.single.total, order.total);
+        expect(session.liveDeliveryAdapter, isNull);
+      }
+      expect(session.cartLines, isEmpty);
+    }
+  });
+
+  test(
+    'D17 device PO fixture is isolated and preserves exact approvals',
+    () async {
+      const enabled = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: true,
+        customerStateStore: _ReceiptReviewStateStore(),
+      );
+      final otherCore = BuySession();
+      final production = BuyV2Session(
+        core: otherCore,
+        reviewDataEnabled: false,
+        customerStateStore: _ReceiptReviewStateStore(),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      addTearDown(otherCore.dispose);
+      addTearDown(production.dispose);
+      expect(production.purchaseOrderAdapter, isNull);
+      expect(production.purchaseOrder, isNull);
+      expect(session.collectionIdentity, isNull);
+      expect(session.collectionCheckout, isNull);
+      final suppliedPo = _ExplicitPoBoundaryAdapter();
+      final suppliedCommerce = _ExplicitCommerceBoundaryAdapter();
+      final owner = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(
+          accountId: 'provider-owner',
+          sessionId: 'provider-session',
+        ),
+      );
+      addTearDown(owner.dispose);
+      for (final withPo in [false, true]) {
+        final injectedCore = BuySession();
+        final injected = BuyV2Session(
+          core: injectedCore,
+          reviewDataEnabled: true,
+          customerStateStore: _ReceiptReviewStateStore(),
+          collectionIdentity: owner,
+          purchaseOrderAdapter: withPo ? suppliedPo : null,
+          commerceAdapter: suppliedCommerce,
+        );
+        expect(injected.collectionIdentity, same(owner));
+        expect(injected.commerceAdapter, same(suppliedCommerce));
+        expect(
+          injected.purchaseOrderAdapter,
+          withPo ? same(suppliedPo) : isNull,
+        );
+        if (withPo) {
+          expect(injected.purchaseOrder!.identity, same(owner));
+          expect(injected.purchaseOrder!.adapter, same(suppliedPo));
+        } else {
+          expect(injected.purchaseOrder, isNull);
+        }
+        injected.dispose();
+        injectedCore.dispose();
+      }
+      // An explicit commerce adapter alone also prevents the review PO fallback.
+      final commerceCore = BuySession();
+      final commerceOnly = BuyV2Session(
+        core: commerceCore,
+        reviewDataEnabled: true,
+        commerceAdapter: suppliedCommerce,
+        customerStateStore: _ReceiptReviewStateStore(),
+      );
+      expect(commerceOnly.purchaseOrderAdapter, isNull);
+      commerceOnly.dispose();
+      commerceCore.dispose();
+      if (!enabled) {
+        expect(session.purchaseOrderAdapter, isNull);
+        expect(session.purchaseOrder, isNull);
+        return;
+      }
+      final source = session.purchaseOrderAdapter!;
+      final controller = session.purchaseOrder!;
+      final product = BuyV2Catalogue.products
+          .firstWhere((p) => p.destination == BuyV2Destination.wholesale)
+          .copyWith(storeId: 'review-store');
+      final lines = [
+        BuyV2CartLine(product: product, quantity: 2),
+        BuyV2CartLine(
+          product: product.copyWith(id: 'other-sku', storeId: 'other-store'),
+          quantity: 3,
+        ),
+      ];
+      final address = session.selectedAddressOrNull!;
+      expect(await controller.prepare(lines, address), isTrue);
+      expect(controller.review!.matches(lines, DateTime.now()), isTrue);
+      expect(controller.review!.documents.length, 2);
+      final draft = controller.review!;
+      await expectLater(
+        source.issue(requestId: 'wrong', expectedRevision: draft.revision),
+        throwsStateError,
+      );
+      expect(await controller.issue(lines, address), isTrue);
+      expect(
+        controller.review!.documents.every(
+          (d) => d.state == BuyV2PurchaseOrderState.awaitingSupplier,
+        ),
+        isTrue,
+      );
+      expect(await controller.refresh(), isTrue);
+      expect(
+        controller.review!.documents.every(
+          (d) => d.state == BuyV2PurchaseOrderState.revised,
+        ),
+        isTrue,
+      );
+      final first = controller.review!.documents.first.id;
+      expect(await controller.approveRevision(first, lines, address), isTrue);
+      expect(
+        controller.review!.documents.first.state,
+        BuyV2PurchaseOrderState.accepted,
+      );
+      expect(
+        controller.review!.documents.last.state,
+        BuyV2PurchaseOrderState.revised,
+      );
+      expect(
+        await controller.approveRevision(
+          controller.review!.documents.last.id,
+          lines,
+          address,
+        ),
+        isTrue,
+      );
+      expect(
+        controller.review!.documents.every(
+          (d) => d.state == BuyV2PurchaseOrderState.accepted,
+        ),
+        isTrue,
+      );
+      expect(controller.review!.documents.first.lines.single.quantity, 2);
+      expect(controller.review!.documents.last.lines.single.quantity, 3);
+      expect(await controller.prepare(lines, address), isTrue);
+      final interruptedRequest = controller.review!.requestId;
+      expect(await controller.issue(lines, address), isFalse);
+      expect(controller.needsReconciliation, isTrue);
+      expect(await controller.issue(lines, address), isFalse);
+      // prepare while uncertain reconciles the original request, not a new one.
+      expect(await controller.prepare(lines, address), isTrue);
+      expect(controller.review!.requestId, interruptedRequest);
+      expect(controller.needsReconciliation, isFalse);
+      expect(
+        controller.review!.documents.every(
+          (d) => d.state == BuyV2PurchaseOrderState.revised,
+        ),
+        isTrue,
+      );
+
+      expect(session.cartLines, isEmpty);
+      expect(session.collectionIdentity, isNull);
+    },
+  );
+
+  testWidgets('C05-A02 reschedule slot wraps complete label', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 844);
+    addTearDown(tester.view.reset);
+    for (final scale in [1.0, 2.0]) {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        deliveryExceptionAdapter: _RescheduleLayoutAdapter(),
+      );
+      final order = session.orders.first;
+      await session.restoreDeliveryException(order.id);
+      session.openTracking(order.id);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: session.destination,
+            initialView: session.view,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final label = find.text('Review afternoon slot');
+      await tester.scrollUntilVisible(
+        label,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      final paragraph = tester.renderObject<RenderParagraph>(label);
+      final painter = TextPainter(
+        text: paragraph.text,
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.linear(scale),
+      )..layout(maxWidth: paragraph.size.width);
+      expect(paragraph.size.height + .1, greaterThanOrEqualTo(painter.height));
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final control = find.byKey(
+        const ValueKey('buy-delivery-slot-Review afternoon slot'),
+      );
+      expect(
+        tester.getRect(label).top,
+        greaterThanOrEqualTo(tester.getRect(control).top),
+      );
+      expect(
+        tester.getRect(label).bottom,
+        lessThanOrEqualTo(tester.getRect(control).bottom),
+      );
+      painter.dispose();
+      await tester.tap(label);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Semantics>(
+              find.byKey(
+                const ValueKey('buy-delivery-slot-Review afternoon slot'),
+              ),
+            )
+            .properties
+            .selected,
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+      core.dispose();
+    }
+  });
+  test(
+    'C05 device receipt fixture is isolated and exactly correlated',
+    () async {
+      const enabled = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: true,
+        customerStateStore: _ReceiptReviewStateStore(),
+      );
+      final productionCore = BuySession();
+      final production = BuyV2Session(
+        core: productionCore,
+        reviewDataEnabled: false,
+        customerStateStore: _ReceiptReviewStateStore(),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      addTearDown(productionCore.dispose);
+      addTearDown(production.dispose);
+      expect(
+        production.orders.where((o) => o.id == 'REVIEW-RECEIPT-01'),
+        isEmpty,
+      );
+      expect(production.deliveryExceptionAdapter, isNull);
+      final orders = session.orders
+          .where((o) => o.id == 'REVIEW-RECEIPT-01')
+          .toList();
+      expect(orders, enabled ? hasLength(1) : isEmpty);
+      if (!enabled) {
+        expect(session.deliveryExceptionAdapter, isNull);
+        return;
+      }
+      final order = orders.single;
+      final adapter = session.deliveryExceptionAdapter!;
+      final snapshot = await adapter.loadException(orderId: order.id);
+      expect(snapshot.itemisedReceipt!.matchesOrder(order), isTrue);
+      expect(snapshot.itemisedReceipt!.lines.single.missingQuantity, 1);
+      expect(snapshot.headline, contains('Review only'));
+      final unrelated = await adapter.loadException(orderId: 'real-order');
+      expect(unrelated.itemisedReceipt, isNull);
+      expect(unrelated.kind, isNull);
+      await adapter.disputeProofOfDelivery(
+        orderId: order.id,
+        exceptionId: 'wrong',
+        proofReference: 'wrong',
+      );
+      expect(
+        (await adapter.loadException(orderId: order.id)).kind,
+        BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      );
+      final disputed = await adapter.disputeProofOfDelivery(
+        orderId: order.id,
+        exceptionId: snapshot.exceptionId!,
+        proofReference: snapshot.proofReference!,
+      );
+      expect(disputed.kind, BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed);
+      expect(disputed.detail, contains('No report was sent'));
+      expect(disputed.itemisedReceipt!.matchesOrder(order), isTrue);
+      final rescheduleOrder = session.orders.singleWhere(
+        (o) => o.id == 'REVIEW-RESCHEDULE-01',
+      );
+      final available = await adapter.loadException(
+        orderId: rescheduleOrder.id,
+      );
+      expect(available.rescheduleSlots, hasLength(2));
+      for (final values in [
+        [
+          'wrong-order',
+          available.exceptionId!,
+          available.rescheduleSlots.first,
+        ],
+        [
+          rescheduleOrder.id,
+          'wrong-exception',
+          available.rescheduleSlots.first,
+        ],
+        [rescheduleOrder.id, available.exceptionId!, 'wrong-slot'],
+      ]) {
+        await adapter.rescheduleDelivery(
+          orderId: values[0],
+          exceptionId: values[1],
+          slot: values[2],
+        );
+        expect(
+          (await adapter.loadException(
+            orderId: rescheduleOrder.id,
+          )).rescheduleSlots,
+          hasLength(2),
+        );
+      }
+      final changed = await adapter.rescheduleDelivery(
+        orderId: rescheduleOrder.id,
+        exceptionId: available.exceptionId!,
+        slot: available.rescheduleSlots.last,
+      );
+      expect(changed.rescheduleSlots, isEmpty);
+      expect(changed.detail, contains(available.rescheduleSlots.last));
+      expect(changed.detail, contains('No delivery was changed'));
+      expect(
+        (await adapter.loadException(
+          orderId: order.id,
+        )).itemisedReceipt!.matchesOrder(order),
+        isTrue,
+      );
+    },
+  );
+  testWidgets('D07-A01 unresolved collection preserves cart count meaning', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = _UnresolvedCollectionStoreSession(core: core);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.chooseCheckoutCollection(true), isTrue);
+    expect(session.checkoutLines, isEmpty);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BuyV2Screen(session: session, initialView: BuyV2View.checkout),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
+    expect(
+      find.descendant(of: dock, matching: find.text('Cart saved')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dock, matching: find.text('0 items')),
+      findsNothing,
+    );
+    final payment = find.descendant(
+      of: dock,
+      matching: find.byType(FilledButton),
+    );
+    expect(tester.widget<FilledButton>(payment).onPressed, isNull);
+    expect(session.cartLines.single.quantity, 1);
+    expect(session.cartLines.single.product.id, 's-tomato');
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('D09-A03 legacy tracking retains counts without address', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    final order = session.orders.firstWhere(
+      (order) => order.itemSummary.startsWith('13 products'),
+    );
+    expect(order.lines, isEmpty);
+    expect(session.openTracking(order.id), isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: session.destination,
+          initialView: session.view,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('13 products'), findsOneWidget);
+    expect(find.text(order.itemSummary), findsNothing);
+    expect(find.text(order.destinationLabel), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('D09-A03 tracking counts omit repeated destination', (
+    tester,
+  ) async {
+    for (final wholesale in [false, true]) {
+      final core = BuySession();
+      final session = BuyV2Session(core: core)..chooseAddress('work');
+      expect(
+        session.addProduct(wholesale ? 'w-notebook' : 's-tomato', quantity: 2),
+        isTrue,
+      );
+      session.openCart(
+        scope: wholesale ? BuyV2CartScope.wholesale : BuyV2CartScope.shop,
+      );
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+      final order = session.confirmedOrders.single;
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: session.destination,
+            initialView: session.view,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('1 product · 2 ${wholesale ? 'packs' : 'items'}'),
+        findsOneWidget,
+      );
+      expect(find.text(order.itemSummary), findsNothing);
+      expect(find.text(order.destinationLabel), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+      core.dispose();
+    }
+  });
   _founderVisualCases();
   test('D05 production never receives a review comparison provider', () {
     final session = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
@@ -692,7 +1213,13 @@ void main() {
     expect(action.hitTestable(), findsOneWidget);
     await tester.tap(action);
     await tester.pumpAndSettle();
-    expect(find.text('Compare prices'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('Compare prices'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
       findsOneWidget,
@@ -1070,6 +1597,109 @@ void main() {
     await first.restore();
     expect(first.savedProfiles, isEmpty);
   });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'C07-A02 initial GST billing focus remains above save bar $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final store = _AccountStore();
+        final controller = _controller(store);
+        await _save(controller);
+        await tester.pumpWidget(
+          _app(BuyV2GstProfileSection(store: store, onChanged: () {})),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('profile-gst-edit')));
+        await tester.pumpAndSettle();
+        final address = find.byKey(const ValueKey('buy-gst-billing-address'));
+        await tester.ensureVisible(address);
+        await tester.pumpAndSettle();
+        final field = tester.widget<TextField>(address);
+        field.controller!.selection = TextSelection.collapsed(
+          offset: field.controller!.text.length,
+        );
+        await tester.tap(address);
+        await tester.pump();
+        for (final inset in [100.0, 220.0, 300.0]) {
+          tester.view.viewInsets = FakeViewPadding(bottom: inset);
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        await tester.pumpAndSettle();
+        final editableFinder = find.descendant(
+          of: address,
+          matching: find.byType(EditableText),
+        );
+        final editable = tester
+            .state<EditableTextState>(editableFinder)
+            .renderEditable;
+        final caret = editable
+            .getLocalRectForCaret(field.controller!.selection.extent)
+            .shift(editable.localToGlobal(Offset.zero));
+        final viewport = tester.getRect(
+          find.byKey(const ValueKey('buy-gst-form-scroll')),
+        );
+        final save = tester.getRect(find.byKey(const ValueKey('buy-gst-save')));
+        expect(caret.top, greaterThanOrEqualTo(viewport.top));
+        expect(
+          caret.bottom,
+          lessThanOrEqualTo(viewport.bottom - 20),
+          reason: 'Initial caret must be visible before any typing',
+        );
+        expect(caret.bottom, lessThan(save.top));
+        expect(save.bottom, lessThanOrEqualTo(500));
+        expect(field.controller!.text, '12 Market Road, Jodhpur');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('C07-A01 GST feedback follows edit and save outcome', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final review = BuyV2Session(core: core, reviewDataEnabled: true);
+    addTearDown(review.dispose);
+    addTearDown(core.dispose);
+    await tester.pumpWidget(
+      _app(
+        BuyV2GstProfileSection(
+          store: review.gstInvoiceProfileStore,
+          onChanged: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add GST details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use GST details'));
+    await tester.pumpAndSettle();
+    const nameError = 'Enter a legal name with at least 3 characters.';
+    expect(find.text(nameError), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+      'Review Buyer',
+    );
+    await tester.pump();
+    expect(find.text(nameError), findsNothing);
+    await tester.tap(find.text('Use GST details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Check the 15-character GSTIN format.'), findsOneWidget);
+    await _fillGst(tester, name: 'Review Buyer');
+    expect(find.text('Review Buyer'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
+    expect(
+      find.text('Details are kept until you close the app.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('GST details kept until you close the app.'),
+      findsNothing,
+    );
+  });
   testWidgets('R6634 C07-14 Profile or checkout save/load failure', (
     tester,
   ) async {
@@ -1247,4 +1877,17 @@ void main() {
     expect(await reviewStore.read(), isNull);
     expect(tester.takeException(), isNull);
   });
+}
+
+// Constructor-boundary sentinels: no provider operation is expected in this test.
+class _ExplicitPoBoundaryAdapter implements BuyV2PurchaseOrderAdapter {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected PO provider operation');
+}
+
+class _ExplicitCommerceBoundaryAdapter implements BuyV2CommerceAdapter {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected commerce provider operation');
 }

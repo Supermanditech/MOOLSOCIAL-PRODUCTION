@@ -16,6 +16,16 @@ String buyV2CustomerStoreName(String name, String? storeId) {
 extension BuyV2CustomerProductCopy on BuyV2Product {
   String customerSeller(String name) => buyV2CustomerStoreName(name, storeId);
 
+  /// Compact SKU identity where a full variant row is not otherwise shown.
+  String get customerVariantPack {
+    if (!hasStructuredVariants) return pack;
+    final seen = <String>{};
+    return [
+      ...variantAttributes.map((attribute) => attribute.optionLabel),
+      pack,
+    ].where((value) => seen.add(value.trim().toLowerCase())).join(' · ');
+  }
+
   String? get _developmentSku {
     final match = RegExp(
       r'^buy-catalogue-dev-v1-(shop|wholesale|medicine)-store-([0-9]{6})-sku-([0-9]{4})$',

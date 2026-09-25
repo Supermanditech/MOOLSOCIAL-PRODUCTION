@@ -187,7 +187,7 @@ Future<void> _openR669Review(WidgetTester tester) async {
   );
   await tester.ensureVisible(action);
   await tester.pumpAndSettle();
-  expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+  expect(tester.widget<ButtonStyleButton>(action).onPressed, isNotNull);
   await tester.tap(action);
   await tester.pumpAndSettle();
 }
@@ -948,7 +948,13 @@ void main() {
           );
           expect(image.fit, BoxFit.contain);
         } else {
-          expect(find.text('Photo unavailable'), findsOneWidget);
+          expect(find.text('Image unavailable'), findsOneWidget);
+          expect(
+            find.byKey(
+              const ValueKey('buy-product-image-retry-s-milk-supplied'),
+            ),
+            findsOneWidget,
+          );
           expect(
             find.bySemanticsLabel(RegExp('Fixture supplied SKU photo')),
             findsNothing,
@@ -1077,7 +1083,16 @@ void main() {
         );
         await tester.pumpAndSettle();
         final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
-        await tester.ensureVisible(edit);
+        await tester.scrollUntilVisible(
+          edit,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$id')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(edit);
         await tester.pumpAndSettle();
@@ -1240,7 +1255,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(add, findsOneWidget);
-      expect(find.text('Buy now'), findsNothing);
+      expect(
+        find.text(
+          entry.destination == BuyV2Destination.wholesale
+              ? 'Review order'
+              : 'Buy now',
+        ),
+        findsNothing,
+      );
       expect(
         tester
             .getSemantics(add)
@@ -1298,59 +1320,58 @@ void main() {
     final actions = find.byKey(
       const ValueKey('buy-product-quick-actions-s-milk'),
     );
-    await tester.scrollUntilVisible(actions, 180, scrollable: productScroll);
-    expect(actions, findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('buy-product-action-save-s-milk')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-product-action-share-s-milk')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-product-action-ask-seller-s-milk')),
-      findsOneWidget,
-    );
-    for (final label in const ['Save', 'Share', 'Compare', 'Ask seller']) {
-      final semanticAction = find.descendant(
-        of: actions,
-        matching: find.bySemanticsLabel(label),
-      );
-      expect(semanticAction, findsOneWidget);
+    final save = find.byKey(const ValueKey('buy-product-action-save-s-milk'));
+    await tester.scrollUntilVisible(save, -180, scrollable: productScroll);
+    await tester.pumpAndSettle();
+    for (final label in const ['Save', 'Share']) {
+      final action = find.byTooltip(label);
+      expect(action, findsOneWidget);
       expect(
         tester
-            .getSemantics(semanticAction)
+            .getSemantics(action)
             .getSemanticsData()
             .hasAction(SemanticsAction.tap),
         isTrue,
       );
     }
-
-    final save = find.byKey(const ValueKey('buy-product-action-save-s-milk'));
-    await tester.ensureVisible(save);
-    await tester.drag(productScroll, const Offset(0, -160));
-    await tester.pumpAndSettle();
-    await tester.tap(save);
+    await tester.tap(save.hitTestable());
     await tester.pumpAndSettle();
     expect(session.isSaved('s-milk'), isTrue);
     expect(
       find.byKey(const ValueKey('buy-product-action-saved-s-milk')),
       findsOneWidget,
     );
-
+    await tester.scrollUntilVisible(actions, 180, scrollable: productScroll);
+    await tester.pumpAndSettle();
+    for (final label in const ['Compare prices', 'Ask seller']) {
+      final action = find.descendant(
+        of: actions,
+        matching: find.bySemanticsLabel(label),
+      );
+      expect(action, findsOneWidget);
+      expect(
+        tester
+            .getSemantics(action)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    }
     await tester.ensureVisible(
       find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
     );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Compare prices'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('Compare prices'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
       findsOneWidget,
@@ -1543,6 +1564,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     final add = find.byKey(const ValueKey('buy-product-primary-w-rice-50kg'));
+    await tester.scrollUntilVisible(
+      add,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-product-w-rice-50kg')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
     expect(add, findsOneWidget);
     await tester.tap(add);
     await tester.pumpAndSettle();

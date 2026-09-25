@@ -103,6 +103,8 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
+    // The seller sheet returns below the price summary.
+    await revealProductHero(tester, productId);
     await tester.scrollUntilVisible(add, 180, scrollable: scroll);
     await tester.pumpAndSettle();
     await tester.ensureVisible(add);
@@ -131,7 +133,7 @@ void main() {
       buyV2ProductOfferDecisionContractVersion,
       'buy-product-offer-decision-v1',
     );
-    expect(find.text('Delivery & returns'), findsOneWidget);
+    expect(find.text('Delivery & seller'), findsOneWidget);
     expect(find.text('MoolSocial Quick Delivery'), findsOneWidget);
     if (product.mrp case final mrp?) {
       expect(find.text(buyV2Money(mrp)), findsOneWidget);
@@ -353,6 +355,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.product);
       expect(session.cartLines, isEmpty);
+      await openProductDecision(tester, session, product.id);
       expect(find.text('Check current availability'), findsWidgets);
       expect(tester.takeException(), isNull);
     },
@@ -376,7 +379,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await openProductDecision(tester, session, product.id);
-    expect(find.text('Delivery & returns'), findsOneWidget);
+    expect(find.text('Delivery & seller'), findsOneWidget);
     await revealProductHero(tester, product.id);
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     await revealAdd(tester, product.id);

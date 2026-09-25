@@ -16,6 +16,30 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  Future<void> reveal(
+    WidgetTester tester,
+    BuyV2Product product,
+    Finder target, {
+    double delta = 180,
+  }) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        target,
+        delta,
+        scrollable: find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+    } else {
+      await tester.ensureVisible(target);
+    }
+    // Loading-state assertions deliberately keep the progress indicator active.
+    await tester.pump();
+  }
+
   Widget app(
     BuyV2Session session,
     BuyV2WholesaleTradeDecisionAdapter adapter, {
@@ -110,6 +134,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    await reveal(tester, product, find.text('Jodhpur market insight'));
     expect(find.text('Jodhpur market insight'), findsOneWidget);
     expect(find.text('Steady local restocking'), findsOneWidget);
     expect(
@@ -117,26 +142,31 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Current through 6:00 pm today'), findsOneWidget);
+    await reveal(
+      tester,
+      product,
+      find.textContaining(product.seller).first,
+      delta: -180,
+    );
     expect(find.textContaining(product.seller), findsWidgets);
 
     final gallery = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
     final imageViewport = find.byKey(
       ValueKey('buy-product-gallery-${product.id}'),
     );
-    expect(tester.getSize(imageViewport).height, lessThanOrEqualTo(238));
+    await reveal(tester, product, imageViewport, delta: -180);
+    expect(tester.getSize(imageViewport).height, closeTo(280, .1));
     expect(
       tester.getRect(imageViewport).bottom,
       lessThanOrEqualTo(tester.getRect(gallery).bottom),
     );
-    final badge = find.byKey(
-      ValueKey('buy-product-gallery-badge-${product.id}'),
-    );
     expect(
-      tester.getRect(badge).bottom,
-      lessThanOrEqualTo(tester.getRect(imageViewport).top),
+      find.byKey(ValueKey('buy-product-action-save-${product.id}')),
+      findsOneWidget,
     );
     await captureR66Visual(tester, 'r669-trade-gallery-and-decision');
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
+    await reveal(tester, product, add);
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
     final facts = session.productFactsFor(product);
@@ -211,10 +241,22 @@ void main() {
       findsNothing,
     );
     expect(find.textContaining('retailers bought'), findsNothing);
+    await reveal(tester, product, find.text(product.confirmedOn));
     expect(find.text(product.confirmedOn), findsOneWidget);
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      delta: -180,
+    );
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsOneWidget,
+    );
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-hero-store-${product.id}')),
     );
     expect(
       find.descendant(
@@ -247,8 +289,15 @@ void main() {
 
     await tester.pumpWidget(app(session, adapter));
     await tester.pump();
+    await reveal(tester, product, find.text('Checking local market insight'));
     expect(find.text('Checking local market insight'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      delta: -180,
+    );
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsOneWidget,
@@ -256,6 +305,11 @@ void main() {
 
     pending.completeError(StateError('service unavailable'));
     await tester.pumpAndSettle();
+    await reveal(
+      tester,
+      product,
+      find.text('Local market insight could not be loaded'),
+    );
     expect(
       find.text('Local market insight could not be loaded'),
       findsOneWidget,
@@ -265,6 +319,12 @@ void main() {
     );
     expect(retry, findsOneWidget);
     expect(tester.getSize(retry).height, greaterThanOrEqualTo(44));
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      delta: -180,
+    );
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsOneWidget,
@@ -308,6 +368,11 @@ void main() {
     );
     expect(tester.getSize(dockRetry).height, greaterThanOrEqualTo(48));
     expect(tester.widget<TextButton>(dockRetry).onPressed, isNotNull);
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-offer-retry-${product.id}')),
+    );
     expect(
       find.byKey(ValueKey('buy-offer-retry-${product.id}')),
       findsOneWidget,

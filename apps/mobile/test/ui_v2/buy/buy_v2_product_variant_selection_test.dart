@@ -196,7 +196,476 @@ Future<void> capturePack(WidgetTester tester, String label) async {
 }
 
 void main() {
+  List<BuyV2Product> structuredFamily() {
+    final base = BuyV2Catalogue.products.first;
+    return [
+      for (final colour in ['blue', 'black'])
+        for (final storage in ['128', '256'])
+          base.copyWith(
+            id: 'phone-$colour-$storage',
+            canonicalId: 'test-phone-family',
+            storeId: 'variant-store',
+            title: 'Review phone',
+            variant: '$colour $storage GB',
+            pack: 'One unit',
+            price:
+                (storage == '128' ? 10000 : 14000) +
+                (colour == 'blue' ? 500 : 0),
+            variantAttributes: [
+              BuyV2VariantAttribute(
+                dimensionId: 'colour',
+                dimensionLabel: 'Colour',
+                optionId: colour,
+                optionLabel: colour,
+                kind: BuyV2VariantDimensionKind.colour,
+                swatchArgb: colour == 'blue' ? 0xff3366aa : 0xff222222,
+              ),
+              BuyV2VariantAttribute(
+                dimensionId: 'storage',
+                dimensionLabel: 'Storage',
+                optionId: storage,
+                optionLabel: '$storage GB',
+                kind: BuyV2VariantDimensionKind.storage,
+              ),
+            ],
+          ),
+    ];
+  }
+
+  test(
+    'structured variants preserve dimensions and reject ambiguous or foreign offers',
+    () {
+      final family = structuredFamily();
+      final current = family.first;
+      expect(
+        current.copyWith(price: 999).variantAttributes,
+        current.variantAttributes,
+      );
+      expect(
+        current.resolveVariantOption(family, 'colour', 'black')?.id,
+        'phone-black-128',
+      );
+      expect(
+        current.resolveVariantOption(family, 'storage', '256')?.id,
+        'phone-blue-256',
+      );
+      expect(current.resolveVariantOption(family, 'storage', '512'), isNull);
+      expect(
+        current.resolveVariantOption(
+          [current, family[1].copyWith(storeId: 'foreign')],
+          'storage',
+          '256',
+        ),
+        isNull,
+      );
+      expect(
+        current.resolveVariantOption(
+          [...family, family[1].copyWith(id: 'duplicate-offer')],
+          'storage',
+          '256',
+        ),
+        isNull,
+      );
+      final malformed = current.copyWith(
+        variantAttributes: [
+          current.variantAttributes.first,
+          current.variantAttributes.first,
+        ],
+      );
+      expect(malformed.hasStructuredVariants, isFalse);
+      expect(malformed.resolveVariantOption(family, 'storage', '256'), isNull);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'structured variant controls preserve exact selected SKU and cart $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final bytes = (await tester.runAsync(
+          () => _mediaFitFixture(512, 512),
+        ))!;
+        final previousClient = debugNetworkImageHttpClientProvider;
+        final client = _MediaHttpClient(bytes);
+        debugNetworkImageHttpClientProvider = () => client;
+        try {
+          final family = structuredFamily()
+              .map(
+                (product) => product.copyWith(
+                  mediaAssets: [
+                    BuyV2ProductMediaAsset(
+                      id: 'photo-${product.id}',
+                      label: 'Exact variant photo',
+                      semanticLabel: 'Photo of ${product.variant}',
+                      kind: BuyV2ProductContentMediaKind.network,
+                      source: 'https://media.example.com/${product.id}.png',
+                      binding: BuyV2ProductMediaBinding(
+                        supplierWorkspaceId: 'variant-workspace',
+                        storeId: product.storeId!,
+                        productId: product.canonicalId,
+                        skuId: product.id,
+                        assetRevision: 'variant-1',
+                        file: BuyV2MediaFileMetadata(
+                          mimeType: 'image/png',
+                          width: 512,
+                          height: 512,
+                          byteLength: bytes.length,
+                          normalized: true,
+                          frameCount: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              .toList();
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            productFactsAdapter: QualifiedTestProductFacts(
+              family.map((p) => p.id).toSet(),
+            ),
+            commerceAdapter: _MediaCommerce(
+              family.first,
+              otherProducts: family.skip(1).toList(),
+            ),
+            reviewDataEnabled: false,
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          expect(session.openProduct(family.first.id), isTrue);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: session.destination,
+                initialView: session.view,
+                productId: family.first.id,
+              ),
+            ),
+          );
+          await tester.runAsync(() async {
+            for (final product in family) {
+              await precacheImage(
+                NetworkImage(product.mediaAssets.single.source!),
+                tester.element(find.byType(BuyV2Screen)),
+              );
+            }
+          });
+          await tester.pumpAndSettle();
+          void expectPhoto(String sku) {
+            final image = tester.widget<Image>(
+              find.descendant(
+                of: find.byKey(ValueKey('buy-variant-photo-$sku')),
+                matching: find.byType(Image),
+              ),
+            );
+            expect(
+              (image.image as NetworkImage).url,
+              'https://media.example.com/$sku.png',
+            );
+          }
+
+          expectPhoto('phone-blue-128');
+          expectPhoto('phone-black-128');
+          Future<void> choose(String dimension, String option) async {
+            final target = find.byKey(
+              ValueKey('buy-product-option-$dimension-$option'),
+            );
+            await tester.scrollUntilVisible(
+              target,
+              150,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      PageStorageKey(
+                        'buy-product-${session.selectedProductId}',
+                      ),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.ensureVisible(target);
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+            await tester.tap(target);
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          }
+
+          await choose('storage', '256');
+          expect(session.selectedProductId, 'phone-blue-256');
+          expect(session.selectedProduct!.price, 14500);
+          expectPhoto('phone-blue-256');
+          expectPhoto('phone-black-256');
+          expect(session.addProduct(session.selectedProductId!), isTrue);
+          await tester.pumpAndSettle();
+          await choose('colour', 'black');
+          expect(session.selectedProductId, 'phone-black-256');
+          expect(session.selectedProduct!.price, 14000);
+          expect(session.addProduct(session.selectedProductId!), isTrue);
+          expect(session.quantityFor('phone-blue-256'), 1);
+          expect(session.quantityFor('phone-black-256'), 1);
+          expect(session.cartLines.map((line) => line.product.id).toSet(), {
+            'phone-blue-256',
+            'phone-black-256',
+          });
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugNetworkImageHttpClientProvider = previousClient;
+          imageCache.clear();
+          imageCache.clearLiveImages();
+        }
+      },
+    );
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'missing variant combination preserves selection and cart $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final family = structuredFamily()
+            .where((p) => p.id != 'phone-black-128')
+            .toList();
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          productFactsAdapter: QualifiedTestProductFacts(
+            family.map((p) => p.id).toSet(),
+          ),
+          commerceAdapter: _MediaCommerce(
+            family.first,
+            otherProducts: family.skip(1).toList(),
+          ),
+          reviewDataEnabled: false,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(session.openProduct(family.first.id), isTrue);
+        expect(session.addProduct(family.first.id), isTrue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: session.destination,
+              initialView: session.view,
+              productId: family.first.id,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final unavailable = find.byKey(
+          const ValueKey('buy-product-option-colour-black'),
+        );
+        final fallback = find.byKey(
+          const ValueKey('buy-variant-photo-phone-blue-128'),
+        );
+        expect(fallback, findsOneWidget);
+        expect(
+          find.descendant(of: fallback, matching: find.byType(Image)),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: fallback,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Container &&
+                  widget.decoration is BoxDecoration &&
+                  (widget.decoration! as BoxDecoration).color ==
+                      const Color(0xff3366aa),
+            ),
+          ),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(unavailable);
+        await tester.pumpAndSettle();
+        expect(tester.widget<OutlinedButton>(unavailable).onPressed, isNull);
+        expect(
+          find.descendant(
+            of: unavailable,
+            matching: find.text('black\nCombination unavailable'),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(unavailable);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, 'phone-blue-128');
+        expect(session.cartLines.single.product.id, 'phone-blue-128');
+        expect(session.quantityFor('phone-blue-128'), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final count in [1, 3, 4, 12]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('many variant options keep selection visible $count $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final base = structuredFamily().first;
+        final family = [
+          for (var i = 0; i < count; i++)
+            base.copyWith(
+              id: 'many-$i',
+              price: 10000 + i * 1000,
+              variantAttributes: [
+                BuyV2VariantAttribute(
+                  dimensionId: 'storage',
+                  dimensionLabel: 'Storage',
+                  optionId: '$i',
+                  optionLabel: '${(i + 1) * 64} GB',
+                  kind: BuyV2VariantDimensionKind.storage,
+                ),
+              ],
+            ),
+        ];
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          productFactsAdapter: QualifiedTestProductFacts(
+            family.map((p) => p.id).toSet(),
+          ),
+          commerceAdapter: _MediaCommerce(
+            family.first,
+            otherProducts: family.skip(1).toList(),
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(session.addProduct(family.first.id), isTrue);
+        expect(session.openProduct(family.last.id), isTrue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: session.destination,
+              initialView: session.view,
+              productId: family.last.id,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final last = find.byKey(
+          ValueKey('buy-product-option-storage-${count - 1}'),
+        );
+        // Verify initial horizontal visibility before ensureVisible can change it.
+        expect(tester.getRect(last).left, greaterThanOrEqualTo(0));
+        expect(tester.getRect(last).right, lessThanOrEqualTo(320));
+        await tester.ensureVisible(last);
+        await tester.pumpAndSettle();
+        expect(last.hitTestable(), findsOneWidget);
+        if (count > 1) {
+          final first = find.byKey(
+            const ValueKey('buy-product-option-storage-0'),
+          );
+          await tester.ensureVisible(first);
+          await tester.pumpAndSettle();
+          await tester.tap(first);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, family.first.id);
+          expect(session.selectedProduct!.price, 10000);
+        }
+        expect(session.cartLines.single.product.id, family.first.id);
+        expect(session.quantityFor(family.first.id), 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final scale in [1.0, 2.0]) {
+    for (final storeContext in [false, true]) {
+      testWidgets(
+        'compact grid identifies storage variants $scale store=$storeContext',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final products = structuredFamily().take(2).toList();
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            productFactsAdapter: QualifiedTestProductFacts(
+              products.map((p) => p.id).toSet(),
+            ),
+            commerceAdapter: _MediaCommerce(
+              products.first,
+              otherProducts: products.skip(1).toList(),
+            ),
+            reviewDataEnabled: false,
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          expect(session.addProduct(products.first.id), isTrue);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: BuyV2ProgressiveProductGrid(
+                    session: session,
+                    products: products,
+                    storageKey: 'variant-identity-grid',
+                    semanticLabel: 'Products',
+                    alignMediaAtTop: true,
+                    storeContext: storeContext,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          for (final storage in ['128', '256']) {
+            final card = find.byKey(
+              ValueKey('buy-product-phone-blue-$storage'),
+            );
+            final summary = find.descendant(
+              of: card,
+              matching: find.text('blue · $storage GB · One unit'),
+            );
+            expect(summary, findsOneWidget);
+            await tester.ensureVisible(summary);
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            final box = tester.getRect(summary);
+            final bounds = tester.getRect(card);
+            expect(box.left, greaterThanOrEqualTo(bounds.left));
+            expect(box.right, lessThanOrEqualTo(bounds.right));
+          }
+          final target = find.text('blue · 256 GB · One unit');
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, products.last.id);
+          expect(session.cartLines.single.product.id, products.first.id);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   group('R669 supplier media contract', () {
     final product = BuyV2Catalogue.products.first.copyWith(
@@ -974,7 +1443,12 @@ void main() {
               final badge = find.byKey(
                 ValueKey('buy-product-gallery-badge-$id'),
               );
-              await tester.ensureVisible(badge);
+              expect(
+                badge,
+                findsNothing,
+                reason: 'Reference gallery removes the old promotional badge.',
+              );
+              await tester.ensureVisible(gallery);
               await tester.pump();
               final image = find.byKey(
                 ValueKey('buy-product-gallery-network-photo-$id'),
@@ -996,10 +1470,14 @@ void main() {
               expect(raw.fit, BoxFit.contain);
               expect(raw.image!.width, width);
               expect(raw.image!.height, height);
+              expect(tester.getSize(gallery).height, greaterThan(0));
               expect(
-                tester.getRect(badge).bottom,
-                lessThanOrEqualTo(tester.getRect(gallery).top + .5),
-                reason: 'Pack labels must not obscure supplier photo content.',
+                find.byKey(ValueKey('buy-product-action-save-$id')),
+                findsOneWidget,
+              );
+              expect(
+                find.byKey(ValueKey('buy-product-action-share-$id')),
+                findsOneWidget,
               );
               expect(
                 media.client.requested,
@@ -1147,7 +1625,16 @@ void main() {
         final notice = find.byKey(
           ValueKey('buy-product-media-notice-${current.id}'),
         );
-        await tester.ensureVisible(notice);
+        await tester.scrollUntilVisible(
+          notice,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-${current.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         expect(notice.hitTestable(), findsOneWidget);
         expect(
@@ -1524,6 +2011,17 @@ void main() {
         final label = find.text(
           'Minimum 1 pack · ${buyV2Money(selected.price)}',
         );
+        await tester.scrollUntilVisible(
+          label,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$selectedId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
         expect(label, findsOneWidget);
         expect(
           tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
@@ -1634,7 +2132,7 @@ void main() {
         );
         await capturePack(tester, 'r5-pack-$offers-$scale-two-in-cart');
         await tester.tap(
-          find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
+          find.byKey(const ValueKey('buy-cart-navigation-button')),
         );
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
@@ -1789,23 +2287,27 @@ void main() {
         expect(session.selectedProduct?.pack, '500 ml pouch');
         expect(session.selectedProduct?.price, 35);
         expect(session.selectedProduct?.unitPrice, '₹70/L');
-        final badge = find.byKey(
-          const ValueKey('buy-product-gallery-badge-s-milk-500ml'),
+        final packFacts = find.text('500 ml pouch · ₹70/L');
+        await tester.scrollUntilVisible(
+          packFacts,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(
+                  const PageStorageKey('buy-product-s-milk-500ml'),
+                ),
+                matching: find.byType(Scrollable),
+              )
+              .first,
         );
-        await tester.ensureVisible(badge);
         await tester.pumpAndSettle();
-        final badgeText = find.descendant(
-          of: badge,
-          matching: find.text('500 ml pack'),
-        );
-        expect(badgeText, findsOneWidget);
+        expect(packFacts, findsOneWidget);
         expect(
-          tester.renderObject<RenderParagraph>(badgeText).didExceedMaxLines,
+          tester.renderObject<RenderParagraph>(packFacts).didExceedMaxLines,
           isFalse,
         );
         expect(find.text('Quick local choice'), findsNothing);
         await capturePack(tester, 'r669-milk-variant-badge-$scale');
-        expect(find.text('500 ml pouch · ₹70/L'), findsOneWidget);
 
         final add = find.byKey(
           const ValueKey('buy-product-primary-s-milk-500ml'),

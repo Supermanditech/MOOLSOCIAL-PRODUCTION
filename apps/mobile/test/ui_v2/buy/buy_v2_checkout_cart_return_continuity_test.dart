@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageByteFormat, Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -16,7 +18,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
-import 'buy_v2_screen_test.dart' show captureR66Visual;
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 // These protected checkout images explicitly include two current deliveries.
 // Ordinary seed history remains inactive; provenance is tested independently.
@@ -344,11 +346,15 @@ class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
       );
   int rescheduleCalls = 0;
   int disputeCalls = 0;
+  bool failLoad = false;
 
   @override
   Future<BuyV2DeliveryExceptionSnapshot> loadException({
     required String orderId,
-  }) async => snapshot;
+  }) async {
+    if (failLoad) throw StateError('Receipt service unavailable');
+    return snapshot;
+  }
 
   @override
   Future<BuyV2DeliveryExceptionSnapshot> rescheduleDelivery({
@@ -383,6 +389,7 @@ class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
       headline: 'Proof of delivery is under review',
       detail: 'Keep this order available while the delivery is checked.',
       proofReference: proofReference,
+      itemisedReceipt: snapshot.itemisedReceipt,
     );
     return snapshot;
   }
@@ -446,6 +453,143 @@ class _R66CheckoutAmountFixture extends BuyV2Session {
 }
 
 void main() {
+  _purchaseOrderControllerCases();
+  _purchaseOrderPanelCases();
+  for (final fault in [
+    'none',
+    'store',
+    'variant',
+    'quantity',
+    'total',
+    'duplicate',
+    'expired',
+    'reference',
+    'revision-reason',
+  ]) {
+    test('R6633 D17 PO review exact binding $fault', () {
+      final product = BuyV2Catalogue.products
+          .firstWhere(
+            (product) => product.destination == BuyV2Destination.wholesale,
+          )
+          .copyWith(storeId: 'po-store');
+      final basket = [BuyV2CartLine(product: product, quantity: 2)];
+      final line = BuyV2PurchaseOrderLine(
+        productId: product.id,
+        variant: fault == 'variant' ? 'different-variant' : product.variant,
+        pack: product.pack,
+        quantity: fault == 'quantity' ? 3 : 2,
+        unitPriceMinor: product.price * 100,
+      );
+      final lines = fault == 'duplicate' ? [line, line] : [line];
+      final subtotal = lines.fold<int>(0, (sum, l) => sum + l.totalMinor);
+      final doc = BuyV2PurchaseOrderDocument(
+        id: 'draft-1',
+        revision: 'revision-1',
+        supplierStoreId: fault == 'store' ? 'another-store' : 'po-store',
+        supplierName: product.seller,
+        state: fault == 'reference'
+            ? BuyV2PurchaseOrderState.accepted
+            : fault == 'revision-reason'
+            ? BuyV2PurchaseOrderState.revised
+            : BuyV2PurchaseOrderState.draft,
+        reference: fault == 'revision-reason' ? 'PO-1' : null,
+        lines: lines,
+        itemSubtotalMinor: subtotal,
+        chargesMinor: 100,
+        totalMinor: subtotal + (fault == 'total' ? 101 : 100),
+        terms: 'Payment is separate; reviewed supplier terms.',
+      );
+      final now = DateTime.utc(2026, 9, 24);
+      final review = BuyV2PurchaseOrderReview(
+        requestId: 'request-1',
+        revision: 'review-1',
+        buyerAccountId: 'buyer-1',
+        buyerName: 'Buyer',
+        address: const BuyV2Address(
+          id: 'address-1',
+          kind: BuyV2AddressKind.home,
+          label: 'Home',
+          recipient: 'Buyer',
+          phone: '9000000000',
+          line: 'Test address',
+          area: 'Test area',
+          pinCode: '342003',
+          landmark: '',
+        ),
+        validUntil: fault == 'expired'
+            ? now
+            : now.add(const Duration(minutes: 5)),
+        documents: [doc],
+      );
+      expect(review.matches(basket, now), fault == 'none');
+      expect(() => review.documents.clear(), throwsUnsupportedError);
+      expect(() => doc.lines.clear(), throwsUnsupportedError);
+    });
+  }
+
+  test('R6633 D11 native handoff is isolated from review fixtures', () {
+    final production = BuyV2Session(
+      core: BuySession(),
+      reviewDataEnabled: false,
+    );
+    final review = BuyV2Session(core: BuySession(), reviewDataEnabled: true);
+    addTearDown(production.dispose);
+    addTearDown(review.dispose);
+    expect(
+      BuyV2Screen(session: production).resolvedPaymentHandoff,
+      same(buyV2LaunchExternalPayment),
+    );
+    expect(BuyV2Screen(session: review).resolvedPaymentHandoff, isNull);
+    Future<bool> override(Uri uri) async => false;
+    expect(
+      BuyV2Screen(
+        session: review,
+        paymentHandoff: override,
+      ).resolvedPaymentHandoff,
+      same(override),
+    );
+  });
+
+  for (final outcome in ['opened', 'unavailable', 'exception']) {
+    testWidgets('R6633 D11 native payment launcher $outcome', (tester) async {
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      final calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        calls.add(call);
+        if (outcome == 'exception') {
+          throw PlatformException(code: 'unavailable');
+        }
+        return outcome == 'opened';
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      for (final uri in [
+        Uri.parse('https://payments.example/checkout?ref=1'),
+        Uri.parse('upi://pay?pa=test%40bank&tr=1'),
+      ]) {
+        expect(await buyV2LaunchExternalPayment(uri), outcome == 'opened');
+        expect(calls.last.method, 'launch');
+        expect((calls.last.arguments as Map)['url'], uri.toString());
+        expect((calls.last.arguments as Map)['useWebView'], isFalse);
+      }
+      final count = calls.length;
+      for (final uri in [
+        Uri.parse('file:///tmp/payment'),
+        Uri.parse('https:///missing-host'),
+        Uri.parse('https://user:secret@payments.example/checkout'),
+      ]) {
+        expect(await buyV2LaunchExternalPayment(uri), isFalse);
+      }
+      expect(calls.length, count);
+    });
+  }
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Widget app(
@@ -788,6 +932,275 @@ void main() {
     expect(session.continueCheckoutFromPayment(), isTrue);
     expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
   }
+
+  Future<BuyV2Session> receiptSession(_DeliveryExceptionAdapter adapter) async {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      deliveryExceptionAdapter: adapter,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Cash on Delivery'), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await session.submitOrder(), isTrue);
+    return session;
+  }
+
+  BuyV2DeliveryExceptionSnapshot receiptSnapshot(
+    BuyV2Order order, {
+    String fault = 'none',
+    int received = 1,
+  }) {
+    final purchased = order.lines.single;
+    final line = BuyV2ReceiptLine(
+      productId: fault == 'product' ? 'another-product' : purchased.product.id,
+      variant: fault == 'variant'
+          ? 'another-variant'
+          : purchased.product.variant,
+      pack: fault == 'pack' ? 'another-pack' : purchased.product.pack,
+      orderedQuantity: fault == 'quantity' ? 3 : purchased.quantity,
+      receivedQuantity: received,
+    );
+    return BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Check your items and report any delivery problem.',
+      exceptionId: 'receipt-exception',
+      kind: fault == 'kind'
+          ? BuyV2DeliveryExceptionKind.dispatchDelayed
+          : BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      headline: 'Delivery receipt',
+      detail: 'Received quantities are shown below.',
+      proofReference: fault == 'proof' ? '' : 'RECEIPT-123',
+      itemisedReceipt: BuyV2ItemisedReceipt(
+        orderId: fault == 'order' ? 'another-order' : order.id,
+        purchaseId: fault == 'purchase'
+            ? 'another-purchase'
+            : order.purchaseId!,
+        lines: fault == 'missing' ? [] : [line, if (fault == 'duplicate') line],
+      ),
+    );
+  }
+
+  for (final fault in [
+    'none',
+    'full',
+    'zero',
+    'product',
+    'variant',
+    'pack',
+    'quantity',
+    'order',
+    'purchase',
+    'missing',
+    'duplicate',
+    'negative',
+    'excess',
+    'proof',
+    'kind',
+  ]) {
+    test('R6634 C05 itemised receipt validates and recovers $fault', () async {
+      final adapter = _DeliveryExceptionAdapter();
+      final session = await receiptSession(adapter);
+      final order = session.confirmedOrders.single;
+      adapter.snapshot = receiptSnapshot(
+        order,
+        fault: fault,
+        received: switch (fault) {
+          'full' => 2,
+          'zero' => 0,
+          'negative' => -1,
+          'excess' => 3,
+          _ => 1,
+        },
+      );
+      final accepted = ['none', 'full', 'zero'].contains(fault);
+      expect(await session.restoreDeliveryException(order.id), accepted);
+      if (!accepted) {
+        expect(session.deliveryExceptionFor(order.id)!.itemisedReceipt, isNull);
+        expect(
+          session.deliveryExceptionFor(order.id)!.state,
+          BuyV2CommerceLoadState.unavailable,
+        );
+        adapter.snapshot = receiptSnapshot(order);
+        expect(await session.restoreDeliveryException(order.id), isTrue);
+      }
+      expect(
+        session.deliveryExceptionFor(order.id)!.itemisedReceipt,
+        isNotNull,
+      );
+      expect(
+        session.orders.firstWhere((value) => value.id == order.id),
+        same(order),
+      );
+      expect(await session.disputeProofOfDelivery(order.id), isTrue);
+      expect(
+        session.deliveryExceptionFor(order.id)!.itemisedReceipt,
+        isNotNull,
+      );
+      expect(await session.disputeProofOfDelivery(order.id), isFalse);
+      expect(adapter.disputeCalls, 1);
+      expect(
+        session.orders.firstWhere((value) => value.id == order.id),
+        same(order),
+      );
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6634 C05 itemised receipt native review $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 844);
+      addTearDown(tester.view.reset);
+      final adapter = _DeliveryExceptionAdapter();
+      final session = await receiptSession(adapter);
+      final order = session.confirmedOrders.single;
+      adapter.snapshot = receiptSnapshot(order);
+      expect(await session.restoreDeliveryException(order.id), isTrue);
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: const ValueKey('r66-cart-capture'),
+          child: app(session, size: const Size(320, 844), textScale: scale),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final quantities = find.text('Received 1 of 2 · Missing 1');
+      await tester.scrollUntilVisible(
+        quantities,
+        180,
+        scrollable: find.byType(Scrollable).first,
+        maxScrolls: 40,
+      );
+      await tester.ensureVisible(quantities);
+      await tester.pumpAndSettle();
+      expect(quantities, findsOneWidget);
+      expect(find.text('Items received'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final receiptCard = find.byKey(
+        const ValueKey('buy-delivery-exception-proofOfDeliveryAvailable'),
+      );
+      await tester.ensureVisible(receiptCard);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.text('Delivery receipt')).dy,
+        greaterThanOrEqualTo(0),
+      );
+      if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
+        await captureR66Visual(tester, 'receipt-partial-text$scale');
+      }
+      final action = find.byKey(const ValueKey('buy-delivery-dispute-proof'));
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      final label = find.descendant(
+        of: action,
+        matching: find.text('Report a delivery problem'),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(label);
+      final painter = TextPainter(
+        text: paragraph.text,
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.linear(scale),
+      )..layout(maxWidth: paragraph.size.width);
+      expect(paragraph.size.height, greaterThanOrEqualTo(painter.height));
+      expect(
+        tester.getRect(action).contains(tester.getRect(label).center),
+        isTrue,
+      );
+      expect(
+        tester.getRect(label).bottom,
+        lessThanOrEqualTo(tester.getRect(action).bottom),
+      );
+      painter.dispose();
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(adapter.disputeCalls, 1);
+      expect(quantities, findsOneWidget);
+      expect(action, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('R6634 C05 itemised receipt handles multiple purchased lines', () async {
+    final session = await receiptSession(_DeliveryExceptionAdapter());
+    final original = session.confirmedOrders.single;
+    final second = BuyV2CartLine(
+      product: session.product('s-milk'),
+      quantity: 3,
+    );
+    final order = BuyV2Order(
+      id: original.id,
+      purchaseId: original.purchaseId,
+      destination: original.destination,
+      title: original.title,
+      itemSummary: original.itemSummary,
+      total: original.total,
+      partner: original.partner,
+      partnerType: original.partnerType,
+      promise: original.promise,
+      destinationLabel: original.destinationLabel,
+      progress: original.progress,
+      status: original.status,
+      lines: [...original.lines, second],
+    );
+    final first = receiptSnapshot(original).itemisedReceipt!.lines.single;
+    final other = BuyV2ReceiptLine(
+      productId: second.product.id,
+      variant: second.product.variant,
+      pack: second.product.pack,
+      orderedQuantity: 3,
+      receivedQuantity: 3,
+    );
+    BuyV2ItemisedReceipt receipt(List<BuyV2ReceiptLine> lines) =>
+        BuyV2ItemisedReceipt(
+          orderId: order.id,
+          purchaseId: order.purchaseId!,
+          lines: lines,
+        );
+    expect(receipt([other, first]).matchesOrder(order), isTrue);
+    expect(receipt([first, first]).matchesOrder(order), isFalse);
+    expect(receipt([first]).matchesOrder(order), isFalse);
+    final source = [other, first];
+    final retained = receipt(source);
+    source.clear();
+    expect(retained.matchesOrder(order), isTrue);
+    expect(() => retained.lines.clear(), throwsUnsupportedError);
+  });
+
+  test(
+    'R6634 C05 itemised receipt offline recovery preserves payment',
+    () async {
+      final adapter = _DeliveryExceptionAdapter();
+      final session = await receiptSession(adapter);
+      final order = session.confirmedOrders.single;
+      adapter.snapshot = receiptSnapshot(order);
+      adapter.failLoad = true;
+      expect(await session.restoreDeliveryException(order.id), isFalse);
+      expect(
+        session.deliveryExceptionFor(order.id)!.state,
+        BuyV2CommerceLoadState.offline,
+      );
+      expect(await session.disputeProofOfDelivery(order.id), isFalse);
+      expect(adapter.disputeCalls, 0);
+      adapter.failLoad = false;
+      expect(await session.restoreDeliveryException(order.id), isTrue);
+      expect(
+        session.orders.firstWhere((value) => value.id == order.id),
+        same(order),
+      );
+      expect(
+        session.deliveryExceptionFor(order.id)!.itemisedReceipt,
+        isNotNull,
+      );
+    },
+  );
 
   for (final size in [const Size(320, 711), const Size(711, 320)]) {
     for (final scale in [1.0, 2.0]) {
@@ -1794,6 +2207,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test(
+    'R6633 D09-C1 assigned timing change invalidates the quoted total',
+    () async {
+      final facts = _R669PendingEstimateFacts()..deadline = 'Tomorrow 4 PM';
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: facts,
+        checkoutQuoteAdapter: _CheckoutQuoteAdapter(),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-milk'), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isFalse);
+      final key = session.checkoutFulfilmentGroups.single.key;
+      facts.deadline = 'Tomorrow 8 PM';
+      expect(session.refreshProductFacts('s-milk'), isTrue);
+      expect(session.checkoutFulfilmentGroups.single.key, key);
+      expect(session.checkoutQuoteReviewRequired, isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isFalse);
+    },
+  );
+
   testWidgets('live Checkout quote retains tax freight delivery and total', (
     tester,
   ) async {
@@ -2663,5 +3101,625 @@ void main() {
       },
       tags: 'protected-reference',
     );
+  }
+}
+
+class _PurchaseOrderFixture implements BuyV2PurchaseOrderAdapter {
+  final product = BuyV2Catalogue.products
+      .firstWhere((p) => p.destination == BuyV2Destination.wholesale)
+      .copyWith(storeId: 'po-store');
+  final now = DateTime.utc(2026, 9, 24);
+  static const address = BuyV2Address(
+    id: 'po-address',
+    kind: BuyV2AddressKind.work,
+    label: 'Work',
+    recipient: 'Buyer',
+    phone: '9000000000',
+    line: 'Test address',
+    area: 'Test area',
+    pinCode: '342003',
+    landmark: '',
+  );
+  BuyV2StoreListing? collectionStore;
+  int basketQuantity = 2;
+  List<BuyV2CartLine> get basket => [
+    BuyV2CartLine(product: product, quantity: basketQuantity),
+  ];
+  BuyV2PurchaseOrderState state = BuyV2PurchaseOrderState.draft;
+  String buyer = 'buyer-a';
+  int quantity = 2;
+  int issueCalls = 0;
+  bool failIssue = false;
+  Completer<BuyV2PurchaseOrderReview>? pending;
+  String? approvedRevision;
+  BuyV2PurchaseOrderReview snapshot() {
+    final subtotal = product.price * 100 * quantity;
+    return BuyV2PurchaseOrderReview(
+      requestId: 'request-a',
+      revision: 'review-2',
+      buyerAccountId: buyer,
+      buyerName: 'Buyer A',
+      address: collectionStore == null ? address : null,
+      collectionStore: collectionStore,
+      validUntil: now.add(const Duration(minutes: 10)),
+      documents: [
+        BuyV2PurchaseOrderDocument(
+          id: 'document-a',
+          revision: 'terms-2',
+          supplierStoreId: 'po-store',
+          supplierName: product.seller,
+          state: state,
+          reference: state == BuyV2PurchaseOrderState.draft ? null : 'PO-A',
+          decisionMessage: state == BuyV2PurchaseOrderState.revised
+              ? 'Quantity revised'
+              : null,
+          lines: [
+            BuyV2PurchaseOrderLine(
+              productId: product.id,
+              variant: product.variant,
+              pack: product.pack,
+              quantity: quantity,
+              requestedQuantity: basketQuantity,
+              unitPriceMinor: product.price * 100,
+            ),
+          ],
+          itemSubtotalMinor: subtotal,
+          chargesMinor: 0,
+          totalMinor: subtotal,
+          terms: 'Payment after supplier acceptance',
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> review({
+    required List<BuyV2CartLine> lines,
+    BuyV2Address? address,
+    BuyV2StoreListing? collectionStore,
+  }) async => snapshot();
+  @override
+  Future<BuyV2PurchaseOrderReview> issue({
+    required String requestId,
+    required String expectedRevision,
+  }) async {
+    issueCalls++;
+    if (failIssue) throw StateError('connection lost');
+    return pending == null ? snapshot() : pending!.future;
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> refresh({required String requestId}) async =>
+      snapshot();
+  @override
+  Future<BuyV2PurchaseOrderReview> approveRevision({
+    required String requestId,
+    required String expectedRevision,
+    required String documentId,
+    required String documentRevision,
+  }) async {
+    approvedRevision = documentRevision;
+    return snapshot();
+  }
+}
+
+void _purchaseOrderControllerCases() {
+  group('R6633 D17 PO controller', () {
+    late _PurchaseOrderFixture source;
+    late ValueNotifier<BuyV2CollectionIdentity?> identity;
+    late BuyV2PurchaseOrderController controller;
+    setUp(() {
+      source = _PurchaseOrderFixture();
+      identity = ValueNotifier(
+        const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'session-a',
+        ),
+      );
+      controller = BuyV2PurchaseOrderController(
+        identity: identity,
+        adapter: source,
+        now: () => source.now,
+      );
+    });
+    tearDown(() {
+      controller.dispose();
+      identity.dispose();
+    });
+    Future<bool> prepare() =>
+        controller.prepare(source.basket, _PurchaseOrderFixture.address);
+    Future<bool> issue() =>
+        controller.issue(source.basket, _PurchaseOrderFixture.address);
+
+    const store = BuyV2StoreListing(
+      id: 'po-store',
+      name: 'Supplier Store',
+      area: 'Test area',
+      address: 'Collection counter',
+      regionId: 'test-region',
+    );
+    test('delivery approval cannot authorize collection', () async {
+      expect(
+        await controller.prepare(source.basket, _PurchaseOrderFixture.address),
+        isTrue,
+      );
+      expect(
+        controller.currentFor(source.basket, null, collectionStore: store),
+        isFalse,
+      );
+      expect(
+        await controller.issue(source.basket, null, collectionStore: store),
+        isFalse,
+      );
+      expect(source.issueCalls, 0);
+    });
+    test('collection approval binds the actual branch address', () async {
+      source.collectionStore = store;
+      expect(
+        await controller.prepare(source.basket, null, collectionStore: store),
+        isTrue,
+      );
+      expect(
+        controller.currentFor(source.basket, null, collectionStore: store),
+        isTrue,
+      );
+      const changed = BuyV2StoreListing(
+        id: 'po-store',
+        name: 'Supplier Store',
+        area: 'Test area',
+        address: 'Different counter',
+        regionId: 'test-region',
+      );
+      expect(
+        controller.currentFor(source.basket, null, collectionStore: changed),
+        isFalse,
+      );
+      expect(
+        await controller.issue(source.basket, null, collectionStore: changed),
+        isFalse,
+      );
+      source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+      expect(
+        await controller.issue(source.basket, null, collectionStore: store),
+        isTrue,
+      );
+      expect(source.issueCalls, 1);
+    });
+    test(
+      'missing ambiguous and wrong-store destinations are rejected',
+      () async {
+        expect(await controller.prepare(source.basket, null), isFalse);
+        expect(
+          await controller.prepare(
+            source.basket,
+            _PurchaseOrderFixture.address,
+            collectionStore: store,
+          ),
+          isFalse,
+        );
+        source.collectionStore = const BuyV2StoreListing(
+          id: 'another-store',
+          name: 'Another Store',
+          area: 'Test area',
+          address: 'Other address',
+          regionId: 'test-region',
+        );
+        expect(
+          await controller.prepare(
+            source.basket,
+            null,
+            collectionStore: source.collectionStore,
+          ),
+          isFalse,
+        );
+        expect(source.issueCalls, 0);
+      },
+    );
+    test('collection quote correlation includes accepted PO revision', () {
+      BuyV2CollectionBasket basket({String? request, String? revision}) =>
+          BuyV2CollectionBasket(
+            identity: identity.value!,
+            store: store,
+            lines: [
+              BuyV2CartLine(
+                product: source.product,
+                quantity: source.product.minimumOrder,
+              ),
+            ],
+            paymentMethod: 'UPI',
+            purchaseOrderRequestId: request,
+            purchaseOrderRevision: revision,
+          );
+      final old = basket();
+      final accepted = basket(request: 'po-request', revision: 'r1');
+      expect(accepted.fingerprint, isNot(old.fingerprint));
+      expect(
+        basket(request: 'po-request', revision: 'r2').fingerprint,
+        isNot(accepted.fingerprint),
+      );
+      expect(() => basket(request: 'po-request'), throwsFormatException);
+      expect(
+        () => basket(request: 'po-request', revision: ''),
+        throwsFormatException,
+      );
+    });
+
+    test(
+      'one issue in flight; acceptance remains separate from payment',
+      () async {
+        expect(await prepare(), isTrue);
+        source.pending = Completer();
+        final result = issue();
+        expect(await issue(), isFalse);
+        expect(source.issueCalls, 1);
+        source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+        source.pending!.complete(source.snapshot());
+        expect(await result, isTrue);
+        expect(await issue(), isFalse);
+        source.state = BuyV2PurchaseOrderState.accepted;
+        expect(await controller.refresh(), isTrue);
+        expect(
+          controller.review!.documents.single.state,
+          BuyV2PurchaseOrderState.accepted,
+        );
+      },
+    );
+    test('late response cannot cross account/session change', () async {
+      expect(await prepare(), isTrue);
+      source.pending = Completer();
+      final result = issue();
+      identity.value = const BuyV2CollectionIdentity(
+        accountId: 'buyer-b',
+        sessionId: 'session-b',
+      );
+      source.pending!.complete(source.snapshot());
+      expect(await result, isFalse);
+      expect(controller.review, isNull);
+      expect(controller.busy, isFalse);
+    });
+    test('uncertain issue reconciles instead of issuing twice', () async {
+      expect(await prepare(), isTrue);
+      source.failIssue = true;
+      expect(await issue(), isFalse);
+      expect(controller.needsReconciliation, isTrue);
+      expect(await issue(), isFalse);
+      expect(source.issueCalls, 1);
+      source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+      expect(await controller.refresh(), isTrue);
+      expect(controller.needsReconciliation, isFalse);
+    });
+    test('changed quantities require explicit revision approval', () async {
+      expect(await prepare(), isTrue);
+      source.state = BuyV2PurchaseOrderState.revised;
+      source.quantity = 3;
+      expect(await controller.refresh(), isTrue);
+      expect(controller.review!.documents.single.lines.single.quantity, 3);
+      source.state = BuyV2PurchaseOrderState.accepted;
+      expect(
+        await controller.approveRevision(
+          'document-a',
+          source.basket,
+          _PurchaseOrderFixture.address,
+        ),
+        isTrue,
+      );
+      expect(source.approvedRevision, 'terms-2');
+    });
+    test('silent changed terms never become accepted', () async {
+      expect(await prepare(), isTrue);
+      source.state = BuyV2PurchaseOrderState.accepted;
+      source.quantity = 3;
+      expect(await issue(), isFalse);
+      expect(controller.needsReconciliation, isTrue);
+      expect(controller.review!.documents.single.lines.single.quantity, 2);
+    });
+    test('failed review cannot reuse a previous approval', () async {
+      expect(await prepare(), isTrue);
+      source.buyer = 'buyer-b';
+      expect(await prepare(), isFalse);
+      source.buyer = 'buyer-a';
+      expect(await issue(), isFalse);
+      expect(source.issueCalls, 0);
+    });
+
+    test('wrong buyer and changed basket rejected', () async {
+      source.buyer = 'buyer-b';
+      expect(await prepare(), isFalse);
+      source.buyer = 'buyer-a';
+      expect(await prepare(), isTrue);
+      expect(
+        await controller.issue([
+          BuyV2CartLine(product: source.product, quantity: 4),
+        ], _PurchaseOrderFixture.address),
+        isFalse,
+      );
+      expect(source.issueCalls, 0);
+    });
+  });
+}
+
+class _PurchaseOrderPanelSession extends BuyV2Session {
+  _PurchaseOrderPanelSession(
+    this.source,
+    ValueNotifier<BuyV2CollectionIdentity?> identity,
+  ) : super(
+        core: BuySession(),
+        collectionIdentity: identity,
+        purchaseOrderAdapter: source,
+        catalogueNow: () => source.now,
+      );
+  final _PurchaseOrderFixture source;
+  @override
+  bool get collectionCheckoutSelected => source.collectionStore != null;
+  @override
+  BuyV2StoreListing? get collectionCheckoutStore => source.collectionStore;
+  @override
+  List<BuyV2CartLine> get checkoutLines => source.basket;
+  @override
+  BuyV2Address? get selectedAddressOrNull => _PurchaseOrderFixture.address;
+  @override
+  BuyV2Product? findProduct(String productId) => productId == source.product.id
+      ? source.product
+      : super.findProduct(productId);
+}
+
+void _purchaseOrderPanelCases() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'R6633 D17 uncertain panel blocks replacement review at $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 700);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final source = _PurchaseOrderFixture();
+        final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+          const BuyV2CollectionIdentity(
+            accountId: 'buyer-a',
+            sessionId: 'session-a',
+          ),
+        );
+        final session = _PurchaseOrderPanelSession(source, identity);
+        addTearDown(session.dispose);
+        addTearDown(identity.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: BuyV2PurchaseOrderPanel(session: session),
+              ),
+            ),
+          ),
+        );
+        Future<void> tap(String key) async {
+          final target = find.byKey(ValueKey(key));
+          await tester.ensureVisible(target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await tap('buy-po-review');
+        source.failIssue = true;
+        await tap('buy-po-issue');
+        expect(session.purchaseOrder!.needsReconciliation, isTrue);
+        expect(source.issueCalls, 1);
+        expect(find.text('Submission status unconfirmed'), findsOneWidget);
+        expect(find.text('Previous terms · review required'), findsNothing);
+        expect(
+          find.text(
+            'Purchase order status needs checking. Do not submit again.',
+          ),
+          findsOneWidget,
+        );
+        for (final key in ['buy-po-issue', 'buy-po-review-updated']) {
+          expect(
+            tester.widget<TextButton>(find.byKey(ValueKey(key))).onPressed,
+            isNull,
+          );
+        }
+        source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+        await tap('buy-po-refresh');
+        expect(session.purchaseOrder!.needsReconciliation, isFalse);
+        expect(find.text('Awaiting supplier response'), findsOneWidget);
+        expect(find.byKey(const ValueKey('buy-po-issue')), findsNothing);
+        expect(source.issueCalls, 1);
+        expect(session.purchaseOrderReviewRequired, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'R6633 D17 collection confirm shows PO before quote refresh at $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 700);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final source = _PurchaseOrderFixture()
+          ..collectionStore = const BuyV2StoreListing(
+            id: 'po-store',
+            name: 'Supplier Store',
+            area: 'Test area',
+            address: 'Collection counter',
+            regionId: 'test-region',
+          );
+        final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+          const BuyV2CollectionIdentity(
+            accountId: 'buyer-a',
+            sessionId: 'session-a',
+          ),
+        );
+        final session = _PurchaseOrderPanelSession(source, identity)
+          ..checkoutStep = BuyV2CheckoutStep.confirm;
+        final gst = BuyV2GstInvoiceController();
+        addTearDown(gst.dispose);
+        addTearDown(session.dispose);
+        addTearDown(identity.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: Scaffold(
+              body: BuyV2CheckoutView(
+                session: session,
+                gstInvoiceController: gst,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(BuyV2PurchaseOrderPanel), findsOneWidget);
+        final action = find.byKey(
+          const ValueKey('buy-checkout-primary-confirm'),
+        );
+        expect(tester.widget<FilledButton>(action).onPressed, isNull);
+        Future<void> tap(String key) async {
+          final target = find.byKey(ValueKey(key));
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        Future<void> captureCollection(String state) async {
+          if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
+          await tester.ensureVisible(find.text('Purchase order'));
+          await tester.pumpAndSettle();
+          await captureR66Visual(tester, 'po-collection-$state-text$scale');
+        }
+
+        await tap('buy-po-review');
+        await captureCollection('draft');
+        source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+        await tap('buy-po-issue');
+        expect(session.purchaseOrderReviewRequired, isTrue);
+        expect(tester.widget<FilledButton>(action).onPressed, isNull);
+        source.state = BuyV2PurchaseOrderState.accepted;
+        await tap('buy-po-refresh');
+        await captureCollection('accepted');
+        expect(session.purchaseOrderReviewRequired, isFalse);
+        expect(find.text('Update total'), findsOneWidget);
+        // No collection gateway is installed in this fixture: approval alone
+        // must not fabricate a quote or enable payment.
+        expect(tester.widget<FilledButton>(action).onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('R6633 D17 checkout PO approval and revised basket at $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final source = _PurchaseOrderFixture();
+      final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'session-a',
+        ),
+      );
+      final session = _PurchaseOrderPanelSession(source, identity);
+      addTearDown(session.dispose);
+      addTearDown(identity.dispose);
+      Widget panel() => MaterialApp(
+        theme: MoolTheme.light(),
+        home: RepaintBoundary(
+          key: const ValueKey('r66-cart-capture'),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: BuyV2PurchaseOrderPanel(session: session),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(panel());
+      Future<void> capture(String state) async {
+        if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
+        final scroll = tester.state<ScrollableState>(
+          find.byType(Scrollable).first,
+        );
+        scroll.position.jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(scroll.position.pixels, 0);
+        expect(
+          tester.getTopLeft(find.text('Purchase order')).dy,
+          greaterThanOrEqualTo(0),
+        );
+        await captureR66Visual(tester, 'po-$state-text$scale');
+        expect(scroll.position.pixels, 0);
+        expect(
+          tester.getTopLeft(find.text('Purchase order')).dy,
+          greaterThanOrEqualTo(0),
+        );
+      }
+
+      Future<void> tap(String key) async {
+        final target = find.byKey(ValueKey(key));
+        await tester.ensureVisible(target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(await session.submitOrder(), isFalse);
+      await tap('buy-po-review');
+      expect(find.text('Buyer: Buyer A'), findsOneWidget);
+      expect(find.text('Draft for your approval'), findsOneWidget);
+      await capture('draft');
+      source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+      await tap('buy-po-issue');
+      expect(find.text('Awaiting supplier response'), findsOneWidget);
+      expect(source.issueCalls, 1);
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      source.state = BuyV2PurchaseOrderState.revised;
+      source.quantity = 3;
+      await tap('buy-po-refresh');
+      expect(find.text('Revised terms need your approval'), findsOneWidget);
+      await capture('revised');
+      source.state = BuyV2PurchaseOrderState.accepted;
+      await tap('buy-po-approve-document-a');
+      expect(find.text('Supplier accepted'), findsOneWidget);
+      await capture('accepted');
+      expect(source.approvedRevision, 'terms-2');
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      source.basketQuantity = 3;
+      expect(session.purchaseOrderReviewRequired, isFalse);
+      source.basketQuantity = 4;
+      await tester.pumpWidget(panel());
+      await tester.pumpAndSettle();
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(find.text('Supplier accepted'), findsNothing);
+      expect(find.text('Previous terms · review required'), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-po-issue')), findsNothing);
+      source.state = BuyV2PurchaseOrderState.draft;
+      source.quantity = 4;
+      await tap('buy-po-review-updated');
+      expect(find.text('Draft for your approval'), findsOneWidget);
+      expect(
+        session.purchaseOrder!.review!.documents.single.lines.single.quantity,
+        4,
+      );
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(find.byKey(const ValueKey('buy-po-review-updated')), findsNothing);
+      expect(source.issueCalls, 1);
+      identity.value = null;
+      await tester.pumpAndSettle();
+      expect(find.text('PO-A'), findsNothing);
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const ValueKey('buy-po-review')))
+            .onPressed,
+        isNull,
+      );
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(tester.takeException(), isNull);
+    });
   }
 }

@@ -281,8 +281,11 @@ class BuyV2ProductCompliance {
     this.genericName,
     this.netQuantity,
     this.manufacturerName,
+    this.manufacturerAddress,
     this.packerName,
+    this.packerAddress,
     this.importerName,
+    this.importerAddress,
     this.countryOfOrigin,
     this.manufacturedOrPackedOnLabel,
     this.bestBeforeOrUseByLabel,
@@ -293,8 +296,11 @@ class BuyV2ProductCompliance {
   final String? genericName;
   final String? netQuantity;
   final String? manufacturerName;
+  final String? manufacturerAddress;
   final String? packerName;
+  final String? packerAddress;
   final String? importerName;
+  final String? importerAddress;
   final String? countryOfOrigin;
   final String? manufacturedOrPackedOnLabel;
   final String? bestBeforeOrUseByLabel;
@@ -392,6 +398,38 @@ enum BuyV2OfferClass { retail, wholesale, bulk }
 
 enum BuyV2DeliveryOption { quick, scheduled, courier, freight, collection }
 
+enum BuyV2VariantDimensionKind { colour, size, storage, pack, other }
+
+/// Published option identity for one SKU, never inferred from its title.
+class BuyV2VariantAttribute {
+  const BuyV2VariantAttribute({
+    required this.dimensionId,
+    required this.dimensionLabel,
+    required this.optionId,
+    required this.optionLabel,
+    this.kind = BuyV2VariantDimensionKind.other,
+    this.swatchArgb,
+  });
+  final String dimensionId;
+  final String dimensionLabel;
+  final String optionId;
+  final String optionLabel;
+  final BuyV2VariantDimensionKind kind;
+  final int? swatchArgb;
+
+  bool get isValid =>
+      [
+        dimensionId,
+        dimensionLabel,
+        optionId,
+        optionLabel,
+      ].every((value) => value.trim().isNotEmpty && value.trim() == value) &&
+      (swatchArgb == null ||
+          (kind == BuyV2VariantDimensionKind.colour &&
+              swatchArgb! >= 0 &&
+              swatchArgb! <= 0xffffffff));
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -415,6 +453,7 @@ class BuyV2Product {
     this.merchandisingLabel = '',
     this.procurementSupplierGrant,
     this.mediaAssets = const [],
+    this.variantAttributes = const [],
     this.storeId,
     this.mrp,
     this.requiresPrescription = false,
@@ -444,6 +483,51 @@ class BuyV2Product {
   final String merchandisingLabel;
   final BuyV2ProcurementSupplierGrant? procurementSupplierGrant;
   final List<BuyV2ProductMediaAsset> mediaAssets;
+  final List<BuyV2VariantAttribute> variantAttributes;
+
+  bool get hasStructuredVariants =>
+      variantAttributes.isNotEmpty &&
+      variantAttributes.every((attribute) => attribute.isValid) &&
+      variantAttributes
+              .map((attribute) => attribute.dimensionId)
+              .toSet()
+              .length ==
+          variantAttributes.length;
+
+  /// Resolve a unique SKU without silently changing the other selected options.
+  BuyV2Product? resolveVariantOption(
+    Iterable<BuyV2Product> family,
+    String dimensionId,
+    String optionId,
+  ) {
+    if (!hasStructuredVariants ||
+        !variantAttributes.any((value) => value.dimensionId == dimensionId)) {
+      return null;
+    }
+    final matches = family
+        .where(
+          (candidate) =>
+              candidate.canonicalId == canonicalId &&
+              candidate.destination == destination &&
+              candidate.isFromSameStoreAs(this) &&
+              candidate.hasStructuredVariants &&
+              candidate.variantAttributes.length == variantAttributes.length &&
+              variantAttributes.every(
+                (selected) => candidate.variantAttributes.any(
+                  (value) =>
+                      value.dimensionId == selected.dimensionId &&
+                      value.kind == selected.kind &&
+                      value.optionId ==
+                          (selected.dimensionId == dimensionId
+                              ? optionId
+                              : selected.optionId),
+                ),
+              ),
+        )
+        .toList(growable: false);
+    return matches.length == 1 ? matches.single : null;
+  }
+
   String get brandLabel =>
       brand.trim().isEmpty ? 'Brand not provided' : brand.trim();
   final String title;
@@ -485,6 +569,7 @@ class BuyV2Product {
     String? merchandisingLabel,
     BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
     List<BuyV2ProductMediaAsset>? mediaAssets,
+    List<BuyV2VariantAttribute>? variantAttributes,
     String? title,
     String? origin,
     String? variant,
@@ -513,6 +598,7 @@ class BuyV2Product {
     procurementSupplierGrant:
         procurementSupplierGrant ?? this.procurementSupplierGrant,
     mediaAssets: mediaAssets ?? this.mediaAssets,
+    variantAttributes: variantAttributes ?? this.variantAttributes,
     title: title ?? this.title,
     variant: variant ?? this.variant,
     pack: pack ?? this.pack,

@@ -258,313 +258,311 @@ void main() {
 
   for (final offers in [false, true]) {
     for (final scale in [1.0, 2.0]) {
-      testWidgets(
-        'R66 Compare returns through source offers $offers at $scale',
-        (tester) async {
-          tester.view.devicePixelRatio = 1;
-          tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
-          addTearDown(tester.view.reset);
-          final core = BuySession();
-          final session = await r669ComparisonContinuitySession(core);
-          addTearDown(core.dispose);
-          addTearDown(session.dispose);
-          final sourceId = offers ? 'w-oil' : 's-milk';
-          final alternateId = '$sourceId-comparison';
-          expect(session.addProduct(sourceId), isTrue, reason: session.notice);
-          final quantity = session.quantityFor(sourceId);
-          await tester.pumpWidget(app(session, textScale: scale));
+      testWidgets('R66 Compare returns through source offers $offers at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = await r669ComparisonContinuitySession(core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final sourceId = offers ? 'w-oil' : 's-milk';
+        final alternateId = '$sourceId-comparison';
+        expect(session.addProduct(sourceId), isTrue, reason: session.notice);
+        final quantity = session.quantityFor(sourceId);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        if (offers) {
+          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
           await tester.pumpAndSettle();
-          if (offers) {
-            await tester.tap(
-              find.byKey(const ValueKey('buy-local-tab-offers')),
-            );
-            await tester.pumpAndSettle();
-          } else {
-            await tester.tap(find.byKey(const ValueKey('buy-search-control')));
-            await tester.pumpAndSettle();
-            await tester.enterText(
-              find.byKey(const ValueKey('buy-search-field')),
-              'milk',
-            );
-            await tester.pumpAndSettle();
-          }
-          final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
-          final sourceTitle = find.descendant(
-            of: sourceCard,
-            matching: find.text(session.product(sourceId).customerTitle),
-          );
-          await Scrollable.ensureVisible(
-            tester.element(sourceTitle),
-            alignment: .4,
+        } else {
+          await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('buy-search-field')),
+            'milk',
           );
           await tester.pumpAndSettle();
-          expect(sourceTitle.hitTestable(), findsOneWidget);
-          await tester.tap(sourceTitle);
-          await tester.pumpAndSettle();
-          expect(session.selectedProductId, sourceId);
-          final product = session.product(sourceId);
-          final packFacts = find.text('${product.pack} · ${product.unitPrice}');
-          final heroPrice = find.byKey(
-            ValueKey('buy-product-hero-price-$sourceId'),
-          );
-          await tester.scrollUntilVisible(
-            heroPrice,
-            160,
-            scrollable: find
-                .descendant(
-                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
-                  matching: find.byType(Scrollable),
-                )
-                .first,
-          );
-          await tester.pumpAndSettle();
-          final viewport = tester.getRect(
-            find.byKey(const ValueKey('buy-cart-content-viewport')),
-          );
-          final priceAndPack = tester
-              .getRect(heroPrice)
-              .expandToInclude(tester.getRect(packFacts));
-          expect(priceAndPack.top, greaterThanOrEqualTo(viewport.top));
-          expect(priceAndPack.bottom, lessThanOrEqualTo(viewport.bottom));
-          final paragraph = tester.renderObject<RenderParagraph>(packFacts);
-          final natural = TextPainter(
-            text: paragraph.text,
-            textDirection: paragraph.textDirection,
-            textScaler: paragraph.textScaler,
-          )..layout(maxWidth: paragraph.size.width);
-          expect(paragraph.didExceedMaxLines, isFalse);
+        }
+        final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
+        final sourceTitle = find.descendant(
+          of: sourceCard,
+          matching: find.text(session.product(sourceId).customerTitle),
+        );
+        await Scrollable.ensureVisible(
+          tester.element(sourceTitle),
+          alignment: .4,
+        );
+        await tester.pumpAndSettle();
+        expect(sourceTitle.hitTestable(), findsOneWidget);
+        await tester.tap(sourceTitle);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, sourceId);
+        final product = session.product(sourceId);
+        final packFacts = find.text('${product.pack} · ${product.unitPrice}');
+        final heroPrice = find.byKey(
+          ValueKey('buy-product-hero-price-$sourceId'),
+        );
+        await tester.scrollUntilVisible(
+          heroPrice,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        final viewport = tester.getRect(
+          find.byKey(const ValueKey('buy-cart-content-viewport')),
+        );
+        final priceAndPack = tester
+            .getRect(heroPrice)
+            .expandToInclude(tester.getRect(packFacts));
+        expect(priceAndPack.top, greaterThanOrEqualTo(viewport.top));
+        expect(priceAndPack.bottom, lessThanOrEqualTo(viewport.bottom));
+        final paragraph = tester.renderObject<RenderParagraph>(packFacts);
+        final natural = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout(maxWidth: paragraph.size.width);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(
+          paragraph.size.height + .1,
+          greaterThanOrEqualTo(natural.height),
+        );
+        natural.dispose();
+        await captureR66Visual(tester, '025-detail-offers-$offers-text-$scale');
+        final compare = find.text('Compare prices');
+        await tester.scrollUntilVisible(
+          compare,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        final compareAction = find.byKey(
+          ValueKey('buy-product-action-compare-$sourceId'),
+        );
+        final quickActions = find.byKey(
+          ValueKey('buy-product-quick-actions-$sourceId'),
+        );
+        for (final text
+            in find
+                .descendant(of: quickActions, matching: find.byType(RichText))
+                .evaluate()) {
+          final paragraph = text.renderObject! as RenderParagraph;
           expect(
-            paragraph.size.height + .1,
-            greaterThanOrEqualTo(natural.height),
-          );
-          natural.dispose();
-          await captureR66Visual(
-            tester,
-            '025-detail-offers-$offers-text-$scale',
-          );
-          final compare = find.text('Compare');
-          await tester.scrollUntilVisible(
-            compare,
-            180,
-            scrollable: find
-                .descendant(
-                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
-                  matching: find.byType(Scrollable),
-                )
-                .first,
-          );
-          await tester.pumpAndSettle();
-          final compareAction = find.byKey(
-            ValueKey('buy-product-action-compare-$sourceId'),
-          );
-          final quickActions = find.byKey(
-            ValueKey('buy-product-quick-actions-$sourceId'),
-          );
-          for (final text
-              in find
-                  .descendant(of: quickActions, matching: find.byType(RichText))
-                  .evaluate()) {
-            final paragraph = text.renderObject! as RenderParagraph;
-            expect(
-              paragraph.didExceedMaxLines,
-              isFalse,
-              reason: paragraph.text.toPlainText(),
-            );
-          }
-          await captureR66Visual(
-            tester,
-            '034-compare-action-offers-$offers-text-$scale',
-          );
-          expect(
-            tester
-                .getRect(
-                  find.byKey(const ValueKey('buy-compact-cart-indicator')),
-                )
-                .overlaps(tester.getRect(compareAction)),
+            paragraph.didExceedMaxLines,
             isFalse,
+            reason: paragraph.text.toPlainText(),
           );
-          await tester.tap(compare);
-          await tester.pumpAndSettle();
-          expect(
-            session.view,
-            BuyV2View.product,
-            reason: 'Compare must open comparison without entering Cart',
-          );
-          final alternate = find.byKey(
-            ValueKey('buy-product-compare-$alternateId'),
-          );
-          await tester.scrollUntilVisible(
-            alternate,
-            180,
-            scrollable: find.byType(Scrollable).last,
-          );
-          final alternateCard = find.descendant(
-            of: alternate,
-            matching: find.byKey(ValueKey('buy-product-$alternateId')),
-          );
-          await tester.ensureVisible(alternateCard);
-          await tester.tap(alternateCard);
-          await tester.pumpAndSettle();
-          expect(session.selectedProductId, alternateId);
-          await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
-          await tester.pumpAndSettle();
-          expect(session.view, BuyV2View.cart);
+        }
+        await captureR66Visual(
+          tester,
+          '034-compare-action-offers-$offers-text-$scale',
+        );
+        expect(
+          tester
+              .getRect(find.byKey(const ValueKey('buy-cart-navigation-button')))
+              .overlaps(tester.getRect(compareAction)),
+          isFalse,
+        );
+        await tester.tap(compare);
+        await tester.pumpAndSettle();
+        expect(
+          session.view,
+          BuyV2View.product,
+          reason: 'Compare must open comparison without entering Cart',
+        );
+        final alternate = find.byKey(
+          ValueKey('buy-product-compare-$alternateId'),
+        );
+        await tester.scrollUntilVisible(
+          alternate,
+          180,
+          scrollable: find.byType(Scrollable).last,
+        );
+        final alternateCard = find.descendant(
+          of: alternate,
+          matching: find.byKey(ValueKey('buy-product-$alternateId')),
+        );
+        await tester.ensureVisible(alternateCard);
+        await tester.tap(alternateCard);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, alternateId);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-cart-navigation-button')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, alternateId);
+        final comparedBack = find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-$alternateId')),
+          matching: find.widgetWithText(InkWell, 'Back to Compare suppliers'),
+        );
+        await tester.scrollUntilVisible(
+          comparedBack,
+          -200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$alternateId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(tester.getSize(comparedBack).height, greaterThanOrEqualTo(44));
+        await tester.pumpAndSettle();
+        expect(comparedBack.hitTestable(), findsOneWidget);
+        if (scale == 2) {
+          await tester.tap(comparedBack);
+        } else {
           await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-          expect(session.selectedProductId, alternateId);
-          final comparedBack = find.descendant(
-            of: find.byKey(PageStorageKey('buy-product-$alternateId')),
-            matching: find.widgetWithText(InkWell, 'Back to Compare suppliers'),
-          );
-          await tester.scrollUntilVisible(
-            comparedBack,
-            -200,
-            scrollable: find
-                .descendant(
-                  of: find.byKey(PageStorageKey('buy-product-$alternateId')),
-                  matching: find.byType(Scrollable),
-                )
-                .first,
-          );
-          expect(tester.getSize(comparedBack).height, greaterThanOrEqualTo(44));
-          await tester.pumpAndSettle();
-          expect(comparedBack.hitTestable(), findsOneWidget);
-          if (scale == 2) {
-            await tester.tap(comparedBack);
-          } else {
-            await tester.binding.handlePopRoute();
-          }
-          await tester.pumpAndSettle();
-          expect(session.view, BuyV2View.product);
-          expect(session.selectedProductId, sourceId);
-          expect(session.quantityFor(sourceId), quantity);
-          expect(
-            find.byKey(const ValueKey('buy-product-comparison-sheet')),
-            findsOneWidget,
-          );
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-          expect(session.selectedProductId, sourceId);
-          final report = find.byKey(ValueKey('buy-report-product-$sourceId'));
-          await tester.scrollUntilVisible(
-            report,
-            160,
-            scrollable: find
-                .descendant(
-                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
-                  matching: find.byType(Scrollable),
-                )
-                .first,
-          );
-          await tester.ensureVisible(report);
-          await tester.pumpAndSettle();
-          final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
-          expect(cart, findsOneWidget);
-          expect(
-            tester.getRect(cart).overlaps(tester.getRect(report)),
-            isFalse,
-          );
-          expect(report.hitTestable(), findsOneWidget);
-          final protectedContent = [
-            find.byKey(ValueKey('buy-marketplace-trust-ready-$sourceId')),
-            find.byKey(ValueKey('buy-product-continuations-$sourceId')),
-          ];
-          Rect visiblePart(Finder target) => tester
-              .getRect(target)
-              .intersect(
-                tester.getRect(
-                  find.byKey(const ValueKey('buy-cart-content-viewport')),
-                ),
+        }
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, sourceId);
+        expect(session.quantityFor(sourceId), quantity);
+        expect(
+          find.byKey(const ValueKey('buy-product-comparison-sheet')),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, sourceId);
+        final report = find.byKey(ValueKey('buy-report-product-$sourceId'));
+        await tester.scrollUntilVisible(
+          report,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.ensureVisible(report);
+        await tester.pumpAndSettle();
+        final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
+        expect(cart, findsOneWidget);
+        expect(tester.getRect(cart).overlaps(tester.getRect(report)), isFalse);
+        expect(report.hitTestable(), findsOneWidget);
+        final protectedContent = [
+          find.byKey(ValueKey('buy-marketplace-trust-ready-$sourceId')),
+          find.byKey(ValueKey('buy-product-continuations-$sourceId')),
+        ];
+        Rect visiblePart(Finder target) => tester
+            .getRect(target)
+            .intersect(
+              tester.getRect(
+                find.byKey(const ValueKey('buy-cart-content-viewport')),
+              ),
+            );
+        void expectDecisionContentClear() {
+          for (final target in protectedContent) {
+            if (target.evaluate().isEmpty) {
+              continue;
+            }
+            expect(target, findsOneWidget);
+            final visible = visiblePart(target);
+            if (!visible.isEmpty) {
+              expect(
+                tester.getRect(cart).overlaps(visible),
+                isFalse,
+                reason: 'Cart must not move over policy or related products',
               );
-          void expectDecisionContentClear() {
-            for (final target in protectedContent) {
-              if (target.evaluate().isEmpty) {
-                continue;
-              }
-              expect(target, findsOneWidget);
-              final visible = visiblePart(target);
-              if (!visible.isEmpty) {
-                expect(
-                  tester.getRect(cart).overlaps(visible),
-                  isFalse,
-                  reason: 'Cart must not move over policy or related products',
-                );
-              }
             }
           }
+        }
 
-          expectDecisionContentClear();
-          expect(protectedContent.last, findsOneWidget);
-          final continuation = visiblePart(protectedContent.last);
-          expect(continuation.isEmpty, isFalse);
-          await tester.drag(cart, continuation.center - tester.getCenter(cart));
+        expectDecisionContentClear();
+        expect(protectedContent.last, findsOneWidget);
+        // Details and recommendations need not fit in the same viewport.
+        // Exercise the protected recommendations after scrolling them into view.
+        await tester.ensureVisible(protectedContent.last);
+        await tester.pumpAndSettle();
+        final continuation = visiblePart(protectedContent.last);
+        expect(continuation.isEmpty, isFalse);
+        await tester.drag(cart, continuation.center - tester.getCenter(cart));
+        await tester.pumpAndSettle();
+        expectDecisionContentClear();
+        await tester.ensureVisible(report);
+        await tester.pumpAndSettle();
+        expect(report.hitTestable(), findsOneWidget);
+        await captureR66Visual(tester, 'r664-compare-report-$offers-$scale');
+        final returnAction = find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+          matching: find.widgetWithText(InkWell, offers ? 'Offers' : 'Shop'),
+        );
+        await tester.scrollUntilVisible(
+          returnAction,
+          -240,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        if (returnAction.hitTestable().evaluate().isEmpty) {
+          await tester.ensureVisible(returnAction);
           await tester.pumpAndSettle();
-          expectDecisionContentClear();
-          expect(report.hitTestable(), findsOneWidget);
-          await captureR66Visual(tester, 'r664-compare-report-$offers-$scale');
-          final returnAction = find.descendant(
-            of: find.byKey(PageStorageKey('buy-product-$sourceId')),
-            matching: find.widgetWithText(InkWell, offers ? 'Offers' : 'Shop'),
+        }
+        expect(returnAction.hitTestable(), findsOneWidget);
+        if (offers) {
+          expect(session.selectedProductId, sourceId);
+          expect(
+            find.byKey(ValueKey('buy-product-gallery-badge-$sourceId')),
+            findsNothing,
           );
+          expect(
+            find.byKey(ValueKey('buy-product-gallery-$sourceId')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(ValueKey('buy-product-action-save-$sourceId')),
+            findsOneWidget,
+          );
+          await captureR66Visual(tester, '034-source-before-back-text-$scale');
+          await tester.binding.handlePopRoute();
+        } else {
+          await tester.tap(returnAction);
+        }
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.destination, BuyV2Destination.shop);
+        if (offers) {
+          final collection = find.byKey(const PageStorageKey('buy-offers'));
+          expect(collection, findsOneWidget);
           await tester.scrollUntilVisible(
-            returnAction,
-            -240,
+            find.byKey(const ValueKey('buy-offers-publisher-summary')),
+            -200,
             scrollable: find
-                .descendant(
-                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
-                  matching: find.byType(Scrollable),
-                )
+                .descendant(of: collection, matching: find.byType(Scrollable))
                 .first,
           );
+        }
+        expect(
+          find.byKey(const ValueKey('buy-offers-publisher-summary')),
+          offers ? findsOneWidget : findsNothing,
+        );
+        if (offers) {
           await tester.pumpAndSettle();
-          if (returnAction.hitTestable().evaluate().isEmpty) {
-            await tester.ensureVisible(returnAction);
-            await tester.pumpAndSettle();
-          }
-          expect(returnAction.hitTestable(), findsOneWidget);
-          if (offers) {
-            final badge = find.descendant(
-              of: find.byKey(ValueKey('buy-product-gallery-badge-$sourceId')),
-              matching: find.byType(RichText),
-            );
-            expect(
-              tester.renderObject<RenderParagraph>(badge).didExceedMaxLines,
-              isFalse,
-              reason: 'Show the complete commercial gallery badge',
-            );
-            await captureR66Visual(
-              tester,
-              '034-source-before-back-text-$scale',
-            );
-            await tester.binding.handlePopRoute();
-          } else {
-            await tester.tap(returnAction);
-          }
-          await tester.pumpAndSettle();
-          expect(session.view, BuyV2View.catalogue);
-          expect(session.destination, BuyV2Destination.shop);
-          if (offers) {
-            final collection = find.byKey(const PageStorageKey('buy-offers'));
-            expect(collection, findsOneWidget);
-            await tester.scrollUntilVisible(
-              find.byKey(const ValueKey('buy-offers-publisher-summary')),
-              -200,
-              scrollable: find
-                  .descendant(of: collection, matching: find.byType(Scrollable))
-                  .first,
-            );
-          }
-          expect(
-            find.byKey(const ValueKey('buy-offers-publisher-summary')),
-            offers ? findsOneWidget : findsNothing,
-          );
-          if (offers) {
-            await tester.pumpAndSettle();
-            await captureR66Visual(tester, '034-offers-after-back-text-$scale');
-          }
-          expect(tester.takeException(), isNull);
-        },
-      );
+          await captureR66Visual(tester, '034-offers-after-back-text-$scale');
+        }
+        expect(tester.takeException(), isNull);
+      });
     }
   }
 
@@ -590,7 +588,7 @@ void main() {
         final page = find.byKey(PageStorageKey('buy-product-$currentId')).last;
         final compare = find.descendant(
           of: page,
-          matching: find.text('Compare'),
+          matching: find.text('Compare prices'),
         );
         await tester.scrollUntilVisible(
           compare,
@@ -882,7 +880,7 @@ void main() {
           expect(session.view, BuyV2View.product);
           if (throughCart) {
             await tester.tap(
-              find.byKey(const ValueKey('buy-compact-cart-indicator')),
+              find.byKey(const ValueKey('buy-cart-navigation-button')),
             );
             await tester.pumpAndSettle();
             expect(session.view, BuyV2View.cart);
@@ -1164,7 +1162,7 @@ void main() {
           ValueKey('buy-product-continuation-${firstNext.id}'),
         );
         await tester.scrollUntilVisible(
-          find.text('You may also like'),
+          find.text('Similar products'),
           200,
           scrollable: find.byType(Scrollable).first,
         );
@@ -1178,10 +1176,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(firstSection, findsOneWidget);
-        expect(find.text('You may also like'), findsOneWidget);
+        expect(find.text('Similar products'), findsOneWidget);
         expect(
           find.text('Compare related products, prices and delivery'),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(ValueKey('buy-product-continuation-${origin.id}')),
@@ -1213,7 +1211,7 @@ void main() {
           ValueKey('buy-product-continuation-${secondNext.id}'),
         );
         await tester.scrollUntilVisible(
-          find.text('You may also like'),
+          find.text('Similar products'),
           200,
           scrollable: find.byType(Scrollable).first,
         );
@@ -1327,18 +1325,18 @@ void main() {
     await tester.pumpAndSettle();
     final product = session.selectedProduct!;
     await tester.scrollUntilVisible(
-      find.text('More for business restocking'),
+      find.text('Similar products'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('More for business restocking'), findsOneWidget);
+    expect(find.text('Similar products'), findsOneWidget);
     expect(
       find.text(
         'Compare pack sizes, prices and delivery from relevant suppliers',
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       session.productContinuationsFor(product),
@@ -1369,7 +1367,7 @@ void main() {
       ValueKey('buy-product-continuations-${product.id}'),
     );
     await tester.scrollUntilVisible(
-      find.text('You may also like'),
+      find.text('Similar products'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
@@ -1380,7 +1378,9 @@ void main() {
       ValueKey('buy-product-continuation-lane-${product.id}'),
     );
     expect(lane, findsOneWidget);
-    expect(tester.getSize(lane).width, lessThanOrEqualTo(282));
+    expect(tester.getSize(lane).width, 288);
+    expect(tester.getTopLeft(lane).dx, 16);
+    expect(tester.getTopRight(lane).dx, 304);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);
   });

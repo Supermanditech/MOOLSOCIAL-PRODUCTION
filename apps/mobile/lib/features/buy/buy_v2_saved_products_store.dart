@@ -142,6 +142,9 @@ class BuyV2CustomerStateSnapshot {
     this.deliveryInstructionIds = const {},
     this.selectedPayment,
     this.purchaseOrderReference,
+    this.pendingPurchaseOrderAccountId,
+    this.pendingPurchaseOrderRequestId,
+    this.pendingPurchaseOrderRevision,
     this.checkoutIdempotencyKey,
     this.paymentReference,
     this.paymentActionUri,
@@ -172,6 +175,9 @@ class BuyV2CustomerStateSnapshot {
   final Map<BuyV2Destination, String> deliveryInstructionIds;
   final String? selectedPayment;
   final String? purchaseOrderReference;
+  final String? pendingPurchaseOrderAccountId;
+  final String? pendingPurchaseOrderRequestId;
+  final String? pendingPurchaseOrderRevision;
   final String? checkoutIdempotencyKey;
   final String? paymentReference;
   final Uri? paymentActionUri;
@@ -258,7 +264,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'reviewDrafts': {
       for (final entry in snapshot.reviewDrafts.entries)
         if (entry.key.isNotEmpty && entry.value.valid)
-          entry.key: {'rating': entry.value.rating, 'comment': entry.value.comment},
+          entry.key: {
+            'rating': entry.value.rating,
+            'comment': entry.value.comment,
+          },
     },
     if (snapshot.procurementDraft case final draft?)
       'procurementDraft': _encodeProcurementDraft(draft),
@@ -273,6 +282,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
     },
     'selectedPayment': snapshot.selectedPayment,
     'purchaseOrderReference': snapshot.purchaseOrderReference,
+    'pendingPurchaseOrderAccountId': snapshot.pendingPurchaseOrderAccountId,
+    'pendingPurchaseOrderRequestId': snapshot.pendingPurchaseOrderRequestId,
+    'pendingPurchaseOrderRevision': snapshot.pendingPurchaseOrderRevision,
     'checkoutIdempotencyKey': snapshot.checkoutIdempotencyKey,
     'paymentReference': snapshot.paymentReference,
     'paymentActionUri': snapshot.paymentActionUri?.toString(),
@@ -326,6 +338,15 @@ final class BuyV2SharedPreferencesCustomerStateStore
         ),
         selectedPayment: _string(source['selectedPayment']),
         purchaseOrderReference: _string(source['purchaseOrderReference']),
+        pendingPurchaseOrderAccountId: _string(
+          source['pendingPurchaseOrderAccountId'],
+        ),
+        pendingPurchaseOrderRequestId: _string(
+          source['pendingPurchaseOrderRequestId'],
+        ),
+        pendingPurchaseOrderRevision: _string(
+          source['pendingPurchaseOrderRevision'],
+        ),
         checkoutIdempotencyKey: _string(source['checkoutIdempotencyKey']),
         paymentReference: _string(source['paymentReference']),
         paymentActionUri: _uri(source['paymentActionUri']),
@@ -363,6 +384,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'brand': entry.value.brand,
           'title': entry.value.title,
           'variant': entry.value.variant,
+          'variantAttributes': _encodeVariantAttributes(entry.value),
           'pack': entry.value.pack,
           'price': entry.value.price,
           'unitPrice': entry.value.unitPrice,
@@ -415,6 +437,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       products[id] = BuyV2Product(
         id: id,
         canonicalId: _string(item['canonicalId']),
+        variantAttributes: _decodeVariantAttributes(item['variantAttributes']),
         storeId: _string(item['storeId']),
         destination: BuyV2Destination.wholesale,
         categoryId: _string(item['categoryId']) ?? 'all',
@@ -592,7 +615,12 @@ final class BuyV2SharedPreferencesCustomerStateStore
     final line = _string(source['line']);
     final area = _string(source['area']);
     final pinCode = _string(source['pinCode']);
-    final landmark = _string(source['landmark']);
+    final landmarkValue = source['landmark'];
+    final landmark = landmarkValue == null
+        ? ''
+        : landmarkValue is String
+        ? landmarkValue
+        : null;
     if ([
           id,
           label,
@@ -637,7 +665,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'productIds': order.productIds,
     'lines': [
       for (final line in order.lines)
-        {'productId': line.product.id, 'quantity': line.quantity},
+        {
+          'productId': line.product.id,
+          'quantity': line.quantity,
+          'purchasedProduct': _encodePurchasedProduct(line.product),
+        },
     ],
     'paymentMethod': order.paymentMethod,
     'purchaseOrderReference': order.purchaseOrderReference,
@@ -799,17 +831,143 @@ final class BuyV2SharedPreferencesCustomerStateStore
   }
 
   static List<BuyV2CartLine> _decodeOrderLines(Object? value) {
-    final products = {
-      for (final product in BuyV2Catalogue.allProducts) product.id: product,
-    };
     return [
       for (final source in _objectList(value))
         if (_string(source['productId']) case final productId?)
-          if (products[productId] case final product?)
-            if (_integer(source['quantity']) case final quantity?
-                when quantity > 0)
+          if (_decodePurchasedProduct(source['purchasedProduct'])
+              case final product? when product.id == productId)
+            if (source['quantity'] case final int quantity when quantity > 0)
               BuyV2CartLine(product: product, quantity: quantity),
     ];
+  }
+
+  // Historical display data only. Never recover purchase facts from today's
+  // catalogue or restore listing/fulfilment authority from this local cache.
+  static Map<String, Object?> _encodePurchasedProduct(BuyV2Product product) => {
+    'version': 1,
+    'id': product.id,
+    'canonicalId': product.canonicalId,
+    'storeId': product.storeId,
+    'destination': product.destination.name,
+    'categoryId': product.categoryId,
+    'brand': product.brand,
+    'title': product.title,
+    'variant': product.variant,
+    'variantAttributes': _encodeVariantAttributes(product),
+    'pack': product.pack,
+    'price': product.price,
+    'unitPrice': product.unitPrice,
+    'seller': product.seller,
+    'sellerType': product.sellerType,
+    'origin': product.origin,
+    'minimumOrder': product.minimumOrder,
+    'requiresPrescription': product.requiresPrescription,
+    'composition': product.composition,
+    'regulatoryNote': product.regulatoryNote,
+  };
+
+  static BuyV2Product? _decodePurchasedProduct(Object? value) {
+    final source = _objectMap(value);
+    final id = _string(source['id']);
+    final canonicalId = _string(source['canonicalId']);
+    final destination = _destination(_string(source['destination']));
+    final title = _string(source['title']);
+    final price = source['price'];
+    final minimumOrder = source['minimumOrder'];
+    const textFields = [
+      'categoryId',
+      'brand',
+      'variant',
+      'pack',
+      'unitPrice',
+      'seller',
+      'sellerType',
+      'origin',
+    ];
+    if (source['version'] != 1 ||
+        id == null ||
+        canonicalId == null ||
+        destination == null ||
+        title == null ||
+        price is! int ||
+        price < 0 ||
+        minimumOrder is! int ||
+        minimumOrder < 1 ||
+        source['requiresPrescription'] is! bool ||
+        textFields.any((key) => source[key] is! String)) {
+      return null;
+    }
+    return BuyV2Product(
+      id: id,
+      canonicalId: canonicalId,
+      variantAttributes: _decodeVariantAttributes(source['variantAttributes']),
+      storeId: _string(source['storeId']),
+      destination: destination,
+      categoryId: source['categoryId'] as String,
+      brand: source['brand'] as String,
+      title: title,
+      variant: source['variant'] as String,
+      pack: source['pack'] as String,
+      price: price,
+      unitPrice: source['unitPrice'] as String,
+      seller: source['seller'] as String,
+      sellerType: source['sellerType'] as String,
+      origin: source['origin'] as String,
+      minimumOrder: minimumOrder,
+      requiresPrescription: source['requiresPrescription'] as bool,
+      composition: _string(source['composition']),
+      regulatoryNote: _string(source['regulatoryNote']),
+      badge: '',
+      deliveryPromise: '',
+      confirmedOn: '',
+      visualLabel: '',
+      visualKind: 'unavailable',
+      catalogueListing: false,
+    );
+  }
+
+  static List<Map<String, Object?>> _encodeVariantAttributes(
+    BuyV2Product product,
+  ) => [
+    for (final value in product.variantAttributes)
+      {
+        'dimensionId': value.dimensionId,
+        'dimensionLabel': value.dimensionLabel,
+        'optionId': value.optionId,
+        'optionLabel': value.optionLabel,
+        'kind': value.kind.name,
+        'swatchArgb': value.swatchArgb,
+      },
+  ];
+
+  static List<BuyV2VariantAttribute> _decodeVariantAttributes(Object? value) {
+    if (value == null) return const []; // Legacy snapshot.
+    if (value is! List) return const [];
+    final result = <BuyV2VariantAttribute>[];
+    final dimensions = <String>{};
+    for (final raw in value) {
+      if (raw is! Map) return const [];
+      final source = _objectMap(raw);
+      final kind = _enumByName(
+        BuyV2VariantDimensionKind.values,
+        _string(source['kind']),
+      );
+      final swatch = source['swatchArgb'];
+      if (kind == null || (swatch != null && swatch is! int)) return const [];
+      final attribute = BuyV2VariantAttribute(
+        dimensionId: _string(source['dimensionId']) ?? '',
+        dimensionLabel: _string(source['dimensionLabel']) ?? '',
+        optionId: _string(source['optionId']) ?? '',
+        optionLabel: _string(source['optionLabel']) ?? '',
+        kind: kind,
+        swatchArgb: swatch as int?,
+      );
+      if (!attribute.isValid || !dimensions.add(attribute.dimensionId)) {
+        return const [];
+      }
+      result.add(attribute);
+    }
+    return List.unmodifiable(result);
   }
 
   static BuyV2Destination? _destination(String? name) =>

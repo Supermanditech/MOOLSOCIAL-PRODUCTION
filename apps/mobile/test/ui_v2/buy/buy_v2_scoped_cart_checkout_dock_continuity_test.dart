@@ -289,7 +289,18 @@ void main() {
           final visit = find.byKey(
             const ValueKey('buy-shop-seller-action-s-tomato'),
           );
-          await tester.ensureVisible(visit);
+          await tester.scrollUntilVisible(
+            visit,
+            160,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-product-s-tomato')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(visit.hitTestable(), findsOneWidget);
           await tester.tap(visit);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
@@ -455,8 +466,18 @@ void main() {
             '${route != 1 ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${product.id}',
           ),
         );
-        await tester.ensureVisible(action);
+        await tester.scrollUntilVisible(
+          action,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
+        expect(action.hitTestable(), findsOneWidget);
         await tester.tap(action);
         await tester.pumpAndSettle();
         final store = find.byKey(
@@ -753,6 +774,12 @@ void main() {
             .description!;
         await tester.pumpWidget(app(session, size: size, textScale: scale));
         await tester.pumpAndSettle();
+        final descriptionTab = find.byKey(
+          const ValueKey('buy-product-details-tab-1-w-oil'),
+        );
+        await revealR5ProductContent(tester, descriptionTab);
+        await tester.tap(descriptionTab.hitTestable());
+        await tester.pumpAndSettle();
         final detail = find.text(description);
         await revealR5ProductContent(tester, detail);
         expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
@@ -789,8 +816,8 @@ void main() {
         }
         expect(tester.getRect(cart).overlaps(tester.getRect(detail)), isFalse);
         await capture(tester, 'r5-description-before-compare-$label');
-        await revealR5ProductContent(tester, find.text('Compare'));
-        await tester.tap(find.text('Compare'));
+        await revealR5ProductContent(tester, find.text('Compare prices'));
+        await tester.tap(find.text('Compare prices'));
         await tester.pumpAndSettle();
         final alternate = find.byKey(
           const ValueKey('buy-product-compare-w-oil-comparison'),
@@ -809,7 +836,12 @@ void main() {
         await tester.tap(alternateCard);
         await tester.pumpAndSettle();
         expect(session.selectedProduct?.id, 'w-oil-comparison');
-        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+        await tester.tap(
+          find
+              .byKey(const ValueKey('buy-cart-navigation-button'))
+              .hitTestable()
+              .last,
+        );
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         await tester.binding.handlePopRoute();
@@ -3312,7 +3344,7 @@ void main() {
         final productState = tester.state<ScrollableState>(productScroll());
         final productOffset = productState.position.pixels;
         final count = session.quantityFor(product.id);
-        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+        await tester.tap(find.byKey(const ValueKey('buy-cart-navigation-button')));
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         expect(find.byType(BuyV2CartView, skipOffstage: false), findsOneWidget);
@@ -3408,7 +3440,7 @@ void main() {
           findsNothing,
         );
         expect(
-          find.byKey(const ValueKey('buy-store-cart-bar')),
+          find.byKey(const ValueKey('buy-cart-navigation-button')),
           findsOneWidget,
         );
         expect(
@@ -3516,7 +3548,7 @@ void main() {
         }
         await tester.tap(storeSku);
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+        await tester.tap(find.byKey(const ValueKey('buy-cart-navigation-button')));
         await tester.pumpAndSettle();
         final continueStore = find.byKey(
           const ValueKey('buy-cart-continue-store'),
@@ -3546,7 +3578,7 @@ void main() {
         );
         await tester.tap(find.byKey(ValueKey('buy-product-${product.id}')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+        await tester.tap(find.byKey(const ValueKey('buy-cart-navigation-button')));
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         expect(find.byType(BuyV2CartView, skipOffstage: false), findsOneWidget);

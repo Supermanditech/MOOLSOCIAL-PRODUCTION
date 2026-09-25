@@ -1019,7 +1019,12 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         FontWeight.w900,
                         textWidth,
                       ) +
-                      measure(product.pack, 11, FontWeight.w500, textWidth) +
+                      measure(
+                        product.customerVariantPack,
+                        11,
+                        FontWeight.w500,
+                        textWidth,
+                      ) +
                       4 +
                       (product.minimumOrder > 1
                           ? measure(
@@ -1142,7 +1147,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                           ),
                                         ),
                                         Text(
-                                          product.pack,
+                                          product.customerVariantPack,
                                           style: const TextStyle(
                                             color: BuyV2Colors.ink,
                                             fontSize: 11,
@@ -5523,7 +5528,7 @@ class _BuyV2ShoppingSettingsSheetState
                   icon: Icons.help_outline_rounded,
                   title: 'Help and support',
                   detail: 'Get help with shopping and orders',
-                  onTap: () => _showBuyV2ShoppingHelp(
+                  onTap: () => showBuyV2ShoppingHelp(
                     context,
                     widget.session,
                     returnScrollController: _scrollController,
@@ -5665,15 +5670,17 @@ Future<void> _confirmClearBuyV2RecentlyViewed(
   session.clearRecentlyViewed(BuyV2Destination.wholesale);
 }
 
-Future<void> _showBuyV2ShoppingHelp(
+Future<void> showBuyV2ShoppingHelp(
   BuildContext context,
   BuyV2Session session, {
-  required ScrollController returnScrollController,
+  ScrollController? returnScrollController,
+  BuyV2Product? product,
+  VoidCallback? onAskSeller,
 }) async {
-  final offset = returnScrollController.hasClients
-      ? returnScrollController.offset
+  final offset = returnScrollController?.hasClients == true
+      ? returnScrollController!.offset
       : null;
-  await showModalBottomSheet<void>(
+  final askSeller = await showModalBottomSheet<bool>(
     context: context,
     useSafeArea: true,
     isScrollControlled: true,
@@ -5684,15 +5691,28 @@ Future<void> _showBuyV2ShoppingHelp(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     sheetAnimationStyle: BuyV2InfoSheetMotion.resolve(context),
-    builder: (_) => _BuyV2ShoppingHelpSheet(session: session),
+    builder: (_) => _BuyV2ShoppingHelpSheet(
+      session: session,
+      product: product,
+      canAskSeller: onAskSeller != null,
+    ),
   );
   if (!context.mounted) return;
-  _restoreBuyV2SettingsOffset(context, returnScrollController, offset);
+  if (returnScrollController != null) {
+    _restoreBuyV2SettingsOffset(context, returnScrollController, offset);
+  }
+  if (askSeller == true) onAskSeller?.call();
 }
 
 class _BuyV2ShoppingHelpSheet extends StatefulWidget {
-  const _BuyV2ShoppingHelpSheet({required this.session});
+  const _BuyV2ShoppingHelpSheet({
+    required this.session,
+    this.product,
+    this.canAskSeller = false,
+  });
   final BuyV2Session session;
+  final BuyV2Product? product;
+  final bool canAskSeller;
 
   @override
   State<_BuyV2ShoppingHelpSheet> createState() =>
@@ -5777,6 +5797,7 @@ class _BuyV2ShoppingHelpSheetState extends State<_BuyV2ShoppingHelpSheet> {
                   order.title,
                   order.itemSummary,
                   order.partner,
+                  order.customerPartner,
                   for (final id in order.productIds)
                     widget.session.findProduct(id)?.title ?? '',
                   for (final line in order.lines) line.product.title,
@@ -5828,6 +5849,31 @@ class _BuyV2ShoppingHelpSheetState extends State<_BuyV2ShoppingHelpSheet> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (widget.product case final product?) ...[
+                              Text(
+                                product.title,
+                                key: const ValueKey(
+                                  'buy-shopping-help-product',
+                                ),
+                                style: context.buyBody,
+                              ),
+                              Text(product.pack, style: context.buyMeta),
+                              Text(
+                                product.customerSeller(product.seller),
+                                style: context.buyMeta,
+                              ),
+                              if (widget.canAskSeller)
+                                TextButton.icon(
+                                  key: const ValueKey('buy-shopping-help-ask'),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  icon: const Icon(Icons.chat_bubble_outline),
+                                  label: const Text(
+                                    'Ask seller about this product',
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                            ],
                             Text(
                               'Products, delivery, invoices and returns.',
                               style: context.buyMeta,
@@ -5935,7 +5981,7 @@ class _BuyV2ShoppingHelpSheetState extends State<_BuyV2ShoppingHelpSheet> {
                         icon: Icons.receipt_long_outlined,
                         title: '${order.id} · ${order.destination.label}',
                         detail:
-                            '${order.itemSummary}\n${order.partner}\n$status',
+                            '${order.itemSummary}\n${order.customerPartner}\n$status',
                         onTap: !canOpenOrders || _visiting
                             ? null
                             : () => _openOrder(order),
@@ -9290,7 +9336,8 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
               );
               final details = Semantics(
                 button: true,
-                label: 'Open ${product.customerTitle}, ${product.pack}',
+                label:
+                    'Open ${product.customerTitle}, ${product.customerVariantPack}',
                 onTap: onOpen,
                 excludeSemantics: true,
                 child: InkWell(
@@ -9328,7 +9375,7 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${product.pack} · ${buyV2Money(facts.price)}',
+                              '${product.customerVariantPack} · ${buyV2Money(facts.price)}',
                               style: context.buyMeta.copyWith(fontSize: 11),
                             ),
                             Text(
@@ -9456,7 +9503,8 @@ class _SavedProductInfoRow extends StatelessWidget {
           Expanded(
             child: Semantics(
               button: true,
-              label: 'Open ${product.customerTitle}, ${product.pack}',
+              label:
+                  'Open ${product.customerTitle}, ${product.customerVariantPack}',
               onTap: onOpen,
               excludeSemantics: true,
               child: InkWell(
@@ -9494,7 +9542,7 @@ class _SavedProductInfoRow extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${product.pack} · ${buyV2Money(product.price)}',
+                              '${product.customerVariantPack} · ${buyV2Money(product.price)}',
                               style: context.buyMeta,
                             ),
                           ],
@@ -11833,7 +11881,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         curve: Curves.easeOutCubic,
         child: Semantics(
           label:
-              '${product.customerTitle}, ${product.pack}, ${buyV2Money(facts.price)}, '
+              '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2Money(facts.price)}, '
               '${product.unitPrice}, '
               '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
               '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
@@ -12197,7 +12245,7 @@ List<_ProductGlanceField> _productGlanceFields(
         fontWeight: FontWeight.w800,
       ),
     ),
-    (text: product.pack, style: detail),
+    (text: product.customerVariantPack, style: detail),
     (
       text: _glancePriceLabel(facts.price),
       style: const TextStyle(
@@ -12522,7 +12570,7 @@ class BuyV2ProductCard extends StatelessWidget {
       spatial: true,
       child: Semantics(
         label:
-            '${product.customerTitle}, ${product.pack}, ${buyV2Money(facts.price)}, '
+            '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2Money(facts.price)}, '
             '${product.unitPrice}, '
             '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
             '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',

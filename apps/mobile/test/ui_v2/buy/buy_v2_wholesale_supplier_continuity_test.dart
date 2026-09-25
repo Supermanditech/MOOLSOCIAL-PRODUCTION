@@ -160,7 +160,7 @@ void main() {
     expect(session.selectedFilter, isNull);
 
     await tester.scrollUntilVisible(
-      find.text('More for business restocking'),
+      find.text('Similar products'),
       220,
       scrollable: find.byType(Scrollable).first,
     );

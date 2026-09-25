@@ -12,10 +12,16 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 
 class _Source extends BuyV2DevelopmentCatalogueSource {
-  _Source(BuyV2Destination destination)
-    : super(destination: destination, providerCount: 4, skusPerStore: 120);
+  _Source(BuyV2Destination destination, {bool variants = false})
+    : super(
+        destination: destination,
+        providerCount: 4,
+        skusPerStore: 120,
+        includeVariantReviewFixtures: variants,
+      );
   Completer<void>? productsWait;
   Completer<void>? storesWait;
   bool failStores = false;
@@ -180,8 +186,9 @@ void main() {
       final session = BuyV2Session(
         core: core,
         reviewDataEnabled: true,
-        cataloguePageSource: _Source(BuyV2Destination.shop),
+        cataloguePageSource: _Source(BuyV2Destination.shop, variants: true),
         publishedCatalogueSource: BuyV2DevelopmentPublishedCatalogueSource(
+          includeVariantReviewFixtures: true,
           providerCount: 20,
           skusPerStore: 500,
           now: () => now,
@@ -191,6 +198,26 @@ void main() {
       );
       addTearDown(session.dispose);
       addTearDown(core.dispose);
+      final previews = session.acquireCatalogueProducts(
+        'review-phone-previews',
+      );
+      addTearDown(
+        () => session.releaseCatalogueProducts('review-phone-previews'),
+      );
+      await previews.open(
+        BuyV2CatalogueQuery(
+          destination: BuyV2Destination.shop,
+          regionId: 'jodhpur',
+          query: 'phone',
+        ),
+      );
+      expect(previews.page!.items, isNotEmpty);
+      for (final phone in previews.page!.items) {
+        expect(
+          buyV2BuyerDeliveryPromiseSource(phone.deliveryPromise),
+          'Delivery for review only',
+        );
+      }
       await tester.pumpWidget(_app(session));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
@@ -206,6 +233,7 @@ void main() {
         isTrue,
       );
       expect(find.text('No current offers from this publisher.'), findsNothing);
+      expect(find.text('Offers need refreshing'), findsNothing);
       final id = pager.page!.items.first.product.id;
       final add = find.byKey(ValueKey('buy-add-$id'));
       await tester.ensureVisible(add);
@@ -218,6 +246,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(ValueKey('buy-cart-line-$id')), findsOneWidget);
+      final quantity = session.quantityFor(id);
+      await tester.tap(find.byKey(ValueKey('buy-cart-product-details-$id')));
+      await tester.pumpAndSettle();
+      expect(session.productReturnLabel, 'Cart');
+      expect(find.text('Cart'), findsOneWidget);
+      await tester.tap(find.text('Cart'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('buy-cart-line-$id')), findsOneWidget);
+      expect(session.quantityFor(id), quantity);
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
       await tester.pumpAndSettle();
       for (final mool in [true, false]) {

@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "6ECA328EAE31397B3B6F11B8DBB1BCB1E0A1F9129F191AA402AECEABB8FB582F"
+    "sha256": "14C12510EE65E867984663A29D4FAA0EC1C0892A84E39314A7F7D6D79B968408"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -159,7 +159,8 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart",
-        "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip"
+        "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
       ]
     },
     {
@@ -177,7 +178,6 @@
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart",
-        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/lib/features/buy/buy_v2_search_relevance.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_sheet_motion.dart",

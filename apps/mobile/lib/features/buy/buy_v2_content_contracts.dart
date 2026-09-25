@@ -642,8 +642,24 @@ enum BuyV2ProductContentState { ready, loading, offline, unavailable }
 
 @immutable
 class BuyV2ProductSpecification {
-  const BuyV2ProductSpecification({required this.label, required this.value});
+  // Public legal attribute IDs consumed by the existing compliance owner:
+  // generic_name, manufacturer_name/address, packer_name/address,
+  // importer_name/address, country_of_origin, manufactured_or_packed_on,
+  // best_before_or_use_by, fssai_license_number and consumer_care.
+  // A supplied structured compliance value takes precedence for its field.
+  // net_quantity stays a technical attribute unless structured compliance owns
+  // it; pack_count is independent. Other IDs remain source-defined attributes.
+  const BuyV2ProductSpecification({
+    required this.label,
+    required this.value,
+    this.attributeId,
+    this.groupLabel,
+  });
 
+  /// Stable public schema field identity, shared across highlights/specifications.
+  /// Absent legacy identity must not be inferred from the displayed value.
+  final String? attributeId;
+  final String? groupLabel;
   final String label;
   final String value;
 }
@@ -813,6 +829,108 @@ abstract final class BuyV2SupplierMediaPolicy {
   }
 }
 
+/// Public category data. The publishing workspace supplies labels and units;
+/// Buy never invents category conversions or measurement instructions.
+@immutable
+class BuyV2ProductSizeChart {
+  BuyV2ProductSizeChart({
+    required this.categoryId,
+    required this.sourceRevision,
+    required this.dimensionLabel,
+    required List<String> columns,
+    required List<List<String>> rows,
+    List<String> instructions = const [],
+  }) : columns = List.unmodifiable(columns),
+       rows = List.unmodifiable(
+         rows.map((row) => List<String>.unmodifiable(row)),
+       ),
+       instructions = List.unmodifiable(instructions);
+
+  final String categoryId;
+  final String sourceRevision;
+  final String dimensionLabel;
+  final List<String> columns;
+  final List<List<String>> rows;
+  final List<String> instructions;
+
+  bool appliesTo(BuyV2Product product) =>
+      categoryId == product.categoryId &&
+      categoryId.trim().isNotEmpty &&
+      sourceRevision.trim().isNotEmpty &&
+      dimensionLabel.trim().isNotEmpty &&
+      columns.isNotEmpty &&
+      columns.every((value) => value.trim().isNotEmpty) &&
+      columns.toSet().length == columns.length &&
+      rows.isNotEmpty &&
+      rows.every(
+        (row) =>
+            row.length == columns.length &&
+            row.every((value) => value.trim().isNotEmpty),
+      );
+}
+
+/// Comparable selling prices, not an MRP markdown. All amounts are minor INR
+/// units. Publication owns provenance, effective times and expiry; the consumer
+/// additionally matches the current Store, SKU, pack, offer and selling price.
+@immutable
+class BuyV2ProductPriceHistory {
+  const BuyV2ProductPriceHistory({
+    required this.storeId,
+    required this.canonicalProductId,
+    required this.skuId,
+    required this.pack,
+    required this.variant,
+    required this.sourceRevision,
+    required this.currency,
+    required this.previousSellingPriceMinor,
+    required this.currentSellingPriceMinor,
+    required this.previousEffectiveAt,
+    required this.currentEffectiveAt,
+    required this.validUntil,
+    this.offerId,
+  });
+
+  final String storeId;
+  final String canonicalProductId;
+  final String skuId;
+  final String pack;
+  final String variant;
+  final String sourceRevision;
+  final String currency;
+  final String? offerId;
+  final int previousSellingPriceMinor;
+  final int currentSellingPriceMinor;
+  final DateTime previousEffectiveAt;
+  final DateTime currentEffectiveAt;
+  final DateTime validUntil;
+
+  bool isCurrentFor(
+    BuyV2Product product, {
+    required BuyV2ProductFactsSnapshot facts,
+    required DateTime now,
+  }) =>
+      storeId.isNotEmpty &&
+      storeId == product.storeId &&
+      canonicalProductId == product.canonicalId &&
+      skuId == product.id &&
+      pack == product.pack &&
+      variant == product.variant &&
+      sourceRevision.trim().isNotEmpty &&
+      currency == 'INR' &&
+      (offerId == null || offerId!.trim().isNotEmpty) &&
+      offerId == product.procurementSupplierGrant?.offerId &&
+      facts.productId == product.id &&
+      !facts.stale &&
+      facts.price > 0 &&
+      facts.price <= 90071992547409 &&
+      previousSellingPriceMinor > 0 &&
+      previousSellingPriceMinor <= 9007199254740991 &&
+      currentSellingPriceMinor == facts.price * 100 &&
+      previousEffectiveAt.isBefore(currentEffectiveAt) &&
+      !currentEffectiveAt.isAfter(now) &&
+      validUntil.isAfter(now);
+}
+
 @immutable
 class BuyV2ProductContentSnapshot {
   const BuyV2ProductContentSnapshot({
@@ -821,10 +939,14 @@ class BuyV2ProductContentSnapshot {
     required this.sourceId,
     this.media = const [],
     this.highlights = const [],
+    this.highlightFields = const [],
     this.specifications = const [],
     this.description,
     this.customerMessage,
     this.observedAt,
+    this.sizeChart,
+    this.priceHistory,
+    this.retryable = false,
   });
 
   final String productId;
@@ -832,10 +954,14 @@ class BuyV2ProductContentSnapshot {
   final String sourceId;
   final List<BuyV2ProductMediaAsset> media;
   final List<String> highlights;
+  final List<BuyV2ProductSpecification> highlightFields;
   final List<BuyV2ProductSpecification> specifications;
   final String? description;
   final String? customerMessage;
   final DateTime? observedAt;
+  final BuyV2ProductSizeChart? sizeChart;
+  final BuyV2ProductPriceHistory? priceHistory;
+  final bool retryable;
 }
 
 abstract interface class BuyV2ProductContentAdapter {
@@ -979,8 +1105,18 @@ class BuyV2CollectionBasket {
     required this.store,
     required Iterable<BuyV2CartLine> lines,
     required this.paymentMethod,
+    this.purchaseOrderRequestId,
+    this.purchaseOrderRevision,
+    this.purchaseOrderReference,
   }) : lines = List.unmodifiable(lines) {
-    if (!_collectionText(identity.accountId) ||
+    if ((purchaseOrderReference != null &&
+            (purchaseOrderRequestId == null ||
+                !_collectionText(purchaseOrderReference!))) ||
+        (purchaseOrderRequestId == null) != (purchaseOrderRevision == null) ||
+        (purchaseOrderRequestId != null &&
+            (!_collectionText(purchaseOrderRequestId!) ||
+                !_collectionText(purchaseOrderRevision!))) ||
+        !_collectionText(identity.accountId) ||
         !_collectionText(identity.sessionId) ||
         !_collectionText(store.id) ||
         store.name.trim().isEmpty ||
@@ -1017,6 +1153,12 @@ class BuyV2CollectionBasket {
   final BuyV2StoreListing store;
   final List<BuyV2CartLine> lines;
   final String paymentMethod;
+  final String? purchaseOrderRequestId;
+  final String? purchaseOrderRevision;
+
+  /// Provider-issued display reference retained with the durable purchase intent.
+  /// It does not replace the request/revision authorization binding.
+  final String? purchaseOrderReference;
 
   /// Stable under row reordering, sensitive to account/session, branch, SKU,
   /// quantity, displayed price and payment changes. It is correlation, not auth.
@@ -1032,6 +1174,11 @@ class BuyV2CollectionBasket {
               identity.sessionId,
               store.id,
               paymentMethod,
+              if (purchaseOrderRequestId != null) ...[
+                purchaseOrderRequestId,
+                purchaseOrderRevision,
+                if (purchaseOrderReference != null) purchaseOrderReference,
+              ],
               for (final line in ordered)
                 [
                   line.product.canonicalId,
@@ -1326,6 +1473,8 @@ class BuyV2OrderPlacementRequest {
     required this.idempotencyKey,
     this.commercialPaymentTermIds = const {},
     this.checkoutQuoteId,
+    this.purchaseOrderRequestId,
+    this.purchaseOrderRevision,
     this.procurementContext,
   });
 
@@ -1337,6 +1486,8 @@ class BuyV2OrderPlacementRequest {
   final String idempotencyKey;
   final Map<String, String> commercialPaymentTermIds;
   final String? checkoutQuoteId;
+  final String? purchaseOrderRequestId;
+  final String? purchaseOrderRevision;
   final BuyV2ProcurementContext? procurementContext;
 }
 
@@ -1416,6 +1567,185 @@ class BuyV2AddressRequestResult {
 }
 
 typedef BuyV2PaymentHandoff = Future<bool> Function(Uri uri);
+
+/// Supplier decisions are document states, never evidence of payment.
+enum BuyV2PurchaseOrderState {
+  draft,
+  awaitingSupplier,
+  accepted,
+  revised,
+  rejected,
+}
+
+@immutable
+class BuyV2PurchaseOrderLine {
+  const BuyV2PurchaseOrderLine({
+    required this.productId,
+    required this.variant,
+    required this.pack,
+    required this.quantity,
+    required this.unitPriceMinor,
+    this.requestedQuantity,
+  });
+  final String productId;
+  final String variant;
+  final String pack;
+  final int quantity;
+
+  /// Original basket quantity, retained when the supplier proposes a change.
+  final int? requestedQuantity;
+  final int unitPriceMinor;
+  int get totalMinor => quantity * unitPriceMinor;
+}
+
+@immutable
+class BuyV2PurchaseOrderDocument {
+  BuyV2PurchaseOrderDocument({
+    required this.id,
+    required this.revision,
+    required this.supplierStoreId,
+    required this.supplierName,
+    required this.state,
+    required List<BuyV2PurchaseOrderLine> lines,
+    required this.itemSubtotalMinor,
+    required this.chargesMinor,
+    required this.totalMinor,
+    required this.terms,
+    this.reference,
+    this.decisionMessage,
+  }) : lines = List.unmodifiable(lines);
+
+  final String id;
+  final String revision;
+  final String supplierStoreId;
+  final String supplierName;
+  final BuyV2PurchaseOrderState state;
+  final List<BuyV2PurchaseOrderLine> lines;
+  final int itemSubtotalMinor;
+  final int chargesMinor;
+  final int totalMinor;
+  final String terms;
+  final String? reference;
+  final String? decisionMessage;
+
+  bool get valid {
+    bool text(String value) => value.trim().isNotEmpty;
+    final ids = <String>{};
+    return text(id) &&
+        text(revision) &&
+        text(supplierStoreId) &&
+        text(supplierName) &&
+        text(terms) &&
+        lines.isNotEmpty &&
+        (state == BuyV2PurchaseOrderState.draft ||
+            (reference != null && text(reference!))) &&
+        (state != BuyV2PurchaseOrderState.revised &&
+                state != BuyV2PurchaseOrderState.rejected ||
+            (decisionMessage != null && text(decisionMessage!))) &&
+        lines.every(
+          (line) =>
+              text(line.productId) &&
+              text(line.variant) &&
+              text(line.pack) &&
+              ids.add(line.productId) &&
+              line.quantity > 0 &&
+              (line.requestedQuantity == null || line.requestedQuantity! > 0) &&
+              line.unitPriceMinor >= 0 &&
+              line.totalMinor <= 9007199254740991,
+        ) &&
+        itemSubtotalMinor ==
+            lines.fold<int>(0, (sum, line) => sum + line.totalMinor) &&
+        chargesMinor >= 0 &&
+        totalMinor >= 0 &&
+        totalMinor <= 9007199254740991 &&
+        totalMinor == itemSubtotalMinor + chargesMinor;
+  }
+}
+
+@immutable
+class BuyV2PurchaseOrderReview {
+  BuyV2PurchaseOrderReview({
+    required this.requestId,
+    required this.revision,
+    required this.buyerAccountId,
+    required this.buyerName,
+    this.address,
+    this.collectionStore,
+    required this.validUntil,
+    required List<BuyV2PurchaseOrderDocument> documents,
+  }) : documents = List.unmodifiable(documents);
+
+  final String requestId;
+  final String revision;
+  final String buyerAccountId;
+  final String buyerName;
+  final BuyV2Address? address;
+  final BuyV2StoreListing? collectionStore;
+  final DateTime validUntil;
+  final List<BuyV2PurchaseOrderDocument> documents;
+
+  /// Match exact purchased SKU/store/quantity; a label is not an identity.
+  bool matches(List<BuyV2CartLine> basket, DateTime now) {
+    if (requestId.trim().isEmpty ||
+        revision.trim().isEmpty ||
+        buyerAccountId.trim().isEmpty ||
+        buyerName.trim().isEmpty ||
+        !now.isBefore(validUntil) ||
+        basket.isEmpty ||
+        documents.isEmpty ||
+        (address == null) == (collectionStore == null) ||
+        (collectionStore != null &&
+            (!collectionStore!.hasCollectionAddress ||
+                basket.any(
+                  (line) => line.product.storeId != collectionStore!.id,
+                )))) {
+      return false;
+    }
+    final expected = {for (final line in basket) line.product.id: line};
+    if (expected.length != basket.length) return false;
+    final seen = <String>{};
+    final documentsSeen = <String>{};
+    for (final document in documents) {
+      if (!document.valid || !documentsSeen.add(document.id)) return false;
+      for (final line in document.lines) {
+        final purchased = expected[line.productId];
+        if (purchased == null ||
+            !seen.add(line.productId) ||
+            purchased.product.destination != BuyV2Destination.wholesale ||
+            purchased.product.storeId != document.supplierStoreId ||
+            purchased.product.variant != line.variant ||
+            purchased.product.pack != line.pack ||
+            (purchased.quantity != (line.requestedQuantity ?? line.quantity) &&
+                !(document.state == BuyV2PurchaseOrderState.accepted &&
+                    purchased.quantity == line.quantity))) {
+          return false;
+        }
+      }
+    }
+    return seen.length == expected.length;
+  }
+}
+
+/// Authenticated provider operations. Repeating the same review revision must
+/// reconcile one issuance; implementations must not create a second PO.
+abstract interface class BuyV2PurchaseOrderAdapter {
+  Future<BuyV2PurchaseOrderReview> review({
+    required List<BuyV2CartLine> lines,
+    BuyV2Address? address,
+    BuyV2StoreListing? collectionStore,
+  });
+  Future<BuyV2PurchaseOrderReview> issue({
+    required String requestId,
+    required String expectedRevision,
+  });
+  Future<BuyV2PurchaseOrderReview> refresh({required String requestId});
+  Future<BuyV2PurchaseOrderReview> approveRevision({
+    required String requestId,
+    required String expectedRevision,
+    required String documentId,
+    required String documentRevision,
+  });
+}
 
 enum BuyV2CommercialPaymentTermKind {
   retailAdvance,
@@ -1624,6 +1954,68 @@ enum BuyV2DeliveryExceptionKind {
 }
 
 @immutable
+class BuyV2ReceiptLine {
+  const BuyV2ReceiptLine({
+    required this.productId,
+    required this.variant,
+    required this.pack,
+    required this.orderedQuantity,
+    required this.receivedQuantity,
+  });
+
+  final String productId;
+  final String variant;
+  final String pack;
+  final int orderedQuantity;
+  final int receivedQuantity;
+
+  int get missingQuantity => orderedQuantity - receivedQuantity;
+}
+
+/// Authoritative quantities for the entire purchased order, not a shipment
+/// fragment. This is receipt evidence; it does not settle or refund payment.
+@immutable
+class BuyV2ItemisedReceipt {
+  BuyV2ItemisedReceipt({
+    required this.orderId,
+    required this.purchaseId,
+    required List<BuyV2ReceiptLine> lines,
+  }) : lines = List.unmodifiable(lines);
+
+  final String orderId;
+  final String purchaseId;
+  final List<BuyV2ReceiptLine> lines;
+
+  bool matchesOrder(BuyV2Order order) {
+    if (orderId != order.id ||
+        purchaseId.trim().isEmpty ||
+        purchaseId != order.purchaseId ||
+        lines.isEmpty ||
+        lines.length != order.lines.length) {
+      return false;
+    }
+    final matched = <int>{};
+    for (final line in lines) {
+      if (line.productId.trim().isEmpty ||
+          line.orderedQuantity <= 0 ||
+          line.receivedQuantity < 0 ||
+          line.receivedQuantity > line.orderedQuantity) {
+        return false;
+      }
+      final index = order.lines.indexWhere(
+        (purchased) =>
+            purchased.product.id == line.productId &&
+            purchased.product.variant == line.variant &&
+            purchased.product.pack == line.pack &&
+            purchased.quantity == line.orderedQuantity,
+      );
+      if (index < 0 || !matched.add(index)) return false;
+    }
+    return true;
+  }
+}
+
+@immutable
 class BuyV2DeliveryExceptionSnapshot {
   const BuyV2DeliveryExceptionSnapshot({
     required this.state,
@@ -1634,6 +2026,7 @@ class BuyV2DeliveryExceptionSnapshot {
     this.detail,
     this.rescheduleSlots = const [],
     this.proofReference,
+    this.itemisedReceipt,
   });
 
   final BuyV2CommerceLoadState state;
@@ -1644,6 +2037,7 @@ class BuyV2DeliveryExceptionSnapshot {
   final String? detail;
   final List<String> rescheduleSlots;
   final String? proofReference;
+  final BuyV2ItemisedReceipt? itemisedReceipt;
 }
 
 abstract interface class BuyV2DeliveryExceptionAdapter {
@@ -1721,6 +2115,16 @@ abstract interface class BuyV2LiveDeliveryAdapter {
   Future<BuyV2LiveDeliverySnapshot> load({required String orderId});
 }
 
+/// Optional authenticated lookup for an interrupted placement whose first
+/// response never reached the buyer. This operation must not place or pay again.
+/// The provider resolves the original immutable attempt by its idempotency key;
+/// unavailable/unknown results are not proof of failure or permission to retry.
+abstract interface class BuyV2PendingOrderRecoveryAdapter {
+  Future<BuyV2OrderPlacementResult> recoverOrder({
+    required String idempotencyKey,
+  });
+}
+
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();
 
@@ -1791,12 +2195,88 @@ final class BuyV2CatalogueProductFactsAdapter
 
 final class BuyV2CatalogueProductContentAdapter
     implements BuyV2ProductContentAdapter {
-  const BuyV2CatalogueProductContentAdapter();
+  const BuyV2CatalogueProductContentAdapter({
+    this.includeVariantReviewFixtures = false,
+    this.now = DateTime.now,
+  });
+  final bool includeVariantReviewFixtures;
+  final DateTime Function() now;
 
   @override
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
     final returnDetail = product.returnPolicy;
     final supplierMedia = BuyV2SupplierMediaPolicy.admittedAssets(product);
+    if (includeVariantReviewFixtures &&
+        product.canonicalId == 'review-phone-16' &&
+        product.mediaAssets.any(
+          (asset) =>
+              asset.binding?.supplierWorkspaceId == 'review-phone-workspace',
+        ) &&
+        product.hasStructuredVariants &&
+        product.storeId != null) {
+      final storage = product.variantAttributes
+          .where((value) => value.dimensionId == 'storage')
+          .firstOrNull;
+      final bundle = switch (storage?.optionId) {
+        '512' => 'Studio review kit',
+        '256' => 'Extended review kit',
+        _ => 'Basic review kit',
+      };
+      final observed = now();
+      return BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.ready,
+        sourceId: 'device-review-variant-content',
+        observedAt: observed,
+        media: supplierMedia,
+        highlightFields: [
+          BuyV2ProductSpecification(
+            attributeId: 'review_bundle',
+            label: 'Review bundle',
+            value: bundle,
+          ),
+        ],
+        specifications: [
+          for (final value in product.variantAttributes)
+            BuyV2ProductSpecification(
+              attributeId: value.dimensionId,
+              label: value.dimensionLabel,
+              value: value.optionLabel,
+              groupLabel: 'Selected configuration',
+            ),
+          BuyV2ProductSpecification(
+            attributeId: 'review_bundle',
+            label: 'Review bundle',
+            value: bundle,
+            groupLabel: 'In the box',
+          ),
+        ],
+        description: switch (storage?.optionId) {
+          '512' =>
+            'Review description: expanded offline-library use case. Synthetic content for interface testing.',
+          '256' =>
+            'Review description: everyday media-library use case. Synthetic content for interface testing.',
+          _ =>
+            'Review description: lightweight everyday use case. Synthetic content for interface testing.',
+        },
+        priceHistory: BuyV2ProductPriceHistory(
+          storeId: product.storeId!,
+          canonicalProductId: product.canonicalId,
+          skuId: product.id,
+          pack: product.pack,
+          variant: product.variant,
+          sourceRevision: 'review-history-20260925',
+          currency: 'INR',
+          previousSellingPriceMinor:
+              (product.price + (storage?.optionId == '512' ? 2000 : 1000)) *
+              100,
+          currentSellingPriceMinor: product.price * 100,
+          previousEffectiveAt: observed.subtract(const Duration(days: 7)),
+          currentEffectiveAt: observed.subtract(const Duration(hours: 1)),
+          validUntil: observed.add(const Duration(hours: 1)),
+        ),
+      );
+    }
     return BuyV2ProductContentSnapshot(
       productId: product.id,
       state: BuyV2ProductContentState.ready,
@@ -1818,13 +2298,25 @@ final class BuyV2CatalogueProductContentAdapter
           : null,
       highlights: [product.variant, product.unitPrice, ?returnDetail],
       specifications: [
-        BuyV2ProductSpecification(label: 'Brand', value: product.brandLabel),
-        BuyV2ProductSpecification(label: 'Pack', value: product.pack),
-        BuyV2ProductSpecification(label: 'Variant', value: product.variant),
+        BuyV2ProductSpecification(
+          attributeId: 'brand',
+          label: 'Brand',
+          value: product.brandLabel,
+        ),
+        BuyV2ProductSpecification(
+          attributeId: 'pack',
+          label: 'Pack',
+          value: product.pack,
+        ),
+        BuyV2ProductSpecification(
+          attributeId: 'variant',
+          label: 'Variant',
+          value: product.variant,
+        ),
       ],
-      description:
-          '${product.title} · ${product.variant}. '
-          '${product.pack} at ${product.unitPrice}.',
+      // A catalogue identity/price summary is not a supplied description.
+      // Leave this absent until the content provider publishes actual copy.
+      description: null,
     );
   }
 }

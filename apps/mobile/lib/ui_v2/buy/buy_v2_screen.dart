@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
@@ -25,6 +26,20 @@ import 'buy_v2_invoice.dart';
 import 'buy_v2_invoice_downloader.dart';
 import 'buy_v2_scanner.dart';
 import 'buy_v2_views.dart';
+
+/// Opens a provider-supplied action only; this never confirms payment.
+Future<bool> buyV2LaunchExternalPayment(Uri uri) async {
+  if (!const {'https', 'upi'}.contains(uri.scheme) ||
+      uri.host.isEmpty ||
+      uri.userInfo.isNotEmpty) {
+    return false;
+  }
+  try {
+    return await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } on Object {
+    return false;
+  }
+}
 
 String buyV2CustomerPaymentProviderLabel(
   String providerSlug, {
@@ -322,6 +337,11 @@ class BuyV2Screen extends StatefulWidget {
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
+
+  BuyV2PaymentHandoff? get resolvedPaymentHandoff =>
+      paymentHandoff ??
+      (session.reviewDataEnabled ? null : buyV2LaunchExternalPayment);
+
   final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
   final BuyV2PublishedOffersSource offersSource;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
@@ -2533,9 +2553,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                                         .wholesaleTradeDecisionAdapter,
                                                               ),
                                                             ),
-                                                            if (session
-                                                                    .itemCount >
-                                                                0)
+                                                            if (product.destination ==
+                                                                    BuyV2Destination
+                                                                        .medicine &&
+                                                                session.itemCount >
+                                                                    0)
                                                               Positioned(
                                                                 left: 0,
                                                                 right: 0,
@@ -2602,9 +2624,32 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                             ),
                           ),
                           bottomNavigationBar:
-                              showingProduct ||
-                                  MediaQuery.viewInsetsOf(context).bottom > 0
+                              MediaQuery.viewInsetsOf(context).bottom > 0
                               ? null
+                              : showingProduct
+                              ? (product.destination !=
+                                            BuyV2Destination.medicine &&
+                                        session.itemCount > 0
+                                    ? SafeArea(
+                                        top: false,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            heightFactor: 1,
+                                            child: _BuyMiniCartBar(
+                                              session: session,
+                                              compact: true,
+                                              initialPosition: null,
+                                              onPositionChanged: (_) {},
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : null)
                               : _buildDestinationNavigation(
                                   session,
                                   navigation,
@@ -2819,7 +2864,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       BuyV2View.product => BuyV2ProductView(
         session: session,
         scrollController: _rootProductScrollController,
-        returnLabel: _offersActive ? 'Offers' : null,
+        aggregateCart: _offersActive,
+        returnLabel:
+            session.productReturnLabel ?? (_offersActive ? 'Offers' : null),
         onAskSeller: _openProductQuestion,
         onVisitComparisonProduct: (product) async {
           await _openStoreProduct(product, returnLabel: 'Compare suppliers');
@@ -2850,7 +2897,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         session: session,
         gstInvoiceController: _gstInvoiceController,
         keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
-        paymentHandoff: widget.paymentHandoff,
+        paymentHandoff: widget.resolvedPaymentHandoff,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
@@ -2862,7 +2909,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         collectionCameraBuilder: widget.collectionCameraBuilder,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
-        paymentHandoff: widget.paymentHandoff,
+        paymentHandoff: widget.resolvedPaymentHandoff,
         liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
@@ -2872,7 +2919,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         collectionCameraBuilder: widget.collectionCameraBuilder,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
-        paymentHandoff: widget.paymentHandoff,
+        paymentHandoff: widget.resolvedPaymentHandoff,
         liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.account => BuyV2AccountView(

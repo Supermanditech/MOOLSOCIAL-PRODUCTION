@@ -2,10 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'buy_v2_qualified_provider_fixture.dart';
+
+final class _FreightCommerce extends Fake implements BuyV2CommerceAdapter {
+  _FreightCommerce(this.products);
+  final List<BuyV2Product> products;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: products,
+    orders: const [],
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +56,101 @@ void main() {
     expect(session.addProduct('w-onion'), isTrue);
     session.openCart(scope: BuyV2CartScope.wholesale);
     return session;
+  }
+
+  for (final flags in [
+    [true],
+    [false],
+    [true, false],
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'Wholesale cart freight summary follows all selected lines $flags $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final base = BuyV2Catalogue.products.firstWhere(
+            (p) => p.id == 'w-onion',
+          );
+          final products = [
+            for (var i = 0; i < flags.length; i++)
+              BuyV2Product(
+                id: 'freight-$i',
+                storeId: 'freight-review-store',
+                offerClass: BuyV2OfferClass.wholesale,
+                price: 100 + i * 50,
+                minimumOrder: 1,
+                freightIncluded: flags[i],
+                destination: base.destination,
+                categoryId: base.categoryId,
+                brand: base.brand,
+                title: base.title,
+                variant: base.variant,
+                pack: base.pack,
+                unitPrice: base.unitPrice,
+                badge: base.badge,
+                seller: base.seller,
+                sellerType: base.sellerType,
+                deliveryPromise: base.deliveryPromise,
+                origin: base.origin,
+                confirmedOn: base.confirmedOn,
+                visualLabel: base.visualLabel,
+                visualKind: base.visualKind,
+              ),
+          ];
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: false,
+            commerceAdapter: _FreightCommerce(products),
+            productFactsAdapter: QualifiedTestProductFacts(
+              products.map((p) => p.id).toSet(),
+            ),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          for (final product in products) {
+          expect(session.addProduct(product.id), isTrue, reason: session.notice);
+          }
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          final totalBefore = session.scopedPayableTotal;
+          await tester.pumpWidget(
+            app(session, size: const Size(360, 800), textScale: scale),
+          );
+          await tester.pumpAndSettle();
+          final included = flags.every((flag) => flag);
+          final action = find.byKey(const ValueKey('buy-cart-action-bar'));
+          expect(
+            find.descendant(
+              of: action,
+              matching: find.text(
+                included
+                    ? 'Freight included · GST invoice at checkout'
+                    : 'Freight confirmed before payment · GST invoice at checkout',
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.text(included ? 'Landed cart total' : 'Cart subtotal'),
+            findsOneWidget,
+          );
+          if (!included) {
+            expect(
+              find.text('Freight included · GST invoice at checkout'),
+              findsNothing,
+            );
+            expect(find.text('Landed cart total'), findsNothing);
+          }
+          expect(session.scopedPayableTotal, totalBefore);
+          expect(session.cartLines.length, flags.length);
+          expect(find.text('Checkout'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   testWidgets('Wholesale Cart distinguishes products, packs and landed total', (

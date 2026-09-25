@@ -16,6 +16,29 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  Future<void> reveal(
+    WidgetTester tester,
+    String id,
+    Finder target, {
+    double delta = 180,
+  }) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        target,
+        delta,
+        scrollable: find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-$id')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+    } else {
+      await tester.ensureVisible(target);
+    }
+    await tester.pumpAndSettle();
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       'R66 003 tomato summary owns one price and purchase actions at $scale',
@@ -68,12 +91,13 @@ void main() {
           findsOneWidget,
         );
         expect(find.descendant(of: hero, matching: primary), findsOneWidget);
-        expect(find.descendant(of: hero, matching: store), findsOneWidget);
+
+        await reveal(tester, product.id, primary);
         _expectParagraphsFit(hero);
         if (scale == 1) {
           expect(tester.getRect(primary).bottom, lessThanOrEqualTo(752));
           expect(primary.hitTestable(), findsOneWidget);
-          expect(store.hitTestable(), findsOneWidget);
+
           await _captureR66Product(tester, '$scale-summary');
         }
         await Scrollable.ensureVisible(tester.element(primary), alignment: .3);
@@ -97,6 +121,14 @@ void main() {
         await tester.tap(plus);
         await tester.pumpAndSettle();
         expect(session.quantityFor(product.id), 2);
+        await reveal(tester, product.id, store);
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+            matching: store,
+          ),
+          findsOneWidget,
+        );
         await Scrollable.ensureVisible(tester.element(store), alignment: .3);
         await tester.pumpAndSettle();
         await tester.tap(store);
@@ -151,6 +183,7 @@ void main() {
       await tester.pumpWidget(app(session, size: size, textScale: 2));
       await tester.pumpAndSettle();
       final hero = find.byKey(ValueKey('buy-product-purchase-hero-$id'));
+      await reveal(tester, id, hero);
       expect(
         find.descendant(
           of: hero,
@@ -175,12 +208,19 @@ void main() {
         final details = find.byKey(ValueKey('buy-automatic-fulfilment-$id'));
         await tester.scrollUntilVisible(details, 180, scrollable: scroll);
         await tester.pumpAndSettle();
-        for (final label in ['Delivery', 'Method', 'Deliver to']) {
+        for (final label in ['Delivery', 'Method']) {
           expect(
             find.descendant(of: details, matching: find.text(label)),
             findsOneWidget,
           );
         }
+        expect(
+          find.descendant(
+            of: details,
+            matching: find.textContaining('Deliver to '),
+          ),
+          findsOneWidget,
+        );
         final terms = find.byKey(
           ValueKey('buy-wholesale-commercial-terms-$id'),
         );
@@ -249,6 +289,8 @@ void main() {
           .firstWhere((item) => item.destination == BuyV2Destination.shop)
           .copyWith(
             brand: 'Test packaged brand',
+            storeId: 'product-detail-test-store',
+            offerClass: BuyV2OfferClass.retail,
             purchaseProtection: const BuyV2PurchaseProtection(
               summary: 'Supplier reviews eligible requests',
               remedies: ['Replacement', 'Repair'],
@@ -301,18 +343,22 @@ void main() {
           .first;
       Future<void> read(String value) async {
         final target = find.text(value);
-        await tester.scrollUntilVisible(
-          target.first,
-          350,
-          scrollable: scroll,
-          maxScrolls: 70,
-        );
+        if (target.evaluate().isNotEmpty) {
+          await tester.ensureVisible(target.first);
+        } else {
+          await tester.scrollUntilVisible(
+            target,
+            350,
+            scrollable: scroll,
+            maxScrolls: 70,
+          );
+        }
         await tester.pumpAndSettle();
         expect(target, findsWidgets);
       }
 
       for (final value in [
-        'Delivery & returns',
+        'Delivery & seller',
         'Order by 14:30',
         'Delivery fee ₹19',
         'Dispatched after packing',
@@ -322,8 +368,15 @@ void main() {
         await read(value);
       }
       final protection = product.purchaseProtection!;
+      final returns = find.byKey(
+        ValueKey('buy-product-assurance-returns-${product.id}'),
+      );
+      await tester.ensureVisible(returns);
+      await tester.pumpAndSettle();
+      await tester.tap(returns.hitTestable());
+      await tester.pumpAndSettle();
       for (final value in [
-        if (protection.remedies.isNotEmpty) protection.remedies.join(' · '),
+        ...protection.remedies,
         protection.windowLabel,
         protection.conditionsLabel,
         protection.verificationLabel,
@@ -337,10 +390,29 @@ void main() {
         protection.policyVersion,
         protection.effectiveFromLabel,
       ].whereType<String>().where((value) => value.trim().isNotEmpty)) {
-        await read(value);
+        final fact = find.textContaining(value);
+        expect(fact, findsWidgets);
+        await tester.ensureVisible(fact.first);
+        await tester.pumpAndSettle();
       }
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      Future<void> selectDetails(int index) async {
+        final tab = find.byKey(
+          ValueKey('buy-product-details-tab-$index-${product.id}'),
+        );
+        if (tab.evaluate().isEmpty) {
+          await tester.scrollUntilVisible(tab, 220, scrollable: scroll);
+        }
+        await tester.ensureVisible(tab);
+        await tester.pumpAndSettle();
+        await tester.tap(tab.hitTestable());
+        await tester.pumpAndSettle();
+      }
+
       final compliance = product.compliance;
       if (compliance != null) {
+        await selectDetails(2);
         for (final value in [
           compliance.genericName,
           compliance.netQuantity,
@@ -356,14 +428,16 @@ void main() {
           await read(value);
         }
       }
+      await selectDetails(0);
       for (final value in [
         'Keep away from direct sunlight',
         'Store in a cool place',
         '${product.brand} special edition',
-        'A distinct supplier description.',
       ]) {
         await read(value);
       }
+      await selectDetails(1);
+      await read('A distinct supplier description.');
       final content = find.byKey(
         ValueKey('buy-product-content-ready-${product.id}'),
       );
@@ -513,7 +587,7 @@ void main() {
       ValueKey('buy-product-purchase-hero-${product.id}'),
     );
     expect(summary, findsOneWidget);
-    expect(tester.getSize(summary).width, greaterThanOrEqualTo(300));
+    expect(tester.getSize(summary).width, equals(288));
     expect(tester.takeException(), isNull);
   });
 
@@ -623,6 +697,24 @@ final class _ProductDetailFacts implements BuyV2ProductFactsAdapter {
                 ? 'Available now'
                 : 'Currently unavailable',
             sourceId: 'r66-product-detail-test',
+            eligibility: product.storeId != null && product.offerClass != null
+                ? BuyV2OfferEligibility(
+                    productId: product.id,
+                    storeId: product.storeId!,
+                    sourceRevision: 'product-detail-test-1',
+                    customerLocationKey: '||0',
+                    observedAt: DateTime.now().subtract(
+                      const Duration(minutes: 1),
+                    ),
+                    expiresAt: DateTime.now().add(const Duration(hours: 1)),
+                    offerClass: product.offerClass!,
+                    channelEnabled: true,
+                    storeReady: true,
+                    fleetAvailable: false,
+                    customerLocationConfirmed: true,
+                    options: const {BuyV2DeliveryOption.courier},
+                  )
+                : null,
             orderCutoffLabel: 'Order by 14:30',
             deliveryFeeLabel: 'Delivery fee ₹19',
             dispatchPromise: 'Dispatched after packing',

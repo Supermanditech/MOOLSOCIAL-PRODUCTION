@@ -103,27 +103,30 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.selectedProductId, id);
           expect(session.view, BuyV2View.product);
-          final hero = find
-              .byKey(ValueKey('buy-product-purchase-hero-$id'))
-              .last;
-          await tester.ensureVisible(hero);
-          await tester.pumpAndSettle();
-          expect(
-            find.descendant(
-              of: hero,
-              matching: find.byKey(ValueKey('buy-product-hero-store-$id')),
-            ),
-            findsOneWidget,
+          final page = find.byKey(PageStorageKey('buy-product-$id')).last;
+          final details = find.descendant(
+            of: page,
+            matching: find.byKey(ValueKey('buy-automatic-fulfilment-$id')),
           );
-          final details = find
-              .byKey(ValueKey('buy-automatic-fulfilment-$id'))
-              .last;
-          await tester.ensureVisible(details);
+          await tester.scrollUntilVisible(
+            details,
+            160,
+            scrollable: find
+                .descendant(of: page, matching: find.byType(Scrollable))
+                .first,
+          );
           await tester.pumpAndSettle();
           expect(
             find.descendant(
               of: details,
-              matching: find.text('Delivery & returns'),
+              matching: find.byKey(ValueKey('buy-product-hero-store-$id')),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: details,
+              matching: find.text('Delivery & seller'),
             ),
             findsOneWidget,
           );
@@ -3168,11 +3171,12 @@ void main() {
           await tester.pumpAndSettle();
           const imageAction = Alignment(-.5, .55);
           expect(image.hitTestable(at: imageAction), findsOneWidget);
-          final requestCount = source.productQueries.length;
           await tester.tapAt(imageAction.withinRect(tester.getRect(image)));
           await tester.pumpAndSettle();
           expect(session.selectedProductId, product);
           expect(session.selectedProduct?.storeId, firstStoreId);
+          // Product discovery may query; returning must not reload the catalogue.
+          final requestCount = source.productQueries.length;
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(source.productQueries.length, requestCount);
@@ -3221,11 +3225,11 @@ void main() {
           );
           await tester.ensureVisible(lastImage);
           await tester.pumpAndSettle();
-          final retainedRequests = source.productQueries.length;
           expect(lastImage.hitTestable(at: imageAction), findsOneWidget);
           await tester.tapAt(imageAction.withinRect(tester.getRect(lastImage)));
           await tester.pumpAndSettle();
           expect(session.selectedProductId, lastProduct);
+          final retainedRequests = source.productQueries.length;
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(tester.testTextInput.isVisible, isFalse);
@@ -3556,7 +3560,6 @@ void main() {
               .controller!
               .offset;
           expect(verticalOffset, greaterThan(0));
-          final requestCount = source.requests.length;
           await captureR66Visual(tester, 'r5-paged-$profile-page2');
           await tester.tapAt(
             imageAction.withinRect(tester.getRect(visibleImage)),
@@ -3564,6 +3567,8 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.selectedProductId, opened.id);
           expect(session.view, BuyV2View.product);
+          // Include product discovery before measuring the return-path requests.
+          final requestCount = source.requests.length;
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(session.view, BuyV2View.catalogue);
@@ -4194,7 +4199,12 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
         expectNestedStatusContrast();
-        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+        expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsNothing);
+        final productCart = find.byKey(
+          const ValueKey('buy-cart-navigation-button'),
+        );
+        expect(productCart.hitTestable(), findsOneWidget);
+        await tester.tap(productCart);
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         expectNestedStatusContrast();
@@ -4206,10 +4216,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
         expectNestedStatusContrast();
-        expect(
-          find.byKey(const ValueKey('buy-store-cart-bar')),
-          findsOneWidget,
-        );
+        expect(productCart.hitTestable(), findsOneWidget);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(full, findsOneWidget);

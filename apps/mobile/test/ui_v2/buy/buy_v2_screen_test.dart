@@ -4137,7 +4137,9 @@ void main() {
       final reviewProduct = find.byKey(
         ValueKey('buy-review-product-${product.id}'),
       );
-      expect(tester.getCenter(reviewProduct).dy, lessThan(480));
+      await tester.ensureVisible(reviewProduct);
+      await tester.pumpAndSettle();
+      expect(reviewProduct.hitTestable(), findsOneWidget);
       await tester.tap(reviewProduct);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -8856,15 +8858,23 @@ void main() {
                 findsOneWidget,
               );
               expect(inContent('Keep crates ventilated'), findsOneWidget);
+              expect(inContent('Product highlights'), findsOneWidget);
+              expect(inContent('All details'), findsOneWidget);
+              expect(inContent('Specifications'), findsOneWidget);
+              final descriptionTab = find.byKey(
+                ValueKey('buy-product-details-tab-1-${product.id}'),
+              );
+              await tester.ensureVisible(descriptionTab);
+              await tester.pumpAndSettle();
+              expect(descriptionTab.hitTestable(), findsOneWidget);
+              await tester.tap(descriptionTab);
+              await tester.pumpAndSettle();
               expect(
                 inContent(
                   'Supplier sorts this lot before packing. Keep away from direct heat.',
                 ),
                 findsOneWidget,
               );
-              expect(inContent('Highlights'), findsOneWidget);
-              expect(inContent('Specifications'), findsOneWidget);
-              expect(inContent('Description'), findsOneWidget);
             } else {
               expect(
                 tester.getSize(content).height,
@@ -9723,7 +9733,11 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Back to Safe Protein Store'), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-cart-navigation-button')).hitTestable(),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Back to Safe Protein Store'));
       await tester.pumpAndSettle();
@@ -11698,6 +11712,10 @@ void main() {
             const PageStorageKey('buy-product-s-dog-food'),
           ).first,
         );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(storeAction);
+        await tester.pumpAndSettle();
+        expect(storeAction.hitTestable(), findsOneWidget);
         await tester.tap(storeAction);
         await tester.pumpAndSettle();
         if (mode == 'closed') {
@@ -12203,11 +12221,19 @@ void main() {
         const PageStorageKey('buy-product-w-rice'),
       );
       await tester.scrollUntilVisible(primary, 220, scrollable: productScroll);
+      await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(primary), alignment: .4);
+      await tester.pumpAndSettle();
+      expect(primary.hitTestable(), findsOneWidget);
       await tester.tap(primary);
       await tester.pumpAndSettle();
       expect(session.quantityFor('w-rice'), greaterThanOrEqualTo(1));
-      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsNothing);
+      final productCart = find.byKey(
+        const ValueKey('buy-cart-navigation-button'),
+      );
+      expect(productCart.hitTestable(), findsOneWidget);
+      await tester.tap(productCart);
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.cart);
       expect(session.cartScope, BuyV2CartScope.wholesale);

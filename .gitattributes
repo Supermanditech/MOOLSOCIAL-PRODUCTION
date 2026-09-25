@@ -6,19 +6,15 @@ apps/mobile/lib/data/generated/** -whitespace
 # `text=auto` leaves binary goldens/captures untouched while normalizing text.
 apps/mobile/lib/** text=auto eol=lf
 apps/mobile/test/** text=auto eol=lf
-
 # Machine-state hashes must be identical in every Windows worktree.
 config/codex-development-regression-registry.json text eol=lf
 config/codex-subagent-coordination-policy.json text eol=lf
-
 # Preserve the upstream font license text exactly as distributed.
 apps/mobile/assets/fonts/OFL.txt -whitespace
-
 # Keep review collateral byte-exact and prevent global text conversion/diff
 # drivers from interpreting PDF and video binaries as source text.
 *.pdf binary
 *.mp4 binary
-
 # Review APKs exceed GitHub's ordinary-blob limit. Keep checksum-addressed
 # binaries recoverable through Git LFS while source and evidence stay in Git.
 *.apk filter=lfs diff=lfs merge=lfs -text

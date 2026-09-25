@@ -6,7 +6,7 @@
   "ticket": {
     "id": "UAW-CURSOR-BUY-READY-20260921",
     "classification": "mvp_supporting",
-    "customerOutcome": "Compact, readable Buy discovery, Store identity/cards and comparison controls with preserved navigation, basket, filters and truthful source data.",
+    "customerOutcome": "Existing commerce product pages show account-owned Recently viewed and current public More products for you, with exact identity, truthful availability and preserved product/Cart returns.",
     "classificationReason": "Complete founder-selected pending frontend acceptance within existing Buy launch journey; backend dependencies remain separately pending.",
     "minimumCompleteScope": [
       "C06-A01 impacted Create route child: normalize retired home entry to existing post editor so Back uses draft preservation",
@@ -17,7 +17,13 @@
       "R6633-D05 controlled comparison provider",
       "R6633-D06-B both publisher tabs with truthful controlled offers",
       "R6634-C08 through C16 founder visual corrections, local impact/child-defect checks and native review captures",
-      "Founder-authorized Redmi children D06-B-A01 publisher query and C10-A01 Store-details identity: implement and locally test, no new APK."
+      "Founder-authorized Redmi children D06-B-A01 publisher query and C10-A01 Store-details identity: implement and locally test, no new APK.",
+      "Founder bounded 19-reference goal; active sequential implementation BUY-PDP-REF-20260924-01 gallery and shared product composition, source connector and affected navigation tests.",
+      "Active sequential reference BUY-PDP-REF-20260924-02: existing variant/price/delivery/seller composition and typed metadata consumers; actual Store publication remains a required distinct acceptance dependency.",
+      "Active BUY-PDP-REF-20260924-03: return-policy and contextual-help presentation in existing owners; authoritative COD policy/placement/collection/ledger remains required and unresolved on the same ticket.",
+      "Active PDP04 replaces the existing commerce continuation rail, reusing published catalogue/content/facts and navigation; actual related-publication integration remains required on04.",
+      "Active PDP05 replaces existing commerce content/compliance card composition; optional source attribute and producer-address fields reuse existing contracts. Actual Store publication remains required on05.",
+      "Active PDP06: reuse recent-history/session/catalogue and shared product cards for lower product-page rail/grid. No invented history, personalization or sponsorship; preserve existing history/account persistence. Actual Store publication remains required."
     ],
     "explicitExclusions": [
       "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized by latest founder instruction; production promotion excluded.",
@@ -42,15 +48,15 @@
     "state": "founder_acknowledged_mvp_scope",
     "beyondMvpExplicitlyAuthorized": false,
     "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
-    "latestFounderInstruction": "GO AHEAD with Git checkpoint, incremental latest-work APK and Redmi testing; fix any build/validation issue before installing."
+    "latestFounderInstruction": "Fully implement all19 tickets/defects plus children, locally test and check impacts, then produce actual native screens for founder approval; no partial completion claim."
   },
   "execution": {
     "referenceWriteAuthorized": false,
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": true,
-    "deviceInstallAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
     "externalServiceWriteAuthorized": false
   },
   "checkpoint": {
@@ -119,12 +125,13 @@
         "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
       ],
       "manifestPath": "config/buy-founder-regression.json",
-      "manifestSha256": "602a8f7b0daeadab61c16ed7717a10f1dc1edd5b3c17bb316eca45e7f5879255",
+      "manifestSha256": "f16fe5cafe7e4d8420f562aab8ba8faa2ba6b5ad43f0105eecf0914f2118480d",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "within60To75DayLock": true,
       "evidencePath": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
     }
-  }
+  },
+  "boundedGoalManifest": "config/buy-founder-regression.json#boundedGoal19_20260924"
 }

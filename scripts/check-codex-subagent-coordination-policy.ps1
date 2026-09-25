@@ -1146,6 +1146,8 @@ $cursorStorefrontOwners = @(
   'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
   # Founder explicitly authorized all-store pickup after shared scope disclosure.
   'apps/mobile/lib/features/buy/buy_v2_session.dart',
+  # D17-A04: existing customer-state codec retains pending PO identity.
+  'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
   'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
   'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',

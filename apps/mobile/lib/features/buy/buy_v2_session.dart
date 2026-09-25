@@ -255,6 +255,159 @@ final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
   );
 }
 
+const _reviewReceiptOrderId = 'REVIEW-RECEIPT-01';
+const _reviewRescheduleOrderId = 'REVIEW-RESCHEDULE-01';
+const _reviewDeliverySlots = ['Review morning slot', 'Review afternoon slot'];
+
+BuyV2Order _deviceReviewReceiptOrder({bool reschedule = false}) {
+  final product = BuyV2Catalogue.allProducts.firstWhere(
+    (p) => p.id == 's-tomato',
+  );
+  return BuyV2Order(
+    id: reschedule ? _reviewRescheduleOrderId : _reviewReceiptOrderId,
+    purchaseId: reschedule
+        ? 'REVIEW-PURCHASE-RESCHEDULE-01'
+        : 'REVIEW-PURCHASE-RECEIPT-01',
+    destination: BuyV2Destination.shop,
+    title: reschedule
+        ? 'Review only: delivery reschedule'
+        : 'Review only: partial receipt',
+    itemSummary: '1 product · 2 items · Review only',
+    total: product.price * 2,
+    partner: 'Review store',
+    partnerType: 'Test data',
+    promise: 'Delivery for review only — no delivery occurred',
+    destinationLabel: 'Review address',
+    progress: reschedule ? .4 : 1,
+    status: reschedule
+        ? BuyV2OrderStatus.preparing
+        : BuyV2OrderStatus.delivered,
+    productIds: [product.id],
+    lines: [BuyV2CartLine(product: product, quantity: 2)],
+  );
+}
+
+BuyV2Order _deviceReviewAssignedOrder() {
+  final product = BuyV2Catalogue.allProducts.firstWhere(
+    (p) => p.id == 's-tomato',
+  );
+  return BuyV2Order(
+    id: 'REVIEW-ASSIGNED-01',
+    purchaseId: 'REVIEW-PURCHASE-ASSIGNED-01',
+    destination: BuyV2Destination.shop,
+    title: 'Review only: assigned delivery',
+    itemSummary: '1 product · 2 items · Review only',
+    total: product.price * 2,
+    partner: 'Review grocery store',
+    partnerType: 'Test Store data',
+    promise: 'Review delivery window - no actual delivery',
+    promisedByLabel: 'Review afternoon window',
+    dispatchPromise: 'Review packing complete',
+    destinationLabel: 'Review delivery address',
+    recipient: 'Review recipient',
+    addressLine: 'Review destination - no actual delivery',
+    deliveryPartnerName: 'Review courier',
+    deliveryPartnerType: 'Delivery partner',
+    deliveryServiceLevel: 'Review scheduled service',
+    trackingReference: 'REVIEW-TRACKING-01',
+    progress: .65,
+    status: BuyV2OrderStatus.dispatched,
+    productIds: [product.id],
+    lines: [BuyV2CartLine(product: product, quantity: 2)],
+  );
+}
+
+final class _BuyV2DeviceReviewReceiptAdapter
+    implements BuyV2DeliveryExceptionAdapter {
+  bool _disputed = false;
+  String? _reviewSlot;
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> loadException({
+    required String orderId,
+  }) async {
+    if (orderId == _reviewRescheduleOrderId) {
+      return BuyV2DeliveryExceptionSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        customerMessage: 'Review only: no delivery time was changed.',
+        exceptionId: 'REVIEW-RESCHEDULE-EXCEPTION-01',
+        kind: _reviewSlot == null
+            ? BuyV2DeliveryExceptionKind.rescheduleAvailable
+            : BuyV2DeliveryExceptionKind.dispatchDelayed,
+        headline: _reviewSlot == null
+            ? 'Review only: choose a delivery time'
+            : 'Review only: time selected',
+        detail: _reviewSlot == null
+            ? 'Test slots for checking the reschedule screen.'
+            : 'Selected $_reviewSlot locally. No delivery was changed.',
+        rescheduleSlots: _reviewSlot == null ? _reviewDeliverySlots : const [],
+      );
+    }
+    if (orderId != _reviewReceiptOrderId) {
+      return const BuyV2DeliveryExceptionSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        customerMessage: 'No review receipt for this order.',
+      );
+    }
+    final order = _deviceReviewReceiptOrder();
+    final line = order.lines.single;
+    return BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Review only: no delivery or support report sent.',
+      exceptionId: 'REVIEW-EXCEPTION-01',
+      kind: _disputed
+          ? BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed
+          : BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      headline: 'Review only: partial receipt',
+      detail: _disputed
+          ? 'Review report recorded locally. No report was sent.'
+          : 'Test data: two items ordered, one received. No real delivery occurred.',
+      proofReference: 'REVIEW-PROOF-01',
+      itemisedReceipt: BuyV2ItemisedReceipt(
+        orderId: order.id,
+        purchaseId: order.purchaseId!,
+        lines: [
+          BuyV2ReceiptLine(
+            productId: line.product.id,
+            variant: line.product.variant,
+            pack: line.product.pack,
+            orderedQuantity: 2,
+            receivedQuantity: 1,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> disputeProofOfDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String proofReference,
+  }) async {
+    if (orderId == _reviewReceiptOrderId &&
+        exceptionId == 'REVIEW-EXCEPTION-01' &&
+        proofReference == 'REVIEW-PROOF-01') {
+      _disputed = true;
+    }
+    return loadException(orderId: orderId);
+  }
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> rescheduleDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String slot,
+  }) async {
+    if (orderId == _reviewRescheduleOrderId &&
+        exceptionId == 'REVIEW-RESCHEDULE-EXCEPTION-01' &&
+        _reviewDeliverySlots.contains(slot)) {
+      _reviewSlot = slot;
+    }
+    return loadException(orderId: orderId);
+  }
+}
+
 final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   const _BuyV2DeviceReviewCommerceAdapter();
 
@@ -805,9 +958,12 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     this.providerCount = 100000,
     this.skusPerStore = 5000,
     this.now = DateTime.now,
-  }) : _templates = List.unmodifiable(
-         BuyV2Catalogue.products.where((p) => p.destination == destination),
-       ) {
+    this.includeVariantReviewFixtures = false,
+  }) : _templates = List.unmodifiable([
+         ...BuyV2Catalogue.products.where((p) => p.destination == destination),
+         if (includeVariantReviewFixtures)
+           ..._variantReviewProducts(destination),
+       ]) {
     if (_templates.isEmpty ||
         providerCount < 1 ||
         providerCount > 100000 ||
@@ -815,6 +971,166 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
         skusPerStore > 5000) {
       throw ArgumentError('Invalid development catalogue cohort');
     }
+  }
+
+  // Explicit review-only cohort. Prices are test values, never live offers.
+  static List<BuyV2Product> _variantReviewProducts(
+    BuyV2Destination destination,
+  ) {
+    final base = BuyV2Catalogue.products.firstWhere(
+      (product) => product.destination == destination,
+    );
+    const media = [
+      (
+        colour: 'pink',
+        view: 'front',
+        source:
+            'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-pink-select-202409?wid=940&hei=1112&fmt=png-alpha&.v=UVNpeHhuaEtmVmFjT28wSWtUWE40Z1V5N29UUE5sYkU5bzFjbnV4MlZFK3h5cTNsSm9CeDJ4ZzdnY0xHQkpkNm53M0FRZHBXNTh1U1lFVEtSR2YzTm5BTWNTTDd0aXhNTTNzYjcxKzVuY2M',
+        file: BuyV2MediaFileMetadata(
+          mimeType: 'image/png',
+          byteLength: 772310,
+          width: 940,
+          height: 1112,
+          normalized: true,
+          frameCount: 1,
+        ),
+      ),
+      (
+        colour: 'pink',
+        view: 'detail',
+        source:
+            'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-pink-select-202409_AV3?wid=1246&hei=518&fmt=jpeg&qlt=90&.v=UVNpeHhuaEtmVmFjT28wSWtUWE40anorcTNYMDVXRDRPM3FYZXpUVkY3M1BiNGFWb0pxVnpqT1Fjd2JNR3AySGhabWVOZUJidkVVTmVBWnZsRzdJVkpMdUFTNkVPN1JRY0dtdDhBSFU2WlZuMU9BZXZDZlFoMkQrRm9RMzZBT24',
+        file: BuyV2MediaFileMetadata(
+          mimeType: 'image/jpeg',
+          byteLength: 128629,
+          width: 1246,
+          height: 518,
+          normalized: true,
+          frameCount: 1,
+        ),
+      ),
+      (
+        colour: 'ultramarine',
+        view: 'front',
+        source:
+            'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-ultramarine-select-202409?wid=940&hei=1112&fmt=png-alpha&.v=aWI5aGdudlZCalMrV3A2QU5NeUlaUS9CQ2hhaHB3cVp0QldQUmg0R3F6NURreFIvckpMM0RHVW1acklsZHpObDJpdkFkeXRGenVzczlmSUZMYlgrMHBJQzFqek53VEVRN3NLQnhtYWpXTnYrNUdoc3VSMTlEQkd4dTVQR01rblc',
+        file: BuyV2MediaFileMetadata(
+          mimeType: 'image/png',
+          byteLength: 783554,
+          width: 940,
+          height: 1112,
+          normalized: true,
+          frameCount: 1,
+        ),
+      ),
+      (
+        colour: 'ultramarine',
+        view: 'detail',
+        source:
+            'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-ultramarine-select-202409_AV3?wid=1246&hei=518&fmt=jpeg&qlt=90&.v=aWI5aGdudlZCalMrV3A2QU5NeUlaUS9CQ2hhaHB3cVp0QldQUmg0R3F6NDRZM2hiRjNTRld2M201ZXQrQVpvNk1HdERxc1JTR0JKeGRITUM3NTliOWRSR0liZklwWjJ2eGlOd1dxRHFuOXA3ck1BalRTbjZTOTd3ZlhKc2VObzQ',
+        file: BuyV2MediaFileMetadata(
+          mimeType: 'image/jpeg',
+          byteLength: 134127,
+          width: 1246,
+          height: 518,
+          normalized: true,
+          frameCount: 1,
+        ),
+      ),
+    ];
+    return [
+      for (final colour in ['pink', 'ultramarine'])
+        for (final storage in [128, 256, 512])
+          BuyV2Product(
+            id: 'review-phone-$colour-$storage',
+            canonicalId: 'review-phone-16',
+            storeId: 'review-phone-store',
+            destination: destination,
+            categoryId: 'review-devices',
+            brand: 'Apple',
+            title: 'iPhone 16 - Review only',
+            variant:
+                '${colour == 'pink' ? 'Pink' : 'Ultramarine'} / $storage GB',
+            pack: 'One phone',
+            price:
+                (storage == 128
+                    ? 60000
+                    : storage == 256
+                    ? 70000
+                    : 80000) +
+                (colour == 'pink' ? 500 : 0),
+            mrp: storage == 128
+                ? 65000
+                : storage == 256
+                ? 75000
+                : 85000,
+            unitPrice: 'Test price / phone',
+            badge: 'Review only',
+            seller: 'Review phone store',
+            sellerType: 'Retailer',
+            deliveryPromise: 'Delivery for review only',
+            reviewDeliveryOptions: const {
+              BuyV2DeliveryOption.quick,
+              BuyV2DeliveryOption.scheduled,
+            },
+            offerClass: destination == BuyV2Destination.shop
+                ? BuyV2OfferClass.retail
+                : BuyV2OfferClass.wholesale,
+            origin: 'Controlled review data',
+            purchaseProtection: BuyV2PurchaseProtection(
+              summary: 'Review policy only; no actual purchase protection.',
+              warrantyLabel: storage == 512
+                  ? '24 months (review only)'
+                  : '12 months (review only)',
+            ),
+            compliance: BuyV2ProductCompliance(
+              manufacturerName: 'Review manufacturer (test entity)',
+              manufacturerAddress:
+                  'Review production site - $storage (test address)',
+              genericName: 'Review mobile phone',
+            ),
+            confirmedOn: base.confirmedOn,
+            visualLabel: 'Phone photo unavailable',
+            visualKind: base.visualKind,
+            variantAttributes: [
+              BuyV2VariantAttribute(
+                dimensionId: 'colour',
+                dimensionLabel: 'Colour',
+                optionId: colour,
+                optionLabel: colour == 'pink' ? 'Pink' : 'Ultramarine',
+                kind: BuyV2VariantDimensionKind.colour,
+                swatchArgb: colour == 'pink' ? 0xffdf8bb2 : 0xff6378d7,
+              ),
+              BuyV2VariantAttribute(
+                dimensionId: 'storage',
+                dimensionLabel: 'Storage',
+                optionId: '$storage',
+                optionLabel: '$storage GB',
+                kind: BuyV2VariantDimensionKind.storage,
+              ),
+            ],
+            mediaAssets: [
+              for (final photo in media.where((item) => item.colour == colour))
+                BuyV2ProductMediaAsset(
+                  id: 'review-phone-$colour-$storage-${photo.view}',
+                  label:
+                      '${photo.view == 'front' ? 'Front and back' : 'Camera detail'} - review photo',
+                  semanticLabel:
+                      'iPhone 16 $colour ${photo.view}; Apple reference photo for review',
+                  kind: BuyV2ProductContentMediaKind.network,
+                  source: photo.source,
+                  binding: BuyV2ProductMediaBinding(
+                    supplierWorkspaceId: 'review-phone-workspace',
+                    storeId: 'review-phone-store',
+                    productId: 'review-phone-16',
+                    skuId: 'review-phone-$colour-$storage',
+                    assetRevision: 'review-20260925',
+                    file: photo.file,
+                  ),
+                ),
+            ],
+          ),
+    ];
   }
 
   static const version = 'buy-catalogue-dev-v1';
@@ -833,13 +1149,15 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
   final BuyV2Destination destination;
   final int providerCount;
   final int skusPerStore;
+  final bool includeVariantReviewFixtures;
   final DateTime Function() now;
   final List<BuyV2Product> _templates;
   int productObjectsCreated = 0;
   int storeObjectsCreated = 0;
 
   String get _snapshotId =>
-      '$version-${destination.name}-$providerCount-$skusPerStore';
+      '$version-${destination.name}-$providerCount-$skusPerStore'
+      '${includeVariantReviewFixtures ? '-variant-review' : ''}';
 
   String storeIdAt(int index) =>
       '$version-${destination.name}-store-${(index + 1).toString().padLeft(6, '0')}';
@@ -924,9 +1242,9 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     final base = _templates[sku % _templates.length];
     return base.copyWith(
       id: productIdAt(store, sku),
-      canonicalId: '$version-${destination.name}-product-${sku + 1}',
+      canonicalId: base.canonicalId,
       storeId: storeIdAt(store),
-      title: '${base.title} ${sku + 1}',
+      title: base.title,
       seller: _name(store),
       sellerType: destination == BuyV2Destination.wholesale
           ? (_publisherType(store) == BuyV2OfferPublisherType.manufacturer
@@ -934,7 +1252,30 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
                 : 'Wholesaler')
           : base.sellerType,
       origin: _area(store),
-      variant: '${base.variant} · SKU ${sku + 1}',
+      variant: base.variant,
+      mediaAssets: [
+        for (final asset in base.mediaAssets)
+          BuyV2ProductMediaAsset(
+            id: asset.id,
+            label: asset.label,
+            semanticLabel: asset.semanticLabel,
+            kind: asset.kind,
+            source: asset.source,
+            posterSource: asset.posterSource,
+            transcript: asset.transcript,
+            binding: asset.binding == null
+                ? null
+                : BuyV2ProductMediaBinding(
+                    supplierWorkspaceId: asset.binding!.supplierWorkspaceId,
+                    storeId: storeIdAt(store),
+                    productId: base.canonicalId,
+                    skuId: productIdAt(store, sku),
+                    assetRevision: asset.binding!.assetRevision,
+                    file: asset.binding!.file,
+                    posterFile: asset.binding!.posterFile,
+                  ),
+          ),
+      ],
       catalogueListing: true,
     );
   }
@@ -959,6 +1300,8 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     bool ignoreText = false,
   }) {
     final base = _templates[sku % _templates.length];
+    // Review combinations are unique SKUs, not repeated load-test rows.
+    if (base.hasStructuredVariants && sku >= _templates.length) return false;
     if (query.categoryId != 'all' && base.categoryId != query.categoryId) {
       return false;
     }
@@ -968,7 +1311,9 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     if (query.maximumPrice != null && base.price > query.maximumPrice!) {
       return false;
     }
-    if (query.offersOnly && sku % 5 != 0) return false;
+    if (query.offersOnly && sku % 5 != 0 && !base.hasStructuredVariants) {
+      return false;
+    }
     final fulfilment = buyV2CatalogueFulfilmentModeFor(base);
     if (query.fulfilmentMode != null && query.fulfilmentMode != fulfilment) {
       return false;
@@ -1168,6 +1513,10 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
       if (store == null || !RegExp(r'^\d{4}$').hasMatch(suffix)) continue;
       final sku = int.parse(suffix) - 1;
       if (sku < 0 || sku >= skusPerStore) continue;
+      if (sku >= _templates.length &&
+          _templates[sku % _templates.length].hasStructuredVariants) {
+        continue;
+      }
       products.add(_product(store, sku));
     }
     return List.unmodifiable(products);
@@ -1181,28 +1530,33 @@ class BuyV2DevelopmentPublishedCatalogueSource
   BuyV2DevelopmentPublishedCatalogueSource({
     int providerCount = 100000,
     int skusPerStore = 5000,
+    this.includeVariantReviewFixtures = false,
     this.now = DateTime.now,
   }) : _shop = BuyV2DevelopmentCatalogueSource(
          destination: BuyV2Destination.shop,
          providerCount: providerCount,
          skusPerStore: skusPerStore,
+         includeVariantReviewFixtures: includeVariantReviewFixtures,
          now: now,
        ),
        _wholesale = BuyV2DevelopmentCatalogueSource(
          destination: BuyV2Destination.wholesale,
          providerCount: providerCount,
          skusPerStore: skusPerStore,
+         includeVariantReviewFixtures: includeVariantReviewFixtures,
          now: now,
        );
 
   static const version = 'buy-published-offers-dev-v1';
+  final bool includeVariantReviewFixtures;
   final DateTime Function() now;
   final BuyV2DevelopmentCatalogueSource _shop;
   final BuyV2DevelopmentCatalogueSource _wholesale;
   int get productObjectsCreated =>
       _shop.productObjectsCreated + _wholesale.productObjectsCreated;
   String get _snapshot =>
-      '$version-${_shop.providerCount}-${_shop.skusPerStore}';
+      '$version-${_shop.providerCount}-${_shop.skusPerStore}'
+      '${includeVariantReviewFixtures ? '-variant-review' : ''}';
 
   BuyV2OfferPublisherType _publisher(BuyV2Destination destination, int store) =>
       store % 4 == 0
@@ -2171,11 +2525,427 @@ class BuyV2ReviewComparisonSource implements BuyV2ComparisonSource {
   }
 }
 
+/// Buyer-side PO state only. The injected account identity and adapter own
+/// authentication and authoritative issuance; no local reference is generated.
+class BuyV2PurchaseOrderController extends ChangeNotifier {
+  BuyV2PurchaseOrderController({
+    required this.identity,
+    required this.adapter,
+    this.now = DateTime.now,
+    this.timeout = const Duration(seconds: 15),
+  }) {
+    identity.addListener(_identityChanged);
+  }
+
+  final ValueListenable<BuyV2CollectionIdentity?> identity;
+  final BuyV2PurchaseOrderAdapter adapter;
+  final DateTime Function() now;
+  final Duration timeout;
+  BuyV2PurchaseOrderReview? review;
+  String? message;
+  bool busy = false;
+  bool needsReconciliation = false;
+  bool _disposed = false;
+  bool _reviewFresh = false;
+  int _epoch = 0;
+  List<BuyV2CartLine> _lines = const [];
+  BuyV2Address? _address;
+  BuyV2StoreListing? _collectionStore;
+
+  void _identityChanged() {
+    _epoch++;
+    review = null;
+    _reviewFresh = false;
+    message = null;
+    busy = false;
+    needsReconciliation = false;
+    _lines = const [];
+    _address = null;
+    _collectionStore = null;
+    if (!_disposed) notifyListeners();
+  }
+
+  static String _destinationKey(
+    BuyV2Address? address,
+    BuyV2StoreListing? store,
+  ) => jsonEncode([
+    if (store != null) ...[
+      'collection',
+      store.id,
+      store.name,
+      store.address,
+      store.area,
+      store.regionId,
+    ],
+    if (address != null) ...[
+      'delivery',
+      address.id,
+      address.kind.name,
+      address.recipient,
+      address.phone,
+      address.line,
+      address.area,
+      address.pinCode,
+      address.landmark,
+    ],
+  ]);
+
+  bool _current(int epoch, BuyV2CollectionIdentity owner) =>
+      !_disposed &&
+      epoch == _epoch &&
+      identity.value?.accountId == owner.accountId &&
+      identity.value?.sessionId == owner.sessionId;
+
+  bool currentFor(
+    List<BuyV2CartLine> lines,
+    BuyV2Address? address, {
+    BuyV2StoreListing? collectionStore,
+  }) {
+    final value = review;
+    return _reviewFresh &&
+        value != null &&
+        value.buyerAccountId == identity.value?.accountId &&
+        value.matches(lines, now()) &&
+        _destinationKey(value.address, value.collectionStore) ==
+            _destinationKey(address, collectionStore);
+  }
+
+  Future<bool> prepare(
+    List<BuyV2CartLine> lines,
+    BuyV2Address? address, {
+    BuyV2StoreListing? collectionStore,
+  }) async {
+    if ((address == null) == (collectionStore == null) ||
+        (collectionStore != null && !collectionStore.hasCollectionAddress)) {
+      return false;
+    }
+    if (_disposed || busy || identity.value == null) return false;
+    // An uncertain issue must be resolved before preparing another draft.
+    if (needsReconciliation) return refresh();
+    _lines = List.unmodifiable(lines);
+    _address = address;
+    _collectionStore = collectionStore;
+    return _run(
+      () => adapter.review(
+        lines: _lines,
+        address: address,
+        collectionStore: collectionStore,
+      ),
+    );
+  }
+
+  Future<bool> issue(
+    List<BuyV2CartLine> lines,
+    BuyV2Address? address, {
+    BuyV2StoreListing? collectionStore,
+  }) async {
+    final value = review;
+    if (busy ||
+        needsReconciliation ||
+        value == null ||
+        !currentFor(lines, address, collectionStore: collectionStore) ||
+        value.documents.any(
+          (doc) => doc.state != BuyV2PurchaseOrderState.draft,
+        )) {
+      return false;
+    }
+    return _run(
+      () => adapter.issue(
+        requestId: value.requestId,
+        expectedRevision: value.revision,
+      ),
+      mutation: true,
+      expected: value,
+    );
+  }
+
+  Future<bool> approveRevision(
+    String documentId,
+    List<BuyV2CartLine> lines,
+    BuyV2Address? address, {
+    BuyV2StoreListing? collectionStore,
+  }) async {
+    final value = review;
+    if (busy ||
+        needsReconciliation ||
+        value == null ||
+        !currentFor(lines, address, collectionStore: collectionStore)) {
+      return false;
+    }
+    final document = value.documents
+        .where((doc) => doc.id == documentId)
+        .firstOrNull;
+    if (document == null || document.state != BuyV2PurchaseOrderState.revised) {
+      return false;
+    }
+    return _run(
+      () => adapter.approveRevision(
+        requestId: value.requestId,
+        expectedRevision: value.revision,
+        documentId: document.id,
+        documentRevision: document.revision,
+      ),
+      mutation: true,
+      expected: value,
+    );
+  }
+
+  Future<bool> refresh() async {
+    final value = review;
+    if (_disposed || busy || value == null) return false;
+    return _run(
+      () => adapter.refresh(requestId: value.requestId),
+      expected: value,
+    );
+  }
+
+  String _commercialKey(BuyV2PurchaseOrderDocument doc) => jsonEncode([
+    doc.supplierStoreId,
+    doc.terms,
+    doc.itemSubtotalMinor,
+    doc.chargesMinor,
+    doc.totalMinor,
+    for (final line in doc.lines)
+      [
+        line.productId,
+        line.variant,
+        line.pack,
+        line.quantity,
+        line.unitPriceMinor,
+      ],
+  ]);
+
+  Future<bool> _run(
+    Future<BuyV2PurchaseOrderReview> Function() operation, {
+    bool mutation = false,
+    BuyV2PurchaseOrderReview? expected,
+  }) async {
+    final owner = identity.value;
+    if (_disposed ||
+        busy ||
+        owner == null ||
+        (_address == null) == (_collectionStore == null)) {
+      return false;
+    }
+    final epoch = _epoch;
+    busy = true;
+    _reviewFresh = false;
+    message = null;
+    if (mutation) needsReconciliation = true;
+    notifyListeners();
+    try {
+      final next = await operation().timeout(timeout);
+      if (!_current(epoch, owner)) return false;
+      if (next.buyerAccountId != owner.accountId ||
+          !next.matches(_lines, now()) ||
+          _destinationKey(next.address, next.collectionStore) !=
+              _destinationKey(_address, _collectionStore) ||
+          (expected != null && next.requestId != expected.requestId)) {
+        throw const FormatException('Purchase order context mismatch');
+      }
+      if (expected != null) {
+        final old = {for (final doc in expected.documents) doc.id: doc};
+        if (next.documents.length != old.length ||
+            next.documents.any((doc) => !old.containsKey(doc.id))) {
+          throw const FormatException('Purchase order document set changed');
+        }
+        for (final doc in next.documents) {
+          final previous = old[doc.id]!;
+          if (_commercialKey(doc) != _commercialKey(previous) &&
+              doc.state != BuyV2PurchaseOrderState.revised &&
+              doc.state != BuyV2PurchaseOrderState.rejected) {
+            throw const FormatException('Unapproved purchase order terms');
+          }
+        }
+      }
+      review = next;
+      _reviewFresh = true;
+      needsReconciliation = false;
+      return true;
+    } on Object {
+      if (!_current(epoch, owner)) return false;
+      message = needsReconciliation
+          ? 'Purchase order status needs checking. Do not submit again.'
+          : 'Purchase order could not be checked. Try again.';
+      return false;
+    } finally {
+      if (_current(epoch, owner)) {
+        busy = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _epoch++;
+    identity.removeListener(_identityChanged);
+    super.dispose();
+  }
+}
+
+/// Explicit device-review fixture; never issues a supplier PO or payment.
+class _BuyV2DeviceReviewPurchaseOrderAdapter
+    implements BuyV2PurchaseOrderAdapter {
+  _BuyV2DeviceReviewPurchaseOrderAdapter(this.now);
+  static const buyerId = 'device-review-po-buyer';
+  final DateTime Function() now;
+  List<BuyV2CartLine> _lines = const [];
+  BuyV2Address? _address;
+  BuyV2StoreListing? _store;
+  final Set<String> _approvedDocuments = {};
+  int _request = 0;
+  int _revision = 0;
+  BuyV2PurchaseOrderState _state = BuyV2PurchaseOrderState.draft;
+  String get _requestId => 'REVIEW-PO-$_request';
+  String get _revisionId => 'review-$_revision';
+  BuyV2PurchaseOrderReview _snapshot() {
+    final groups = <String, List<BuyV2CartLine>>{};
+    for (final line in _lines) {
+      groups.putIfAbsent(line.product.storeId!, () => []).add(line);
+    }
+    return BuyV2PurchaseOrderReview(
+      requestId: _requestId,
+      revision: _revisionId,
+      buyerAccountId: buyerId,
+      buyerName: 'Review only - no real purchase order',
+      address: _address,
+      collectionStore: _store,
+      validUntil: now().add(const Duration(minutes: 15)),
+      documents: [
+        for (final group in groups.entries)
+          BuyV2PurchaseOrderDocument(
+            id: '$_requestId-${group.key}',
+            revision: _revisionId,
+            supplierStoreId: group.key,
+            supplierName: group.value.first.product.customerSeller(
+              group.value.first.product.seller,
+            ),
+            state: _approvedDocuments.contains('$_requestId-${group.key}')
+                ? BuyV2PurchaseOrderState.accepted
+                : _state,
+            reference: _state == BuyV2PurchaseOrderState.draft
+                ? null
+                : _requestId,
+            decisionMessage: _state == BuyV2PurchaseOrderState.revised
+                ? 'Review only: approve the revised sample packing terms.'
+                : null,
+            lines: [
+              for (final line in group.value)
+                BuyV2PurchaseOrderLine(
+                  productId: line.product.id,
+                  variant: line.product.variant,
+                  pack: line.product.pack,
+                  quantity: line.quantity,
+                  requestedQuantity: line.quantity,
+                  unitPriceMinor: line.product.price * 100,
+                ),
+            ],
+            itemSubtotalMinor: group.value.fold<int>(
+              0,
+              (sum, line) => sum + line.total * 100,
+            ),
+            chargesMinor: 0,
+            totalMinor: group.value.fold<int>(
+              0,
+              (sum, line) => sum + line.total * 100,
+            ),
+            terms: _revision >= 3
+                ? 'Review only: separate labelled packs. No supplier contacted or payment made.'
+                : 'Review only: original sample packing terms. No supplier contacted or payment made.',
+          ),
+      ],
+    );
+  }
+
+  void _check(String requestId, [String? revision]) {
+    if (_lines.isEmpty ||
+        requestId != _requestId ||
+        (revision != null && revision != _revisionId)) {
+      throw StateError('Stale review purchase order');
+    }
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> review({
+    required List<BuyV2CartLine> lines,
+    BuyV2Address? address,
+    BuyV2StoreListing? collectionStore,
+  }) async {
+    if (lines.isEmpty ||
+        (address == null) == (collectionStore == null) ||
+        lines.any(
+          (line) =>
+              line.product.storeId == null ||
+              line.product.destination != BuyV2Destination.wholesale,
+        )) {
+      throw StateError('Review purchase order needs exact wholesale identity');
+    }
+    _lines = List.unmodifiable(lines);
+    _address = address;
+    _store = collectionStore;
+    _approvedDocuments.clear();
+    _request++;
+    _revision = 1;
+    _state = BuyV2PurchaseOrderState.draft;
+    return _snapshot();
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> issue({
+    required String requestId,
+    required String expectedRevision,
+  }) async {
+    _check(requestId, expectedRevision);
+    if (_state != BuyV2PurchaseOrderState.draft) return _snapshot();
+    _state = BuyV2PurchaseOrderState.awaitingSupplier;
+    _revision = 2;
+    // Second explicit review scenario models a lost response after local issue.
+    // Refresh must reconcile the retained request; never a real supplier call.
+    if (_request == 2) throw StateError('Review-only interrupted PO response');
+    return _snapshot();
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> refresh({required String requestId}) async {
+    _check(requestId);
+    if (_state == BuyV2PurchaseOrderState.awaitingSupplier) {
+      _state = BuyV2PurchaseOrderState.revised;
+      _revision = 3;
+    }
+    return _snapshot();
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> approveRevision({
+    required String requestId,
+    required String expectedRevision,
+    required String documentId,
+    required String documentRevision,
+  }) async {
+    _check(requestId, expectedRevision);
+    if (documentRevision != _revisionId ||
+        !_snapshot().documents.any((doc) => doc.id == documentId) ||
+        _state != BuyV2PurchaseOrderState.revised) {
+      throw StateError('Invalid review approval');
+    }
+    _approvedDocuments.add(documentId);
+    if (_snapshot().documents.every(
+      (doc) => _approvedDocuments.contains(doc.id),
+    )) {
+      _state = BuyV2PurchaseOrderState.accepted;
+    }
+    _revision++;
+    return _snapshot();
+  }
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
-    this.productContentAdapter = const BuyV2CatalogueProductContentAdapter(),
+    BuyV2ProductContentAdapter? productContentAdapter,
     BuyV2ComparisonSource? comparisonSource,
     this.marketplaceTrustAdapter =
         const BuyV2CatalogueMarketplaceTrustAdapter(),
@@ -2188,8 +2958,9 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
     this.commercialPaymentTermsAdapter,
     this.checkoutQuoteAdapter,
+    BuyV2PurchaseOrderAdapter? purchaseOrderAdapter,
     this.balancePaymentAdapter,
-    this.deliveryExceptionAdapter,
+    BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter,
     this.liveDeliveryAdapter,
     this.collectionGateway,
     this.collectionIdentity,
@@ -2206,7 +2977,31 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
-  }) : comparisonSource =
+  }) : purchaseOrderAdapter =
+           purchaseOrderAdapter ??
+           (kDebugMode &&
+                   buyV2DeviceReviewBenefitSeedsEnabled &&
+                   reviewDataEnabled != false &&
+                   collectionIdentity == null &&
+                   commerceAdapter == null
+               ? _BuyV2DeviceReviewPurchaseOrderAdapter(catalogueNow)
+               : null),
+       deliveryExceptionAdapter =
+           deliveryExceptionAdapter ??
+           (kDebugMode &&
+                   buyV2DeviceReviewBenefitSeedsEnabled &&
+                   reviewDataEnabled != false
+               ? _BuyV2DeviceReviewReceiptAdapter()
+               : null),
+       productContentAdapter =
+           productContentAdapter ??
+           BuyV2CatalogueProductContentAdapter(
+             includeVariantReviewFixtures:
+                 reviewDataEnabled ??
+                 (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled),
+             now: catalogueNow,
+           ),
+       comparisonSource =
            comparisonSource ??
            ((reviewDataEnabled ??
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
@@ -2253,6 +3048,23 @@ class BuyV2Session extends ChangeNotifier {
     procurementIdentity?.addListener(_onProcurementIdentityChanged);
     collectionIdentity?.addListener(_onCollectionIdentityChanged);
     final buyerIdentity = collectionIdentity;
+    if (this.purchaseOrderAdapter is _BuyV2DeviceReviewPurchaseOrderAdapter) {
+      _deviceReviewPoIdentity = ValueNotifier(
+        const BuyV2CollectionIdentity(
+          accountId: _BuyV2DeviceReviewPurchaseOrderAdapter.buyerId,
+          sessionId: 'device-review-po-session',
+        ),
+      );
+    }
+    final poIdentity = _deviceReviewPoIdentity ?? buyerIdentity;
+    if (poIdentity != null && this.purchaseOrderAdapter != null) {
+      purchaseOrder = BuyV2PurchaseOrderController(
+        identity: poIdentity,
+        adapter: this.purchaseOrderAdapter!,
+        now: catalogueNow,
+      )..addListener(_onPurchaseOrderChanged);
+    }
+
     if (buyerIdentity != null) {
       collectionCheckout = BuyV2CollectionCheckoutController(
         identity: buyerIdentity,
@@ -2275,6 +3087,7 @@ class BuyV2Session extends ChangeNotifier {
         _deviceCatalogueSources[destination] = BuyV2DevelopmentCatalogueSource(
           destination: destination,
           now: catalogueNow,
+          includeVariantReviewFixtures: true,
         );
       }
       for (final area in BuyV2DevelopmentCatalogueSource.regions) {
@@ -2284,7 +3097,10 @@ class BuyV2Session extends ChangeNotifier {
       _catalogueRegionId ??= 'jodhpur';
       if (publishedCatalogueSource == null) {
         _devicePublishedCatalogueSource =
-            BuyV2DevelopmentPublishedCatalogueSource(now: catalogueNow);
+            BuyV2DevelopmentPublishedCatalogueSource(
+              now: catalogueNow,
+              includeVariantReviewFixtures: true,
+            );
       }
     }
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
@@ -2300,6 +3116,7 @@ class BuyV2Session extends ChangeNotifier {
             .expand((order) => order.productIds),
       );
     }
+    _seedDeviceReviewReceipt();
     if (!this.reviewDataEnabled) {
       _catalogueProducts.clear();
       _addresses.clear();
@@ -2316,6 +3133,23 @@ class BuyV2Session extends ChangeNotifier {
   bool get pagedCatalogueEnabled =>
       cataloguePageSource != null ||
       _deviceCatalogueSources.containsKey(destination);
+
+  void _seedDeviceReviewReceipt() {
+    if (kDebugMode &&
+        buyV2DeviceReviewBenefitSeedsEnabled &&
+        reviewDataEnabled &&
+        deliveryExceptionAdapter is _BuyV2DeviceReviewReceiptAdapter) {
+      for (final order in [
+        _deviceReviewReceiptOrder(),
+        _deviceReviewReceiptOrder(reschedule: true),
+        _deviceReviewAssignedOrder(),
+      ]) {
+        if (!_orders.any((existing) => existing.id == order.id)) {
+          _orders.add(order);
+        }
+      }
+    }
+  }
 
   /// Supplied by the Store wrapper from its authenticated active operation.
   /// Changing identity never converts this session's retained cart. The wrapper
@@ -2907,6 +3741,7 @@ class BuyV2Session extends ChangeNotifier {
     bool offersOnly = false,
     bool collectionOnly = false,
     BuyV2Destination? catalogueDestination,
+    BuyV2WholesaleSaleType? catalogueWholesaleSaleType,
     BuyV2DiscoveryRefinements? refinements,
   }) {
     final value = catalogueDestination ?? destination;
@@ -2929,7 +3764,7 @@ class BuyV2Session extends ChangeNotifier {
           ? shopSaleType
           : null,
       wholesaleSaleType: !storeCatalogue && value == BuyV2Destination.wholesale
-          ? wholesaleSaleType
+          ? catalogueWholesaleSaleType ?? wholesaleSaleType
           : null,
       fulfilmentMode: storeCatalogue || collectionOnly
           ? null
@@ -3448,6 +4283,9 @@ class BuyV2Session extends ChangeNotifier {
     _collectionEpoch++;
     collectionCheckout?.removeListener(_onCollectionCheckoutChanged);
     collectionCheckout?.dispose();
+    purchaseOrder?.removeListener(_onPurchaseOrderChanged);
+    purchaseOrder?.dispose();
+    _deviceReviewPoIdentity?.dispose();
     collectionIdentity?.removeListener(_onCollectionIdentityChanged);
     for (final state in _collectionStates.values) {
       state.elapsed.stop();
@@ -3890,6 +4728,87 @@ class BuyV2Session extends ChangeNotifier {
 
   final BuyV2CommercialPaymentTermsAdapter? commercialPaymentTermsAdapter;
   final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
+  final BuyV2PurchaseOrderAdapter? purchaseOrderAdapter;
+  BuyV2PurchaseOrderController? purchaseOrder;
+  ValueNotifier<BuyV2CollectionIdentity?>? _deviceReviewPoIdentity;
+
+  List<BuyV2CartLine> get purchaseOrderLines => checkoutLines
+      .where((line) => line.product.destination == BuyV2Destination.wholesale)
+      .toList(growable: false);
+  bool get purchaseOrderRequired =>
+      purchaseOrderAdapter != null && purchaseOrderLines.isNotEmpty;
+  bool get purchaseOrderReviewRequired {
+    if (!purchaseOrderRequired) return false;
+    final controller = purchaseOrder;
+    final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
+    final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
+    if (controller == null ||
+        (address == null && store == null) ||
+        controller.busy ||
+        controller.needsReconciliation ||
+        !controller.currentFor(
+          purchaseOrderLines,
+          address,
+          collectionStore: store,
+        )) {
+      return true;
+    }
+    final lines = {
+      for (final line in purchaseOrderLines) line.product.id: line,
+    };
+    return controller.review!.documents.any(
+      (doc) =>
+          doc.state != BuyV2PurchaseOrderState.accepted ||
+          doc.lines.any(
+            (line) =>
+                lines[line.productId]?.quantity != line.quantity ||
+                lines[line.productId]!.product.price * 100 !=
+                    line.unitPriceMinor,
+          ),
+    );
+  }
+
+  Future<bool> reviewPurchaseOrder() async {
+    final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
+    final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
+    if (address == null && store == null) return false;
+    return await purchaseOrder?.prepare(
+          purchaseOrderLines,
+          address,
+          collectionStore: store,
+        ) ??
+        false;
+  }
+
+  Future<bool> issuePurchaseOrder() async {
+    final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
+    final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
+    if (address == null && store == null) return false;
+    return await purchaseOrder?.issue(
+          purchaseOrderLines,
+          address,
+          collectionStore: store,
+        ) ??
+        false;
+  }
+
+  Future<bool> approvePurchaseOrderRevision(String documentId) async {
+    final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
+    final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
+    if (address == null && store == null) return false;
+    return await purchaseOrder?.approveRevision(
+          documentId,
+          purchaseOrderLines,
+          address,
+          collectionStore: store,
+        ) ??
+        false;
+  }
+
+  void _onPurchaseOrderChanged() {
+    if (!_collectionDisposed) notifyListeners();
+  }
+
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
   final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
   final BuyV2LiveDeliveryAdapter? liveDeliveryAdapter;
@@ -3933,8 +4852,6 @@ class BuyV2Session extends ChangeNotifier {
   static const bool sponsoredContentActivationApproved = false;
   static const BuyV2CatalogueProductFactsAdapter _catalogueFactsFallback =
       BuyV2CatalogueProductFactsAdapter();
-  static const BuyV2CatalogueProductContentAdapter _catalogueContentFallback =
-      BuyV2CatalogueProductContentAdapter();
   static const BuyV2CatalogueMarketplaceTrustAdapter _catalogueTrustFallback =
       BuyV2CatalogueMarketplaceTrustAdapter();
 
@@ -3962,6 +4879,10 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CheckoutSubmissionState.idle;
   Set<String> availablePaymentMethods = paymentMethods;
   String? commerceMessage;
+  String? _pendingPurchaseOrderAccountId;
+  String? _pendingPurchaseOrderRequestId;
+  String? _pendingPurchaseOrderRevision;
+  BuyV2PurchaseOrderReview? _pendingPurchaseOrderApproval;
   String? _checkoutIdempotencyKey;
   String? _paymentReference;
   Uri? _paymentActionUri;
@@ -4552,6 +5473,7 @@ class BuyV2Session extends ChangeNotifier {
   String? orderRefreshMessage(String orderId) => _orderRefreshMessages[orderId];
 
   Future<bool> refreshOrder(String orderId) async {
+    if (_collectionDisposed) return false;
     final index = _orders.indexWhere((order) => order.id == orderId);
     if (index < 0) {
       notice = 'This order could not be found.';
@@ -4567,11 +5489,14 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
     try {
       final result = await commerceAdapter.refreshOrder(orderId: orderId);
+      if (_collectionDisposed) return false;
       final refreshed = result.order;
       final valid =
           result.state == BuyV2CommerceLoadState.ready &&
           refreshed != null &&
           refreshed.id == orderId &&
+          refreshed.purchaseId == _orders[index].purchaseId &&
+          refreshed.destination == _orders[index].destination &&
           refreshed.total >= 0 &&
           refreshed.progress >= 0 &&
           refreshed.progress <= 1 &&
@@ -4598,6 +5523,7 @@ class BuyV2Session extends ChangeNotifier {
       notice = result.customerMessage;
       return true;
     } on Object {
+      if (_collectionDisposed) return false;
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.offline;
       _orderRefreshMessages[orderId] =
           'Order could not refresh. Check your connection and try again.';
@@ -4605,7 +5531,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     } finally {
       _orderRefreshBusyIds.remove(orderId);
-      notifyListeners();
+      if (!_collectionDisposed) notifyListeners();
     }
   }
 
@@ -4835,8 +5761,19 @@ class BuyV2Session extends ChangeNotifier {
   bool deliveryExceptionBusy(String orderId) =>
       _deliveryExceptionBusyOrderIds.contains(orderId);
 
-  BuyV2DeliveryExceptionSnapshot? deliveryExceptionFor(String orderId) =>
-      _deliveryExceptionSnapshots[orderId];
+  BuyV2DeliveryExceptionSnapshot? deliveryExceptionFor(String orderId) {
+    final snapshot = _deliveryExceptionSnapshots[orderId];
+    // An order refresh can replace its purchased lines after a receipt loaded.
+    // Never render or dispute receipt lines against a different purchase.
+    if (snapshot?.itemisedReceipt != null &&
+        !_validDeliveryExceptionSnapshot(snapshot!, orderId)) {
+      return const BuyV2DeliveryExceptionSnapshot(
+        state: BuyV2CommerceLoadState.unavailable,
+        customerMessage: 'Delivery receipt could not be verified. Try again.',
+      );
+    }
+    return snapshot;
+  }
 
   String? selectedDeliveryRescheduleSlot(String orderId) =>
       _selectedDeliveryRescheduleSlots[orderId];
@@ -4852,7 +5789,15 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
     try {
       final snapshot = await adapter.loadException(orderId: orderId);
-      if (!_validDeliveryExceptionSnapshot(snapshot)) return false;
+      if (!_validDeliveryExceptionSnapshot(snapshot, orderId)) {
+        _deliveryExceptionSnapshots[orderId] =
+            const BuyV2DeliveryExceptionSnapshot(
+              state: BuyV2CommerceLoadState.unavailable,
+              customerMessage:
+                  'Delivery receipt could not be verified. Try again.',
+            );
+        return false;
+      }
       _deliveryExceptionSnapshots[orderId] = snapshot;
       final selected = _selectedDeliveryRescheduleSlots[orderId];
       if (selected != null && !snapshot.rescheduleSlots.contains(selected)) {
@@ -4906,7 +5851,10 @@ class BuyV2Session extends ChangeNotifier {
         exceptionId: exceptionId,
         slot: slot,
       );
-      if (!_validDeliveryExceptionSnapshot(updated)) return false;
+      if (!_validDeliveryExceptionSnapshot(updated, orderId)) {
+        notice = 'Delivery update could not be verified. Try again.';
+        return false;
+      }
       _deliveryExceptionSnapshots[orderId] = updated;
       _selectedDeliveryRescheduleSlots.remove(orderId);
       notice = updated.customerMessage;
@@ -4922,7 +5870,7 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> disputeProofOfDelivery(String orderId) async {
     final adapter = deliveryExceptionAdapter;
-    final snapshot = _deliveryExceptionSnapshots[orderId];
+    final snapshot = deliveryExceptionFor(orderId);
     final exceptionId = snapshot?.exceptionId;
     final proofReference = snapshot?.proofReference;
     if (adapter == null ||
@@ -4939,7 +5887,10 @@ class BuyV2Session extends ChangeNotifier {
         exceptionId: exceptionId,
         proofReference: proofReference,
       );
-      if (!_validDeliveryExceptionSnapshot(updated)) return false;
+      if (!_validDeliveryExceptionSnapshot(updated, orderId)) {
+        notice = 'Delivery update could not be verified. Try again.';
+        return false;
+      }
       _deliveryExceptionSnapshots[orderId] = updated;
       notice = updated.customerMessage;
       return updated.kind == BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed;
@@ -5057,10 +6008,22 @@ class BuyV2Session extends ChangeNotifier {
 
   bool _validDeliveryExceptionSnapshot(
     BuyV2DeliveryExceptionSnapshot snapshot,
+    String orderId,
   ) {
     if (snapshot.customerMessage.trim().isEmpty) return false;
     if (snapshot.state != BuyV2CommerceLoadState.ready) return true;
     final kind = snapshot.kind;
+    final receipt = snapshot.itemisedReceipt;
+    if (receipt != null) {
+      final orderIndex = _orders.indexWhere((order) => order.id == orderId);
+      if (orderIndex < 0 ||
+          !receipt.matchesOrder(_orders[orderIndex]) ||
+          (kind != BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable &&
+              kind != BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed) ||
+          snapshot.proofReference?.trim().isNotEmpty != true) {
+        return false;
+      }
+    }
     if (kind == null) return true;
     if (snapshot.exceptionId?.trim().isNotEmpty != true ||
         snapshot.headline?.trim().isNotEmpty != true ||
@@ -5149,6 +6112,7 @@ class BuyV2Session extends ChangeNotifier {
           ..clear()
           ..addAll(snapshot.orders);
       }
+      _seedDeviceReviewReceipt();
       if (snapshot.state == BuyV2CommerceLoadState.ready) {
         if (!isStoreProcurement) _currentDeliveryOrderIds.clear();
         _currentDeliveryOrderIds.addAll(
@@ -6029,6 +6993,10 @@ class BuyV2Session extends ChangeNotifier {
       selectedPayment = storedPayment;
     }
     purchaseOrderReference = snapshot.purchaseOrderReference ?? '';
+    _pendingPurchaseOrderAccountId = snapshot.pendingPurchaseOrderAccountId;
+    _pendingPurchaseOrderRequestId = snapshot.pendingPurchaseOrderRequestId;
+    _pendingPurchaseOrderRevision = snapshot.pendingPurchaseOrderRevision;
+    _pendingPurchaseOrderApproval = null;
     _checkoutIdempotencyKey = snapshot.checkoutIdempotencyKey;
     _paymentReference = snapshot.paymentReference;
     _paymentActionUri = snapshot.paymentActionUri;
@@ -6076,7 +7044,8 @@ class BuyV2Session extends ChangeNotifier {
         .where((state) => state.name == snapshot.checkoutSubmissionState)
         .firstOrNull;
     checkoutSubmissionState = switch (storedSubmissionState) {
-      BuyV2CheckoutSubmissionState.submitting when _paymentReference != null =>
+      BuyV2CheckoutSubmissionState.submitting
+          when _paymentReference != null || _checkoutIdempotencyKey != null =>
         BuyV2CheckoutSubmissionState.paymentUnknown,
       BuyV2CheckoutSubmissionState.submitting =>
         BuyV2CheckoutSubmissionState.failed,
@@ -6194,15 +7163,15 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  void _persistCustomerState() {
+  Future<bool>? _persistCustomerState() {
     if (!procurementScopeCurrent ||
         (customerStateRecoveryPending &&
             (!_customerStateSnapshotLoaded ||
                 !_customerStateRestoreInFlight))) {
-      return;
+      return null;
     }
     final store = customerStateStore;
-    if (store == null || store.ownerScope == null) return;
+    if (store == null || store.ownerScope == null) return null;
     _customerStateMutationRevision += 1;
     if (customerStateRecoveryPending) {
       // Once a retained SKU is present in the live Cart, later removal must
@@ -6241,6 +7210,15 @@ class BuyV2Session extends ChangeNotifier {
       purchaseOrderReference: purchaseOrderReference.trim().isEmpty
           ? null
           : purchaseOrderReference.trim(),
+      pendingPurchaseOrderAccountId: _checkoutIdempotencyKey == null
+          ? null
+          : _pendingPurchaseOrderAccountId,
+      pendingPurchaseOrderRequestId: _checkoutIdempotencyKey == null
+          ? null
+          : _pendingPurchaseOrderRequestId,
+      pendingPurchaseOrderRevision: _checkoutIdempotencyKey == null
+          ? null
+          : _pendingPurchaseOrderRevision,
       checkoutIdempotencyKey: _checkoutIdempotencyKey,
       paymentReference: _paymentReference,
       paymentActionUri: _paymentActionUri,
@@ -6329,6 +7307,7 @@ class BuyV2Session extends ChangeNotifier {
           })
           .catchError((Object _) => reportFailure()),
     );
+    return write;
   }
 
   List<BuyV2CartLine> get cartLines {
@@ -6473,6 +7452,20 @@ class BuyV2Session extends ChangeNotifier {
         store: store,
         lines: checkoutLines,
         paymentMethod: selectedPayment,
+        purchaseOrderRequestId:
+            purchaseOrderRequired && !purchaseOrderReviewRequired
+            ? purchaseOrder!.review!.requestId
+            : null,
+        purchaseOrderReference:
+            purchaseOrderRequired && !purchaseOrderReviewRequired
+            ? purchaseOrder!.review!.documents
+                  .map((doc) => doc.reference!)
+                  .join(', ')
+            : null,
+        purchaseOrderRevision:
+            purchaseOrderRequired && !purchaseOrderReviewRequired
+            ? purchaseOrder!.review!.revision
+            : null,
       );
     } on FormatException {
       return null;
@@ -6514,6 +7507,12 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitCollectionPurchase() async {
+    if (purchaseOrderReviewRequired) {
+      notice = 'Purchase order collection details need review before payment.';
+      notifyListeners();
+      return false;
+    }
+
     if (!_checkoutEligibilityCurrent()) return false;
     if (_holdCheckoutForCustomerRecovery()) return false;
     if (view != BuyV2View.checkout ||
@@ -6601,6 +7600,7 @@ class BuyV2Session extends ChangeNotifier {
           productIds: List.unmodifiable(lines.map((line) => line.product.id)),
           lines: lines,
           paymentMethod: intent.basket.paymentMethod,
+          purchaseOrderReference: intent.basket.purchaseOrderReference,
           paymentStatusLabel: 'Paid',
           invoiceAvailable: false,
         ),
@@ -6723,9 +7723,11 @@ class BuyV2Session extends ChangeNotifier {
       final mode = fulfilmentModeFor(product);
       final promise = facts.deliveryPromise.trim().toLowerCase();
       final promisedBy = facts.promisedByLabel?.trim().toLowerCase() ?? '';
+      final provider = facts.deliveryProviderName?.trim() ?? '';
+      final service = facts.deliveryServiceLevel?.trim() ?? '';
       final key =
           '${product.destination.name}|${product.storeId ?? product.seller}|'
-          '${mode.name}|$promise|$promisedBy';
+          '${mode.name}|$promise|$promisedBy|$provider|$service';
       grouped.putIfAbsent(key, () => []).add(line);
     }
     return grouped.values
@@ -7430,18 +8432,42 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String _currentCheckoutQuoteFingerprint() {
-    final addressId = selectedAddressOrNull?.id ?? 'no-address';
-    final benefits = selectedCartBenefitsFor(
-      cartDestinations,
-    ).map((benefit) => '${benefit.id}:${benefit.sourceId}').join(',');
-    return checkoutFulfilmentGroups
-        .map(
-          (group) =>
-              '${group.key}:${group.total}:${tipForGroup(group)}:'
-              '${_checkoutGroupCouponSavings()[group.key] ?? 0}',
-        )
-        .followedBy([addressId, selectedPayment, benefits])
-        .join('|');
+    final address = selectedAddressOrNull;
+    final couponSavings = _checkoutGroupCouponSavings();
+    // Stable grouping is not a quote for a changed delivery plan. Bind both
+    // retained and in-flight quotes to the actual connector request context.
+    return jsonEncode([
+      for (final group in checkoutFulfilmentGroups)
+        [
+          group.key,
+          group.total,
+          tipForGroup(group),
+          couponSavings[group.key] ?? 0,
+          group.promise,
+          group.promisedByLabel,
+          group.dispatchPromise,
+          group.deliveryProviderName,
+          group.deliveryServiceLevel,
+          for (final line in group.lines)
+            [line.product.id, line.quantity, line.product.price],
+        ],
+      if (address != null)
+        [
+          address.id,
+          address.kind.name,
+          address.recipient,
+          address.phone,
+          address.line,
+          address.area,
+          address.pinCode,
+          address.landmark,
+        ]
+      else
+        null,
+      selectedPayment,
+      for (final benefit in selectedCartBenefitsFor(cartDestinations))
+        [benefit.id, benefit.sourceId],
+    ]);
   }
 
   void _invalidateCheckoutQuote() {
@@ -7963,13 +8989,23 @@ class BuyV2Session extends ChangeNotifier {
   /// ordering helper, not a personalized or clinical recommendation owner.
   List<BuyV2Product> productVariantsFor(BuyV2Product current) {
     if (current.destination == BuyV2Destination.orders) return const [];
+    final legacyOptions = <(String, String)>{};
     return List.unmodifiable(
-      _catalogueProducts
+      _knownCatalogueProducts
           .where(_procurementDiscoveryAllows)
           .where(
             (product) =>
                 product.destination == current.destination &&
-                product.canonicalId == current.canonicalId,
+                product.canonicalId == current.canonicalId &&
+                product.isFromSameStoreAs(current),
+          )
+          .where(
+            (product) =>
+                product.hasStructuredVariants ||
+                (product.variant == current.variant &&
+                        product.pack == current.pack
+                    ? product.id == current.id
+                    : legacyOptions.add((product.variant, product.pack))),
           ),
     );
   }
@@ -7983,9 +9019,14 @@ class BuyV2Session extends ChangeNotifier {
             destination != BuyV2Destination.wholesale)) {
       return const [];
     }
+    // Cart snapshots preserve an existing purchase but do not authorize
+    // discovery of products withdrawn from the current public catalogue.
+    final currentProducts = {
+      for (final product in _knownCatalogueProducts) product.id: product,
+    };
     return List.unmodifiable(
       _recentlyViewedProductIds
-          .map(findProduct)
+          .map((id) => currentProducts[id])
           .whereType<BuyV2Product>()
           .where(_procurementDiscoveryAllows)
           .where((product) => product.destination == destination)
@@ -8010,6 +9051,43 @@ class BuyV2Session extends ChangeNotifier {
     _persistCustomerState();
   }
 
+  /// Current public catalogue suggestions, not a personalization source. The
+  /// optional source is an already validated page or the existing real history.
+  List<BuyV2Product> productDiscoveryFor(
+    BuyV2Product current, {
+    Iterable<BuyV2Product>? source,
+    Set<String> excludedProductIds = const {},
+    bool includeVariants = false,
+    int limit = 40,
+  }) {
+    if (!catalogueAvailable ||
+        limit <= 0 ||
+        (current.destination != BuyV2Destination.shop &&
+            current.destination != BuyV2Destination.wholesale)) {
+      return const [];
+    }
+    final seen = <(String?, String, String, String)>{};
+    return List.unmodifiable(
+      (source ?? _knownCatalogueProducts)
+          .where(
+            (item) =>
+                item.destination == current.destination &&
+                item.id != current.id &&
+                !excludedProductIds.contains(item.id) &&
+                (item.catalogueListing || includeVariants) &&
+                _procurementDiscoveryAllows(item) &&
+                _availableForDiscovery(item) &&
+                (current.destination != BuyV2Destination.wholesale ||
+                    item.offerClass == current.offerClass),
+          )
+          .where(
+            (item) =>
+                seen.add((item.storeId, item.id, item.variant, item.pack)),
+          )
+          .take(limit),
+    );
+  }
+
   void clearRecentlyViewed(BuyV2Destination destination) {
     final productIds = _knownCatalogueProducts
         .where((product) => product.destination == destination)
@@ -8025,11 +9103,17 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2Product> productContinuationsFor(
     BuyV2Product current, {
-    int limit = 6,
+    int? limit = 6,
   }) {
-    if (current.destination == BuyV2Destination.orders || limit <= 0) {
+    if (current.destination == BuyV2Destination.orders ||
+        (limit != null && limit <= 0)) {
       return const [];
     }
+
+    final commerce =
+        current.destination == BuyV2Destination.shop ||
+        current.destination == BuyV2Destination.wholesale;
+    if (commerce && !catalogueAvailable) return const [];
 
     int score(BuyV2Product product) {
       var value = product.categoryId == current.categoryId ? 8 : 0;
@@ -8040,15 +9124,21 @@ class BuyV2Session extends ChangeNotifier {
     }
 
     final candidates =
-        (current.storeId == null ? _catalogueProducts : _knownCatalogueProducts)
+        (commerce || current.storeId != null
+                ? _knownCatalogueProducts
+                : _catalogueProducts)
             .where(_procurementDiscoveryAllows)
             .where(
               (product) =>
                   product.destination == current.destination &&
                   product.catalogueListing &&
-                  (current.storeId == null ||
-                      product.isFromSameStoreAs(current)) &&
-                  product.canonicalId != current.canonicalId,
+                  (commerce
+                      ? product.id != current.id &&
+                            product.categoryId == current.categoryId &&
+                            product.canonicalId != current.canonicalId
+                      : (current.storeId == null ||
+                                product.isFromSameStoreAs(current)) &&
+                            product.canonicalId != current.canonicalId),
             )
             .toList(growable: false);
     candidates.sort((left, right) {
@@ -8058,7 +9148,9 @@ class BuyV2Session extends ChangeNotifier {
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
-    return List.unmodifiable(candidates.take(limit));
+    return List.unmodifiable(
+      limit == null ? candidates : candidates.take(limit),
+    );
   }
 
   /// Returns exact current-catalogue Wholesale products from the same seller.
@@ -8498,7 +9590,12 @@ class BuyV2Session extends ChangeNotifier {
       final next = productContentAdapter.snapshotFor(product);
       return _validProductContent(product, next)
           ? next
-          : _catalogueContentFallback.snapshotFor(product);
+          : BuyV2ProductContentSnapshot(
+              productId: product.id,
+              state: BuyV2ProductContentState.unavailable,
+              sourceId: 'buy-product-content-validation',
+              customerMessage: 'Product information could not be loaded.',
+            );
     });
   }
 
@@ -8516,6 +9613,11 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final previous = _productContent[product.id];
+    if (previous?.observedAt != null &&
+        next.observedAt != null &&
+        next.observedAt!.isBefore(previous!.observedAt!)) {
+      return false;
+    }
     _productContent[product.id] = next;
     _productContentMediaInputs[product.id] = List.unmodifiable(
       product.mediaAssets,
@@ -8545,16 +9647,21 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (snapshot.highlights.any((item) => item.trim().isEmpty) ||
-        snapshot.specifications.any(
-          (item) => item.label.trim().isEmpty || item.value.trim().isEmpty,
+        [...snapshot.highlightFields, ...snapshot.specifications].any(
+          (item) =>
+              item.label.trim().isEmpty ||
+              item.value.trim().isEmpty ||
+              (item.attributeId != null &&
+                  (item.attributeId!.trim().isEmpty ||
+                      item.attributeId!.trim() != item.attributeId)) ||
+              (item.groupLabel != null && item.groupLabel!.trim().isEmpty),
         ) ||
         (snapshot.description != null &&
             snapshot.description!.trim().isEmpty)) {
       return false;
     }
-    if ((snapshot.state == BuyV2ProductContentState.offline ||
-            snapshot.state == BuyV2ProductContentState.unavailable) &&
-        snapshot.customerMessage?.trim().isNotEmpty != true) {
+    if (snapshot.customerMessage != null &&
+        snapshot.customerMessage!.trim().isEmpty) {
       return false;
     }
     return true;
@@ -8905,7 +10012,8 @@ class BuyV2Session extends ChangeNotifier {
     if (current == null ||
         next == null ||
         next.destination != current.destination ||
-        next.canonicalId != current.canonicalId) {
+        next.canonicalId != current.canonicalId ||
+        !next.isFromSameStoreAs(current)) {
       notice = 'This product option is no longer available.';
       notifyListeners();
       return false;
@@ -9001,6 +10109,8 @@ class BuyV2Session extends ChangeNotifier {
             'Previous product'
       : canReturnToShoppingAlerts
       ? 'Shopping alerts'
+      : _productReturnView == BuyV2View.cart
+      ? 'Cart'
       : _productReturnView == BuyV2View.orderItems
       ? 'Order items'
       : _productReturnDestination == BuyV2Destination.orders
@@ -11259,6 +12369,11 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (purchaseOrderReviewRequired) {
+      notice = 'Purchase order approval changed. Review it before payment.';
+      notifyListeners();
+      return false;
+    }
     final purchaseId = _nextLocalPurchaseId();
     _confirmedPurchaseId = purchaseId;
     _confirmedOrders = _createOrdersForGroups(groups, address, purchaseId);
@@ -11267,6 +12382,13 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (purchaseOrderReviewRequired) {
+      notice =
+          'Review the purchase order and supplier response before payment.';
+      notifyListeners();
+      return Future<bool>.value(false);
+    }
+
     if (!checkoutRequiresResolution &&
         (selectedPayment == 'Purchase order' ||
             !availablePaymentMethods.contains(selectedPayment))) {
@@ -11519,13 +12641,59 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!_checkoutEligibilityCurrent()) return false;
+    if (purchaseOrderReviewRequired) {
+      notice = 'Purchase order approval changed. Review it before payment.';
+      notifyListeners();
+      return false;
+    }
+    _pendingPurchaseOrderApproval = purchaseOrderRequired
+        ? purchaseOrder?.review
+        : null;
+    _pendingPurchaseOrderAccountId =
+        _pendingPurchaseOrderApproval?.buyerAccountId;
+    _pendingPurchaseOrderRequestId = _pendingPurchaseOrderApproval?.requestId;
+    _pendingPurchaseOrderRevision = _pendingPurchaseOrderApproval?.revision;
     _checkoutIdempotencyKey ??=
         'shop-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-'
         '${_checkoutAttemptSequence++}';
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
     notice = null;
-    _persistCustomerState();
+    final paymentOwner = collectionIdentity?.value;
+    final persistenceOwner = customerStateStore?.ownerScope;
+    final pendingWrite = _persistCustomerState();
     notifyListeners();
+    if (purchaseOrderRequired) {
+      bool retained = false;
+      try {
+        retained = await (pendingWrite ?? Future<bool>.value(false)).timeout(
+          purchaseOrder!.timeout,
+        );
+      } catch (_) {
+        retained = false;
+      }
+      if (_collectionDisposed) return false;
+      if (!retained ||
+          customerStateStore?.ownerScope != persistenceOwner ||
+          collectionIdentity?.value?.accountId != paymentOwner?.accountId ||
+          collectionIdentity?.value?.sessionId != paymentOwner?.sessionId ||
+          !procurementScopeCurrent ||
+          purchaseOrderReviewRequired ||
+          purchaseOrder?.review?.requestId != _pendingPurchaseOrderRequestId ||
+          purchaseOrder?.review?.revision != _pendingPurchaseOrderRevision) {
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
+        _checkoutIdempotencyKey = null;
+        _pendingPurchaseOrderApproval = null;
+        _pendingPurchaseOrderAccountId = null;
+        _pendingPurchaseOrderRequestId = null;
+        _pendingPurchaseOrderRevision = null;
+        notice = retained
+            ? 'Purchase order approval changed. Review it before payment.'
+            : 'Order recovery details could not be saved. Try again before payment.';
+        _persistCustomerState();
+        notifyListeners();
+        return false;
+      }
+    }
     final placement = await commerceAdapter.placeOrder(
       BuyV2OrderPlacementRequest(
         lines: List.unmodifiable(lines),
@@ -11538,6 +12706,12 @@ class BuyV2Session extends ChangeNotifier {
           _selectedCommercialPaymentTermIds,
         ),
         checkoutQuoteId: _checkoutQuote?.id,
+        purchaseOrderRequestId: purchaseOrderRequired
+            ? purchaseOrder?.review?.requestId
+            : null,
+        purchaseOrderRevision: purchaseOrderRequired
+            ? purchaseOrder?.review?.revision
+            : null,
         procurementContext: procurementContext,
       ),
     );
@@ -11552,6 +12726,90 @@ class BuyV2Session extends ChangeNotifier {
       groups: groups,
       address: address,
     );
+  }
+
+  bool _purchaseOrderConfirmationMatches(
+    BuyV2OrderPlacementResult placement,
+    List<BuyV2CartLine> purchased,
+  ) {
+    final approval = _pendingPurchaseOrderApproval ?? purchaseOrder?.review;
+    final purchaseId = placement.purchaseReference;
+    if (approval == null ||
+        approval.buyerAccountId != collectionIdentity?.value?.accountId ||
+        approval.documents.any(
+          (doc) => !doc.valid || doc.state != BuyV2PurchaseOrderState.accepted,
+        ) ||
+        purchaseId == null ||
+        purchaseId.trim().isEmpty ||
+        placement.orders.isEmpty ||
+        placement.orders.fold<int>(0, (sum, order) => sum + order.total) !=
+            checkoutPayableTotal) {
+      return false;
+    }
+    final expected = {for (final line in purchased) line.product.id: line};
+    final remaining = {
+      for (final line in purchased) line.product.id: line.quantity,
+    };
+    final orderIds = <String>{};
+    for (final order in placement.orders) {
+      if (order.id.trim().isEmpty ||
+          !orderIds.add(order.id) ||
+          order.purchaseId != purchaseId ||
+          order.total < 0 ||
+          order.lines.isEmpty ||
+          _orders.any(
+            (existing) =>
+                existing.id == order.id && existing.purchaseId != purchaseId,
+          )) {
+        return false;
+      }
+      final lineIds = <String>{};
+      for (final line in order.lines) {
+        final original = expected[line.product.id];
+        if (original == null ||
+            !lineIds.add(line.product.id) ||
+            line.quantity <= 0 ||
+            line.product.storeId != original.product.storeId ||
+            line.product.canonicalId != original.product.canonicalId ||
+            line.product.variant != original.product.variant ||
+            line.product.pack != original.product.pack ||
+            line.product.price != original.product.price ||
+            line.product.destination != original.product.destination ||
+            order.destination != line.product.destination) {
+          return false;
+        }
+        final left = remaining[line.product.id]! - line.quantity;
+        if (left < 0) return false;
+        remaining[line.product.id] = left;
+      }
+      if (order.productIds.length != lineIds.length ||
+          !setEquals(order.productIds.toSet(), lineIds)) {
+        return false;
+      }
+      final documents = approval.documents
+          .where(
+            (doc) => doc.lines.any((line) => lineIds.contains(line.productId)),
+          )
+          .toList(growable: false);
+      for (final line in order.lines.where(
+        (line) => line.product.destination == BuyV2Destination.wholesale,
+      )) {
+        if (!documents.any(
+          (doc) =>
+              doc.supplierStoreId == line.product.storeId &&
+              doc.lines.any(
+                (approved) => approved.productId == line.product.id,
+              ),
+        )) {
+          return false;
+        }
+      }
+      final reference = documents.isEmpty
+          ? null
+          : documents.map((doc) => doc.reference!).join(', ');
+      if (order.purchaseOrderReference != reference) return false;
+    }
+    return remaining.values.every((quantity) => quantity == 0);
   }
 
   bool _handleOrderPlacement({
@@ -11600,6 +12858,17 @@ class BuyV2Session extends ChangeNotifier {
         _bankTransferInstructions = null;
       }
       notice = null;
+      _persistCustomerState();
+      notifyListeners();
+      return false;
+    }
+    if (!reviewDataEnabled &&
+        purchaseOrderRequired &&
+        !_purchaseOrderConfirmationMatches(placement, lines)) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'Order details could not be matched to your purchase order. '
+          'Do not pay again. Check payment status or get order help.';
       _persistCustomerState();
       notifyListeners();
       return false;
@@ -11746,9 +13015,77 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> _restorePendingPurchaseOrder(
+    List<BuyV2CartLine> lines,
+    BuyV2Address address,
+  ) async {
+    final owner = collectionIdentity?.value;
+    final controller = purchaseOrder;
+    final requestId = _pendingPurchaseOrderRequestId;
+    final revision = _pendingPurchaseOrderRevision;
+    if (owner == null ||
+        controller == null ||
+        requestId == null ||
+        revision == null ||
+        owner.accountId != _pendingPurchaseOrderAccountId) {
+      return false;
+    }
+    try {
+      final approval =
+          _pendingPurchaseOrderApproval ??
+          await controller.adapter
+              .refresh(requestId: requestId)
+              .timeout(controller.timeout);
+      if (_collectionDisposed ||
+          collectionIdentity?.value?.accountId != owner.accountId ||
+          collectionIdentity?.value?.sessionId != owner.sessionId ||
+          approval.requestId != requestId ||
+          approval.revision != revision ||
+          approval.buyerAccountId != owner.accountId ||
+          BuyV2PurchaseOrderController._destinationKey(
+                approval.address,
+                approval.collectionStore,
+              ) !=
+              BuyV2PurchaseOrderController._destinationKey(address, null) ||
+          // An issued payment can outlive the offer's validity window. This
+          // historical match never authorizes a fresh order or payment.
+          !approval.matches(
+            lines
+                .where(
+                  (line) =>
+                      line.product.destination == BuyV2Destination.wholesale,
+                )
+                .toList(),
+            approval.validUntil.subtract(const Duration(microseconds: 1)),
+          ) ||
+          approval.documents.any(
+            (doc) => doc.state != BuyV2PurchaseOrderState.accepted,
+          )) {
+        return false;
+      }
+      for (final doc in approval.documents) {
+        for (final approved in doc.lines) {
+          final purchased = lines
+              .where((line) => line.product.id == approved.productId)
+              .firstOrNull;
+          if (purchased == null ||
+              purchased.quantity != approved.quantity ||
+              purchased.product.price * 100 != approved.unitPriceMinor) {
+            return false;
+          }
+        }
+      }
+      _pendingPurchaseOrderApproval = approval;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> reconcilePayment() async {
     if (!procurementScopeCurrent) return false;
     final procurementEpoch = _procurementEpoch;
+    final recoveryOwner = collectionIdentity?.value;
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
       return reconcileCollectionPurchase();
     }
@@ -11758,7 +13095,8 @@ class BuyV2Session extends ChangeNotifier {
     final address = selectedAddressOrNull;
     final lines = checkoutLines;
     if (idempotencyKey == null ||
-        paymentReference == null ||
+        (paymentReference == null &&
+            commerceAdapter is! BuyV2PendingOrderRecoveryAdapter) ||
         address == null ||
         lines.isEmpty) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
@@ -11768,16 +13106,65 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    // Hold the existing submission lock across PO restoration as well.
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
+    notice = null;
+    _persistCustomerState();
+    notifyListeners();
+    if (_pendingPurchaseOrderRequestId != null || purchaseOrderRequired) {
+      if (!await _restorePendingPurchaseOrder(lines, address)) {
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+        notice =
+            'Purchase order details could not be restored. Do not pay again. '
+            'Check payment status again or get order help.';
+        _persistCustomerState();
+        notifyListeners();
+        return false;
+      }
+    }
     final previous = _navigationSurfaceIdentity;
     final groups = checkoutFulfilmentGroups;
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
     notice = null;
     _persistCustomerState();
     notifyListeners();
-    final placement = await commerceAdapter.reconcileOrder(
-      idempotencyKey: idempotencyKey,
-      paymentReference: paymentReference,
-    );
+    BuyV2OrderPlacementResult placement;
+    try {
+      placement = paymentReference == null
+          ? await (commerceAdapter as BuyV2PendingOrderRecoveryAdapter)
+                .recoverOrder(idempotencyKey: idempotencyKey)
+                .timeout(const Duration(seconds: 15))
+          : await commerceAdapter.reconcileOrder(
+              idempotencyKey: idempotencyKey,
+              paymentReference: paymentReference,
+            );
+    } catch (_) {
+      if (_collectionDisposed) return false;
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'Payment status is unavailable. Do not pay again. Try checking again.';
+      _persistCustomerState();
+      notifyListeners();
+      return false;
+    }
+    if (_collectionDisposed) return false;
+    if (_pendingPurchaseOrderRequestId != null &&
+        (collectionIdentity?.value?.accountId != recoveryOwner?.accountId ||
+            collectionIdentity?.value?.sessionId != recoveryOwner?.sessionId)) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'Your account changed. Check this payment from the original account.';
+      _persistCustomerState();
+      notifyListeners();
+      return false;
+    }
+    if (paymentReference == null &&
+        placement.outcome == BuyV2OrderPlacementOutcome.unavailable) {
+      placement = const BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
+        customerMessage: 'Payment status is unavailable. Do not pay again.',
+      );
+    }
     if (isStoreProcurement &&
         (!procurementScopeCurrent || procurementEpoch != _procurementEpoch)) {
       return false;
