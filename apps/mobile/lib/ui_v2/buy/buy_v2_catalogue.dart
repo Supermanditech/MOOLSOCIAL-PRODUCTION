@@ -1873,7 +1873,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                       ? 'No matching offers'
                       : 'No matching products',
                   detail: widget.savedOnly
-                      ? 'Browse the next page or show all offers.'
+                      ? canPrevious || canNext
+                            ? 'Use the page controls or show all offers.'
+                            : 'Show all offers to browse available products.'
                       : widget.query.maximumPrice != null
                       ? 'Your price filter is limiting these results.'
                       : widget.showAreaControl
@@ -1999,7 +2001,11 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                     style: context.buyMeta,
                   ),
                 ),
-              if (widget.session.isStoreProcurement || widget.storeContext)
+              if (widget.session.isStoreProcurement ||
+                  widget.storeContext ||
+                  (widget.savedOnly &&
+                      products.isEmpty &&
+                      (canPrevious || canNext)))
                 pageControls,
               if (widget.footer != null) widget.footer!,
             ],

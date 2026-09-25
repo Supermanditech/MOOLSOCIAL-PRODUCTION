@@ -171,7 +171,100 @@ class _OffersSource implements BuyV2PublishedCatalogueSource {
   }
 }
 
+class _SavedPagesSource extends _OffersSource {
+  final cursors = <String?>[];
+  final itemsByCursor = <String?, List<BuyV2PublishedCatalogueOffer>>{};
+  @override
+  Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    cursors.add(cursor);
+    final all = await super.loadOffers(query, pageSize: pageSize);
+    final start = cursor == 'second' ? 2 : 0;
+    final items = all.items.skip(start).take(2).toList();
+    itemsByCursor[cursor] = items;
+    return BuyV2CataloguePage(
+      queryKey: query.key,
+      snapshotId: 'saved-pages-v1',
+      startIndex: start,
+      totalCount: 4,
+      items: items,
+      previousCursor: start == 0 ? null : 'first',
+      nextCursor: start == 0 ? 'second' : null,
+    );
+  }
+}
+
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Saved Offers empty page keeps pagination $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final core = BuySession();
+      final source = _SavedPagesSource();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: true,
+        cataloguePageSource: _Source(BuyV2Destination.shop),
+        publishedCatalogueSource: source,
+        initialCatalogueRegionId: 'jodhpur',
+        catalogueNow: () => source.now,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await tester.pumpWidget(_app(session));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      final original = source.itemsByCursor[null]!.first.product.id;
+      expect(session.addProduct(original), isTrue);
+      await tester.pumpAndSettle();
+      final saved = find.byKey(const ValueKey('buy-offers-saved'));
+      await tester.tap(saved);
+      await tester.pumpAndSettle();
+      expect(find.text('No saved offers on this page'), findsOneWidget);
+      final next = find.byKey(const ValueKey('buy-page-next-published-offers'));
+      await tester.ensureVisible(next);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IconButton>(next).onPressed, isNotNull);
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      expect(source.cursors, contains('second'));
+      final target = source.itemsByCursor['second']!.first.product.id;
+      await tester.tap(saved);
+      await tester.pumpAndSettle();
+      session.toggleSaved(target);
+      await tester.pumpAndSettle();
+      await tester.tap(saved);
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('buy-paged-card-$target')), findsOneWidget);
+      // Return through the existing grid swipe, then recover from its empty page.
+      final swipe = find.byKey(
+        const ValueKey('buy-page-swipe-published-offers'),
+      );
+      await tester.ensureVisible(swipe);
+      await tester.pumpAndSettle();
+      await tester.drag(swipe, const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('No saved offers on this page'), findsOneWidget);
+      await tester.ensureVisible(next);
+      await tester.pumpAndSettle();
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('buy-paged-card-$target')), findsOneWidget);
+      expect(session.cartLines.single.product.id, original);
+      expect(session.quantityFor(original), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     for (final amount in [50000, 1000000, 10000000, 10000001]) {
       testWidgets('A04 Offers banner price $amount stays complete at $scale', (

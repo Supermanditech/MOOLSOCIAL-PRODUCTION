@@ -1506,10 +1506,14 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     }
     final products = <BuyV2Product>[];
     for (final id in productIds) {
-      final separator = id.lastIndexOf('-sku-');
+      final comparison = RegExp(
+        r'^review-compare-(.+)-([1-3])$',
+      ).firstMatch(id);
+      final originId = comparison?.group(1) ?? id;
+      final separator = originId.lastIndexOf('-sku-');
       if (separator < 0) continue;
-      final store = _storeIndex(id.substring(0, separator));
-      final suffix = id.substring(separator + 5);
+      final store = _storeIndex(originId.substring(0, separator));
+      final suffix = originId.substring(separator + 5);
       if (store == null || !RegExp(r'^\d{4}$').hasMatch(suffix)) continue;
       final sku = int.parse(suffix) - 1;
       if (sku < 0 || sku >= skusPerStore) continue;
@@ -1517,7 +1521,15 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
           _templates[sku % _templates.length].hasStructuredVariants) {
         continue;
       }
-      products.add(_product(store, sku));
+      final origin = _product(store, sku);
+      products.add(
+        comparison == null
+            ? origin
+            : BuyV2ReviewComparisonSource.listing(
+                origin,
+                int.parse(comparison.group(2)!) - 1,
+              ),
+      );
     }
     return List.unmodifiable(products);
   }
@@ -2361,6 +2373,24 @@ class BuyV2ReviewComparisonSource implements BuyV2ComparisonSource {
   final Map<String, BuyV2Product> _origins = {};
   final Map<String, DateTime> _observations = {};
 
+  /// Deterministic review listing identity shared with retained-state resolution.
+  static BuyV2Product listing(BuyV2Product origin, int index) {
+    RangeError.checkValueInInterval(index, 0, 2, 'index');
+    final price = math.max(1, origin.price - 5 + index * 2);
+    return origin.copyWith(
+      id: 'review-compare-${origin.id}-${index + 1}',
+      storeId: 'review-comparison-store-${index + 1}',
+      seller: [
+        'Market Square Store',
+        'Neighbourhood Grocer',
+        'City Supply Store',
+      ][index],
+      price: price,
+      unitPrice: '₹$price / pack',
+      badge: '',
+    );
+  }
+
   @override
   BuyV2ComparisonIdentity? identityFor(BuyV2Product product) {
     if (product.destination != BuyV2Destination.shop &&
@@ -2424,19 +2454,7 @@ class BuyV2ReviewComparisonSource implements BuyV2ComparisonSource {
     final offers = <BuyV2ComparisonOffer>[];
     for (var i = 0; i < 3; i++) {
       final store = 'review-comparison-store-${i + 1}';
-      final price = math.max(1, origin.price - 5 + i * 2);
-      final product = origin.copyWith(
-        id: 'review-compare-${origin.id}-${i + 1}',
-        storeId: store,
-        seller: [
-          'Market Square Store',
-          'Neighbourhood Grocer',
-          'City Supply Store',
-        ][i],
-        price: price,
-        unitPrice: '₹$price / pack',
-        badge: '',
-      );
+      final product = listing(origin, i);
       _products[product.id] = product;
       _origins[product.id] = origin;
       _identities[product.id] = identity;

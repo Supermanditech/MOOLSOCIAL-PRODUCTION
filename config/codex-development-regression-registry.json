@@ -106824,6 +106824,26 @@
         "prevention": "Preserve rejected evidence; implement founder single-lane/radio colour correction, then run every selected exact scenario on final source and bind results before retry. Use discovered literal paths/full IDs.",
         "status": "corrected_547_exact_selected_scenarios_passed_checkpoint_pending",
         "followup": "Progress counters included hidden loading entries; corrected by set of exact required file/test pairs:547. Screenshot528 filename implies intended removal but observed cart remains1;preserve correction and require fresh frame immediately before coordinates."
+      },
+      "quantityCaseProjection20260925": {
+        "incident": "A04 full cases projection exceeded4000tokenbudget andtruncated at13320tokens.",
+        "cause": "Projected cases includingalllocalbindings instead of exact route summaries.",
+        "prevention": "Read onlycase counts anddistinct routes;exactmatchingcase whenneeded. No omitted outputtreated asread.",
+        "recovery": "Use bounded1000characterpercaseprojection orfirsttargetcase only.",
+        "resumeOutputRecovery": "Resume: prior capture/view 556 response exceeded context; file exists (163287 bytes), must inspect separately before device coordinates. Combined AGENTS reads also truncated; re-read bounded omitted portions. Separate owner reads and images, capped output; no truncated output treated as observed.",
+        "variantOwnerLookup": "A read-only rg lookup guessed buy_v2_variant_selection_test.dart and returned file-not-found exit1. No mutation/test result inferred. Before retry discover exact test owner from registered ticket cases or rg --files, never guess filename."
+      },
+      "savedEmptyRecovery20260925": {
+        "defect": "Native Saved Offers emptypage removes grid gesture andpublic pagecontrols;546 retained.",
+        "testFailure": "Two normal/enlarged tests read fixturelastItems afterprefetch andselectedwrongpageproduct. Usecursor-keyedfixturepages,notlastrequest.",
+        "diagnostics": "A guessed offersfilename/glob outputtruncated; titlemissing onlegacyticket;unicodeprint failed cp1252. Recover withknowncatalogueowner,gettitledefault,boundedJSONASCII output.",
+        "prevention": "Exactcursorandvisibleproductassertions;bounded projections;no stalefixtureassumption;preservefailedlogs."
+      },
+      "comparisonRestoreEncoding20260925": {
+        "incident": "Default PythonWindows encodingfailed writing rupeesymbol andtruncated newly edited sessionowner beforeformat;no tests/deviceusedfailedfile.",
+        "rootCause": "Path.write_text omittedencoding;laterformatwasnotconditionallygated.",
+        "recovery": "Preservedfailed1byte inignoredcomparison-restore-encoding-failed-session.bin;restored entire previouslyclean ownerfromHEADd681a1c6 bytes487004 SHA837873f22193fea0cf2b7ca1d08c22f5adf1808279547ec769e4ee8854a40fa1.",
+        "prevention": "ExplicitUTF8 read/write;prepare encodedbytes beforewrite;separatedependentformat/testcalls;readback beforeproceed."
       }
     }
   ],

@@ -1873,6 +1873,76 @@ void r669SharedProductTests() {
 
 void main() {
   test(
+    'review comparison cart restores through exact catalogue resolver',
+    () async {
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final source = BuyV2DevelopmentCatalogueSource(
+          destination: destination,
+          providerCount: 2,
+          skusPerStore: 24,
+          includeVariantReviewFixtures: true,
+        );
+        final page = await source.loadProducts(
+          BuyV2CatalogueQuery(destination: destination, regionId: 'jodhpur'),
+          pageSize: 1,
+        );
+        final origin = page.items.single;
+        final listings = [
+          for (var index = 0; index < 3; index++)
+            BuyV2ReviewComparisonSource.listing(origin, index),
+        ];
+        final snapshot = BuyV2CustomerStateSnapshot(
+          cartQuantities: {for (final item in listings) item.id: 2},
+          savedProductKeys: {},
+          recentlyViewedProductIds: [listings.first.id],
+        );
+        final store = _MemoryCustomerStateStore(
+          'comparison-restore-${destination.name}',
+        )..snapshot = snapshot;
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+            destination: destination,
+            providerCount: 2,
+            skusPerStore: 24,
+            includeVariantReviewFixtures: true,
+          ),
+          customerStateStore: store,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCustomerState();
+        expect(session.customerStateRecoveryPending, isFalse);
+        expect(session.cartLines, hasLength(3));
+        for (final listing in listings) {
+          final restored = session.product(listing.id);
+          expect(restored.storeId, listing.storeId);
+          expect(restored.canonicalId, origin.canonicalId);
+          expect(restored.variant, origin.variant);
+          expect(restored.pack, origin.pack);
+          expect(restored.price, listing.price);
+          expect(session.quantityFor(listing.id), 2);
+        }
+        expect(store.snapshot, same(snapshot));
+        expect(
+          await source.resolveProducts({
+            'review-compare-${origin.id}-0',
+            'review-compare-${origin.id}-4',
+            'review-compare-unknown-1',
+            'review-compare-${listings.first.id}-1',
+          }),
+          isEmpty,
+        );
+      }
+    },
+  );
+
+  test(
     'phone review cohort is explicit and binds six unique media variants',
     () async {
       final count = BuyV2Catalogue.products
