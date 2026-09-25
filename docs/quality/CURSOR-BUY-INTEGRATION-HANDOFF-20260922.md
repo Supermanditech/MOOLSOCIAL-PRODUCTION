@@ -2577,3 +2577,12 @@ Founder clarified the window must initially remain partial and expand fully only
 Store product queries remain bound to exact Store ID. Category taxonomy is currently shared; Store-specific category availability/counts remain provider-deferred. No claim of completed Store/backend integration. Inventory remains19 originals plus37 follow-ups (56 references); individual verification receipts do not imply all-ticket closure or founder acceptance. No APK, push, merge or checkout.
 
 Final native clarification receipt: after founder returned to MoolSocial,445 shows the normal partial opening and446 shows full safe-area expansion by dragging upwards, with Flour/rice/grains selection retained. This replaces the notification-obscured442 attempt for qualification. No automatic full-screen opening and no new APK.
+
+
+### Founder Git/completion count reconciliation — 25 September 2026
+
+Audited source checkpoint4a62a78b: zero staged, unstaged or untracked files. No ignored source/test/config/script/quality files in the assigned Buy owners. Required source, tests, ticket records and selected evidence are committed; the evidence archive SHA is4ddbd4333a2d3a8635411598d9b9340114004efd829062b31d03ca11af7eb516. Generated build/temp files and private unrelated phone images remain intentionally outside Git. No push/merge/APK.
+
+56 distinct references =19 original references +37 additional children/follow-ups.19 follow-up fixes have implementation, local-test and targeted Redmi verification evidence.37 references still require complete qualification:19 original references +18 follow-ups. This is NOT37 entirely unimplemented defects. A04 quantity remains in the18 because its full surface replay and unexplained extra-add observation are not closed; its requested large-price banner/unit-price repairs passed local/native checks and are no longer labelled open.17 other follow-ups still need their exact native trigger/recovery audit. All original parent closures and founder acceptance remain unproven. Backend is deferred separately.
+
+The exact verified19 and pending18 ID lists are in config/buy-founder-regression.json under boundedGoal19_20260924.reconciledStatus20260925. That snapshot supersedes stale chat/historical totals, without deleting historical evidence. Current source has547 distinct passing local scenarios. Do not call targeted native evidence full parent acceptance.

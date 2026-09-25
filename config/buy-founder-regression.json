@@ -9106,7 +9106,8 @@
         "path": "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/PDP04-SIMILAR-NATIVE-20260925.json",
         "sha256": "a0aeacbdfc4b134410453d147e4f443250103b999a2bdc7cfaecaec8b59c75db",
         "status": "targeted_native_verified_founder_approval_pending"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-05-A01",
@@ -9212,7 +9213,8 @@
       "reproduction": {
         "path": "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/150-512-manufacturer.png",
         "sha256": "ea4af85dc860408ef2091a57ca2815f46c43c14ca31ce5fe9f6ab12f596bac64"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-05-A02",
@@ -9962,7 +9964,8 @@
         "hotReload": "1/3185 libraries in 2569ms",
         "remaining": "Founder approval pending; mixed/enlarged cases locally verified. Parent D17 remains separately open."
       },
-      "frontendTechnicalStatus": "implemented_local_and_targeted_device_verified"
+      "frontendTechnicalStatus": "implemented_local_and_targeted_device_verified",
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6633-D06-B-A02",
@@ -10070,7 +10073,8 @@
           "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/175-offers-clean-delivery-copy.png"
         ],
         "observed": "Phone previews retained from Shop before Offers; Suppliers loads and phone search remains valid."
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-06-A03",
@@ -10159,7 +10163,8 @@
           "observed": "Shop/Suppliers SKU and Cart show Delivery for review only once. Cart-origin product labels Back as Cart and returns exact Pink128 SKU qty1 price60500. Only audit unit removed; returns retained Suppliers phone query without cart badge. No checkout or order.",
           "founderApproval": null
         }
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-06-A04",
@@ -10248,7 +10253,8 @@
           "observed": "Shop/Suppliers SKU and Cart show Delivery for review only once. Cart-origin product labels Back as Cart and returns exact Pink128 SKU qty1 price60500. Only audit unit removed; returns retained Suppliers phone query without cart badge. No checkout or order.",
           "founderApproval": null
         }
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6634-C07-A01",
@@ -10338,7 +10344,8 @@
         },
         "founderApproval": null,
         "backend": "deferred"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6634-C07-A02",
@@ -10425,7 +10432,8 @@
         "founderApproval": null,
         "backend": "deferred",
         "testHarnessNote": "First reproduction used wrong EditableText render wrapper and redundant controller teardown; corrected via EditableTextState.renderEditable and existing helper teardown. Corrected baseline failed only200percent withcaret506 versus viewport410. Failed logs preserved."
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6633-D09-A03",
@@ -10487,7 +10495,8 @@
         "analysis": "apps/mobile/build/buy-bounded-19-20260924/redmi-founder-audit/d09-a03-legacy-analysis.log",
         "finding": "First native replay221 exposed older saved orders with no line snapshots; recognised count-prefix fallback now covers that format without changing saved data. Unknown opaque summaries preserved.",
         "founderApproval": null
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6633-D07-A01",
@@ -10549,7 +10558,8 @@
         "observed": "Unverified collection preserves Cart; no duplicate sign-in, payment disabled. Native227 misleading0items repaired230 Cart saved. Native228 return proves quantity1 and37rupees unchanged. Audit-added unit removed. No order/payment submitted.",
         "testHarnessNote": "Initial static test product lacked Store binding; corrected test supplies explicit unresolved storeId matching native catalogue. Initial failed log retained.",
         "founderApproval": null
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6634-C05-A02",
@@ -10634,7 +10644,8 @@
         },
         "founderApproval": null,
         "backend": "deferred"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-03-A01",
@@ -10711,7 +10722,8 @@
         },
         "founderApproval": null,
         "backend": "deferred"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "R6633-D17-A07",
@@ -10846,7 +10858,8 @@
         "cart": "Audit-only Shop1 and Wholesale6 retained for remaining tests.",
         "founderApproval": null,
         "backend": "deferred"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-02-A03",
@@ -10910,7 +10923,8 @@
         "observed": "Compare prices whole words visible at200percent; comparison opens exact10kg/4pack context, refresh and Back return; scoped cart4 preserved. Font restored/readback1.0.",
         "hotReloadMs": 2789,
         "founderApproval": null
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-05-A03",
@@ -11036,7 +11050,8 @@
           "Current-source cumulative selected ledger replay and Git checkpoint",
           "Parent provider integration deferred; parent not closed"
         ]
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-PDP-REF-20260924-02-A04",
@@ -12344,7 +12359,7 @@
         }
       },
       "largePriceDeviceExperiment20260925": {
-        "status": "native_requested_amounts_verified_source_restored_final_replay_pending",
+        "status": "requested_amounts_native_verified_source_restored_final547_qualified_remaining_surface_audit_pending",
         "authority": "Founder requests one review SKU each in Buy, Wholesale and Offers with50000,1000000,10000000 to inspect clipping/overlap/spacing.",
         "classification": "mvp_supporting",
         "reuse": "Existing development catalogue product factory and existing native commerce views, no new screen/provider contract.",
@@ -12372,7 +12387,7 @@
         "acceptance": "Native normal/200percent before/afterAdd, price completeness, no overlaps or added quantity lane, product and Cart exact totals; restore test basket and font. Include50000 in local amount matrices. Review price-filter behavior is excluded from this temporary layout experiment; restore source before checkpoint.",
         "findings": [
           {
-            "status": "open",
+            "status": "repaired_local_and_requested_native_verified",
             "surface": "Offers featured banner",
             "evidence": "400-offers-price-review-refresh.png",
             "amount": 10000000,
@@ -12380,7 +12395,7 @@
             "repair": "Reuse exact glance monetary labels; measure banner price within available width, keep one line with readable bounded size; test normal/enlarged and uneven values."
           },
           {
-            "status": "open",
+            "status": "repaired_local_and_requested_native_verified",
             "surface": "SKU per-unit price after Add",
             "evidence": "402-offers-crore-after-add.png",
             "cause": "Unit-price text shares reduced price/action column and digits wrap after quantity reserves more width.",
@@ -12632,7 +12647,8 @@
           434
         ],
         "founderApproval": "pending"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     },
     {
       "id": "BUY-STORE-CATEGORY-20260925-01",
@@ -12820,7 +12836,8 @@
           }
         ],
         "founderApproval": "pending"
-      }
+      },
+      "frontendVerificationStatus20260925": "implemented_local_and_targeted_redmi_verified_founder_pending"
     }
   ],
   "visualReview20260923": {
@@ -14587,7 +14604,7 @@
         "bytes": 225646890
       }
     },
-    "newChildStatus": "37 linked/new follow-ups. Previous17 native-verified count retained as historical; A04/A05 and Store-category new targeted receipts recorded individually, comprehensive closure reconciliation pending. No all-ticket completion claim.",
+    "newChildStatus": "37 follow-ups:19 implemented/local-tested/targeted-Redmi-verified;18 pending required complete qualification, including partial-native A04.19 original parents also pending complete frontend acceptance.56 references total;37 pending qualification; founder approval separate.",
     "totalReferencesIncludingNewChildren": 56,
     "founderApprovalSequence": "Founder amendment20260925: show actual screens on connected Redmi using existing debug app via Flutter attach/hot reload, screen by screen across original19 and applicable children. Do not substitute a new APK without explicit authority and required gates. Check attachability, target identity and source/config compatibility first.",
     "latestProgress": "Current source547 distinct qualified scenarios, zero failures/skips. A04 requested price repairs, A05 address select/edit/cancel restoration, Store category partial-to-full drag verified. Founder approval and remaining goal references stay open; backend deferred.",
@@ -14805,6 +14822,94 @@
       "scope": "Local selected-case checkpoint evidence only; full device/founder/backend qualification remains separate.",
       "analysis": "content-empty-final-analysis.log: zero issues",
       "gitCheckpoint": "pre_commit_retry_pending"
+    },
+    "reconciledStatus20260925": {
+      "date": "2026-09-25",
+      "authority": "Founder requests check for work omitted from Git and definitive done/pending counts.",
+      "sourceCommit": "4a62a78bf93cbe13ced7a7299a717e96ec9f4e92",
+      "sourceSha256": "435877446cf304112efeaa1866fa5b038868812afdca418bb722f992c52d1803",
+      "countingUnit": "Distinct original ticket references plus distinct additional children/follow-ups; D08-C1,D09-C1,D10-C2 are already in original19 and not counted twice.",
+      "totalReferences": 56,
+      "originalReferences": 19,
+      "additionalChildrenAndFollowups": 37,
+      "implementedLocalAndTargetedRedmiVerifiedFollowups": [
+        "BUY-PDP-REF-20260924-04-A01",
+        "BUY-PDP-REF-20260924-05-A01",
+        "R6634-C05-A01",
+        "R6633-D09-A02",
+        "R6633-D17-A06",
+        "R6633-D06-B-A02",
+        "BUY-PDP-REF-20260924-06-A03",
+        "BUY-PDP-REF-20260924-06-A04",
+        "R6634-C07-A01",
+        "R6634-C07-A02",
+        "R6633-D09-A03",
+        "R6633-D07-A01",
+        "R6634-C05-A02",
+        "BUY-PDP-REF-20260924-03-A01",
+        "R6633-D17-A07",
+        "BUY-PDP-REF-20260924-02-A03",
+        "R6633-D05-A01",
+        "BUY-PDP-REF-20260924-02-A05",
+        "BUY-STORE-CATEGORY-20260925-01"
+      ],
+      "pendingFullQualificationOriginals": [
+        "BUY-PDP-REF-20260924-01",
+        "BUY-PDP-REF-20260924-02",
+        "BUY-PDP-REF-20260924-03",
+        "BUY-PDP-REF-20260924-04",
+        "BUY-PDP-REF-20260924-05",
+        "BUY-PDP-REF-20260924-06",
+        "R6633-D07",
+        "R6633-D08",
+        "R6633-D08-C1",
+        "R6633-D09",
+        "R6633-D09-C1",
+        "R6633-D10",
+        "R6633-D10-C2",
+        "R6633-D11",
+        "R6633-D17",
+        "R6633-D05",
+        "R6633-D06-B",
+        "R6634-C07",
+        "R6634-C05"
+      ],
+      "pendingFullQualificationFollowups": [
+        "BUY-PDP-REF-20260924-01-A01",
+        "BUY-PDP-REF-20260924-01-A02",
+        "BUY-PDP-REF-20260924-01-A03",
+        "BUY-PDP-REF-20260924-02-A01",
+        "BUY-PDP-REF-20260924-02-A02",
+        "BUY-PDP-REF-20260924-05-A02",
+        "BUY-PDP-REF-20260924-06-A01",
+        "BUY-PDP-REF-20260924-06-A02",
+        "R6633-D17-A01",
+        "R6633-D17-A02",
+        "R6633-D17-A03",
+        "R6633-D17-A04",
+        "R6633-D17-A05",
+        "R6633-D06-B-A01",
+        "R6634-C08",
+        "R6633-D09-A01",
+        "BUY-PDP-REF-20260924-05-A03",
+        "BUY-PDP-REF-20260924-02-A04"
+      ],
+      "verifiedFollowupCount": 19,
+      "pendingFullQualificationCount": 37,
+      "fullyClosedOriginalParents": 0,
+      "founderApproval": "separate_pending; targeted device proof is not full acceptance",
+      "backend": "deferred; not described as an unimplemented frontend fix",
+      "quantityChildDisposition": "A04 local547-selected coverage and multiple native surfaces passed, but required all-surface device replay and unresolved extra-add observation remain. Counted pending, not verified-done.",
+      "gitAudit": {
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "ignoredSourceTestConfigScriptsAndQualityFiles": 0,
+        "evidenceArchive": "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+        "archiveSha256": "4ddbd4333a2d3a8635411598d9b9340114004efd829062b31d03ca11af7eb516",
+        "intentionalExclusions": "Generated build/temp logs and unrelated private phone images442–443 remain ignored; no source or ticket work excluded."
+      },
+      "verification": "547 unique current-source local scenarios passed;8 Store parity/navigation cases included. Pending qualification is not a count of entirely unimplemented defects."
     }
   }
 }
