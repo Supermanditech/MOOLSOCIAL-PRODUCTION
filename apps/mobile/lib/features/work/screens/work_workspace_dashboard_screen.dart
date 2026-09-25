@@ -23513,10 +23513,18 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                     : 0,
               ),
               child: _StoreFormLayout(
+                compact: widget.counterSaleReceipt,
                 action: FilledButton(
                   key: Key(
                     widget.refund ? 'refund-confirm' : 'collection-confirm',
                   ),
+                  style: widget.counterSaleReceipt
+                      ? FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFF0F1F7),
+                          foregroundColor: MoolColors.navy,
+                          minimumSize: const Size(48, 48),
+                        )
+                      : null,
                   onPressed:
                       !draft.ready ||
                           draft.busy ||
@@ -23532,6 +23540,8 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                         ? 'Checking…'
                         : widget.refund
                         ? 'Confirm refund'
+                        : widget.counterSaleReceipt
+                        ? 'Record receipt'
                         : 'Confirm collection',
                   ),
                 ),
@@ -23540,12 +23550,30 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      widget.refund ? 'Record refund' : 'Record collection',
-                      style: Theme.of(context).textTheme.titleLarge,
+                      widget.refund
+                          ? 'Record refund'
+                          : widget.counterSaleReceipt
+                          ? 'Payment receipt'
+                          : 'Record collection',
+                      style: widget.counterSaleReceipt
+                          ? const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: MoolColors.ink,
+                            )
+                          : Theme.of(context).textTheme.titleLarge,
                     ),
+                    if (widget.counterSaleReceipt) const SizedBox(height: 6),
                     Text(
                       '${widget.payment.customerName} · ${widget.payment.invoiceId}',
+                      style: widget.counterSaleReceipt
+                          ? const TextStyle(
+                              fontSize: 12,
+                              color: MoolColors.muted,
+                            )
+                          : null,
                     ),
+                    if (widget.counterSaleReceipt) const SizedBox(height: 14),
                     if (!widget.counterSaleReceipt)
                       Text(
                         '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
@@ -28020,11 +28048,13 @@ class _StoreFormLayout extends StatelessWidget {
     required this.child,
     required this.action,
     this.scrollKey,
+    this.compact = false,
     this.padding = const EdgeInsets.all(16),
   });
 
   final Widget child, action;
   final Key? scrollKey;
+  final bool compact;
   final EdgeInsets padding;
 
   @override
@@ -28048,9 +28078,11 @@ class _StoreFormLayout extends StatelessWidget {
         );
       }
       return Column(
+        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
+          Flexible(
+            fit: compact ? FlexFit.loose : FlexFit.tight,
             child: SingleChildScrollView(
               key: scrollKey,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,

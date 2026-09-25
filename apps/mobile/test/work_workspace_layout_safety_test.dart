@@ -17169,6 +17169,22 @@ void main() {
       'POSPOLISH thirty item category cart preserves bill on toggles ${display.size} ${display.scale}',
       (tester) async {
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
         work.workspaceCatalogueItems
           ..clear()
           ..addAll(
@@ -17287,6 +17303,53 @@ void main() {
         expect(work.workspaceOrderQuantities, isEmpty);
         expect(work.workspaceInvoices.single.id, invoice.id);
         expect(work.workspaceCatalogueItems.every((p) => p.stock == 4), isTrue);
+        await tester.tap(find.byKey(const Key('work-counter-close')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        final savedInvoice = find.byKey(
+          ValueKey('work-sales-invoice-${invoice.id}'),
+        );
+        await reveal(tester, savedInvoice);
+        await tester.tap(savedInvoice);
+        await tester.pumpAndSettle();
+        final receipt = find.byKey(const Key('work-invoice-record-payment'));
+        await reveal(tester, receipt);
+        await tester.tap(receipt);
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsOneWidget);
+        if (display.scale == 1) {
+          expect(
+            tester.getSize(find.byType(BottomSheet)).height,
+            lessThan(420),
+          );
+        }
+        final confirm = find.byKey(const Key('collection-confirm'));
+        await reveal(tester, confirm);
+        expect(tester.getSize(confirm).height, greaterThanOrEqualTo(48));
+        expect(confirm.hitTestable(), findsOneWidget);
+        await tester.tap(find.byKey(const Key('collection-amount')));
+        tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+        await tester.pumpAndSettle();
+        await reveal(tester, confirm);
+        expect(confirm.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(confirm).bottom,
+          lessThanOrEqualTo(display.size.height - 160),
+        );
+        tester.view.resetViewInsets();
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(work.workspaceInvoices.single.id, invoice.id);
+        expect(
+          work.workspaceFinance!.payments
+              .singleWhere((payment) => payment.invoiceId == invoice.id)
+              .dueMinor,
+          300000,
+        );
         expect(tester.takeException(), isNull);
       },
     );

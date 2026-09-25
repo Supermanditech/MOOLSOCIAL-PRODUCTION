@@ -2375,3 +2375,33 @@ The whole Add Products/Counter Sale visual polish remains open. In particular,
 receipt-sheet compactness, remaining text/size refinements and device viewport
 coverage are not approved merely because functional tests pass. Final ticket
 closure still requires a separately authorized checksum-verified successor APK.
+
+### Reopened Counter Sale receipt compactness (2026-09-25)
+
+Observed receipt sheet filled the display despite short content. Opted only
+counterSaleReceipt into content-fit _StoreFormLayout; other collections/refunds
+retain their default layout. Existing bounded scroll/keyboard padding and all
+collection/draft/identity checks remain.18sp Payment receipt heading,12sp invoice
+reference and subdued48dp Record receipt action replace the oversized treatment.
+
+Failing-before receipt-compact-before-bound.txt measured806px sheet height where
+compact portrait must be below420. Earlier receipt-compact-before.txt lacked the
+finance binding and is test-setup evidence only, not an application failure.
+Extended30-item journey verifies unpaid invoice reopen, compact sheet, keyboard
+action reachability, cancel and unchanged300000paise due at360x806,320x640/2x and
+806x360/1.6x.21 combined tests pass in receipt-compact-after.txt, including existing
+counter receipt/customer and ordinary ledger collection regressions. Analysis clean.
+
+Attached OPPO reload accepted4libraries in3244ms. Existing1761 unpaid invoice
+opened compact receipt, amount field and action remained above numeric keyboard;
+Android Back dismissed keyboard then sheet. No device collection/invoice created.
+Actual screenshots oppo-receipt-compact.png and oppo-receipt-compact-keyboard.png
+were visually inspected against earlier oppo-receipt-keyboard.png. Founder visual
+approval and full sweep remain open; no new APK or backend work.
+
+Founder GST addition remains a separate open mapping requirement: seller snapshot
+currently lacks GSTIN, while buyer business GSTIN is separately mapped. Verify
+Store-scoped authoritative registration and applicability before populating seller
+GSTIN; never infer tax amounts/status from onboarding text or alter old invoices.
+Official CBIC invoice/composition guidance was checked; this is not a claim that
+local review documents meet all tax-invoice issuance requirements.
