@@ -2556,3 +2556,28 @@ confirm one-line heading, readable instruction, entire product and both actions
 above system navigation. Before: csv-photo-check-font16.png. Dismissed dialog
 without accepting replacement, cancelled editor, restored rotationfree and kept
 font1.6. No new APK/install or Cursor changes. Full sweep remains open.
+
+### Combined polish reconciliation at bd2866eb (2026-09-25)
+
+Latest selected connected journey suite119/119 passed, exit0: POSPOLISH,
+PRIVATEPHOTO, ADDPHOTO, ADDENTRY, ADDREVIEW, ADDGRID, CSV20/21/24/29/34/37,
+COUNTERLARGE/SCALE/POLISH/1919/D01/DISCOUNT and CSOPPOFIX015. Log in task outputs:
+polish-latest-combined-bd2866eb.txt. This is not an all-repository qualification.
+
+Invoice PDF suite22/22 passed in review mode and22/22 in default mode. Initial
+invocation enabled review source without EXPECT_REVIEW_PDF=true; the source-mode
+assertion correctly conflicted with that invocation,21pass/1fail retained in
+polish-latest-document-bd2866eb.txt. No source assertion was weakened. Corrected
+review invocation and separate default invocation both exited0; logs
+polish-latest-document-review-bd2866eb.txt and
+polish-latest-document-default-bd2866eb.txt. Renderer/source isolation, native
+printer contracts, cancellation, page handling, share absence and errors tested;
+no physical print/message/payment implied.
+
+Current founder review, superseding stale pending tables, is task outputs/
+store-pos-polish-current-review-20260925.md, queued in the right-side panel.
+All six referenced OPPO screenshots exist. Keep optical match, physical haptic
+feel, remaining device-only variants and cold-process fidelity distinct from
+local/attached-restart proof. Seller GST automatic mapping remains a separate
+open founder addition; backend and successor-APK closure remain deferred. No
+full-sweep/founder-acceptance claim is made by this evidence checkpoint.
