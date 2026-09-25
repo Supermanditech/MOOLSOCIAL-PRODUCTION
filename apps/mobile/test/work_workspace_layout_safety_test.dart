@@ -2064,7 +2064,10 @@ void main() {
       final before = tester.getSize(centre).width;
       expect(
         before,
-        tester.getSize(find.byKey(const Key('work-workspace-dashboard'))).width,
+        tester
+                .getSize(find.byKey(const Key('work-workspace-dashboard')))
+                .width -
+            (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1 ? 49 : 0),
       );
       await tester.tap(toggle);
       await tester.pumpAndSettle();

@@ -3027,3 +3027,24 @@ remained after collapse. No records, stock, payments or invoices were changed.
 Latest final host evidence: outputs/home-true-collapse-qualified-20260926.txt.
 Analysis passed. Physical landscape/enlarged-text verification remains pending;
 no new APK and no claim of complete device qualification or prior-ticket closure.
+
+## HOME-03 midpoint Shortcuts tab — device preview, awaiting review
+
+Founder requested showing the labelled midpoint right-edge alternative on OPPO.
+Replaced the bottom-only chevron with a Shortcuts tab in a reserved49dp strip
+(48dp target plus1dp divider), centred beside home content. Expanded named tabs
+remain scrollable; the same tab hides them. No content overlay, extra bottom tab
+or dual-purpose Store navigation. Existing session choice remains; no restart
+persistence added. Short/enlarged layouts retain the adaptive horizontal strip.
+Trade-off disclosed: collapsed centre is wider than expanded, but the edge-tab
+target still reserves49dp rather than giving the centre the entire pane width.
+
+Initial local run found1px overflow from the divider reducing the48dp target;
+fixed the allocated width, without shrinking the target. All10 focused HOME/
+AP030 checks then passed, including enlarged text and old-rail source guard.
+This is a preview qualification, not a new full regression/release claim.
+Hot reload succeeded (1 library,2523ms). OPPO portrait opening and closing were
+verified; screenshot pairs outputs/home-edge-preview-20260926.png and
+outputs/home-edge-open-20260926.png inspected. Left OPPO on collapsed Store home.
+No records changed or APK built. Await founder visual review; existing physical
+landscape/enlarged-text and previous pending items remain open.

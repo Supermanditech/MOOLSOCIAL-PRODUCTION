@@ -3715,8 +3715,7 @@ class _StoreControlDashboard extends StatelessWidget {
           // Enlarged text has its own fallback below. Do not make a fitting
           // compact portrait scroll merely because its text is scaled.
           final shortViewport = constraints.maxHeight < 260;
-          final actionsBelow =
-              !actionsExpanded || _storeActionsBelowContent(context);
+          final actionsBelow = _storeActionsBelowContent(context);
           final collection =
               (reviewedOrder ?? session.currentWorkspaceOrder)
                   ?.isCustomerCollection ==
@@ -3928,7 +3927,7 @@ class _StoreActionEdge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deal = session.activeGroupBuy;
-    final horizontal = !expanded || _storeActionsBelowContent(context);
+    final horizontal = _storeActionsBelowContent(context);
     final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
     final readableWidth =
         _storeRailWordWidth(
@@ -3945,13 +3944,14 @@ class _StoreActionEdge extends StatelessWidget {
         key: const Key('work-store-action-edge'),
         width: horizontal
             ? double.infinity
-            : (readableWidth > normalWidth ? readableWidth : normalWidth) +
-                  (expanded ? 40 : 20),
+            : expanded
+            ? (readableWidth > normalWidth ? readableWidth : normalWidth) + 68
+            : 49,
         height: horizontal
-            ? !expanded
-                  ? 48
-                  : (MediaQuery.textScalerOf(context).scale(11) * 2.55 + 22)
-                        .clamp(54.0, double.infinity)
+            ? (MediaQuery.textScalerOf(context).scale(11) * 2.55 + 22).clamp(
+                54.0,
+                double.infinity,
+              )
             : null,
         decoration: BoxDecoration(
           border: horizontal
@@ -3959,44 +3959,67 @@ class _StoreActionEdge extends StatelessWidget {
               : const Border(left: BorderSide(color: Color(0xFFE5E8F1))),
         ),
         child: Flex(
-          direction: horizontal ? Axis.horizontal : Axis.vertical,
-          verticalDirection: VerticalDirection.up,
+          direction: Axis.horizontal,
+          textDirection: TextDirection.rtl,
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Semantics(
-              expanded: expanded,
-              button: true,
-              label: expanded ? 'Hide Store shortcuts' : 'Show Store shortcuts',
-              excludeSemantics: true,
-              onTap: onToggle,
-              child: Tooltip(
-                message: expanded ? 'Hide shortcuts' : 'Show shortcuts',
-                child: InkWell(
-                  key: const Key('work-home-actions-toggle'),
-                  onTap: onToggle,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 6,
+            Center(
+              child: Semantics(
+                expanded: expanded,
+                button: true,
+                label: expanded
+                    ? 'Hide Store shortcuts'
+                    : 'Show Store shortcuts',
+                excludeSemantics: true,
+                onTap: onToggle,
+                child: Tooltip(
+                  message: expanded ? 'Hide shortcuts' : 'Show shortcuts',
+                  child: InkWell(
+                    key: const Key('work-home-actions-toggle'),
+                    onTap: onToggle,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
                       ),
-                      child: Flex(
-                        direction: horizontal ? Axis.horizontal : Axis.vertical,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            expanded
-                                ? Icons.chevron_right_rounded
-                                : Icons.chevron_left_rounded,
-                            size: 21,
-                            color: MoolColors.navy,
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF0F1F7),
+                          borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(12),
                           ),
-                        ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                expanded
+                                    ? Icons.chevron_right_rounded
+                                    : Icons.chevron_left_rounded,
+                                size: 21,
+                                color: MoolColors.navy,
+                              ),
+                              RotatedBox(
+                                quarterTurns: horizontal ? 0 : 3,
+                                child: const Text(
+                                  'Shortcuts',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: MoolColors.navy,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
