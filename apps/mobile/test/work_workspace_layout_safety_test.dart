@@ -9270,6 +9270,39 @@ void main() {
     );
   }
 
+  testWidgets('POSPOLISH stock activity names its actual destination', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrderCustomer = '';
+    work.workspaceOrderStage = 'No order';
+    work.workspaceOrders.clear();
+    work.activeGroupBuy = null;
+    work.workspaceSettlementBalance = 0;
+    work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+        .copyWith(stock: 1);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+      textScale: 1,
+    );
+    final activity = find.byKey(const Key('work-activity-stock'));
+    expect(activity, findsOneWidget);
+    final action = find.descendant(
+      of: activity,
+      matching: find.text('View stock'),
+    );
+    expect(action, findsOneWidget);
+    expect(find.text('Open catalogue'), findsNothing);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-stock-horizontal')), findsOneWidget);
+    expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('ADDENTRY03 manual keyboard keeps save and cancel reachable', (
     tester,
   ) async {
@@ -9315,6 +9348,67 @@ void main() {
       ),
     );
     expect(title.controller.text, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('POSPOLISH manual zero replaces cleanly on keyboard Next', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+      textScale: 1,
+    );
+    final open = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, open);
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+    await chooseAddProductMode(tester, 'enter');
+    final title = find.byKey(const Key('work-product-title'));
+    final price = find.byKey(const Key('work-product-selling-price'));
+    await tester.enterText(title, 'Unsaved product');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    final field = tester.widget<TextField>(price);
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(field.controller!.text, '0');
+    expect(
+      field.controller!.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 1),
+    );
+    // Model typing over the selected default, not enterText replacing everything.
+    final selected = field.controller!.selection;
+    final entered = field.controller!.text.replaceRange(
+      selected.start,
+      selected.end,
+      '10000000',
+    );
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: entered,
+        selection: TextSelection.collapsed(offset: entered.length),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(field.controller!.text, '10000000');
+    await tester.tap(title);
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    expect(field.controller!.text, '10000000');
+    expect(tester.widget<TextField>(price).selectAllOnFocus, isFalse);
+    final stock = find.byKey(const Key('work-product-stock'));
+    await tester.ensureVisible(stock);
+    await tester.tap(stock);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(stock).controller!.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 1),
+    );
+    expect(work.workspaceCatalogueItems, isEmpty);
     expect(tester.takeException(), isNull);
   });
 
@@ -17055,6 +17149,62 @@ void main() {
       },
     );
   }
+
+  testWidgets('POSPOLISH quantity haptics confirm changes only', (
+    tester,
+  ) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final product = work.workspaceCatalogueItems.first;
+    final index = work.workspaceCatalogueItems.indexOf(product);
+    work.workspaceCatalogueItems[index] = product.copyWith(stock: 1);
+    final haptics = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          haptics.add(call.arguments);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 806),
+    );
+    await openCounterSaleFromSales(tester);
+    await enterSaleCustomer(tester, '9000092501', name: 'POS feedback QA');
+    haptics.clear();
+    final add = find.byKey(Key('work-order-add-${product.id}'));
+    final reduce = find.byKey(Key('work-order-reduce-${product.id}'));
+    await reveal(tester, add);
+    expect(tester.widget<IconButton>(reduce).onPressed, isNull);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderQuantities[product.id], 1);
+    expect(haptics, ['HapticFeedbackType.selectionClick']);
+    expect(tester.widget<IconButton>(add).onPressed, isNull);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(haptics, hasLength(1));
+    await tester.tap(reduce);
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderQuantities[product.id] ?? 0, 0);
+    expect(haptics, [
+      'HapticFeedbackType.selectionClick',
+      'HapticFeedbackType.selectionClick',
+    ]);
+    expect(tester.widget<IconButton>(reduce).onPressed, isNull);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('COUNTER1919 fast entry validation and business retention', (
     tester,

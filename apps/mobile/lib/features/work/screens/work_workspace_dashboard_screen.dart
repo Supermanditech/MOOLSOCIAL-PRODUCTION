@@ -8533,7 +8533,7 @@ class _StockActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  product?.title ?? 'Your product catalogue',
+                  product?.title ?? 'Your Store stock',
                   style: const TextStyle(
                     color: MoolColors.ink,
                     fontSize: 15,
@@ -8568,7 +8568,7 @@ class _StockActivityCard extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           child: FilledButton(
             onPressed: onOpen,
-            child: const Text('Open catalogue'),
+            child: const Text('View stock'),
           ),
         ),
       ],
@@ -16779,6 +16779,20 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
             key: Key(keyName),
             controller: controller,
             focusNode: _fieldFocus.putIfAbsent(id, () => FocusNode()),
+            // Replace the initial zero on entry without clearing valid existing
+            // prices/quantities or changing the stored value merely on focus.
+            selectAllOnFocus: numeric ? controller.text == '0' : null,
+            onTap: numeric
+                ? () {
+                    // Android's tap caret placement follows focus selection.
+                    if (controller.text == '0') {
+                      controller.selection = const TextSelection(
+                        baseOffset: 0,
+                        extentOffset: 1,
+                      );
+                    }
+                  }
+                : null,
             keyboardType: numeric
                 ? TextInputType.number
                 : lines > 1
@@ -28320,6 +28334,14 @@ class _SaleProductTile extends StatelessWidget {
   final WorkSession session;
   final VoidCallback onOpen;
 
+  void _adjustQuantity(int change) {
+    final before = session.workspaceOrderQuantities[product.id] ?? 0;
+    session.adjustWorkspaceOrderQuantity(product.id, change);
+    final after = session.workspaceOrderQuantities[product.id] ?? 0;
+    // Confirm a real selection change, never a rejected or disabled action.
+    if (after != before) unawaited(HapticFeedback.selectionClick());
+  }
+
   @override
   Widget build(BuildContext context) {
     final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
@@ -28384,9 +28406,7 @@ class _SaleProductTile extends StatelessWidget {
           key: Key('work-order-reduce-${product.id}'),
           tooltip: 'Reduce ${product.title}',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: quantity == 0
-              ? null
-              : () => session.adjustWorkspaceOrderQuantity(product.id, -1),
+          onPressed: quantity == 0 ? null : () => _adjustQuantity(-1),
           icon: const Icon(Icons.remove_rounded, size: 20),
         ),
         ConstrainedBox(
@@ -28414,7 +28434,7 @@ class _SaleProductTile extends StatelessWidget {
                   (product.stockMode == WorkspaceStockMode.availabilityOnly
                       ? quantity < 99
                       : product.stock > quantity)
-              ? () => session.adjustWorkspaceOrderQuantity(product.id, 1)
+              ? () => _adjustQuantity(1)
               : null,
           style: IconButton.styleFrom(
             disabledForegroundColor: const Color(0xFF68758A),
