@@ -2594,3 +2594,16 @@ task outputs/csv-search-header-tests.txt. Narrow2x and landscape1.6 layouts are
 included in local tests. Device visual approval remains pending: OPPO connected
 but moved to another app while reconnecting the debug session. No import saved,
 invoice issued, payment recorded, APK built or device data cleared for this change.
+
+### CSV entry compact actions — founder follow-up
+
+Choose CSV and Template share one row with 48dp minimum tap targets, neutral
+foreground and subdued chooser background. Shortened visible guidance retains
+file limits and private Stock destination; full column guidance stays expandable.
+Large text on narrow screens stacks actions rather than clipping. Existing
+picker/download/busy handlers are reused. Initial CSV suite35/36: new alignment
+test compared top edges of different-height controls, not their aligned centres.
+Corrected to centre alignment, retaining minimum48dp checks. Rerun evidence:
+task outputs/csv-compact-actions-tests-rerun.txt; analysis clean.
+OPPO debug attachment is still waiting; this is local verification, not device
+visual acceptance or APK closure. No data or financial action was performed.

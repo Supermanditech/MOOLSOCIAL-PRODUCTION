@@ -11143,6 +11143,15 @@ void main() {
     await openAddProductsFromHome(tester);
     await chooseAddProductMode(tester, 'import');
     await captureStoreView(tester, 'csv29-entry');
+    final choose = find.byKey(const Key('work-add-product-choose-csv'));
+    final template = find.byKey(
+      const Key('work-add-product-download-template'),
+    );
+    expect(tester.getCenter(choose).dy, tester.getCenter(template).dy);
+    expect(tester.getSize(choose).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(template).height, greaterThanOrEqualTo(48));
+    expect(find.text('Choose CSV'), findsOneWidget);
+    expect(find.text('Template'), findsOneWidget);
     expect(find.text('Add your product list'), findsNothing);
     expect(
       find.byKey(const Key('work-add-product-choose-csv')).hitTestable(),

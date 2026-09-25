@@ -334,31 +334,58 @@ class _StoreAddProductEntryScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'One row per SKU, variant and pack. Up to 10,000 products · 10 MB.',
+          'Up to 10,000 products · 10 MB',
           style: TextStyle(fontSize: 12, height: 1.4, color: MoolColors.muted),
         ),
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          key: const Key('work-add-product-choose-csv'),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFF0F1F7),
-            foregroundColor: const Color(0xFF252B38),
-          ),
-          onPressed: _importing || _templateBusy ? null : _import,
-          icon: const Icon(Icons.upload_file_outlined, size: 20),
-          label: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Text(_importing ? 'Opening…' : 'Choose CSV file'),
-          ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final actions = <Widget>[
+              FilledButton.icon(
+                key: const Key('work-add-product-choose-csv'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFF0F1F7),
+                  foregroundColor: const Color(0xFF252B38),
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                onPressed: _importing || _templateBusy ? null : _import,
+                icon: const Icon(Icons.upload_file_outlined, size: 20),
+                label: Text(_importing ? 'Opening…' : 'Choose CSV'),
+              ),
+              TextButton.icon(
+                key: const Key('work-add-product-download-template'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF252B38),
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                onPressed: _templateBusy || _importing
+                    ? null
+                    : _downloadTemplate,
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: Text(_templateBusy ? 'Downloading…' : 'Template'),
+              ),
+            ];
+            final largeText = MediaQuery.textScalerOf(context).scale(14) > 21;
+            if (largeText && constraints.maxWidth < 460) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: actions,
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: actions[0]),
+                const SizedBox(width: 8),
+                Expanded(child: actions[1]),
+              ],
+            );
+          },
         ),
-        TextButton.icon(
-          key: const Key('work-add-product-download-template'),
-          onPressed: _templateBusy || _importing ? null : _downloadTemplate,
-          icon: const Icon(Icons.download_outlined, size: 18),
-          label: Text(_templateBusy ? 'Downloading…' : 'Download CSV template'),
-        ),
+        const SizedBox(height: 4),
         const Text(
-          'Review before saving. Importing does not publish products.',
+          'Review, then save to Stock. Not published.',
           style: TextStyle(fontSize: 12, height: 1.4, color: MoolColors.muted),
         ),
         if (_importStatus != null)
