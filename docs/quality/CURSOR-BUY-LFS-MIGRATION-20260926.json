@@ -186,12 +186,13 @@
   },
   "runtimeTests": "Existing 556 unique scenarios remain source-identical; no runtime change requiring a new Flutter replay.",
   "billingReadback": "Unavailable: current credential lacks user scope. No account/budget/credential changes.",
-  "remoteStatus": "Pending final checkpoint gates and normal fast-forward push; never claim parity until remote readback.",
+  "remoteStatus": "Founder stopped archive backup/upload. Three objects uploaded before cancellation. No LFS archive objects are referenced by the new source-only unpublished history; see source recovery policy.",
   "ordinaryBlobAudit": {
     "ordinaryBlobsOver100MiB": 0,
     "maxOrdinaryBlobBytes": 6459788,
     "applicationTreeUnchanged": true,
     "appsTree": "36bf5550274969d11604c6ef27e4d5e457fb1e35"
   },
-  "lfsCurrentFsck": "passed exit 0"
+  "lfsCurrentFsck": "passed exit 0",
+  "supersededBySourceOnlyPolicy": "docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json"
 }

@@ -1,0 +1,111 @@
+{
+  "authority": "Founder 2026-09-26 supersedes evidence upload with source-recovery-only scope. Stop uploading old APK/screenshot archives; preserve code and rebuild/test inputs.",
+  "publishedBase": "5dc6885ada1fe0cd23f3d5d0a2bc62fe56cc0abd",
+  "before": "adfd39003e4db7a671a2a9becd0cc99bb4a8a7ee",
+  "after": "56497c5e062767e226cea6b0f82f90cb6559d854",
+  "rewrittenCommits": 16,
+  "excludedGeneratedArchives": [
+    "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+    "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip"
+  ],
+  "applicationAndTestsUnchanged": true,
+  "testReferenceImagesRetained": true,
+  "physicalArchivesPreserved": true,
+  "map": [
+    {
+      "before": "eeb714b79e72fce101828d33b3231709dcfe3cee",
+      "after": "4e64cc58ef8ca72f1dfe7034dbe2ac3554de22f0"
+    },
+    {
+      "before": "66ef29a9aba97b5d6e244b45c8df27a2aea30351",
+      "after": "f19180b1db9dc632d87f6a9c7915dd03e77083a0"
+    },
+    {
+      "before": "cb5bbc84a641d8d9a922dd02b26232636a6e4978",
+      "after": "778889624c51fe8051d1d58cde31a12fa661bd3b"
+    },
+    {
+      "before": "b1f7eb59905e05bfe96ce55c963529f8b75980d7",
+      "after": "ddecca98c6f8ac81ae8f52857a8bbbe00af0978a"
+    },
+    {
+      "before": "af46649e9f3307898c7e64a5885bfd21ea95ed34",
+      "after": "f2fe161187640b20fe1ae6571ecddf4b231622c7"
+    },
+    {
+      "before": "fc96e6e82bb43995bbadbd258a4e5d5c47924d1e",
+      "after": "88c255494b61cee83e4f7dca264960464066bd3d"
+    },
+    {
+      "before": "b34107580ff036623d7966e74027dd0965fc2237",
+      "after": "6b8df922247670a98640fc2fbe4f5e466aaf8988"
+    },
+    {
+      "before": "74a5ef825d6603c1c92d0cab7e0c36315a39f8a8",
+      "after": "2d73eb7c4136aabfd3b2e9c56a757b3571adbc0c"
+    },
+    {
+      "before": "c4b1ed4a14f887f9f4a461894e727a74de5fdad9",
+      "after": "2bcb7ca1fc550207bddf214cae12c28d954629a1"
+    },
+    {
+      "before": "aa913497c8a4dee830d981d228f1fb384c53ce3d",
+      "after": "0fea7ca566c3d43710305f70eff1e54286abdeb4"
+    },
+    {
+      "before": "8a4bec6d534ea80cfdc684a65598f3ef4d7b6d02",
+      "after": "c6dc5676a8e7d6635f06ff4920a8d57863fd69da"
+    },
+    {
+      "before": "eea65f4fe9a22d0516a7a9b0b7a1599674ebf33c",
+      "after": "0197ae42ebaf57a86e52469866ae6bda6a06ff94"
+    },
+    {
+      "before": "9cdfb124ac9f3b6f487cbe3118b0cc44b599cedb",
+      "after": "fb26888574b23bc90633b344333db1f5c7d94ca0"
+    },
+    {
+      "before": "6462a4c6956a98b663ce0c012f4c815a69124be1",
+      "after": "fa92c5a37d1575a41f6932d334b56d6ea3b11251"
+    },
+    {
+      "before": "a766591aceeadb8dcc53d08b0fa1d191e99d47e2",
+      "after": "61038a3813c6a481ef7d580cff6afb743c62eab7"
+    },
+    {
+      "before": "adfd39003e4db7a671a2a9becd0cc99bb4a8a7ee",
+      "after": "56497c5e062767e226cea6b0f82f90cb6559d854"
+    }
+  ],
+  "state": "Source-only history verified; final policy checkpoint gates and normal push pending.",
+  "actor": "Founder recovering/rebuilding MoolSocial Buy source",
+  "classification": "mvp_supporting; reliable source preservation without generated evidence uploads",
+  "retainedInputs": [
+    "Application source and runtime assets",
+    "Native Android/iOS configuration and project files",
+    "Dependency manifests and lockfiles",
+    "Build, validation and test scripts",
+    "Regression tests and their required reference assets",
+    "Provider contracts, ticket records and implementation handoff notes"
+  ],
+  "excludedFromThisUnpublishedBatch": [
+    "docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip",
+    "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip"
+  ],
+  "historicalPublishedFiles": "Left unchanged; this bounded repair does not purge older published APKs or accepted visual references.",
+  "secureRecovery": "Signing keys, credentials and service account access must be preserved separately and securely; source Git alone does not supply them. No secrets copied.",
+  "localPreservationRoot": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRESERVATION\\cursor-buy-pre-lfs-20260926",
+  "originalRef": "archive/cursor-buy-pre-lfs-20260926",
+  "supersededLfsAttemptRef": "archive/cursor-buy-lfs-attempt-20260926",
+  "remoteArchiveObjectsUploadedBeforeStop": 3,
+  "runtimeQualification": "Application/test tree is identical to the 556-scenario qualified source; no new app test claim or APK.",
+  "auditEvidencePolicy": "The two exact ZIP paths remain physically present and ignored locally for historical QA. They are not source recovery inputs. Existing fail-closed local release/test gates remain intact.",
+  "prePushAudit": {
+    "appsTree": "36bf5550274969d11604c6ef27e4d5e457fb1e35",
+    "maxNewOrdinaryBlobBytes": 6462564,
+    "ordinaryBlobsOver100MiB": 0,
+    "newLfsObjectsToUpload": 0,
+    "excludedZipFilesTracked": 0,
+    "localArchiveFilesPreserved": 2
+  }
+}

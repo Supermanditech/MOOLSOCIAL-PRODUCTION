@@ -1169,6 +1169,8 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  '.gitignore',
+  'docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json',
   '.gitattributes',
   'docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json',
   'docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip',

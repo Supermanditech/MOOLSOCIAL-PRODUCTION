@@ -106887,6 +106887,17 @@
           "evidence": "docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json",
           "billing": "Existing CLI credential cannot read billing (missing user scope); no scope or billing settings changed. Normal upload subject to existing GitHub account allowance/budget; do not claim confirmed free quota.",
           "ordinaryBlobAuditRecovery": "Read-only size helper sent SHA-plus-path lines without a rest field to cat-file, yielding no parsed blobs and an empty max failure. Corrected input to SHA-only lines. LFS fsck independently passed. Rerun final precommit after recording this metadata; do not reuse the overlapping earlier gate as final acceptance."
+        },
+        "sourceRecoveryPolicy20260926": {
+          "authority": "Founder superseded evidence backup/upload: retain app source and inputs needed to rebuild; old generated APKs and screenshot archives are not required in the new source checkpoint.",
+          "action": "Stopped only verified owned git-lfs upload PID9068. Rewrote the 16 still-unpublished commits (15 original migrations plus preservation metadata commit), removing only the two generated evidence ZIP paths and their new LFS rule. Original history and local bytes preserved. Published base unchanged.",
+          "retained": "All apps tree entries and test fixtures byte-identical. Keep runtime media, source, dependency locks, platform config, build/test scripts, ticket/contract handoffs; secrets/signing keys require separate secure recovery.",
+          "scope": "No wholesale deletion of older published artifacts, no runtime edit, APK, live service change, or server-side LFS deletion. Exact ignored evidence paths stay local.",
+          "verification": "Per-commit tree comparison; expected removals only, gitattributes exact ZIP rule removed, final gitignore exact exclusions. Application tree remains 36bf5550274969d11604c6ef27e4d5e457fb1e35.",
+          "remoteArtifactReadback": "Three archive objects became available before cancellation; they are not referenced by the source-only branch. No further archive upload.",
+          "evidence": "docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json",
+          "prevention": "Keep generated evidence archives out of future source commits; do not remove runtime images or regression-test reference images merely by extension. Check new branch objects and LFS dry-run before normal push.",
+          "diagnosticRecovery": "One combined optional diagnostic was output-truncated; subsequent inspection used bounded file reads. No source or ownership conclusion was based on the truncated section."
         }
       }
     }

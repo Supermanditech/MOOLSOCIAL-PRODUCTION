@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "213FC44E5F62827A855C766A59628755107AAC0187504D2AB1A64BDF27317E62"
+    "sha256": "CBF36B9A05A3AAA7AB139D00B3E4430D085A5B670B360AB24CAA0782BCEC516D"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -166,7 +166,9 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
         ".gitattributes",
         "docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json",
-        "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip"
+        "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip",
+        ".gitignore",
+        "docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json"
       ]
     },
     {
