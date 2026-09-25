@@ -106816,6 +106816,14 @@
         "prevention": "Use existing supported workspace archive root for historical evidence resolution; project exact named registry fields rather than entire accumulated umbrella.",
         "archiveRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904",
         "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+      },
+      "selectorReviewCheckpoint20260925": {
+        "incident": "Precommit rejected stale C01-1 after selector source changed; focused123 tests cannot refresh cumulative selected scenarios. Founder rejected separate selector rows after native review. Two bounded diagnostic lookups used wrong script extension/glob and short ticket ID; corrected by exact file inventory and case lookup.",
+        "rootCause": "Checkpoint attempted before full source-bound selected evidence refresh; layout preserved separate dimension rows despite space-saving intent.",
+        "detection": "selector-layout-precommit.log and founder response to524 screenshot",
+        "prevention": "Preserve rejected evidence; implement founder single-lane/radio colour correction, then run every selected exact scenario on final source and bind results before retry. Use discovered literal paths/full IDs.",
+        "status": "corrected_547_exact_selected_scenarios_passed_checkpoint_pending",
+        "followup": "Progress counters included hidden loading entries; corrected by set of exact required file/test pairs:547. Screenshot528 filename implies intended removal but observed cart remains1;preserve correction and require fresh frame immediately before coordinates."
       }
     }
   ],

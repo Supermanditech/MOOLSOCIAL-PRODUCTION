@@ -362,7 +362,7 @@ void main() {
           void expectPhoto(String sku) {
             final image = tester.widget<Image>(
               find.descendant(
-                of: find.byKey(ValueKey('buy-variant-photo-$sku')),
+                of: find.byKey(ValueKey('buy-product-packshot-$sku')),
                 matching: find.byType(Image),
               ),
             );
@@ -373,7 +373,6 @@ void main() {
           }
 
           expectPhoto('phone-blue-128');
-          expectPhoto('phone-black-128');
           Future<void> choose(String dimension, String option) async {
             final target = find.byKey(
               ValueKey('buy-product-option-$dimension-$option'),
@@ -404,12 +403,12 @@ void main() {
           expect(session.selectedProductId, 'phone-blue-256');
           expect(session.selectedProduct!.price, 14500);
           expectPhoto('phone-blue-256');
-          expectPhoto('phone-black-256');
           expect(session.addProduct(session.selectedProductId!), isTrue);
           await tester.pumpAndSettle();
           await choose('colour', 'black');
           expect(session.selectedProductId, 'phone-black-256');
           expect(session.selectedProduct!.price, 14000);
+          expectPhoto('phone-black-256');
           expect(session.addProduct(session.selectedProductId!), isTrue);
           expect(session.quantityFor('phone-blue-256'), 1);
           expect(session.quantityFor('phone-black-256'), 1);
@@ -471,7 +470,7 @@ void main() {
           const ValueKey('buy-product-option-colour-black'),
         );
         final fallback = find.byKey(
-          const ValueKey('buy-variant-photo-phone-blue-128'),
+          const ValueKey('buy-product-option-colour-blue'),
         );
         expect(fallback, findsOneWidget);
         expect(
@@ -483,9 +482,9 @@ void main() {
             of: fallback,
             matching: find.byWidgetPredicate(
               (widget) =>
-                  widget is Container &&
+                  widget is DecoratedBox &&
                   widget.decoration is BoxDecoration &&
-                  (widget.decoration! as BoxDecoration).color ==
+                  (widget.decoration as BoxDecoration).color ==
                       const Color(0xff3366aa),
             ),
           ),
@@ -493,12 +492,9 @@ void main() {
         );
         await tester.ensureVisible(unavailable);
         await tester.pumpAndSettle();
-        expect(tester.widget<OutlinedButton>(unavailable).onPressed, isNull);
+        expect(tester.widget<InkResponse>(unavailable).onTap, isNull);
         expect(
-          find.descendant(
-            of: unavailable,
-            matching: find.text('black\nCombination unavailable'),
-          ),
+          find.descendant(of: unavailable, matching: find.byIcon(Icons.close)),
           findsOneWidget,
         );
         await tester.tap(unavailable);
@@ -566,12 +562,25 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        final optionRow = find.byKey(const ValueKey('buy-variant-row-storage'));
+        final horizontalChoices = find.descendant(
+          of: optionRow,
+          matching: find.byType(SingleChildScrollView),
+        );
+        expect(horizontalChoices, findsOneWidget);
+        expect(
+          tester
+              .widget<SingleChildScrollView>(horizontalChoices)
+              .scrollDirection,
+          Axis.horizontal,
+        );
         final last = find.byKey(
           ValueKey('buy-product-option-storage-${count - 1}'),
         );
         // Verify initial horizontal visibility before ensureVisible can change it.
         expect(tester.getRect(last).left, greaterThanOrEqualTo(0));
         expect(tester.getRect(last).right, lessThanOrEqualTo(320));
+        expect(tester.getSize(last).width, lessThan(200));
         await tester.ensureVisible(last);
         await tester.pumpAndSettle();
         expect(last.hitTestable(), findsOneWidget);

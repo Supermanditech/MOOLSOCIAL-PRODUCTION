@@ -2696,3 +2696,24 @@ Reconciliation after registration:64 references=19 originals+45 children/follow-
 
 
 Founder follow-up: apply all eight tickets across Buy/Shop,Wholesale,Bulk,Offers,Store and every applicable public surface. Sequential frontend implementation is now explicitly authorized, subject to exact ticket selection/owner andcontract gates. Each ticket has a mandatory all-surfaces case including Cart,Saved andproduct-return navigation. Earlier registration-only wording describes the initial research request and is superseded by this authorization; ticket status remains open/unimplemented/untested. Reuse shared owners;display only provider-supported applicable fields,never force phone selectors onto groceries. Provider work remains Codex Store-lane handoff;no worktree integration requested.
+
+
+### Compact horizontal selector founder amendment — 25 September 2026
+
+Founder rejected the large scattered colour/storage cards. Existing BUY-CATALOGUE-20260925-02 now records this presentation amendment; no duplicate ticket was allocated. Shared structured and pack-only selectors use compact horizontal rows at normal/enlarged text, with selected option kept reachable. Colour choices retain photo/name/selection without repeated price or available-stock copy; storage/pack choices retain price. Unavailable status remains visible and all semantics retain offer information.
+
+Final focused variant suite:123 passed,0 errors; focused analysis passed. Redmi hot reload:7 libraries,4586ms. Native normal and200percent screens confirm compact layout,sideways scrolling and Pink512->Pink256 price/selection change;cart retained one512 unit. Font restored1.0 and screen left for founder review. Actual screenshots510–524 and proof/tests archived under selector-layout-founder-review-20260925/ in CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip (SHA256 1a7ece123816632c224276031bdddf66601b23c0ab8e43c7beaf8d922bcdf519,249048767bytes).
+
+Earlier quantity continuation510–515 verified exact Add0->1,plus1->2,cart subtotal161000,Back2,minus2->1 without card growth. Its remaining surfaces still require native qualification. No new APK,backend orpublication.64 references remain tracked;20 targeted-verified followups,44 pending full qualification. Of eight catalogue requirements,one now has this implemented/tested layout amendment;none is wholly closed. Previous547 cumulative evidence predates this source change and must not be claimed as a fresh whole-suite pass. Founder approval pending.
+
+
+### Founder supersession: single variant lane and colour radios — 25 September 2026
+
+The founder rejected the earlier separate colour/storage rows as still occupying too much vertical space, then explicitly requested colour radio buttons. That uncommitted presentation is superseded: structured dimensions now share one horizontal lane; colours use circular swatches with selected ring,accessible names and48logical-pixel targets. Storage/size/pack choices preserve price and unavailable-combination handling. Replaced colour-photo-card code was removed; main selected-SKU gallery and cart assertions remain tested. Pack-only horizontal selectors remain shared.
+
+Focused variant suite123passed and analysis passed on the new code. Redmi hot reload7libraries3981ms;525–533 retain actual evidence.527/533 show the single lane;530–532 cover200percent text and horizontal access,then normal font restored.528 filename was an intended action,not proof: quantity stayed1 and viewport/gallery had changed;do not claim emptycart. Current retained review cart has onePink512GB phone. All547 selected scenarios are being replayed against source fingerprint1c9ead4b220e14a91e91295cce763aa07bfc8e710beaed2f0b576d7884d9f019. Precommit previously rejected staleC01-1,correctly;no bypass orcommit occurred.
+
+BUY-CATALOGUE-20260925-02 remains open for full provider family/option completeness,multi-colour andall-entry-path qualification. Founder confirmed3/4colours andmore may remain pending under that existing researchticket. No duplicate ticket orclosure claim. Backend deferred;no APK orpublication.
+
+
+Single-lane radio final local checkpoint: all547 unique selected scenarios across561case references passed in15 terminal-success batches; source unchanged at1c9ead4b220e14a91e91295cce763aa07bfc8e710beaed2f0b576d7884d9f019. Every selected case now binds its exact successful test name/log/hash to that source. Earlier progress counters included loading events; final547 excludes them. Focused123 overlaps this suite and is not added to547. Analysis passed. Evidence archived in selector-radio-qualified-20260925/;archive252190506bytes,SHA256079da55f59351dff1d9e57ae2241c99239d996f4e33928a0e33cec1bc98f2ad4. Native proof includes normal/enlarged lane andfont restoration. Founder approval andwhole catalogue requirement remain open;no count reductions,no backend,APK orpublication.

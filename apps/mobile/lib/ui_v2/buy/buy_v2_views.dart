@@ -3396,10 +3396,18 @@ class _ProductVariantSelector extends StatelessWidget {
             const SizedBox(height: 8),
             LayoutBuilder(
               builder: (context, constraints) {
-                final width = (constraints.maxWidth - 8) / 2;
-                return Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                final largeText =
+                    MediaQuery.textScalerOf(context).scale(12) > 18;
+                final width = math.min(
+                  largeText ? 172.0 : 112.0,
+                  constraints.maxWidth * .8,
+                );
+                return _ProductVariantOptionsRow(
+                  key: ValueKey('buy-variant-row-pack-${product.canonicalId}'),
+                  selectedIndex: variants.indexWhere(
+                    (item) => item.id == product.id,
+                  ),
+                  itemWidth: width,
                   children: [
                     for (final option in variants)
                       _ProductVariantOption(
@@ -3432,102 +3440,196 @@ class _StructuredProductVariants extends StatelessWidget {
   final BuyV2ProductSizeChart? sizeChart;
 
   @override
-  Widget build(BuildContext context) => BuyV2CartAvoidanceRegion(
-    child: Column(
-      key: ValueKey('buy-product-variants-${product.canonicalId}'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final selected in product.variantAttributes) ...[
+  Widget build(BuildContext context) {
+    final largeText = MediaQuery.textScalerOf(context).scale(12) > 18;
+    final viewport = MediaQuery.sizeOf(context).width - 32;
+    return BuyV2CartAvoidanceRegion(
+      child: SingleChildScrollView(
+        key: ValueKey('buy-product-variants-${product.canonicalId}'),
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final selected in product.variantAttributes)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: _dimension(context, selected, largeText, viewport),
+              ),
+            if (sizeChart != null)
+              TextButton(
+                key: ValueKey('buy-product-size-chart-${product.id}'),
+                onPressed: () =>
+                    _showProductSizeChart(context, session, product),
+                child: const Text('Size chart'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  VoidCallback? _colourSelection(
+    BuyV2VariantAttribute dimension,
+    BuyV2VariantAttribute option,
+  ) {
+    final candidate = product.resolveVariantOption(
+      variants,
+      dimension.dimensionId,
+      option.optionId,
+    );
+    return candidate == null
+        ? null
+        : () => session.selectProductVariant(candidate.id);
+  }
+
+  Widget _dimension(
+    BuildContext context,
+    BuyV2VariantAttribute selected,
+    bool largeText,
+    double viewport,
+  ) {
+    final options = <String, BuyV2VariantAttribute>{};
+    for (final variant in variants.where(
+      (item) => item.hasStructuredVariants && item.isFromSameStoreAs(product),
+    )) {
+      for (final value in variant.variantAttributes) {
+        if (value.dimensionId == selected.dimensionId &&
+            value.kind == selected.kind) {
+          options.putIfAbsent(value.optionId, () => value);
+        }
+      }
+    }
+    final colour = selected.kind == BuyV2VariantDimensionKind.colour;
+    final width = colour
+        ? 48.0
+        : largeText
+        ? 172.0
+        : 100.0;
+    final groupWidth = math.min(
+      viewport,
+      math.max(colour ? 100.0 : width, options.length * (width + 8) - 8),
+    );
+    return SizedBox(
+      width: groupWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               '${selected.dimensionLabel}: ${selected.optionLabel}',
               style: context.buyBody.copyWith(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final options = <String, BuyV2VariantAttribute>{};
-              for (final variant in variants.where(
-                (item) =>
-                    item.hasStructuredVariants &&
-                    item.isFromSameStoreAs(product),
-              )) {
-                for (final value in variant.variantAttributes) {
-                  if (value.dimensionId == selected.dimensionId &&
-                      value.kind == selected.kind) {
-                    options.putIfAbsent(value.optionId, () => value);
-                  }
-                }
-              }
-              final largeText = MediaQuery.textScalerOf(context).scale(12) > 18;
-              final width = largeText
-                  ? constraints.maxWidth
-                  : options.length > 2
-                  ? math.min(160.0, constraints.maxWidth * .43)
-                  : (constraints.maxWidth - 8) / 2;
-              final children = <Widget>[
-                for (final option in options.values)
-                  if (product.resolveVariantOption(
-                        variants,
-                        selected.dimensionId,
-                        option.optionId,
-                      )
-                      case final candidate?)
-                    _ProductVariantOption(
-                      session: session,
-                      option: candidate,
-                      selected: candidate.id == product.id,
-                      width: width,
-                      optionLabel: option.optionLabel,
-                      swatchArgb: option.swatchArgb,
-                      showPhoto:
-                          option.kind == BuyV2VariantDimensionKind.colour,
-                      optionKey:
-                          'buy-product-option-${selected.dimensionId}-${option.optionId}',
+          _ProductVariantOptionsRow(
+            key: ValueKey('buy-variant-row-${selected.dimensionId}'),
+            selectedIndex: options.keys.toList().indexOf(selected.optionId),
+            itemWidth: width,
+            children: [
+              for (final option in options.values)
+                if (colour)
+                  _ProductColourOption(
+                    value: option,
+                    selected: option.optionId == selected.optionId,
+                    onSelected: _colourSelection(selected, option),
+                  )
+                else if (product.resolveVariantOption(
+                      variants,
+                      selected.dimensionId,
+                      option.optionId,
                     )
-                  else
-                    SizedBox(
-                      width: width,
-                      child: OutlinedButton(
-                        key: ValueKey(
-                          'buy-product-option-${selected.dimensionId}-${option.optionId}',
-                        ),
-                        onPressed: null,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(48, 64),
-                        ),
-                        child: Text(
-                          '${option.optionLabel}\nCombination unavailable',
-                        ),
+                    case final candidate?)
+                  _ProductVariantOption(
+                    session: session,
+                    option: candidate,
+                    selected: candidate.id == product.id,
+                    width: width,
+                    optionLabel: option.optionLabel,
+                    optionKey:
+                        'buy-product-option-${selected.dimensionId}-${option.optionId}',
+                  )
+                else
+                  SizedBox(
+                    width: width,
+                    child: OutlinedButton(
+                      key: ValueKey(
+                        'buy-product-option-${selected.dimensionId}-${option.optionId}',
+                      ),
+                      onPressed: null,
+                      child: Text(
+                        '${option.optionLabel}\nCombination unavailable',
                       ),
                     ),
-              ];
-              if (largeText) {
-                return Wrap(spacing: 8, runSpacing: 6, children: children);
-              }
-              return _ProductVariantOptionsRow(
-                key: ValueKey('buy-variant-row-${selected.dimensionId}'),
-                selectedIndex: options.keys.toList().indexOf(selected.optionId),
-                itemWidth: width,
-                children: children,
-              );
-            },
+                  ),
+            ],
           ),
         ],
-        if (sizeChart != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              key: ValueKey('buy-product-size-chart-${product.id}'),
-              onPressed: () => _showProductSizeChart(context, session, product),
-              child: const Text('Size chart'),
+      ),
+    );
+  }
+}
+
+class _ProductColourOption extends StatelessWidget {
+  const _ProductColourOption({
+    required this.value,
+    required this.selected,
+    required this.onSelected,
+  });
+  final BuyV2VariantAttribute value;
+  final bool selected;
+  final VoidCallback? onSelected;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label:
+        '${value.optionLabel}${onSelected == null ? ', combination unavailable' : ''}',
+    checked: selected,
+    inMutuallyExclusiveGroup: true,
+    enabled: onSelected != null,
+    child: Tooltip(
+      message: value.optionLabel,
+      child: InkResponse(
+        key: ValueKey(
+          'buy-product-option-${value.dimensionId}-${value.optionId}',
+        ),
+        onTap: onSelected,
+        radius: 24,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: Container(
+              width: 30,
+              height: 30,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: value.swatchArgb == null
+                      ? Colors.transparent
+                      : Color(value.swatchArgb!),
+                  border: Border.all(color: BuyV2Colors.muted, width: .5),
+                ),
+                child: onSelected == null
+                    ? const Icon(Icons.close, size: 14)
+                    : value.swatchArgb == null
+                    ? const Icon(Icons.question_mark, size: 14)
+                    : null,
+              ),
             ),
           ),
-      ],
+        ),
+      ),
     ),
   );
 }
@@ -3603,8 +3705,6 @@ class _ProductVariantOption extends StatelessWidget {
     required this.selected,
     required this.width,
     this.optionLabel,
-    this.swatchArgb,
-    this.showPhoto = false,
     this.optionKey,
   });
 
@@ -3613,8 +3713,6 @@ class _ProductVariantOption extends StatelessWidget {
   final bool selected;
   final double width;
   final String? optionLabel;
-  final int? swatchArgb;
-  final bool showPhoto;
   final String? optionKey;
 
   @override
@@ -3627,34 +3725,6 @@ class _ProductVariantOption extends StatelessWidget {
     final statusColor = decision.canAdd
         ? BuyV2Colors.green
         : BuyV2Colors.orange;
-    final photo = showPhoto
-        ? BuyV2SupplierMediaPolicy.admittedAssets(option)
-              .where(
-                (asset) =>
-                    asset.kind == BuyV2ProductContentMediaKind.network ||
-                    asset.kind == BuyV2ProductContentMediaKind.asset,
-              )
-              .firstOrNull
-        : null;
-    Widget swatch() => Center(
-      child: swatchArgb == null
-          ? const Icon(Icons.image_not_supported_outlined, size: 18)
-          : Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: Color(swatchArgb!),
-                shape: BoxShape.circle,
-                border: Border.all(color: BuyV2Colors.muted),
-              ),
-            ),
-    );
-    Widget decodedPhoto(
-      BuildContext context,
-      Widget child,
-      int? frame,
-      bool synchronouslyLoaded,
-    ) => frame == null && !synchronouslyLoaded ? swatch() : child;
     void select() {
       HapticFeedback.selectionClick();
       session.selectProductVariant(option.id);
@@ -3692,7 +3762,7 @@ class _ProductVariantOption extends StatelessWidget {
               key: ValueKey(optionKey ?? 'buy-product-variant-${option.id}'),
               onTap: select,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 76),
+                constraints: const BoxConstraints(minHeight: 48),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 9,
@@ -3702,28 +3772,6 @@ class _ProductVariantOption extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (showPhoto || swatchArgb != null)
-                        SizedBox(
-                          key: ValueKey('buy-variant-photo-${option.id}'),
-                          width: showPhoto ? 44 : 16,
-                          height: showPhoto ? 44 : 16,
-                          child: photo == null
-                              ? swatch()
-                              : photo.kind ==
-                                    BuyV2ProductContentMediaKind.network
-                              ? Image.network(
-                                  photo.source!,
-                                  fit: BoxFit.contain,
-                                  frameBuilder: decodedPhoto,
-                                  errorBuilder: (_, _, _) => swatch(),
-                                )
-                              : Image.asset(
-                                  photo.source!,
-                                  fit: BoxFit.contain,
-                                  frameBuilder: decodedPhoto,
-                                  errorBuilder: (_, _, _) => swatch(),
-                                ),
-                        ),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -3743,24 +3791,28 @@ class _ProductVariantOption extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        buyV2Money(facts.price),
-                        style: const TextStyle(
-                          color: BuyV2Colors.navy,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
+                      ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          buyV2Money(facts.price),
+                          style: const TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        decision.statusLabel,
-                        style: context.buyMeta.copyWith(
-                          color: statusColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                      ],
+                      if (!decision.canAdd) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          decision.statusLabel,
+                          style: context.buyMeta.copyWith(
+                            color: statusColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
