@@ -1169,6 +1169,7 @@ $cursorStorefrontOwners = @(
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
   'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
   # Exact successor candidate images for the founder-requested A04 quantity repair.

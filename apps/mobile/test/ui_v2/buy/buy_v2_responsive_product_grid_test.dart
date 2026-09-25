@@ -22,6 +22,7 @@ void main() {
     for (final amount in [
       1000,
       10000,
+      50000,
       100000,
       1000000,
       10000000,
@@ -46,7 +47,11 @@ void main() {
           final original = BuyV2Catalogue.products.firstWhere(
             (p) => p.destination == destination,
           );
-          final product = original.copyWith(price: amount);
+          final product = original.copyWith(
+            price: amount,
+            unitPrice: '${buyV2Money(amount * 2)}/kg',
+          );
+          double? beforeAddHeight;
           for (final added in [false, true]) {
             if (added) {
               expect(session.addProduct(product.id), isTrue);
@@ -112,6 +117,29 @@ void main() {
               tester.getRect(highlight).right,
               lessThanOrEqualTo(tester.getRect(row).right),
             );
+            final unit = tester.renderObject<RenderParagraph>(
+              find.text(product.unitPrice),
+            );
+            final unitBoxes = unit.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: unit.text.toPlainText().length,
+              ),
+            );
+            expect(unitBoxes.map((box) => box.top).toSet(), hasLength(1));
+            for (final box in unitBoxes) {
+              expect(box.right, lessThanOrEqualTo(unit.size.width + .5));
+            }
+            final height = tester
+                .getSize(
+                  find.byKey(ValueKey('buy-product-compare-${product.id}')),
+                )
+                .height;
+            if (!added) {
+              beforeAddHeight = height;
+            } else {
+              expect(height, lessThanOrEqualTo(beforeAddHeight! + .5));
+            }
             expect(tester.takeException(), isNull);
           }
         }

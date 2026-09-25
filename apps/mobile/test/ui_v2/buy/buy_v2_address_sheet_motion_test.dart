@@ -1,6 +1,7 @@
 import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -326,6 +327,82 @@ void main() {
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
     expect(session.selectedAddressId, 'home');
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('A05 complete address and recovery at $scale', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      expect(session.addProduct(product.id), isTrue);
+      final quantity = session.quantityFor(product.id);
+      await openSheet(tester, session, textScale: scale);
+
+      final work = session.addresses.firstWhere((item) => item.id == 'work');
+      final fullAddress = find.text(
+        '${work.line}, ${work.shortLine} · ${work.landmark}',
+      );
+      await tester.scrollUntilVisible(
+        fullAddress,
+        100,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('buy-address-sheet-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final paragraph = tester.renderObject<RenderParagraph>(fullAddress);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(paragraph.text.toPlainText(), contains(work.pinCode));
+      expect(paragraph.text.toPlainText(), contains(work.landmark));
+      expect(tester.takeException(), isNull);
+
+      final choice = find.byKey(const ValueKey('buy-address-work'));
+      await tester.ensureVisible(choice);
+      await tester.pumpAndSettle();
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      expect(session.selectedAddressId, 'work');
+      expect(session.quantityFor(product.id), quantity);
+
+      await tester.tap(find.byKey(const ValueKey('open-address-sheet')));
+      await tester.pumpAndSettle();
+      final manage = find.byKey(const ValueKey('buy-address-actions-work'));
+      await tester.scrollUntilVisible(
+        manage,
+        100,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('buy-address-sheet-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(manage);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-address-edit-work')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-address-add-form-route')),
+        findsOne,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.selectedAddressId, 'work');
+      expect(session.quantityFor(product.id), quantity);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-address-sheet-route')),
+        findsNothing,
+      );
+      expect(session.selectedAddressId, 'work');
+      expect(session.quantityFor(product.id), quantity);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('compact 140 percent keeps address recovery reachable', (
     tester,

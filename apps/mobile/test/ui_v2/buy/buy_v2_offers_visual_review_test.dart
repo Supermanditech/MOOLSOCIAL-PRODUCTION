@@ -106,6 +106,8 @@ Future<void> _capture(WidgetTester tester, String name) async {
 }
 
 class _OffersSource implements BuyV2PublishedCatalogueSource {
+  _OffersSource({this.price});
+  final int? price;
   final now = DateTime.utc(2026, 9, 18);
   @override
   Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
@@ -146,7 +148,7 @@ class _OffersSource implements BuyV2PublishedCatalogueSource {
       offers.add(
         BuyV2PublishedCatalogueOffer(
           publicationId: 'visual-offer-$index',
-          product: product,
+          product: product.copyWith(price: price),
           publisherType: publisher,
           publisherId: 'publisher-$index',
           publisherName: index >= 8 ? 'MoolSocial' : product.seller,
@@ -170,6 +172,59 @@ class _OffersSource implements BuyV2PublishedCatalogueSource {
 }
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    for (final amount in [50000, 1000000, 10000000, 10000001]) {
+      testWidgets('A04 Offers banner price $amount stays complete at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 720);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final source = _OffersSource(price: amount);
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          publishedCatalogueSource: source,
+          initialCatalogueRegionId: 'jodhpur',
+          catalogueNow: () => source.now,
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(_app(session));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+        await tester.pumpAndSettle();
+        final price = find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  widget.key.toString().contains('buy-offer-banner-price-'),
+            )
+            .first;
+        expect(price, findsOneWidget);
+        final text = tester.widget<Text>(price);
+        expect(text.semanticsLabel, buyV2Money(amount));
+        expect(text.style!.fontSize, greaterThanOrEqualTo(12));
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: price, matching: find.byType(RichText)),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final measured = TextPainter(
+          text: paragraph.text,
+          textScaler: paragraph.textScaler,
+          textDirection: TextDirection.ltr,
+        )..layout();
+        expect(measured.width, lessThanOrEqualTo(paragraph.size.width + .5));
+        expect(measured.height, lessThanOrEqualTo(paragraph.size.height + .5));
+        measured.dispose();
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   setUpAll(() async {
     final font = FontLoader('Inter')
       ..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));

@@ -17908,8 +17908,6 @@ class _BuyV2AddressChoice extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   '${address.line}, ${address.shortLine} · ${address.landmark}',
-                                  maxLines: 4,
-                                  overflow: TextOverflow.ellipsis,
                                   style: context.buyMeta,
                                 ),
                               ],

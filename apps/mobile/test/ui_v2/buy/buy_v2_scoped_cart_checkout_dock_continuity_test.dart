@@ -832,7 +832,9 @@ void main() {
         expect(alternate.hitTestable(), findsOneWidget);
         final alternateCard = find.descendant(
           of: alternate,
-          matching: find.byKey(const ValueKey('buy-product-w-oil-comparison')),
+          matching: find.byKey(
+            const ValueKey('buy-comparison-open-w-oil-comparison'),
+          ),
         );
         await tester.ensureVisible(alternateCard);
         await tester.tap(alternateCard);

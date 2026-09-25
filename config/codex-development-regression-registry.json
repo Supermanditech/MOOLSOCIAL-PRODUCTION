@@ -104944,6 +104944,16 @@
     },
     {
       "id": "REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES",
+      "storeCategoryResumeQualification20260925": {
+        "tickets": [
+          "BUY-PDP-REF-20260924-02-A05",
+          "BUY-STORE-CATEGORY-20260925-01"
+        ],
+        "finding": "Resume implementation gate rejected earlier address-test change absent from exact owner claim. First claim edit Python quoting failed before mutation; apply_patch succeeded. Removed redundant Store test assertions after preserving passed experimental harness; initial removal hunk mismatched formatter layout, inspected exact diff then repaired. One reverted Dart line retained LF among CRLF and changed raw fingerprint; restored original byte convention and verified exact prior435877 fingerprint. No test or gate weakened.",
+        "prevention": "Admit exact test owner before edits; read back bounded patch and use inspected formatted context; preserve raw-byte source fingerprint for evidence. Reuse existing category visual/scoped navigation tests and retain experiment separately.",
+        "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+        "nativePrivacy": "Unrelated notification/app images442–443 excluded from tracked archive; founder resumed MoolSocial and clean445–446 prove partial-to-full drag."
+      },
       "status": "registered_prevention_active",
       "appliesTo": [
         "primary",

@@ -175,7 +175,15 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    for (final amount in [1000, 10000, 100000, 1000000, 10000000, 10000001]) {
+    for (final amount in [
+      1000,
+      10000,
+      50000,
+      100000,
+      1000000,
+      10000000,
+      10000001,
+    ]) {
       testWidgets('A04 product price $amount complete at $scale', (
         tester,
       ) async {
@@ -232,7 +240,15 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    for (final amount in [1000, 10000, 100000, 1000000, 10000000, 10000001]) {
+    for (final amount in [
+      1000,
+      10000,
+      50000,
+      100000,
+      1000000,
+      10000000,
+      10000001,
+    ]) {
       testWidgets('A04 Offers to cart price $amount complete at $scale', (
         tester,
       ) async {

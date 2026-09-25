@@ -980,6 +980,26 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                 final textWidth = largeText
                     ? cardWidth - 16
                     : cardWidth - imageWidth - 16;
+                TextStyle priceStyle(BuyV2Product product) {
+                  const style = TextStyle(
+                    color: BuyV2Colors.navy,
+                    fontSize: 22,
+                    height: 1.15,
+                    fontWeight: FontWeight.w900,
+                  );
+                  final width = buyV2ValueTextSize(
+                    context,
+                    _glancePriceLabel(product.price),
+                    style,
+                  ).width;
+                  final ratio = width > 0
+                      ? ((textWidth - 1) / width).clamp(0.0, 1.0)
+                      : 1.0;
+                  return style.copyWith(
+                    fontSize: (22 * ratio).clamp(12.0, 22.0),
+                  );
+                }
+
                 double measure(
                   String text,
                   double size,
@@ -1014,8 +1034,8 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         textWidth,
                       ) +
                       measure(
-                        buyV2Money(product.price),
-                        22,
+                        _glancePriceLabel(product.price),
+                        priceStyle(product).fontSize!,
                         FontWeight.w900,
                         textWidth,
                       ) +
@@ -1138,13 +1158,16 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          buyV2Money(product.price),
-                                          style: const TextStyle(
-                                            color: BuyV2Colors.navy,
-                                            fontSize: 22,
-                                            height: 1.15,
-                                            fontWeight: FontWeight.w900,
+                                          _glancePriceLabel(product.price),
+                                          key: ValueKey(
+                                            'buy-offer-banner-price-${product.id}',
                                           ),
+                                          semanticsLabel: buyV2Money(
+                                            product.price,
+                                          ),
+                                          style: priceStyle(product),
+                                          maxLines: 1,
+                                          softWrap: false,
                                         ),
                                         Text(
                                           product.customerVariantPack,
@@ -10834,6 +10857,15 @@ TextStyle _readableGlancePriceStyle(
 double _compactGlanceActionWidth(double cardWidth) =>
     cardWidth >= 230 ? 88 : 44;
 
+bool _glanceUnitNeedsFullWidth(
+  BuildContext context,
+  _ProductGlanceField unit,
+  double contentWidth,
+  double actionWidth,
+) =>
+    buyV2ValueTextSize(context, unit.text, unit.style).width >
+    contentWidth - actionWidth.clamp(80.0, double.infinity) - 4;
+
 double _productGlanceCardHeight(
   BuildContext context,
   BuyV2Session session,
@@ -10852,8 +10884,18 @@ double _productGlanceCardHeight(
   final actionReserve =
       (quantity == 0
           ? _compactGlanceActionWidth(cardWidth)
-          : _inlineQuantityWidth(context, quantity)) +
+          : _inlineQuantityWidth(
+              context,
+              quantity,
+            ).clamp(_compactGlanceActionWidth(cardWidth), double.infinity)) +
       4;
+  final fields = _productGlanceFields(session, product, storeContext);
+  final fullWidthUnit = _glanceUnitNeedsFullWidth(
+    context,
+    fields[3],
+    cardWidth - 12,
+    actionReserve - 4,
+  );
   var priceHeight = 0.0;
   var height =
       _compactProductVisualLayout(
@@ -10866,13 +10908,11 @@ double _productGlanceCardHeight(
       12 +
       8 +
       4;
-  for (final (index, field) in _productGlanceFields(
-    session,
-    product,
-    storeContext,
-  ).indexed) {
+  for (final (index, field) in fields.indexed) {
     if (index >= 4 && field.text.trim().isEmpty) continue;
-    final reserve = index == 2 || index == 3 ? actionReserve : 0.0;
+    final reserve = index == 2 || (index == 3 && !fullWidthUnit)
+        ? actionReserve
+        : 0.0;
     final painter =
         TextPainter(
           text: TextSpan(
@@ -10896,7 +10936,7 @@ double _productGlanceCardHeight(
           ),
         );
     final measured = painter.height.ceilToDouble() + 2;
-    if (inlineAdd && (index == 2 || index == 3)) {
+    if (inlineAdd && (index == 2 || (index == 3 && !fullWidthUnit))) {
       priceHeight += measured;
     } else {
       height += measured;
@@ -12297,63 +12337,80 @@ class _ProductGlance extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) {
-    final fields = _productGlanceFields(session, product, storeContext);
-    Widget line(_ProductGlanceField field) => Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Text(field.text, style: field.style),
-    );
-    final priceAndUnit = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) => Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              key: ValueKey('buy-price-highlight-${product.id}'),
-              margin: const EdgeInsets.only(bottom: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFE082),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                fields[2].text,
-                style: _readableGlancePriceStyle(
-                  context,
-                  fields[2],
-                  constraints.maxWidth - 8,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final fields = _productGlanceFields(session, product, storeContext);
+      final quantity = session.quantityFor(product.id);
+      final fullWidthUnit =
+          action != null &&
+          _glanceUnitNeedsFullWidth(
+            context,
+            fields[3],
+            constraints.maxWidth,
+            quantity == 0
+                ? _compactGlanceActionWidth(constraints.maxWidth + 12)
+                : _inlineQuantityWidth(context, quantity).clamp(
+                    _compactGlanceActionWidth(constraints.maxWidth + 12),
+                    double.infinity,
+                  ),
+          );
+      Widget line(_ProductGlanceField field) => Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Text(field.text, style: field.style),
+      );
+      final priceAndUnit = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) => Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                key: ValueKey('buy-price-highlight-${product.id}'),
+                margin: const EdgeInsets.only(bottom: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE082),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(
+                  fields[2].text,
+                  style: _readableGlancePriceStyle(
+                    context,
+                    fields[2],
+                    constraints.maxWidth - 8,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-        line(fields[3]),
-      ],
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        line(fields[0]),
-        line(fields[1]),
-        if (action == null)
-          priceAndUnit
-        else
-          Row(
-            key: ValueKey('buy-price-action-row-${product.id}'),
-            children: [
-              Expanded(child: priceAndUnit),
-              const SizedBox(width: 4),
-              action!,
-            ],
-          ),
-        for (final field in fields.skip(4))
-          if (field.text.trim().isNotEmpty) line(field),
-      ],
-    );
-  }
+          if (!fullWidthUnit) line(fields[3]),
+        ],
+      );
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          line(fields[0]),
+          line(fields[1]),
+          if (action == null)
+            priceAndUnit
+          else
+            Row(
+              key: ValueKey('buy-price-action-row-${product.id}'),
+              children: [
+                Expanded(child: priceAndUnit),
+                const SizedBox(width: 4),
+                action!,
+              ],
+            ),
+          if (fullWidthUnit) line(fields[3]),
+          for (final field in fields.skip(4))
+            if (field.text.trim().isNotEmpty) line(field),
+        ],
+      );
+    },
+  );
 }
 
 class BuyV2ProductCard extends StatelessWidget {
@@ -12600,7 +12657,10 @@ class BuyV2ProductCard extends StatelessWidget {
       },
     );
     final inlineQuantity = SizedBox(
-      width: _inlineQuantityWidth(context, quantity),
+      width: _inlineQuantityWidth(
+        context,
+        quantity,
+      ).clamp(inlineActionWidth, double.infinity),
       height: BuyV2Metrics.minimumTap,
       child: Stack(
         children: [
