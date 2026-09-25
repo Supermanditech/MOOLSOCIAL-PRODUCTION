@@ -16877,11 +16877,24 @@ void main() {
       expect(find.byKey(const Key('work-review-items-toggle')), findsNothing);
       expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
       await captureStoreView(tester, 'counter-cart-review-initial-$caseId');
+      final cartCategory = find.byKey(
+        ValueKey('work-review-category-${products.first.categoryId}'),
+      );
+      expect(find.text(products.first.title), findsNothing);
+      await reveal(tester, cartCategory);
+      await tester.tap(cartCategory);
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderTotal, expectedTotal);
+      expect(
+        work.workspaceOrderQuantities.values.where((q) => q > 0),
+        hasLength(itemCount),
+      );
       expectFullTitleFits(reviewSummary, products.first.title);
       expect(save.hitTestable(), findsOneWidget);
       final saveBounds = tester.getRect(save);
       if (fitment.width == 412 && scale == 1) {
         expect(tester.getSize(reviewSummary).height, greaterThan(450));
+        await reveal(tester, find.text(products[5].title));
         expect(find.text(products[5].title).hitTestable(), findsOneWidget);
         // Non-interactive money rows can have an unpainted centre.
         final totalRect = tester.getRect(reviewTotal);

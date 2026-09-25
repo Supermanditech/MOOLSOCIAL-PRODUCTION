@@ -2478,3 +2478,25 @@ oppo-discount-wide-font16-complete.png and oppo-payment-wide-font16-after.png
 against oppo-review20-landscape-font16.png. No discount applied, invoice/payment
 created or stock changed. Rotation restoredfree; founder's font1.6 retained.
 These files are in task outputs; full sweep/founder approval remain open.
+
+### Category-aware cart stress reconciliation (2026-09-25)
+
+The additional stress/recovery run finished15 passed/7 failed. All seven
+COUNTER1919 20/30/50-item cases stopped at the first-title lookup because their
+review assertions predated the approved initially collapsed category groups.
+Failure evidence remains in task outputs/polish-stress-recovery-final.txt.
+No application regression or production-data claim is inferred from that lookup.
+
+Updated the existing tests to assert the initially hidden title, tap the real
+category control, verify unchanged total and selected-item count, then retain
+full first/last title fit, no truncation, footer position, edit-return, payment,
+discount and keyboard recovery assertions. The sixth row is explicitly revealed
+before checking its hit target rather than assuming expansion paints it onscreen.
+No app source or approved layout changed.
+
+Expanded batch COUNTERLARGE/COUNTERSCALE/COUNTERPOLISH/COUNTER1919/CSOPPOFIX015
+plus POSPOLISH thirty-item category journeys passed25/25, including320dp/2x
+and806x360/1.6x cases. Evidence: task outputs/
+polish-stress-recovery-category-aware.txt. These are fixture-based automated
+checks, not OPPO genuine-stock verification. Full sweep and device closure remain
+open; no new APK, device invoice/payment, stock mutation or Cursor change.
