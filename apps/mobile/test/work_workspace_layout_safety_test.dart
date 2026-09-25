@@ -8934,18 +8934,20 @@ void main() {
     ('manual', null),
     ('manual-reselect', null),
     ('csv', null),
+    ('csv-large', null),
     ('manual', 4),
     ('manual', 7),
     ('csv', 3),
     ('csv', 5),
     ('csv', 6),
   ]) {
-    final entryPath = scenario.$1;
+    final entryPath = scenario.$1.replaceAll('-large', '');
+    final enlargedPhotoReview = scenario.$1.endsWith('-large');
     final sample = scenario.$2 == null
         ? null
         : storeEntryEvaluationCatalogue[scenario.$2!];
     testWidgets(
-      'PRIVATEPHOTO $entryPath ${sample?.id ?? 'fixture'} selected image saves restarts and follows exact SKU into POS',
+      'PRIVATEPHOTO ${scenario.$1} ${sample?.id ?? 'fixture'} selected image saves restarts and follows exact SKU into POS',
       (tester) async {
         FlutterSecureStorage.setMockInitialValues({});
         final directory = (await tester.runAsync(
@@ -8993,6 +8995,7 @@ void main() {
           route: '/app/work/workspace/dashboard',
           work: work,
           viewport: const Size(360, 806),
+          textScale: enlargedPhotoReview ? 2 : 1,
         );
         await openAddProductsFromHome(tester);
         if (entryPath == 'csv') {
@@ -9060,7 +9063,31 @@ void main() {
           );
           rethrow;
         }
-        await tester.tap(find.byKey(const Key('work-product-photo-confirm')));
+        final photoDialog = find.byType(AlertDialog);
+        expect(
+          tester.widget<Text>(find.text('Check product image')).style!.fontSize,
+          16,
+        );
+        final confirmPhoto = find.byKey(
+          const Key('work-product-photo-confirm'),
+        );
+        expect(confirmPhoto.hitTestable(), findsOneWidget);
+        expect(tester.getSize(confirmPhoto).height, greaterThanOrEqualTo(48));
+        expect(find.text('Choose another').hitTestable(), findsOneWidget);
+        expect(
+          tester
+              .widget<Image>(
+                find.descendant(of: photoDialog, matching: find.byType(Image)),
+              )
+              .fit,
+          BoxFit.contain,
+        );
+        expect(tester.takeException(), isNull);
+        await captureStoreView(
+          tester,
+          'photo-review-${scenario.$1}-${sample?.id ?? 'fixture'}',
+        );
+        await tester.tap(confirmPhoto);
         await tester.pumpAndSettle();
         expect(work.workspaceCatalogueItems, isEmpty);
         if (sample != null && entryPath == 'manual') {

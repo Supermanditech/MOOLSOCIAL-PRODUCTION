@@ -2528,3 +2528,31 @@ The earlier csv-subdued-entry.png captured Store home and is NOT CSV evidence.
 Back cancelled the review with No products were added. No stock/invoice/payment
 write, APK build/install or Cursor change. CSV photo continuity remains open;
 these retained evaluation rows and colour checks do not prove production media.
+
+### CSV photo continuity and compact photo-review dialog (2026-09-25)
+
+Actual OPPO CSV row4 correction→image picker→photo confirmation→Apply→Save1
+created private evaluation SKU OPPO37E-0003,1kg,price103,cost80,stock100. Selected
+existing QA41-rice-1kg.png test-sample media. Stock rendered its rice image; hot
+restart4325ms then Counter Sale search0003 retained the same title/pack/stock/price
+and image. Added one unit to the retained draft, inspected the same photo and
+103line in Review Bill, then removed only that addition:20units/1773 restored.
+No invoice/payment; saved evaluation product remains for reuse. Evidence:
+task outputs/csv-photo-device-journey-20260925.md, csv-photo-stock.png,
+csv-photo-pos-restart-verified.png and csv-photo-review-bill.png. This verifies
+visible local continuity, not production-approved media/backend or all variants.
+
+That journey exposed oversized inherited AlertDialog typography at OPPO1.6:
+Check product image occupied three lines. Existing shared editor dialog now uses
+explicit16sp heading,12sp instruction and13sp actions, full user text scaling,
+48dp minimum actions, compact padding and80–180dp height-aware contain preview.
+Permission/exact-pack wording, accept/cancel, photo identity and storage unchanged.
+
+PRIVATEPHOTO/ADDPHOTO19/19 passed, including new2x CSV full save/restart/POS case,
+reachable actions, uncropped preview and exact-SKU binding. Focused analysis clean.
+Log: task outputs/photo-dialog-connected.txt. OPPO reload1library/3321ms;
+photo-dialog-compact-font16.png and photo-dialog-compact-landscape.png visually
+confirm one-line heading, readable instruction, entire product and both actions
+above system navigation. Before: csv-photo-check-font16.png. Dismissed dialog
+without accepting replacement, cancelled editor, restored rotationfree and kept
+font1.6. No new APK/install or Cursor changes. Full sweep remains open.

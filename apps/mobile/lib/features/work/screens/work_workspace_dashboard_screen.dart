@@ -15973,29 +15973,63 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       final accepted = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Check product image'),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          actionsPadding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+          title: const Text(
+            'Check product image',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF252B38),
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox.square(
-                  dimension: 180,
+                  dimension: (MediaQuery.sizeOf(dialogContext).height * .28)
+                      .clamp(80.0, 180.0),
                   child: Image.memory(bytes, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Use an image you have permission to use. Check that the exact product and pack are upright, clear and fully visible.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: MoolColors.muted,
+                  ),
                 ),
               ],
             ),
           ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Choose another'),
             ),
             TextButton(
               key: const Key('work-product-photo-confirm'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Use image'),
             ),
