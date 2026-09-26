@@ -3915,7 +3915,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 _OperatingMetric(
                   id: 'billed',
                   onTap: widget.onSales,
-                  label: 'Billed',
+                  label: 'Billed today',
                   value: money(billed),
                   detail: invoiceReady
                       ? '${todayInvoices.length} invoices · before returns'
@@ -3924,7 +3924,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 _OperatingMetric(
                   id: 'collections',
                   tinted: true,
-                  label: 'Collected',
+                  label: 'Collected today',
                   value: money(collected),
                   detail: collectionsReady
                       ? 'Recorded receipts · before refunds'
@@ -3932,7 +3932,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'invoice-count',
-                  label: 'Invoices',
+                  label: 'Invoices today',
                   value: count(invoiceReady ? todayInvoices.length : null),
                   detail: invoiceReady
                       ? 'Invoices recorded today. Open Sales to review.'
@@ -3990,19 +3990,12 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-spread',
-                  label: 'Potential spread',
+                  label: 'Potential gross profit',
                   value: money(
                     cost != null && resale != null ? resale - cost : null,
                   ),
                   detail:
                       'Selling value less purchase value · before tax, discounts and expenses',
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    'Potential only · before tax, discounts & expenses; not net profit',
-                    style: TextStyle(fontSize: 11, color: MoolColors.muted),
-                  ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
@@ -4075,9 +4068,7 @@ class _OperatingMetric extends StatelessWidget {
               key: Key('store-overview-open-$id'),
               onTap: onTap,
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: onTap != null || showInfo ? 48 : 36,
-                ),
+                constraints: const BoxConstraints(minHeight: 48),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
@@ -4100,12 +4091,6 @@ class _OperatingMetric extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (onTap != null)
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              size: 14,
-                              color: MoolColors.muted,
-                            ),
                         ],
                       );
                       final amount = _StoreValueMotion(
@@ -4128,19 +4113,56 @@ class _OperatingMetric extends StatelessWidget {
                             caption,
                             const SizedBox(height: 4),
                             amount,
+                            if (id == 'stock-spread')
+                              const Text(
+                                'Before tax, discounts & expenses · not net profit',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: MoolColors.muted,
+                                ),
+                              ),
                           ],
                         );
                       }
-                      return Row(
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(child: caption),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: amount,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(child: caption),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: onTap != null && showInfo
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(child: amount),
+                                            const Icon(
+                                              Icons.chevron_right_rounded,
+                                              size: 16,
+                                              color: MoolColors.muted,
+                                            ),
+                                          ],
+                                        )
+                                      : amount,
+                                ),
+                              ),
+                            ],
                           ),
+                          if (id == 'stock-spread')
+                            const Padding(
+                              padding: EdgeInsets.only(top: 3),
+                              child: Text(
+                                'Before tax, discounts & expenses · not net profit',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: MoolColors.muted,
+                                ),
+                              ),
+                            ),
                         ],
                       );
                     },
@@ -4172,8 +4194,16 @@ class _OperatingMetric extends StatelessWidget {
                 ),
               ),
             )
-          else
-            const SizedBox(width: 48),
+          else if (onTap != null)
+            IconButton(
+              onPressed: onTap,
+              tooltip: 'Open $label',
+              icon: const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: MoolColors.muted,
+              ),
+            ),
         ],
       ),
     ),
