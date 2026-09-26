@@ -3727,6 +3727,8 @@ class _StoreControlDashboard extends StatelessWidget {
             ),
             session: session,
             scrollController: homeContentScroll,
+            onSales: () => onOpenOperation(_WorkspaceOperation.sales),
+            onStock: onStock,
           );
         },
       ),
@@ -3738,10 +3740,13 @@ class _StoreControlDashboard extends StatelessWidget {
 class _StoreOperatingBoard extends StatefulWidget {
   const _StoreOperatingBoard({
     required this.session,
+    required this.onSales,
+    required this.onStock,
     this.scrollController,
     super.key,
   });
   final WorkSession session;
+  final VoidCallback onSales, onStock;
   final ScrollController? scrollController;
   @override
   State<_StoreOperatingBoard> createState() => _StoreOperatingBoardState();
@@ -3902,8 +3907,10 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 if (session.workspaceDashboardState !=
                     WorkspaceDashboardState.ready)
                   _DashboardSyncBanner(session: session),
+                const _OperatingSection('Today'),
                 _OperatingMetric(
                   id: 'billed',
+                  onTap: widget.onSales,
                   label: 'Billed today',
                   value: money(billed),
                   detail: invoiceReady
@@ -3912,21 +3919,33 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'collections',
+                  tinted: true,
                   label: 'Collected today',
                   value: money(collected),
                   detail: collectionsReady
                       ? 'Recorded receipts · before refunds'
                       : 'Complete collection history not available',
                 ),
-                const Divider(height: 20),
+                _OperatingMetric(
+                  id: 'invoice-count',
+                  label: 'Invoices',
+                  value: count(invoiceReady ? todayInvoices.length : null),
+                  detail: invoiceReady
+                      ? 'Invoices recorded today. Open Sales to review.'
+                      : 'Invoice history not available',
+                  onTap: widget.onSales,
+                ),
+                const _OperatingSection('Inventory'),
                 _OperatingMetric(
                   id: 'skus',
+                  onTap: widget.onStock,
                   label: 'Saved products',
                   value: count(stockReady ? products.length : null),
                   detail: 'Saved SKUs · not a count of units',
                 ),
                 _OperatingMetric(
                   id: 'low-stock',
+                  tinted: true,
                   alertColor: stockReady && session.workspaceLowStockCount > 0
                       ? const Color(0xFF8A5100)
                       : null,
@@ -3947,7 +3966,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   ),
                   detail: 'Unavailable products',
                 ),
-                const Divider(height: 20),
+                const _OperatingSection('Stock value'),
                 _OperatingMetric(
                   id: 'stock-cost',
                   label: 'Stock cost value',
@@ -3958,6 +3977,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-sale',
+                  tinted: true,
                   label: 'Stock sale value',
                   value: money(resale),
                   detail: pricesKnown
@@ -3991,6 +4011,23 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
   );
 }
 
+class _OperatingSection extends StatelessWidget {
+  const _OperatingSection(this.title);
+  final String title;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 12, bottom: 5),
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: MoolColors.muted,
+      ),
+    ),
+  );
+}
+
 class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
     required this.id,
@@ -3998,71 +4035,112 @@ class _OperatingMetric extends StatelessWidget {
     required this.value,
     required this.detail,
     this.alertColor,
+    this.tinted = false,
+    this.onTap,
   });
   final String id, label, value, detail;
   final Color? alertColor;
+  final bool tinted;
+  final VoidCallback? onTap;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        final stacked =
-            constraints.maxWidth < 260 ||
-            MediaQuery.textScalerOf(context).scale(14) > 21;
-        final amount = _StoreValueMotion(
-          value: value,
-          child: Text(
-            value,
-            key: Key('store-overview-$id'),
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: alertColor ?? MoolColors.ink,
+  Widget build(BuildContext context) => Material(
+    color: tinted ? const Color(0xFFF7F8FC) : Colors.white,
+    child: Container(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFEDF0F5))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              key: Key('store-overview-open-$id'),
+              onTap: onTap,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 7,
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      final stacked =
+                          box.maxWidth < 230 ||
+                          MediaQuery.textScalerOf(context).scale(14) > 21;
+                      final caption = Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: alertColor ?? MoolColors.ink,
+                        ),
+                      );
+                      final amount = _StoreValueMotion(
+                        value: value,
+                        child: Text(
+                          value,
+                          key: Key('store-overview-$id'),
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: alertColor ?? MoolColors.ink,
+                          ),
+                        ),
+                      );
+                      if (stacked) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            caption,
+                            const SizedBox(height: 4),
+                            amount,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: caption),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: amount,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
           ),
-        );
-        final caption = Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: alertColor ?? MoolColors.ink,
-          ),
-        );
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (stacked) ...[
-              caption,
-              const SizedBox(height: 4),
-              amount,
-            ] else
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: caption),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: amount,
-                    ),
+          IconButton(
+            key: Key('store-overview-info-$id'),
+            tooltip: 'About $label',
+            icon: const Icon(
+              Icons.info_outline_rounded,
+              size: 16,
+              color: MoolColors.muted,
+            ),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(label),
+                content: Text(detail),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
                   ),
                 ],
               ),
-            const SizedBox(height: 3),
-            Text(
-              detail,
-              style: const TextStyle(
-                fontSize: 11,
-                height: 1.4,
-                color: MoolColors.muted,
-              ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     ),
   );
 }
