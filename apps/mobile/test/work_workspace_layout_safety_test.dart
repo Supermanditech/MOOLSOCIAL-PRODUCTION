@@ -812,7 +812,13 @@ Future<void> _toggleHomeCategory(WidgetTester tester, String id) async {
 void _expectHomeCategoryContrast(WidgetTester tester, String id) {
   final category = find.byKey(Key('store-category-$id'));
   final decoration = tester.widget<DecoratedBox>(category).decoration as BoxDecoration;
-  final backgrounds = (decoration.gradient! as LinearGradient).colors;
+  expect(decoration.gradient, isNull, reason: 'Rejected wide gradients must not return');
+  expect(decoration.color, Colors.white, reason: 'Rejected pastel fills must not return');
+  final backgrounds = [decoration.color!];
+  final badge = tester.widget<DecoratedBox>(find.byKey(Key('store-category-badge-$id'))).decoration as BoxDecoration;
+  final icon = tester.widget<Icon>(find.byKey(Key('store-category-icon-$id'))).color!;
+  final iconContrast = (icon.computeLuminance() + 0.05) / (badge.color!.computeLuminance() + 0.05);
+  expect(iconContrast, greaterThanOrEqualTo(3));
   for (final text in tester.widgetList<Text>(find.descendant(of: category, matching: find.byType(Text)))) {
     final foreground = text.style?.color;
     if (foreground == null) continue;
@@ -821,7 +827,7 @@ void _expectHomeCategoryContrast(WidgetTester tester, String id) {
       final second = background.computeLuminance();
       final ratio = (first > second ? first + 0.05 : second + 0.05) /
           (first > second ? second + 0.05 : first + 0.05);
-      expect(ratio, greaterThanOrEqualTo(7), reason: '${text.data}: high-contrast text at both gradient endpoints');
+      expect(ratio, greaterThanOrEqualTo(7), reason: '${text.data}: high-contrast text on category tint');
     }
   }
 }
@@ -2261,6 +2267,17 @@ void main() {
         _expectHomeCategoryContrast(tester, id);
         expect(tester.getSize(find.byKey(Key('store-category-toggle-$id'))).height, greaterThanOrEqualTo(48));
       }
+      final categoryColours = <Color>{};
+      for (final id in ['sales', 'stock', 'orders', 'money', 'capital']) {
+        categoryColours.add((tester.widget<DecoratedBox>(find.byKey(Key('store-category-badge-$id'))).decoration as BoxDecoration).color!);
+        expect((tester.widget<DecoratedBox>(find.byKey(Key('store-category-$id'))).decoration as BoxDecoration).boxShadow, isEmpty);
+      }
+      expect(categoryColours.length, 5);
+      for (final title in ['Sales & collections', 'Stock & visibility', 'Orders & fulfilment', 'Receivables & payables', 'Working capital']) {
+        final text = tester.renderObject<RenderParagraph>(find.text(title));
+        expect(text.size.width, greaterThanOrEqualTo(text.getMinIntrinsicWidth(double.infinity) - 0.1),
+          reason: '$title should wrap between words, not inside a word');
+      }
       if (display.$1.width == 360 && display.$2 == 1) {
         expect(tester.getRect(find.byKey(const Key('store-overview-stock-days'))).bottom,
           lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-store-operating-board'))).bottom));
@@ -2274,6 +2291,7 @@ void main() {
       }
       expect(find.byKey(const Key('store-overview-details-toggle')), findsNothing);
       await _toggleHomeCategory(tester, 'sales');
+      expect((tester.widget<DecoratedBox>(find.byKey(const Key('store-category-sales'))).decoration as BoxDecoration).boxShadow, isNotEmpty);
       await _toggleHomeCategory(tester, 'stock');
       expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget);
       expect(find.byKey(const Key('store-overview-stock-spread')), findsOneWidget);

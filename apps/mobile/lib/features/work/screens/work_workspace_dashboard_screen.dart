@@ -4241,8 +4241,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
 
 abstract final class _OperatingPalette {
   static const secondary = Color(0xFF39415A);
-  static const surface = Color(0xFFF4F6FC);
-  static const expandedSurface = Color(0xFFEBEFF8);
   static const divider = Color(0xFFCBD2E1);
   static const warning = Color(0xFF754400);
   static const error = Color(0xFF991B1B);
@@ -4266,17 +4264,29 @@ class _OperatingCategory extends StatelessWidget {
     final metrics = {for (final item in children.whereType<_OperatingMetric>()) item.id: item};
     final primary = [for (final id in primaryIds) metrics[id]!];
     final secondary = children.where((item) => item is! _OperatingMetric || !primaryIds.contains(item.id)).toList();
+    final (accent, categoryIcon) = switch (id) {
+      'sales' => (const Color(0xFF4338CA), Icons.point_of_sale_outlined),
+      'stock' => (const Color(0xFF00695C), Icons.inventory_2_outlined),
+      'orders' => (const Color(0xFF1557B0), Icons.receipt_long_outlined),
+      'money' => (const Color(0xFF7135A6), Icons.account_balance_wallet_outlined),
+      _ => (const Color(0xFF006478), Icons.insights_outlined),
+    };
     return DecoratedBox(
       key: Key('store-category-$id'),
       decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight,
-          colors: [expanded ? _OperatingPalette.expandedSurface : _OperatingPalette.surface, Colors.white]),
+        color: Colors.white,
+        boxShadow: expanded ? const [BoxShadow(color: Color(0x14000050),
+          blurRadius: 8, offset: Offset(0, 3))] : const [],
         border: const Border(top: BorderSide(color: _OperatingPalette.divider, width: 0.5))),
-      child: Padding(padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Stack(children: [
+        Positioned(left: 0, top: 8, width: 2, height: 28,
+          child: DecoratedBox(decoration: BoxDecoration(color: accent,
+            borderRadius: BorderRadius.circular(2)))),
+        Padding(padding: const EdgeInsets.fromLTRB(6, 4, 0, 4),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           LayoutBuilder(builder: (context, constraints) {
             final scale = MediaQuery.textScalerOf(context);
-            final titleWidth = constraints.maxWidth * 0.24;
+            final titleWidth = constraints.maxWidth * 0.25;
             final cellWidth = (constraints.maxWidth - titleWidth - 62) / 2;
             var horizontal = constraints.maxWidth >= 290 && scale.scale(12) <= 15;
             var captionHeight = 0.0;
@@ -4304,7 +4314,13 @@ class _OperatingCategory extends StatelessWidget {
               onPressed: onToggle,
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               padding: EdgeInsets.zero,
-              icon: Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20, color: MoolColors.navy),
+              icon: Row(mainAxisSize: MainAxisSize.min, children: [
+                DecoratedBox(key: Key('store-category-badge-$id'),
+                  decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(7)),
+                  child: SizedBox(width: 24, height: 24,
+                    child: Icon(categoryIcon, key: Key('store-category-icon-$id'), size: 16, color: Colors.white))),
+                Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20, color: MoolColors.navy),
+              ]),
             ));
             if (!horizontal) {
               return Column(children: [
@@ -4330,6 +4346,7 @@ class _OperatingCategory extends StatelessWidget {
           ?attention,
           if (expanded) _OperatingGroups(children: secondary),
         ])),
+      ]),
     );
   }
 }
