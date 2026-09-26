@@ -3736,6 +3736,7 @@ class _StoreControlDashboard extends StatelessWidget {
             onStock: onStock,
             onOrders: onOrders,
             onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
+            onDues: () => onOpenOperation(_WorkspaceOperation.dues),
           );
         },
       ),
@@ -3751,11 +3752,12 @@ class _StoreOperatingBoard extends StatefulWidget {
     required this.onStock,
     required this.onOrders,
     required this.onSettlement,
+    required this.onDues,
     this.scrollController,
     super.key,
   });
   final WorkSession session;
-  final VoidCallback onSales, onStock, onOrders, onSettlement;
+  final VoidCallback onSales, onStock, onOrders, onSettlement, onDues;
   final ScrollController? scrollController;
   @override
   State<_StoreOperatingBoard> createState() => _StoreOperatingBoardState();
@@ -3917,6 +3919,19 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
       final financeReady = finance != null && finance.valid &&
           finance.historyComplete && !session.workspaceFinanceStale &&
           !finance.asOf.isAfter(DateTime.now());
+      // The summary is authoritative; possibly partial rows only establish
+      // whether the existing register has a relevant record to review.
+      final hasDuesToReview = financeReady &&
+          !session.workspaceFinanceUsesLegacyReview && finance.duesMinor > 0 &&
+          finance.payments.any((p) => p.dueMinor > 0 && const {
+            WorkspacePaymentState.unpaid, WorkspacePaymentState.partPaid,
+          }.contains(p.state));
+      final settlementIssues = financeReady && !session.workspaceFinanceUsesLegacyReview
+          ? finance.payouts.where((p) => const {
+              WorkspacePayoutState.failed, WorkspacePayoutState.held,
+              WorkspacePayoutState.unknown,
+            }.contains(p.state)).toList()
+          : <WorkspacePayoutRecord>[];
       // A local order list is not proof of complete remote order coverage.
       final seenOrderIds = <String>{};
       final openOrders = session.workspaceOrders.where((order) =>
@@ -4183,6 +4198,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   id: 'customer-dues', label: 'Receivables',
                   value: money(financeReady ? finance.duesMinor : null),
                   detail: 'Money customers owe you · not cash received. Complete customer balances are required.',
+                  onTap: hasDuesToReview ? widget.onDues : null,
                 ),
                 if (financeReady) ...[
                   _OperatingMetric(
@@ -4206,6 +4222,22 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   id: 'payables', label: 'Payables', value: '—',
                   detail: 'Money owed to suppliers. A complete set of supplier balances is not available yet; a few saved purchase bills cannot establish the total.',
                 ),
+                if (hasDuesToReview)
+                  _OperatingAttention(id: 'customer-dues',
+                    title: 'Review unpaid customer payments',
+                    detail: 'Check unpaid and part-paid records. A balance due does not mean overdue.',
+                    action: 'Collect dues', onTap: widget.onDues,
+                    color: MoolColors.navy, expanded: true),
+                if (settlementIssues.isNotEmpty)
+                  _OperatingAttention(id: 'settlement-issues',
+                    title: '${settlementIssues.length} recorded ${settlementIssues.length == 1 ? 'settlement needs' : 'settlements need'} review',
+                    detail: [
+                      for (final state in [WorkspacePayoutState.failed, WorkspacePayoutState.held, WorkspacePayoutState.unknown])
+                        if (settlementIssues.any((p) => p.state == state))
+                          '${settlementIssues.where((p) => p.state == state).length} ${state == WorkspacePayoutState.failed ? 'failed' : state == WorkspacePayoutState.held ? 'on hold' : 'awaiting an update'}',
+                    ].join(' · '),
+                    action: 'Review MoolSocial settlement', onTap: widget.onSettlement,
+                    color: _OperatingPalette.warning, expanded: true),
                 ]),
                 _OperatingCategory(id: 'capital', title: 'Working capital',
                   expanded: _expandedCategories.contains('capital'),

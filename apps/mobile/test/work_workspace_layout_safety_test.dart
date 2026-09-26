@@ -2520,6 +2520,73 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('HOMEBOARD dues and settlement alerts use records and existing destinations', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final seed = StoreReviewSeed(accountScope: 'review-draft-account',
+      orderCount: 12, now: DateTime.now().subtract(const Duration(minutes: 1)));
+    work.activeWorkspace = seed.workspace;
+    final savedAt = DateTime.now().subtract(const Duration(seconds: 1));
+    WorkspaceFinanceSnapshot snapshot(int revision, {bool complete = true, bool rows = true}) => WorkspaceFinanceSnapshot(
+      accountScope: seed.accountScope, workspaceId: seed.storeId,
+      revision: revision, asOf: savedAt,
+      salesTodayMinor: 0, duesMinor: 10000, availableMinor: 50000,
+      heldMinor: 2000, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0,
+      taxWithheldMinor: 0, historyComplete: complete,
+      payments: rows ? [WorkspacePaymentRecord(orderId: 'HOME-DUE', customerId: 'HOME-CUSTOMER',
+        customerName: 'Test customer', revision: 1, updatedAt: savedAt,
+        amountMinor: 10000, paidMinor: 0, dueMinor: 10000, refundedMinor: 0,
+        state: WorkspacePaymentState.unpaid, channel: WorkspacePaymentChannel.credit)] : [],
+      payouts: rows ? [for (final state in WorkspacePayoutState.values)
+        WorkspacePayoutRecord(id: 'HOME-${state.name}', operationId: 'OP-${state.name}',
+          revision: 1, amountMinor: 1000, updatedAt: savedAt, state: state)] : [],
+    );
+    expect(work.applyWorkspaceFinance(snapshot(1, rows: false)), isTrue);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    expect(find.byKey(const Key('store-insight-settlement-issues')), findsNothing);
+    await _toggleHomeCategory(tester, 'money');
+    expect(find.byKey(const Key('store-insight-customer-dues')), findsNothing,
+      reason: 'A summary alone is not evidence of actionable payment rows');
+    expect(work.applyWorkspaceFinance(snapshot(2)), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('3 recorded settlements need review'), findsOneWidget);
+    expect(find.text('1 failed · 1 on hold · 1 awaiting an update'), findsOneWidget);
+    final dues = find.byKey(const Key('store-insight-customer-dues'));
+    await tester.ensureVisible(dues);
+    await tester.tap(dues);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('work-finance-dues')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-store-home')));
+    await tester.pumpAndSettle();
+    await _toggleHomeCategory(tester, 'money');
+    final issues = find.byKey(const Key('store-insight-settlement-issues'));
+    await tester.ensureVisible(issues);
+    await tester.tap(issues);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('work-finance-settlement')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('work-finance-payout-HOME-failed')),
+      250, scrollable: find.descendant(of: find.byKey(const ValueKey('work-finance-settlement')),
+        matching: find.byType(Scrollable)).first);
+    expect(find.byKey(const ValueKey('work-finance-payout-HOME-failed')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-store-home')));
+    await tester.pumpAndSettle();
+    await _toggleHomeCategory(tester, 'money');
+    expect(work.applyWorkspaceFinance(snapshot(3, complete: false)), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-insight-customer-dues')), findsNothing);
+    expect(find.byKey(const Key('store-insight-settlement-issues')), findsNothing);
+    expect(find.byKey(const Key('store-overview-open-customer-dues')), findsNothing);
+    expect(work.applyWorkspaceFinance(snapshot(4)), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-insight-settlement-issues')), findsOneWidget);
+    work.markWorkspaceFinanceStale(accountScope: seed.accountScope, storeId: seed.storeId);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-insight-customer-dues')), findsNothing);
+    expect(find.byKey(const Key('store-insight-settlement-issues')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('HOMEBOARD finance projection rejects incomplete history', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     final seed = StoreReviewSeed(accountScope: 'review-draft-account',
