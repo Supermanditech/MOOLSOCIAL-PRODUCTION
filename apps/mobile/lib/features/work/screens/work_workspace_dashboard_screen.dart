@@ -1229,6 +1229,7 @@ class _WorkWorkspaceDashboardScreenState
             )
           : storeRootSurface
           ? _WorkspaceDashboardHeader(
+              showStatusLabel: _view == _WorkspaceControlView.dashboard,
               compact: compactOperation,
               singleLine: shortHomeHeader,
               session: session,
@@ -3036,6 +3037,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     this.backSize = 44,
     this.keepSearchUtilities = false,
     this.compact = false,
+    this.showStatusLabel = false,
     this.singleLine = false,
     required this.searchController,
     required this.searchFocusNode,
@@ -3061,6 +3063,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final double backSize;
   final bool keepSearchUtilities;
   final bool compact;
+  final bool showStatusLabel;
   final bool singleLine;
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
@@ -3169,7 +3172,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                           : 'Off'}, ${session.workspaceVisibleToCustomers ? 'public storefront' : 'private storefront'}. Store status',
                   child: Material(
                     key: const Key('work-dashboard-settings'),
-                    color: compact
+                    color: compact || showStatusLabel
                         ? Colors.transparent
                         : MoolColors.navy.withValues(alpha: .06),
                     borderRadius: BorderRadius.circular(999),
@@ -3191,20 +3194,35 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                             value:
                                 '${session.workspaceStoreState}:${session.workspaceVisibleToCustomers}',
                             motionKey: const Key('work-store-status-motion'),
-                            child: SizedBox(
-                              width: compact ? 32 : 40,
-                              child: Icon(
-                                session.workspaceStoreState ==
-                                        WorkspaceStoreState.open
-                                    ? Icons.radio_button_checked_rounded
-                                    : session.workspaceStoreState ==
-                                          WorkspaceStoreState.paused
-                                    ? Icons.pause_circle_outline_rounded
-                                    : Icons.power_settings_new_rounded,
-                                size: 18,
-                                color: MoolColors.navy,
-                              ),
-                            ),
+                            child: showStatusLabel
+                                ? Text(
+                                    session.workspaceStoreState ==
+                                            WorkspaceStoreState.open
+                                        ? 'Open'
+                                        : session.workspaceStoreState ==
+                                              WorkspaceStoreState.paused
+                                        ? 'Paused'
+                                        : 'Off',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: MoolColors.navy,
+                                    ),
+                                  )
+                                : SizedBox(
+                                    width: compact ? 32 : 40,
+                                    child: Icon(
+                                      session.workspaceStoreState ==
+                                              WorkspaceStoreState.open
+                                          ? Icons.radio_button_checked_rounded
+                                          : session.workspaceStoreState ==
+                                                WorkspaceStoreState.paused
+                                          ? Icons.pause_circle_outline_rounded
+                                          : Icons.power_settings_new_rounded,
+                                      size: 18,
+                                      color: MoolColors.navy,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
@@ -3877,8 +3895,8 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Recorded on this device',
-                  style: TextStyle(fontSize: 12, color: MoolColors.muted),
+                  'Device records · update time unavailable',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
                 const SizedBox(height: 10),
                 if (session.workspaceDashboardState !=
@@ -3891,7 +3909,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   detail: invoiceReady
                       ? '${todayInvoices.length} invoices · before returns'
                       : 'Invoice history not available',
-                  prominent: true,
                 ),
                 _OperatingMetric(
                   id: 'collections',
@@ -3910,6 +3927,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'low-stock',
+                  alertColor: stockReady && session.workspaceLowStockCount > 0
+                      ? const Color(0xFF8A5100)
+                      : null,
                   label: 'Low stock',
                   value: count(
                     stockReady ? session.workspaceLowStockCount : null,
@@ -3918,6 +3938,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'out-of-stock',
+                  alertColor: stockReady && session.workspaceOutOfStockCount > 0
+                      ? const Color(0xFFB3261E)
+                      : null,
                   label: 'Out of stock',
                   value: count(
                     stockReady ? session.workspaceOutOfStockCount : null,
@@ -3927,7 +3950,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 const Divider(height: 20),
                 _OperatingMetric(
                   id: 'stock-cost',
-                  label: 'Stock at purchase price',
+                  label: 'Stock cost value',
                   value: money(cost),
                   detail: costsKnown
                       ? 'Current quantities × saved purchase prices'
@@ -3935,7 +3958,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-sale',
-                  label: 'Stock at selling price',
+                  label: 'Stock sale value',
                   value: money(resale),
                   detail: pricesKnown
                       ? 'Potential sales value · not money received'
@@ -3943,7 +3966,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-spread',
-                  label: 'Potential gross spread',
+                  label: 'Potential spread',
                   value: money(
                     cost != null && resale != null ? resale - cost : null,
                   ),
@@ -3952,18 +3975,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 const Divider(height: 20),
                 const Text(
-                  'Public activity & forecasts',
+                  'Public activity & forecasts · Not connected',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: MoolColors.ink,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Not connected. Visits, cart activity and forecasts will appear when verified data is available.',
-                  style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     height: 1.4,
                     color: MoolColors.muted,
                   ),
@@ -3983,13 +3997,13 @@ class _OperatingMetric extends StatelessWidget {
     required this.label,
     required this.value,
     required this.detail,
-    this.prominent = false,
+    this.alertColor,
   });
   final String id, label, value, detail;
-  final bool prominent;
+  final Color? alertColor;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
+    padding: const EdgeInsets.symmetric(vertical: 4),
     child: LayoutBuilder(
       builder: (context, constraints) {
         final stacked =
@@ -4000,10 +4014,11 @@ class _OperatingMetric extends StatelessWidget {
           child: Text(
             value,
             key: Key('store-overview-$id'),
+            textAlign: TextAlign.right,
             style: TextStyle(
-              fontSize: prominent ? 24 : 17,
+              fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: MoolColors.ink,
+              color: alertColor ?? MoolColors.ink,
             ),
           ),
         );
@@ -4011,8 +4026,8 @@ class _OperatingMetric extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: prominent ? FontWeight.w700 : FontWeight.w500,
-            color: MoolColors.ink,
+            fontWeight: FontWeight.w500,
+            color: alertColor ?? MoolColors.ink,
           ),
         );
         return Column(
@@ -4028,7 +4043,12 @@ class _OperatingMetric extends StatelessWidget {
                 children: [
                   Expanded(child: caption),
                   const SizedBox(width: 10),
-                  Flexible(child: amount),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: amount,
+                    ),
+                  ),
                 ],
               ),
             const SizedBox(height: 3),

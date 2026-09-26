@@ -2242,7 +2242,9 @@ void main() {
             .data,
         '—',
       );
-      await tester.ensureVisible(find.text('Public activity & forecasts'));
+      await tester.ensureVisible(
+        find.text('Public activity & forecasts · Not connected'),
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const Key('work-store-stock')));
