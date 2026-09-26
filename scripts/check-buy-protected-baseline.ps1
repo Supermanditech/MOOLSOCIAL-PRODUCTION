@@ -344,6 +344,79 @@ function Test-RedmiReviewBuySource {
 
 function Test-CursorStorefrontPickupReviewSource {
   param([string]$SourceCommit)
+  if ($SourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d') {
+    # Fresh r66.36 review: exact committed source, never a moving allowance.
+    $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+    if ($reviewRoot -cne 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921') { return $false }
+    $reviewBranch = @(& git -C $root branch --show-current)
+    if ($LASTEXITCODE -ne 0 -or $reviewBranch.Count -ne 1 -or
+        $reviewBranch[0] -cne 'work/cursor-ui/buy-ready-20260921') { return $false }
+    foreach ($tip in @('0fd4da937635e159354d5213d134b80516873242', $SourceCommit)) {
+      & git -C $root merge-base --is-ancestor $tip HEAD
+      if ($LASTEXITCODE -ne 0) { return $false }
+    }
+    $boundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
+    $expectedDelta = @(
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+      'apps/mobile/lib/features/buy/buy_v2_customer_copy.dart',
+      'apps/mobile/lib/features/buy/buy_v2_models.dart',
+      'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260926/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260926/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+      'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png'
+    )
+    $delta = @(& git -C $root diff --name-only '0fd4da937635e159354d5213d134b80516873242' $SourceCommit -- @boundaries)
+    if ($LASTEXITCODE -ne 0 -or (@($delta | Sort-Object) -join '|') -cne (@($expectedDelta | Sort-Object) -join '|')) { return $false }
+    & git -C $root diff --quiet $SourceCommit HEAD -- @boundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & git -C $root diff --quiet $SourceCommit -- @boundaries
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaries)
+    if ($LASTEXITCODE -ne 0 -or $untracked.Count -ne 0) { return $false }
+    $protectedRoots = @('apps/mobile/lib/features/buy','apps/mobile/lib/ui_v2/buy') +
+      @($explicitFiles | ForEach-Object { $_.Replace('\','/') })
+    $sealedOwners = @(& git -C $root ls-tree -r --name-only $SourceCommit -- @protectedRoots)
+    return $LASTEXITCODE -eq 0 -and
+      (@($sealedOwners | Sort-Object -Unique) -join '|') -ceq ($relativeFiles -join '|')
+  }
   if ($SourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242') {
     # Fresh r66.35 review: exact committed source, never a moving allowance.
     $reviewRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')

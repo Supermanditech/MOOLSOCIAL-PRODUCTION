@@ -92,7 +92,8 @@ function Test-SealedBuyEgressClipboardAction {
     $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
     if ($IntegratedReviewSourceCommit -cin @(
         '71c48d9cec5c7c5362194c0129ba5a68ed4380ef',
-        '0fd4da937635e159354d5213d134b80516873242')) {
+        '0fd4da937635e159354d5213d134b80516873242',
+        '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d')) {
       $overlayCommit = $IntegratedReviewSourceCommit
     }
     if ($IntegratedReviewSourceCommit -cin @('87bc96d4c28300146c9e2c3c3b37c7c3aacffed0', 'd5279222466211f0526c625e58b8da5dc0d78218', '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d', '11b6562e7bf382afeb11e1801a0a390477fcae8f', '3c30ba11521db6bb1a1ec6995b181a81df1a6b34', '4221158fead95a89047e3408aaeb11c9a12dd135', '41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab', 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957', '1880614bb499a47993df86ebed6599926414fc50')) {
@@ -125,6 +126,34 @@ function Get-BuyDataEgressViolations {
 
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
+    # Exact review screen: external payment launch is disabled by reviewDataEnabled.
+    if ($IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d' -and
+        $owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart') {
+      $launchSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $launchBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $launchHash = [BitConverter]::ToString($launchSha.ComputeHash($launchBytes)).Replace('-', '')
+      } finally { $launchSha.Dispose() }
+      if ($launchHash -ceq '7B739218F46A38E9C21B43D222CCD14FDF1125FF8F79EDF437A29BACEE8CC5F7') {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
+    # Exact r66.36 source; customer-tapped Store/resolved-area Maps actions only.
+    if ($IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d' -and
+        $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      $expectedMapHash = if ($owner.EndsWith('/buy_v2_store_address.dart')) {
+        '20968444FB7A945288DF451D39490489348E247B3E4ACB7AC742C780E1E79C45'
+      } else { '11CAC04ED562563A37AC8D329773A62008714DA36134C7874F11ECF75C900548' }
+      if ($mapHash -ceq $expectedMapHash) {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
     # Exact r66.35 source; customer-tapped Store/resolved-area Maps actions only.
     if ($IntegratedReviewSourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242' -and
         $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
@@ -175,6 +204,17 @@ function Get-BuyDataEgressViolations {
       $Content = $Content.Replace('SharedPreferencesAsync', 'QualifiedReviewStateStore')
     }
     if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart') {
+      # Founder-approved explicit Store name/address Copy tap; exact snapshot only.
+      if ($IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d') {
+        $copySha = [Security.Cryptography.SHA256]::Create()
+        try {
+          $copyBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+          $copyHash = [BitConverter]::ToString($copySha.ComputeHash($copyBytes)).Replace('-', '')
+        } finally { $copySha.Dispose() }
+        if ($copyHash -ceq '6EF558533D4B408266ED5C290D0E0F8891C22B8284AF6932623350E8F6650187') {
+          $Content = $Content.Replace('Clipboard.setData(ClipboardData(text: details))', '')
+        }
+      }
       # Only the two existing user-invoked product/address shares and address-link copy.
       $Content = $Content.Replace("import 'package:share_plus/share_plus.dart';", '')
       $Content = $Content.Replace('SharePlus.instance.share(', 'QualifiedReviewShareAction(')
