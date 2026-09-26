@@ -506,7 +506,6 @@ class _WorkWorkspaceDashboardScreenState
   final Map<String, Map<String, String>> _requirementDrafts = {};
   final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
   final Set<Object> _expandedHomeActions = {};
-  final Set<Object> _moneyHomeSections = {};
   bool _requirementPickerOpen = false;
   _WorkspaceControlView _view = _WorkspaceControlView.dashboard;
   bool _draftAcceptingOrders = true;
@@ -1388,21 +1387,6 @@ class _WorkWorkspaceDashboardScreenState
             session: session,
             workspace: workspace,
             homeContentScroll: _homeContentScroll,
-            moneySelected: _moneyHomeSections.contains(
-              session.workspaceStockHistoryScope()?.key ?? workspace.id,
-            ),
-            onSelectMoney: (money) {
-              final scope =
-                  session.workspaceStockHistoryScope()?.key ?? workspace.id;
-              setState(() {
-                if (money) {
-                  _moneyHomeSections.add(scope);
-                } else {
-                  _moneyHomeSections.remove(scope);
-                }
-              });
-              unawaited(HapticFeedback.selectionClick());
-            },
             actionsExpanded: _expandedHomeActions.contains(
               session.workspaceStockHistoryScope()?.key ?? workspace.id,
             ),
@@ -3623,8 +3607,6 @@ class _StoreControlDashboard extends StatelessWidget {
     this.onNavigate,
     required this.actionsExpanded,
     required this.onToggleActions,
-    required this.moneySelected,
-    required this.onSelectMoney,
   });
 
   final WorkSession session;
@@ -3640,8 +3622,6 @@ class _StoreControlDashboard extends StatelessWidget {
   final ValueChanged<VoidCallback>? onNavigate;
   final bool actionsExpanded;
   final VoidCallback onToggleActions;
-  final bool moneySelected;
-  final ValueChanged<bool> onSelectMoney;
 
   void _navigate(VoidCallback action) {
     if (onNavigate case final navigate?) {
@@ -3659,315 +3639,229 @@ class _StoreControlDashboard extends StatelessWidget {
     return Material(
       key: const Key('work-workspace-dashboard'),
       color: const Color(0xFFF7F8FC),
-      child: Column(
-        children: [
-          if (workingCentre == null)
-            Material(
-              color: Colors.white,
-              child: LayoutBuilder(
-                builder: (context, tabConstraints) => SingleChildScrollView(
-                  key: const Key('work-store-home-tabs-scroll'),
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    key: const Key('work-store-home-tabs'),
-                    children: [
-                      for (final money in [false, true])
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minWidth: tabConstraints.maxWidth / 2,
-                          ),
-                          child: Semantics(
-                            selected: moneySelected == money,
-                            child: TextButton(
-                              key: Key(
-                                money
-                                    ? 'work-store-tab-money'
-                                    : 'work-store-tab-today',
-                              ),
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(48, 48),
-                                foregroundColor: moneySelected == money
-                                    ? MoolColors.navy
-                                    : MoolColors.muted,
-                                shape: const RoundedRectangleBorder(),
-                              ),
-                              onPressed: () => onSelectMoney(money),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: moneySelected == money
-                                          ? MoolColors.navy
-                                          : Colors.transparent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  child: Text(
-                                    money ? 'Money' : 'Today',
-                                    softWrap: false,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final enlarged = MediaQuery.textScalerOf(context).scale(14) > 23;
+          // Enlarged text has its own fallback below. Do not make a fitting
+          // compact portrait scroll merely because its text is scaled.
+          final shortViewport = constraints.maxHeight < 260;
+          final actionsBelow = _storeActionsBelowContent(context);
+          final collection =
+              (reviewedOrder ?? session.currentWorkspaceOrder)
+                  ?.isCustomerCollection ==
+              true;
+          final collectionNeedsScroll =
+              collection &&
+              (constraints.maxHeight < 580 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 18);
+          late final Widget actions;
+          final desk =
+              workingCentre ??
+              (ready
+                  ? _StoreActivityDeck(
+                      key: const Key('store-stable-working-centre'),
+                      stickyActions: !actionsExpanded && !actionsBelow
+                          ? () => actions
+                          : null,
+                      session: session,
+                      reviewedOrder: reviewedOrder,
+                      onOrders: onOrders,
+                      onReviewOrder: onReviewOrder,
+                      onCloseOrder: onCloseOrder,
+                      onStock: onStock,
+                      onMoney: onMoney,
+                      onGroupBulk: () =>
+                          onOpenOperation(_WorkspaceOperation.groupBuying),
+                    )
+                  : _StoreSetupDeck(
+                      session: session,
+                      workspace: workspace,
+                      onSetup: onSetup,
+                      onProducts: onAddProducts,
+                    ));
+          // At enlarged text, the selected detail owns the working area.
+          // Closing restores the home dashboard; no new route.
+          if (workingCentre == null &&
+              enlarged &&
+              reviewedOrder != null &&
+              !collection) {
+            return desk;
+          }
+          final finance = _StoreLiveBusinessPulse(
+            session: session,
+            compactHome: workingCentre == null,
+            onOrders: () => _navigate(onCustomers),
+            onSales: () => _navigate(onMoney),
+            onStock: () => _navigate(onStock),
+            onSettlement: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.payments)),
+          );
+          final pulse = workingCentre == null
+              ? const SizedBox.shrink()
+              : finance;
+          actions = _StoreActionEdge(
+            session: session,
+            expanded: actionsExpanded,
+            onToggle: onToggleActions,
+            onCounterSale: onNewSale,
+            onCollectDues: () => _navigate(onCustomers),
+            onStatement: () => _navigate(onMoney),
+            onSettlement: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.payments)),
+            onStoreLink: () => _navigate(onDeliverOrder),
+            onAddProducts: () => _navigate(onAddProducts),
+            onCreateOffer: () => _navigate(onGrow),
+            onPromote: () => _navigate(onPromote),
+            onRequirement: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.paidWork)),
+            onRestock: () => _navigate(onBuyStock),
+            onPurchases: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.sourcing)),
+            onGroup: () => _navigate(
+              () => onOpenOperation(_WorkspaceOperation.groupBuying),
             ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final enlarged =
-                    MediaQuery.textScalerOf(context).scale(14) > 23;
-                // Enlarged text has its own fallback below. Do not make a fitting
-                // compact portrait scroll merely because its text is scaled.
-                final shortViewport = constraints.maxHeight < 260;
-                final actionsBelow = _storeActionsBelowContent(context);
-                final collection =
-                    (reviewedOrder ?? session.currentWorkspaceOrder)
-                        ?.isCustomerCollection ==
-                    true;
-                final collectionNeedsScroll =
-                    collection &&
-                    (constraints.maxHeight < 580 ||
-                        MediaQuery.textScalerOf(context).scale(14) > 18);
-                late final Widget actions;
-                final desk =
-                    workingCentre ??
-                    (ready
-                        ? _StoreActivityDeck(
-                            key: const Key('store-stable-working-centre'),
-                            stickyActions: !actionsExpanded && !actionsBelow
-                                ? () => actions
-                                : null,
-                            session: session,
-                            reviewedOrder: reviewedOrder,
-                            onOrders: onOrders,
-                            onReviewOrder: onReviewOrder,
-                            onCloseOrder: onCloseOrder,
-                            onStock: onStock,
-                            onMoney: onMoney,
-                            onGroupBulk: () => onOpenOperation(
-                              _WorkspaceOperation.groupBuying,
-                            ),
-                          )
-                        : _StoreSetupDeck(
-                            session: session,
-                            workspace: workspace,
-                            onSetup: onSetup,
-                            onProducts: onAddProducts,
-                          ));
-                // At enlarged text, the selected detail owns the working area.
-                // Closing restores the home dashboard; no new route.
-                if (workingCentre == null &&
-                    enlarged &&
-                    reviewedOrder != null &&
-                    !collection) {
-                  return desk;
-                }
-                final finance = _StoreLiveBusinessPulse(
-                  session: session,
-                  compactHome: workingCentre == null,
-                  onOrders: () => _navigate(onCustomers),
-                  onSales: () => _navigate(onMoney),
-                  onStock: () => _navigate(onStock),
-                  onSettlement: () => _navigate(
-                    () => onOpenOperation(_WorkspaceOperation.payments),
-                  ),
-                );
-                if (workingCentre == null && moneySelected) {
-                  return SingleChildScrollView(
-                    key: const Key('work-store-money-section'),
-                    child: Column(
-                      children: [
-                        finance,
-                        if (session.workspaceDashboardState !=
-                            WorkspaceDashboardState.ready)
-                          _DashboardSyncBanner(session: session),
-                      ],
-                    ),
-                  );
-                }
-                final pulse = workingCentre == null
-                    ? const SizedBox.shrink()
-                    : finance;
-                actions = _StoreActionEdge(
-                  session: session,
-                  expanded: actionsExpanded,
-                  onToggle: onToggleActions,
-                  onCounterSale: onNewSale,
-                  onStoreLink: () => _navigate(onDeliverOrder),
-                  onAddProducts: () => _navigate(onAddProducts),
-                  onCreateOffer: () => _navigate(onGrow),
-                  onPromote: () => _navigate(onPromote),
-                  onRequirement: () => _navigate(
-                    () => onOpenOperation(_WorkspaceOperation.paidWork),
-                  ),
-                  onRestock: () => _navigate(onBuyStock),
-                  onPurchases: () => _navigate(
-                    () => onOpenOperation(_WorkspaceOperation.sourcing),
-                  ),
-                  onGroup: () => _navigate(
-                    () => onOpenOperation(_WorkspaceOperation.groupBuying),
-                  ),
-                );
-                if (workingCentre != null) {
-                  final keyboard = View.of(context).viewInsets.bottom > 0;
-                  final height = constraints.maxHeight;
-                  // Keep the editor under the same parents when keyboard space changes.
-                  // Reparenting the focused field can detach its active input connection.
-                  return SingleChildScrollView(
-                    key: const Key('work-active-counter-layout'),
-                    child: SizedBox(
-                      height: height,
-                      child: Column(
-                        children: [
-                          // Cap the summary on short screens without reserving an
-                          // unused flex share below the invoice/working content.
-                          ConstrainedBox(
-                            constraints: BoxConstraints(maxHeight: height / 2),
-                            child: SingleChildScrollView(
-                              child: Offstage(offstage: keyboard, child: pulse),
-                            ),
-                          ),
-                          Expanded(
-                            child: Flex(
-                              key: const Key('work-active-content-area'),
-                              direction: actionsBelow
-                                  ? Axis.vertical
-                                  : Axis.horizontal,
-                              crossAxisAlignment: actionsBelow
-                                  ? CrossAxisAlignment.stretch
-                                  : CrossAxisAlignment.start,
-                              children: [Expanded(child: desk)],
-                            ),
-                          ),
-                        ],
+          );
+          if (workingCentre != null) {
+            final keyboard = View.of(context).viewInsets.bottom > 0;
+            final height = constraints.maxHeight;
+            // Keep the editor under the same parents when keyboard space changes.
+            // Reparenting the focused field can detach its active input connection.
+            return SingleChildScrollView(
+              key: const Key('work-active-counter-layout'),
+              child: SizedBox(
+                height: height,
+                child: Column(
+                  children: [
+                    // Cap the summary on short screens without reserving an
+                    // unused flex share below the invoice/working content.
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: height / 2),
+                      child: SingleChildScrollView(
+                        child: Offstage(offstage: keyboard, child: pulse),
                       ),
                     ),
-                  );
-                }
-                // Keep narrow/enlarged actions reachable above navigation while the
-                // working content scrolls independently; no tall empty action strip.
-                if (actionsBelow) {
-                  if (enlarged || collectionNeedsScroll || shortViewport) {
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            key: const Key('work-dashboard-enlarged-scroll'),
-                            controller: homeContentScroll,
-                            child: Column(
-                              children: [
-                                SizedBox(
-                                  height: collection
-                                      ? 1260
-                                      : enlarged
-                                      ? 760
-                                      : 520,
-                                  child: Column(
-                                    children: [
-                                      pulse,
-                                      if (session.workspaceDashboardState !=
-                                          WorkspaceDashboardState.ready)
-                                        _DashboardSyncBanner(session: session),
-                                      Expanded(child: desk),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        actions,
-                      ],
-                    );
-                  }
-                  return Column(
-                    children: [
-                      pulse,
-                      if (session.workspaceDashboardState !=
-                          WorkspaceDashboardState.ready)
-                        _DashboardSyncBanner(session: session),
-                      Expanded(child: desk),
-                      actions,
-                    ],
-                  );
-                }
-                final content = Column(
-                  children: [
-                    pulse,
-                    if (session.workspaceDashboardState !=
-                        WorkspaceDashboardState.ready)
-                      _DashboardSyncBanner(session: session),
                     Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: desk),
-                          if (actionsExpanded) actions,
-                        ],
+                      child: Flex(
+                        key: const Key('work-active-content-area'),
+                        direction: actionsBelow
+                            ? Axis.vertical
+                            : Axis.horizontal,
+                        crossAxisAlignment: actionsBelow
+                            ? CrossAxisAlignment.stretch
+                            : CrossAxisAlignment.start,
+                        children: [Expanded(child: desk)],
                       ),
                     ),
                   ],
-                );
-                // Setup has no activity-card shell to host the notched control.
-                // Keep its action access separate from the approved live-home card.
-                Widget withSetupActionAccess(Widget body) =>
-                    actionsExpanded || ready
-                    ? body
-                    : Stack(
-                        fit: StackFit.expand,
+                ),
+              ),
+            );
+          }
+          // Keep narrow/enlarged actions reachable above navigation while the
+          // working content scrolls independently; no tall empty action strip.
+          if (actionsBelow) {
+            if (enlarged || collectionNeedsScroll || shortViewport) {
+              return Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      key: const Key('work-dashboard-enlarged-scroll'),
+                      controller: homeContentScroll,
+                      child: Column(
                         children: [
-                          body,
-                          Positioned(
-                            right: 0,
-                            top:
-                                (constraints.maxHeight - 120).clamp(
-                                  0.0,
-                                  double.infinity,
-                                ) /
-                                2,
-                            width: _quickActionsTabWidth,
-                            child: actions,
+                          SizedBox(
+                            height: collection
+                                ? 1260
+                                : enlarged
+                                ? 760
+                                : 520,
+                            child: Column(
+                              children: [
+                                pulse,
+                                if (session.workspaceDashboardState !=
+                                    WorkspaceDashboardState.ready)
+                                  _DashboardSyncBanner(session: session),
+                                Expanded(child: desk),
+                              ],
+                            ),
                           ),
                         ],
-                      );
-                if (!enlarged && !collectionNeedsScroll && !shortViewport) {
-                  return withSetupActionAccess(content);
-                }
-                return withSetupActionAccess(
-                  SingleChildScrollView(
-                    key: const Key('work-dashboard-enlarged-scroll'),
-                    child: SizedBox(
-                      height: constraints.maxHeight.clamp(
-                        collection
-                            ? (enlarged ? 1260 : 980)
-                            : enlarged
-                            ? 760
-                            : 520,
-                        double.infinity,
                       ),
-                      child: content,
                     ),
                   ),
+                  actions,
+                ],
+              );
+            }
+            return Column(
+              children: [
+                pulse,
+                if (session.workspaceDashboardState !=
+                    WorkspaceDashboardState.ready)
+                  _DashboardSyncBanner(session: session),
+                Expanded(child: desk),
+                actions,
+              ],
+            );
+          }
+          final content = Column(
+            children: [
+              pulse,
+              if (session.workspaceDashboardState !=
+                  WorkspaceDashboardState.ready)
+                _DashboardSyncBanner(session: session),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: desk),
+                    if (actionsExpanded) actions,
+                  ],
+                ),
+              ),
+            ],
+          );
+          // Setup has no activity-card shell to host the notched control.
+          // Keep its action access separate from the approved live-home card.
+          Widget withSetupActionAccess(Widget body) => actionsExpanded || ready
+              ? body
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    body,
+                    Positioned(
+                      right: 0,
+                      top:
+                          (constraints.maxHeight - 120).clamp(
+                            0.0,
+                            double.infinity,
+                          ) /
+                          2,
+                      width: _quickActionsTabWidth,
+                      child: actions,
+                    ),
+                  ],
                 );
-              },
+          if (!enlarged && !collectionNeedsScroll && !shortViewport) {
+            return withSetupActionAccess(content);
+          }
+          return withSetupActionAccess(
+            SingleChildScrollView(
+              key: const Key('work-dashboard-enlarged-scroll'),
+              child: SizedBox(
+                height: constraints.maxHeight.clamp(
+                  collection
+                      ? (enlarged ? 1260 : 980)
+                      : enlarged
+                      ? 760
+                      : 520,
+                  double.infinity,
+                ),
+                child: content,
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -3982,6 +3876,9 @@ class _StoreActionEdge extends StatelessWidget {
     required this.onPurchases,
     required this.onGroup,
     required this.onCounterSale,
+    required this.onCollectDues,
+    required this.onStatement,
+    required this.onSettlement,
     required this.onStoreLink,
     required this.onAddProducts,
     required this.onCreateOffer,
@@ -3991,6 +3888,7 @@ class _StoreActionEdge extends StatelessWidget {
   final WorkSession session;
   final VoidCallback onRestock, onPurchases, onGroup;
   final VoidCallback onCounterSale, onStoreLink, onAddProducts;
+  final VoidCallback onCollectDues, onStatement, onSettlement;
   final VoidCallback onCreateOffer, onPromote, onRequirement;
   final bool expanded;
   final VoidCallback onToggle;
@@ -4004,6 +3902,7 @@ class _StoreActionEdge extends StatelessWidget {
         _storeRailWordWidth(
           context,
           'Counter sale Share store link Buy stock Track purchases '
+          'Collect dues View statement MoolSocial settlement '
           'Buy together Add products Create offer Promote store Post requirement',
         ) +
         17;
@@ -4123,6 +4022,30 @@ class _StoreActionEdge extends StatelessWidget {
                                 icon: Icons.point_of_sale_outlined,
                                 label: 'Counter sale',
                                 onTap: onCounterSale,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-collect-dues',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.payments_outlined,
+                                label: 'Collect dues',
+                                onTap: onCollectDues,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-statement',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.receipt_long_outlined,
+                                label: 'View statement',
+                                onTap: onStatement,
+                              ),
+                              _StoreEdgeAction(
+                                keyName: 'work-quick-settlement',
+                                compact: horizontal,
+                                horizontal: horizontal,
+                                icon: Icons.account_balance_wallet_outlined,
+                                label: 'MoolSocial settlement',
+                                onTap: onSettlement,
                               ),
                               const Divider(
                                 height: 16,

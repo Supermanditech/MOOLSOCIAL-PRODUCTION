@@ -1906,13 +1906,13 @@ void main() {
     return work;
   }
 
-  Future<void> openHomeSection(
+  Future<void> openFinanceSummaryOrHome(
     WidgetTester tester, {
     required bool money,
   }) async {
-    final tab = find.byKey(
-      Key(money ? 'work-store-tab-money' : 'work-store-tab-today'),
-    );
+    // Finance facts remain in the existing Sales working-screen summary.
+    // Home now contains direct named actions, not a second finance summary.
+    final tab = find.byKey(Key(money ? 'work-store-sell' : 'work-store-home'));
     if (tab.evaluate().isNotEmpty) {
       await tester.tap(tab);
       await tester.pumpAndSettle();
@@ -1922,13 +1922,13 @@ void main() {
   Future<void> reveal(WidgetTester tester, Finder finder) async {
     // Follow the approved contextual entry points, not obsolete Home controls.
     if (finder.evaluate().isEmpty &&
-        find.byKey(const Key('work-store-home-tabs')).evaluate().isNotEmpty) {
+        find.byKey(const Key('work-store-home')).evaluate().isNotEmpty) {
       final description = finder.describeMatch(Plurality.zero);
       if (description.contains('work-pulse-')) {
-        await openHomeSection(tester, money: true);
+        await openFinanceSummaryOrHome(tester, money: true);
       } else if (description.contains('work-quick-') ||
           description.contains('work-incoming-purchases')) {
-        await openHomeSection(tester, money: false);
+        await openFinanceSummaryOrHome(tester, money: false);
       }
     }
     final actions = find.byKey(const Key('work-home-actions-toggle'));
@@ -2261,7 +2261,7 @@ void main() {
     expect(find.byKey(const Key('work-activity-invoice')), findsNothing);
     expect(find.byKey(const Key('work-store-recent-sales')), findsNothing);
     expect(find.byKey(const Key('work-store-finance-material')), findsNothing);
-    await openHomeSection(tester, money: true);
+    await openFinanceSummaryOrHome(tester, money: true);
     expect(
       tester
           .widget<Material>(
@@ -2315,7 +2315,7 @@ void main() {
     (const Size(320, 568), 2.0),
     (const Size(720, 360), 1.0),
   ]) {
-    testWidgets('HOME Today Money contextual navigation $display', (
+    testWidgets('HOME direct finance actions and retained expansion $display', (
       tester,
     ) async {
       final work = liveStore();
@@ -2331,15 +2331,11 @@ void main() {
         textScale: display.$2,
         openHomeActions: false,
       );
-      final topRail = find.byKey(const Key('work-store-home-tabs-scroll'));
       expect(
-        tester.widget<SingleChildScrollView>(topRail).scrollDirection,
-        Axis.horizontal,
+        find.byKey(const Key('work-store-home-tabs-scroll')),
+        findsNothing,
       );
-      await tester.drag(topRail, const Offset(-120, 0));
-      await tester.pumpAndSettle();
-      await tester.drag(topRail, const Offset(120, 0));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-money-section')), findsNothing);
       expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
       expect(
         find.byKey(const Key('work-store-finance-material')),
@@ -2347,22 +2343,25 @@ void main() {
       );
       expect(find.byKey(const Key('work-home-actions-toggle')), findsOneWidget);
       for (final destination in [
-        ('work-pulse-sales', 'work-store-statement'),
-        ('work-pulse-dues', 'work-store-dues'),
-        ('work-pulse-settlement', 'work-money-destination'),
+        ('work-quick-statement', 'work-store-statement'),
+        ('work-quick-collect-dues', 'work-store-dues'),
+        ('work-quick-settlement', 'work-money-destination'),
       ]) {
-        await openHomeSection(tester, money: true);
-        expect(find.byKey(const Key('work-store-activity-deck')), findsNothing);
+        expect(
+          find.byKey(const Key('work-store-activity-deck')),
+          findsOneWidget,
+        );
         final action = find.byKey(Key(destination.$1));
         await reveal(tester, action);
         expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
         await tester.tap(action);
         await tester.pumpAndSettle();
         expect(find.byKey(Key(destination.$2)), findsOneWidget);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('work-store-money-section')),
+          find.byKey(const Key('work-store-quick-actions-scroll')),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
@@ -2371,8 +2370,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-store-home')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-money-section')), findsOneWidget);
-      await openHomeSection(tester, money: false);
+      expect(
+        find.byKey(const Key('work-store-quick-actions-scroll')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('work-store-finance-material')),
         findsNothing,
@@ -2383,10 +2384,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-store-quick-actions-scroll')),
-        findsOneWidget,
+        findsNothing,
       );
-      await openHomeSection(tester, money: true);
-      await openHomeSection(tester, money: false);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-store-quick-actions-scroll')),
         findsOneWidget,
@@ -2396,7 +2397,6 @@ void main() {
         stock,
       );
       expect(work.workspaceInvoices.length, invoiceCount);
-      await openHomeSection(tester, money: true);
       final originalStore = work.activeWorkspace!;
       work.activeWorkspace = const WorkWorkspace(
         id: 'different-store',
@@ -2408,14 +2408,17 @@ void main() {
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const Key('work-store-money-section')),
+        find.byKey(const Key('work-store-quick-actions-scroll')),
         findsNothing,
-        reason: 'A different Store must start at Today',
+        reason: 'A different Store starts with Quick actions collapsed',
       );
       work.activeWorkspace = originalStore;
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-money-section')), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-store-quick-actions-scroll')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
   }
@@ -3701,7 +3704,7 @@ void main() {
           viewport: Size(display.width, display.height),
           textScale: display.scale,
         );
-        await openHomeSection(tester, money: true);
+        await openFinanceSummaryOrHome(tester, money: true);
         final sales = find.byKey(const Key('work-pulse-settlement'));
         final originalTop = tester.getTopLeft(sales).dy;
         final originalHeight = tester.getSize(sales).height;
@@ -4369,7 +4372,7 @@ void main() {
           viewport: Size(display.width, display.height),
           textScale: display.scale,
         );
-        await openHomeSection(tester, money: true);
+        await openFinanceSummaryOrHome(tester, money: true);
         for (final metric in [
           ('work-pulse-dues', 'Unpaid bills', '₹860'),
           ('work-pulse-settlement', 'Available to settle', '₹17,820'),
@@ -4660,7 +4663,7 @@ void main() {
           expect(tester.takeException(), isNull);
           await tester.tap(find.byKey(const Key('work-store-home')));
           await tester.pumpAndSettle();
-          await openHomeSection(tester, money: false);
+          await openFinanceSummaryOrHome(tester, money: false);
           expect(
             find.byKey(const Key('work-quick-counter-sale')),
             findsOneWidget,
@@ -4908,8 +4911,8 @@ void main() {
       expect(consumer.quantityFor(product.id), 0);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-money-section')), findsOneWidget);
-      await openHomeSection(tester, money: false);
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      await openFinanceSummaryOrHome(tester, money: false);
       expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
@@ -8836,7 +8839,7 @@ void main() {
           );
           final action = find.byKey(const Key('work-activity-order-accept'));
           final actionBounds = tester.getRect(action);
-          await openHomeSection(tester, money: true);
+          await openFinanceSummaryOrHome(tester, money: true);
           final metric = find.byKey(const Key('work-pulse-settlement'));
           Finder renderedLabel(String label) => find.descendant(
             of: metric,
@@ -8937,7 +8940,7 @@ void main() {
             tester,
             'finish-dashboard-${display.$1}-${display.$3}-$reduced',
           );
-          await openHomeSection(tester, money: false);
+          await openFinanceSummaryOrHome(tester, money: false);
           expect(tester.getRect(action), actionBounds);
           expect(tester.takeException(), isNull);
         },
@@ -8956,7 +8959,7 @@ void main() {
         textScale: display.$3,
         bottomInset: 34,
       );
-      await openHomeSection(tester, money: true);
+      await openFinanceSummaryOrHome(tester, money: true);
       final motion = find.byKey(
         const Key('work-pulse-settlement-value-motion'),
       );
@@ -8987,7 +8990,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
       expect(work.currentWorkspaceOrderId, 'APP-1043');
-      await tester.tap(find.byKey(const Key('work-pulse-dues')));
+      final collectDues = find.byKey(const Key('work-quick-collect-dues'));
+      await reveal(tester, collectDues);
+      await tester.tap(collectDues);
       await tester.pumpAndSettle();
       final workingSurface = tester.widget<Material>(
         find.byKey(const Key('work-first-tap-working-surface')),
@@ -19004,13 +19009,13 @@ void main() {
         route: '/app/work/workspace/dashboard',
         work: liveStore(),
       );
-      await openHomeSection(tester, money: true);
+      await openFinanceSummaryOrHome(tester, money: true);
       await tester.tap(find.byKey(const Key('work-pulse-sales')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
       await tester.tap(find.byKey(const Key('work-store-home')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-money-section')), findsOneWidget);
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
       await reveal(tester, find.byKey(const Key('work-quick-buy')));
       await tester.tap(find.byKey(const Key('work-quick-buy')));
       await tester.pumpAndSettle();
@@ -19388,14 +19393,14 @@ void main() {
           viewport: const Size(412, 915),
           textScale: 1,
         );
-        await openHomeSection(tester, money: true);
+        await openFinanceSummaryOrHome(tester, money: true);
         final pulse = find.byKey(const Key('work-store-live-business-pulse'));
         for (final widget in tester.widgetList<AnimatedSwitcher>(
           find.descendant(of: pulse, matching: find.byType(AnimatedSwitcher)),
         )) {
           expect(widget.duration, Duration.zero);
         }
-        await openHomeSection(tester, money: false);
+        await openFinanceSummaryOrHome(tester, money: false);
         final edge = tester.getRect(
           find.byKey(const Key('work-store-action-edge')),
         );
@@ -25709,7 +25714,9 @@ void main() {
     for (final key in const [
       'work-store-activity-deck',
       'work-activity-ready',
-      'work-store-home-tabs',
+      'work-quick-collect-dues',
+      'work-quick-statement',
+      'work-quick-settlement',
       'work-store-action-edge',
       'work-quick-create-offer',
       'work-dashboard-settings',
@@ -25765,7 +25772,8 @@ void main() {
       expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
       expect(find.text('₹28,450'), findsNothing);
       expect(find.text('Sales today'), findsNothing);
-      expect(find.text('View statement'), findsNothing);
+      expect(find.byKey(const Key('work-quick-statement')), findsOneWidget);
+      expect(find.byKey(const Key('work-pulse-sales')), findsNothing);
       expect(find.text('Sales'), findsOneWidget);
       expect(find.text('Buy stock'), findsOneWidget);
       expect(find.text('Buy together'), findsOneWidget);
@@ -25796,7 +25804,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    await openHomeSection(tester, money: true);
+    await openFinanceSummaryOrHome(tester, money: true);
     await tester.tap(find.byKey(const Key('work-pulse-settlement')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-money-destination')), findsOneWidget);
@@ -37778,7 +37786,7 @@ void main() {
             viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
             textScale: scale,
           );
-          await openHomeSection(tester, money: true);
+          await openFinanceSummaryOrHome(tester, money: true);
           expectFinanceActionWords(tester);
           await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
           await captureStoreView(tester, 'finance-paise-boundary-$scale');
@@ -38058,7 +38066,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('work-store-money-section')),
+          find.byKey(const Key('work-store-activity-deck')),
           findsOneWidget,
         );
         for (final key in ['work-pulse-sales', 'work-pulse-dues']) {
