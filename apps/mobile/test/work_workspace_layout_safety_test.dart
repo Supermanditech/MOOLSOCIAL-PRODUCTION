@@ -2260,9 +2260,19 @@ void main() {
       final panel = find.byKey(const Key('work-stock-actions-panel'));
       expect(
         tester.getRect(table).right,
-        lessThanOrEqualTo(tester.getRect(panel).left),
+        closeTo(tester.getRect(panel).right, 1),
       );
-      expect(tester.getSize(table).width, lessThan(fullWidth));
+      expect(tester.getSize(table).width, fullWidth);
+      expect(
+        tester.getSize(panel).height,
+        lessThanOrEqualTo(tester.getSize(table).height),
+      );
+      if (display.$1.width == 360 && display.$2 == 1) {
+        expect(
+          tester.getSize(panel).height,
+          lessThan(tester.getSize(table).height),
+        );
+      }
       await tester.tap(edge);
       await tester.pumpAndSettle();
       expect(tester.getSize(table).width, fullWidth);

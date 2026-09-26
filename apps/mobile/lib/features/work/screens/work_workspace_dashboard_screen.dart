@@ -13299,9 +13299,9 @@ double _stockQuickTabHeight(BuildContext context) {
   final painter = TextPainter(
     text: TextSpan(
       text: 'Quick actions',
-      style: DefaultTextStyle.of(context).style.merge(
-        const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-      ),
+      style: DefaultTextStyle.of(
+        context,
+      ).style.merge(const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
     ),
     textDirection: TextDirection.ltr,
     textScaler: MediaQuery.textScalerOf(context),
@@ -13406,28 +13406,37 @@ class _StockQuickActionsFrame extends StatelessWidget {
         color: const Color(0xFFF7F8FC),
         child: Stack(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: ClipPath(
-                    key: const Key('work-stock-action-content'),
-                    clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
-                    child: child,
-                  ),
+            Positioned.fill(
+              child: ClipPath(
+                key: const Key('work-stock-action-content'),
+                clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
+                child: child,
+              ),
+            ),
+            if (expanded) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  key: const Key('work-stock-actions-dismiss'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onToggle,
+                  child: const SizedBox.expand(),
                 ),
-                if (expanded)
-                  Container(
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                width: panelWidth,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: box.maxHeight),
+                  child: Material(
                     key: const Key('work-stock-actions-panel'),
-                    width: panelWidth,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(left: BorderSide(color: Color(0xFFE5E8F1))),
-                    ),
+                    type: MaterialType.transparency,
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
+                        Flexible(
                           child: ListView.separated(
+                            shrinkWrap: true,
                             key: const Key('work-stock-entry-controls'),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4,
@@ -13443,8 +13452,9 @@ class _StockQuickActionsFrame extends StatelessWidget {
                       ],
                     ),
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
             if (!expanded) Positioned(right: 0, bottom: 0, child: toggle),
           ],
         ),
