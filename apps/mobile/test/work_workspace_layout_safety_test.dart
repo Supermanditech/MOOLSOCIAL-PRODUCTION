@@ -2230,7 +2230,7 @@ void main() {
       expect(find.byKey(const Key('work-store-activity-deck')), findsNothing);
       expect(find.byKey(const Key('work-quick-add-products')), findsNothing);
       // An unhydrated or incomplete ledger must not become a zero sales total.
-      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('Today'), findsNothing);
       expect(find.text('Inventory'), findsOneWidget);
       expect(find.text('Stock value'), findsOneWidget);
       final billedInfo = find.byKey(const Key('store-overview-info-billed'));

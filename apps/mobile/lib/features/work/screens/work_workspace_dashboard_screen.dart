@@ -3195,18 +3195,23 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                 '${session.workspaceStoreState}:${session.workspaceVisibleToCustomers}',
                             motionKey: const Key('work-store-status-motion'),
                             child: showStatusLabel
-                                ? Text(
-                                    session.workspaceStoreState ==
-                                            WorkspaceStoreState.open
-                                        ? 'Open'
-                                        : session.workspaceStoreState ==
-                                              WorkspaceStoreState.paused
-                                        ? 'Paused'
-                                        : 'Off',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: MoolColors.navy,
+                                ? SizedBox(
+                                    height: 36,
+                                    child: Center(
+                                      child: Text(
+                                        session.workspaceStoreState ==
+                                                WorkspaceStoreState.open
+                                            ? 'Open'
+                                            : session.workspaceStoreState ==
+                                                  WorkspaceStoreState.paused
+                                            ? 'Paused'
+                                            : 'Off',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: MoolColors.navy,
+                                        ),
+                                      ),
                                     ),
                                   )
                                 : SizedBox(
@@ -3903,15 +3908,14 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   'Device records · update time unavailable',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
                 if (session.workspaceDashboardState !=
                     WorkspaceDashboardState.ready)
                   _DashboardSyncBanner(session: session),
-                const _OperatingSection('Today'),
                 _OperatingMetric(
                   id: 'billed',
                   onTap: widget.onSales,
-                  label: 'Billed today',
+                  label: 'Billed',
                   value: money(billed),
                   detail: invoiceReady
                       ? '${todayInvoices.length} invoices · before returns'
@@ -3920,7 +3924,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 _OperatingMetric(
                   id: 'collections',
                   tinted: true,
-                  label: 'Collected today',
+                  label: 'Collected',
                   value: money(collected),
                   detail: collectionsReady
                       ? 'Recorded receipts · before refunds'
@@ -3993,7 +3997,14 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   detail:
                       'Selling value less purchase value · before tax, discounts and expenses',
                 ),
-                const Divider(height: 20),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'Potential only · before tax, discounts & expenses; not net profit',
+                    style: TextStyle(fontSize: 11, color: MoolColors.muted),
+                  ),
+                ),
+                const SizedBox(height: 6),
                 const Text(
                   'Public activity & forecasts · Not connected',
                   style: TextStyle(
@@ -4016,7 +4027,7 @@ class _OperatingSection extends StatelessWidget {
   final String title;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 12, bottom: 5),
+    padding: const EdgeInsets.only(top: 6, bottom: 2),
     child: Text(
       title,
       style: const TextStyle(
@@ -4043,6 +4054,13 @@ class _OperatingMetric extends StatelessWidget {
   final bool tinted;
   final VoidCallback? onTap;
 
+  bool get showInfo => !const {
+    'invoice-count',
+    'skus',
+    'low-stock',
+    'out-of-stock',
+  }.contains(id);
+
   @override
   Widget build(BuildContext context) => Material(
     color: tinted ? const Color(0xFFF7F8FC) : Colors.white,
@@ -4057,24 +4075,38 @@ class _OperatingMetric extends StatelessWidget {
               key: Key('store-overview-open-$id'),
               onTap: onTap,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 48),
+                constraints: BoxConstraints(
+                  minHeight: onTap != null || showInfo ? 48 : 36,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
-                    vertical: 7,
+                    vertical: 4,
                   ),
                   child: LayoutBuilder(
                     builder: (context, box) {
                       final stacked =
                           box.maxWidth < 230 ||
                           MediaQuery.textScalerOf(context).scale(14) > 21;
-                      final caption = Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: alertColor ?? MoolColors.ink,
-                        ),
+                      final caption = Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: alertColor ?? MoolColors.ink,
+                              ),
+                            ),
+                          ),
+                          if (onTap != null)
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 14,
+                              color: MoolColors.muted,
+                            ),
+                        ],
                       );
                       final amount = _StoreValueMotion(
                         value: value,
@@ -4117,28 +4149,31 @@ class _OperatingMetric extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            key: Key('store-overview-info-$id'),
-            tooltip: 'About $label',
-            icon: const Icon(
-              Icons.info_outline_rounded,
-              size: 16,
-              color: MoolColors.muted,
-            ),
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text(label),
-                content: Text(detail),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Close'),
-                  ),
-                ],
+          if (showInfo)
+            IconButton(
+              key: Key('store-overview-info-$id'),
+              tooltip: 'About $label',
+              icon: const Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: MoolColors.muted,
               ),
-            ),
-          ),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(label),
+                  content: Text(detail),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 48),
         ],
       ),
     ),
