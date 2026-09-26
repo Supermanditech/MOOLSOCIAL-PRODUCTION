@@ -3891,7 +3891,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           ),
           clipBehavior: Clip.antiAlias,
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -3990,7 +3990,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-spread',
-                  label: 'Gross profit*',
+                  label: 'Potential profit*',
                   value: money(
                     cost != null && resale != null ? resale - cost : null,
                   ),
@@ -4020,7 +4020,7 @@ class _OperatingSection extends StatelessWidget {
   final String title;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 6, bottom: 2),
+    padding: const EdgeInsets.only(top: 4, bottom: 2),
     child: Text(
       title,
       style: const TextStyle(
@@ -4097,13 +4097,27 @@ class _OperatingMetric extends StatelessWidget {
                           alignment: Alignment.center,
                           child: LayoutBuilder(
                             builder: (context, box) {
-                              final caption = Text(
-                                label,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: alertColor ?? MoolColors.ink,
-                                ),
+                              final caption = Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: alertColor ?? MoolColors.ink,
+                                    ),
+                                  ),
+                                  if (id == 'billed')
+                                    const Text(
+                                      'Before returns',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: MoolColors.muted,
+                                      ),
+                                    ),
+                                ],
                               );
                               final amount = _StoreValueMotion(
                                 value: value,
@@ -4181,14 +4195,6 @@ class _OperatingMetric extends StatelessWidget {
               ),
             ],
           ),
-          if (id == 'billed')
-            const Padding(
-              padding: EdgeInsets.fromLTRB(6, 0, 6, 4),
-              child: Text(
-                'Before returns',
-                style: TextStyle(fontSize: 11, color: MoolColors.muted),
-              ),
-            ),
           if (id == 'stock-spread')
             const Padding(
               padding: EdgeInsets.fromLTRB(6, 0, 6, 4),
