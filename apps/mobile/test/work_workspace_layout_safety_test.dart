@@ -802,6 +802,13 @@ Future<void> chooseAddProductMode(WidgetTester tester, String mode) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _toggleHomeCategory(WidgetTester tester, String id) async {
+  final toggle = find.byKey(Key('store-category-toggle-$id'));
+  await tester.ensureVisible(toggle);
+  await tester.tap(toggle);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('STORESEARCH recent terms recall cap typing and stale scope', (
     tester,
@@ -2232,6 +2239,27 @@ void main() {
       // An unhydrated or incomplete ledger must not become a zero sales total.
       expect(find.text('Today'), findsNothing);
       expect(find.text('Stock & visibility'), findsOneWidget);
+      for (final id in ['sales', 'stock', 'orders', 'money', 'capital']) {
+        expect(find.byKey(Key('store-category-toggle-$id')), findsOneWidget);
+      }
+      for (final id in ['billed', 'collections', 'stock-cost', 'low-stock',
+        'recorded-open-orders', 'overdue-fulfilment', 'customer-dues', 'payables', 'trade-cash', 'stock-days']) {
+        expect(find.byKey(Key('store-overview-$id')), findsOneWidget);
+      }
+      for (final id in ['invoice-count', 'stock-sale', 'stock-spread', 'awaiting-acceptance']) {
+        expect(find.byKey(Key('store-overview-$id')), findsNothing);
+      }
+      expect(find.byKey(const Key('store-overview-details-toggle')), findsNothing);
+      await _toggleHomeCategory(tester, 'sales');
+      await _toggleHomeCategory(tester, 'stock');
+      expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget);
+      expect(find.byKey(const Key('store-overview-stock-spread')), findsOneWidget);
+      await _toggleHomeCategory(tester, 'stock');
+      expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget,
+        reason: 'Closing Stock must not close Sales');
+      expect(find.byKey(const Key('store-overview-stock-spread')), findsNothing);
+      await _toggleHomeCategory(tester, 'stock');
+      await _toggleHomeCategory(tester, 'money');
       expect(find.text('Current stock value'), findsOneWidget);
       for (final label in ['Billed today', 'Collected today', 'Invoices today',
         'Saved products', 'Low stock', 'Out of stock', 'Money in stock',
@@ -2254,15 +2282,12 @@ void main() {
           matching: find.byIcon(Icons.north_east_rounded)), findsNothing);
       }
       expect(find.byKey(const Key('store-working-capital-coverage')), findsNothing);
-      final detailsToggle = find.byKey(const Key('store-overview-details-toggle'));
-      await tester.tap(detailsToggle);
-      await tester.pumpAndSettle();
+      await _toggleHomeCategory(tester, 'capital');
       expect(find.byKey(const Key('store-working-capital-coverage')), findsOneWidget);
       for (final id in ['billed', 'stock-cost', 'stock-spread', 'payables', 'stock-days']) {
         expect(find.byKey(Key('store-overview-$id')), findsOneWidget);
       }
-      await tester.tap(detailsToggle);
-      await tester.pumpAndSettle();
+      await _toggleHomeCategory(tester, 'capital');
       expect(find.byKey(const Key('store-working-capital-coverage')), findsNothing);
       expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
       expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
@@ -2271,20 +2296,11 @@ void main() {
         final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
         final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
         expect(billedRect.top, collectedRect.top);
-        expect(billedRect.height, collectedRect.height);
         expect(billedRect.right, lessThan(collectedRect.left));
-        final guide = find.byKey(const Key('store-overview-column-guide-collections'));
-        expect(tester.getSize(guide).width, 10);
-        expect(tester.widget<VerticalDivider>(guide).thickness, 0.5);
-        expect(collectedRect.left - billedRect.right, 10);
-        expect(find.byKey(const Key('store-overview-section-line-Stock & visibility')), findsOneWidget);
-        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 18);
-        expect(tester.getRect(find.byKey(const Key('store-metric-band-invoice-count'))).top, billedRect.top);
-        expect(tester.getRect(find.byKey(const Key('store-overview-stock-spread'))).bottom,
-          lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-store-operating-board'))).bottom));
+        expect(tester.widget<DecoratedBox>(find.byKey(const Key('store-category-stock'))).decoration,
+          isA<BoxDecoration>());
+        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 16);
         expect(find.byKey(const Key('store-metric-tile-billed')), findsNothing);
-        expect(tester.getRect(find.byKey(const Key('store-overview-stock-cost'))).top,
-          tester.getRect(find.byKey(const Key('store-overview-stock-spread'))).top);
       } else if (display.$2 == 2) {
         final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
         final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
@@ -2407,6 +2423,7 @@ void main() {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     await mount(tester, route: '/app/work/workspace/dashboard', work: work,
       openHomeActions: false);
+    await _toggleHomeCategory(tester, 'orders');
     final now = DateTime.now();
     WorkspaceOrderRecord order(String id, String stage, {DateTime? acceptance, DateTime? fulfilment}) => WorkspaceOrderRecord(
       id: id, customer: 'Test customer', items: 'Test item', quantities: const {'test': 1},
@@ -2469,11 +2486,12 @@ void main() {
     expect(work.applyWorkspaceFinance(snapshot(1, true)), isTrue);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work,
       openHomeActions: false);
+    await _toggleHomeCategory(tester, 'money');
     expect(find.byKey(const Key('store-overview-customer-dues')), findsOneWidget);
     expect(find.byKey(const Key('store-overview-settlement-held')), findsOneWidget);
     expect(work.applyWorkspaceFinance(snapshot(2, false)), isTrue);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('store-overview-customer-dues')), findsNothing);
+    expect(tester.widget<Text>(find.byKey(const Key('store-overview-customer-dues'))).data, '—');
     expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -2518,22 +2536,21 @@ void main() {
       String value(String id) =>
           tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data!;
       expect(value('stock-cost'), '₹160');
+      expect(find.byKey(const Key('store-overview-stock-sale')), findsNothing);
+      expect(find.byKey(const Key('store-insight-visibility')), findsNothing);
+      await _toggleHomeCategory(tester, 'stock');
       expect(value('stock-sale'), '₹240');
       expect(value('stock-spread'), '₹80');
       expect(value('low-stock'), '1');
       expect(find.byKey(const Key('store-insight-replenish')), findsOneWidget);
-      expect(find.byKey(const Key('store-insight-visibility')), findsNothing,
-        reason: 'Additional alerts start collapsed, not additional metric values');
+      expect(find.byKey(const Key('store-insight-visibility')), findsOneWidget);
       expect(find.byKey(const Key('store-insight-price')), findsNothing);
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
           .copyWith(sellingPrice: 15);
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('store-insight-price')), findsNothing);
-      final moreAlerts = find.byKey(const Key('store-stock-more-alerts'));
-      await tester.ensureVisible(moreAlerts);
-      await tester.tap(moreAlerts);
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-overview-stock-spread')), findsOneWidget,
+        reason: 'A data update must not collapse an open category');
       expect(find.byKey(const Key('store-insight-visibility')), findsOneWidget);
       expect(find.text('1 product · review public visibility'), findsOneWidget);
       expect(find.byKey(const Key('store-insight-price')), findsOneWidget);
@@ -2543,6 +2560,7 @@ void main() {
       expect(find.byKey(const Key('work-stock-action-content')), findsOneWidget);
       await tester.tap(find.byKey(const Key('work-store-home')));
       await tester.pumpAndSettle();
+      await _toggleHomeCategory(tester, 'stock');
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
           .copyWith(stock: 10, purchasePrice: 0, sellingPrice: 30);
       work.setWorkspaceMoneyPeriod('Today');
@@ -2551,17 +2569,21 @@ void main() {
       expect(value('stock-sale'), '₹300');
       expect(value('stock-spread'), '—');
       expect(find.byKey(const Key('store-insight-price')), findsNothing);
-      final costsMore = find.byKey(const Key('store-stock-more-alerts'));
-      if (find.byKey(const Key('store-insight-cost-details')).evaluate().isEmpty) {
-        await tester.ensureVisible(costsMore);
-        await tester.tap(costsMore);
-        await tester.pumpAndSettle();
-      }
       expect(find.byKey(const Key('store-insight-cost-details')), findsOneWidget);
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first.copyWith(
+        stock: 1, purchasePrice: 10000000, sellingPrice: 10000005);
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pumpAndSettle();
+      expect(value('stock-cost'), '₹1,00,00,000');
+      final largeAmount = tester.renderObject<RenderParagraph>(
+        find.byKey(const Key('store-overview-stock-cost')));
+      expect(largeAmount.size.height,
+        greaterThanOrEqualTo(largeAmount.getMaxIntrinsicHeight(largeAmount.size.width) - 0.1));
+      expect(find.byKey(const Key('store-overview-stock-spread')), findsOneWidget);
       work.workspaceCatalogueItems.clear();
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('store-stock-more-alerts')), findsNothing,
+      expect(find.byKey(const Key('store-category-alerts-stock')), findsNothing,
         reason: 'No empty alert menus when stock no longer needs attention');
       expect(find.byKey(const Key('store-insight-cost-details')), findsNothing);
       work.workspaceCatalogueItems.add(base.copyWith(

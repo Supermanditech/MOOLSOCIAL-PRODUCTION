@@ -3765,8 +3765,11 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     with WidgetsBindingObserver {
   Timer? _dayBoundary;
   Timer? _orderClock;
-  bool _detailsExpanded = false;
-  bool _stockAlertsExpanded = false;
+  final Set<String> _expandedCategories = {};
+
+  void _toggleCategory(String id) => setState(() {
+    if (!_expandedCategories.remove(id)) _expandedCategories.add(id);
+  });
   DateTime _today = DateUtils.dateOnly(DateTime.now());
 
   @override
@@ -3953,31 +3956,31 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             title: '${productCount(unavailable)} unavailable',
             detail: 'Out of stock or marked unavailable. Review availability before taking orders.',
             action: 'Review stock', onTap: widget.onStock,
-            color: const Color(0xFFB3261E), expanded: _detailsExpanded),
+            color: const Color(0xFFB3261E), expanded: _expandedCategories.contains('stock')),
         if (replenish > 0)
           _OperatingAttention(id: 'replenish',
             title: '${productCount(replenish)} running low',
             detail: 'Still in stock, at or below their individual alert levels. Review replenishment.',
             action: 'Review stock', onTap: widget.onStock,
-            color: const Color(0xFF8A5100), expanded: _detailsExpanded),
+            color: const Color(0xFF8A5100), expanded: _expandedCategories.contains('stock')),
         if (belowCost > 0)
           _OperatingAttention(id: 'price',
             title: '${productCount(belowCost)} priced below cost',
             detail: 'Saved selling price is below purchase price for stock on hand. Check prices; this is not realised loss.',
             action: 'Review prices in Stock', onTap: widget.onStock,
-            color: const Color(0xFF8A5100), expanded: _detailsExpanded),
+            color: const Color(0xFF8A5100), expanded: _expandedCategories.contains('stock')),
         if (visibilityReview > 0)
           _OperatingAttention(id: 'visibility',
             title: '${productCount(visibilityReview)} · review public visibility',
             detail: 'Saved listing settings, product details or photo approval do not meet publication requirements. Review products in Stock. This does not confirm their live online status.',
             action: 'Review products in Stock', onTap: widget.onStock,
-            color: MoolColors.navy, expanded: _detailsExpanded),
+            color: MoolColors.navy, expanded: _expandedCategories.contains('stock')),
         if (missingCosts > 0)
           _OperatingAttention(id: 'cost-details',
             title: '${productCount(missingCosts)} · purchase cost needed for valuation',
             detail: 'Stock is saved but purchase costs are zero or missing. Confirm the actual cost in the product editor; no cost is assumed.',
             action: 'Review costs in Stock', onTap: widget.onStock,
-            color: MoolColors.navy, expanded: _detailsExpanded),
+            color: MoolColors.navy, expanded: _expandedCategories.contains('stock')),
       ];
       return SingleChildScrollView(
         key: const Key('work-store-operating-board'),
@@ -3994,27 +3997,8 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: _OperatingGroups(
               children: [
-                Semantics(
-                  expanded: _detailsExpanded,
-                  child: InkWell(
-                    key: const Key('store-overview-details-toggle'),
-                    onTap: () => setState(() {
-                      _detailsExpanded = !_detailsExpanded;
-                      if (!_detailsExpanded) _stockAlertsExpanded = false;
-                    }),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48),
-                      child: Row(children: [
-                        const Expanded(child: Text('Store overview',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
-                        Text(_detailsExpanded ? 'Less detail' : 'Details',
-                          style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
-                        Icon(_detailsExpanded ? Icons.expand_less : Icons.expand_more,
-                          size: 18, color: MoolColors.navy),
-                      ]),
-                    ),
-                  ),
-                ),
+                const Text('Store overview', style: TextStyle(fontSize: 14,
+                  fontWeight: FontWeight.w700, color: MoolColors.navy)),
                 const SizedBox(height: 4),
                 const Text(
                   'Saved on this phone · not live',
@@ -4024,7 +4008,10 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 if (session.workspaceDashboardState !=
                     WorkspaceDashboardState.ready)
                   _DashboardSyncBanner(session: session),
-                const _OperatingSection('Sales & collections'),
+                _OperatingCategory(id: 'sales', title: 'Sales & collections',
+                  expanded: _expandedCategories.contains('sales'),
+                  onToggle: () => _toggleCategory('sales'),
+                  primaryIds: const ['billed', 'collections'], children: [
                 _OperatingMetric(
                   id: 'billed',
                   onTap: widget.onSales,
@@ -4059,7 +4046,14 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     : todayInvoices.isEmpty ? 'No bills saved today'
                     : 'Billed today divided by invoice count · before returns; not spend per visitor',
                 ),
-                const _OperatingSection('Stock & visibility'),
+                ]),
+                _OperatingCategory(id: 'stock', title: 'Stock & visibility',
+                  expanded: _expandedCategories.contains('stock'),
+                  onToggle: () => _toggleCategory('stock'),
+                  primaryIds: const ['stock-cost', 'low-stock'],
+                  alertCount: stockAlerts.length,
+                  attention: stockAlerts.isEmpty ? null : stockAlerts.first,
+                  children: [
                 _OperatingMetric(
                   id: 'skus',
                   onTap: widget.onStock,
@@ -4115,21 +4109,30 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   detail:
                       'Selling value less purchase value · before tax, discounts and expenses',
                 ),
-                if (stockAlerts.isNotEmpty) ...[
-                  Row(children: [
-                    Expanded(child: stockAlerts.first),
-                    if (stockAlerts.length > 1)
-                      Tooltip(message: _stockAlertsExpanded ? 'Hide extra alerts' : 'Show more stock alerts',
-                        child: TextButton(
-                          key: const Key('store-stock-more-alerts'),
-                          onPressed: () => setState(() => _stockAlertsExpanded = !_stockAlertsExpanded),
-                          child: Text(_stockAlertsExpanded ? 'Less' : '··· ${stockAlerts.length - 1}',
-                            semanticsLabel: _stockAlertsExpanded ? 'Hide extra stock alerts' : 'Show ${stockAlerts.length - 1} more stock alerts'),
-                        )),
-                  ]),
-                  if (_stockAlertsExpanded) ...stockAlerts.skip(1),
-                ],
-                const _OperatingSection('Orders & fulfilment'),
+                ...stockAlerts.skip(1),
+                if (!stockReady)
+                  const Text('Stock details are unavailable. Please check Stock.',
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                if (stockReady && stockAlerts.isEmpty)
+                  const Text('No stock or listing-readiness alerts in saved inventory.',
+                    style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                const Text('Online views, carts, repeat purchases and forecasts need verified activity and more history.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                ]),
+                _OperatingCategory(id: 'orders', title: 'Orders & fulfilment',
+                  expanded: _expandedCategories.contains('orders'),
+                  onToggle: () => _toggleCategory('orders'),
+                  primaryIds: const ['recorded-open-orders', 'overdue-fulfilment'],
+                  alertCount: overdueOrders.length + acceptanceExpired.length + awaitingAcceptance.length,
+                  coverage: 'Saved orders only · online coverage may be incomplete',
+                  attention: orderAttention == null ? null :
+                    _OperatingAttention(id: 'order-attention', title: orderAttentionTitle,
+                      detail: 'Review order ${orderAttention.id}. ${acceptanceExpired.length} acceptance updates pending; $missingTargets preparing or ready orders have no recorded fulfilment deadline.',
+                      action: 'Review order', expanded: _expandedCategories.contains('orders'),
+                      color: const Color(0xFF8A5100),
+                      onTap: () => context.go(Uri(path: '/app/retailer/orders',
+                        queryParameters: {'order': orderAttention.id}).toString())),
+                  children: [
                 _OperatingMetric(
                   id: 'recorded-open-orders', label: 'Open orders',
                   value: count(session.workspaceOrders.isEmpty ? null : openOrders.length),
@@ -4149,27 +4152,27 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   alertColor: overdueOrders.isEmpty ? null : const Color(0xFFB3261E),
                   onTap: widget.onOrders,
                 ),
-                Text(session.workspaceOrders.isEmpty
-                  ? 'No saved order records · online coverage unavailable'
-                  : 'Saved orders only · online coverage may be incomplete',
-                  style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
-                if (orderAttention != null)
-                  _OperatingAttention(id: 'order-attention', title: orderAttentionTitle,
-                    detail: 'Review order ${orderAttention.id}. ${acceptanceExpired.length} acceptance updates pending; $missingTargets preparing or ready orders have no recorded fulfilment deadline.',
-                    action: 'Review order', expanded: _detailsExpanded,
-                    color: const Color(0xFF8A5100),
-                    onTap: () => context.go(Uri(path: '/app/retailer/orders',
-                      queryParameters: {'order': orderAttention.id}).toString())),
-                if (_detailsExpanded && orderAttention == null && missingTargets > 0)
+                if (session.workspaceOrders.isEmpty)
+                  const Text('No saved order records · online coverage unavailable',
+                    style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                if (orderAttention == null && missingTargets > 0)
                   Text('$missingTargets preparing or ready orders have no recorded fulfilment deadline.',
                     style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
-                const _OperatingSection('Receivables & payables'),
+                ]),
+                _OperatingCategory(id: 'money', title: 'Receivables & payables',
+                  expanded: _expandedCategories.contains('money'),
+                  onToggle: () => _toggleCategory('money'),
+                  primaryIds: const ['customer-dues', 'payables'],
+                  coverage: financeReady
+                    ? 'Balances as of · ${MaterialLocalizations.of(context).formatShortDate(finance.asOf.toLocal())}'
+                    : 'Balances unavailable · not zero',
+                  children: [
+                _OperatingMetric(
+                  id: 'customer-dues', label: 'Receivables',
+                  value: money(financeReady ? finance.duesMinor : null),
+                  detail: 'Money customers owe you · not cash received. Complete customer balances are required.',
+                ),
                 if (financeReady) ...[
-                  _OperatingMetric(
-                    id: 'customer-dues', label: 'Receivables',
-                    value: money(finance.duesMinor),
-                    detail: 'Money customers owe you · not cash received',
-                  ),
                   _OperatingMetric(
                     id: 'settlement-available', label: 'Settlement available',
                     value: money(finance.availableMinor),
@@ -4191,7 +4194,12 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   id: 'payables', label: 'Payables', value: '—',
                   detail: 'Money owed to suppliers. A complete set of supplier balances is not available yet; a few saved purchase bills cannot establish the total.',
                 ),
-                const _OperatingSection('Working capital'),
+                ]),
+                _OperatingCategory(id: 'capital', title: 'Working capital',
+                  expanded: _expandedCategories.contains('capital'),
+                  onToggle: () => _toggleCategory('capital'),
+                  primaryIds: const ['trade-cash', 'stock-days'],
+                  coverage: 'More supplier balances and history needed', children: [
                 const _OperatingMetric(
                   id: 'trade-cash', label: 'Cash tied up', value: '—',
                   detail: 'Money in stock + customer receivables − supplier payables. This is trade cash tied up, not full accounting working capital. Complete matching balances are needed.',
@@ -4200,27 +4208,20 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   id: 'stock-days', label: 'Stock days', value: '—',
                   detail: 'Estimated days current stock will last. Complete sales history and exact product quantities are needed. A partial order list cannot establish Store-wide stock days.',
                 ),
-                if (_detailsExpanded) const Text(
+                const Text(
                   'Payables & cash tied up: supplier balances incomplete. Stock days: not enough history yet.',
                   key: Key('store-working-capital-coverage'),
                   style: TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
-                if (_detailsExpanded) const Text(
+                const Text(
                   'Credit sales / purchases · Not available yet',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
-                if (_detailsExpanded) const Text(
+                const Text(
                   'Collection days / payment days / cash cycle · Not enough history yet',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
-                if (!_detailsExpanded) const Text('— More records needed · tap a figure for details',
-                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
-                if (!stockReady)
-                  const Text('Stock details are unavailable. Please check Stock.',
-                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
-                if (_detailsExpanded && stockReady && stockAlerts.isEmpty)
-                  const Text('No stock or listing-readiness alerts in saved inventory.',
-                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                ]),
                 const Text(
                   'Online activity & forecasts · Not available yet',
                   style: TextStyle(
@@ -4229,10 +4230,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     color: MoolColors.muted,
                   ),
                 ),
-                if (_detailsExpanded) const Text(
-                  'Online views, carts, repeat purchases and forecasts need verified activity and more history.',
-                  style: TextStyle(fontSize: 11, height: 1.4, color: MoolColors.muted),
-                ),
               ],
             ),
           ),
@@ -4240,6 +4237,89 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
       );
     },
   );
+}
+
+class _OperatingCategory extends StatelessWidget {
+  const _OperatingCategory({required this.id, required this.title,
+    required this.expanded, required this.onToggle, required this.primaryIds,
+    required this.children, this.alertCount = 0, this.attention, this.coverage});
+  final String id, title;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<String> primaryIds;
+  final List<Widget> children;
+  final int alertCount;
+  final Widget? attention;
+  final String? coverage;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = {for (final item in children.whereType<_OperatingMetric>()) item.id: item};
+    final primary = [for (final id in primaryIds) metrics[id]!];
+    final secondary = children.where((item) => item is! _OperatingMetric || !primaryIds.contains(item.id)).toList();
+    return DecoratedBox(
+      key: Key('store-category-$id'),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFE5E8F1), width: 0.5))),
+      child: Padding(padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          LayoutBuilder(builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context);
+            final titleWidth = constraints.maxWidth * 0.24;
+            final cellWidth = (constraints.maxWidth - titleWidth - 62) / 2;
+            var horizontal = constraints.maxWidth >= 290 && scale.scale(12) <= 15;
+            var captionHeight = 0.0;
+            for (final metric in primary) {
+              final amount = TextPainter(text: TextSpan(text: metric.value,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                textDirection: Directionality.of(context), textScaler: scale)..layout();
+              if (amount.width + (metric.onTap == null ? 0 : 14) + 4 > cellWidth) horizontal = false;
+              amount.dispose();
+              final caption = TextPainter(text: TextSpan(text: metric.label,
+                style: _operatingCaptionStyle(context).copyWith(fontSize: 11)),
+                textDirection: Directionality.of(context), textScaler: scale)..layout(maxWidth: cellWidth.clamp(1, double.infinity));
+              if (caption.height > captionHeight) captionHeight = caption.height;
+              caption.dispose();
+            }
+            final heading = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+              if (alertCount > 0) Text('$alertCount ${alertCount == 1 ? 'alert' : 'alerts'}',
+                key: Key('store-category-alerts-$id'),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF8A5100))),
+            ]);
+            final toggle = Semantics(expanded: expanded, child: IconButton(
+              key: Key('store-category-toggle-$id'),
+              tooltip: '${expanded ? 'Collapse' : 'Expand'} $title',
+              onPressed: onToggle,
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              padding: EdgeInsets.zero,
+              icon: Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20, color: MoolColors.navy),
+            ));
+            if (!horizontal) {
+              return Column(children: [
+                Row(children: [Expanded(child: heading), toggle]),
+                _OperatingGroups(children: primary),
+              ]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(width: titleWidth, child: heading),
+              const SizedBox(width: 8),
+              for (var i = 0; i < primary.length; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                Expanded(child: _OperatingMetric(id: primary[i].id,
+                  label: primary[i].label, value: primary[i].value,
+                  detail: primary[i].detail, alertColor: primary[i].alertColor,
+                  onTap: primary[i].onTap, compact: true,
+                  captionHeight: captionHeight.ceilToDouble() + 2)),
+              ],
+              toggle,
+            ]);
+          }),
+          if (coverage != null) Text(coverage!, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+          ?attention,
+          if (expanded) _OperatingGroups(children: secondary),
+        ])),
+    );
+  }
 }
 
 class _OperatingAttention extends StatelessWidget {
@@ -4399,11 +4479,12 @@ class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
     required this.id, required this.label, required this.value,
     required this.detail, this.alertColor, this.onTap,
-    this.captionHeight,
+    this.captionHeight, this.compact = false,
   });
   final String id, label, value, detail;
   final Color? alertColor;
   final double? captionHeight;
+  final bool compact;
   final VoidCallback? onTap;
   bool get showInfo => !const {
     'invoice-count', 'skus', 'low-stock', 'out-of-stock',
@@ -4437,12 +4518,12 @@ class _OperatingMetric extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: captionHeight,
-                  child: Text(label, style: _operatingCaptionStyle(context))),
+                  child: Text(label, style: _operatingCaptionStyle(context).copyWith(fontSize: compact ? 11 : 12))),
                 const SizedBox(height: 3),
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   Expanded(child: _StoreValueMotion(value: value, child: Text(value,
                     key: Key('store-overview-$id'),
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+                    style: TextStyle(fontSize: compact ? 16 : 18, fontWeight: FontWeight.w700,
                       color: alertColor ?? MoolColors.navy)))),
                   if (onTap != null)
                     const Icon(Icons.north_east_rounded, size: 14, color: MoolColors.muted),
