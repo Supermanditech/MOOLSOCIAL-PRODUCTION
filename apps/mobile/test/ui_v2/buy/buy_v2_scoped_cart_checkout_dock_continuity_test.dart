@@ -203,6 +203,7 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     bool reducedMotion = false,
+    bool embeddedStore = false,
     EdgeInsets safeArea = EdgeInsets.zero,
     ValueChanged<PersonalMoolActionSpec>? onOpenMainAction,
     BuyV2DeliveryArrivalSound? deliveryArrivalSound,
@@ -224,6 +225,7 @@ void main() {
         ),
         home: BuyV2Screen(
           session: session,
+          embeddedStore: embeddedStore,
           initialDestination: session.destination,
           initialView: session.view,
           initialCartScope: session.cartScope,
@@ -232,6 +234,51 @@ void main() {
         ),
       ),
     );
+  }
+
+  for (final wholesale in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('C01 embedded Cart overlay $wholesale at $scale', (
+        tester,
+      ) async {
+        const size = Size(360, 800);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final product = session.product(wholesale ? 'w-rice' : 's-tomato');
+        session.openDestination(product.destination);
+        session.addProduct(product.id);
+        await tester.pumpWidget(
+          app(session, size: size, textScale: scale, embeddedStore: true),
+        );
+        await tester.pumpAndSettle();
+        final owner = find.byKey(const ValueKey('buy-v2-screen'));
+        expect(tester.widget<Scaffold>(owner).bottomNavigationBar, isNull);
+        final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
+        expect(cart.hitTestable(), findsOneWidget);
+        session.openProduct(product.id);
+        await tester.pumpAndSettle();
+        final scroll = find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        expect(tester.getRect(scroll).bottom, closeTo(size.height, .5));
+        final state = tester.state<ScrollableState>(scroll);
+        state.position.jumpTo(state.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(cart.hitTestable(), findsOneWidget);
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.quantityFor(product.id), greaterThan(0));
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   for (final entry in [
@@ -3227,6 +3274,7 @@ void main() {
             size: size,
             textScale: scale,
             reducedMotion: lane == 'bulk',
+            safeArea: const EdgeInsets.only(bottom: 24),
           ),
         );
         session.openProduct(product.id);
@@ -3310,6 +3358,31 @@ void main() {
           find.byKey(const ValueKey('buy-store-product-surface-owner')),
           findsOneWidget,
         );
+        // The nested route must use the whole safe viewport, including the
+        // area beside Cart. A reserved bottom bar recreated the white strip.
+        final nestedViewport = tester.getRect(productScroll());
+        expect(nestedViewport.bottom, closeTo(size.height - 24, .5));
+        final nestedCart = find.byKey(
+          const ValueKey('buy-cart-navigation-button'),
+        );
+        expect(nestedCart.hitTestable(), findsOneWidget);
+        final cartRect = tester.getRect(nestedCart);
+        expect(cartRect.bottom, lessThanOrEqualTo(nestedViewport.bottom));
+        expect(cartRect.top, greaterThan(nestedViewport.top));
+        final scrollState = tester.state<ScrollableState>(productScroll());
+        final previousOffset = scrollState.position.pixels;
+        await tester.dragFrom(
+          Offset(12, nestedViewport.bottom - 8),
+          const Offset(0, -100),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          scrollState.position.pixels,
+          greaterThan(previousOffset),
+          reason: 'The area beside floating Cart must scroll product content.',
+        );
+        scrollState.position.jumpTo(previousOffset);
+        await tester.pumpAndSettle();
         if (lane == 'shop-root-live-cart-first') {
           final toggle = find.byKey(
             const ValueKey('buy-quick-delivery-toggle'),

@@ -578,6 +578,7 @@ class BuyV2ProductView extends StatelessWidget {
     super.key,
     required this.session,
     this.scrollController,
+    this.bottomContentInset = 0,
     this.trailingAction,
     this.returnLabel,
     this.onReturn,
@@ -591,6 +592,7 @@ class BuyV2ProductView extends StatelessWidget {
 
   final BuyV2Session session;
   final ScrollController? scrollController;
+  final double bottomContentInset;
   final Widget? trailingAction;
   final String? returnLabel;
   final VoidCallback? onReturn;
@@ -756,7 +758,7 @@ class BuyV2ProductView extends StatelessWidget {
               automaticFulfilment ? 0 : 10,
               8,
               automaticFulfilment ? 0 : 10,
-              automaticFulfilment ? 16 : 104,
+              (automaticFulfilment ? 16.0 : 104.0) + bottomContentInset,
             ),
             children:
                 [

@@ -1364,26 +1364,20 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            bottomNavigationBar: keyboardVisible
+            floatingActionButton:
+                widget.embeddedStore &&
+                    !keyboardVisible &&
+                    (_miniCartParked || _usesFixedCart(session)) &&
+                    _showsMiniCart(session)
+                ? _BuyMiniCartBar(
+                    session: session,
+                    compact: true,
+                    initialPosition: _miniCartPosition,
+                    onPositionChanged: (_) {},
+                  )
+                : null,
+            bottomNavigationBar: keyboardVisible || widget.embeddedStore
                 ? null
-                : widget.embeddedStore
-                ? ((_miniCartParked || _usesFixedCart(session)) &&
-                          _showsMiniCart(session)
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            heightFactor: 1,
-                            child: _BuyMiniCartBar(
-                              session: session,
-                              aggregate: false,
-                              compact: true,
-                              initialPosition: _miniCartPosition,
-                              onPositionChanged: (_) {},
-                            ),
-                          ),
-                        )
-                      : null)
                 : _buildDestinationNavigation(
                     session,
                     _moolNavigationController,
@@ -2518,6 +2512,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                               child: BuyV2ProductView(
                                                                 session:
                                                                     session,
+                                                                bottomContentInset:
+                                                                    session.itemCount >
+                                                                        0
+                                                                    ? 76
+                                                                    : 0,
                                                                 trailingAction:
                                                                     _buildDeliveryControl(
                                                                       session,
@@ -2623,33 +2622,26 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
+                          // A compact Cart is an overlay, never a full-width
+                          // reserved bar. Keep product content behind it scrollable.
+                          floatingActionButton:
+                              showingProduct &&
+                                  MediaQuery.viewInsetsOf(context).bottom ==
+                                      0 &&
+                                  product.destination !=
+                                      BuyV2Destination.medicine &&
+                                  session.itemCount > 0
+                              ? _BuyMiniCartBar(
+                                  session: session,
+                                  compact: true,
+                                  initialPosition: null,
+                                  onPositionChanged: (_) {},
+                                )
+                              : null,
                           bottomNavigationBar:
-                              MediaQuery.viewInsetsOf(context).bottom > 0
+                              showingProduct ||
+                                  MediaQuery.viewInsetsOf(context).bottom > 0
                               ? null
-                              : showingProduct
-                              ? (product.destination !=
-                                            BuyV2Destination.medicine &&
-                                        session.itemCount > 0
-                                    ? SafeArea(
-                                        top: false,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          child: Align(
-                                            alignment: Alignment.centerRight,
-                                            heightFactor: 1,
-                                            child: _BuyMiniCartBar(
-                                              session: session,
-                                              compact: true,
-                                              initialPosition: null,
-                                              onPositionChanged: (_) {},
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    : null)
                               : _buildDestinationNavigation(
                                   session,
                                   navigation,
@@ -2863,6 +2855,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       ),
       BuyV2View.product => BuyV2ProductView(
         session: session,
+        bottomContentInset: widget.embeddedStore && session.itemCount > 0
+            ? 76
+            : 0,
         scrollController: _rootProductScrollController,
         aggregateCart: _offersActive,
         returnLabel:
