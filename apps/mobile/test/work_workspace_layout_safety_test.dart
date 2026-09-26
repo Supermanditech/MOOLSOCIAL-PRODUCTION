@@ -2231,7 +2231,7 @@ void main() {
       expect(find.byKey(const Key('work-quick-add-products')), findsNothing);
       // An unhydrated or incomplete ledger must not become a zero sales total.
       expect(find.text('Today'), findsNothing);
-      expect(find.text('Current stock'), findsOneWidget);
+      expect(find.text('Stock & visibility'), findsOneWidget);
       expect(find.text('Current stock value'), findsOneWidget);
       for (final label in ['Billed today', 'Collected today', 'Invoices today',
         'Saved products', 'Low stock', 'Out of stock', 'Money in stock',
@@ -2242,7 +2242,7 @@ void main() {
           greaterThanOrEqualTo(paragraph.getMaxIntrinsicHeight(paragraph.size.width) - 0.1),
           reason: '$label must not clip its wrapped text');
       }
-      expect(find.text('Decisions & next steps'), findsOneWidget);
+      expect(find.text('Sales & collections'), findsOneWidget);
       expect(find.text('Store overview'), findsOneWidget);
       expect(find.text('Saved on this phone · not live'), findsOneWidget);
       expect(find.text('Working capital'), findsOneWidget);
@@ -2253,7 +2253,17 @@ void main() {
         expect(find.descendant(of: find.byKey(Key('store-metric-band-$id')),
           matching: find.byIcon(Icons.north_east_rounded)), findsNothing);
       }
+      expect(find.byKey(const Key('store-working-capital-coverage')), findsNothing);
+      final detailsToggle = find.byKey(const Key('store-overview-details-toggle'));
+      await tester.tap(detailsToggle);
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('store-working-capital-coverage')), findsOneWidget);
+      for (final id in ['billed', 'stock-cost', 'stock-spread', 'payables', 'stock-days']) {
+        expect(find.byKey(Key('store-overview-$id')), findsOneWidget);
+      }
+      await tester.tap(detailsToggle);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-working-capital-coverage')), findsNothing);
       expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
       expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
       expect(tester.widget<Text>(find.byKey(const Key('store-overview-average-bill'))).data, '—');
@@ -2267,7 +2277,7 @@ void main() {
         expect(tester.getSize(guide).width, 10);
         expect(tester.widget<VerticalDivider>(guide).thickness, 0.5);
         expect(collectedRect.left - billedRect.right, 10);
-        expect(find.byKey(const Key('store-overview-section-line-Current stock')), findsOneWidget);
+        expect(find.byKey(const Key('store-overview-section-line-Stock & visibility')), findsOneWidget);
         expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 18);
         expect(tester.getRect(find.byKey(const Key('store-metric-band-invoice-count'))).top, billedRect.top);
         expect(tester.getRect(find.byKey(const Key('store-overview-stock-spread'))).bottom,
@@ -2447,6 +2457,7 @@ void main() {
             stockMode: WorkspaceStockMode.exactQuantity,
             lowStockThreshold: 10,
             available: true,
+            publicListing: false,
           ),
         );
       await mount(
@@ -2462,11 +2473,20 @@ void main() {
       expect(value('stock-spread'), '₹80');
       expect(value('low-stock'), '1');
       expect(find.byKey(const Key('store-insight-replenish')), findsOneWidget);
+      expect(find.byKey(const Key('store-insight-visibility')), findsNothing,
+        reason: 'Additional alerts start collapsed, not additional metric values');
       expect(find.byKey(const Key('store-insight-price')), findsNothing);
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
           .copyWith(sellingPrice: 15);
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-insight-price')), findsNothing);
+      final moreAlerts = find.byKey(const Key('store-stock-more-alerts'));
+      await tester.ensureVisible(moreAlerts);
+      await tester.tap(moreAlerts);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-insight-visibility')), findsOneWidget);
+      expect(find.text('1 product · review public visibility'), findsOneWidget);
       expect(find.byKey(const Key('store-insight-price')), findsOneWidget);
       await tester.ensureVisible(find.byKey(const Key('store-insight-price')));
       await tester.tap(find.byKey(const Key('store-insight-price')));
@@ -2482,6 +2502,26 @@ void main() {
       expect(value('stock-sale'), '₹300');
       expect(value('stock-spread'), '—');
       expect(find.byKey(const Key('store-insight-price')), findsNothing);
+      final costsMore = find.byKey(const Key('store-stock-more-alerts'));
+      if (find.byKey(const Key('store-insight-cost-details')).evaluate().isEmpty) {
+        await tester.ensureVisible(costsMore);
+        await tester.tap(costsMore);
+        await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const Key('store-insight-cost-details')), findsOneWidget);
+      work.workspaceCatalogueItems.clear();
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-stock-more-alerts')), findsNothing,
+        reason: 'No empty alert menus when stock no longer needs attention');
+      expect(find.byKey(const Key('store-insight-cost-details')), findsNothing);
+      work.workspaceCatalogueItems.add(base.copyWith(
+        stock: 10, purchasePrice: 0, sellingPrice: 30,
+        stockMode: WorkspaceStockMode.exactQuantity,
+      ));
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pumpAndSettle();
+      expect(value('stock-sale'), '₹300');
       work.activeWorkspace = const WorkWorkspace(
         id: 'other',
         name: 'Other',
