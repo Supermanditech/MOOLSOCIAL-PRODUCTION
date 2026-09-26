@@ -2587,6 +2587,62 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('HOMEBOARD Restock receipt prompts reuse exact purchase $scale', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final store = work.activeWorkspace!;
+      final beforeStock = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+      final savedAt = DateTime.now().subtract(const Duration(minutes: 2));
+      WorkspacePurchaseRecord purchase(String id, WorkspaceReceiptState receipt, {
+        WorkspaceSupplyStage stage = WorkspaceSupplyStage.delivered,
+        bool linked = true, bool future = false,
+      }) => WorkspacePurchaseRecord(
+        accountScope: 'review-draft-account', workspaceId: store.id,
+        supplierId: 'supplier-$id', supplierName: 'Test supplier $id',
+        orderId: 'PO-$id', shipmentId: 'SHIP-$id', revision: 1,
+        createdAt: savedAt, updatedAt: future ? DateTime.now().add(const Duration(days: 1)) : savedAt,
+        stage: stage, amountMinor: 10000, itemSummary: 'Test pack', paymentLabel: 'Not recorded',
+        receiptState: receipt, lines: const [],
+        procurementContext: linked ? BuyV2ProcurementContext(accountId: 'review-draft-account',
+          storeId: store.id, purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'RESTOCK-$id') : null,
+      );
+      expect(work.applyWorkspacePurchases(accountScope: 'review-draft-account', storeId: store.id,
+        feedRevision: 1, complete: true, records: [
+          purchase('awaiting', WorkspaceReceiptState.awaiting),
+          purchase('partial', WorkspaceReceiptState.partial),
+          purchase('disputed', WorkspaceReceiptState.disputed),
+          purchase('confirmed', WorkspaceReceiptState.confirmed),
+          purchase('cancelled', WorkspaceReceiptState.disputed, stage: WorkspaceSupplyStage.cancelled),
+          purchase('returned', WorkspaceReceiptState.partial, stage: WorkspaceSupplyStage.returned),
+          purchase('unlinked', WorkspaceReceiptState.awaiting, linked: false),
+          purchase('future', WorkspaceReceiptState.awaiting, future: true),
+          purchase('transit', WorkspaceReceiptState.awaiting, stage: WorkspaceSupplyStage.dispatched),
+        ]), isTrue);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        textScale: scale, openHomeActions: false);
+      expect(find.byKey(const Key('store-insight-receipt-awaiting')), findsNothing);
+      await _toggleHomeCategory(tester, 'stock');
+      expect(find.text('1 delivered · check receipt'), findsOneWidget);
+      expect(find.text('1 part received · review remaining items'), findsOneWidget);
+      expect(find.text('1 under receipt review'), findsOneWidget);
+      for (final id in ['awaiting', 'partial', 'disputed']) {
+        final alert = find.byKey(Key('store-insight-receipt-$id'));
+        await tester.ensureVisible(alert);
+        await tester.tap(alert);
+        await tester.pumpAndSettle();
+        expect(work.focusedWorkspacePurchaseId, 'SHIP-$id');
+        expect(find.text('Order PO-$id'), findsOneWidget);
+        expect(find.byKey(const Key('work-purchase-receipt-status')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-store-home')));
+        await tester.pumpAndSettle();
+        await _toggleHomeCategory(tester, 'stock');
+      }
+      expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), beforeStock);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('HOMEBOARD finance projection rejects incomplete history', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     final seed = StoreReviewSeed(accountScope: 'review-draft-account',

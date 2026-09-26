@@ -3737,6 +3737,17 @@ class _StoreControlDashboard extends StatelessWidget {
             onOrders: onOrders,
             onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
             onDues: () => onOpenOperation(_WorkspaceOperation.dues),
+            onPurchase: (purchase) {
+              final current = session.workspacePurchases.where((p) =>
+                p.shipmentId == purchase.shipmentId && p.orderId == purchase.orderId &&
+                p.accountScope == purchase.accountScope && p.workspaceId == purchase.workspaceId &&
+                _homeReceiptNeedsReview(p)).firstOrNull;
+              if (current == null || !session.selectWorkspacePurchase(current.shipmentId)) {
+                session.showNotice('This purchase has changed. Review the latest purchases.');
+                return;
+              }
+              onOpenOperation(_WorkspaceOperation.sourcing);
+            },
           );
         },
       ),
@@ -3745,6 +3756,16 @@ class _StoreControlDashboard extends StatelessWidget {
 }
 
 /// Read-only projections of the existing Store records, never a second ledger.
+bool _homeReceiptNeedsReview(WorkspacePurchaseRecord purchase) {
+  final origin = purchase.procurementContext;
+  return purchase.valid && origin != null && origin.hasIdentity &&
+      const {BuyV2ProcurementPurpose.restock, BuyV2ProcurementPurpose.groupBulkBuying}.contains(origin.purpose) &&
+      !purchase.updatedAt.isAfter(DateTime.now()) &&
+      !const {WorkspaceSupplyStage.cancelled, WorkspaceSupplyStage.returned}.contains(purchase.stage) &&
+      (const {WorkspaceReceiptState.partial, WorkspaceReceiptState.disputed}.contains(purchase.receiptState) ||
+       (purchase.stage == WorkspaceSupplyStage.delivered && purchase.receiptState == WorkspaceReceiptState.awaiting));
+}
+
 class _StoreOperatingBoard extends StatefulWidget {
   const _StoreOperatingBoard({
     required this.session,
@@ -3753,11 +3774,13 @@ class _StoreOperatingBoard extends StatefulWidget {
     required this.onOrders,
     required this.onSettlement,
     required this.onDues,
+    required this.onPurchase,
     this.scrollController,
     super.key,
   });
   final WorkSession session;
   final VoidCallback onSales, onStock, onOrders, onSettlement, onDues;
+  final ValueChanged<WorkspacePurchaseRecord> onPurchase;
   final ScrollController? scrollController;
   @override
   State<_StoreOperatingBoard> createState() => _StoreOperatingBoardState();
@@ -3975,6 +3998,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
       final missingCosts = stockReady
           ? products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity &&
               p.stock > 0 && p.purchasePrice <= 0).length : 0;
+      final receiptPurchases = session.workspacePurchases.where(_homeReceiptNeedsReview).toList();
       final stockAlerts = <_OperatingAttention>[
         if (unavailable > 0)
           _OperatingAttention(id: 'unavailable',
@@ -4137,6 +4161,13 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                       'Selling value less purchase value · before tax, discounts and expenses',
                 ),
                 ...stockAlerts.skip(1),
+                for (final state in [WorkspaceReceiptState.awaiting, WorkspaceReceiptState.partial, WorkspaceReceiptState.disputed])
+                  if (receiptPurchases.any((p) => p.receiptState == state))
+                    _OperatingAttention(id: 'receipt-${state.name}',
+                      title: '${receiptPurchases.where((p) => p.receiptState == state).length} ${state == WorkspaceReceiptState.awaiting ? 'delivered · check receipt' : state == WorkspaceReceiptState.partial ? 'part received · review remaining items' : 'under receipt review'}',
+                      detail: 'Open ${receiptPurchases.firstWhere((p) => p.receiptState == state).orderId} · ${receiptPurchases.firstWhere((p) => p.receiptState == state).supplierName}',
+                      action: 'Review purchase', color: _OperatingPalette.warning, expanded: true,
+                      onTap: () => widget.onPurchase(receiptPurchases.firstWhere((p) => p.receiptState == state))),
                 if (!stockReady)
                   const Text('Stock details are unavailable. Please check Stock.',
                     style: TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
