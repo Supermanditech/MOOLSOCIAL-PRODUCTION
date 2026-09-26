@@ -1062,6 +1062,7 @@ class _WorkWorkspaceDashboardScreenState
         const {
           _WorkspaceOperation.catalogue,
           _WorkspaceOperation.stockStatement,
+          _WorkspaceOperation.sales,
           _WorkspaceOperation.statement,
           _WorkspaceOperation.dues,
           _WorkspaceOperation.payments,
@@ -1388,6 +1389,7 @@ class _WorkWorkspaceDashboardScreenState
             session: session,
             workspace: workspace,
             homeContentScroll: _homeContentScroll,
+            showWorkingFinance: !salesOpen,
             onNavigate: (action) =>
                 unawaited(_navigateFromCounterDraft(action)),
             workingCentre: saleOpen
@@ -1398,6 +1400,7 @@ class _WorkWorkspaceDashboardScreenState
                     session: session,
                     salesOnly: true,
                     showNewSaleAction: true,
+                    onOpenOperation: _showOperation,
                     onNewSale: () {
                       if (session.prepareWorkspaceOrder(
                         source: 'Counter',
@@ -3627,6 +3630,7 @@ class _StoreControlDashboard extends StatelessWidget {
     required this.onReviewOrder,
     required this.onCloseOrder,
     this.workingCentre,
+    this.showWorkingFinance = true,
     this.homeContentScroll,
     this.onNavigate,
   });
@@ -3641,6 +3645,7 @@ class _StoreControlDashboard extends StatelessWidget {
   final WorkspaceOrderRecord? reviewedOrder;
   final VoidCallback onReviewOrder, onCloseOrder;
   final Widget? workingCentre;
+  final bool showWorkingFinance;
   final ScrollController? homeContentScroll;
   final ValueChanged<VoidCallback>? onNavigate;
 
@@ -3663,6 +3668,7 @@ class _StoreControlDashboard extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (workingCentre != null) {
+            if (!showWorkingFinance) return workingCentre!;
             final keyboard = View.of(context).viewInsets.bottom > 0;
             final actionsBelow = _storeActionsBelowContent(context);
             final height = constraints.maxHeight;
@@ -11367,12 +11373,14 @@ class _StoreStatementSurface extends StatefulWidget {
     this.salesOnly = false,
     this.showNewSaleAction = true,
     this.onNewSale,
+    this.onOpenOperation,
     super.key,
   });
   final WorkSession session;
   final bool salesOnly;
   final bool showNewSaleAction;
   final VoidCallback? onNewSale;
+  final ValueChanged<_WorkspaceOperation>? onOpenOperation;
   @override
   State<_StoreStatementSurface> createState() => _StoreStatementSurfaceState();
 }
@@ -11381,15 +11389,26 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   String _book = 'Sales';
   String _invoicePeriod = 'Today';
   DateTimeRange? _invoiceRange;
-  bool _showSalesFinance = false;
+  final _invoiceSearch = TextEditingController();
+  Object? _salesScope;
+  bool _salesActionsExpanded = false;
+
+  void _changeSalesBrowse(VoidCallback change) {
+    setState(change);
+    PageStorage.maybeOf(context)?.writeState(context,
+      (query: _invoiceSearch.text, period: _invoicePeriod, range: _invoiceRange, expanded: _salesActionsExpanded),
+      identifier: ('sales-browse', _salesScope));
+  }
+
+  @override
+  void dispose() {
+    _invoiceSearch.dispose();
+    super.dispose();
+  }
   WorkspaceCustomerInvoice? _selectedInvoice;
   String? _invoiceStoreScope;
   String? _invoiceAccountScope;
   bool closeSelectedInvoice() {
-    if (_selectedInvoice == null && _showSalesFinance) {
-      setState(() => _showSalesFinance = false);
-      return true;
-    }
     if (_selectedInvoice == null) return false;
     setState(() => _selectedInvoice = null);
     return true;
@@ -11430,6 +11449,60 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       0,
       (sum, invoice) => sum + invoice.payableMinor,
     );
+    if (widget.salesOnly) {
+      final query = _invoiceSearch.text.trim().toLowerCase();
+      final matches = invoices.where((invoice) =>
+        '${invoice.id} ${invoice.orderId} ${invoice.customer} ${invoice.billingDetails.name} ${invoice.billingDetails.businessName}'.toLowerCase().contains(query)).toList();
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          key: const Key('work-sales-period-summary'),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, runSpacing: 4, children: [
+            Text('Recorded sales · $_invoicePeriod', style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+            Text('₹${_formatStoreMinorAmount(totalMinor)}', key: const Key('work-sales-period-total'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink,
+                fontFeatures: [FontFeature.tabularFigures()])),
+          ]),
+        ),
+        Expanded(child: ListView.separated(
+          key: PageStorageKey(('sales-invoices', _salesScope, _invoicePeriod, _invoiceRange, query)),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.only(bottom: 150),
+          itemCount: matches.isEmpty ? 1 : matches.length,
+          separatorBuilder: (_, _) => const Divider(height: 1, thickness: .5),
+          itemBuilder: (context, index) {
+            if (matches.isEmpty) { return Padding(padding: const EdgeInsets.all(16),
+              child: Text(query.isEmpty ? 'No recorded invoices in this period.' : 'No matching invoices in this period. Clear search or change the period.',
+                style: const TextStyle(fontSize: 13, color: MoolColors.muted))); }
+            final invoice = matches[index];
+            final details = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_RecentCounterCustomer(invoice.customer, invoice.billingDetails).label,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+              Text('${_registerDate(invoice.issuedAt)} · ${invoice.id}',
+                style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+            ]);
+            final amount = Text('₹${_formatStoreMinorAmount(invoice.payableMinor)}', textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink,
+                fontFeatures: [FontFeature.tabularFigures()]));
+            return InkWell(
+              key: ValueKey('work-sales-invoice-${invoice.id}'),
+              onTap: () { FocusScope.of(context).unfocus(); setState(() {
+                _selectedInvoice = invoice;
+                _invoiceStoreScope = session.activeWorkspace?.id;
+                _invoiceAccountScope = session.workspaceFinance?.accountScope;
+              }); },
+              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: LayoutBuilder(builder: (context, box) =>
+                  MediaQuery.textScalerOf(context).scale(13) > 19.5 || box.maxWidth < 300
+                  ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [details, const SizedBox(height: 4), amount])
+                  : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(flex: 3, child: details), const SizedBox(width: 12), Expanded(flex: 2, child: amount),
+                    ]))),
+            );
+          },
+        )),
+      ]);
+    }
     final register = _StoreVoucherRegister(
       identity: (
         'sales',
@@ -11467,44 +11540,27 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         _invoiceAccountScope = session.workspaceFinance?.accountScope;
       }),
     );
-    if (!widget.salesOnly) return register;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Wrap(
-            key: const Key('work-sales-period-summary'),
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 4,
-            children: [
-              Text(
-                'Recorded sales · $_invoicePeriod',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF555D6E)),
-              ),
-              Text(
-                '₹${_formatStoreMinorAmount(totalMinor)}',
-                key: const Key('work-sales-period-total'),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF252B38),
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(child: register),
-      ],
-    );
+    return register;
   }
 
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    final salesScope = session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id;
+    if (_salesScope != salesScope) {
+      _salesScope = salesScope;
+      _invoiceSearch.clear();
+      _salesActionsExpanded = false;
+      _invoicePeriod = 'Today';
+      _invoiceRange = null;
+      final saved = PageStorage.maybeOf(context)?.readState(context, identifier: ('sales-browse', _salesScope));
+      if (saved is ({String query, String period, DateTimeRange? range, bool expanded})) {
+        _invoiceSearch.text = saved.query;
+        _invoicePeriod = saved.period;
+        _invoiceRange = saved.range;
+        _salesActionsExpanded = saved.expanded;
+      }
+    }
     if (_selectedInvoice != null) {
       if (session.activeWorkspace?.id != _invoiceStoreScope ||
           session.workspaceFinance?.accountScope != _invoiceAccountScope) {
@@ -11534,25 +11590,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         color: MoolColors.navy,
       ),
     );
-    final title = widget.salesOnly
-        ? Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              titleText,
-              IconButton(
-                tooltip: 'Collections and customer ledger',
-                onPressed: () =>
-                    setState(() => _showSalesFinance = !_showSalesFinance),
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-              ),
-            ],
-          )
-        : titleText;
+    final title = titleText;
     final periodControl = PopupMenuButton<String>(
       key: const Key('work-statement-period'),
       tooltip: 'Statement period',
       onSelected: (period) async {
-        if (widget.salesOnly && !_showSalesFinance) {
+        if (widget.salesOnly) {
           if (period == 'Custom range') {
             final range = await showDateRangePicker(
               context: context,
@@ -11561,12 +11604,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               initialDateRange: _invoiceRange,
             );
             if (!mounted || range == null) return;
-            setState(() {
+            _changeSalesBrowse(() {
               _invoicePeriod = period;
               _invoiceRange = range;
             });
           } else {
-            setState(() => _invoicePeriod = period);
+            _changeSalesBrowse(() => _invoicePeriod = period);
           }
           return;
         }
@@ -11577,7 +11620,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       },
       itemBuilder: (_) => [
         for (final period
-            in widget.salesOnly && !_showSalesFinance
+            in widget.salesOnly
                 ? ['Today', 'Week', 'Month', 'Year', 'Custom range']
                 : ['Today', 'Week', 'Month', 'Financial year'])
           PopupMenuItem(value: period, child: Text(period)),
@@ -11588,7 +11631,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              widget.salesOnly && !_showSalesFinance
+              widget.salesOnly
                   ? _invoicePeriod
                   : session.workspaceMoneyPeriod,
               style: const TextStyle(
@@ -11601,23 +11644,60 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         ),
       ),
     );
+    if (widget.salesOnly) {
+      return _StockQuickActionsFrame(
+        keyPrefix: 'work-sales',
+        actionWords: 'New sale Collect dues View statement MoolSocial settlement',
+        expanded: _salesActionsExpanded,
+        onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
+        actions: [
+          if (widget.showNewSaleAction)
+            _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: Icons.add_rounded, label: 'New sale', onTap: widget.onNewSale),
+          if (widget.onOpenOperation != null) ...[
+            _StoreEdgeAction(keyName: 'work-sales-dues', icon: Icons.account_balance_wallet_outlined,
+              label: 'Collect dues', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.dues)),
+            _StoreEdgeAction(keyName: 'work-sales-statement', icon: Icons.receipt_long_outlined,
+              label: 'View statement', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.statement)),
+            _StoreEdgeAction(keyName: 'work-sales-settlement', icon: Icons.account_balance_outlined,
+              label: 'MoolSocial settlement', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.payments)),
+          ],
+        ],
+        child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
+          StoreRecentSearches(
+            controller: _invoiceSearch,
+            history: session.workspaceRecentSearches('sales'),
+            isCurrent: () => _salesScope == (session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id),
+            onChanged: (_) => _changeSalesBrowse(() {}),
+            child: Row(children: [
+              Expanded(child: TextField(
+                key: const Key('work-sales-search'), controller: _invoiceSearch,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => _changeSalesBrowse(() {}),
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+                decoration: InputDecoration(
+                  hintText: 'Search invoices or customers', filled: false, isDense: true,
+                  border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+                  prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
+                  suffixIcon: _invoiceSearch.text.isEmpty ? null : IconButton(
+                    tooltip: 'Clear invoice search', onPressed: () => _changeSalesBrowse(_invoiceSearch.clear),
+                    icon: const Icon(Icons.close_rounded, size: 18)),
+                ),
+              )),
+              periodControl,
+            ]),
+          ),
+          Expanded(child: _compactInvoices(session)),
+        ])),
+      );
+    }
     final content = Column(
       key: const Key('work-store-statement'),
       children: [
-        if (widget.salesOnly && widget.showNewSaleAction && !largeText)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              key: const Key('work-sales-new-counter-sale'),
-              onPressed: widget.onNewSale,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Counter sale'),
-            ),
-          ),
         if (_book != 'Purchases' || session.focusedWorkspacePurchaseId == null)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
-            child: largeText || widget.salesOnly
+            child: largeText
                 ? Align(
                     alignment: Alignment.centerLeft,
                     child: Wrap(
@@ -11626,15 +11706,6 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                       children: [
                         title,
                         periodControl,
-                        if (widget.salesOnly &&
-                            widget.showNewSaleAction &&
-                            largeText)
-                          TextButton.icon(
-                            key: const Key('work-sales-new-counter-sale'),
-                            onPressed: widget.onNewSale,
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Counter sale'),
-                          ),
                       ],
                     ),
                   )
@@ -11703,8 +11774,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               session.workspaceFinanceUsesLegacyReview,
             )),
             child:
-                (widget.salesOnly && !_showSalesFinance) ||
-                    (!widget.salesOnly && _book == 'Sales')
+                _book == 'Sales'
                 ? _compactInvoices(session)
                 : _book == 'Purchases'
                 ? _StorePurchasesSurface(session: session, statement: true)
@@ -12243,6 +12313,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         key: ValueKey(operation),
         session: session,
         salesOnly: operation == _WorkspaceOperation.sales,
+        onOpenOperation: onOpenOperation,
         onNewSale: () {
           if (session.prepareWorkspaceOrder(
             source: 'Counter',
@@ -13928,7 +13999,7 @@ double _stockQuickTabHeight(BuildContext context) {
   return height;
 }
 
-/// Stock-only placement of the approved manual right-edge interaction.
+/// Approved manual right-edge interaction, reused by Stock and Sales.
 /// Keeps the table under the same parents while expanding/collapsing.
 class _StockQuickActionsFrame extends StatelessWidget {
   const _StockQuickActionsFrame({
@@ -13936,11 +14007,14 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.actions,
     required this.expanded,
     required this.onToggle,
+    this.keyPrefix = 'work-stock',
+    this.actionWords = 'Add products Buy stock Purchases Buy together',
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
+  final String keyPrefix, actionWords;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -13952,7 +14026,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
       final readableWidth =
           _storeRailWordWidth(
             context,
-            'Add products Buy stock Purchases Buy together',
+            actionWords,
           ) +
           17;
       final panelWidth =
@@ -13973,7 +14047,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
               bottomLeft: Radius.circular(12),
             ),
             child: InkWell(
-              key: const Key('work-stock-actions-toggle'),
+              key: Key('$keyPrefix-actions-toggle'),
               onTap: onToggle,
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
@@ -14025,7 +14099,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
           children: [
             Positioned.fill(
               child: ClipPath(
-                key: const Key('work-stock-action-content'),
+                key: Key('$keyPrefix-action-content'),
                 clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
                 child: child,
               ),
@@ -14033,7 +14107,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
             if (expanded) ...[
               Positioned.fill(
                 child: GestureDetector(
-                  key: const Key('work-stock-actions-dismiss'),
+                  key: Key('$keyPrefix-actions-dismiss'),
                   behavior: HitTestBehavior.opaque,
                   onTap: onToggle,
                   child: const SizedBox.expand(),
@@ -14046,7 +14120,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxHeight: box.maxHeight),
                   child: Material(
-                    key: const Key('work-stock-actions-panel'),
+                    key: Key('$keyPrefix-actions-panel'),
                     type: MaterialType.transparency,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -14054,7 +14128,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
                         Flexible(
                           child: ListView.separated(
                             shrinkWrap: true,
-                            key: const Key('work-stock-entry-controls'),
+                            key: Key('$keyPrefix-entry-controls'),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4,
                               vertical: 12,
