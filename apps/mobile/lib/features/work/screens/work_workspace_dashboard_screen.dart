@@ -13032,13 +13032,11 @@ class _WorkspaceCatalogueSurfaceState
         expanded: _actionsExpanded,
         onToggle: _toggleActions,
         actions: [
-          TextButton(
-            key: const Key('work-quick-add-products'),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(48, 48),
-              alignment: Alignment.centerLeft,
-            ),
-            onPressed: () async {
+          _StoreEdgeAction(
+            keyName: 'work-quick-add-products',
+            icon: Icons.add_box_outlined,
+            label: 'Add products',
+            onTap: () async {
               await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
                   builder: (_) => _WorkspaceCatalogueSurface(
@@ -13049,37 +13047,27 @@ class _WorkspaceCatalogueSurfaceState
               );
               if (mounted) setState(() {});
             },
-            child: const Text('Add products'),
           ),
           if (widget.onBuyStock != null)
-            TextButton(
-              key: const Key('work-quick-buy'),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(48, 48),
-                alignment: Alignment.centerLeft,
-              ),
-              onPressed: widget.onBuyStock,
-              child: const Text('Buy stock'),
+            _StoreEdgeAction(
+              keyName: 'work-quick-buy',
+              icon: Icons.inventory_2_outlined,
+              label: 'Buy stock',
+              onTap: widget.onBuyStock,
             ),
           if (widget.onPurchases != null)
-            TextButton(
-              key: const Key('work-incoming-purchases'),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(48, 48),
-                alignment: Alignment.centerLeft,
-              ),
-              onPressed: widget.onPurchases,
-              child: const Text('Purchases'),
+            _StoreEdgeAction(
+              keyName: 'work-incoming-purchases',
+              icon: Icons.local_shipping_outlined,
+              label: 'Purchases',
+              onTap: widget.onPurchases,
             ),
           if (widget.onGroupBuying != null)
-            TextButton(
-              key: const Key('work-quick-group-buy'),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(48, 48),
-                alignment: Alignment.centerLeft,
-              ),
-              onPressed: widget.onGroupBuying,
-              child: const Text('Buy together'),
+            _StoreEdgeAction(
+              keyName: 'work-quick-group-buy',
+              icon: Icons.groups_2_outlined,
+              label: 'Buy together',
+              onTap: widget.onGroupBuying,
             ),
         ],
         child: Column(
@@ -13169,16 +13157,156 @@ class _WorkspaceCatalogueSurfaceState
   }
 }
 
+class _StoreEdgeAction extends StatelessWidget {
+  const _StoreEdgeAction({
+    required this.keyName,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.semanticLabel,
+    this.detail,
+    this.progress,
+    this.compact = false,
+    this.horizontal = false,
+    this.showDetails = false,
+  });
+  final String keyName, label;
+  final String? detail;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String? semanticLabel;
+  final double? progress;
+  final bool compact, horizontal;
+  final bool showDetails;
+
+  _StoreEdgeAction asNamedTab(bool expanded) => _StoreEdgeAction(
+    keyName: keyName,
+    icon: icon,
+    label: label,
+    onTap: onTap,
+    semanticLabel: semanticLabel,
+    detail: detail,
+    progress: progress,
+    compact: compact,
+    horizontal: horizontal,
+    showDetails: expanded,
+  );
+
+  Widget _buildNamedTab(BuildContext context) => Semantics(
+    button: true,
+    label: semanticLabel ?? (detail == null ? label : '$label, $detail'),
+    enabled: onTap != null,
+    onTap: onTap,
+    excludeSemantics: true,
+    child: Tooltip(
+      message: semanticLabel ?? label,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (!horizontal)
+            Positioned.fill(
+              left: 3,
+              right: 3,
+              top: -3,
+              bottom: 3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F1F6),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+              ),
+            ),
+          Material(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9),
+              side: const BorderSide(color: Color(0xFFE5E8F1)),
+            ),
+            child: InkWell(
+              key: Key(keyName),
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                width: horizontal
+                    ? MediaQuery.textScalerOf(context).scale(110) + 32
+                    : double.infinity,
+                constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          icon,
+                          size: 15,
+                          color: onTap == null
+                              ? MoolColors.muted
+                              : MoolColors.navy,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.25,
+                              fontWeight: FontWeight.w600,
+                              color: onTap == null
+                                  ? MoolColors.muted
+                                  : const Color(0xFF252B38),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (showDetails && !horizontal && detail != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        detail!,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          height: 1.3,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                    ],
+                    if (showDetails && !horizontal && progress != null) ...[
+                      const SizedBox(height: 5),
+                      LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 2,
+                        color: MoolColors.navy,
+                        backgroundColor: const Color(0xFFE5E8F1),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => _buildNamedTab(context);
+}
+
 double _stockQuickTabHeight(BuildContext context) {
   final painter = TextPainter(
-    text: const TextSpan(
+    text: TextSpan(
       text: 'Quick actions',
-      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      style: DefaultTextStyle.of(context).style.merge(
+        const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      ),
     ),
     textDirection: TextDirection.ltr,
     textScaler: MediaQuery.textScalerOf(context),
   )..layout();
-  final height = painter.width + 40;
+  final height = painter.width.ceilToDouble() + 41;
   painter.dispose();
   return height;
 }
@@ -13203,8 +13331,16 @@ class _StockQuickActionsFrame extends StatelessWidget {
       final desiredHeight = _stockQuickTabHeight(context);
       final short = box.maxHeight < desiredHeight + 12;
       final tabHeight = short ? 48.0 : desiredHeight;
-      final panelWidth = (MediaQuery.textScalerOf(context).scale(100) + 20)
-          .clamp(120.0, box.maxWidth * .48);
+      final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
+      final readableWidth =
+          _storeRailWordWidth(
+            context,
+            'Add products Buy stock Purchases Buy together',
+          ) +
+          17;
+      final panelWidth =
+          ((readableWidth > normalWidth ? readableWidth : normalWidth) + 20)
+              .clamp(48.0, box.maxWidth * .48);
       final label = expanded ? 'Hide Quick actions' : 'Show Quick actions';
       final toggle = Tooltip(
         message: label,
@@ -13214,7 +13350,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
           expanded: expanded,
           excludeSemantics: true,
           child: Material(
-            color: const Color(0xFFF0F1F6),
+            color: expanded ? Colors.transparent : const Color(0xFFF0F1F7),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(12),
               bottomLeft: Radius.circular(12),
@@ -13228,27 +13364,34 @@ class _StockQuickActionsFrame extends StatelessWidget {
                 height: expanded ? 48 : tabHeight,
                 child: expanded || short
                     ? Icon(
-                        expanded ? Icons.chevron_right : Icons.chevron_left,
+                        expanded
+                            ? Icons.chevron_right_rounded
+                            : Icons.chevron_left_rounded,
                         color: MoolColors.navy,
-                        size: 20,
+                        size: 21,
                       )
-                    : RotatedBox(
-                        quarterTurns: 3,
-                        child: Row(
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 6,
+                        ),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(
-                              Icons.expand_less,
-                              size: 18,
+                              Icons.chevron_left_rounded,
+                              size: 21,
                               color: MoolColors.navy,
                             ),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'Quick actions',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: MoolColors.navy,
+                            const RotatedBox(
+                              quarterTurns: 3,
+                              child: Text(
+                                'Quick actions',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: MoolColors.navy,
+                                ),
                               ),
                             ),
                           ],
@@ -13274,28 +13417,26 @@ class _StockQuickActionsFrame extends StatelessWidget {
                   ),
                 ),
                 if (expanded)
-                  SizedBox(
+                  Container(
                     key: const Key('work-stock-actions-panel'),
                     width: panelWidth,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(left: BorderSide(color: Color(0xFFE5E8F1))),
+                    ),
                     child: Column(
                       children: [
                         Expanded(
                           child: ListView.separated(
                             key: const Key('work-stock-entry-controls'),
-                            padding: const EdgeInsets.fromLTRB(6, 6, 4, 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 12,
+                            ),
                             itemCount: actions.length,
                             separatorBuilder: (_, _) =>
                                 const SizedBox(height: 4),
-                            itemBuilder: (_, i) => Material(
-                              color: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(9),
-                                side: const BorderSide(
-                                  color: Color(0xFFE5E8F1),
-                                ),
-                              ),
-                              child: actions[i],
-                            ),
+                            itemBuilder: (_, i) => actions[i],
                           ),
                         ),
                         Align(alignment: Alignment.centerRight, child: toggle),

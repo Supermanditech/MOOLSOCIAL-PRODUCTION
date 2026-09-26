@@ -2274,6 +2274,18 @@ void main() {
       );
       final add = find.byKey(const Key('work-quick-add-products'));
       await tester.ensureVisible(add);
+      final actionLabel = tester.widget<Text>(
+        find.descendant(of: add, matching: find.text('Add products')),
+      );
+      expect(actionLabel.style?.fontSize, 11);
+      expect(actionLabel.style?.height, 1.25);
+      expect(actionLabel.style?.fontWeight, FontWeight.w600);
+      expect(actionLabel.style?.color, const Color(0xFF252B38));
+      final actionIcon = tester.widget<Icon>(
+        find.descendant(of: add, matching: find.byIcon(Icons.add_box_outlined)),
+      );
+      expect(actionIcon.size, 15);
+      expect(actionIcon.color, MoolColors.navy);
       expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
       await tester.tap(add);
       await tester.pumpAndSettle();
