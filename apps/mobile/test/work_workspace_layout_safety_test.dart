@@ -4101,7 +4101,10 @@ void main() {
       expect(find.byKey(const Key('retailer-setup-screen')), findsOneWidget);
       expect(work.retailerStoreCollection, isTrue);
       await tester.binding.handlePopRoute();
+      // Complete the route removal frame before settling its reverse transition.
+      await tester.pump();
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('retailer-setup-screen')), findsNothing);
       expect(find.byKey(const Key('work-activity-setup')), findsOneWidget);
       expect(work.retailerSetupSaved, isFalse);
       expect(work.workspaceCatalogueItems, isEmpty);
@@ -8613,7 +8616,18 @@ void main() {
             find.byKey(const Key('work-store-finance-material')),
           );
           final surface = band.color!;
-          expect(surface, MoolColors.navy);
+          expect(surface, Colors.white);
+          double contrast(Color foreground, Color background) {
+            final a = foreground.computeLuminance();
+            final b = background.computeLuminance();
+            return (a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05));
+          }
+
+          final pressedOverlay = tester
+              .widget<InkWell>(metric)
+              .overlayColor!
+              .resolve({WidgetState.pressed})!;
+          final pressedSurface = Color.alphaBlend(pressedOverlay, surface);
           for (final label in ['₹28,450', 'Sales today', 'View statement']) {
             final text = renderedLabel(label);
             final paragraph = find.descendant(
@@ -8621,9 +8635,8 @@ void main() {
               matching: find.byType(RichText),
             );
             final color = tester.widget<RichText>(paragraph).text.style!.color!;
-            final light = color.computeLuminance();
-            final dark = surface.computeLuminance();
-            expect((light + .05) / (dark + .05), greaterThan(4.6));
+            expect(contrast(color, surface), greaterThan(4.6));
+            expect(contrast(color, pressedSurface), greaterThan(4.6));
           }
           final control = tester.widget<InkWell>(metric);
           expect(
@@ -8631,12 +8644,6 @@ void main() {
             Colors.white24,
           );
           if (reduced) expect(control.splashFactory, NoSplash.splashFactory);
-          final pressedSurface = Color.alphaBlend(Colors.white24, surface);
-          expect(
-            (const Color(0xFFDADAF5).computeLuminance() + .05) /
-                (pressedSurface.computeLuminance() + .05),
-            greaterThan(4.6),
-          );
           final press = await tester.startGesture(tester.getCenter(metric));
           await tester.pump(const Duration(milliseconds: 90));
           await captureStoreView(
@@ -8710,13 +8717,14 @@ void main() {
       await tester.tap(find.byKey(const Key('work-pulse-sales')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
-      final selected = find.byKey(const Key('work-shortcut-statement'));
-      final button = tester.widget<InkWell>(selected);
-      expect(button.onTap, isNull);
-      final selectedText = tester.widget<Text>(
-        find.descendant(of: selected, matching: find.byType(Text)),
+      expect(find.byKey(const Key('work-shortcut-statement')), findsNothing);
+      expect(find.byKey(const Key('work-contextual-shortcuts')), findsNothing);
+      expect(
+        tester
+            .getSize(find.byKey(const Key('work-first-tap-working-surface')))
+            .width,
+        display.$1,
       );
-      expect(selectedText.style!.color, MoolColors.navy);
       await captureStoreView(
         tester,
         'finish-statement-${display.$1}-${display.$3}',
@@ -9829,6 +9837,15 @@ void main() {
       (tester) async {
         final work = storeViewFixture();
         if (activity == 'invoice') {
+          // Exercise the invoice card with no higher-priority operational work.
+          work.activeGroupBuy = null;
+          work.workspaceSettlementBalance = 0;
+          for (var i = 0; i < work.workspaceCatalogueItems.length; i++) {
+            final product = work.workspaceCatalogueItems[i];
+            work.workspaceCatalogueItems[i] = product.copyWith(
+              stock: product.lowStockThreshold + 1,
+            );
+          }
           work.workspaceOrderStage = 'Completed';
           work.workspaceInvoices.add(
             WorkspaceCustomerInvoice(
@@ -32354,37 +32371,34 @@ void main() {
   );
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets(
-      'counter isolation keeps pending handover on dashboard $scale',
-      (tester) async {
-        final work = storeViewFixture();
-        final selected = work.currentWorkspaceOrderId;
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: const Size(412, 915),
-          textScale: scale,
-        );
-        work.workspaceHandoverBusy = true;
-        await openCounterSaleFromSales(tester);
-        expect(work.currentWorkspaceOrderId, selected);
-        expect(find.byKey(const Key('work-sale-customer-sheet')), findsNothing);
-        expect(
-          find.byKey(const Key('work-quick-counter-sale')),
-          findsOneWidget,
-        );
-        expect(work.noticeMessage, contains('current order update'));
-        work.workspaceHandoverBusy = false;
-        await openCounterSaleFromSales(tester);
-        expect(
-          find.byKey(const Key('work-sale-customer-sheet')),
-          findsOneWidget,
-        );
-        expect(work.currentWorkspaceOrderId, isNull);
-        expect(tester.takeException(), isNull);
-      },
-    );
+    testWidgets('counter isolation keeps pending handover on Sales $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      final selected = work.currentWorkspaceOrderId;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: scale,
+      );
+      work.workspaceHandoverBusy = true;
+      await openCounterSaleFromSales(tester);
+      expect(work.currentWorkspaceOrderId, selected);
+      expect(find.byKey(const Key('work-sale-customer-sheet')), findsNothing);
+      expect(
+        find.byKey(const Key('work-sales-new-counter-sale')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-contextual-shortcuts')), findsNothing);
+      expect(work.noticeMessage, contains('current order update'));
+      work.workspaceHandoverBusy = false;
+      await openCounterSaleFromSales(tester);
+      expect(find.byKey(const Key('work-sale-customer-sheet')), findsOneWidget);
+      expect(work.currentWorkspaceOrderId, isNull);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'counter isolation refused save retains bill and recovers $scale',
@@ -32870,7 +32884,9 @@ void main() {
         await captureStoreView(tester, 'invoice-delivery-unavailable-$scale');
         await press('work-counter-close');
         await press('work-store-home');
-        await press('work-invoice-open');
+        // Active work outranks old invoices at Home; reopen through Sales.
+        await press('work-store-sell');
+        await press('work-sales-invoice-${work.workspaceInvoices.single.id}');
         expect(find.byKey(const Key('work-invoice-share-chat')), findsNothing);
         expect(
           find.byKey(const Key('work-invoice-share-whatsapp')),
@@ -33041,7 +33057,7 @@ void main() {
         }
 
         expect(find.text('Invoice created'), findsOneWidget);
-        expect(find.text('Start next sale').hitTestable(), findsOneWidget);
+        expect(find.text('New sale').hitTestable(), findsOneWidget);
         expect(payment().state, WorkspacePaymentState.unpaid);
         expect(payment().paidMinor, 0);
         expect(payment().dueMinor, invoice.payableMinor);
@@ -33655,14 +33671,10 @@ void main() {
       await tester.tap(payment);
       await tester.pumpAndSettle();
       expect(find.text('Payment details'), findsOneWidget);
+      expect(find.byKey(const Key('work-contextual-shortcuts')), findsNothing);
       expect(
-        tester
-            .widget<Semantics>(
-              find.byKey(const Key('work-shortcut-state-statement')),
-            )
-            .properties
-            .selected,
-        isTrue,
+        find.byKey(const Key('work-shortcut-state-statement')),
+        findsNothing,
       );
       expect(
         find.byKey(const Key('work-finance-payment-APP-1043')),
@@ -33715,14 +33727,10 @@ void main() {
       await tester.tap(payout);
       await tester.pumpAndSettle();
       expect(find.text('Settlement details'), findsOneWidget);
+      expect(find.byKey(const Key('work-contextual-shortcuts')), findsNothing);
       expect(
-        tester
-            .widget<Semantics>(
-              find.byKey(const Key('work-shortcut-state-payments')),
-            )
-            .properties
-            .selected,
-        isTrue,
+        find.byKey(const Key('work-shortcut-state-payments')),
+        findsNothing,
       );
       expect(
         find.byKey(const Key('work-finance-payout-SET-A')),
@@ -35149,7 +35157,11 @@ void main() {
         expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
         expect(find.byKey(const Key('work-shortcut-direct')), findsNothing);
         final tracking = find.byKey(const Key('work-shortcut-sourcing'));
-        expect(tester.widget<InkWell>(tracking).onTap, isNull);
+        expect(tracking, findsNothing);
+        expect(
+          find.byKey(const Key('work-contextual-shortcuts')),
+          findsNothing,
+        );
         expect(work.currentWorkspaceOrderId, originalOrder);
         await captureStoreView(tester, 'track-stock-shortcut-populated-$scale');
         final row = find.byKey(const Key('work-purchase-open-SHIP-7'));
