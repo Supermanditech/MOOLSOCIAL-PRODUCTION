@@ -3990,7 +3990,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-spread',
-                  label: 'Potential gross profit',
+                  label: 'Gross profit*',
                   value: money(
                     cost != null && resale != null ? resale - cost : null,
                   ),
@@ -4046,13 +4046,26 @@ class _OperatingMetric extends StatelessWidget {
   final Color? alertColor;
   final bool tinted;
   final VoidCallback? onTap;
-
   bool get showInfo => !const {
     'invoice-count',
     'skus',
     'low-stock',
     'out-of-stock',
   }.contains(id);
+
+  void _explain(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(label),
+      content: Text(detail),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => Material(
@@ -4061,147 +4074,127 @@ class _OperatingMetric extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFEDF0F5))),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: InkWell(
-              key: Key('store-overview-open-$id'),
-              onTap: onTap,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 48),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, box) {
-                      final stacked =
-                          box.maxWidth < 230 ||
-                          MediaQuery.textScalerOf(context).scale(14) > 21;
-                      final caption = Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: alertColor ?? MoolColors.ink,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                      final amount = _StoreValueMotion(
-                        value: value,
-                        child: Text(
-                          value,
-                          key: Key('store-overview-$id'),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: alertColor ?? MoolColors.ink,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Tooltip(
+                  message: detail,
+                  child: InkWell(
+                    key: Key('store-overview-open-$id'),
+                    onTap: onTap,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: LayoutBuilder(
+                            builder: (context, box) {
+                              final caption = Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: alertColor ?? MoolColors.ink,
+                                ),
+                              );
+                              final amount = _StoreValueMotion(
+                                value: value,
+                                child: Text(
+                                  value,
+                                  key: Key('store-overview-$id'),
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: alertColor ?? MoolColors.ink,
+                                  ),
+                                ),
+                              );
+                              if (box.maxWidth < 230 ||
+                                  MediaQuery.textScalerOf(context).scale(14) >
+                                      21) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    caption,
+                                    const SizedBox(height: 4),
+                                    amount,
+                                  ],
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  Expanded(child: caption),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: amount,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
-                      );
-                      if (stacked) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            caption,
-                            const SizedBox(height: 4),
-                            amount,
-                            if (id == 'stock-spread')
-                              const Text(
-                                'Before tax, discounts & expenses · not net profit',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: MoolColors.muted,
-                                ),
-                              ),
-                          ],
-                        );
-                      }
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(child: caption),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: onTap != null && showInfo
-                                      ? Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Flexible(child: amount),
-                                            const Icon(
-                                              Icons.chevron_right_rounded,
-                                              size: 16,
-                                              color: MoolColors.muted,
-                                            ),
-                                          ],
-                                        )
-                                      : amount,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (id == 'stock-spread')
-                            const Padding(
-                              padding: EdgeInsets.only(top: 3),
-                              child: Text(
-                                'Before tax, discounts & expenses · not net profit',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: MoolColors.muted,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              SizedBox(
+                key: Key('store-overview-control-$id'),
+                width: 48,
+                height: 48,
+                child: onTap != null
+                    ? IconButton(
+                        onPressed: onTap,
+                        tooltip: 'Open $label',
+                        icon: const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: MoolColors.muted,
+                        ),
+                      )
+                    : showInfo
+                    ? IconButton(
+                        key: Key('store-overview-info-$id'),
+                        tooltip: 'About $label',
+                        onPressed: () => _explain(context),
+                        icon: const Icon(
+                          Icons.info_outline_rounded,
+                          size: 16,
+                          color: MoolColors.muted,
+                        ),
+                      )
+                    : null,
+              ),
+            ],
           ),
-          if (showInfo)
-            IconButton(
-              key: Key('store-overview-info-$id'),
-              tooltip: 'About $label',
-              icon: const Icon(
-                Icons.info_outline_rounded,
-                size: 16,
-                color: MoolColors.muted,
+          if (id == 'billed')
+            const Padding(
+              padding: EdgeInsets.fromLTRB(6, 0, 6, 4),
+              child: Text(
+                'Before returns',
+                style: TextStyle(fontSize: 11, color: MoolColors.muted),
               ),
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(label),
-                  content: Text(detail),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (onTap != null)
-            IconButton(
-              onPressed: onTap,
-              tooltip: 'Open $label',
-              icon: const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: MoolColors.muted,
+            ),
+          if (id == 'stock-spread')
+            const Padding(
+              padding: EdgeInsets.fromLTRB(6, 0, 6, 4),
+              child: Text(
+                '*Potential from unsold stock · before tax, discounts & expenses; not net profit',
+                style: TextStyle(fontSize: 11, color: MoolColors.muted),
               ),
             ),
         ],

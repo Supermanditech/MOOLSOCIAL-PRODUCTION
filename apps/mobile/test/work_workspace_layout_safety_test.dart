@@ -2233,11 +2233,25 @@ void main() {
       expect(find.text('Today'), findsNothing);
       expect(find.text('Inventory'), findsOneWidget);
       expect(find.text('Stock value'), findsOneWidget);
-      final billedInfo = find.byKey(const Key('store-overview-info-billed'));
+      if (display.$1.width == 360 && display.$2 == 1) {
+        final billedRect = tester.getRect(find.byKey(const Key('store-overview-billed')));
+        for (final id in ['collections', 'invoice-count', 'skus', 'low-stock', 'out-of-stock', 'stock-cost', 'stock-sale']) {
+          final number = tester.getRect(find.byKey(Key('store-overview-$id')));
+          final control = tester.getRect(find.byKey(Key('store-overview-control-$id')));
+          expect(number.right, closeTo(billedRect.right, 1));
+          expect(number.center.dy, closeTo(control.center.dy, 1));
+        }
+      }
+      final billedInfo = find.byKey(
+        const Key('store-overview-info-collections'),
+      );
       await tester.ensureVisible(billedInfo);
       await tester.tap(billedInfo);
       await tester.pumpAndSettle();
-      expect(find.text('Invoice history not available'), findsOneWidget);
+      expect(
+        find.text('Complete collection history not available'),
+        findsOneWidget,
+      );
       await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
       expect(
