@@ -70,7 +70,10 @@ void main() {
             );
             await tester.pumpAndSettle();
             expect(
-              find.descendant(of: identity, matching: action),
+              find.descendant(
+                of: find.byKey(ValueKey('buy-automatic-fulfilment-$id')),
+                matching: action,
+              ),
               findsOneWidget,
             );
             expect(find.text(label), findsOneWidget);
@@ -153,7 +156,7 @@ void main() {
           )
           .first,
     );
-    expect(find.text('Ratings and seller'), findsOneWidget);
+    expect(find.text('Customer ratings'), findsOneWidget);
     expect(find.text('4.6 from 328 ratings'), findsOneWidget);
     expect(find.text('301'), findsOneWidget);
     expect(session.marketplaceTrustFor(product).partnerName, product.seller);

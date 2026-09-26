@@ -3368,11 +3368,16 @@ void main() {
           tester.getRect(find.byKey(ValueKey('buy-product-${product.id}'))),
       ];
       expect(rects[1].top, closeTo(rects[0].top, .1));
-      expect(rects[2].top, closeTo(rects[0].top, .1));
+      // The approved inline price/Add layout uses two readable columns here.
       expect(rects[1].left, greaterThan(rects[0].right));
-      expect(rects[2].left, greaterThan(rects[1].right));
-      expect(rects[3].top, greaterThan(rects[0].bottom));
-      expect(rects[2].right, lessThanOrEqualTo(360));
+      expect(rects[2].top, greaterThan(rects[0].bottom));
+      expect(rects[2].left, closeTo(rects[0].left, .1));
+      expect(rects[3].top, greaterThan(rects[1].bottom));
+      expect(rects[3].left, closeTo(rects[1].left, .1));
+      for (final rect in rects) {
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(360));
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -3473,7 +3478,7 @@ void main() {
       find.byKey(ValueKey('buy-add-${product.id}')),
     );
     expect(action.height, 44);
-    expect(action.width, greaterThanOrEqualTo(60));
+    expect(action.width, greaterThanOrEqualTo(44));
     expect(card.contains(action.center), isTrue);
     expect(action.right, lessThanOrEqualTo(card.right));
     expect(tester.takeException(), isNull);
@@ -3708,7 +3713,7 @@ void main() {
     );
     expect(
       find.descendant(of: primary, matching: find.text('Add')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.text('Buy now'), findsNothing);
   });
@@ -5972,7 +5977,7 @@ void main() {
       expect(cardRect.contains(tester.getCenter(add)), isTrue);
       expect(cardRect.contains(tester.getCenter(promise)), isTrue);
       expect(tester.getSize(add).height, 44);
-      expect(tester.getSize(add).width, greaterThanOrEqualTo(60));
+      expect(tester.getSize(add).width, greaterThanOrEqualTo(44));
     },
   );
 
@@ -8596,7 +8601,7 @@ void main() {
       final rect = tester.getRect(card);
       final action = tester.getRect(add);
       expect(action.height, 44);
-      expect(action.width, greaterThanOrEqualTo(60));
+      expect(action.width, greaterThanOrEqualTo(44));
       expect(rect.contains(action.center), isTrue);
       expect(action.bottom, lessThanOrEqualTo(dockTop));
       expect(add.hitTestable(), findsOneWidget);

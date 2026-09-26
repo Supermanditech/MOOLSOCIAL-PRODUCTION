@@ -96,9 +96,12 @@ void main() {
         );
         expect(
           tester.getSize(slot),
-          Size(destination == BuyV2Destination.medicine ? 148 : 88, 44),
+          Size(destination == BuyV2Destination.medicine ? 148 : 44, 44),
         );
-        expect(tester.getSize(shell), const Size(88, 44));
+        expect(
+          tester.getSize(shell),
+          Size(destination == BuyV2Destination.medicine ? 88 : 44, 44),
+        );
         expect(tester.getTopRight(shell), tester.getTopRight(slot));
         expect(tester.getSize(primary).height, greaterThanOrEqualTo(44));
         expect(find.descendant(of: panel, matching: shell), findsOneWidget);
@@ -133,7 +136,13 @@ void main() {
         );
         expect(
           find.descendant(of: primary, matching: find.text('Add')),
-          findsOneWidget,
+          destination == BuyV2Destination.medicine
+              ? findsOneWidget
+              : findsNothing,
+        );
+        expect(
+          tester.getSemantics(primary).label,
+          contains(product.customerTitle),
         );
         expect(
           find.descendant(of: primary, matching: find.text(product.title)),
@@ -185,23 +194,17 @@ void main() {
     await tester.tap(find.byKey(ValueKey('buy-product-primary-${product.id}')));
     await tester.pump();
 
-    final enteringSlide = find.descendant(
-      of: slot,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is SlideTransition && widget.position.value.dx > 0.02,
-        description: 'incoming product-action transform-only acknowledgement',
-      ),
-    );
     expect(addShell, findsNothing);
     expect(
       find.byKey(ValueKey('buy-product-quantity-${product.id}')),
       findsOneWidget,
     );
-    expect(enteringSlide, findsOneWidget);
-    final incomingTransition = tester.widget<SlideTransition>(enteringSlide);
-    expect(incomingTransition.position.value.dx, closeTo(0.025, 0.001));
-    expect(incomingTransition.transformHitTests, isFalse);
+    expect(
+      find.byKey(ValueKey('buy-product-quantity-${product.id}')).hitTestable(),
+      findsOneWidget,
+      reason:
+          'Replacing the compact Add must expose usable quantity controls immediately.',
+    );
     expect(
       find.descendant(
         of: slot,
@@ -223,7 +226,7 @@ void main() {
       matching: find.byTooltip('Add one'),
     );
     expect(slotSizeBefore.height, 44);
-    expect(slotSizeBefore.width, 88);
+    expect(slotSizeBefore.width, 44);
     expect(tester.getSize(slot).width, inInclusiveRange(120, 170));
     expect(tester.getSize(slot).height, slotSizeBefore.height);
     expect(
@@ -232,7 +235,6 @@ void main() {
     );
     expect(tester.getSize(stepper), tester.getSize(slot));
     expect(tester.getCenter(stepper), tester.getCenter(slot));
-    expect(incomingTransition.position.value, Offset.zero);
     expect(tester.getSize(remove), const Size(44, 44));
     expect(tester.widget<IconButton>(remove).tooltip, 'Remove from Cart');
     expect(tester.getSize(add), const Size(44, 44));
@@ -339,12 +341,13 @@ void main() {
       await tester.pumpAndSettle();
       final shell = find.byKey(ValueKey('buy-product-add-shell-${product.id}'));
       final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-      expect(tester.getSize(shell), const Size(88, 44));
+      final medicine = product.destination == BuyV2Destination.medicine;
+      expect(tester.getSize(shell), Size(medicine ? 88 : 44, 44));
       expect(tester.getSize(panel).width, greaterThan(0));
       expect(find.descendant(of: panel, matching: shell), findsOneWidget);
       expect(
         find.descendant(of: primary, matching: find.text('Add')),
-        findsOneWidget,
+        medicine ? findsOneWidget : findsNothing,
       );
       expect(
         find.descendant(of: primary, matching: find.text(product.title)),

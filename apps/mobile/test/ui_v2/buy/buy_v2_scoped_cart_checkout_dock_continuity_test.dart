@@ -4020,8 +4020,15 @@ void main() {
               final fact = find.byElementPredicate(
                 (element) => identical(element, factElement),
               );
-              final paragraph = tester.renderObject<RenderParagraph>(fact);
-              expect(paragraph.didExceedMaxLines, isFalse);
+              final paragraphs = find.descendant(
+                of: fact,
+                matching: find.byType(RichText),
+              );
+              expect(paragraphs, findsWidgets);
+              for (final element in paragraphs.evaluate()) {
+                final paragraph = element.renderObject! as RenderParagraph;
+                expect(paragraph.didExceedMaxLines, isFalse);
+              }
               final factBounds = tester.getRect(fact);
               expect(factBounds.bottom, lessThanOrEqualTo(bounds.bottom - 7));
               expect(factBounds.right, lessThanOrEqualTo(bounds.right - 10));
@@ -4353,14 +4360,17 @@ void main() {
         await tester.pumpAndSettle();
         await settleVisibleImages(tester);
         expectConnectedOwner(tester, session, BuyV2Destination.shop);
-        final referenceVersion = viewport.checkout
-            ? 'cursor-post-r6633-20260923'
-            : 'cursor-approved-cool-grey-20260926';
+        // These checkout captures render the same approved checkout as the
+        // Cart-return suite. Share its successor reference, retaining originals.
+        final reference = viewport.checkout
+            ? 'cursor-approved-cool-grey-20260927/'
+                  'buy-v2-r58-8-6-c24f-checkout-cart-return-'
+                  '${viewport.label.replaceFirst('-checkout', '')}.png'
+            : 'cursor-approved-cool-grey-20260926/'
+                  'buy-v2-r58-8-7-c24f-${viewport.label}.png';
         await expectLater(
           find.byType(BuyV2Screen),
-          matchesGoldenFile(
-            'candidate_captures/$referenceVersion/buy-v2-r58-8-7-c24f-${viewport.label}.png',
-          ),
+          matchesGoldenFile('candidate_captures/$reference'),
         );
       },
       tags: 'protected-reference',

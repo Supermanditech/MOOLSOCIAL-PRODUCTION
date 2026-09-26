@@ -136,7 +136,7 @@ void main() {
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
       findsOneWidget,
     );
-    expect(find.text('Delivery & returns'), findsOneWidget);
+    expect(find.text('Delivery & seller'), findsOneWidget);
     expect(find.text('Fulfilment arranged by MoolSocial'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -212,7 +212,7 @@ void main() {
     expect(automatic, findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
-      findsNothing,
+      findsOneWidget,
     );
     await tester.pumpAndSettle();
     expect(tester.binding.transientCallbackCount, 0);

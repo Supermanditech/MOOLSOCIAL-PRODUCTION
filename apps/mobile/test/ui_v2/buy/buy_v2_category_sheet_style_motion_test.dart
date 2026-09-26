@@ -268,7 +268,7 @@ void main() {
           .label;
       expect(
         selectedNode.label,
-        startsWith('Shop category, $selectedLabel, selected'),
+        startsWith('Shop categories, $selectedLabel, selected'),
       );
       expect(selectedNode.flagsCollection.isSelected, Tristate.isTrue);
       expect(

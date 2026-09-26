@@ -883,7 +883,7 @@ void main() {
           matching: find.text(brand),
         );
         final paragraph = tester.renderObject<RenderParagraph>(label);
-        expect(paragraph.text.style?.color, Colors.white);
+        expect(paragraph.text.style?.color, BuyV2ActionStyle.primaryForeground);
         expect(paragraph.didExceedMaxLines, isFalse);
       }
       expect(session.quantityFor('w-rice'), otherQuantity);
@@ -1000,7 +1000,10 @@ void main() {
             );
             final paragraph = tester.renderObject<RenderParagraph>(label);
             expect(paragraph.text.style?.fontFamily, 'Inter');
-            expect(paragraph.text.style?.color, Colors.white);
+            expect(
+              paragraph.text.style?.color,
+              BuyV2ActionStyle.primaryForeground,
+            );
             expect(paragraph.didExceedMaxLines, isFalse);
             final natural = TextPainter(
               text: paragraph.text,
@@ -1122,7 +1125,10 @@ void main() {
             final paragraph = tester.renderObject<RenderParagraph>(
               find.descendant(of: find.byKey(key), matching: find.text(brand)),
             );
-            expect(paragraph.text.style?.color, Colors.white);
+            expect(
+              paragraph.text.style?.color,
+              BuyV2ActionStyle.primaryForeground,
+            );
             expect(paragraph.didExceedMaxLines, isFalse);
             for (final word in brand.split(' ')) {
               final natural = TextPainter(

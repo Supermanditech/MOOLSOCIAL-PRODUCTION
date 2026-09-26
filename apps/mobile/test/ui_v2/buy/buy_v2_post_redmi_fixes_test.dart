@@ -263,16 +263,13 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             find.descendant(
-              of: hero,
+              of: find.byKey(ValueKey('buy-automatic-fulfilment-$id')),
               matching: find.byKey(ValueKey('buy-product-hero-store-$id')),
             ),
             findsOneWidget,
           );
           expect(
-            find.descendant(
-              of: hero,
-              matching: find.text('Delivery & returns'),
-            ),
+            find.descendant(of: hero, matching: find.text('Delivery & seller')),
             findsNothing,
           );
           final details = find.byKey(ValueKey('buy-automatic-fulfilment-$id'));
@@ -281,7 +278,7 @@ void main() {
           expect(
             find.descendant(
               of: details,
-              matching: find.text('Delivery & returns'),
+              matching: find.text('Delivery & seller'),
             ),
             findsOneWidget,
           );
@@ -662,7 +659,16 @@ void main() {
           final store = find.byKey(
             ValueKey('buy-product-hero-store-$productId'),
           );
-          await tester.ensureVisible(store);
+          await tester.scrollUntilVisible(
+            store,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$productId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
           await tester.pumpAndSettle();
           expect(
             find.descendant(of: store, matching: find.text('Open for orders')),
@@ -677,12 +683,15 @@ void main() {
           expect(
             find.descendant(
               of: information,
-              matching: find.text('Delivery & returns'),
+              matching: find.text('Delivery & seller'),
             ),
             findsOneWidget,
           );
           expect(
-            find.descendant(of: information, matching: find.text('Deliver to')),
+            find.descendant(
+              of: information,
+              matching: find.textContaining('Deliver to '),
+            ),
             findsOneWidget,
           );
           expect(
@@ -690,7 +699,7 @@ void main() {
               of: information,
               matching: find.text('Open for orders'),
             ),
-            findsNothing,
+            findsOneWidget,
           );
           expect(tester.takeException(), isNull);
           await captureR66Visual(tester, 'organized-product-$productId-$scale');
@@ -1378,7 +1387,7 @@ void main() {
       for (final id in [first, second, outside]) {
         expect(await session.openLinkedProduct(id), isTrue);
       }
-      final products = session.productContinuationsFor(session.product(first));
+      final products = session.sellerContinuationsFor(session.product(first));
       expect(products.map((item) => item.id), contains(second));
       expect(
         products.every((item) => item.storeId == source.storeIdAt(0)),

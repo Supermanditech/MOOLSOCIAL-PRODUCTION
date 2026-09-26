@@ -619,10 +619,13 @@ void main() {
                 expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
                 expect(tester.getSize(add).width, greaterThanOrEqualTo(44));
                 expectCollectionText(tester, add);
-                final label = tester.renderObject<RenderParagraph>(
-                  find.descendant(of: add, matching: find.text('Add')),
+                expect(
+                  find.descendant(
+                    of: add,
+                    matching: find.byIcon(Icons.add_rounded),
+                  ),
+                  findsOneWidget,
                 );
-                expect(label.text.style?.fontFamily, 'Inter');
                 await tester.tap(add);
                 await tester.pumpAndSettle();
                 expect(session.quantityFor(productId), 1);

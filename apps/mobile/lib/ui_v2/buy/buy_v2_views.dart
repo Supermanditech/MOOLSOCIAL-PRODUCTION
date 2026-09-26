@@ -1228,7 +1228,7 @@ class BuyV2ProductView extends StatelessWidget {
                                             ).scale(1) <=
                                             1.3 &&
                                         purchaseWidth <=
-                                            constraints.maxWidth * .6 &&
+                                            constraints.maxWidth - 108 &&
                                         (!wholesale ||
                                             (session.businessVerified &&
                                                 offerDecision!.canAdd))) {
@@ -12085,7 +12085,8 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
                 label,
                 actionStyle,
               ).width;
-              final actionWidth = (labelWidth + 24).clamp(
+              // Include the Ink surface's one-pixel border on both sides.
+              final actionWidth = (labelWidth + 26).clamp(
                 164.0.clamp(0.0, constraints.maxWidth),
                 constraints.maxWidth,
               );
