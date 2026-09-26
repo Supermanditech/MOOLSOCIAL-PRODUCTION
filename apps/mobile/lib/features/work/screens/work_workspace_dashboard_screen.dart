@@ -505,6 +505,7 @@ class _WorkWorkspaceDashboardScreenState
   final _saleSearchController = TextEditingController();
   final Map<String, Map<String, String>> _requirementDrafts = {};
   final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
+  final Set<Object> _expandedStockActions = {};
   bool _requirementPickerOpen = false;
   _WorkspaceControlView _view = _WorkspaceControlView.dashboard;
   bool _draftAcceptingOrders = true;
@@ -1609,6 +1610,16 @@ class _WorkWorkspaceDashboardScreenState
             session: session,
             procurementSession: _activeProcurement,
             catalogueKey: _catalogueKey,
+            stockActionsExpanded: _expandedStockActions.contains(
+              session.workspaceStockHistoryScope()?.key ?? workspace.id,
+            ),
+            onToggleStockActions: () => setState(() {
+              final scope =
+                  session.workspaceStockHistoryScope()?.key ?? workspace.id;
+              if (!_expandedStockActions.remove(scope)) {
+                _expandedStockActions.add(scope);
+              }
+            }),
             counterKey: _counterKey,
             saleQuery: _saleSearchController.text,
             stockStatementBookmark: _stockStatementViews.putIfAbsent(
@@ -11549,6 +11560,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.session,
     required this.procurementSession,
     required this.catalogueKey,
+    required this.stockActionsExpanded,
+    required this.onToggleStockActions,
     required this.counterKey,
     required this.saleQuery,
     required this.requirementDraft,
@@ -11569,6 +11582,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final WorkSession session;
   final BuyV2Session procurementSession;
   final GlobalKey<_WorkspaceCatalogueSurfaceState> catalogueKey;
+  final bool stockActionsExpanded;
+  final VoidCallback onToggleStockActions;
   final GlobalKey<_CounterOrderSurfaceState> counterKey;
   final String saleQuery;
   final Map<String, String> requirementDraft;
@@ -11984,6 +11999,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _WorkspaceCatalogueSurface(
         key: catalogueKey,
         session: session,
+        actionsExpanded: stockActionsExpanded,
+        onToggleActions: onToggleStockActions,
         onBuyStock: onBuyStock,
         onPurchases: () => onOpenOperation(_WorkspaceOperation.sourcing),
         onGroupBuying: () => onOpenOperation(_WorkspaceOperation.groupBuying),
@@ -12396,6 +12413,8 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
   const _WorkspaceCatalogueSurface({
     required this.session,
     this.entryOnly = false,
+    this.actionsExpanded,
+    this.onToggleActions,
     this.onBuyStock,
     this.onPurchases,
     this.onGroupBuying,
@@ -12404,6 +12423,8 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 
   final WorkSession session;
   final bool entryOnly;
+  final bool? actionsExpanded;
+  final VoidCallback? onToggleActions;
   final VoidCallback? onBuyStock, onPurchases, onGroupBuying;
 
   @override
@@ -12414,6 +12435,27 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 class _WorkspaceCatalogueSurfaceState
     extends State<_WorkspaceCatalogueSurface> {
   final _stockActionKeys = <String, GlobalKey>{};
+  final Set<Object> _localExpandedActions = {};
+  Object get _actionScope =>
+      widget.session.workspaceStockHistoryScope()?.key ??
+      widget.session.activeWorkspace?.id ??
+      widget.session.workspaceId ??
+      widget.session;
+  bool get _actionsExpanded =>
+      widget.actionsExpanded ?? _localExpandedActions.contains(_actionScope);
+  void _toggleActions() {
+    unawaited(HapticFeedback.selectionClick());
+    if (widget.onToggleActions case final toggle?) {
+      toggle();
+    } else {
+      setState(() {
+        if (!_localExpandedActions.remove(_actionScope)) {
+          _localExpandedActions.add(_actionScope);
+        }
+      });
+    }
+  }
+
   bool _retryingInventory = false;
 
   Future<void> _retryInventory() async {
@@ -12986,137 +13028,311 @@ class _WorkspaceCatalogueSurfaceState
     if (widget.entryOnly) return _entryPage;
     return SizedBox.expand(
       key: const Key('work-dashboard-catalogue-screen'),
-      child: Column(
-        children: [
-          SingleChildScrollView(
-            key: const Key('work-stock-entry-controls'),
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                TextButton.icon(
-                  key: const Key('work-quick-add-products'),
-                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                  onPressed: () async {
-                    await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => _WorkspaceCatalogueSurface(
-                          session: widget.session,
-                          entryOnly: true,
-                        ),
-                      ),
-                    );
-                    if (mounted) setState(() {});
-                  },
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add products'),
-                ),
-                if (widget.onBuyStock != null)
-                  TextButton(
-                    key: const Key('work-quick-buy'),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    onPressed: widget.onBuyStock,
-                    child: const Text('Buy stock'),
-                  ),
-                if (widget.onPurchases != null)
-                  TextButton(
-                    key: const Key('work-incoming-purchases'),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    onPressed: widget.onPurchases,
-                    child: const Text('Purchases'),
-                  ),
-                if (widget.onGroupBuying != null)
-                  TextButton(
-                    key: const Key('work-quick-group-buy'),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    onPressed: widget.onGroupBuying,
-                    child: const Text('Buy together'),
-                  ),
-              ],
+      child: _StockQuickActionsFrame(
+        expanded: _actionsExpanded,
+        onToggle: _toggleActions,
+        actions: [
+          TextButton(
+            key: const Key('work-quick-add-products'),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(48, 48),
+              alignment: Alignment.centerLeft,
             ),
-          ),
-          ListenableBuilder(
-            listenable: widget.session,
-            builder: (context, _) {
-              final error = widget.session.workspaceInventoryError;
-              if (error == null) return const SizedBox.shrink();
-              return Padding(
-                key: const Key('store-inventory-save-error'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(error, style: const TextStyle(color: MoolColors.ink)),
-                    TextButton(
-                      onPressed: _retryingInventory ? null : _retryInventory,
-                      child: Text(
-                        _retryingInventory ? 'Saving…' : 'Retry stock save',
-                      ),
-                    ),
-                  ],
+            onPressed: () async {
+              await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => _WorkspaceCatalogueSurface(
+                    session: widget.session,
+                    entryOnly: true,
+                  ),
                 ),
               );
+              if (mounted) setState(() {});
             },
+            child: const Text('Add products'),
           ),
-          Expanded(
-            child: StoreAddProductSheet(
-              key: ValueKey(
-                'store-stock-${widget.session.activeWorkspace?.id ?? widget.session.workspaceId}',
+          if (widget.onBuyStock != null)
+            TextButton(
+              key: const Key('work-quick-buy'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                alignment: Alignment.centerLeft,
               ),
-              embedded: true,
-              stockOnly: true,
-              recentSearches: widget.session.workspaceRecentSearches('stock'),
-              catalogue: const [],
-              ownedProducts: List.of(widget.session.workspaceCatalogueItems),
-              createProduct: (barcode) => _blankProduct(barcode: barcode),
-              scanBarcode: () => showStoreProductScanner(context),
-              onSelected: _edit,
-              stockStatementBuilder: (products, count, vertical, loadMore) =>
-                  _StoreStockStatementTable(
-                    products: products,
-                    visibleCount: count,
-                    vertical: vertical,
-                    loadMore: loadMore,
-                    rowBuilder:
-                        (product, horizontal, frozenWidth, widths, height) =>
-                            _WorkspaceProductRow(
-                              product: product,
-                              session: widget.session,
-                              owned: true,
-                              statement: true,
-                              horizontal: horizontal,
-                              frozenWidth: frozenWidth,
-                              statementWidths: widths,
-                              statementHeight: height,
-                              stockActionKey: _stockActionKeys.putIfAbsent(
-                                product.id,
-                                () => GlobalKey(),
-                              ),
-                              onEdit: () => _edit(product),
-                              onChangePrice: () =>
-                                  _edit(product, field: 'sellingPrice'),
-                              onUpdateStock: () =>
-                                  _edit(product, field: 'stock'),
-                              onEditField: (field) =>
-                                  _edit(product, field: field),
-                              onTogglePublic: () => _togglePublic(product),
-                            ),
-                  ),
+              onPressed: widget.onBuyStock,
+              child: const Text('Buy stock'),
             ),
-          ),
+          if (widget.onPurchases != null)
+            TextButton(
+              key: const Key('work-incoming-purchases'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                alignment: Alignment.centerLeft,
+              ),
+              onPressed: widget.onPurchases,
+              child: const Text('Purchases'),
+            ),
+          if (widget.onGroupBuying != null)
+            TextButton(
+              key: const Key('work-quick-group-buy'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                alignment: Alignment.centerLeft,
+              ),
+              onPressed: widget.onGroupBuying,
+              child: const Text('Buy together'),
+            ),
         ],
+        child: Column(
+          children: [
+            ListenableBuilder(
+              listenable: widget.session,
+              builder: (context, _) {
+                final error = widget.session.workspaceInventoryError;
+                if (error == null) return const SizedBox.shrink();
+                return Padding(
+                  key: const Key('store-inventory-save-error'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        error,
+                        style: const TextStyle(color: MoolColors.ink),
+                      ),
+                      TextButton(
+                        onPressed: _retryingInventory ? null : _retryInventory,
+                        child: Text(
+                          _retryingInventory ? 'Saving…' : 'Retry stock save',
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            Expanded(
+              child: StoreAddProductSheet(
+                key: ValueKey(
+                  'store-stock-${widget.session.activeWorkspace?.id ?? widget.session.workspaceId}',
+                ),
+                embedded: true,
+                stockOnly: true,
+                recentSearches: widget.session.workspaceRecentSearches('stock'),
+                catalogue: const [],
+                ownedProducts: List.of(widget.session.workspaceCatalogueItems),
+                createProduct: (barcode) => _blankProduct(barcode: barcode),
+                scanBarcode: () => showStoreProductScanner(context),
+                onSelected: _edit,
+                stockStatementBuilder: (products, count, vertical, loadMore) =>
+                    _StoreStockStatementTable(
+                      products: products,
+                      bottomClearance: _actionsExpanded
+                          ? 0
+                          : _stockQuickTabHeight(context) + 6,
+                      visibleCount: count,
+                      vertical: vertical,
+                      loadMore: loadMore,
+                      rowBuilder:
+                          (product, horizontal, frozenWidth, widths, height) =>
+                              _WorkspaceProductRow(
+                                product: product,
+                                session: widget.session,
+                                owned: true,
+                                statement: true,
+                                horizontal: horizontal,
+                                frozenWidth: frozenWidth,
+                                statementWidths: widths,
+                                statementHeight: height,
+                                stockActionKey: _stockActionKeys.putIfAbsent(
+                                  product.id,
+                                  () => GlobalKey(),
+                                ),
+                                onEdit: () => _edit(product),
+                                onChangePrice: () =>
+                                    _edit(product, field: 'sellingPrice'),
+                                onUpdateStock: () =>
+                                    _edit(product, field: 'stock'),
+                                onEditField: (field) =>
+                                    _edit(product, field: field),
+                                onTogglePublic: () => _togglePublic(product),
+                              ),
+                    ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+double _stockQuickTabHeight(BuildContext context) {
+  final painter = TextPainter(
+    text: const TextSpan(
+      text: 'Quick actions',
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  final height = painter.width + 40;
+  painter.dispose();
+  return height;
+}
+
+/// Stock-only placement of the approved manual right-edge interaction.
+/// Keeps the table under the same parents while expanding/collapsing.
+class _StockQuickActionsFrame extends StatelessWidget {
+  const _StockQuickActionsFrame({
+    required this.child,
+    required this.actions,
+    required this.expanded,
+    required this.onToggle,
+  });
+  final Widget child;
+  final List<Widget> actions;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final desiredHeight = _stockQuickTabHeight(context);
+      final short = box.maxHeight < desiredHeight + 12;
+      final tabHeight = short ? 48.0 : desiredHeight;
+      final panelWidth = (MediaQuery.textScalerOf(context).scale(100) + 20)
+          .clamp(120.0, box.maxWidth * .48);
+      final label = expanded ? 'Hide Quick actions' : 'Show Quick actions';
+      final toggle = Tooltip(
+        message: label,
+        child: Semantics(
+          button: true,
+          label: label,
+          expanded: expanded,
+          excludeSemantics: true,
+          child: Material(
+            color: const Color(0xFFF0F1F6),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              bottomLeft: Radius.circular(12),
+            ),
+            child: InkWell(
+              key: const Key('work-stock-actions-toggle'),
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 48,
+                height: expanded ? 48 : tabHeight,
+                child: expanded || short
+                    ? Icon(
+                        expanded ? Icons.chevron_right : Icons.chevron_left,
+                        color: MoolColors.navy,
+                        size: 20,
+                      )
+                    : RotatedBox(
+                        quarterTurns: 3,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.expand_less,
+                              size: 18,
+                              color: MoolColors.navy,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Quick actions',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: MoolColors.navy,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return ColoredBox(
+        color: const Color(0xFFF7F8FC),
+        child: Stack(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ClipPath(
+                    key: const Key('work-stock-action-content'),
+                    clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
+                    child: child,
+                  ),
+                ),
+                if (expanded)
+                  SizedBox(
+                    key: const Key('work-stock-actions-panel'),
+                    width: panelWidth,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: ListView.separated(
+                            key: const Key('work-stock-entry-controls'),
+                            padding: const EdgeInsets.fromLTRB(6, 6, 4, 6),
+                            itemCount: actions.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 4),
+                            itemBuilder: (_, i) => Material(
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                                side: const BorderSide(
+                                  color: Color(0xFFE5E8F1),
+                                ),
+                              ),
+                              child: actions[i],
+                            ),
+                          ),
+                        ),
+                        Align(alignment: Alignment.centerRight, child: toggle),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            if (!expanded) Positioned(right: 0, bottom: 0, child: toggle),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _StockActionCutout extends CustomClipper<Path> {
+  const _StockActionCutout(this.height);
+  final double height;
+  @override
+  Path getClip(Size size) {
+    final full = Path()..addRect(Offset.zero & size);
+    if (height == 0) return full;
+    final notch = Path()
+      ..addRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(size.width - 54, size.height - height, 60, height + 6),
+          topLeft: const Radius.circular(18),
+          bottomLeft: const Radius.circular(18),
+        ),
+      );
+    return Path.combine(PathOperation.difference, full, notch);
+  }
+
+  @override
+  bool shouldReclip(_StockActionCutout oldClipper) =>
+      oldClipper.height != height;
 }
 
 // ignore: unused_element
@@ -13470,7 +13686,9 @@ class _StoreStockStatementTable extends StatefulWidget {
     required this.vertical,
     required this.loadMore,
     required this.rowBuilder,
+    this.bottomClearance = 0,
   });
+  final double bottomClearance;
   final List<WorkspaceCatalogueItem> products;
   final int visibleCount;
   final ScrollController vertical;
@@ -13658,8 +13876,10 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
                                           ),
                                         ),
                                       ),
-                                    const SliverToBoxAdapter(
-                                      child: SizedBox(height: 12),
+                                    SliverToBoxAdapter(
+                                      child: SizedBox(
+                                        height: 12 + widget.bottomClearance,
+                                      ),
                                     ),
                                   ],
                                 ),

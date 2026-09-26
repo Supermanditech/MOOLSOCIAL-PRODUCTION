@@ -9,6 +9,28 @@ general preferences only where their specific accepted design permits it.
 
 ## Authority, coverage and conflict handling
 
+### Approved-screen freeze — explicit founder amendment, 26 September 2026
+
+- An approved screen's layout, wording, styling, controls and interactions stay
+  unchanged until the founder explicitly requests or approves the specific change.
+  A related feature request, general polish instruction or move into a section
+  does not authorize redesigning that section's approved screen.
+- Before a proposed change touches an approved screen, Codex must warn the founder:
+  identify the screen, the exact approved behavior/layout affected, why the change
+  is needed, and what will remain unchanged. Wait for explicit scoped approval;
+  do not silently broaden it to neighboring screens or shared consumers.
+- Unexpected impacts discovered during implementation must be reported before
+  changing those approved surfaces. Register the issue and preserve the approved
+  version until direction is given; tests alone do not grant visual approval.
+- Current scoped correction: Stock's new horizontal Add products / Buy stock /
+  Purchases / Buy together toolbar is rejected. Keep those existing actions in
+  Stock but use the previously approved right-edge Quick actions interaction.
+  Preserve Stock search, table, divider, typography, editor and data owners.
+  Home remains analytics-only. This supersedes the older Home-only procurement
+  placement and the latest horizontal Stock action row, not other approvals.
+- This is a durable founder instruction, not a claim of automatic platform-wide
+  enforcement. Record future scoped exceptions explicitly.
+
 - Coverage amendment23September: includes the extended conversation history
   supplied by the founder and accessible saved evidence through the current
   OPPO r66.38 review. The founder requests continuity over the last30 days;

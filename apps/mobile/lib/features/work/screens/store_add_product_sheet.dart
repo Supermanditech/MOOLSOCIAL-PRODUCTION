@@ -2319,7 +2319,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                                 Text(
                                   widget.stockOnly
                                       ? (widget.ownedProducts.isEmpty
-                                            ? 'No products saved yet. Tap Add products above to add your stock.'
+                                            ? 'No products saved yet. Open Quick actions → Add products to add your stock.'
                                             : 'No matching stock. Try another search or filter.')
                                       : _savedOnly && _saved.isEmpty
                                       ? 'Your shortlist is empty. Tap the bookmark on a product, then review it before adding to Store.'

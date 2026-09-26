@@ -1946,6 +1946,13 @@ void main() {
       await tester.pumpAndSettle();
     }
     final salesRecords = find.byKey(const ValueKey('work-finance-payments'));
+    final stockActions = find.byKey(const Key('work-stock-actions-toggle'));
+    if (finder.evaluate().isEmpty &&
+        stockActions.evaluate().isNotEmpty &&
+        find.byKey(const Key('work-stock-actions-panel')).evaluate().isEmpty) {
+      await tester.tap(stockActions);
+      await tester.pumpAndSettle();
+    }
     final vertical = find.byWidgetPredicate(
       (widget) =>
           widget is Scrollable &&
@@ -2239,6 +2246,27 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final edge = find.byKey(const Key('work-stock-actions-toggle'));
+      final table = find.byKey(const Key('work-stock-action-content'));
+      final fullWidth = tester.getSize(table).width;
+      expect(find.byKey(const Key('work-stock-entry-controls')), findsNothing);
+      expect(
+        tester.getRect(edge).right,
+        closeTo(tester.getRect(table).right, 1),
+      );
+      await tester.tap(edge);
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const Key('work-stock-actions-panel'));
+      expect(
+        tester.getRect(table).right,
+        lessThanOrEqualTo(tester.getRect(panel).left),
+      );
+      expect(tester.getSize(table).width, lessThan(fullWidth));
+      await tester.tap(edge);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(table).width, fullWidth);
+      await tester.tap(edge);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-stock-entry-controls')),
@@ -14653,7 +14681,7 @@ void main() {
     expect(find.textContaining('0 products'), findsNothing);
     expect(
       find.text(
-        'No products saved yet. Tap Add products above to add your stock.',
+        'No products saved yet. Open Quick actions → Add products to add your stock.',
       ),
       findsOneWidget,
     );
