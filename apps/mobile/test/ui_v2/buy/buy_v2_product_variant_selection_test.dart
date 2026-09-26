@@ -303,6 +303,211 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
 }
 
 void main() {
+  testWidgets(
+    'Public polish discovery cards expose validated Add and quantity controls',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      for (final scale in [1.0, 2.0]) {
+        for (final id in ['s-milk', 'w-rice']) {
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          final current = session.product(id);
+          session.openProduct(id);
+          final other = session
+              .productDiscoveryFor(
+                current,
+                includeVariants: true,
+                excludedProductIds: session
+                    .productContinuationsFor(current)
+                    .map((p) => p.id)
+                    .toSet(),
+              )
+              .first;
+          session.openProduct(other.id);
+          session.openProduct(id);
+          expect(
+            session
+                .productDiscoveryFor(
+                  current,
+                  source: session.recentlyViewedProductsFor(
+                    current.destination,
+                  ),
+                  excludedProductIds: session
+                      .productContinuationsFor(current)
+                      .map((p) => p.id)
+                      .toSet(),
+                  includeVariants: true,
+                )
+                .map((p) => p.id),
+            contains(other.id),
+            reason: '$id $scale',
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(scale),
+                  disableAnimations: true,
+                ),
+                child: child!,
+              ),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: current.destination,
+                initialView: BuyV2View.product,
+                productId: id,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final card = find.byKey(
+            ValueKey('buy-product-continuation-${other.id}'),
+          );
+          final scroll = find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$id')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            card,
+            350,
+            scrollable: scroll,
+            maxScrolls: 60,
+          );
+          final add = find.descendant(
+            of: card,
+            matching: find.byKey(ValueKey('buy-product-primary-${other.id}')),
+          );
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(other.id), other.minimumOrder);
+          expect(session.quantityFor(id), 0);
+          expect(
+            session.selectedProductId,
+            id,
+            reason: 'Adding must not navigate to a different product.',
+          );
+          expect(
+            find.descendant(
+              of: card,
+              matching: find.byKey(
+                ValueKey('buy-product-quantity-${other.id}'),
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(session.cartLines.single.product.storeId, other.storeId);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          session.dispose();
+          core.dispose();
+        }
+      }
+    },
+  );
+
+  testWidgets('Public polish hero and actions remain compact and readable', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    for (final scale in [1.0, 2.0]) {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      session.openProduct('s-milk');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+              disableAnimations: true,
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialView: BuyV2View.product,
+            productId: 's-milk',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final price = find.byKey(const ValueKey('buy-product-hero-price-s-milk'));
+      final add = find.byKey(const ValueKey('buy-product-primary-s-milk'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(price).style!.color, const Color(0xFF24272B));
+      final addFace = find.descendant(
+        of: add,
+        matching: find.byType(BuyV2AddFace),
+      );
+      expect(addFace, findsOneWidget);
+      expect(tester.getSize(addFace), const Size(44, 32));
+      if (scale == 1) {
+        final hero = tester.getRect(
+          find.byKey(const ValueKey('buy-product-purchase-hero-s-milk')),
+        );
+        expect(hero.width, greaterThan(300));
+        expect(hero.height, lessThan(145));
+        expect(tester.getRect(add).right, lessThanOrEqualTo(hero.right));
+        final title = tester.getRect(
+          find.byKey(const ValueKey('buy-product-title-s-milk')),
+        );
+        expect(tester.getRect(add).top, closeTo(title.top, 1));
+        expect(tester.getRect(price).left, greaterThan(title.right));
+      }
+      expect(
+        tester.getRect(add).left - tester.getRect(price).right,
+        lessThanOrEqualTo(16),
+      );
+      final scroll = find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-product-s-milk')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      for (final key in [
+        'buy-product-actions-scroll-s-milk',
+        'buy-product-assurance-scroll-s-milk',
+      ]) {
+        final row = find.byKey(ValueKey(key));
+        await tester.scrollUntilVisible(row, 250, scrollable: scroll);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<SingleChildScrollView>(row).scrollDirection,
+          Axis.horizontal,
+        );
+        for (final label in [
+          'Compare prices',
+          'Cash on Delivery',
+          'Customer support',
+        ]) {
+          final texts = find.descendant(of: row, matching: find.text(label));
+          for (final text in tester.widgetList<Text>(texts)) {
+            expect(text.softWrap, isFalse);
+          }
+        }
+        await tester.drag(row, const Offset(-240, 0));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      session.dispose();
+      core.dispose();
+    }
+  });
+
   testWidgets('CAT08 paths retain exact variant through Cart and Saved', (
     tester,
   ) async {
@@ -3606,7 +3811,7 @@ void main() {
               .first,
         );
         final priceSummary = find.byKey(
-          ValueKey('buy-wholesale-price-summary-$selectedId'),
+          ValueKey('buy-product-purchase-hero-$selectedId'),
         );
         expect(
           find.descendant(

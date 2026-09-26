@@ -393,7 +393,7 @@ void main() {
         );
         final alternateCard = find.descendant(
           of: alternate,
-          matching: find.byKey(ValueKey('buy-product-$alternateId')),
+          matching: find.byKey(ValueKey('buy-comparison-open-$alternateId')),
         );
         await tester.ensureVisible(alternateCard);
         await tester.tap(alternateCard);
@@ -611,7 +611,7 @@ void main() {
         );
         final sku = find.descendant(
           of: option,
-          matching: find.byKey(ValueKey('buy-product-$id')),
+          matching: find.byKey(ValueKey('buy-comparison-open-$id')),
         );
         await tester.ensureVisible(sku);
         await tester.tap(sku);

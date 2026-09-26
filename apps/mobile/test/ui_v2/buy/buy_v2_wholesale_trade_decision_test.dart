@@ -466,7 +466,7 @@ void main() {
       await tester.scrollUntilVisible(add, 160, scrollable: productScroll);
       await tester.pumpAndSettle();
       expect(add.hitTestable(), findsOneWidget);
-      expect(tester.getSize(add).width, 88);
+      expect(tester.getSize(add).width, 44);
       expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
       expect(find.descendant(of: inline, matching: add), findsOneWidget);
       expect(

@@ -9321,49 +9321,69 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final add = ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 76,
-                  minHeight: BuyV2Metrics.minimumTap,
-                ),
-                child: Semantics(
-                  button: true,
-                  label: !decision.canAdd
-                      ? 'Review ${product.customerTitle}. ${decision.statusLabel}'
-                      : quantity > 0
-                      ? '${product.customerTitle} is in Cart'
-                      : 'Add ${product.customerTitle} to cart',
-                  child: FilledButton.tonalIcon(
-                    key: ValueKey(
-                      decision.canAdd
-                          ? 'buy-recently-viewed-add-${product.id}'
-                          : 'buy-recently-viewed-review-${product.id}',
-                    ),
-                    onPressed: decision.canAdd ? onAdd : onOpen,
-                    icon: Icon(
-                      !decision.canAdd
-                          ? Icons.info_outline_rounded
-                          : quantity > 0
-                          ? Icons.check_rounded
-                          : Icons.add_shopping_cart_rounded,
-                      size: 17,
-                    ),
-                    label: Text(
-                      !decision.canAdd
-                          ? 'Details'
-                          : quantity > 0
-                          ? 'Added'
-                          : 'Add',
-                    ),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(76, BuyV2Metrics.minimumTap),
-                      padding: const EdgeInsets.symmetric(horizontal: 9),
-                      textStyle: Theme.of(context).textTheme.labelLarge
-                          ?.copyWith(fontSize: 10, fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ),
-              );
+              final add = decision.canAdd && quantity == 0
+                  ? Semantics(
+                      button: true,
+                      label: 'Add ${product.customerTitle} to cart',
+                      child: TextButton(
+                        key: ValueKey('buy-recently-viewed-add-${product.id}'),
+                        onPressed: onAdd,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const BuyV2AddFace(),
+                      ),
+                    )
+                  : ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 76,
+                        minHeight: BuyV2Metrics.minimumTap,
+                      ),
+                      child: Semantics(
+                        button: true,
+                        label: !decision.canAdd
+                            ? 'Review ${product.customerTitle}. ${decision.statusLabel}'
+                            : quantity > 0
+                            ? '${product.customerTitle} is in Cart'
+                            : 'Add ${product.customerTitle} to cart',
+                        child: FilledButton.tonalIcon(
+                          key: ValueKey(
+                            decision.canAdd
+                                ? 'buy-recently-viewed-add-${product.id}'
+                                : 'buy-recently-viewed-review-${product.id}',
+                          ),
+                          onPressed: decision.canAdd ? onAdd : onOpen,
+                          icon: Icon(
+                            !decision.canAdd
+                                ? Icons.info_outline_rounded
+                                : quantity > 0
+                                ? Icons.check_rounded
+                                : Icons.add_shopping_cart_rounded,
+                            size: 17,
+                          ),
+                          label: Text(
+                            !decision.canAdd
+                                ? 'Details'
+                                : quantity > 0
+                                ? 'Added'
+                                : 'Add',
+                          ),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(
+                              76,
+                              BuyV2Metrics.minimumTap,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            textStyle: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                      ),
+                    );
               final details = Semantics(
                 button: true,
                 label:
@@ -12182,8 +12202,8 @@ class _FeaturedProductAction extends StatelessWidget {
                                 ? BuyV2Colors.softOrange
                                 : rxBlocked
                                 ? BuyV2Colors.navy
-                                : Colors.white,
-                            elevation: 3,
+                                : Colors.transparent,
+                            elevation: requiresOfferReview || rxBlocked ? 3 : 0,
                             shadowColor: const Color(0x33000040),
                             borderRadius: BorderRadius.circular(12),
                             child: InkWell(
@@ -12202,14 +12222,14 @@ class _FeaturedProductAction extends StatelessWidget {
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: SizedBox(
-                                width: 62,
+                                width: 44,
                                 height: BuyV2Metrics.minimumTap,
                                 child: Center(
                                   child: rxBlocked
                                       ? const Text(
                                           'Rx',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: Colors.transparent,
                                             fontSize: 10,
                                             fontWeight: FontWeight.w900,
                                           ),
@@ -12220,25 +12240,7 @@ class _FeaturedProductAction extends StatelessWidget {
                                           color: BuyV2Colors.orange,
                                           size: 23,
                                         )
-                                      : const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.add_rounded,
-                                              color: BuyV2Colors.navy,
-                                              size: 19,
-                                            ),
-                                            SizedBox(width: 2),
-                                            Text(
-                                              'Add',
-                                              style: TextStyle(
-                                                color: BuyV2Colors.navy,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                      : const BuyV2AddFace(),
                                 ),
                               ),
                             ),
@@ -12432,6 +12434,24 @@ class _ProductGlance extends StatelessWidget {
   );
 }
 
+/// Shared Shop SKU Add appearance; surrounding controls retain their callbacks.
+class BuyV2AddFace extends StatelessWidget {
+  const BuyV2AddFace({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 44,
+    height: 32,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: const Color(0x66000080)),
+    ),
+    child: const Icon(Icons.add_rounded, color: BuyV2Colors.navy, size: 20),
+  );
+}
+
 class BuyV2ProductCard extends StatelessWidget {
   const BuyV2ProductCard({
     super.key,
@@ -12579,32 +12599,29 @@ class BuyV2ProductCard extends StatelessWidget {
                         },
                         borderRadius: BorderRadius.circular(11),
                         child: Center(
-                          child: Container(
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: requiresOfferReview
-                                  ? BuyV2Colors.softOrange
-                                  : rxBlocked
-                                  ? BuyV2Colors.navy
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: requiresOfferReview
-                                    ? BuyV2Colors.orange
-                                    : rxBlocked
-                                    ? BuyV2Colors.navy
-                                    : const Color(0x66000080),
-                              ),
-                            ),
-                            child: requiresOfferReview
-                                ? const Icon(
-                                    Icons.info_outline_rounded,
-                                    color: BuyV2Colors.orange,
-                                    size: 20,
-                                  )
-                                : rxBlocked
-                                ? inlineIconOnly
+                          child: !requiresOfferReview && !rxBlocked
+                              ? const BuyV2AddFace()
+                              : Container(
+                                  height: 32,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: requiresOfferReview
+                                        ? BuyV2Colors.softOrange
+                                        : BuyV2Colors.navy,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: requiresOfferReview
+                                          ? BuyV2Colors.orange
+                                          : BuyV2Colors.navy,
+                                    ),
+                                  ),
+                                  child: requiresOfferReview
+                                      ? const Icon(
+                                          Icons.info_outline_rounded,
+                                          color: BuyV2Colors.orange,
+                                          size: 20,
+                                        )
+                                      : inlineIconOnly
                                       ? const Icon(
                                           Icons.medication_outlined,
                                           color: Colors.white,
@@ -12617,33 +12634,8 @@ class BuyV2ProductCard extends StatelessWidget {
                                             fontSize: 9,
                                             fontWeight: FontWeight.w900,
                                           ),
-                                        )
-                                : inlineIconOnly
-                                ? const Icon(
-                                    Icons.add_rounded,
-                                    color: BuyV2Colors.navy,
-                                    size: 20,
-                                  )
-                                : const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.add_rounded,
-                                        color: BuyV2Colors.navy,
-                                        size: 17,
-                                      ),
-                                      SizedBox(width: 3),
-                                      Text(
-                                        'Add',
-                                        style: TextStyle(
-                                          color: BuyV2Colors.navy,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
+                                ),
                         ),
                       ),
                     ),

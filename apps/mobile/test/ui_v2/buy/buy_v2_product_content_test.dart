@@ -553,13 +553,14 @@ void main() {
         expect(rect.left, greaterThanOrEqualTo(bounds.left));
         expect(rect.right, lessThanOrEqualTo(bounds.right + .1));
       }
-      if (scale == 1) {
-        expect(rects[1].top, closeTo(rects[0].top, .1));
-        expect(rects[2].top, closeTo(rects[0].top, .1));
-      } else {
-        expect(rects[1].top, greaterThanOrEqualTo(rects[0].bottom));
-        expect(rects[2].top, greaterThanOrEqualTo(rects[1].bottom));
-      }
+      expect(rects[1].top, closeTo(rects[0].top, .1));
+      expect(rects[2].top, closeTo(rects[0].top, .1));
+      expect(rects[1].left, greaterThanOrEqualTo(rects[0].right));
+      expect(rects[2].left, greaterThanOrEqualTo(rects[1].right));
+      final horizontal = tester.widget<SingleChildScrollView>(
+        find.byKey(const ValueKey('buy-product-assurance-scroll-s-milk')),
+      );
+      expect(horizontal.scrollDirection, Axis.horizontal);
       await tester.ensureVisible(controls[1]);
       await tester.pumpAndSettle();
       await tester.tap(controls[1]);
@@ -2094,6 +2095,13 @@ void main() {
       find.byKey(ValueKey('buy-product-discount-${product.id}')),
       findsOneWidget,
     );
+    final heroMrp = find.byKey(ValueKey('buy-product-hero-mrp-${product.id}'));
+    expect(heroMrp, findsOneWidget);
+    expect(tester.widget<Text>(heroMrp).data, '₹100');
+    expect(
+      tester.widget<Text>(heroMrp).style!.decoration,
+      TextDecoration.lineThrough,
+    );
     await tester.tap(action.hitTestable());
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsNothing);
@@ -2131,6 +2139,7 @@ void main() {
     facts.price = 110;
     session.refreshProductFacts(product.id);
     await tester.pumpAndSettle();
+    expect(heroMrp, findsNothing);
     expect(
       find.byKey(ValueKey('buy-product-discount-${product.id}')),
       findsNothing,
