@@ -14,7 +14,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show showBuyV2ShoppingHelp;
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
-    show buyV2BuyerDeliveryPromise;
+    show buyV2BuyerDeliveryPromise, BuyV2ActionStyle;
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
@@ -3504,7 +3504,8 @@ void main() {
         find.descendant(of: description, matching: find.byType(Ink)).first,
       );
       final decoration = selected.decoration! as BoxDecoration;
-      expect(decoration.gradient, isA<LinearGradient>());
+      expect(decoration.gradient, isNull);
+      expect(decoration.color, BuyV2ActionStyle.pressedFill);
       expect(decoration.border, isNotNull);
       expect(tester.takeException(), isNull);
     },

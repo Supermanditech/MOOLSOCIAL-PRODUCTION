@@ -987,6 +987,94 @@ abstract final class BuyV2Colors {
   static const softBlue = Color(0xFFEDECFF);
 }
 
+/// Shared public commerce action palette; geometry and callbacks stay with
+/// the existing controls. Primary actions use a raised cool-grey surface without a gradient.
+abstract final class BuyV2ActionStyle {
+  static const gradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE5EAFB), Color(0xFFE5F3F0)],
+  );
+  static const primaryFill = Color(0xFFE7EAF0);
+  static const pressedFill = Color(0xFFDCE1E8);
+  static const primaryForeground = Color(0xFF25252A);
+  static const primaryBorder = Color(0xFFC6CDD7);
+  static const foreground = BuyV2Colors.navy;
+  static const border = Color(0x66000080);
+
+  static BoxDecoration selectionSurface({
+    required bool selected,
+    double radius = 12,
+  }) => BoxDecoration(
+    color: selected ? pressedFill : primaryFill,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(
+      color: selected ? primaryForeground : primaryBorder,
+      width: selected ? 1.4 : 1,
+    ),
+  );
+
+  static Widget background(
+    BuildContext context,
+    Set<WidgetState> states,
+    Widget? child,
+  ) => Ink(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: states.contains(WidgetState.disabled)
+            ? BuyV2Colors.line
+            : states.contains(WidgetState.focused)
+            ? primaryForeground
+            : primaryBorder,
+      ),
+      color: states.contains(WidgetState.disabled)
+          ? const Color(0xFFF0F1F4)
+          : states.contains(WidgetState.pressed)
+          ? pressedFill
+          : primaryFill,
+    ),
+    child: child,
+  );
+
+  static ButtonStyle button([ButtonStyle? layout]) =>
+      (layout ?? const ButtonStyle()).copyWith(
+        minimumSize:
+            layout?.minimumSize ?? const WidgetStatePropertyAll(Size(44, 44)),
+        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : primaryForeground,
+        ),
+        iconColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : primaryForeground,
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        elevation: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? 0
+              : states.contains(WidgetState.pressed)
+              ? 1
+              : 3,
+        ),
+        shadowColor: const WidgetStatePropertyAll(Color(0x665C5C68)),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: WidgetStateProperty.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.disabled)
+                ? BuyV2Colors.line
+                : primaryBorder,
+          ),
+        ),
+        backgroundBuilder: background,
+      );
+}
+
 abstract final class BuyV2Metrics {
   static const maxWidth = 520.0;
   static const railWidth = 94.0;

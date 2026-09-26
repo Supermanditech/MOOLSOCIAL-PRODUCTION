@@ -236,6 +236,146 @@ void main() {
     );
   }
 
+  test('Action fills retain readable enabled and disabled contrast', () {
+    double contrast(Color foreground, Color background) {
+      final a = foreground.computeLuminance();
+      final b = background.computeLuminance();
+      return a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05);
+    }
+
+    for (final fill in [
+      BuyV2ActionStyle.primaryFill,
+      BuyV2ActionStyle.pressedFill,
+    ]) {
+      expect(
+        contrast(BuyV2ActionStyle.primaryForeground, fill),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+    expect(
+      contrast(BuyV2Colors.muted, const Color(0xFFF0F1F4)),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
+  for (final enabled in [true, false]) {
+    testWidgets('Primary action preserves enabled behavior $enabled', (
+      tester,
+    ) async {
+      var calls = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: FilledButton(
+                style: BuyV2ActionStyle.button(),
+                onPressed: enabled ? () => calls++ : null,
+                child: const Text('Continue to payment'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final semantics = tester.ensureSemantics();
+
+      expect(
+        tester.getSemantics(find.byType(FilledButton)),
+        matchesSemantics(
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: enabled,
+          hasTapAction: enabled,
+          hasFocusAction: enabled,
+          isFocusable: enabled,
+          label: 'Continue to payment',
+        ),
+      );
+      await tester.tap(find.byType(FilledButton));
+      await tester.pumpAndSettle();
+      expect(calls, enabled ? 1 : 0);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  }
+
+  for (final orders in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('Public primary fills orders $orders scale $scale', (
+        tester,
+      ) async {
+        const size = Size(360, 800);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.addProduct('s-tomato');
+        if (orders) {
+          session.openOrders();
+        } else {
+          session.openCart();
+        }
+        await tester.pumpWidget(app(session, size: size, textScale: scale));
+        await tester.pumpAndSettle();
+        if (!orders) {
+          for (final scope in [
+            BuyV2CartScope.shop,
+            BuyV2CartScope.wholesale,
+            BuyV2CartScope.all,
+          ]) {
+            final selector = find.byKey(
+              ValueKey('buy-cart-scope-${scope.name}'),
+            );
+            await tester.ensureVisible(selector);
+            await tester.tap(selector);
+            await tester.pumpAndSettle();
+            expect(session.cartScope, scope);
+            expect(session.itemCount, 1);
+            expect(tester.takeException(), isNull);
+          }
+        }
+        final buttons = find.byType(FilledButton);
+        expect(buttons, findsWidgets);
+        for (final button in tester.widgetList<FilledButton>(buttons)) {
+          expect(
+            button.style?.backgroundBuilder,
+            isNotNull,
+            reason: 'Public primary actions must use the shared primary fill.',
+          );
+          expect(
+            button.style?.foregroundColor?.resolve({}),
+            BuyV2ActionStyle.primaryForeground,
+          );
+        }
+        final primary = orders
+            ? find.widgetWithText(FilledButton, 'Track order').first
+            : find.widgetWithText(FilledButton, 'Checkout');
+        await tester.ensureVisible(primary);
+        await tester.pumpAndSettle();
+        expect(primary.hitTestable(), findsOneWidget);
+        final face = tester.getSize(primary);
+        final label = tester.getSize(
+          find.descendant(
+            of: primary,
+            matching: find.text(orders ? 'Track order' : 'Checkout'),
+          ),
+        );
+        expect(
+          face.width,
+          lessThanOrEqualTo(label.width + 64),
+          reason: 'Primary action should fit its text with modest padding.',
+        );
+        expect(face.height, greaterThanOrEqualTo(44));
+        await tester.tap(primary);
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final wholesale in [false, true]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('C01 embedded Cart overlay $wholesale at $scale', (
@@ -4215,7 +4355,7 @@ void main() {
         expectConnectedOwner(tester, session, BuyV2Destination.shop);
         final referenceVersion = viewport.checkout
             ? 'cursor-post-r6633-20260923'
-            : 'cursor-a04-compact-quantity-review-20260925';
+            : 'cursor-approved-cool-grey-20260926';
         await expectLater(
           find.byType(BuyV2Screen),
           matchesGoldenFile(

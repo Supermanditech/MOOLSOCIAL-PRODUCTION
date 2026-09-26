@@ -168,11 +168,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF10085F), BuyV2Colors.navy],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: BuyV2ActionStyle.gradient,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Row(
@@ -182,12 +178,14 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                       height: 46,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .14),
+                        color: BuyV2ActionStyle.foreground.withValues(
+                          alpha: .14,
+                        ),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(
                         Icons.receipt_long_rounded,
-                        color: Colors.white,
+                        color: BuyV2ActionStyle.foreground,
                         size: 25,
                       ),
                     ),
@@ -209,7 +207,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                           Text(
                             order.title,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: BuyV2ActionStyle.foreground,
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
                             ),
@@ -217,7 +215,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                           Text(
                             taxInvoice?.invoiceNumber ?? order.id,
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: BuyV2Colors.muted,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                             ),
@@ -228,7 +226,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     Text(
                       buyV2Money(order.total),
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: BuyV2ActionStyle.foreground,
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                       ),
@@ -586,23 +584,28 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
               child: SizedBox(
                 width: double.infinity,
                 height: 48,
-                child: FilledButton.icon(
-                  key: ValueKey('buy-download-invoice-${order.id}'),
-                  onPressed: _downloading || !legalInvoiceReady
-                      ? null
-                      : _download,
-                  icon: _downloading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.download_rounded),
-                  label: Text(
-                    _downloading ? 'Preparing invoice' : 'Download invoice',
+                child: Align(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: FilledButton.icon(
+                    style: BuyV2ActionStyle.button(),
+                    key: ValueKey('buy-download-invoice-${order.id}'),
+                    onPressed: _downloading || !legalInvoiceReady
+                        ? null
+                        : _download,
+                    icon: _downloading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: BuyV2ActionStyle.primaryForeground,
+                            ),
+                          )
+                        : const Icon(Icons.download_rounded),
+                    label: Text(
+                      _downloading ? 'Preparing invoice' : 'Download invoice',
+                    ),
                   ),
                 ),
               ),

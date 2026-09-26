@@ -1605,9 +1605,10 @@ void main() {
 
         for (final x in [4, frame.width ~/ 2, frame.width - 5]) {
           final top = at(x, 10);
-          expect(top, BuyV2Colors.navy);
+          expect(top.computeLuminance(), greaterThan(.7));
+          expect(top, isNot(Colors.white));
           expect(
-            1.05 / (top.computeLuminance() + .05),
+            (top.computeLuminance() + .05) / .05,
             greaterThanOrEqualTo(4.5),
           );
           final bottom = at(x, frame.height - 10);
@@ -1824,7 +1825,7 @@ void main() {
             await tester.tap(entry);
             await tester.pumpAndSettle();
             expect(find.byKey(ValueKey(route.page)), findsOneWidget);
-            expectIcons(fromSettings ? Brightness.light : Brightness.dark);
+            expectIcons(Brightness.dark);
             if (!platformBack) {
               await captureReadability(
                 tester,
@@ -1841,7 +1842,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.byKey(ValueKey(route.page)), findsNothing);
             expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
-            expectIcons(Brightness.light);
+            expectIcons(Brightness.dark);
             expect(session.destination, BuyV2Destination.wholesale);
             expect(session.view, BuyV2View.catalogue);
             expect(session.quantityFor('s-milk'), 1);
@@ -1864,14 +1865,14 @@ void main() {
                 find.byKey(const ValueKey('buy-shopping-settings')),
                 findsNothing,
               );
-              expectIcons(Brightness.light);
+              expectIcons(Brightness.dark);
             }
           }
         }
         for (final destination in BuyV2Destination.values) {
           session.openDestination(destination);
           await tester.pumpAndSettle();
-          expectIcons(Brightness.light);
+          expectIcons(Brightness.dark);
           await expectBuySystemBarPaint(tester);
           await captureReadability(
             tester,
@@ -1882,11 +1883,11 @@ void main() {
         await tester.pumpAndSettle();
         tester.view.physicalSize = Size(size.height, size.width);
         await tester.pumpAndSettle();
-        expectIcons(Brightness.light);
+        expectIcons(Brightness.dark);
         await expectBuySystemBarPaint(tester);
         tester.view.physicalSize = size;
         await tester.pumpAndSettle();
-        expectIcons(Brightness.light);
+        expectIcons(Brightness.dark);
         expect(session.quantityFor('s-milk'), 1);
         expect(session.quantityFor('w-rice-50kg'), 1);
         expect(session.orders.map((order) => order.id), orderIds);

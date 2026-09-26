@@ -496,7 +496,14 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('buy-store-price-100')));
         final apply = find.byKey(const ValueKey('buy-store-filters-apply'));
         expect(apply.hitTestable(), findsOneWidget);
-        expect(tester.getSize(apply).width, greaterThanOrEqualTo(120));
+        final applySize = tester.getSize(apply);
+        final applyLabel = tester.getSize(
+          find.descendant(of: apply, matching: find.byType(Text)).first,
+        );
+        expect(applySize.width, greaterThanOrEqualTo(44));
+        expect(applySize.width, greaterThanOrEqualTo(applyLabel.width));
+        expect(applySize.width, lessThanOrEqualTo(applyLabel.width + 64));
+        expect(applySize.height, greaterThanOrEqualTo(44));
         expect(tester.getSize(apply).height, lessThanOrEqualTo(100));
         expect(tester.getRect(apply).bottom, lessThanOrEqualTo(752));
         if (profile.$2 == 1) {
@@ -2835,6 +2842,23 @@ void main() {
         await tester.tap(categoryControl);
         await tester.pumpAndSettle();
         await capture('categories');
+        expect(
+          find.byKey(const ValueKey('buy-category-search')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-offers-category-list')),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget(find.byKey(const ValueKey('buy-offers-category-list'))),
+          isA<GridView>(),
+        );
+        final offerSheet = tester.widget<DraggableScrollableSheet>(
+          find.byKey(const ValueKey('buy-category-draggable-sheet')),
+        );
+        expect(offerSheet.maxChildSize, 1);
+        expect(offerSheet.initialChildSize, lessThanOrEqualTo(1));
         final category = session
             .categoriesFor(BuyV2Destination.shop)
             .firstWhere((category) => category.id != 'all');
@@ -4032,11 +4056,14 @@ void main() {
                 .widget<AnnotatedRegion<SystemUiOverlayStyle>>(regions.last)
                 .value
                 .statusBarIconBrightness,
-            Brightness.light,
+            Brightness.dark,
           );
           final bars = find.byWidgetPredicate(
             (widget) =>
-                widget is ColoredBox && widget.color == BuyV2Colors.navy,
+                widget is DecoratedBox &&
+                widget.decoration is BoxDecoration &&
+                (widget.decoration as BoxDecoration).gradient ==
+                    BuyV2ActionStyle.gradient,
           );
           expect(
             bars.evaluate().any((element) {
@@ -4048,7 +4075,7 @@ void main() {
             }),
             isTrue,
             reason:
-                'R665 D03: light status icons must have a painted dark inset.',
+                'R665 D03: dark status icons must have a painted pale gradient inset.',
           );
         }
 

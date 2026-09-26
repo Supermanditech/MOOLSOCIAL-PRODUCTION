@@ -74,8 +74,8 @@ class _BuySystemBars extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
         systemNavigationBarColor: Colors.white,
         systemNavigationBarIconBrightness: Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
@@ -93,7 +93,11 @@ class _BuySystemBars extends StatelessWidget {
               right: 0,
               height: topInset,
               child: const IgnorePointer(
-                child: ColoredBox(color: BuyV2Colors.navy),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: BuyV2ActionStyle.gradient,
+                  ),
+                ),
               ),
             ),
         ],
@@ -3804,27 +3808,33 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
             key: const ValueKey('buy-cart-navigation-button'),
             width: 44,
             height: 44,
-            child: Material(
-              color: BuyV2Colors.navy,
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                key: const ValueKey('buy-mini-cart-drag-handle'),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: BuyV2Colors.navy,
                 borderRadius: BorderRadius.circular(14),
-                onTap: activate,
-                child: Center(
-                  child: Badge(
-                    label: Text(
-                      itemCount > 9 ? '9+' : '$itemCount',
-                      // The full count remains in the button's accessible name.
-                      // Keep this small badge from covering the Cart glyph.
-                      textScaler: MediaQuery.textScalerOf(
-                        context,
-                      ).clamp(maxScaleFactor: 1.3),
-                    ),
-                    child: const Icon(
-                      Icons.shopping_cart_outlined,
-                      color: Colors.white,
-                      size: 21,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  key: const ValueKey('buy-mini-cart-drag-handle'),
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: activate,
+                  child: Center(
+                    child: Badge(
+                      label: Text(
+                        itemCount > 9 ? '9+' : '$itemCount',
+                        // The full count remains in the button's accessible name.
+                        // Keep this small badge from covering the Cart glyph.
+                        textScaler: MediaQuery.textScalerOf(
+                          context,
+                        ).clamp(maxScaleFactor: 1.3),
+                      ),
+                      child: const Icon(
+                        Icons.shopping_cart_outlined,
+                        color: Colors.white,
+                        size: 21,
+                      ),
                     ),
                   ),
                 ),
@@ -3941,75 +3951,84 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                     child: SizedBox(
                       width: cartWidth,
                       height: cartHeight,
-                      child: Material(
-                        color: BuyV2Colors.navy,
-                        elevation: 3,
-                        shadowColor: BuyV2Colors.navy.withValues(alpha: .2),
-                        shape: RoundedRectangleBorder(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: BuyV2Colors.navy,
                           borderRadius: BorderRadius.circular(14),
-                          side: const BorderSide(color: BuyV2Colors.royal),
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: activate,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              children: [
-                                AnimatedSwitcher(
-                                  duration: BuyV2Motion.resolved(
-                                    context,
-                                    BuyV2Motion.stateChange,
-                                  ),
-                                  child: Icon(
-                                    acknowledgement == null
-                                        ? Icons.shopping_cart_outlined
-                                        : Icons.check_circle_rounded,
-                                    key: ValueKey(
-                                      acknowledgement == null
-                                          ? 'buy-mini-cart-icon'
-                                          : 'buy-mini-cart-added-icon',
+                        child: Material(
+                          color: Colors.transparent,
+                          elevation: 3,
+                          shadowColor: BuyV2Colors.navy.withValues(alpha: .2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: BuyV2Colors.royal),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: activate,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  AnimatedSwitcher(
+                                    duration: BuyV2Motion.resolved(
+                                      context,
+                                      BuyV2Motion.stateChange,
                                     ),
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    BuyV2FiniteValueTransition(
+                                    child: Icon(
+                                      acknowledgement == null
+                                          ? Icons.shopping_cart_outlined
+                                          : Icons.check_circle_rounded,
                                       key: ValueKey(
                                         acknowledgement == null
-                                            ? 'buy-cart-summary'
-                                            : 'buy-cart-acknowledgement',
+                                            ? 'buy-mini-cart-icon'
+                                            : 'buy-mini-cart-added-icon',
                                       ),
-                                      stateKey:
-                                          '$summaryText|$cartMessage|$itemCount|$total',
-                                      text: summaryText,
-                                      ownerSize: Size(
-                                        valueWidth,
-                                        itemSize.height,
-                                      ),
-                                      textAlign: TextAlign.start,
-                                      style: itemStyle,
+                                      color: Colors.white,
+                                      size: 18,
                                     ),
-                                    const SizedBox(height: 2),
-                                    BuyV2FiniteValueTransition(
-                                      key: const ValueKey('buy-cart-total'),
-                                      stateKey: '$total|$totalText',
-                                      text: totalText,
-                                      ownerSize: Size(
-                                        valueWidth,
-                                        totalSize.height,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      BuyV2FiniteValueTransition(
+                                        key: ValueKey(
+                                          acknowledgement == null
+                                              ? 'buy-cart-summary'
+                                              : 'buy-cart-acknowledgement',
+                                        ),
+                                        stateKey:
+                                            '$summaryText|$cartMessage|$itemCount|$total',
+                                        text: summaryText,
+                                        ownerSize: Size(
+                                          valueWidth,
+                                          itemSize.height,
+                                        ),
+                                        textAlign: TextAlign.start,
+                                        style: itemStyle,
                                       ),
-                                      textAlign: TextAlign.start,
-                                      style: totalStyle,
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                      const SizedBox(height: 2),
+                                      BuyV2FiniteValueTransition(
+                                        key: const ValueKey('buy-cart-total'),
+                                        stateKey: '$total|$totalText',
+                                        text: totalText,
+                                        ownerSize: Size(
+                                          valueWidth,
+                                          totalSize.height,
+                                        ),
+                                        textAlign: TextAlign.start,
+                                        style: totalStyle,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -4047,7 +4066,7 @@ class _BuyNotice extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 36, maxWidth: 248),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: BuyV2Colors.navy,
+              gradient: BuyV2ActionStyle.gradient,
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(
@@ -4062,7 +4081,7 @@ class _BuyNotice extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.info_outline_rounded,
-                  color: Colors.white,
+                  color: BuyV2ActionStyle.foreground,
                   size: 16,
                 ),
                 const SizedBox(width: 7),
@@ -4070,7 +4089,7 @@ class _BuyNotice extends StatelessWidget {
                   child: Text(
                     message,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: BuyV2ActionStyle.foreground,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),

@@ -169,7 +169,9 @@
         "docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json",
         "docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip",
         ".gitignore",
-        "docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json"
+        "docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260926/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260926/buy-v2-r58-8-7-c24f-430x932-ios-cart.png"
       ]
     },
     {
