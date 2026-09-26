@@ -3764,6 +3764,7 @@ class _StoreOperatingBoard extends StatefulWidget {
 class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     with WidgetsBindingObserver {
   Timer? _dayBoundary;
+  Timer? _orderClock;
   bool _detailsExpanded = false;
   bool _stockAlertsExpanded = false;
   DateTime _today = DateUtils.dateOnly(DateTime.now());
@@ -3773,6 +3774,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scheduleDayBoundary();
+    _startOrderClock();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Hydrate the same scoped records used by Stock and Sales. Missing
@@ -3793,15 +3795,30 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     );
   }
 
+  void _startOrderClock() {
+    _orderClock?.cancel();
+    _orderClock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _scheduleDayBoundary();
-    if (state == AppLifecycleState.paused) _dayBoundary?.cancel();
+    if (state == AppLifecycleState.resumed) {
+      _scheduleDayBoundary();
+      _startOrderClock();
+      setState(() {});
+    }
+    if (state == AppLifecycleState.paused) {
+      _dayBoundary?.cancel();
+      _orderClock?.cancel();
+    }
   }
 
   @override
   void dispose() {
     _dayBoundary?.cancel();
+    _orderClock?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -3898,8 +3915,31 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           finance.historyComplete && !session.workspaceFinanceStale &&
           !finance.asOf.isAfter(DateTime.now());
       // A local order list is not proof of complete remote order coverage.
-      final recordedOpenOrders = session.workspaceOrders
-          .where((order) => !order.isClosed).length;
+      final seenOrderIds = <String>{};
+      final openOrders = session.workspaceOrders.where((order) =>
+        seenOrderIds.add(order.id) && !order.isClosed &&
+        !const {'Delivered', 'Collected', 'Rejected'}.contains(order.stage)).toList();
+      final orderNow = DateTime.now();
+      final acceptanceExpired = openOrders.where((order) =>
+        order.stage == 'Confirmed' && order.actionDeadline != null &&
+        !order.actionDeadline!.isAfter(orderNow)).toList();
+      final awaitingAcceptance = openOrders.where((order) =>
+        order.stage == 'Confirmed' && (order.actionDeadline == null ||
+        order.actionDeadline!.isAfter(orderNow))).toList();
+      final fulfilmentOrders = openOrders.where((order) =>
+        const {'Preparing', 'Ready', 'Ready for pickup'}.contains(order.stage)).toList();
+      final overdueOrders = fulfilmentOrders.where((order) =>
+        order.fulfilmentDeadline != null &&
+        !order.fulfilmentDeadline!.isAfter(orderNow)).toList();
+      final missingTargets = fulfilmentOrders.where((order) => order.fulfilmentDeadline == null).length;
+      final orderAttention = overdueOrders.isNotEmpty ? overdueOrders.first
+        : acceptanceExpired.isNotEmpty ? acceptanceExpired.first
+        : awaitingAcceptance.isNotEmpty ? awaitingAcceptance.first : null;
+      final orderAttentionTitle = overdueOrders.isNotEmpty
+        ? '${overdueOrders.length} past fulfilment time · review orders'
+        : acceptanceExpired.isNotEmpty
+        ? 'Acceptance update pending · ${acceptanceExpired.length}'
+        : '${awaitingAcceptance.length} awaiting acceptance';
       final visibilityReview = stockReady
           ? products.where((p) => p.available &&
               (p.stockMode == WorkspaceStockMode.availabilityOnly || p.stock > 0) && !p.published).length
@@ -4019,16 +4059,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     : todayInvoices.isEmpty ? 'No bills saved today'
                     : 'Billed today divided by invoice count · before returns; not spend per visitor',
                 ),
-                if (session.workspaceOrders.isNotEmpty) ...[
-                  _OperatingMetric(
-                    id: 'recorded-open-orders', label: 'Open orders',
-                    value: count(recordedOpenOrders),
-                    detail: 'Orders saved on this phone only. Online orders may not all be included.',
-                    onTap: widget.onOrders,
-                  ),
-                  const Text('Orders saved on this phone only',
-                    style: TextStyle(fontSize: 11, color: MoolColors.muted)),
-                ],
                 const _OperatingSection('Stock & visibility'),
                 _OperatingMetric(
                   id: 'skus',
@@ -4099,6 +4129,40 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   ]),
                   if (_stockAlertsExpanded) ...stockAlerts.skip(1),
                 ],
+                const _OperatingSection('Orders & fulfilment'),
+                _OperatingMetric(
+                  id: 'recorded-open-orders', label: 'Open orders',
+                  value: count(session.workspaceOrders.isEmpty ? null : openOrders.length),
+                  detail: 'Open orders saved on this phone only. Online orders may not all be included.',
+                  onTap: widget.onOrders,
+                ),
+                _OperatingMetric(
+                  id: 'awaiting-acceptance', label: 'Awaiting acceptance',
+                  value: count(session.workspaceOrders.isEmpty ? null : awaitingAcceptance.length),
+                  detail: 'Saved confirmed orders awaiting acceptance. Expired acceptance windows are excluded and need a status update.',
+                  onTap: widget.onOrders,
+                ),
+                _OperatingMetric(
+                  id: 'overdue-fulfilment', label: 'Past fulfilment time',
+                  value: count(session.workspaceOrders.isEmpty ? null : overdueOrders.length),
+                  detail: 'Saved preparing or ready orders past their recorded fulfilment deadline. Orders without a deadline are not counted. This is not a live delivery-status feed.',
+                  alertColor: overdueOrders.isEmpty ? null : const Color(0xFFB3261E),
+                  onTap: widget.onOrders,
+                ),
+                Text(session.workspaceOrders.isEmpty
+                  ? 'No saved order records · online coverage unavailable'
+                  : 'Saved orders only · online coverage may be incomplete',
+                  style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                if (orderAttention != null)
+                  _OperatingAttention(id: 'order-attention', title: orderAttentionTitle,
+                    detail: 'Review order ${orderAttention.id}. ${acceptanceExpired.length} acceptance updates pending; $missingTargets preparing or ready orders have no recorded fulfilment deadline.',
+                    action: 'Review order', expanded: _detailsExpanded,
+                    color: const Color(0xFF8A5100),
+                    onTap: () => context.go(Uri(path: '/app/retailer/orders',
+                      queryParameters: {'order': orderAttention.id}).toString())),
+                if (_detailsExpanded && orderAttention == null && missingTargets > 0)
+                  Text('$missingTargets preparing or ready orders have no recorded fulfilment deadline.',
+                    style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
                 const _OperatingSection('Receivables & payables'),
                 if (financeReady) ...[
                   _OperatingMetric(

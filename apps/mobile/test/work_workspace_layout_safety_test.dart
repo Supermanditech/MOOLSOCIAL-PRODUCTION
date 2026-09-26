@@ -2403,6 +2403,55 @@ void main() {
     });
   }
 
+  testWidgets('HOMEBOARD order attention uses saved deadlines and terminal states', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      openHomeActions: false);
+    final now = DateTime.now();
+    WorkspaceOrderRecord order(String id, String stage, {DateTime? acceptance, DateTime? fulfilment}) => WorkspaceOrderRecord(
+      id: id, customer: 'Test customer', items: 'Test item', quantities: const {'test': 1},
+      amount: 10, source: 'Test', fulfilment: 'Pickup', payment: 'Unpaid',
+      address: '', stage: stage, needsDelivery: false, createdAt: now,
+      actionDeadline: acceptance, fulfilmentDeadline: fulfilment,
+    );
+    final past = now.subtract(const Duration(minutes: 5));
+    final future = now.add(const Duration(minutes: 5));
+    work.workspaceOrders
+      ..clear()
+      ..addAll([
+        order('waiting', 'Confirmed', acceptance: future),
+        order('expired', 'Confirmed', acceptance: past),
+        order('expired', 'Confirmed', acceptance: past),
+        order('late', 'Preparing', fulfilment: past),
+        order('unknown', 'Preparing'),
+        order('ready', 'Ready for pickup', fulfilment: future),
+        for (final stage in ['Completed', 'Cancelled', 'Rejected', 'Delivered', 'Collected'])
+          order(stage, stage, fulfilment: past),
+      ]);
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    String value(String id) => tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data!;
+    expect(value('recorded-open-orders'), '5');
+    expect(value('awaiting-acceptance'), '1');
+    expect(value('overdue-fulfilment'), '1');
+    expect(find.text('1 past fulfilment time · review orders'), findsOneWidget);
+    expect(find.text('Saved orders only · online coverage may be incomplete'), findsOneWidget);
+    work.workspaceOrders[3] = order('late', 'Completed', fulfilment: past);
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    expect(value('recorded-open-orders'), '4');
+    expect(value('overdue-fulfilment'), '0');
+    expect(find.text('Acceptance update pending · 1'), findsOneWidget);
+    work.workspaceOrders.clear();
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    expect(value('recorded-open-orders'), '—');
+    expect(value('overdue-fulfilment'), '—');
+    expect(find.byKey(const Key('store-insight-order-attention')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('HOMEBOARD finance projection rejects incomplete history', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     final seed = StoreReviewSeed(accountScope: 'review-draft-account',
