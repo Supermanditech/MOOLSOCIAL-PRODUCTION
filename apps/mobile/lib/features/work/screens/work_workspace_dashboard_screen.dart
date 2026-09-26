@@ -3943,10 +3943,20 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         : acceptanceExpired.isNotEmpty
         ? 'Acceptance update pending · ${acceptanceExpired.length}'
         : '${awaitingAcceptance.length} awaiting acceptance';
-      final visibilityReview = stockReady
+      final visibilityProducts = stockReady
           ? products.where((p) => p.available &&
-              (p.stockMode == WorkspaceStockMode.availabilityOnly || p.stock > 0) && !p.published).length
-          : 0;
+              (p.stockMode == WorkspaceStockMode.availabilityOnly || p.stock > 0) && !p.published).toList()
+          : <WorkspaceCatalogueItem>[];
+      final visibilityReview = visibilityProducts.length;
+      final visibilityOff = visibilityProducts.where((p) => !p.publicListing).length;
+      final visibilityDetails = visibilityProducts.where((p) => p.publicListing &&
+          (!p.customerProductFieldsComplete || p.catalogueFactsRequireReview)).length;
+      final visibilityPhotos = visibilityReview - visibilityOff - visibilityDetails;
+      final visibilityReasons = [
+        if (visibilityOff > 0) '$visibilityOff visibility off',
+        if (visibilityDetails > 0) '$visibilityDetails need product details checked',
+        if (visibilityPhotos > 0) '$visibilityPhotos need photo review',
+      ].join(' · ');
       final missingCosts = stockReady
           ? products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity &&
               p.stock > 0 && p.purchasePrice <= 0).length : 0;
@@ -3954,31 +3964,31 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         if (unavailable > 0)
           _OperatingAttention(id: 'unavailable',
             title: '${productCount(unavailable)} unavailable',
-            detail: 'Out of stock or marked unavailable. Review availability before taking orders.',
+            detail: 'Check quantity or availability in Stock.',
             action: 'Review stock', onTap: widget.onStock,
             color: _OperatingPalette.error, expanded: _expandedCategories.contains('stock')),
         if (replenish > 0)
           _OperatingAttention(id: 'replenish',
             title: '${productCount(replenish)} running low',
-            detail: 'Still in stock, at or below their individual alert levels. Review replenishment.',
+            detail: 'At or below the product’s alert level. Review replenishment.',
             action: 'Review stock', onTap: widget.onStock,
             color: _OperatingPalette.warning, expanded: _expandedCategories.contains('stock')),
         if (belowCost > 0)
           _OperatingAttention(id: 'price',
             title: '${productCount(belowCost)} priced below cost',
-            detail: 'Saved selling price is below purchase price for stock on hand. Check prices; this is not realised loss.',
+            detail: 'Check selling prices against purchase prices. Not a realised loss.',
             action: 'Review prices in Stock', onTap: widget.onStock,
             color: _OperatingPalette.warning, expanded: _expandedCategories.contains('stock')),
         if (visibilityReview > 0)
           _OperatingAttention(id: 'visibility',
             title: '${productCount(visibilityReview)} · review public visibility',
-            detail: 'Saved listing settings, product details or photo approval do not meet publication requirements. Review products in Stock. This does not confirm their live online status.',
+            detail: '$visibilityReasons. Review in Stock; online status unverified.',
             action: 'Review products in Stock', onTap: widget.onStock,
             color: MoolColors.navy, expanded: _expandedCategories.contains('stock')),
         if (missingCosts > 0)
           _OperatingAttention(id: 'cost-details',
             title: '${productCount(missingCosts)} · purchase cost needed for valuation',
-            detail: 'Stock is saved but purchase costs are zero or missing. Confirm the actual cost in the product editor; no cost is assumed.',
+            detail: 'Enter the actual purchase price in the product editor.',
             action: 'Review costs in Stock', onTap: widget.onStock,
             color: MoolColors.navy, expanded: _expandedCategories.contains('stock')),
       ];
@@ -4000,9 +4010,11 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 const Text('Store overview', style: TextStyle(fontSize: 14,
                   fontWeight: FontWeight.w700, color: MoolColors.navy)),
                 const SizedBox(height: 4),
-                const Text(
-                  'Saved on this phone · not live',
-                  style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary),
+                const Tooltip(
+                  message: 'Saved on this phone, not live across devices. A last-updated time is not available for the complete overview. Dated balances show their own date.',
+                  child: Text('Phone records · update time unavailable',
+                    key: Key('store-overview-freshness'),
+                    style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
                 ),
                 const SizedBox(height: 4),
                 if (session.workspaceDashboardState !=
@@ -4199,7 +4211,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   expanded: _expandedCategories.contains('capital'),
                   onToggle: () => _toggleCategory('capital'),
                   primaryIds: const ['trade-cash', 'stock-days'],
-                  coverage: 'More supplier balances and history needed', children: [
+                  coverage: 'Incomplete history · — means unavailable', children: [
                 const _OperatingMetric(
                   id: 'trade-cash', label: 'Cash tied up', value: '—',
                   detail: 'Money in stock + customer receivables − supplier payables. This is trade cash tied up, not full accounting working capital. Complete matching balances are needed.',
@@ -4222,14 +4234,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary),
                 ),
                 ]),
-                const Text(
-                  'Online activity & forecasts · Not available yet',
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 1.4,
-                    color: _OperatingPalette.secondary,
-                  ),
-                ),
               ],
             ),
           ),
@@ -4304,7 +4308,9 @@ class _OperatingCategory extends StatelessWidget {
             }
             final heading = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: MoolColors.navy)),
-              if (alertCount > 0) Text('$alertCount ${alertCount == 1 ? 'alert' : 'alerts'}',
+              if (alertCount > 0) Text(id == 'stock'
+                  ? '$alertCount ${alertCount == 1 ? 'issue type' : 'issue types'}'
+                  : '$alertCount ${alertCount == 1 ? 'order' : 'orders'} to review',
                 key: Key('store-category-alerts-$id'),
                 style: const TextStyle(fontSize: 11, color: _OperatingPalette.warning)),
             ]);
@@ -4314,13 +4320,13 @@ class _OperatingCategory extends StatelessWidget {
               onPressed: onToggle,
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               padding: EdgeInsets.zero,
-              icon: Row(mainAxisSize: MainAxisSize.min, children: [
-                DecoratedBox(key: Key('store-category-badge-$id'),
+              icon: DecoratedBox(key: Key('store-category-badge-$id'),
                   decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(7)),
-                  child: SizedBox(width: 24, height: 24,
-                    child: Icon(categoryIcon, key: Key('store-category-icon-$id'), size: 16, color: Colors.white))),
-                Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20, color: MoolColors.navy),
-              ]),
+                  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(categoryIcon, key: Key('store-category-icon-$id'), size: 16, color: Colors.white),
+                      Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 18, color: Colors.white),
+                    ]))),
             ));
             if (!horizontal) {
               return Column(children: [
@@ -4344,7 +4350,18 @@ class _OperatingCategory extends StatelessWidget {
           }),
           if (coverage != null) Text(coverage!, style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
           ?attention,
-          if (expanded) _OperatingGroups(children: secondary),
+          if (expanded) ...[
+            _OperatingGroups(children: secondary),
+            Align(alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: Key('store-category-collapse-end-$id'),
+                onPressed: onToggle,
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                  foregroundColor: MoolColors.navy),
+                icon: const Icon(Icons.expand_less, size: 18),
+                label: const Text('Show less', style: TextStyle(fontSize: 12)),
+              )),
+          ],
         ])),
       ]),
     );
@@ -4366,7 +4383,7 @@ class _OperatingAttention extends StatelessWidget {
     child: Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
-      child: InkWell(
+      child: Tooltip(message: '$detail $action', child: InkWell(
         key: Key('store-insight-$id'),
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
@@ -4381,15 +4398,11 @@ class _OperatingAttention extends StatelessWidget {
                 Expanded(child: Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color))),
                 const Icon(Icons.chevron_right, size: 18, color: MoolColors.navy),
               ])),
-            if (expanded) ...[
-              Text(detail, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-              const SizedBox(height: 3),
-              Text(action, style: const TextStyle(fontSize: 12,
-                fontWeight: FontWeight.w600, color: MoolColors.navy)),
-            ],
+            if (expanded)
+              Text(detail, style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
           ]),
         ),
-      ),
+      )),
     ),
   );
 }
@@ -4545,7 +4558,8 @@ class _OperatingMetric extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: captionHeight,
-                  child: Text(label, style: _operatingCaptionStyle(context))),
+                  child: Align(alignment: Alignment.bottomLeft,
+                    child: Text(label, style: _operatingCaptionStyle(context)))),
                 const SizedBox(height: 3),
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   Expanded(child: _StoreValueMotion(value: value, child: Text(value,

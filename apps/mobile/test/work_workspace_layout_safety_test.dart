@@ -2295,7 +2295,12 @@ void main() {
       await _toggleHomeCategory(tester, 'stock');
       expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget);
       expect(find.byKey(const Key('store-overview-stock-spread')), findsOneWidget);
-      await _toggleHomeCategory(tester, 'stock');
+      final stockCollapse = find.byKey(const Key('store-category-collapse-end-stock'));
+      await tester.ensureVisible(stockCollapse);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(stockCollapse).height, greaterThanOrEqualTo(48));
+      await tester.tap(stockCollapse);
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget,
         reason: 'Closing Stock must not close Sales');
       expect(find.byKey(const Key('store-overview-stock-spread')), findsNothing);
@@ -2316,7 +2321,9 @@ void main() {
       }
       expect(find.text('Sales & collections'), findsOneWidget);
       expect(find.text('Store overview'), findsOneWidget);
-      expect(find.text('Saved on this phone · not live'), findsOneWidget);
+      expect(find.text('Phone records · update time unavailable'), findsOneWidget);
+      expect(find.text('Online activity & forecasts · Not available yet'), findsNothing,
+        reason: 'Unavailable online analytics are explained once inside Stock details');
       expect(find.text('Working capital'), findsOneWidget);
       for (final id in ['payables', 'trade-cash', 'stock-days']) {
         expect(tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data, '—');
@@ -2376,7 +2383,7 @@ void main() {
         '—',
       );
       await tester.ensureVisible(
-        find.text('Online activity & forecasts · Not available yet'),
+        find.text('Online views, carts, repeat purchases and forecasts need verified activity and more history.'),
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -2593,6 +2600,11 @@ void main() {
       expect(find.descendant(of: find.byKey(const Key('store-insight-replenish')),
         matching: find.byIcon(Icons.warning_amber_rounded)), findsOneWidget);
       expect(find.byKey(const Key('store-insight-visibility')), findsOneWidget);
+      expect(find.text('2 issue types'), findsOneWidget);
+      expect(find.text('1 visibility off. Review in Stock; online status unverified.'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('store-insight-replenish')),
+        matching: find.text('Review stock')), findsNothing,
+        reason: 'The alert row already opens Stock; do not repeat a link beneath it');
       expect(find.byKey(const Key('store-insight-price')), findsNothing);
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
           .copyWith(sellingPrice: 15);
