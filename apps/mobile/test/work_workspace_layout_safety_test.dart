@@ -2536,7 +2536,14 @@ void main() {
       payments: rows ? [WorkspacePaymentRecord(orderId: 'HOME-DUE', customerId: 'HOME-CUSTOMER',
         customerName: 'Test customer', revision: 1, updatedAt: savedAt,
         amountMinor: 10000, paidMinor: 0, dueMinor: 10000, refundedMinor: 0,
-        state: WorkspacePaymentState.unpaid, channel: WorkspacePaymentChannel.credit)] : [],
+        state: WorkspacePaymentState.unpaid, channel: WorkspacePaymentChannel.credit),
+        for (final state in [WorkspacePaymentState.refundPending, WorkspacePaymentState.refunded])
+          WorkspacePaymentRecord(orderId: 'HOME-${state.name}', customerId: 'REFUND-CUSTOMER',
+            customerName: 'Test refund customer', revision: 1, updatedAt: savedAt,
+            amountMinor: 5000, paidMinor: 5000, dueMinor: 0,
+            refundedMinor: state == WorkspacePaymentState.refunded ? 5000 : 0,
+            state: state, channel: WorkspacePaymentChannel.platform),
+      ] : [],
       payouts: rows ? [for (final state in WorkspacePayoutState.values)
         WorkspacePayoutRecord(id: 'HOME-${state.name}', operationId: 'OP-${state.name}',
           revision: 1, amountMinor: 1000, updatedAt: savedAt, state: state)] : [],
@@ -2551,6 +2558,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('3 recorded settlements need review'), findsOneWidget);
     expect(find.text('1 failed · 1 on hold · 1 awaiting an update'), findsOneWidget);
+    expect(find.text('1 recorded refund awaits confirmation'), findsOneWidget);
+    final refund = find.byKey(const Key('store-insight-pending-refunds'));
+    await tester.ensureVisible(refund);
+    await tester.tap(refund);
+    await tester.pumpAndSettle();
+    expect(find.text('Payment details'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('work-finance-payment-HOME-refundPending')),
+      200, scrollable: find.descendant(of: find.byKey(const ValueKey('work-finance-settlement')),
+        matching: find.byType(Scrollable)).first);
+    expect(find.byKey(const ValueKey('work-finance-payment-HOME-refunded')), findsNothing);
+    expect(find.byKey(const ValueKey('work-finance-payment-HOME-DUE')), findsNothing);
+    expect(work.workspaceFinance!.payments.firstWhere((p) => p.orderId == 'HOME-refundPending').refundedMinor, 0);
+    await tester.tap(find.byKey(const Key('work-store-home')));
+    await tester.pumpAndSettle();
+    await _toggleHomeCategory(tester, 'money');
     final dues = find.byKey(const Key('store-insight-customer-dues'));
     await tester.ensureVisible(dues);
     await tester.tap(dues);
@@ -2576,11 +2598,13 @@ void main() {
     expect(find.byKey(const Key('store-insight-customer-dues')), findsNothing);
     expect(find.byKey(const Key('store-insight-settlement-issues')), findsNothing);
     expect(find.byKey(const Key('store-overview-open-customer-dues')), findsNothing);
+    expect(find.byKey(const Key('store-insight-pending-refunds')), findsNothing);
     expect(work.applyWorkspaceFinance(snapshot(4)), isTrue);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('store-insight-settlement-issues')), findsOneWidget);
     work.markWorkspaceFinanceStale(accountScope: seed.accountScope, storeId: seed.storeId);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-insight-pending-refunds')), findsNothing);
     expect(find.byKey(const Key('store-insight-customer-dues')), findsNothing);
     expect(find.byKey(const Key('store-insight-settlement-issues')), findsNothing);
     expect(tester.takeException(), isNull);

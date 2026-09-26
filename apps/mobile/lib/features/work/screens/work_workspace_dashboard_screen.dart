@@ -1467,6 +1467,8 @@ class _WorkWorkspaceDashboardScreenState
             onStock: () => _showOperation(_WorkspaceOperation.catalogue),
             onOpenOperation: _showOperation,
             onBuyStock: _showProcurement,
+            onReviewFinance: (focus) => _showOperation(_WorkspaceOperation.statement,
+              focusedFinance: focus, returnView: _WorkspaceControlView.dashboard),
           ),
           _WorkspaceControlView.search => StoreRecentSearches(
             controller: _searchController,
@@ -3620,6 +3622,7 @@ class _StoreControlDashboard extends StatelessWidget {
     required this.onStock,
     required this.onOpenOperation,
     required this.onBuyStock,
+    required this.onReviewFinance,
     required this.reviewedOrder,
     required this.onReviewOrder,
     required this.onCloseOrder,
@@ -3634,6 +3637,7 @@ class _StoreControlDashboard extends StatelessWidget {
   final VoidCallback onNewSale, onDeliverOrder, onStock, onBuyStock;
   final VoidCallback onPromote, onAddProducts;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
+  final ValueChanged<_WorkspaceFinanceFocus> onReviewFinance;
   final WorkspaceOrderRecord? reviewedOrder;
   final VoidCallback onReviewOrder, onCloseOrder;
   final Widget? workingCentre;
@@ -3737,6 +3741,7 @@ class _StoreControlDashboard extends StatelessWidget {
             onOrders: onOrders,
             onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
             onDues: () => onOpenOperation(_WorkspaceOperation.dues),
+            onReviewFinance: onReviewFinance,
             onPurchase: (purchase) {
               final current = session.workspacePurchases.where((p) =>
                 p.shipmentId == purchase.shipmentId && p.orderId == purchase.orderId &&
@@ -3775,12 +3780,14 @@ class _StoreOperatingBoard extends StatefulWidget {
     required this.onSettlement,
     required this.onDues,
     required this.onPurchase,
+    required this.onReviewFinance,
     this.scrollController,
     super.key,
   });
   final WorkSession session;
   final VoidCallback onSales, onStock, onOrders, onSettlement, onDues;
   final ValueChanged<WorkspacePurchaseRecord> onPurchase;
+  final ValueChanged<_WorkspaceFinanceFocus> onReviewFinance;
   final ScrollController? scrollController;
   @override
   State<_StoreOperatingBoard> createState() => _StoreOperatingBoardState();
@@ -3955,6 +3962,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
               WorkspacePayoutState.unknown,
             }.contains(p.state)).toList()
           : <WorkspacePayoutRecord>[];
+      final pendingRefunds = financeReady && !session.workspaceFinanceUsesLegacyReview
+          ? finance.payments.where((p) => p.state == WorkspacePaymentState.refundPending).toList()
+          : <WorkspacePaymentRecord>[];
       // A local order list is not proof of complete remote order coverage.
       final seenOrderIds = <String>{};
       final openOrders = session.workspaceOrders.where((order) =>
@@ -4259,6 +4269,16 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     detail: 'Check unpaid and part-paid records. A balance due does not mean overdue.',
                     action: 'Collect dues', onTap: widget.onDues,
                     color: MoolColors.navy, expanded: true),
+                if (pendingRefunds.isNotEmpty)
+                  _OperatingAttention(id: 'pending-refunds',
+                    title: '${pendingRefunds.length} recorded ${pendingRefunds.length == 1 ? 'refund awaits' : 'refunds await'} confirmation',
+                    detail: 'Review ${pendingRefunds.first.orderId} · ${pendingRefunds.first.customerName}. Not confirmed as refunded.',
+                    action: 'Review payment', color: _OperatingPalette.warning, expanded: true,
+                    onTap: () => widget.onReviewFinance((
+                      accountScope: finance!.accountScope, workspaceId: finance.workspaceId,
+                      orderId: pendingRefunds.first.orderId, customerId: pendingRefunds.first.customerId,
+                      payoutId: null, operationId: null,
+                    ))),
                 if (settlementIssues.isNotEmpty)
                   _OperatingAttention(id: 'settlement-issues',
                     title: '${settlementIssues.length} recorded ${settlementIssues.length == 1 ? 'settlement needs' : 'settlements need'} review',
