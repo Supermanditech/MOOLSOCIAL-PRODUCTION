@@ -107,6 +107,7 @@
         "apps/mobile/lib/features/work/work_services.dart",
         "apps/mobile/lib/features/journey01/journey_router.dart",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/widgets/work_widgets.dart",
         "apps/mobile/test/work_workspace_layout_safety_test.dart",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",

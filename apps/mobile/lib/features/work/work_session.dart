@@ -6238,14 +6238,15 @@ class WorkSession extends ChangeNotifier {
             product.sellingPrice * (workspaceOrderQuantities[product.id] ?? 0);
       });
 
-  int get workspaceLowStockCount => workspaceCatalogueItems
-      .where(
+  Iterable<WorkspaceCatalogueItem> get workspaceLowStockProducts =>
+      workspaceCatalogueItems.where(
         (product) =>
             product.stockMode == WorkspaceStockMode.exactQuantity &&
             product.available &&
             product.stock <= product.lowStockThreshold,
-      )
-      .length;
+      );
+
+  int get workspaceLowStockCount => workspaceLowStockProducts.length;
 
   int get workspaceOutOfStockCount => workspaceCatalogueItems
       .where(

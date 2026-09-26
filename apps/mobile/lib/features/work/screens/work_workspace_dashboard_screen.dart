@@ -1380,7 +1380,7 @@ class _WorkWorkspaceDashboardScreenState
       resizeToAvoidBottomInset: _view != _WorkspaceControlView.procurement,
       bottomAction: bottomAction,
       body: _StoreWorkingSurface(
-        child: _withReviewSeedControls(switch (saleOpen || salesOpen
+        child: switch (saleOpen || salesOpen
             ? _WorkspaceControlView.dashboard
             : _view) {
           _WorkspaceControlView.dashboard => _StoreControlDashboard(
@@ -1641,78 +1641,8 @@ class _WorkWorkspaceDashboardScreenState
                 ? _leaveOperation
                 : null,
           ),
-        }),
+        },
       ),
-    );
-  }
-
-  Widget _withReviewSeedControls(Widget child) {
-    if (!session.canLoadStoreReviewSeed ||
-        _view != _WorkspaceControlView.dashboard) {
-      return child;
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Material(
-          color: Colors.white,
-          child: PopupMenuButton<int>(
-            key: const Key('store-review-seed-menu'),
-            tooltip: 'Open product-entry evaluation Store',
-            onSelected: (count) {
-              if (count < 0) {
-                session.setStoreReviewOrderResponse(
-                  count == -1
-                      ? StoreReviewOrderResponse.lostReply
-                      : StoreReviewOrderResponse.rejected,
-                );
-                return;
-              }
-              if (session.loadStoreReviewSeed(count)) _showDashboard();
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 0,
-                child: Text('Test Store · product entry'),
-              ),
-              if (session.activeWorkspace?.id.startsWith('QA-STORE-V1-') ==
-                  true) ...[
-                const PopupMenuItem(
-                  value: -1,
-                  child: Text('Next order action: lose reply'),
-                ),
-                const PopupMenuItem(
-                  value: -2,
-                  child: Text('Next order action: reject request'),
-                ),
-              ],
-            ],
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 48),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical:
-                      MediaQuery.sizeOf(context).width >= 700 &&
-                          MediaQuery.sizeOf(context).height <= 450
-                      ? 0
-                      : 14,
-                ),
-                child: const Align(
-                  alignment: Alignment.centerLeft,
-                  heightFactor: 1,
-                  child: Text(
-                    'Review data',
-                    semanticsLabel:
-                        'Review APK test data. No real transactions.',
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Expanded(child: child),
-      ],
     );
   }
 
@@ -3759,6 +3689,7 @@ class _StoreControlDashboard extends StatelessWidget {
           }
           final pulse = _StoreLiveBusinessPulse(
             session: session,
+            compactHome: workingCentre == null,
             onOrders: () => _navigate(onCustomers),
             onSales: () => _navigate(onMoney),
             onStock: () => _navigate(onStock),
@@ -4442,6 +4373,7 @@ class _StoreAdaptiveRail extends StatelessWidget {
 class _StoreLiveBusinessPulse extends StatelessWidget {
   const _StoreLiveBusinessPulse({
     required this.session,
+    this.compactHome = false,
     required this.onOrders,
     required this.onSales,
     required this.onStock,
@@ -4449,6 +4381,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
   });
 
   final WorkSession session;
+  final bool compactHome;
   final VoidCallback onOrders;
   final VoidCallback onSales;
   final VoidCallback onStock;
@@ -4522,15 +4455,27 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                       onPressed: onSales,
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF252B38),
-                        minimumSize: const Size(48, 72),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size(48, compactHome ? 64 : 72),
+                        alignment: compactHome
+                            ? Alignment.bottomCenter
+                            : Alignment.center,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: compactHome ? 4 : 0,
+                        ),
                       ),
-                      child: const Text(
-                        'View statement',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                      child: SizedBox(
+                        height: compactHome
+                            ? MediaQuery.textScalerOf(context).scale(28)
+                            : null,
+                        child: const Text(
+                          'View statement',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -4538,6 +4483,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                   _StorePulseDivider(),
                   _StorePulseMetric(
                     keyName: 'work-pulse-dues',
+                    compactHome: compactHome,
                     flex: flex[1],
                     label: 'Collect dues',
                     contextLabel: duesLabel,
@@ -4548,6 +4494,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                   _StorePulseDivider(),
                   _StorePulseMetric(
                     keyName: 'work-pulse-settlement',
+                    compactHome: compactHome,
                     flex: flex[2],
                     label: 'MoolSocial settlement',
                     contextLabel: settlementLabel,
@@ -4579,6 +4526,7 @@ class _StorePulseDivider extends StatelessWidget {
 
 class _StorePulseMetric extends StatelessWidget {
   const _StorePulseMetric({
+    this.compactHome = false,
     required this.keyName,
     required this.label,
     required this.contextLabel,
@@ -4589,6 +4537,7 @@ class _StorePulseMetric extends StatelessWidget {
   });
 
   final String keyName;
+  final bool compactHome;
   final String label;
   final String contextLabel;
   final String value;
@@ -4624,11 +4573,11 @@ class _StorePulseMetric extends StatelessWidget {
           ),
           onTap: onTap,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 72),
+            constraints: BoxConstraints(minHeight: compactHome ? 64 : 72),
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: enlarged ? 1 : 4,
-                vertical: 5,
+                vertical: compactHome ? 4 : 5,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -4638,7 +4587,9 @@ class _StorePulseMetric extends StatelessWidget {
                     children: [
                       Flexible(
                         child: SizedBox(
-                          height: MediaQuery.textScalerOf(context).scale(28),
+                          height: MediaQuery.textScalerOf(
+                            context,
+                          ).scale(compactHome ? 24 : 28),
                           child: Center(
                             child: _StoreValueMotion(
                               value: value,
@@ -4714,13 +4665,19 @@ class _StorePulseMetric extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                  SizedBox(
+                    height: compactHome
+                        ? MediaQuery.textScalerOf(context).scale(28)
+                        : null,
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: compactHome ? accent : MoolColors.navy,
+                        fontSize: 11,
+                        height: compactHome ? 1.15 : null,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -4834,10 +4791,6 @@ class _StoreActivityDeck extends StatelessWidget {
       );
     } else if (session.workspaceSettlementBalance > 0) {
       content = _MoneyActivityCard(session: session, onOpen: onMoney);
-    } else if (session.latestWorkspaceInvoice case final invoice?) {
-      // An absent delivery receipt is not a pending retailer action. Keep the
-      // latest invoice available without outranking current operational work.
-      content = _InvoiceReadyActivityCard(session: session, invoice: invoice);
     } else {
       content = _StoreReadyActivity(session: session);
     }
@@ -4852,8 +4805,7 @@ class _StoreActivityDeck extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
-          if (content is _InvoiceReadyActivityCard ||
-              content is _StockActivityCard) {
+          if (content is _StockActivityCard) {
             return SingleChildScrollView(
               key: const Key('work-store-activity-scroll'),
               child: _ActivityDeckShell(
@@ -4942,15 +4894,7 @@ class _StoreActivityDeck extends StatelessWidget {
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Flexible(child: card),
-              if (reviewedOrder == null &&
-                  constraints.maxHeight > desiredHeight + 160 &&
-                  session.visibleWorkspaceOrders.any(
-                    (order) => order.stage == 'Completed',
-                  ))
-                _StoreRecentSale(session: session, onOpen: onMoney),
-            ],
+            children: [Flexible(child: card)],
           );
         },
       ),
@@ -4966,85 +4910,6 @@ class _StoreActivityDeck extends StatelessWidget {
         _StoreWorkloadSummary(session: session, onOrders: onOrders),
         Expanded(child: deck),
       ],
-    );
-  }
-}
-
-class _StoreRecentSale extends StatelessWidget {
-  const _StoreRecentSale({required this.session, required this.onOpen});
-  final WorkSession session;
-  final VoidCallback onOpen;
-  @override
-  Widget build(BuildContext context) {
-    final completed =
-        session.visibleWorkspaceOrders
-            .where((order) => order.stage == 'Completed')
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return Padding(
-      key: const Key('work-store-recent-sales'),
-      padding: const EdgeInsets.only(top: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Recent sales',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: MoolColors.muted,
-            ),
-          ),
-          const SizedBox(height: 4),
-          for (final order in completed.take(2))
-            InkWell(
-              onTap: onOpen,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: _StoreMoneyLine(
-                  value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: MoolColors.navy,
-                  ),
-                  leading: Row(
-                    children: [
-                      const Icon(
-                        Icons.receipt_long_outlined,
-                        color: MoolColors.navy,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              order.customer.split('·').first.trim(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              session.workspaceOrderPaymentLabel(order),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: MoolColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -5085,13 +4950,13 @@ class _ActivityDeckShell extends StatelessWidget {
         : _quickActionsNotchHeight(context);
     final surface = Material(
       color: Colors.white,
-      elevation: 3,
-      shadowColor: const Color(0x24000080),
+      elevation: 1,
+      shadowColor: const Color(0x18000050),
       shape: stickyActions != null
           ? _QuickActionsNotch(notchHeight)
           : RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFCCD2ED)),
+              side: const BorderSide(color: Color(0xFFE5E8F1)),
             ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -5118,7 +4983,7 @@ class _ActivityDeckShell extends StatelessWidget {
                   value: state,
                   motionKey: const Key('work-store-state-motion'),
                   child: const SizedBox(
-                    height: 3,
+                    height: 1,
                     child: ColoredBox(color: MoolColors.navy),
                   ),
                 ),
@@ -6995,80 +6860,6 @@ Future<void> _showWorkspacePickupSheet(
   );
 }
 
-class _InvoiceReadyActivityCard extends StatelessWidget {
-  const _InvoiceReadyActivityCard({
-    required this.session,
-    required this.invoice,
-  });
-  final WorkSession session;
-  final WorkspaceCustomerInvoice invoice;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    key: const Key('work-activity-invoice'),
-    padding: const EdgeInsets.all(14),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.receipt_long_outlined, color: MoolColors.navy, size: 22),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Invoice ready',
-                style: TextStyle(
-                  color: Color(0xFF252B38),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          invoice.customer,
-          style: const TextStyle(
-            color: Color(0xFF252B38),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          invoice.id,
-          style: const TextStyle(color: MoolColors.muted, fontSize: 12),
-        ),
-        const Divider(height: 20),
-        _StoreMoneyText(
-          '₹${_formatStoreMinorAmount(invoice.payableMinor)}',
-          summary: true,
-          style: const TextStyle(
-            color: Color(0xFF252B38),
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Payment method: ${invoice.payment}',
-          style: const TextStyle(color: MoolColors.muted, fontSize: 12),
-        ),
-        const SizedBox(height: 8),
-        TextButton.icon(
-          key: const Key('work-invoice-open'),
-          onPressed: () =>
-              _showWorkspaceInvoiceSheet(context, session, invoice),
-          icon: const Icon(Icons.receipt_long_outlined, size: 18),
-          label: const Text('View invoice'),
-        ),
-      ],
-    ),
-  );
-}
-
 String _workspaceInvoiceMessage(
   WorkSession session,
   WorkspaceCustomerInvoice invoice,
@@ -8515,12 +8306,10 @@ class _StockActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final product = session.workspaceCatalogueItems
-        .where((item) => item.stock <= 5)
-        .firstOrNull;
+    final product = session.workspaceLowStockProducts.firstOrNull;
     return Padding(
       key: const Key('work-activity-stock'),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -8533,7 +8322,7 @@ class _StockActivityCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             product?.title ?? 'Your Store stock',
             style: const TextStyle(
@@ -8552,7 +8341,7 @@ class _StockActivityCard extends StatelessWidget {
           const SizedBox(height: 8),
           ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: bottomNotchHeight > 0 ? bottomNotchHeight - 14 : 0,
+              minHeight: bottomNotchHeight > 0 ? bottomNotchHeight - 12 : 0,
             ),
             child: Padding(
               key: const Key('work-stock-lower-content'),
@@ -8564,7 +8353,7 @@ class _StockActivityCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Check quantities and replenish what your customers need.',
+                    'Review stock and plan replenishment.',
                     style: TextStyle(
                       color: MoolColors.muted,
                       fontSize: 13,
@@ -8572,9 +8361,21 @@ class _StockActivityCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: onOpen,
-                    child: const Text('View stock'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: onOpen,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        foregroundColor: MoolColors.navy,
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: const Text('View stock'),
+                    ),
                   ),
                 ],
               ),

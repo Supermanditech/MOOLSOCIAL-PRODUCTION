@@ -725,6 +725,35 @@ Future<void> openCounterSaleFromSales(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> openSavedInvoiceFromSales(WidgetTester tester, String id) async {
+  await tester.tap(find.byKey(const Key('work-store-sell')));
+  await tester.pumpAndSettle();
+  final row = find.byKey(ValueKey('work-sales-invoice-$id'));
+  if (row.evaluate().isEmpty) {
+    final registerScroll = find.descendant(
+      of: find.byKey(const Key('work-voucher-register')),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    // The table is wider than the phone; its geometric centre is offscreen.
+    // Swipe inside the visible first column to build the lazy invoice row.
+    for (var attempt = 0; attempt < 12 && row.evaluate().isEmpty; attempt++) {
+      final rect = tester.getRect(registerScroll);
+      await tester.dragFrom(
+        Offset(rect.left + 24, rect.center.dy),
+        const Offset(0, -80),
+      );
+      await tester.pumpAndSettle();
+    }
+  }
+  await tester.ensureVisible(row);
+  await tester.pumpAndSettle();
+  await tester.tap(row);
+  await tester.pumpAndSettle();
+}
+
 Future<void> openSalesCollections(WidgetTester tester) async {
   final sales = find.byKey(const Key('work-store-sell'));
   await tester.ensureVisible(sales);
@@ -2181,7 +2210,9 @@ void main() {
     }
   });
 
-  testWidgets('HOME compact invoice and method wording', (tester) async {
+  testWidgets('HOME keeps saved invoices in Sales without deleting history', (
+    tester,
+  ) async {
     final work = liveStore();
     work.workspaceInvoices.add(
       WorkspaceCustomerInvoice(
@@ -2191,7 +2222,7 @@ void main() {
         items: 'Goods',
         amount: 250,
         payment: 'Cash',
-        issuedAt: DateTime(2026, 9, 26),
+        issuedAt: DateTime.now(),
       ),
     );
     await mount(
@@ -2200,17 +2231,11 @@ void main() {
       work: work,
       viewport: const Size(360, 720),
     );
-    expect(find.text('Payment method: Cash'), findsOneWidget);
+    expect(find.text('Payment method: Cash'), findsNothing);
     expect(find.text('Cash'), findsNothing);
     expect(find.text('Send invoice'), findsNothing);
-    expect(
-      tester.getSize(find.byKey(const Key('work-activity-invoice'))).height,
-      lessThan(300),
-    );
-    expect(
-      find.byKey(const Key('work-invoice-open')).hitTestable(),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('work-activity-invoice')), findsNothing);
+    expect(find.byKey(const Key('work-store-recent-sales')), findsNothing);
     expect(
       tester
           .widget<Material>(
@@ -2220,6 +2245,9 @@ void main() {
       Colors.white,
     );
     expect(work.workspaceInvoices.single.sharedChannels, isEmpty);
+    await openSavedInvoiceFromSales(tester, 'INV-HOME');
+    expect(find.text('Payment method: Cash'), findsOneWidget);
+    expect(work.workspaceInvoices.single.id, 'INV-HOME');
     expect(tester.takeException(), isNull);
   });
 
@@ -2255,6 +2283,71 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'HOME polish configured low stock and preserved review records $scale',
+      (tester) async {
+        final work = liveStore();
+        final base = work.workspaceCatalogueItems.first;
+        WorkspaceCatalogueItem product(String id) =>
+            WorkspaceCatalogueItem.fromInventoryJson({
+              ...base.toInventoryJson(),
+              'id': id,
+            });
+        final target = product('LOW-TARGET').copyWith(
+          title: 'Threshold ten product',
+          stock: 8,
+          lowStockThreshold: 10,
+          available: true,
+        );
+        work.workspaceCatalogueItems
+          ..clear()
+          ..addAll([
+            product(
+              'NOT-LOW',
+            ).copyWith(title: 'Not low stock', stock: 3, lowStockThreshold: 1),
+            product('AVAILABILITY').copyWith(
+              title: 'Availability only',
+              stock: 0,
+              stockMode: WorkspaceStockMode.availabilityOnly,
+              available: true,
+            ),
+            product('UNAVAILABLE').copyWith(
+              title: 'Unavailable product',
+              stock: 0,
+              available: false,
+            ),
+            target,
+          ]);
+        final before = work.workspaceCatalogueItems
+            .map((p) => p.toInventoryJson())
+            .toList();
+        expect(work.workspaceLowStockCount, 1);
+        expect(work.workspaceLowStockProducts.single.id, target.id);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(360, 720),
+          textScale: scale,
+          openHomeActions: false,
+        );
+        expect(find.text('Review data'), findsNothing);
+        expect(find.byKey(const Key('store-review-seed-menu')), findsNothing);
+        expect(find.text(target.title), findsOneWidget);
+        expect(find.text('8 available · ${target.pack}'), findsOneWidget);
+        final action = find.widgetWithText(TextButton, 'View stock');
+        await reveal(tester, action);
+        expect(action.hitTestable(), findsOneWidget);
+        expect(
+          work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(),
+          before,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('HOME unsent invoice does not displace active group work', (
     tester,
@@ -3732,9 +3825,13 @@ void main() {
           viewport: Size(display.width, display.height),
           textScale: display.scale,
         );
+        if (surface == 'invoice') {
+          await tester.tap(find.byKey(const Key('work-store-sell')));
+          await tester.pumpAndSettle();
+        }
         final action = find.byKey(
           Key(switch (surface) {
-            'invoice' => 'work-invoice-open',
+            'invoice' => 'work-sales-invoice-INV-RANGE',
             'group' => 'work-quick-group-buy',
             _ => 'work-pulse-settlement',
           }),
@@ -9901,10 +9998,14 @@ void main() {
         expect(saleRect.top, greaterThanOrEqualTo(contentRect.top));
         expect(saleRect.bottom, lessThanOrEqualTo(contentRect.bottom));
         await captureStoreView(tester, 'r6641-home-landscape-$activity-1.6');
+        if (activity == 'invoice') {
+          await tester.tap(find.byKey(const Key('work-store-sell')));
+          await tester.pumpAndSettle();
+        }
         final review = find.byKey(
           Key(
             activity == 'invoice'
-                ? 'work-invoice-open'
+                ? 'work-sales-new-counter-sale'
                 : 'work-activity-order-review',
           ),
         );
@@ -15549,10 +15650,7 @@ void main() {
         viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
         textScale: scale,
       );
-      final open = find.byKey(const Key('work-invoice-open'));
-      await reveal(tester, open);
-      await tester.tap(open);
-      await tester.pumpAndSettle();
+      await openSavedInvoiceFromSales(tester, payment.invoiceId!);
       expect(
         find.byKey(const Key('work-invoice-payment-summary')),
         findsOneWidget,
@@ -18945,12 +19043,8 @@ void main() {
       textScale: 1.4,
       bottomInset: 24,
     );
-    if (storeReviewRuntime) {
-      // The explicitly labelled review-data toolbar takes additional height.
-      // Verify real scrolling, not suppression of that label or smaller text.
-      expect(find.byKey(const Key('store-review-seed-menu')), findsOneWidget);
-      await reveal(tester, find.text('Accept'));
-    }
+    expect(find.byKey(const Key('store-review-seed-menu')), findsNothing);
+    await reveal(tester, find.text('Accept'));
     expect(find.text('Accept').hitTestable(), findsOneWidget);
     expect(find.text('Reject').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -26217,7 +26311,7 @@ void main() {
     expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
     expectStoreNavigationOwnsProcurement(tester);
     expect(
-      find.bySemanticsLabel('Store choices: Store, Orders, Sell and Stock.'),
+      find.bySemanticsLabel('Store choices: Store, Orders, Sales and Stock.'),
       findsOneWidget,
     );
     final accessibleNodes = tester.semantics.simulatedAccessibilityTraversal();
@@ -27155,10 +27249,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(work.workspaceOrderStage, 'Completed');
     expect(work.workspaceInvoices, isNotEmpty);
-    expect(find.byKey(const Key('work-invoice-open')).hitTestable(), findsOne);
-    await tester.tap(find.byKey(const Key('work-invoice-open')));
-    await tester.pumpAndSettle();
+    await openSavedInvoiceFromSales(tester, work.latestWorkspaceInvoice!.id);
     expect(find.byKey(const Key('work-invoice-share-chat')), findsOne);
+    await reveal(tester, find.byKey(const Key('work-invoice-share-chat')));
+    expect(
+      find.byKey(const Key('work-invoice-share-chat')).hitTestable(),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('work-invoice-share-chat')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-pending-draft-card')), findsOne);
@@ -27168,9 +27265,9 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await captureStoreView(tester, 'pickup-invoice-chat-back');
-    expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+    expect(find.byKey(const Key('work-invoice-share-chat')), findsOneWidget);
     expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
-    expect(find.byKey(const Key('work-activity-invoice')), findsOneWidget);
+    expect(find.byKey(const Key('work-activity-invoice')), findsNothing);
     expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
     expect(work.workspaceInvoices, hasLength(1));
   });
@@ -38643,7 +38740,8 @@ void main() {
           items: 'Test product × 1',
           amount: 264,
           payment: 'Cash',
-          issuedAt: DateTime(2026, 9, 20),
+          // Enter through the default Today register, not the removed Home card.
+          issuedAt: DateTime.now(),
           billingDetails: WorkspaceBillingDetails(
             business: outcome == 'opened',
             name: 'Test customer',
@@ -38676,9 +38774,7 @@ void main() {
           viewport: const Size(320, 568),
           textScale: 1.4,
         );
-        await reveal(tester, find.byKey(const Key('work-invoice-open')));
-        await tester.tap(find.byKey(const Key('work-invoice-open')));
-        await tester.pumpAndSettle();
+        await openSavedInvoiceFromSales(tester, invoice.id);
         final whatsapp = find.byKey(const Key('work-invoice-share-whatsapp'));
         await reveal(tester, whatsapp);
         await tester.tap(whatsapp);
@@ -38728,16 +38824,15 @@ void main() {
             findsOneWidget,
           );
           await captureStoreView(tester, '38-invoice-$outcome-320');
-          final close = find.byTooltip('Close invoice');
-          await reveal(tester, close);
-          await tester.tap(close);
-          await tester.pumpAndSettle();
-          expect(find.byTooltip('Close invoice'), findsNothing);
         }
-        expect(
-          find.byKey(const Key('work-store-activity-deck')),
-          findsOneWidget,
-        );
+        // Saved invoices are embedded in Sales; Android Back returns to its
+        // register rather than dismissing the obsolete Home invoice sheet.
+        // A successful external launch already closes the invoice itself.
+        if (outcome != 'opened') {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        expect(find.byKey(const Key('work-voucher-register')), findsOneWidget);
         expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
         expect(tester.takeException(), isNull);
       },

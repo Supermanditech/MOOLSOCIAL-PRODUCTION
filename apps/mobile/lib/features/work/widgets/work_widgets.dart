@@ -772,7 +772,7 @@ class WorkPageScaffold extends StatelessWidget {
         surfaceTone: MoolLocalNavigationSurfaceTone.light,
         semanticLabel: contextualLocalActions == null
             ? 'Work choices: Earn Today and Workspace.'
-            : 'Store choices: Store, Orders, Sell and Stock.',
+            : 'Store choices: Store, Orders, Sales and Stock.',
         activeId: resolvedActiveId,
         actions: localActions,
       ),
