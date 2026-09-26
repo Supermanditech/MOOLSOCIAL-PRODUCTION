@@ -809,6 +809,23 @@ Future<void> _toggleHomeCategory(WidgetTester tester, String id) async {
   await tester.pumpAndSettle();
 }
 
+void _expectHomeCategoryContrast(WidgetTester tester, String id) {
+  final category = find.byKey(Key('store-category-$id'));
+  final decoration = tester.widget<DecoratedBox>(category).decoration as BoxDecoration;
+  final backgrounds = (decoration.gradient! as LinearGradient).colors;
+  for (final text in tester.widgetList<Text>(find.descendant(of: category, matching: find.byType(Text)))) {
+    final foreground = text.style?.color;
+    if (foreground == null) continue;
+    for (final background in backgrounds) {
+      final first = foreground.computeLuminance();
+      final second = background.computeLuminance();
+      final ratio = (first > second ? first + 0.05 : second + 0.05) /
+          (first > second ? second + 0.05 : first + 0.05);
+      expect(ratio, greaterThanOrEqualTo(7), reason: '${text.data}: high-contrast text at both gradient endpoints');
+    }
+  }
+}
+
 void main() {
   testWidgets('STORESEARCH recent terms recall cap typing and stale scope', (
     tester,
@@ -2241,6 +2258,12 @@ void main() {
       expect(find.text('Stock & visibility'), findsOneWidget);
       for (final id in ['sales', 'stock', 'orders', 'money', 'capital']) {
         expect(find.byKey(Key('store-category-toggle-$id')), findsOneWidget);
+        _expectHomeCategoryContrast(tester, id);
+        expect(tester.getSize(find.byKey(Key('store-category-toggle-$id'))).height, greaterThanOrEqualTo(48));
+      }
+      if (display.$1.width == 360 && display.$2 == 1) {
+        expect(tester.getRect(find.byKey(const Key('store-overview-stock-days'))).bottom,
+          lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-store-operating-board'))).bottom));
       }
       for (final id in ['billed', 'collections', 'stock-cost', 'low-stock',
         'recorded-open-orders', 'overdue-fulfilment', 'customer-dues', 'payables', 'trade-cash', 'stock-days']) {
@@ -2260,6 +2283,9 @@ void main() {
       expect(find.byKey(const Key('store-overview-stock-spread')), findsNothing);
       await _toggleHomeCategory(tester, 'stock');
       await _toggleHomeCategory(tester, 'money');
+      for (final id in ['sales', 'stock', 'money']) {
+        _expectHomeCategoryContrast(tester, id);
+      }
       expect(find.text('Current stock value'), findsOneWidget);
       for (final label in ['Billed today', 'Collected today', 'Invoices today',
         'Saved products', 'Low stock', 'Out of stock', 'Money in stock',
@@ -2299,7 +2325,7 @@ void main() {
         expect(billedRect.right, lessThan(collectedRect.left));
         expect(tester.widget<DecoratedBox>(find.byKey(const Key('store-category-stock'))).decoration,
           isA<BoxDecoration>());
-        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 16);
+        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 17);
         expect(find.byKey(const Key('store-metric-tile-billed')), findsNothing);
       } else if (display.$2 == 2) {
         final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
@@ -2543,6 +2569,11 @@ void main() {
       expect(value('stock-spread'), '₹80');
       expect(value('low-stock'), '1');
       expect(find.byKey(const Key('store-insight-replenish')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('store-insight-replenish')),
+        matching: find.byIcon(Icons.chevron_right)), findsOneWidget,
+        reason: 'An expanded alert has one destination affordance, not duplicate arrows');
+      expect(find.descendant(of: find.byKey(const Key('store-insight-replenish')),
+        matching: find.byIcon(Icons.warning_amber_rounded)), findsOneWidget);
       expect(find.byKey(const Key('store-insight-visibility')), findsOneWidget);
       expect(find.byKey(const Key('store-insight-price')), findsNothing);
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
