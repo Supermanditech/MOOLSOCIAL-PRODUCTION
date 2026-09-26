@@ -2237,21 +2237,31 @@ void main() {
         'Saved products', 'Low stock', 'Out of stock', 'Stock cost value',
         'Stock sale value', 'Potential profit*']) {
         expect(find.text(label), findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
+        expect(paragraph.size.height,
+          greaterThanOrEqualTo(paragraph.getMaxIntrinsicHeight(paragraph.size.width) - 0.1),
+          reason: '$label must not clip its wrapped text');
       }
       expect(find.text('Decisions & next steps'), findsOneWidget);
       expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
       expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
       expect(tester.widget<Text>(find.byKey(const Key('store-overview-average-bill'))).data, '—');
       if (display.$1.width == 360 && display.$2 == 1) {
-        final billedRect = tester.getRect(find.byKey(const Key('store-metric-tile-billed')));
-        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-tile-collections')));
+        final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
+        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
         expect(billedRect.top, collectedRect.top);
         expect(billedRect.height, collectedRect.height);
         expect(billedRect.right, lessThan(collectedRect.left));
-        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 20);
+        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 18);
+        expect(tester.getRect(find.byKey(const Key('store-metric-band-invoice-count'))).top, billedRect.top);
+        expect(tester.getRect(find.byKey(const Key('store-overview-stock-spread'))).bottom,
+          lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-store-operating-board'))).bottom));
+        expect(find.byKey(const Key('store-metric-tile-billed')), findsNothing);
+        expect(tester.getRect(find.byKey(const Key('store-overview-stock-cost'))).top,
+          tester.getRect(find.byKey(const Key('store-overview-stock-spread'))).top);
       } else if (display.$2 == 2) {
-        final billedRect = tester.getRect(find.byKey(const Key('store-metric-tile-billed')));
-        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-tile-collections')));
+        final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
+        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
         expect(billedRect.bottom, lessThan(collectedRect.top));
       }
       final billedInfo = find.byKey(

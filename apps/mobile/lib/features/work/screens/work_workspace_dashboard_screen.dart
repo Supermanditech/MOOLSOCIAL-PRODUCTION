@@ -3902,7 +3902,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         controller: widget.scrollController,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
         child: Material(
-          color: const Color(0xFFF7F8FC),
+          color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: const BorderSide(color: Color(0xFFE5E8F1)),
@@ -4012,40 +4012,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                       'Selling value less purchase value · before tax, discounts and expenses',
                 ),
                 const SizedBox(height: 6),
-                const _OperatingSection('Decisions & next steps'),
-                if (!stockReady)
-                  const Text('Stock insights await saved inventory.',
-                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
-                if (unavailable > 0)
-                  _OperatingAttention(
-                    id: 'unavailable',
-                    title: '$unavailable products unavailable',
-                    detail: 'Out of stock or marked unavailable. Review availability before taking orders.',
-                    action: 'Review stock',
-                    onTap: widget.onStock,
-                    color: const Color(0xFFB3261E),
-                  ),
-                if (replenish > 0)
-                  _OperatingAttention(
-                    id: 'replenish',
-                    title: '$replenish products running low',
-                    detail: 'Still in stock, at or below their individual alert levels. Review replenishment.',
-                    action: 'Review stock',
-                    onTap: widget.onStock,
-                    color: const Color(0xFF8A5100),
-                  ),
-                if (belowCost > 0)
-                  _OperatingAttention(
-                    id: 'price',
-                    title: '$belowCost products priced below cost',
-                    detail: 'Saved selling price is below purchase price for stock on hand. Check prices; this is not realised loss.',
-                    action: 'Review prices in Stock',
-                    onTap: widget.onStock,
-                    color: const Color(0xFF8A5100),
-                  ),
-                if (stockReady && unavailable == 0 && replenish == 0 && belowCost == 0)
-                  const Text('No availability, low-stock or below-cost alerts in saved inventory.',
-                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
                 _OperatingMetric(
                   id: 'average-bill',
                   label: 'Average bill today',
@@ -4091,6 +4057,40 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     key: Key('store-insights-finance-unavailable'),
                     style: TextStyle(fontSize: 12, color: MoolColors.muted)),
                 const SizedBox(height: 8),
+                const _OperatingSection('Decisions & next steps'),
+                if (!stockReady)
+                  const Text('Stock insights await saved inventory.',
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                if (unavailable > 0)
+                  _OperatingAttention(
+                    id: 'unavailable',
+                    title: '$unavailable products unavailable',
+                    detail: 'Out of stock or marked unavailable. Review availability before taking orders.',
+                    action: 'Review stock',
+                    onTap: widget.onStock,
+                    color: const Color(0xFFB3261E),
+                  ),
+                if (replenish > 0)
+                  _OperatingAttention(
+                    id: 'replenish',
+                    title: '$replenish products running low',
+                    detail: 'Still in stock, at or below their individual alert levels. Review replenishment.',
+                    action: 'Review stock',
+                    onTap: widget.onStock,
+                    color: const Color(0xFF8A5100),
+                  ),
+                if (belowCost > 0)
+                  _OperatingAttention(
+                    id: 'price',
+                    title: '$belowCost products priced below cost',
+                    detail: 'Saved selling price is below purchase price for stock on hand. Check prices; this is not realised loss.',
+                    action: 'Review prices in Stock',
+                    onTap: widget.onStock,
+                    color: const Color(0xFF8A5100),
+                  ),
+                if (stockReady && unavailable == 0 && replenish == 0 && belowCost == 0)
+                  const Text('No availability, low-stock or below-cost alerts in saved inventory.',
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
                 const Text(
                   'Public activity & forecasts · Not connected',
                   style: TextStyle(
@@ -4154,17 +4154,22 @@ class _OperatingSection extends StatelessWidget {
   final String title;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 12, bottom: 4),
-    child: Text(
-      title,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: MoolColors.navy,
-      ),
-    ),
+    padding: const EdgeInsets.only(top: 4, bottom: 2),
+    child: Row(children: [
+      Icon(title == 'Inventory' || title == 'Stock value'
+          ? Icons.inventory_2_outlined : title == 'Money position'
+          ? Icons.account_balance_wallet_outlined : Icons.notifications_none,
+        size: 16, color: MoolColors.navy),
+      const SizedBox(width: 6),
+      Expanded(child: Text(title, style: const TextStyle(
+        fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy))),
+    ]),
   );
 }
+
+TextStyle _operatingCaptionStyle(BuildContext context) =>
+    Theme.of(context).textTheme.bodyMedium!.copyWith(
+      fontSize: 12, fontWeight: FontWeight.w500, color: MoolColors.muted);
 
 class _OperatingGroups extends StatelessWidget {
   const _OperatingGroups({required this.children});
@@ -4173,36 +4178,68 @@ class _OperatingGroups extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final paired = constraints.maxWidth >= 280 &&
-          MediaQuery.textScalerOf(context).scale(13) <= 17;
+      final scale = MediaQuery.textScalerOf(context);
       final arranged = <Widget>[];
       for (var i = 0; i < children.length; i++) {
-        final current = children[i];
-        if (current is! _OperatingMetric) {
-          arranged.add(current);
+        if (children[i] is! _OperatingMetric) {
+          arranged.add(children[i]);
           continue;
         }
-        final next = i + 1 < children.length ? children[i + 1] : null;
-        final canPair = paired && current.id != 'stock-spread' &&
-            current.value.length <= 8 && next is _OperatingMetric &&
-            next.id != 'stock-spread' && next.value.length <= 8;
-        arranged.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: canPair
-              ? IntrinsicHeight(child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: current),
-                    const SizedBox(width: 8),
-                    Expanded(child: next),
-                  ],
-                ))
-              : _OperatingMetric(id: current.id, label: current.label,
-                  value: current.value, detail: current.detail,
-                  alertColor: current.alertColor, onTap: current.onTap,
-                  compact: paired),
-        ));
-        if (canPair) i++;
+        final metrics = <_OperatingMetric>[];
+        while (i < children.length && children[i] is _OperatingMetric) {
+          metrics.add(children[i++] as _OperatingMetric);
+        }
+        i--;
+        var columns = constraints.maxWidth >= 290 && scale.scale(12) <= 15
+            ? 3 : constraints.maxWidth >= 280 && scale.scale(12) <= 19 ? 2 : 1;
+        // Measure amounts instead of truncating digits to fit the layout.
+        for (final metric in metrics) {
+          final measure = TextPainter(
+            text: TextSpan(text: metric.value,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            textDirection: Directionality.of(context), textScaler: scale,
+          )..layout();
+          while (columns > 1 &&
+              measure.width + 28 > (constraints.maxWidth - (columns - 1) * 10) / columns) {
+            columns--;
+          }
+          measure.dispose();
+        }
+        for (var start = 0; start < metrics.length; start += columns) {
+          final row = metrics.skip(start).take(columns).toList();
+          var captionHeight = 0.0;
+          final cellWidth = (constraints.maxWidth - (row.length - 1) * 10) / row.length;
+          for (final metric in row) {
+            final caption = TextPainter(
+              text: TextSpan(text: metric.label,
+                style: _operatingCaptionStyle(context)),
+              textDirection: Directionality.of(context), textScaler: scale,
+            )..layout(maxWidth: cellWidth);
+            if (caption.height > captionHeight) captionHeight = caption.height;
+            caption.dispose();
+          }
+          arranged.add(Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: IntrinsicHeight(child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var col = 0; col < row.length; col++) ...[
+                  if (col > 0) const SizedBox(width: 10),
+                  Expanded(child: _OperatingMetric(
+                    id: row[col].id, label: row[col].label, value: row[col].value,
+                    detail: row[col].detail, alertColor: row[col].alertColor,
+                    onTap: row[col].onTap, captionHeight: captionHeight.ceilToDouble() + 2,
+                  )),
+                ],
+              ],
+            )),
+          ));
+        }
+        if (metrics.any((m) => m.id == 'stock-spread')) {
+          arranged.add(const Text(
+            '*Potential from unsold stock · before tax, discounts & expenses; not net profit',
+            style: TextStyle(fontSize: 11, color: MoolColors.muted)));
+        }
       }
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
         children: arranged);
@@ -4214,25 +4251,15 @@ class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
     required this.id, required this.label, required this.value,
     required this.detail, this.alertColor, this.onTap,
-    this.compact = false,
+    this.captionHeight,
   });
   final String id, label, value, detail;
   final Color? alertColor;
-  final bool compact;
+  final double? captionHeight;
   final VoidCallback? onTap;
   bool get showInfo => !const {
     'invoice-count', 'skus', 'low-stock', 'out-of-stock',
   }.contains(id);
-
-  IconData get metricIcon => switch (id) {
-    'billed' || 'invoice-count' || 'average-bill' => Icons.receipt_long_outlined,
-    'collections' || 'customer-dues' => Icons.account_balance_wallet_outlined,
-    'skus' || 'stock-cost' || 'stock-sale' => Icons.inventory_2_outlined,
-    'low-stock' || 'out-of-stock' => Icons.inventory_outlined,
-    'stock-spread' => Icons.trending_up_rounded,
-    'recorded-open-orders' => Icons.shopping_bag_outlined,
-    _ => Icons.account_balance_outlined,
-  };
 
   void _explain(BuildContext context) => showDialog<void>(
     context: context,
@@ -4245,65 +4272,39 @@ class _OperatingMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    key: Key('store-metric-tile-$id'),
-    color: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: const BorderSide(color: Color(0xFFE5E8F1)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      key: Key('store-overview-open-$id'),
-      onTap: onTap ?? (showInfo ? () => _explain(context) : null),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Icon(metricIcon, size: 18, color: MoolColors.navy),
-              if (compact) ...[
-                const SizedBox(width: 8),
-                Expanded(child: Text(label, style: const TextStyle(fontSize: 13,
-                  fontWeight: FontWeight.w500, color: MoolColors.ink))),
-                const SizedBox(width: 8),
-                Expanded(child: Text(value, key: Key('store-overview-$id'),
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
-                    color: alertColor ?? MoolColors.navy))),
-              ] else const Spacer(),
-              SizedBox(
-                key: Key('store-overview-control-$id'),
-                width: 48, height: 48,
-                child: onTap != null
-                    ? IconButton(onPressed: onTap, tooltip: 'Open $label',
-                        icon: const Icon(Icons.chevron_right_rounded,
-                          size: 18, color: MoolColors.muted))
-                    : showInfo
-                    ? IconButton(key: Key('store-overview-info-$id'),
-                        tooltip: 'About $label', onPressed: () => _explain(context),
-                        icon: const Icon(Icons.info_outline_rounded,
-                          size: 18, color: MoolColors.muted))
-                    : null,
-              ),
-            ]),
-            if (!compact) ...[
-            Text(label, style: const TextStyle(fontSize: 13,
-              fontWeight: FontWeight.w500, color: MoolColors.ink)),
-            const SizedBox(height: 6),
-            _StoreValueMotion(value: value, child: Text(value,
-              key: Key('store-overview-$id'),
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
-                color: alertColor ?? MoolColors.navy))),
-            ],
-            if (id == 'billed')
-              const Text('Before returns', style: TextStyle(fontSize: 11,
-                color: MoolColors.muted)),
-            if (id == 'stock-spread')
-              const Text(
-                '*Potential from unsold stock · before tax, discounts & expenses; not net profit',
-                style: TextStyle(fontSize: 11, color: MoolColors.muted)),
-          ],
+    key: Key('store-metric-band-$id'),
+    color: Colors.transparent,
+    child: Tooltip(
+      message: detail,
+      child: InkWell(
+        key: Key(onTap == null && showInfo
+            ? 'store-overview-info-$id' : 'store-overview-open-$id'),
+        onTap: onTap ?? (showInfo ? () => _explain(context) : null),
+        borderRadius: BorderRadius.circular(6),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: captionHeight,
+                  child: Text(label, style: _operatingCaptionStyle(context))),
+                const SizedBox(height: 3),
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  Expanded(child: _StoreValueMotion(value: value, child: Text(value,
+                    key: Key('store-overview-$id'),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+                      color: alertColor ?? MoolColors.navy)))),
+                  if (onTap != null)
+                    const Icon(Icons.north_east_rounded, size: 14, color: MoolColors.muted),
+                ]),
+                if (id == 'billed')
+                  const Text('Before returns', style: TextStyle(fontSize: 11,
+                    color: MoolColors.muted)),
+              ],
+            ),
+          ),
         ),
       ),
     ),
