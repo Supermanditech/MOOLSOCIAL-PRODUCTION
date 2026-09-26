@@ -432,6 +432,15 @@ class BuyV2VariantAttribute {
 
 /// Provider definition of one sellable SKU, independent of order quantity.
 /// Net content describes each contained unit, never the entire outer case.
+class BuyV2PackPriceTier {
+  const BuyV2PackPriceTier({required this.minimumPacks, required this.price});
+
+  final int minimumPacks;
+
+  /// Uses the same currency unit as BuyV2Product.price.
+  final int price;
+}
+
 class BuyV2PackTerms {
   const BuyV2PackTerms({
     required this.skuId,
@@ -443,6 +452,12 @@ class BuyV2PackTerms {
     this.quantityStep = 1,
     this.requiresMeasurement = false,
     this.unitPriceLabel,
+    this.priceTiers = const [],
+    this.pricingStoreId,
+    this.priceObservedAt,
+    this.priceValidUntil,
+    this.pricesIncludeTax,
+    this.pricesIncludeFreight,
   });
 
   final String skuId;
@@ -454,6 +469,64 @@ class BuyV2PackTerms {
   final int quantityStep;
   final bool requiresMeasurement;
   final String? unitPriceLabel;
+  final List<BuyV2PackPriceTier> priceTiers;
+  final String? pricingStoreId;
+  final DateTime? priceObservedAt;
+  final DateTime? priceValidUntil;
+  final bool? pricesIncludeTax;
+  final bool? pricesIncludeFreight;
+
+  bool validPricingFor(String? storeId, int minimumOrder) {
+    if (priceTiers.isEmpty) {
+      return pricingStoreId == null &&
+          priceObservedAt == null &&
+          priceValidUntil == null &&
+          pricesIncludeTax == null &&
+          pricesIncludeFreight == null;
+    }
+    // A single converted-unit label cannot describe several changing prices.
+    // Until per-tier unit quotes are supplied, show the exact pack basis only.
+    if (unitPriceLabel != null ||
+        storeId == null ||
+        storeId.trim().isEmpty ||
+        pricingStoreId != storeId ||
+        priceObservedAt == null ||
+        priceValidUntil == null ||
+        !priceValidUntil!.isAfter(priceObservedAt!) ||
+        priceTiers.first.minimumPacks != minimumOrder) {
+      return false;
+    }
+    var previousMinimum = 0;
+    int? previousPrice;
+    for (final tier in priceTiers) {
+      if (tier.minimumPacks <= previousMinimum ||
+          tier.minimumPacks > 9007199254740991 ||
+          tier.price < 0 ||
+          tier.price > 9007199254740991 ||
+          (previousPrice != null && tier.price > previousPrice)) {
+        return false;
+      }
+      previousMinimum = tier.minimumPacks;
+      previousPrice = tier.price;
+    }
+    return true;
+  }
+
+  bool pricingCurrentAt(DateTime now) =>
+      priceTiers.isEmpty ||
+      (priceObservedAt != null &&
+          !priceObservedAt!.isAfter(now) &&
+          priceValidUntil != null &&
+          now.isBefore(priceValidUntil!));
+
+  int priceForQuantity(int quantity, int fallback) {
+    var result = fallback;
+    for (final tier in priceTiers) {
+      if (quantity < tier.minimumPacks) break;
+      result = tier.price;
+    }
+    return result;
+  }
 
   bool isValidFor(String id) =>
       skuId == id &&
@@ -611,9 +684,16 @@ class BuyV2Product {
   bool get hasValidPackTerms =>
       packTerms == null ||
       (packTerms!.isValidFor(id) &&
+          packTerms!.validPricingFor(storeId, minimumOrder) &&
           pack == packTerms!.label &&
           unitPrice == (packTerms!.unitPriceLabel ?? ''));
   int get quantityStep => packTerms?.quantityStep ?? 1;
+  int minimumOrderTotal(int currentPrice) =>
+      (hasValidPackTerms
+          ? packTerms?.priceForQuantity(minimumOrder, currentPrice) ??
+                currentPrice
+          : currentPrice) *
+      minimumOrder;
   final int price;
   final String unitPrice;
   final String badge;

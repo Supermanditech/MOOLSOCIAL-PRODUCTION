@@ -14,21 +14,44 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+final class _PackCustomerStore implements BuyV2CustomerStateStore {
+  _PackCustomerStore(this.snapshot);
+  BuyV2CustomerStateSnapshot snapshot;
+  @override
+  String get ownerScope => 'cat04-pack-customer';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
+
 final class _MediaHttpClient extends Fake implements HttpClient {
-  _MediaHttpClient(this.bytes, {this.responses = const {}});
+  _MediaHttpClient(
+    this.bytes, {
+    this.responses = const {},
+    this.delayedResponses = const {},
+  });
   final Uint8List bytes;
   final Map<Uri, Uint8List> responses;
+  final Map<Uri, Future<Uint8List>> delayedResponses;
   final requested = <Uri>[];
   @override
   Future<HttpClientRequest> getUrl(Uri url) async {
     requested.add(url);
-    return _MediaHttpRequest(responses[url] ?? bytes);
+    final delayed = delayedResponses[url];
+    return _MediaHttpRequest(
+      delayed == null ? responses[url] ?? bytes : await delayed,
+    );
   }
 }
 
@@ -280,6 +303,190 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
 }
 
 void main() {
+  testWidgets('CAT08 paths retain exact variant through Cart and Saved', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    for (final scale in [1.0, 2.0]) {
+      for (final entry in ['Shop', 'Wholesale', 'Bulk', 'Offers', 'Store']) {
+        final core = BuySession();
+        final store = _PackCustomerStore(const BuyV2CustomerStateSnapshot());
+        final session = BuyV2Session(core: core, customerStateStore: store);
+        await session.restoreCustomerState();
+        final trade = entry == 'Wholesale' || entry == 'Bulk';
+        final sourceId = trade
+            ? 'w-rice'
+            : entry == 'Offers'
+            ? 'w-oil'
+            : 's-milk';
+        final variantId = trade
+            ? 'w-rice-50kg'
+            : entry == 'Offers'
+            ? 'w-oil-10l'
+            : 's-milk-500ml';
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (trade || entry == 'Offers') {
+          await tester.tap(
+            find.byKey(
+              ValueKey(
+                trade ? 'buy-local-tab-wholesale' : 'buy-local-tab-offers',
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        if (entry == 'Bulk') {
+          await tester.tap(
+            find.byKey(const ValueKey('buy-wholesale-sale-type-bulk')),
+          );
+          await tester.pumpAndSettle();
+          expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+        }
+        if (entry != 'Offers') {
+          await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('buy-search-field')),
+            trade ? 'rice' : 'milk',
+          );
+          await tester.pumpAndSettle();
+        }
+        final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
+        if (entry == 'Offers') {
+          await tester.scrollUntilVisible(
+            sourceCard,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-offers')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+        }
+        await tester.ensureVisible(sourceCard);
+        await tester.pumpAndSettle();
+        await tester.tap(sourceCard);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, sourceId, reason: '$entry $scale');
+        if (entry == 'Store') {
+          final action = find.byKey(
+            ValueKey('buy-shop-seller-action-$sourceId'),
+          );
+          await tester.scrollUntilVisible(
+            action,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          final sheet = find.byKey(ValueKey('buy-shop-seller-sheet-$sourceId'));
+          expect(sheet, findsOneWidget);
+          final storeCard = find.descendant(of: sheet, matching: sourceCard);
+          await tester.ensureVisible(storeCard);
+          await tester.pumpAndSettle();
+          await tester.tap(storeCard);
+          await tester.pumpAndSettle();
+        }
+        final option = find
+            .byKey(ValueKey('buy-product-variant-$variantId'))
+            .last;
+        final scroll = find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-$sourceId')).last,
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(option, 160, scrollable: scroll);
+        await tester.ensureVisible(option);
+        await tester.pumpAndSettle();
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        final selected = session.selectedProduct!;
+        expect(selected.id, variantId);
+        expect(selected.storeId, session.product(sourceId).storeId);
+        final add = find.byKey(ValueKey('buy-product-primary-$variantId')).last;
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(variantId), selected.minimumOrder);
+        expect(session.quantityFor(sourceId), 0);
+        final save = find.byKey(ValueKey('buy-product-action-save-$variantId'));
+        await tester.scrollUntilVisible(
+          save,
+          -200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$variantId')).last,
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(session.isSaved(variantId), isTrue);
+        final cart = find
+            .byKey(const ValueKey('buy-cart-navigation-button'))
+            .last;
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.cartLines.single.product.id, variantId);
+        expect(session.cartLines.single.product.storeId, selected.storeId);
+        expect(session.cartLines.single.product.pack, selected.pack);
+        expect(session.cartLines.single.product.price, selected.price);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, variantId);
+        expect(session.view, BuyV2View.product);
+        expect(tester.takeException(), isNull, reason: '$entry $scale');
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        session.dispose();
+        core.dispose();
+        final restoredCore = BuySession();
+        final restored = BuyV2Session(
+          core: restoredCore,
+          customerStateStore: store,
+        );
+        await restored.restoreCustomerState();
+        expect(restored.quantityFor(variantId), selected.minimumOrder);
+        expect(restored.isSaved(variantId), isTrue);
+        expect(restored.cartLines.single.product.id, variantId);
+        expect(restored.cartLines.single.product.storeId, selected.storeId);
+        expect(restored.openProduct(variantId), isTrue);
+        expect(restored.selectedProduct?.pack, selected.pack);
+        restored.dispose();
+        restoredCore.dispose();
+      }
+    }
+  });
+
   BuyV2Product packProduct({BuyV2PackTerms? terms}) =>
       BuyV2Catalogue.products.first.copyWith(
         id: 'case-review',
@@ -298,13 +505,19 @@ void main() {
             ),
       );
 
-  Future<BuyV2Session> packSession(BuyV2Product product) async {
+  Future<BuyV2Session> packSession(
+    BuyV2Product product, {
+    DateTime Function()? now,
+    BuyV2CustomerStateStore? stateStore,
+  }) async {
     final core = BuySession();
     final session = BuyV2Session(
       core: core,
       commerceAdapter: _MediaCommerce(product),
       reviewDataEnabled: false,
       productFactsAdapter: QualifiedTestProductFacts({product.id}),
+      catalogueNow: now ?? DateTime.now,
+      customerStateStore: stateStore,
     );
     addTearDown(core.dispose);
     addTearDown(session.dispose);
@@ -402,6 +615,244 @@ void main() {
     },
   );
 
+  BuyV2Product tierProduct(
+    DateTime now, {
+    String storeId = 'case-store',
+    List<BuyV2PackPriceTier> tiers = const [
+      BuyV2PackPriceTier(minimumPacks: 2, price: 400),
+      BuyV2PackPriceTier(minimumPacks: 5, price: 380),
+      BuyV2PackPriceTier(minimumPacks: 8, price: 360),
+    ],
+  }) => packProduct(
+    terms: BuyV2PackTerms(
+      skuId: 'case-review',
+      revision: 'tier-1',
+      sellUnit: 'Case',
+      containedUnits: 4,
+      netContentMilli: 1000,
+      contentUnit: 'L',
+      quantityStep: 3,
+      pricingStoreId: storeId,
+      priceObservedAt: now.subtract(const Duration(minutes: 1)),
+      priceValidUntil: now.add(const Duration(minutes: 10)),
+      priceTiers: tiers,
+    ),
+  ).copyWith(price: 400);
+
+  test('CAT04 tiers reprice complete Cart line in both directions', () async {
+    final now = DateTime.now();
+    final product = tierProduct(now);
+    final session = await packSession(product, now: () => now);
+    expect(session.addProduct(product.id), isTrue);
+    expect(session.cartTotal, 800);
+    session.increase(product.id);
+    expect(session.quantityFor(product.id), 5);
+    expect(session.cartLines.single.product.price, 380);
+    expect(session.cartTotal, 1900);
+    expect(session.productFactsFor(product).price, 380);
+    expect(session.setCartQuantity(product.id, '4'), isFalse);
+    expect(session.cartTotal, 1900);
+    expect(session.addProduct(product.id), isTrue);
+    expect(session.cartTotal, 2880);
+    session.decrease(product.id);
+    expect(session.cartTotal, 1900);
+    session.decrease(product.id);
+    expect(session.cartTotal, 800);
+    expect(session.cartLines.single.product.packTerms!.revision, 'tier-1');
+    expect(session.cartLines.single.product.storeId, 'case-store');
+  });
+
+  test(
+    'CAT04 invalid and expired tiers cannot authorize Add or checkout',
+    () async {
+      var now = DateTime.now();
+      for (final product in [
+        tierProduct(now, storeId: 'foreign-store'),
+        tierProduct(
+          now,
+          tiers: const [
+            BuyV2PackPriceTier(minimumPacks: 2, price: 400),
+            BuyV2PackPriceTier(minimumPacks: 2, price: 380),
+          ],
+        ),
+        tierProduct(
+          now,
+          tiers: const [
+            BuyV2PackPriceTier(minimumPacks: 2, price: 400),
+            BuyV2PackPriceTier(minimumPacks: 5, price: -1),
+          ],
+        ),
+      ]) {
+        final session = await packSession(product, now: () => now);
+        expect(session.addProduct(product.id), isFalse);
+        expect(session.cartLines, isEmpty);
+      }
+      final product = tierProduct(now);
+      final session = await packSession(product, now: () => now);
+      expect(session.addProduct(product.id), isTrue);
+      now = now.add(const Duration(minutes: 11));
+      expect(session.productFactsFor(product).stale, isTrue);
+      expect(session.addProduct(product.id), isFalse);
+      expect(session.setCartQuantity(product.id, '5'), isFalse);
+      expect(session.openCheckout(), isFalse);
+      expect(session.cartTotal, 800);
+      session.remove(product.id);
+      expect(session.cartLines, isEmpty);
+    },
+  );
+
+  test(
+    'CAT04 tier prices keep offer controls available without masking real price changes',
+    () async {
+      final product = tierProduct(DateTime.now());
+      final session = await packSession(product);
+      expect(session.addProduct(product.id), isTrue);
+      for (final quantity in [2, 5, 8, 5, 2]) {
+        expect(session.setCartQuantity(product.id, '$quantity'), isTrue);
+        final facts = session.productFactsFor(product);
+        expect(
+          buyV2ResolveProductOfferDecision(
+            product: product,
+            facts: facts,
+            quantity: quantity,
+          ).canAdd,
+          isTrue,
+        );
+        expect(
+          buyV2ResolveProductOfferDecision(
+            product: product,
+            facts: facts.copyWith(price: facts.price + 1),
+            quantity: quantity,
+          ).state,
+          BuyV2ProductOfferDecisionState.changedPrice,
+        );
+        expect(
+          buyV2ResolveProductOfferDecision(
+            product: product,
+            facts: facts.copyWith(stale: true),
+            quantity: quantity,
+          ).canAdd,
+          isFalse,
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'CAT04 tier table and Cart totals stay consistent at enlarged text',
+    (tester) async {
+      for (final scale in [1.0, 2.0]) {
+        final product = tierProduct(DateTime.now());
+        final session = await packSession(product);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(session: session, productId: product.id),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final details = find.byKey(
+          ValueKey('buy-product-price-details-${product.id}'),
+        );
+        await tester.scrollUntilVisible(
+          details,
+          140,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        expect(find.text('5+ packs'), findsOneWidget);
+        expect(find.text('₹380 / Case'), findsOneWidget);
+        expect(find.text('Not yet confirmed'), findsNWidgets(2));
+        expect(find.text('Total'), findsNothing);
+        expect(session.addProduct(product.id), isTrue);
+        session.increase(product.id);
+        await tester.pumpAndSettle();
+        expect(session.productFactsFor(product).price, 380);
+        final quantityControl = find.byKey(
+          ValueKey('buy-product-quantity-${product.id}'),
+        );
+        await tester.ensureVisible(quantityControl);
+        await tester.pumpAndSettle();
+        expect(quantityControl.hitTestable(), findsOneWidget);
+        expect(find.text('Price changed'), findsNothing);
+        session.openCart();
+        await tester.pumpAndSettle();
+        expect(session.cartTotal, 1900);
+        expect(find.text('₹1,900'), findsWidgets);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+
+  test(
+    'CAT04 restored Cart uses exact pack tier and preserves Saved identity',
+    () async {
+      final product = tierProduct(DateTime.now());
+      final key = 'shop|listing:${Uri.encodeComponent(product.id)}';
+      final store = _PackCustomerStore(
+        BuyV2CustomerStateSnapshot(
+          cartQuantities: {product.id: 5},
+          savedProductKeys: {key},
+        ),
+      );
+      final session = await packSession(product, stateStore: store);
+      await session.restoreCustomerState();
+      expect(session.cartLines.single.product.id, product.id);
+      expect(session.cartLines.single.product.storeId, product.storeId);
+      expect(session.cartLines.single.product.pack, '4 × 1 L · Case');
+      expect(session.quantityFor(product.id), 5);
+      expect(session.cartTotal, 1900);
+      expect(session.cartLines.single.product.price, 380);
+      expect(store.snapshot.savedProductKeys, contains(key));
+    },
+  );
+
+  test(
+    'CAT04 reorder uses current tier without rewriting historical order',
+    () async {
+      final product = tierProduct(DateTime.now());
+      final session = await packSession(product);
+      final order = BuyV2Order(
+        id: 'historical-tier-order',
+        destination: product.destination,
+        title: product.title,
+        itemSummary: product.pack,
+        total: 2100,
+        partner: 'Previous supplier',
+        partnerType: 'Retailer',
+        promise: 'Delivered',
+        destinationLabel: 'Shop',
+        progress: 1,
+        status: BuyV2OrderStatus.delivered,
+        productIds: [product.id],
+        lines: [
+          BuyV2CartLine(product: product.copyWith(price: 420), quantity: 5),
+        ],
+      );
+      expect(session.reorder(order), isTrue);
+      expect(session.quantityFor(product.id), 2);
+      expect(session.cartTotal, 800);
+      expect(session.reorder(order), isTrue);
+      expect(session.quantityFor(product.id), 5);
+      expect(session.cartTotal, 1900);
+      expect(order.total, 2100);
+      expect(order.lines.single.product.price, 420);
+      expect(order.lines.single.total, 2100);
+    },
+  );
+
   testWidgets(
     'CAT04 pack step controls preserve exact SKU in product and Cart',
     (tester) async {
@@ -455,6 +906,94 @@ void main() {
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       }
+    },
+  );
+
+  test('CAT08 restore rejects same SKU reassigned to another Store', () async {
+    final product = BuyV2Catalogue.products.first.copyWith(
+      storeId: 'original-store',
+    );
+    final store = _PackCustomerStore(const BuyV2CustomerStateSnapshot());
+    final first = await packSession(product, stateStore: store);
+    await first.restoreCustomerState();
+    expect(first.addProduct(product.id), isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(store.snapshot.cartQuantities[product.id], product.minimumOrder);
+    final restored = await packSession(
+      product.copyWith(storeId: 'foreign-store'),
+      stateStore: store,
+    );
+    await restored.restoreCustomerState();
+    expect(restored.customerStateRecoveryPending, isTrue);
+    expect(restored.cartLines, isEmpty);
+    expect(store.snapshot.cartQuantities[product.id], product.minimumOrder);
+  });
+
+  test(
+    'CAT08 restore allows display and price updates for exact identity',
+    () async {
+      final product = BuyV2Catalogue.products.first.copyWith(
+        storeId: 'original-store',
+      );
+      final store = _PackCustomerStore(const BuyV2CustomerStateSnapshot());
+      final first = await packSession(product, stateStore: store);
+      await first.restoreCustomerState();
+      expect(first.addProduct(product.id), isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.snapshot.productIdentityKeys, contains(product.id));
+      final restored = await packSession(
+        product.copyWith(
+          title: 'Updated product label',
+          price: product.price + 1,
+        ),
+        stateStore: store,
+      );
+      await restored.restoreCustomerState();
+      expect(restored.customerStateRecoveryPending, isFalse);
+      expect(restored.cartLines.single.product.title, 'Updated product label');
+      expect(restored.cartLines.single.product.price, product.price + 1);
+      expect(restored.quantityFor(product.id), product.minimumOrder);
+    },
+  );
+
+  test(
+    'CAT08 restore rejects same SKU reassigned to another product family',
+    () async {
+      final product = BuyV2Catalogue.products.first.copyWith(
+        storeId: 'original-store',
+      );
+      final store = _PackCustomerStore(const BuyV2CustomerStateSnapshot());
+      final first = await packSession(product, stateStore: store);
+      await first.restoreCustomerState();
+      expect(first.addProduct(product.id), isTrue);
+      await Future<void>.delayed(Duration.zero);
+      final restored = await packSession(
+        product.copyWith(canonicalId: 'different-product-family'),
+        stateStore: store,
+      );
+      await restored.restoreCustomerState();
+      expect(restored.customerStateRecoveryPending, isTrue);
+      expect(restored.cartLines, isEmpty);
+      expect(restored.openProduct(product.id), isFalse);
+      expect(restored.addProduct(product.id), isFalse);
+      expect(store.snapshot.cartQuantities[product.id], product.minimumOrder);
+    },
+  );
+
+  test(
+    'CAT04 restored invalid pack step requires correction before checkout',
+    () async {
+      final product = tierProduct(DateTime.now());
+      final store = _PackCustomerStore(
+        BuyV2CustomerStateSnapshot(cartQuantities: {product.id: 4}),
+      );
+      final session = await packSession(product, stateStore: store);
+      await session.restoreCustomerState();
+      expect(session.quantityFor(product.id), 4);
+      expect(session.openCheckout(), isFalse);
+      expect(session.setCartQuantity(product.id, '5'), isTrue);
+      expect(session.cartTotal, 1900);
+      expect(session.openCheckout(), isTrue);
     },
   );
 
@@ -1478,9 +2017,14 @@ void main() {
     ({_MediaHttpClient client, VoidCallback restore}) installMediaClient(
       Uint8List bytes, {
       Map<Uri, Uint8List> responses = const {},
+      Map<Uri, Future<Uint8List>> delayedResponses = const {},
     }) {
       final previous = debugNetworkImageHttpClientProvider;
-      final client = _MediaHttpClient(bytes, responses: responses);
+      final client = _MediaHttpClient(
+        bytes,
+        responses: responses,
+        delayedResponses: delayedResponses,
+      );
       imageCache.clear();
       imageCache.clearLiveImages();
       debugNetworkImageHttpClientProvider = () => client;
@@ -1509,6 +2053,306 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    for (final destination in [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+    ]) {
+      testWidgets(
+        'CAT03 late photo cannot replace selected variant ${destination.name}',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final oldBytes = (await tester.runAsync(
+            () => _mediaFitFixture(128, 256),
+          ))!;
+          final newBytes = (await tester.runAsync(
+            () => _mediaFitFixture(256, 128),
+          ))!;
+          final delayed = Completer<Uint8List>();
+          final base = BuyV2Catalogue.products
+              .firstWhere((item) => item.destination == destination)
+              .copyWith(storeId: 'supplier-store');
+          final oldAsset = asset(
+            id: 'late-original',
+            sku: base.id,
+            canonical: base.canonicalId,
+            file: photo(mime: 'image/png', width: 128, height: 256),
+          );
+          final nextAsset = asset(
+            id: 'current-variant',
+            sku: 'cat03-next-sku',
+            canonical: base.canonicalId,
+            file: photo(mime: 'image/png', width: 256, height: 128),
+          );
+          final first = base.copyWith(mediaAssets: [oldAsset]);
+          final second = first.copyWith(
+            id: 'cat03-next-sku',
+            variant: 'Second exact pack',
+            mediaAssets: [nextAsset],
+          );
+          final media = installMediaClient(
+            newBytes,
+            delayedResponses: {Uri.parse(oldAsset.source!): delayed.future},
+          );
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: _MediaCommerce(first, otherProducts: [second]),
+            reviewDataEnabled: false,
+            productFactsAdapter: QualifiedTestProductFacts({
+              first.id,
+              second.id,
+            }),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          try {
+            await session.restoreCommerce();
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                home: BuyV2Screen(session: session, onExit: () {}),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(session.openProduct(first.id), isTrue);
+            await tester.pump();
+            for (
+              var tick = 0;
+              tick < 30 &&
+                  !media.client.requested.contains(Uri.parse(oldAsset.source!));
+              tick++
+            ) {
+              await tester.runAsync(
+                () => Future<void>.delayed(const Duration(milliseconds: 20)),
+              );
+              await tester.pump();
+            }
+            expect(
+              media.client.requested,
+              contains(Uri.parse(oldAsset.source!)),
+            );
+            expect(delayed.isCompleted, isFalse);
+            expect(session.openProduct(second.id), isTrue);
+            await tester.pump();
+            final current = find.byKey(
+              const ValueKey('buy-product-gallery-network-current-variant'),
+            );
+            await awaitMedia(
+              tester,
+              () => tester
+                  .widgetList<RawImage>(
+                    find.descendant(
+                      of: current,
+                      matching: find.byType(RawImage),
+                    ),
+                  )
+                  .any((raw) => raw.image != null),
+            );
+            delayed.complete(oldBytes);
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 100)),
+            );
+            await tester.pumpAndSettle();
+            final image = tester
+                .widget<RawImage>(
+                  find.descendant(of: current, matching: find.byType(RawImage)),
+                )
+                .image!;
+            expect(image.width, 256);
+            expect(image.height, 128);
+            expect(session.selectedProductId, second.id);
+            expect(
+              find.byKey(
+                const ValueKey('buy-product-gallery-network-late-original'),
+              ),
+              findsNothing,
+            );
+            expect(session.cartLines, isEmpty);
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+          } finally {
+            if (!delayed.isCompleted) delayed.complete(oldBytes);
+            media.restore();
+          }
+        },
+      );
+    }
+
+    testWidgets(
+      'CAT03 gallery counter matches visible photo after Cart return',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final bytes = (await tester.runAsync(
+          () => _mediaFitFixture(128, 256),
+        ))!;
+        final media = installMediaClient(bytes);
+        final current = product.copyWith(
+          mediaAssets: [
+            asset(
+              id: 'front',
+              file: photo(mime: 'image/png', width: 128, height: 256),
+            ),
+            asset(
+              id: 'back',
+              file: photo(mime: 'image/png', width: 128, height: 256),
+            ),
+          ],
+        );
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: _MediaCommerce(current),
+          reviewDataEnabled: false,
+          productFactsAdapter: QualifiedTestProductFacts({current.id}),
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        try {
+          await session.restoreCommerce();
+          session.openProduct(current.id);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: session.destination,
+                initialView: session.view,
+                productId: current.id,
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          final gallery = find.byKey(
+            ValueKey('buy-product-gallery-${current.id}'),
+          );
+          await tester.drag(gallery, const Offset(-320, 0));
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          expect(
+            tester.widget<PageView>(gallery).controller!.page,
+            closeTo(1, .001),
+          );
+          expect(find.text('2 of 2'), findsOneWidget);
+          expect(session.addProduct(current.id), isTrue);
+          session.openCart();
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          session.goBack();
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          expect(session.selectedProductId, current.id);
+          expect(find.text('1 of 2'), findsOneWidget);
+          expect(
+            tester.widget<PageView>(gallery).controller!.page,
+            closeTo(0, .001),
+          );
+          expect(session.quantityFor(current.id), current.minimumOrder);
+          expect(tester.takeException(), isNull);
+        } finally {
+          media.restore();
+        }
+      },
+    );
+
+    testWidgets('CAT03 same media ID revision replaces image and resets zoom', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final oldBytes = (await tester.runAsync(
+        () => _mediaFitFixture(128, 256),
+      ))!;
+      final newBytes = (await tester.runAsync(
+        () => _mediaFitFixture(256, 128),
+      ))!;
+      final first = asset(
+        id: 'stable-photo-id',
+        file: photo(mime: 'image/png', width: 128, height: 256),
+      );
+      final revised = asset(
+        id: 'stable-photo-id',
+        revision: 'revision-2',
+        file: photo(mime: 'image/png', width: 256, height: 128),
+      );
+      final inputs = [first];
+      final current = product.copyWith(mediaAssets: inputs);
+      final media = installMediaClient(
+        newBytes,
+        responses: {
+          Uri.parse(first.source!): oldBytes,
+          Uri.parse(revised.source!): newBytes,
+        },
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _MediaCommerce(current),
+        reviewDataEnabled: false,
+        productFactsAdapter: QualifiedTestProductFacts({current.id}),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      try {
+        await session.restoreCommerce();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(session: session, onExit: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.openProduct(current.id), isTrue);
+        await tester.pump();
+        final image = find.byKey(
+          const ValueKey('buy-product-gallery-network-stable-photo-id'),
+        );
+        RawImage? decoded() => tester
+            .widgetList<RawImage>(
+              find.descendant(of: image, matching: find.byType(RawImage)),
+            )
+            .where((raw) => raw.image != null)
+            .firstOrNull;
+        await awaitMedia(tester, () => decoded()?.image?.width == 128);
+        final zoom = find.descendant(
+          of: find.byKey(ValueKey('buy-product-gallery-${current.id}')),
+          matching: find.byType(InteractiveViewer),
+        );
+        tester.widget<InteractiveViewer>(zoom).transformationController!.value =
+            Matrix4.diagonal3Values(2, 2, 1);
+        await tester.pump();
+        inputs[0] = revised;
+        expect(session.refreshProductContent(current.id), isTrue);
+        await tester.pump();
+        await awaitMedia(tester, () => decoded()?.image?.width == 256);
+        expect(decoded()!.image!.height, 128);
+        expect(
+          tester
+              .widget<InteractiveViewer>(zoom)
+              .transformationController!
+              .value
+              .getMaxScaleOnAxis(),
+          1,
+        );
+        expect(media.client.requested, contains(Uri.parse(revised.source!)));
+        inputs.clear();
+        expect(session.refreshProductContent(current.id), isTrue);
+        await tester.pumpAndSettle();
+        expect(image, findsNothing);
+        expect(session.selectedProductId, current.id);
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        media.restore();
+      }
+    });
 
     final encodedPhotos = [
       (
@@ -2583,6 +3427,24 @@ void main() {
         expect(snapshot.customerMessage, isNotNull);
       },
     );
+    test('CAT03 cached media cannot cross Store or canonical identity', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final supplied = asset();
+      final current = product.copyWith(mediaAssets: [supplied]);
+      expect(session.productContentFor(current).media.single, same(supplied));
+      for (final changed in [
+        current.copyWith(storeId: 'another-store'),
+        current.copyWith(canonicalId: 'another-family'),
+      ]) {
+        final foreign = session.productContentFor(changed);
+        expect(foreign.media.where((item) => item.binding != null), isEmpty);
+        expect(session.productContentFor(current).media.single, same(supplied));
+      }
+    });
+
     test('content cache replaces withdrawn or revised exact-SKU media', () {
       final core = BuySession();
       final session = BuyV2Session(core: core);

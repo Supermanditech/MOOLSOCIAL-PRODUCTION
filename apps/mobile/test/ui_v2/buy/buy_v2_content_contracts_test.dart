@@ -51,7 +51,8 @@ void main() {
       expect(content.media, hasLength(1));
       expect(content.highlights, isNotEmpty);
       expect(content.specifications, isNotEmpty);
-      expect(content.description, isNotEmpty);
+      // Catalogue labels are not a provider-authored product description.
+      expect(content.description, isNull);
 
       final trust = session.marketplaceTrustFor(product);
       expect(trust.state, BuyV2MarketplaceTrustState.ready);

@@ -647,7 +647,11 @@ class BuyV2ProductView extends StatelessWidget {
         ? buyV2BuyerDeliveryPromise(facts)
         : facts.deliveryPromise;
     final offerDecision = automaticFulfilment
-        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        ? buyV2ResolveProductOfferDecision(
+            product: product,
+            facts: facts,
+            quantity: session.quantityFor(product.id),
+          )
         : null;
     final partnerProducts = switch (product.destination) {
       BuyV2Destination.shop ||
@@ -1029,7 +1033,7 @@ class BuyV2ProductView extends StatelessWidget {
                                                     addSemanticLabel:
                                                         'Add minimum order of ${_packCountLabel(product.minimumOrder)} of '
                                                         '${product.customerTitle} to Cart for '
-                                                        '${buyV2Money(facts.price * product.minimumOrder)}. '
+                                                        '${buyV2Money(product.minimumOrderTotal(facts.price))}. '
                                                         '${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · '
                                                         '${buyV2BuyerDeliveryPromise(facts)}',
                                                     rxBlocked: rxBlocked,
@@ -3067,9 +3071,13 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
 
   void _scheduleExpiry() {
     _expiry?.cancel();
-    final end = widget.content.priceHistory?.validUntil;
-    if (end == null) return;
-    final remaining = end.difference(widget.session.catalogueNow());
+    final now = widget.session.catalogueNow();
+    final ends = [
+      widget.content.priceHistory?.validUntil,
+      widget.product.packTerms?.priceValidUntil,
+    ].whereType<DateTime>().where((end) => end.isAfter(now)).toList()..sort();
+    if (ends.isEmpty) return;
+    final remaining = ends.first.difference(now);
     if (remaining <= Duration.zero) return;
     // Recheck long-lived data without exceeding platform timer ranges.
     final delay = remaining > const Duration(days: 1)
@@ -3100,7 +3108,9 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final facts = widget.facts;
+    final facts = widget.session.productFactsFor(product);
+    final terms = product.packTerms;
+    final hasTiers = terms != null && terms.priceTiers.isNotEmpty;
     final mrp = product.mrp;
     final saving =
         !facts.stale && facts.price > 0 && mrp != null && mrp > facts.price;
@@ -3198,13 +3208,40 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
                     ),
                   ],
                   _ProductInfoRow(
-                    label: 'Total',
+                    label: hasTiers ? 'Price per ${terms.sellUnit}' : 'Total',
                     value: buyV2Money(facts.price),
                   ),
-                  Text(
-                    'Delivery fees and any order discounts are confirmed in Cart.',
-                    style: context.buyMeta,
-                  ),
+                  if (hasTiers) ...[
+                    for (final tier in terms.priceTiers)
+                      _ProductInfoRow(
+                        label: '${tier.minimumPacks}+ packs',
+                        value: '${buyV2Money(tier.price)} / ${terms.sellUnit}',
+                      ),
+                    _ProductInfoRow(
+                      label: 'Tax',
+                      value: terms.pricesIncludeTax == null
+                          ? 'Not yet confirmed'
+                          : terms.pricesIncludeTax!
+                          ? 'Included'
+                          : 'Extra',
+                    ),
+                    _ProductInfoRow(
+                      label: 'Freight',
+                      value: terms.pricesIncludeFreight == null
+                          ? 'Not yet confirmed'
+                          : terms.pricesIncludeFreight!
+                          ? 'Included'
+                          : 'Extra',
+                    ),
+                    Text(
+                      'Item prices only. Final charges are confirmed at checkout.',
+                      style: context.buyMeta,
+                    ),
+                  ] else
+                    Text(
+                      'Delivery fees and any order discounts are confirmed in Cart.',
+                      style: context.buyMeta,
+                    ),
                 ],
               ],
             ),
@@ -3937,6 +3974,7 @@ class _ProductVariantOption extends StatelessWidget {
     final decision = buyV2ResolveProductOfferDecision(
       product: option,
       facts: facts,
+      quantity: session.quantityFor(option.id),
     );
     final statusColor = decision.canAdd
         ? BuyV2Colors.green
@@ -4198,7 +4236,7 @@ class _WholesaleTradeDecisionPanelState
     final facts = widget.facts;
     final decision = widget.decision;
     final fulfilmentMode = widget.session.fulfilmentModeFor(product);
-    final minimumTotal = facts.price * product.minimumOrder;
+    final minimumTotal = product.minimumOrderTotal(facts.price);
     final showSignal =
         _loading ||
         _failure != null ||
@@ -4437,7 +4475,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Minimum ${_packCountLabel(product.minimumOrder)} · ${buyV2Money(facts.price * product.minimumOrder)}',
+          'Minimum ${_packCountLabel(product.minimumOrder)} · ${buyV2Money(product.minimumOrderTotal(facts.price))}',
           style: context.buyMeta.copyWith(fontWeight: FontWeight.w700),
         ),
         if (!decision.canAdd)
@@ -5721,7 +5759,9 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
   @override
   void initState() {
     super.initState();
-    _controller = PageController();
+    // Recreated galleries reset their counter; do not restore an unrelated
+    // PageStorage offset behind that counter after Cart or lazy-list disposal.
+    _controller = PageController(keepPage: false);
   }
 
   @override
@@ -21872,7 +21912,11 @@ class _CartLine extends StatelessWidget {
                   final fields = [
                     (text: product.customerTitle, style: context.buyBody),
                     (
-                      text: '${product.customerVariant} · ${product.pack}',
+                      text:
+                          product.packTerms != null ||
+                              product.hasStructuredVariants
+                          ? product.customerVariantPack
+                          : '${product.customerVariant} · ${product.pack}',
                       style: context.buyMeta.copyWith(fontSize: 11),
                     ),
                     (
@@ -22038,7 +22082,8 @@ class _CartLine extends StatelessWidget {
           Text(
             priceUnavailable
                 ? 'Retained item'
-                : product.freightIncluded
+                : product.freightIncluded &&
+                      product.packTerms?.priceTiers.isNotEmpty != true
                 ? 'Landed subtotal'
                 : 'Item subtotal',
             style: context.buyMeta.copyWith(fontSize: 11),
@@ -22168,7 +22213,11 @@ class _CartLine extends StatelessWidget {
                     [
                       (text: product.customerTitle, style: context.buyBody),
                       (
-                        text: '${product.customerVariant} ${product.pack}',
+                        text:
+                            product.packTerms != null ||
+                                product.hasStructuredVariants
+                            ? product.customerVariantPack
+                            : '${product.customerVariant} ${product.pack}',
                         style: context.buyMeta.copyWith(fontSize: 11),
                       ),
                       (

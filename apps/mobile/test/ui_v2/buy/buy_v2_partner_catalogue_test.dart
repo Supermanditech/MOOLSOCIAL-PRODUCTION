@@ -4700,7 +4700,8 @@ void main() {
           )
           .first;
       expect(fullEggs, findsOneWidget);
-      expect(tester.getSize(fullEggs).width, inInclusiveRange(90, 390 / 3));
+      // The public Store catalogue uses two readable columns at this width.
+      expect(tester.getSize(fullEggs).width, inInclusiveRange(150, 390 / 2));
       expect(tester.getSize(fullEggs).width, lessThanOrEqualTo(390));
 
       await tester.tap(

@@ -892,6 +892,7 @@ class BuyV2ProductOfferDecision {
 BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
   required BuyV2Product product,
   required BuyV2ProductFactsSnapshot facts,
+  int quantity = 0,
 }) {
   final orderability = facts.orderabilityLabel.trim().toLowerCase();
   final partner = facts.partner.trim().toLowerCase();
@@ -937,12 +938,19 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
           'We’re confirming current stock and delivery before you add this product.',
     );
   }
-  if (facts.price != product.price) {
+  final packQuantity = quantity < product.minimumOrder
+      ? product.minimumOrder
+      : quantity;
+  final expectedPrice = product.hasValidPackTerms
+      ? product.packTerms?.priceForQuantity(packQuantity, product.price) ??
+            product.price
+      : product.price;
+  if (facts.price != expectedPrice) {
     return BuyV2ProductOfferDecision(
       state: BuyV2ProductOfferDecisionState.changedPrice,
       statusLabel: 'Price changed',
       detail:
-          'The price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
+          'The price changed from ${buyV2Money(expectedPrice)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
     );
   }
   if (automaticFulfilment &&

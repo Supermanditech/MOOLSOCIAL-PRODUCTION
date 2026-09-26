@@ -134,6 +134,7 @@ class BuyV2CustomerStateSnapshot {
     this.shoppingGooglePlaceId,
     this.shoppingAreaScope,
     this.cartQuantities = const {},
+    this.productIdentityKeys = const {},
     this.reviewDrafts = const {},
     this.procurementDraft,
     this.addresses = const [],
@@ -163,6 +164,9 @@ class BuyV2CustomerStateSnapshot {
   });
 
   final Map<String, int> cartQuantities;
+
+  /// Retained identity constraints only, never listing or purchase authority.
+  final Map<String, String> productIdentityKeys;
   final Map<String, BuyV2ProductReviewDraft> reviewDrafts;
   // Persist selection identifiers, not Google response labels or coordinates.
   final String? shoppingRegionId;
@@ -261,6 +265,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'shoppingGooglePlaceId': snapshot.shoppingGooglePlaceId,
     'shoppingAreaScope': snapshot.shoppingAreaScope,
     'cartQuantities': snapshot.cartQuantities,
+    'productIdentityKeys': snapshot.productIdentityKeys,
     'reviewDrafts': {
       for (final entry in snapshot.reviewDrafts.entries)
         if (entry.key.isNotEmpty && entry.value.valid)
@@ -326,6 +331,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
         shoppingAreaScope: _string(source['shoppingAreaScope']),
         cartQuantities: _stringIntMap(source['cartQuantities']),
+        productIdentityKeys: _stringMap(source['productIdentityKeys']),
         reviewDrafts: _decodeReviewDrafts(source['reviewDrafts']),
         procurementDraft: _decodeProcurementDraft(source['procurementDraft']),
         addresses: _objectList(

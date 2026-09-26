@@ -9305,6 +9305,7 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
     final decision = buyV2ResolveProductOfferDecision(
       product: product,
       facts: facts,
+      quantity: quantity,
     );
     return Semantics(
       container: true,
@@ -11893,7 +11894,11 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         ? buyerPromise.replaceFirst(RegExp(r'^Delivered\s+'), 'Delivery ')
         : buyerPromise;
     final offerDecision = automaticFulfilment
-        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        ? buyV2ResolveProductOfferDecision(
+            product: product,
+            facts: facts,
+            quantity: session.quantityFor(product.id),
+          )
         : null;
     final quantity = session.quantityFor(product.id);
     final rxBlocked =
@@ -12276,7 +12281,11 @@ List<_ProductGlanceField> _productGlanceFields(
       product.destination == BuyV2Destination.shop ||
       product.destination == BuyV2Destination.wholesale;
   final decision = automatic
-      ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+      ? buyV2ResolveProductOfferDecision(
+          product: product,
+          facts: facts,
+          quantity: session.quantityFor(product.id),
+        )
       : null;
   final promise = automatic
       ? buyV2BuyerDeliveryPromise(facts)
@@ -12314,7 +12323,7 @@ List<_ProductGlanceField> _productGlanceFields(
       (
         text:
             'Minimum ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'} · '
-            '${buyV2Money(facts.price * product.minimumOrder)} total'
+            '${buyV2Money(product.minimumOrderTotal(facts.price))} total'
             '${product.quantityStep > 1 ? ' · Step ${product.quantityStep}' : ''}',
         style: detail.copyWith(color: BuyV2Colors.navy),
       ),
@@ -12487,7 +12496,11 @@ class BuyV2ProductCard extends StatelessWidget {
         ? buyerPromise.replaceFirst(RegExp(r'^Delivered\s+'), 'Delivery ')
         : buyerPromise;
     final offerDecision = automaticFulfilment
-        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        ? buyV2ResolveProductOfferDecision(
+            product: product,
+            facts: facts,
+            quantity: session.quantityFor(product.id),
+          )
         : null;
     final requiresOfferReview = offerDecision?.canAdd == false;
     final quantity = session.quantityFor(product.id);

@@ -36,6 +36,21 @@ String? _buyV2SavedListingId(String key) {
   }
 }
 
+String _buyV2ProductIdentityKey(BuyV2Product product) {
+  final options = List<BuyV2VariantAttribute>.of(product.variantAttributes)
+    ..sort((a, b) => a.dimensionId.compareTo(b.dimensionId));
+  final pack = product.packTerms;
+  return jsonEncode([
+    product.storeId,
+    product.canonicalId,
+    product.destination.name,
+    for (final option in options)
+      [option.dimensionId, option.kind.name, option.optionId],
+    if (pack != null)
+      [pack.containedUnits, pack.netContentMilli, pack.contentUnit],
+  ]);
+}
+
 /// A catalogue draft. Previewing it never changes the session or saved account.
 @immutable
 class BuyV2DiscoveryRefinements {
@@ -1142,7 +1157,7 @@ class BuyV2DevelopmentCatalogueSource
         variant: '1 L · Pack of 4',
         pack: '4 × 1 L · Case',
         price: 400,
-        unitPrice: 'Test price / case',
+        unitPrice: '',
         badge: 'Test supplier',
         seller: 'Test supplier',
         sellerType: 'Retailer',
@@ -1152,7 +1167,7 @@ class BuyV2DevelopmentCatalogueSource
         visualLabel: 'Product photo unavailable',
         visualKind: 'unavailable',
         minimumOrder: 2,
-        packTerms: const BuyV2PackTerms(
+        packTerms: BuyV2PackTerms(
           skuId: 'review-amul-calci-1l-four',
           revision: 'test-supplier-20260926',
           sellUnit: 'Case',
@@ -1160,7 +1175,14 @@ class BuyV2DevelopmentCatalogueSource
           netContentMilli: 1000,
           contentUnit: 'L',
           quantityStep: 3,
-          unitPriceLabel: 'Test price / case',
+          pricingStoreId: 'review-pack-store',
+          priceObservedAt: DateTime.now().subtract(const Duration(minutes: 1)),
+          priceValidUntil: DateTime.now().add(const Duration(days: 1)),
+          priceTiers: const [
+            BuyV2PackPriceTier(minimumPacks: 2, price: 400),
+            BuyV2PackPriceTier(minimumPacks: 5, price: 380),
+            BuyV2PackPriceTier(minimumPacks: 8, price: 360),
+          ],
         ),
         reviewDeliveryOptions: const {
           BuyV2DeliveryOption.quick,
@@ -1350,6 +1372,14 @@ class BuyV2DevelopmentCatalogueSource
               quantityStep: base.packTerms!.quantityStep,
               requiresMeasurement: base.packTerms!.requiresMeasurement,
               unitPriceLabel: base.packTerms!.unitPriceLabel,
+              priceTiers: base.packTerms!.priceTiers,
+              pricingStoreId: base.packTerms!.priceTiers.isEmpty
+                  ? null
+                  : storeIdAt(store),
+              priceObservedAt: base.packTerms!.priceObservedAt,
+              priceValidUntil: base.packTerms!.priceValidUntil,
+              pricesIncludeTax: base.packTerms!.pricesIncludeTax,
+              pricesIncludeFreight: base.packTerms!.pricesIncludeFreight,
             ),
       canonicalId: base.canonicalId,
       storeId: storeIdAt(store),
@@ -5305,8 +5335,7 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2CartLine> _cart = {};
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
   final Map<String, BuyV2ProductContentSnapshot> _productContent = {};
-  final Map<String, List<BuyV2ProductMediaAsset>> _productContentMediaInputs =
-      {};
+  final Map<String, List<Object?>> _productContentMediaInputs = {};
   final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
@@ -5427,6 +5456,13 @@ class BuyV2Session extends ChangeNotifier {
   bool _customerStateRestoreInFlight = false;
   bool _customerStateSnapshotLoaded = false;
   final Map<String, int> _unresolvedCustomerCart = {};
+  final Map<String, String> _retainedProductIdentityKeys = {};
+
+  bool _matchesRetainedProductIdentity(BuyV2Product product) =>
+      isStoreProcurement ||
+      _retainedProductIdentityKeys[product.id] == null ||
+      _retainedProductIdentityKeys[product.id] ==
+          _buyV2ProductIdentityKey(product);
   Future<void> _consumerStateWrites = Future<void>.value();
   int _consumerStateWritesPending = 0;
   BuyV2CustomerStateSnapshot? _consumerPendingSnapshot;
@@ -6937,6 +6973,7 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       if (snapshot == null) {
+        _retainedProductIdentityKeys.clear();
         if (customerStateRecoveryPending) {
           _unresolvedCustomerCart.clear();
           _customerStateRecoveryOwnerScope = null;
@@ -6957,6 +6994,22 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       if (!isStoreProcurement) {
+        _retainedProductIdentityKeys
+          ..clear()
+          ..addAll(snapshot.productIdentityKeys);
+        for (final id in {
+          ...snapshot.cartQuantities.keys,
+          ...snapshot.savedProductKeys
+              .map(_buyV2SavedListingId)
+              .whereType<String>(),
+        }) {
+          final current = findProduct(id);
+          if (current != null && !_matchesRetainedProductIdentity(current)) {
+            throw const FormatException(
+              'Retained product owner or variant changed',
+            );
+          }
+        }
         // The local snapshot is authoritative even while supplier details load.
         // Apply known choices now, retaining unresolved quantities separately.
         _unresolvedCustomerCart
@@ -6985,6 +7038,14 @@ class BuyV2Session extends ChangeNotifier {
           store.ownerScope != ownerScope ||
           mutationRevision != _customerStateMutationRevision) {
         return;
+      }
+      if (!isStoreProcurement &&
+          resolved.values.any(
+            (product) => !_matchesRetainedProductIdentity(product),
+          )) {
+        throw const FormatException(
+          'Resolved product owner or variant changed',
+        );
       }
       _pagedProducts.addAll(resolved);
       _applyCustomerStateSnapshot(snapshot);
@@ -7090,7 +7151,10 @@ class BuyV2Session extends ChangeNotifier {
                   ),
             )
           : current!;
-      _cart[entry.key] = BuyV2CartLine(product: product, quantity: entry.value);
+      _cart[entry.key] = BuyV2CartLine(
+        product: _productAtPackQuantity(product, entry.value),
+        quantity: entry.value,
+      );
     }
     for (final order in snapshot.orders.reversed) {
       final validOrder =
@@ -7345,6 +7409,20 @@ class BuyV2Session extends ChangeNotifier {
         if (customerStateRecoveryPending) ..._unresolvedCustomerCart,
         for (final line in _cart.values) line.product.id: line.quantity,
       }),
+      productIdentityKeys: isStoreProcurement
+          ? const {}
+          : Map.unmodifiable({
+              for (final id in {
+                ..._cart.keys,
+                if (customerStateRecoveryPending)
+                  ..._unresolvedCustomerCart.keys,
+                ..._savedKeys.map(_buyV2SavedListingId).whereType<String>(),
+              })
+                if (_retainedProductIdentityKeys[id] case final retained?)
+                  id: retained
+                else if (findProduct(id) case final product?)
+                  id: _buyV2ProductIdentityKey(product),
+            }),
       addresses: List.unmodifiable(_addresses),
       selectedAddressId: _selectedAddressId,
       savedProductKeys: Set.unmodifiable(_savedKeys),
@@ -7392,6 +7470,11 @@ class BuyV2Session extends ChangeNotifier {
         ),
       ),
     );
+    if (!isStoreProcurement) {
+      _retainedProductIdentityKeys
+        ..clear()
+        ..addAll(snapshot.productIdentityKeys);
+    }
     final ownerScope = store.ownerScope;
     final revision = _customerStateMutationRevision;
     bool currentWrite() =>
@@ -9783,7 +9866,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) {
-    final cached = _productFacts.putIfAbsent(product.id, () {
+    var cached = _productFacts.putIfAbsent(product.id, () {
       final next = productFactsAdapter.snapshotFor(product);
       final facts = _validProductFacts(product, next)
           ? next
@@ -9797,12 +9880,23 @@ class BuyV2Session extends ChangeNotifier {
             );
     });
     if (variantWithdrawn(product) ||
+        !_matchesRetainedProductIdentity(product) ||
         !product.hasValidPackTerms ||
+        product.packTerms?.pricingCurrentAt(catalogueNow()) == false ||
         product.packTerms?.requiresMeasurement == true) {
       return cached.copyWith(
         orderabilityLabel: 'Unavailable',
         stale: true,
         clearEligibility: true,
+      );
+    }
+    final terms = product.packTerms;
+    if (terms != null && terms.priceTiers.isNotEmpty) {
+      cached = cached.copyWith(
+        price: terms.priceForQuantity(
+          math.max(product.minimumOrder, quantityFor(product.id)),
+          cached.price,
+        ),
       );
     }
     if (isStoreProcurement ||
@@ -9891,15 +9985,20 @@ class BuyV2Session extends ChangeNotifier {
             snapshot.nextOpeningLabel?.trim().isNotEmpty == true);
   }
 
+  List<Object?> _productContentInput(BuyV2Product product) => [
+    product.storeId,
+    product.canonicalId,
+    product.destination,
+    product.categoryId,
+    product.procurementSupplierGrant?.workspaceId,
+    ...product.mediaAssets,
+  ];
+
   BuyV2ProductContentSnapshot productContentFor(BuyV2Product product) {
-    if (!listEquals(
-      _productContentMediaInputs[product.id],
-      product.mediaAssets,
-    )) {
+    final input = _productContentInput(product);
+    if (!listEquals(_productContentMediaInputs[product.id], input)) {
       _productContent.remove(product.id);
-      _productContentMediaInputs[product.id] = List.unmodifiable(
-        product.mediaAssets,
-      );
+      _productContentMediaInputs[product.id] = input;
     }
     return _productContent.putIfAbsent(product.id, () {
       final next = productContentAdapter.snapshotFor(product);
@@ -9934,9 +10033,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _productContent[product.id] = next;
-    _productContentMediaInputs[product.id] = List.unmodifiable(
-      product.mediaAssets,
-    );
+    _productContentMediaInputs[product.id] = _productContentInput(product);
     if (!identical(previous, next)) notifyListeners();
     return true;
   }
@@ -10261,7 +10358,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool openProduct(String id, {bool preserveComparisonOrigin = false}) {
     final item = findProduct(id);
-    if (item == null) {
+    if (item == null || !_matchesRetainedProductIdentity(item)) {
       notice = 'This product could not be found.';
       notifyListeners();
       return false;
@@ -10521,6 +10618,28 @@ class BuyV2Session extends ChangeNotifier {
 
   bool openCheckout() {
     if (!_allowProcurementLines(cartLines)) return false;
+    if (!checkoutRequiresResolution) {
+      for (final line in cartLines.where(
+        (line) => line.product.packTerms != null,
+      )) {
+        final error = cartQuantityError(line.product.id, '${line.quantity}');
+        if (error != null) {
+          notice = error;
+          notifyListeners();
+          return false;
+        }
+      }
+    }
+    if (!checkoutRequiresResolution &&
+        cartLines.any(
+          (line) =>
+              !line.product.hasValidPackTerms ||
+              line.product.packTerms?.pricingCurrentAt(catalogueNow()) == false,
+        )) {
+      notice = 'Pack prices have changed. Refresh the products in your Cart.';
+      notifyListeners();
+      return false;
+    }
     final previous = _navigationSurfaceIdentity;
     final retainingCheckout = view == BuyV2View.checkout;
     final retainedStep = checkoutStep;
@@ -12037,6 +12156,19 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
+  BuyV2Product _productAtPackQuantity(BuyV2Product product, int quantity) {
+    final terms = product.packTerms;
+    if (terms == null ||
+        terms.priceTiers.isEmpty ||
+        !product.hasValidPackTerms ||
+        !terms.pricingCurrentAt(catalogueNow())) {
+      return product;
+    }
+    return product.copyWith(
+      price: terms.priceForQuantity(quantity, product.price),
+    );
+  }
+
   bool addProduct(String id, {int? quantity}) {
     if (_holdCartForPaymentResolution()) return false;
     final item = findProduct(id);
@@ -12047,6 +12179,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (!_allowProcurementProduct(item)) return false;
     if (!item.hasValidPackTerms ||
+        item.packTerms?.pricingCurrentAt(catalogueNow()) == false ||
         item.packTerms?.requiresMeasurement == true) {
       notice = item.packTerms?.requiresMeasurement == true
           ? 'Final weight and price must be confirmed before ordering.'
@@ -12102,14 +12235,17 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final pricedItem = _productAtPackQuantity(item, proposedQuantity);
     final nextTotal =
-        _cart.values.fold<BigInt>(
-          BigInt.zero,
-          (sum, line) =>
-              sum +
-              BigInt.from(line.product.price) * BigInt.from(line.quantity),
-        ) +
-        BigInt.from(item.price) * BigInt.from(addedQuantity);
+        _cart.values
+            .where((line) => line.product.id != id)
+            .fold<BigInt>(
+              BigInt.zero,
+              (sum, line) =>
+                  sum +
+                  BigInt.from(line.product.price) * BigInt.from(line.quantity),
+            ) +
+        BigInt.from(pricedItem.price) * BigInt.from(proposedQuantity);
     if (nextTotal * BigInt.from(10000) > BigInt.from(9007199254740991)) {
       notice =
           'This quantity is too large to calculate. Enter a smaller quantity.';
@@ -12124,7 +12260,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _cart[id] = BuyV2CartLine(
-      product: item,
+      product: pricedItem,
       quantity: (current?.quantity ?? 0) + addedQuantity,
     );
     // A fresh addition from discovery should reveal the basket, not a saved
@@ -12238,6 +12374,9 @@ class BuyV2Session extends ChangeNotifier {
     if (!item.hasValidPackTerms) {
       return 'Pack information could not be confirmed. Refresh this product.';
     }
+    if (item.packTerms?.pricingCurrentAt(catalogueNow()) == false) {
+      return 'Pack prices have expired. Refresh this product.';
+    }
     if (item.packTerms?.requiresMeasurement == true) {
       return 'Final weight and price must be confirmed before ordering.';
     }
@@ -12255,7 +12394,12 @@ class BuyV2Session extends ChangeNotifier {
     // percentage calculations. This is numeric capacity, not supplier stock.
     final total = _cart.values.fold<BigInt>(BigInt.zero, (sum, entry) {
       return sum +
-          BigInt.from(entry.product.price) *
+          BigInt.from(
+                entry.product.id == id
+                    ? item.packTerms?.priceForQuantity(quantity, item.price) ??
+                          item.price
+                    : entry.product.price,
+              ) *
               BigInt.from(entry.product.id == id ? quantity : entry.quantity);
     });
     if (BigInt.from(quantity) > BigInt.from(9007199254740991) ||
@@ -12291,7 +12435,10 @@ class BuyV2Session extends ChangeNotifier {
     final current = _cart[id]!;
     final quantity = int.parse(input.trim());
     if (quantity == current.quantity) return true;
-    _cart[id] = current.copyWith(quantity: quantity);
+    _cart[id] = current.copyWith(
+      quantity: quantity,
+      product: _productAtPackQuantity(current.product, quantity),
+    );
     _pruneCartSelections();
     _acknowledgeCart(
       '${current.product.customerTitle} · $quantity in cart',
@@ -12337,6 +12484,10 @@ class BuyV2Session extends ChangeNotifier {
         minimum,
         current.quantity - current.product.quantityStep,
       );
+      if (current.product.packTerms?.priceTiers.isNotEmpty == true) {
+        setCartQuantity(id, '$next');
+        return;
+      }
       _cart[id] = current.copyWith(quantity: next);
       _acknowledgeCart(
         '${current.product.customerTitle} · $next in cart',
@@ -12863,7 +13014,9 @@ class BuyV2Session extends ChangeNotifier {
       }
       final cartLine = _cart[product.id];
       if (cartLine != null) {
-        _cart[product.id] = cartLine.copyWith(product: updatedProduct);
+        _cart[product.id] = cartLine.copyWith(
+          product: _productAtPackQuantity(updatedProduct, cartLine.quantity),
+        );
       }
       _productFacts[product.id] = next;
     }
@@ -13828,26 +13981,51 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final plan = <String, BuyV2CartLine>{};
     for (final product in exactProducts) {
       final approvedMaximum = _prescriptionApprovedQuantities[product.id];
+      final current = _cart[product.id];
       final nextQuantity =
-          (_cart[product.id]?.quantity ?? 0) + product.minimumOrder;
+          (current?.quantity ?? 0) +
+          (current != null && product.packTerms != null
+              ? product.quantityStep
+              : product.minimumOrder);
+      if (product.packTerms != null &&
+          (!product.hasValidPackTerms ||
+              !product.packTerms!.pricingCurrentAt(catalogueNow()) ||
+              product.packTerms!.requiresMeasurement ||
+              !_availableForDiscovery(product) ||
+              (nextQuantity - product.minimumOrder) % product.quantityStep !=
+                  0)) {
+        notice =
+            'Pack details or prices have changed. Review this product before reordering.';
+        notifyListeners();
+        return false;
+      }
       if (approvedMaximum != null && nextQuantity > approvedMaximum) {
         notice = 'Prescription quantity reached for ${product.title}.';
         notifyListeners();
         return false;
       }
-    }
-
-    final previous = _navigationSurfaceIdentity;
-    destination = order.destination;
-    for (final product in exactProducts) {
-      final current = _cart[product.id];
-      _cart[product.id] = BuyV2CartLine(
-        product: product,
-        quantity: (current?.quantity ?? 0) + product.minimumOrder,
+      plan[product.id] = BuyV2CartLine(
+        product: _productAtPackQuantity(product, nextQuantity),
+        quantity: nextQuantity,
       );
     }
+    final total = {..._cart, ...plan}.values.fold<BigInt>(
+      BigInt.zero,
+      (sum, line) =>
+          sum + BigInt.from(line.product.price) * BigInt.from(line.quantity),
+    );
+    if (total * BigInt.from(10000) > BigInt.from(9007199254740991)) {
+      notice =
+          'This quantity is too large to calculate. Enter a smaller quantity.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _navigationSurfaceIdentity;
+    destination = order.destination;
+    _cart.addAll(plan);
     cartScope = switch (order.destination) {
       BuyV2Destination.shop => BuyV2CartScope.shop,
       BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
@@ -13946,7 +14124,9 @@ class BuyV2Session extends ChangeNotifier {
     }
     final cartLine = _cart[product.id];
     if (cartLine != null) {
-      _cart[product.id] = cartLine.copyWith(product: updatedProduct);
+      _cart[product.id] = cartLine.copyWith(
+        product: _productAtPackQuantity(updatedProduct, cartLine.quantity),
+      );
     }
     _productFacts[product.id] = next;
     if (next.price != product.price) {
