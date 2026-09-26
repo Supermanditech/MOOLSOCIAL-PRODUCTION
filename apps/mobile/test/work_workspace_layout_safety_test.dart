@@ -1577,7 +1577,7 @@ void main() {
     for (final entry in const {
       'work-pulse-sales': 'View statement',
       'work-pulse-dues': 'Collect dues',
-      'work-pulse-settlement': 'Settle',
+      'work-pulse-settlement': 'MoolSocial settlement',
     }.entries) {
       final label = find.descendant(
         of: find.byKey(Key(entry.key)),
@@ -1600,6 +1600,10 @@ void main() {
         of: find.byKey(Key('${entry.key}-value-motion')),
         matching: find.byType(Text),
       );
+      if (entry.key == 'work-pulse-sales') {
+        expect(amount, findsNothing);
+        continue;
+      }
       expect(amount, findsOneWidget);
       final amountText = tester.widget<Text>(amount).data!;
       final amountParagraph = tester.renderObject<RenderParagraph>(amount);
@@ -3468,7 +3472,7 @@ void main() {
           viewport: Size(display.width, display.height),
           textScale: display.scale,
         );
-        final sales = find.byKey(const Key('work-pulse-sales'));
+        final sales = find.byKey(const Key('work-pulse-settlement'));
         final originalTop = tester.getTopLeft(sales).dy;
         final originalHeight = tester.getSize(sales).height;
         for (final value in [
@@ -3482,10 +3486,11 @@ void main() {
           (9990000000, '₹999 cr', '₹9,99,00,00,000'),
           (10000000000, '₹1,000 cr', '₹10,00,00,00,000'),
           (100000000000, '₹10,000 cr', '₹1,00,00,00,00,000'),
-          (-10000000000, '₹-1,000 cr', '₹-10,00,00,00,000'),
+          // A negative settlement balance must not offer a negative payout.
+          (-10000000000, '₹0', '₹0'),
           (10000000001, '≈₹1,000 cr', '₹10,00,00,00,001'),
         ]) {
-          work.workspaceSalesToday = value.$1;
+          work.workspaceSettlementBalance = value.$1;
           work.setWorkspaceMoneyPeriod('Today');
           await tester.pumpAndSettle();
           final expectedDigits = RegExp(r'-?[\d,.]+').firstMatch(value.$2)!;
@@ -3524,7 +3529,7 @@ void main() {
           );
           expect(
             find.bySemanticsLabel(
-              'View statement, Sales today, ${value.$3} in store records',
+              'MoolSocial settlement, Available to settle, ${value.$3} in store records',
             ),
             findsOneWidget,
           );
@@ -3534,7 +3539,7 @@ void main() {
             closeTo(originalHeight, .1),
             reason: 'Live totals must not move the financial action area',
           );
-          expect(work.workspaceSalesToday, value.$1);
+          expect(work.workspaceSettlementBalance, value.$1);
           expect(tester.takeException(), isNull);
         }
         await captureStoreView(tester, 'r665-money-live-$suffix');
@@ -3919,7 +3924,7 @@ void main() {
         final labels = [
           ('work-pulse-sales', 'View statement'),
           ('work-pulse-dues', 'Collect dues'),
-          ('work-pulse-settlement', 'Settle'),
+          ('work-pulse-settlement', 'MoolSocial settlement'),
           ('work-quick-buy', 'Buy stock'),
           ('work-incoming-purchases', 'Track purchases'),
           ('work-quick-group-buy', 'Buy together'),
@@ -4131,9 +4136,8 @@ void main() {
           textScale: display.scale,
         );
         for (final metric in [
-          ('work-pulse-sales', 'Sales today', '₹28,450'),
           ('work-pulse-dues', 'Unpaid bills', '₹860'),
-          ('work-pulse-settlement', 'Available', '₹17,820'),
+          ('work-pulse-settlement', 'Available to settle', '₹17,820'),
         ]) {
           final target = find.byKey(Key(metric.$1));
           expect(target.hitTestable(), findsOneWidget);
@@ -4155,12 +4159,9 @@ void main() {
           );
           expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
         }
-        expect(
-          find.bySemanticsLabel(
-            'View statement, Sales today, ₹28,450 in store records',
-          ),
-          findsOneWidget,
-        );
+        expect(find.bySemanticsLabel('View statement'), findsOneWidget);
+        expect(find.text('Sales today'), findsNothing);
+        expect(find.text('₹28,450'), findsNothing);
         await captureStoreView(tester, 'r665-refinement-finance-$suffix');
         await tester.tap(find.byKey(const Key('work-pulse-sales')));
         await tester.pumpAndSettle();
@@ -8595,7 +8596,7 @@ void main() {
             textScale: display.$3,
             bottomInset: 34,
           );
-          final metric = find.byKey(const Key('work-pulse-sales'));
+          final metric = find.byKey(const Key('work-pulse-settlement'));
           Finder renderedLabel(String label) => find.descendant(
             of: metric,
             matching: find.byWidgetPredicate(
@@ -8605,7 +8606,9 @@ void main() {
                       label.replaceAll(RegExp(r'\s+'), ''),
             ),
           );
-          final motion = find.byKey(const Key('work-pulse-sales-value-motion'));
+          final motion = find.byKey(
+            const Key('work-pulse-settlement-value-motion'),
+          );
           final action = find.byKey(const Key('work-activity-order-accept'));
           final metricBounds = tester.getRect(metric);
           final actionBounds = tester.getRect(action);
@@ -8628,7 +8631,11 @@ void main() {
               .overlayColor!
               .resolve({WidgetState.pressed})!;
           final pressedSurface = Color.alphaBlend(pressedOverlay, surface);
-          for (final label in ['₹28,450', 'Sales today', 'View statement']) {
+          for (final label in [
+            '₹17,820',
+            'Available to settle',
+            'MoolSocial settlement',
+          ]) {
             final text = renderedLabel(label);
             final paragraph = find.descendant(
               of: text,
@@ -8653,11 +8660,11 @@ void main() {
           await press.cancel();
           await tester.pumpAndSettle();
           expect(work.currentWorkspaceOrderId, 'APP-1043');
-          work.workspaceSalesToday = 28550;
+          work.workspaceSettlementBalance = 28550;
           work.setWorkspaceMoneyPeriod('Today');
           await tester.pump();
           expect(renderedLabel('₹28,550'), findsOneWidget);
-          expect(renderedLabel('₹28,450'), findsNothing);
+          expect(renderedLabel('₹17,820'), findsNothing);
           expect(displacement(), reduced ? 0 : greaterThan(0));
           expect(tester.widget<Transform>(motion).transformHitTests, isFalse);
           expect(tester.getRect(metric), metricBounds);
@@ -8667,7 +8674,7 @@ void main() {
             tester,
             'finish-motion-${display.$1}-${display.$3}-$reduced',
           );
-          work.workspaceSalesToday = 28700;
+          work.workspaceSettlementBalance = 28700;
           work.setWorkspaceMoneyPeriod('Today');
           await tester.pump();
           expect(renderedLabel('₹28,700'), findsOneWidget);
@@ -8705,9 +8712,11 @@ void main() {
         textScale: display.$3,
         bottomInset: 34,
       );
-      final motion = find.byKey(const Key('work-pulse-sales-value-motion'));
+      final motion = find.byKey(
+        const Key('work-pulse-settlement-value-motion'),
+      );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      work.workspaceSalesToday = 30000;
+      work.workspaceSettlementBalance = 30000;
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pump();
       expect(tester.widget<Transform>(motion).transform.entry(1, 3), 0);
@@ -15728,6 +15737,71 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Sales summary ignores legacy total and preserves invoice paise',
+    (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      work.workspaceSalesToday = 2425;
+      work.workspaceInvoices.clear();
+      work.workspaceInvoices.add(
+        WorkspaceCustomerInvoice(
+          id: 'PRIOR-DAY',
+          orderId: 'PRIOR-ORDER',
+          customer: 'Prior customer',
+          items: 'Saved goods',
+          amount: 2425,
+          remainderPaise: 90,
+          payment: 'Cash',
+          issuedAt: today.subtract(const Duration(seconds: 1)),
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 720),
+        textScale: 1.4,
+      );
+      expect(find.text('Sales today'), findsNothing);
+      expect(find.byKey(const Key('work-sales-period-summary')), findsNothing);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      String? total() => tester
+          .widget<Text>(find.byKey(const Key('work-sales-period-total')))
+          .data;
+      expect(total(), '₹0');
+      expect(find.text('No recorded invoices in this period.'), findsOneWidget);
+      work.workspaceInvoices.add(
+        WorkspaceCustomerInvoice(
+          id: 'TODAY-PAISE',
+          orderId: 'TODAY-ORDER',
+          customer: 'Current customer',
+          items: 'Saved goods',
+          amount: 125,
+          remainderPaise: 90,
+          payment: 'Cash',
+          issuedAt: today,
+        ),
+      );
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pumpAndSettle();
+      expect(total(), '₹125.90');
+      expect(
+        find.byKey(const ValueKey('work-sales-invoice-TODAY-PAISE')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('work-sales-invoice-PRIOR-DAY')),
+        findsNothing,
+      );
+      expect(work.workspaceSalesToday, 2425);
+      expect(work.workspaceInvoices, hasLength(2));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('COUNTERD01 Sales periods filter saved invoice issue dates', (
     tester,
   ) async {
@@ -15769,6 +15843,20 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(PopupMenuItem<String>, label));
       await tester.pumpAndSettle();
+      final includedCount = dates
+          .where(
+            (date) =>
+                !date.isBefore(start) &&
+                date.isBefore(today.add(const Duration(days: 1))),
+          )
+          .length;
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('work-sales-period-total')))
+            .data,
+        '₹${includedCount * 125}',
+      );
+      expect(find.text('Recorded sales · $label'), findsOneWidget);
       for (var index = 0; index < dates.length; index++) {
         final included =
             !dates[index].isBefore(start) &&
@@ -18550,7 +18638,7 @@ void main() {
     for (final label in [
       'View statement',
       'Collect dues',
-      'Settle',
+      'MoolSocial settlement',
       'Counter sale',
       'Share store link',
       'Buy stock',
@@ -21353,17 +21441,13 @@ void main() {
         );
         work.setWorkspaceMoneyPeriod('Today');
         await tester.pumpAndSettle();
-        for (final key in [
-          'work-pulse-sales',
-          'work-pulse-dues',
-          'work-pulse-settlement',
-        ]) {
+        for (final key in ['work-pulse-dues', 'work-pulse-settlement']) {
           final metric = find.byKey(Key(key));
           await reveal(tester, metric);
           final action = switch (key) {
             'work-pulse-sales' => 'View statement',
             'work-pulse-dues' => 'Collect dues',
-            _ => 'Settle',
+            _ => 'MoolSocial settlement',
           };
           final fullValue = find.byWidgetPredicate(
             (widget) =>
@@ -37472,7 +37556,9 @@ void main() {
           );
           expect(
             find.bySemanticsLabel(
-              RegExp(r'Settle, Available, ₹10,00,00,00,000\.50'),
+              RegExp(
+                r'MoolSocial settlement, Available to settle, ₹10,00,00,00,000\.50',
+              ),
             ),
             findsOneWidget,
           );
@@ -37582,11 +37668,7 @@ void main() {
           await captureStoreView(tester, 'finance-stale-$scale');
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          for (final key in [
-            'work-pulse-sales',
-            'work-pulse-dues',
-            'work-pulse-settlement',
-          ]) {
+          for (final key in ['work-pulse-dues', 'work-pulse-settlement']) {
             final pulse = find.byKey(Key(key));
             await reveal(tester, pulse);
             expect(
@@ -37681,11 +37763,7 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
-        for (final key in [
-          'work-pulse-sales',
-          'work-pulse-dues',
-          'work-pulse-settlement',
-        ]) {
+        for (final key in ['work-pulse-dues', 'work-pulse-settlement']) {
           final pulse = find.byKey(Key(key));
           await reveal(tester, pulse);
           expect(

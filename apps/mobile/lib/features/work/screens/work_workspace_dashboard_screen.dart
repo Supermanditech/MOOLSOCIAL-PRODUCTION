@@ -4463,14 +4463,8 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
         : finance != null || review
         ? confirmed
         : 'Update pending';
-    final salesLabel = factLabel('Sales today');
     final duesLabel = factLabel('Unpaid bills');
-    final settlementLabel = factLabel('Available');
-    final salesValue = finance != null
-        ? _purchaseAmount(finance.salesTodayMinor)
-        : review
-        ? '₹${_formatStoreMinorAmount(session.workspaceSalesTodayMinor)}'
-        : '—';
+    final settlementLabel = factLabel('Available to settle');
     final duesValue = finance != null
         ? _purchaseAmount(finance.duesMinor)
         : review
@@ -4483,7 +4477,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
         : '—';
     final minimumAmountWidths = MediaQuery.textScalerOf(context).scale(11) <= 16
         ? const <double>[]
-        : [salesValue, duesValue, settlementValue].map<double>((value) {
+        : ['', duesValue, settlementValue].map<double>((value) {
             return _storeRailWordWidth(
                   context,
                   _storeSummaryAmount(value),
@@ -4511,9 +4505,9 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
             // Reserve each column's own readable label and amount width.
             minimumItemWidths: minimumAmountWidths,
             labels: [
-              'View statement $salesLabel',
+              'View statement',
               'Collect dues $duesLabel',
-              'Settle $settlementLabel',
+              'MoolSocial settlement $settlementLabel',
             ],
             normalFlex: const [1, 1, 1],
             builder: (flex) => IntrinsicHeight(
@@ -4521,14 +4515,25 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _StorePulseMetric(
-                    keyName: 'work-pulse-sales',
+                  Expanded(
                     flex: flex[0],
-                    label: 'View statement',
-                    contextLabel: salesLabel,
-                    value: salesValue,
-                    icon: Icons.point_of_sale_outlined,
-                    onTap: onSales,
+                    child: TextButton(
+                      key: const Key('work-pulse-sales'),
+                      onPressed: onSales,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF252B38),
+                        minimumSize: const Size(48, 72),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                      child: const Text(
+                        'View statement',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                   _StorePulseDivider(),
                   _StorePulseMetric(
@@ -4544,7 +4549,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                   _StorePulseMetric(
                     keyName: 'work-pulse-settlement',
                     flex: flex[2],
-                    label: 'Settle',
+                    label: 'MoolSocial settlement',
                     contextLabel: settlementLabel,
                     value: settlementValue,
                     icon: Icons.account_balance_wallet_outlined,
@@ -11361,7 +11366,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             final date = a.issuedAt.compareTo(b.issuedAt);
             return date == 0 ? a.id.compareTo(b.id) : date;
           });
-    return _StoreVoucherRegister(
+    final totalMinor = invoices.fold<int>(
+      0,
+      (sum, invoice) => sum + invoice.payableMinor,
+    );
+    final register = _StoreVoucherRegister(
       identity: (
         'sales',
         session.workspaceStockHistoryScope()?.key,
@@ -11389,9 +11398,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           ValueKey('work-sales-invoice-${invoice.id}'),
       ],
       amountColumns: const {4},
-      total: _formatStoreMinorAmount(
-        invoices.fold<int>(0, (sum, invoice) => sum + invoice.payableMinor),
-      ),
+      total: _formatStoreMinorAmount(totalMinor),
       notice: 'Recorded invoices only · not a customer balance statement',
       empty: 'No recorded invoices in this period.',
       onOpen: (index) => setState(() {
@@ -11399,6 +11406,39 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         _invoiceStoreScope = session.activeWorkspace?.id;
         _invoiceAccountScope = session.workspaceFinance?.accountScope;
       }),
+    );
+    if (!widget.salesOnly) return register;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Wrap(
+            key: const Key('work-sales-period-summary'),
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              Text(
+                'Recorded sales · $_invoicePeriod',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF555D6E)),
+              ),
+              Text(
+                '₹${_formatStoreMinorAmount(totalMinor)}',
+                key: const Key('work-sales-period-total'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF252B38),
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: register),
+      ],
     );
   }
 
