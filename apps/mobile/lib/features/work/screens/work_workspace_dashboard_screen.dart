@@ -3734,6 +3734,8 @@ class _StoreControlDashboard extends StatelessWidget {
             scrollController: homeContentScroll,
             onSales: () => onOpenOperation(_WorkspaceOperation.sales),
             onStock: onStock,
+            onOrders: onOrders,
+            onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
           );
         },
       ),
@@ -3747,11 +3749,13 @@ class _StoreOperatingBoard extends StatefulWidget {
     required this.session,
     required this.onSales,
     required this.onStock,
+    required this.onOrders,
+    required this.onSettlement,
     this.scrollController,
     super.key,
   });
   final WorkSession session;
-  final VoidCallback onSales, onStock;
+  final VoidCallback onSales, onStock, onOrders, onSettlement;
   final ScrollController? scrollController;
   @override
   State<_StoreOperatingBoard> createState() => _StoreOperatingBoardState();
@@ -3879,6 +3883,20 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           value == null ? '—' : '₹${_formatStoreMinorAmount(value)}';
       String count(int? value) =>
           value == null ? '—' : _formatStoreAmount(value);
+      final belowCost = stockReady
+          ? products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity && p.stock > 0 && p.purchasePrice > 0 &&
+              p.sellingPrice > 0 && p.sellingPrice < p.purchasePrice).length
+          : 0;
+      final replenish = stockReady
+          ? session.workspaceLowStockProducts.where((p) => p.stock > 0).length
+          : 0;
+      final unavailable = stockReady ? session.workspaceOutOfStockCount : 0;
+      final financeReady = finance != null && finance.valid &&
+          finance.historyComplete && !session.workspaceFinanceStale &&
+          !finance.asOf.isAfter(DateTime.now());
+      // A local order list is not proof of complete remote order coverage.
+      final recordedOpenOrders = session.workspaceOrders
+          .where((order) => !order.isClosed).length;
       return SingleChildScrollView(
         key: const Key('work-store-operating-board'),
         controller: widget.scrollController,
@@ -3998,6 +4016,85 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                       'Selling value less purchase value · before tax, discounts and expenses',
                 ),
                 const SizedBox(height: 6),
+                const _OperatingSection('Decisions & next steps'),
+                if (!stockReady)
+                  const Text('Stock insights await saved inventory.',
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                if (unavailable > 0)
+                  _OperatingAttention(
+                    id: 'unavailable',
+                    title: '$unavailable products unavailable',
+                    detail: 'Out of stock or marked unavailable. Review availability before taking orders.',
+                    action: 'Review stock',
+                    onTap: widget.onStock,
+                    color: const Color(0xFFB3261E),
+                  ),
+                if (replenish > 0)
+                  _OperatingAttention(
+                    id: 'replenish',
+                    title: '$replenish products running low',
+                    detail: 'Still in stock, at or below their individual alert levels. Review replenishment.',
+                    action: 'Review stock',
+                    onTap: widget.onStock,
+                    color: const Color(0xFF8A5100),
+                  ),
+                if (belowCost > 0)
+                  _OperatingAttention(
+                    id: 'price',
+                    title: '$belowCost products priced below cost',
+                    detail: 'Saved selling price is below purchase price for stock on hand. Check prices; this is not realised loss.',
+                    action: 'Review prices in Stock',
+                    onTap: widget.onStock,
+                    color: const Color(0xFF8A5100),
+                  ),
+                if (stockReady && unavailable == 0 && replenish == 0 && belowCost == 0)
+                  const Text('No availability, low-stock or below-cost alerts in saved inventory.',
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                _OperatingMetric(
+                  id: 'average-bill',
+                  label: 'Average bill today',
+                  value: money(billed != null && todayInvoices.isNotEmpty
+                    ? (billed / todayInvoices.length).round() : null),
+                  detail: !invoiceReady ? 'Invoice history not available'
+                    : todayInvoices.isEmpty ? 'No invoices recorded today'
+                    : 'Billed today divided by invoice count · before returns; not spend per visitor',
+                ),
+                if (session.workspaceOrders.isNotEmpty) ...[
+                  _OperatingMetric(
+                    id: 'recorded-open-orders',
+                    label: 'Recorded open orders',
+                    value: count(recordedOpenOrders),
+                    detail: 'Saved order records only · not a live or complete public order count',
+                    onTap: widget.onOrders,
+                  ),
+                  const Text('On this device · remote queue not verified',
+                    style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                ],
+                const _OperatingSection('Money position'),
+                if (financeReady) ...[
+                  _OperatingMetric(
+                    id: 'customer-dues', label: 'Customer dues',
+                    value: money(finance.duesMinor),
+                    detail: 'Outstanding amount in the Store finance snapshot; not cash received.',
+                  ),
+                  _OperatingMetric(
+                    id: 'settlement-available', label: 'Settlement available',
+                    value: money(finance.availableMinor),
+                    detail: 'Available for MoolSocial settlement · not a bank balance',
+                    onTap: widget.onSettlement,
+                  ),
+                  _OperatingMetric(
+                    id: 'settlement-held', label: 'Settlement on hold',
+                    value: money(finance.heldMinor),
+                    detail: 'Held amount in the finance snapshot · not available for payout',
+                  ),
+                  Text('Finance snapshot · ${MaterialLocalizations.of(context).formatShortDate(finance.asOf.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(finance.asOf.toLocal()))}',
+                    style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                ] else
+                  const Text('Dues and settlement await a complete, current finance snapshot.',
+                    key: Key('store-insights-finance-unavailable'),
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                const SizedBox(height: 8),
                 const Text(
                   'Public activity & forecasts · Not connected',
                   style: TextStyle(
@@ -4006,12 +4103,53 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     color: MoolColors.muted,
                   ),
                 ),
+                const Text(
+                  'Views → cart → orders, missed orders, repeat customers and slow movers need verified events and sufficient history. No estimates shown.',
+                  style: TextStyle(fontSize: 11, height: 1.4, color: MoolColors.muted),
+                ),
               ],
             ),
           ),
         ),
       );
     },
+  );
+}
+
+class _OperatingAttention extends StatelessWidget {
+  const _OperatingAttention({required this.id, required this.title,
+    required this.detail, required this.action, required this.onTap,
+    required this.color});
+  final String id, title, detail, action;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Material(
+      color: const Color(0xFFF7F8FC),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        key: Key('store-insight-$id'),
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+            const SizedBox(height: 3),
+            Text(detail, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+            const SizedBox(height: 6),
+            Row(children: [
+              Expanded(child: Text(action, style: const TextStyle(fontSize: 12,
+                fontWeight: FontWeight.w600, color: MoolColors.navy))),
+              const Icon(Icons.chevron_right, size: 18, color: MoolColors.navy),
+            ]),
+          ]),
+        ),
+      ),
+    ),
   );
 }
 

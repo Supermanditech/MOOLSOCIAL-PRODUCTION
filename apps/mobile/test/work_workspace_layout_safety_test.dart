@@ -2233,6 +2233,15 @@ void main() {
       expect(find.text('Today'), findsNothing);
       expect(find.text('Inventory'), findsOneWidget);
       expect(find.text('Stock value'), findsOneWidget);
+      for (final label in ['Billed today', 'Collected today', 'Invoices today',
+        'Saved products', 'Low stock', 'Out of stock', 'Stock cost value',
+        'Stock sale value', 'Potential profit*']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      expect(find.text('Decisions & next steps'), findsOneWidget);
+      expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
+      expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
+      expect(tester.widget<Text>(find.byKey(const Key('store-overview-average-bill'))).data, '—');
       if (display.$1.width == 360 && display.$2 == 1) {
         final billedRect = tester.getRect(find.byKey(const Key('store-overview-billed')));
         for (final id in ['collections', 'invoice-count', 'skus', 'low-stock', 'out-of-stock', 'stock-cost', 'stock-sale']) {
@@ -2354,6 +2363,33 @@ void main() {
     });
   }
 
+  testWidgets('HOMEBOARD finance projection rejects incomplete history', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final seed = StoreReviewSeed(accountScope: 'review-draft-account',
+      orderCount: 12, now: DateTime.now().subtract(const Duration(minutes: 1)));
+    work.activeWorkspace = seed.workspace;
+    WorkspaceFinanceSnapshot snapshot(int revision, bool complete) => WorkspaceFinanceSnapshot(
+      accountScope: seed.accountScope, workspaceId: seed.storeId,
+      revision: revision, asOf: DateTime.now().subtract(const Duration(seconds: 1)),
+      salesTodayMinor: 0, duesMinor: 10000, availableMinor: 50000,
+      heldMinor: 2000, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0,
+      taxWithheldMinor: 0, payments: const [], payouts: const [],
+      historyComplete: complete,
+    );
+    expect(work.applyWorkspaceFinance(snapshot(1, true)), isTrue);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      openHomeActions: false);
+    expect(find.byKey(const Key('store-overview-customer-dues')), findsOneWidget);
+    expect(find.byKey(const Key('store-overview-settlement-held')), findsOneWidget);
+    expect(work.applyWorkspaceFinance(snapshot(2, false)), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-overview-customer-dues')), findsNothing);
+    expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'HOMEBOARD exact stock values refresh and unknown cost stays unknown',
     (tester) async {
@@ -2395,13 +2431,27 @@ void main() {
       expect(value('stock-sale'), '₹240');
       expect(value('stock-spread'), '₹80');
       expect(value('low-stock'), '1');
+      expect(find.byKey(const Key('store-insight-replenish')), findsOneWidget);
+      expect(find.byKey(const Key('store-insight-price')), findsNothing);
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
-          .copyWith(stock: 10, purchasePrice: 0);
+          .copyWith(sellingPrice: 15);
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-insight-price')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('store-insight-price')));
+      await tester.tap(find.byKey(const Key('store-insight-price')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-stock-action-content')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+          .copyWith(stock: 10, purchasePrice: 0, sellingPrice: 30);
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
       expect(value('stock-cost'), '—');
       expect(value('stock-sale'), '₹300');
       expect(value('stock-spread'), '—');
+      expect(find.byKey(const Key('store-insight-price')), findsNothing);
       work.activeWorkspace = const WorkWorkspace(
         id: 'other',
         name: 'Other',
