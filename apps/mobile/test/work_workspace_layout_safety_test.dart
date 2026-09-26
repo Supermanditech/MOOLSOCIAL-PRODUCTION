@@ -1926,9 +1926,12 @@ void main() {
       final description = finder.describeMatch(Plurality.zero);
       if (description.contains('work-pulse-')) {
         await openFinanceSummaryOrHome(tester, money: true);
-      } else if (description.contains('work-quick-') ||
+      } else if (description.contains('work-quick-add-products') ||
+          description.contains('work-quick-buy') ||
+          description.contains('work-quick-group-buy') ||
           description.contains('work-incoming-purchases')) {
-        await openFinanceSummaryOrHome(tester, money: false);
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
       }
     }
     final actions = find.byKey(const Key('work-home-actions-toggle'));
@@ -2091,124 +2094,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  for (final display in [
-    (360.0, 720.0, 1.0),
-    (720.0, 360.0, 1.0),
-    (320.0, 568.0, 2.0),
-  ]) {
-    testWidgets('HOME rail reflow and manual collapse $display', (
-      tester,
-    ) async {
-      final work = liveStore();
-      await mount(
-        tester,
-        route: '/app/work/workspace/dashboard',
-        work: work,
-        viewport: Size(display.$1, display.$2),
-        textScale: display.$3,
-        openHomeActions: false,
-      );
-      final toggle = find.byKey(const Key('work-home-actions-toggle'));
-      final rail = find.byKey(const Key('work-store-action-edge'));
-      final centre = find.byKey(const Key('work-store-activity-deck'));
-      expect(toggle.hitTestable(), findsOneWidget);
-      expect(find.text('Actions'), findsNothing);
-      expect(find.text('Quick actions'), findsOneWidget);
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
-      expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
-        findsNothing,
-      );
-      final before = tester.getSize(centre).width;
-      if (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1) {
-        final padding = tester.widget<Padding>(centre).padding as EdgeInsets;
-        expect(padding.right, 0);
-        expect(padding.left, 12);
-        final card = find.byKey(const Key('work-home-notched-card'));
-        expect(card, findsOneWidget);
-        final rect = tester.getRect(card);
-        final tabRect = tester.getRect(toggle);
-        expect(tabRect.bottom, closeTo(rect.bottom, 1));
-        final surface = tester
-            .widgetList<Material>(
-              find.descendant(of: card, matching: find.byType(Material)),
-            )
-            .first;
-        final shape = surface.shape!.getOuterPath(Offset.zero & rect.size);
-        expect(
-          shape.contains(Offset(rect.width - 2, rect.height - 20)),
-          isFalse,
-        );
-        expect(shape.contains(Offset(rect.width / 2, rect.height / 2)), isTrue);
-        expect(shape.contains(Offset(rect.width - 2, 24)), isTrue);
-        final localTab = tabRect.shift(-rect.topLeft);
-        expect(
-          shape.contains(Offset(localTab.left - 2, localTab.center.dy)),
-          isFalse,
-        );
-        expect(
-          shape.contains(Offset(localTab.center.dx, localTab.top - 2)),
-          isFalse,
-        );
-        expect(
-          shape.contains(Offset(localTab.left - 10, localTab.center.dy)),
-          isTrue,
-        );
-        final content = tester.getRect(
-          find.byKey(const Key('work-home-notch-content')),
-        );
-        expect(content.right, rect.right);
-      }
-      expect(
-        before,
-        tester.getSize(find.byKey(const Key('work-workspace-dashboard'))).width,
-      );
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
-      for (final label in [
-        'Counter sale',
-        'Share store link',
-        'Buy stock',
-        'Track purchases',
-        'Buy together',
-        'Add products',
-        'Create offer',
-        'Promote store',
-        'Post requirement',
-      ]) {
-        expect(find.text(label), findsOneWidget);
-      }
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
-      if (display.$1 >= 360 && display.$2 > 450 && display.$3 == 1) {
-        expect(find.text('Quick actions'), findsNothing);
-        expect(
-          tester.getRect(rail).right -
-              tester
-                  .getRect(find.byKey(const Key('work-quick-counter-sale')))
-                  .right,
-          lessThan(12),
-          reason: 'No reserved handle lane beside expanded tabs.',
-        );
-        expect(tester.getSize(centre).width, lessThan(before));
-        expect(
-          tester.getRect(centre).right,
-          lessThanOrEqualTo(tester.getRect(rail).left),
-        );
-      }
-      await tester.pump(const Duration(seconds: 4));
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsOneWidget);
-      expect(toggle.hitTestable(), findsOneWidget);
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-quick-counter-sale')), findsNothing);
-      expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
-        findsNothing,
-      );
-      expect(tester.getSize(centre).width, before);
-      expect(tester.takeException(), isNull);
-    });
-  }
+  // Former rail/notch tests are superseded by HOMEBOARD responsive routes below.
 
   test('HOME obsolete Store rails cannot be restored in application sources', () {
     final files = Directory('lib')
@@ -2220,6 +2106,9 @@ void main() {
       for (final obsolete in [
         '_StoreFirstTapAccess',
         '_StoreQuickActionBar',
+        '_StoreActionEdge',
+        '_StoreEdgeAction',
+        '_QuickActionsNotch',
         '_StockContextRail',
         'work-contextual-shortcuts',
         'work-shortcut-restock',
@@ -2293,14 +2182,9 @@ void main() {
         textScale: 1,
         openHomeActions: false,
       );
-      final card = find.byKey(const Key('work-activity-stock'));
+      final card = find.byKey(const Key('work-store-operating-board'));
       expect(card, findsOneWidget);
-      expect(tester.getSize(card).height, lessThan(300));
-      expect(
-        tester.widget<Text>(find.text(product.title)).style!.color,
-        const Color(0xFF252B38),
-      );
-      final action = find.widgetWithText(TextButton, 'View stock');
+      final action = find.byKey(const Key('work-store-stock'));
       expect(action.hitTestable(), findsOneWidget);
       await tester.tap(action);
       await tester.pumpAndSettle();
@@ -2315,14 +2199,14 @@ void main() {
     (const Size(320, 568), 2.0),
     (const Size(720, 360), 1.0),
   ]) {
-    testWidgets('HOME direct finance actions and retained expansion $display', (
+    testWidgets('HOMEBOARD analytics only and Stock entry routes $display', (
       tester,
     ) async {
       final work = liveStore();
       final stock = work.workspaceCatalogueItems
           .map((p) => p.toInventoryJson())
           .toList();
-      final invoiceCount = work.workspaceInvoices.length;
+      final invoices = work.workspaceInvoices.length;
       await mount(
         tester,
         route: '/app/work/workspace/dashboard',
@@ -2332,75 +2216,119 @@ void main() {
         openHomeActions: false,
       );
       expect(
-        find.byKey(const Key('work-store-home-tabs-scroll')),
-        findsNothing,
+        find.byKey(const Key('work-store-operating-board')),
+        findsOneWidget,
       );
-      expect(find.byKey(const Key('work-store-money-section')), findsNothing);
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(find.byKey(const Key('work-home-actions-toggle')), findsNothing);
+      expect(find.byKey(const Key('work-store-activity-deck')), findsNothing);
+      expect(find.byKey(const Key('work-quick-add-products')), findsNothing);
+      // An unhydrated or incomplete ledger must not become a zero sales total.
       expect(
-        find.byKey(const Key('work-store-finance-material')),
-        findsNothing,
+        tester
+            .widget<Text>(find.byKey(const Key('store-overview-billed')))
+            .data,
+        '—',
       );
-      expect(find.byKey(const Key('work-home-actions-toggle')), findsOneWidget);
-      for (final destination in [
-        ('work-quick-statement', 'work-store-statement'),
-        ('work-quick-collect-dues', 'work-store-dues'),
-        ('work-quick-settlement', 'work-money-destination'),
-      ]) {
-        expect(
-          find.byKey(const Key('work-store-activity-deck')),
-          findsOneWidget,
-        );
-        final action = find.byKey(Key(destination.$1));
-        await reveal(tester, action);
-        expect(action.hitTestable(), findsOneWidget);
-        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
-        await tester.tap(action);
-        await tester.pumpAndSettle();
-        expect(find.byKey(Key(destination.$2)), findsOneWidget);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const Key('work-store-quick-actions-scroll')),
-          findsOneWidget,
-        );
-        expect(tester.takeException(), isNull);
-      }
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('store-overview-collections')))
+            .data,
+        '—',
+      );
+      await tester.ensureVisible(find.text('Public activity & forecasts'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-stock-entry-controls')),
+        findsOneWidget,
+      );
+      final add = find.byKey(const Key('work-quick-add-products'));
+      await tester.ensureVisible(add);
+      expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-operating-board')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      final purchases = find.byKey(const Key('work-incoming-purchases'));
+      await tester.ensureVisible(purchases);
+      await tester.tap(purchases);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
       await tester.tap(find.byKey(const Key('work-store-home')));
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('work-store-finance-material')),
-        findsNothing,
-      );
-      final toggle = find.byKey(const Key('work-home-actions-toggle'));
-      await tester.ensureVisible(toggle);
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
-        findsNothing,
-      );
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
+        find.byKey(const Key('work-store-operating-board')),
         findsOneWidget,
       );
       expect(
         work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(),
         stock,
       );
-      expect(work.workspaceInvoices.length, invoiceCount);
-      final originalStore = work.activeWorkspace!;
+      expect(work.workspaceInvoices.length, invoices);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets(
+    'HOMEBOARD exact stock values refresh and unknown cost stays unknown',
+    (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      final work =
+          WorkSession(
+              contactDraftStore: account,
+              inventoryStore: SecureWorkInventoryStore(
+                accountScope: () => account.accountScope,
+              ),
+            )
+            ..seedVerifiedWorkspace()
+            ..retailerSetupSaved = true
+            ..reviewStage = WorkReviewStage.live;
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final base = work.workspaceCatalogueItems.first;
+      work.workspaceCatalogueItems
+        ..clear()
+        ..add(
+          base.copyWith(
+            stock: 8,
+            purchasePrice: 20,
+            sellingPrice: 30,
+            stockMode: WorkspaceStockMode.exactQuantity,
+            lowStockThreshold: 10,
+            available: true,
+          ),
+        );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        openHomeActions: false,
+      );
+      String value(String id) =>
+          tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data!;
+      expect(value('stock-cost'), '₹160');
+      expect(value('stock-sale'), '₹240');
+      expect(value('stock-spread'), '₹80');
+      expect(value('low-stock'), '1');
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+          .copyWith(stock: 10, purchasePrice: 0);
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pumpAndSettle();
+      expect(value('stock-cost'), '—');
+      expect(value('stock-sale'), '₹300');
+      expect(value('stock-spread'), '—');
       work.activeWorkspace = const WorkWorkspace(
-        id: 'different-store',
-        name: 'Other Store',
+        id: 'other',
+        name: 'Other',
         profileLabel: 'Retailer',
         area: 'Jodhpur',
         verified: true,
@@ -2408,20 +2336,14 @@ void main() {
       work.setWorkspaceMoneyPeriod('Today');
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
+        find.text('₹300'),
         findsNothing,
-        reason: 'A different Store starts with Quick actions collapsed',
-      );
-      work.activeWorkspace = originalStore;
-      work.setWorkspaceMoneyPeriod('Today');
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-store-quick-actions-scroll')),
-        findsOneWidget,
+        reason: 'A different Store must not retain the previous valuation',
       );
       expect(tester.takeException(), isNull);
-    });
-  }
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
@@ -2474,9 +2396,11 @@ void main() {
         );
         expect(find.text('Review data'), findsNothing);
         expect(find.byKey(const Key('store-review-seed-menu')), findsNothing);
-        expect(find.text(target.title), findsOneWidget);
-        expect(find.text('8 available · ${target.pack}'), findsOneWidget);
-        final action = find.widgetWithText(TextButton, 'View stock');
+        expect(
+          find.byKey(const Key('work-store-operating-board')),
+          findsOneWidget,
+        );
+        final action = find.byKey(const Key('work-store-stock'));
         await reveal(tester, action);
         expect(action.hitTestable(), findsOneWidget);
         expect(
@@ -2488,7 +2412,7 @@ void main() {
     );
   }
 
-  testWidgets('HOME unsent invoice does not displace active group work', (
+  testWidgets('HOME unsent invoice does not displace operating overview', (
     tester,
   ) async {
     final work = storeViewFixture();
@@ -2512,7 +2436,7 @@ void main() {
       work: work,
       viewport: const Size(360, 720),
     );
-    expect(find.byKey(const Key('work-activity-group-bulk')), findsOneWidget);
+    expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
     expect(work.workspaceInvoices.single.sharedChannels, isEmpty);
     expect(tester.takeException(), isNull);
   });
@@ -5150,7 +5074,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('work-store-activity-deck')),
+          find.byKey(const Key('work-store-operating-board')),
           findsOneWidget,
         );
         expect(buy.selectedFilter, filters.$2 ?? filters.$1);
@@ -9362,9 +9286,8 @@ void main() {
       expect(page, findsNothing);
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),
-        findsNothing,
-        reason:
-            'Back returns to Store home without an intermediate Stock route.',
+        findsOneWidget,
+        reason: 'Back returns to the Stock screen that opened Add products.',
       );
       expect(find.byKey(const Key('work-store-home')), findsOneWidget);
       await openAddProductsFromHome(tester);
@@ -14730,7 +14653,7 @@ void main() {
     expect(find.textContaining('0 products'), findsNothing);
     expect(
       find.text(
-        'No products saved yet. Open Store → Add products to add your stock.',
+        'No products saved yet. Tap Add products above to add your stock.',
       ),
       findsOneWidget,
     );
@@ -14747,7 +14670,7 @@ void main() {
       find.byWidgetPredicate(
         (widget) => widget is StoreAddProductSheet && widget.stockOnly,
       ),
-      findsNothing,
+      findsOneWidget,
     );
     expect(find.byKey(const Key('work-quick-add-products')), findsOneWidget);
     expect(work.workspaceCatalogueItems, isEmpty);

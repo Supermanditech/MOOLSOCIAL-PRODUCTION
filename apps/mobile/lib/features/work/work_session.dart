@@ -643,6 +643,7 @@ class WorkSession extends ChangeNotifier {
           const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
           const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'));
   String? get workspaceInventoryError => _storeData.inventoryError;
+  bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
 
   Future<bool> loadWorkspaceInventory({bool retry = false}) {
@@ -2950,6 +2951,7 @@ class WorkSession extends ChangeNotifier {
       _storeData.pendingCustomerRefund == null &&
       !workspaceFinanceStale;
   String? get customerLedgerRecoveryError => _storeData.ledgerRecoveryError;
+  bool get workspaceInvoiceHistoryLoaded => _storeData.ledgerRecovered;
   bool get customerCollectionBusy => _storeData.customerCollectionBusy;
   WorkspaceCustomerRefund? get pendingCustomerRefund =>
       _storeData.pendingCustomerRefund;
