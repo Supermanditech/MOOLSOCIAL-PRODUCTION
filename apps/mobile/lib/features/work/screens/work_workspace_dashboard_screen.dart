@@ -3902,7 +3902,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         controller: widget.scrollController,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
         child: Material(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FC),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: const BorderSide(color: Color(0xFFE5E8F1)),
@@ -3910,8 +3910,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           clipBehavior: Clip.antiAlias,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: _OperatingGroups(
               children: [
                 const Text(
                   'Today · Store overview',
@@ -3941,7 +3940,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'collections',
-                  tinted: true,
                   label: 'Collected today',
                   value: money(collected),
                   detail: collectionsReady
@@ -3967,7 +3965,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'low-stock',
-                  tinted: true,
                   alertColor: stockReady && session.workspaceLowStockCount > 0
                       ? const Color(0xFF8A5100)
                       : null,
@@ -3999,7 +3996,6 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'stock-sale',
-                  tinted: true,
                   label: 'Stock sale value',
                   value: money(resale),
                   detail: pricesKnown
@@ -4158,190 +4154,157 @@ class _OperatingSection extends StatelessWidget {
   final String title;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 4, bottom: 2),
+    padding: const EdgeInsets.only(top: 12, bottom: 4),
     child: Text(
       title,
       style: const TextStyle(
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: MoolColors.muted,
+        color: MoolColors.navy,
       ),
     ),
   );
 }
 
+class _OperatingGroups extends StatelessWidget {
+  const _OperatingGroups({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final paired = constraints.maxWidth >= 280 &&
+          MediaQuery.textScalerOf(context).scale(13) <= 17;
+      final arranged = <Widget>[];
+      for (var i = 0; i < children.length; i++) {
+        final current = children[i];
+        if (current is! _OperatingMetric) {
+          arranged.add(current);
+          continue;
+        }
+        final next = i + 1 < children.length ? children[i + 1] : null;
+        final canPair = paired && current.id != 'stock-spread' &&
+            current.value.length <= 8 && next is _OperatingMetric &&
+            next.id != 'stock-spread' && next.value.length <= 8;
+        arranged.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: canPair
+              ? IntrinsicHeight(child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: current),
+                    const SizedBox(width: 8),
+                    Expanded(child: next),
+                  ],
+                ))
+              : _OperatingMetric(id: current.id, label: current.label,
+                  value: current.value, detail: current.detail,
+                  alertColor: current.alertColor, onTap: current.onTap,
+                  compact: paired),
+        ));
+        if (canPair) i++;
+      }
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: arranged);
+    },
+  );
+}
+
 class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
-    required this.id,
-    required this.label,
-    required this.value,
-    required this.detail,
-    this.alertColor,
-    this.tinted = false,
-    this.onTap,
+    required this.id, required this.label, required this.value,
+    required this.detail, this.alertColor, this.onTap,
+    this.compact = false,
   });
   final String id, label, value, detail;
   final Color? alertColor;
-  final bool tinted;
+  final bool compact;
   final VoidCallback? onTap;
   bool get showInfo => !const {
-    'invoice-count',
-    'skus',
-    'low-stock',
-    'out-of-stock',
+    'invoice-count', 'skus', 'low-stock', 'out-of-stock',
   }.contains(id);
+
+  IconData get metricIcon => switch (id) {
+    'billed' || 'invoice-count' || 'average-bill' => Icons.receipt_long_outlined,
+    'collections' || 'customer-dues' => Icons.account_balance_wallet_outlined,
+    'skus' || 'stock-cost' || 'stock-sale' => Icons.inventory_2_outlined,
+    'low-stock' || 'out-of-stock' => Icons.inventory_outlined,
+    'stock-spread' => Icons.trending_up_rounded,
+    'recorded-open-orders' => Icons.shopping_bag_outlined,
+    _ => Icons.account_balance_outlined,
+  };
 
   void _explain(BuildContext context) => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(label),
-      content: Text(detail),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
+      title: Text(label), content: Text(detail),
+      actions: [TextButton(onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Close'))],
     ),
   );
 
   @override
   Widget build(BuildContext context) => Material(
-    color: tinted ? const Color(0xFFF7F8FC) : Colors.white,
-    child: Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFEDF0F5))),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Tooltip(
-                  message: detail,
-                  child: InkWell(
-                    key: Key('store-overview-open-$id'),
-                    onTap: onTap,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: LayoutBuilder(
-                            builder: (context, box) {
-                              final caption = Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: alertColor ?? MoolColors.ink,
-                                    ),
-                                  ),
-                                  if (id == 'billed')
-                                    const Text(
-                                      'Before returns',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: MoolColors.muted,
-                                      ),
-                                    ),
-                                ],
-                              );
-                              final amount = _StoreValueMotion(
-                                value: value,
-                                child: Text(
-                                  value,
-                                  key: Key('store-overview-$id'),
-                                  textAlign: TextAlign.right,
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w700,
-                                    color: alertColor ?? MoolColors.ink,
-                                  ),
-                                ),
-                              );
-                              if (box.maxWidth < 230 ||
-                                  MediaQuery.textScalerOf(context).scale(14) >
-                                      21) {
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    caption,
-                                    const SizedBox(height: 4),
-                                    amount,
-                                  ],
-                                );
-                              }
-                              return Row(
-                                children: [
-                                  Expanded(child: caption),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Align(
-                                      alignment: Alignment.centerRight,
-                                      child: amount,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    key: Key('store-metric-tile-$id'),
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: Color(0xFFE5E8F1)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      key: Key('store-overview-open-$id'),
+      onTap: onTap ?? (showInfo ? () => _explain(context) : null),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(metricIcon, size: 18, color: MoolColors.navy),
+              if (compact) ...[
+                const SizedBox(width: 8),
+                Expanded(child: Text(label, style: const TextStyle(fontSize: 13,
+                  fontWeight: FontWeight.w500, color: MoolColors.ink))),
+                const SizedBox(width: 8),
+                Expanded(child: Text(value, key: Key('store-overview-$id'),
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
+                    color: alertColor ?? MoolColors.navy))),
+              ] else const Spacer(),
               SizedBox(
                 key: Key('store-overview-control-$id'),
-                width: 48,
-                height: 48,
+                width: 48, height: 48,
                 child: onTap != null
-                    ? IconButton(
-                        onPressed: onTap,
-                        tooltip: 'Open $label',
-                        icon: const Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: MoolColors.muted,
-                        ),
-                      )
+                    ? IconButton(onPressed: onTap, tooltip: 'Open $label',
+                        icon: const Icon(Icons.chevron_right_rounded,
+                          size: 18, color: MoolColors.muted))
                     : showInfo
-                    ? IconButton(
-                        key: Key('store-overview-info-$id'),
-                        tooltip: 'About $label',
-                        onPressed: () => _explain(context),
-                        icon: const Icon(
-                          Icons.info_outline_rounded,
-                          size: 16,
-                          color: MoolColors.muted,
-                        ),
-                      )
+                    ? IconButton(key: Key('store-overview-info-$id'),
+                        tooltip: 'About $label', onPressed: () => _explain(context),
+                        icon: const Icon(Icons.info_outline_rounded,
+                          size: 18, color: MoolColors.muted))
                     : null,
               ),
+            ]),
+            if (!compact) ...[
+            Text(label, style: const TextStyle(fontSize: 13,
+              fontWeight: FontWeight.w500, color: MoolColors.ink)),
+            const SizedBox(height: 6),
+            _StoreValueMotion(value: value, child: Text(value,
+              key: Key('store-overview-$id'),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
+                color: alertColor ?? MoolColors.navy))),
             ],
-          ),
-          if (id == 'stock-spread')
-            const Padding(
-              padding: EdgeInsets.fromLTRB(6, 0, 6, 4),
-              child: Text(
+            if (id == 'billed')
+              const Text('Before returns', style: TextStyle(fontSize: 11,
+                color: MoolColors.muted)),
+            if (id == 'stock-spread')
+              const Text(
                 '*Potential from unsold stock · before tax, discounts & expenses; not net profit',
-                style: TextStyle(fontSize: 11, color: MoolColors.muted),
-              ),
-            ),
-        ],
+                style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+          ],
+        ),
       ),
     ),
   );

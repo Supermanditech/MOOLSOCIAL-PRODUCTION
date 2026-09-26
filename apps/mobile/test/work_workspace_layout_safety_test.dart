@@ -2243,13 +2243,16 @@ void main() {
       expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
       expect(tester.widget<Text>(find.byKey(const Key('store-overview-average-bill'))).data, '—');
       if (display.$1.width == 360 && display.$2 == 1) {
-        final billedRect = tester.getRect(find.byKey(const Key('store-overview-billed')));
-        for (final id in ['collections', 'invoice-count', 'skus', 'low-stock', 'out-of-stock', 'stock-cost', 'stock-sale']) {
-          final number = tester.getRect(find.byKey(Key('store-overview-$id')));
-          final control = tester.getRect(find.byKey(Key('store-overview-control-$id')));
-          expect(number.right, closeTo(billedRect.right, 1));
-          expect(number.center.dy, closeTo(control.center.dy, 1));
-        }
+        final billedRect = tester.getRect(find.byKey(const Key('store-metric-tile-billed')));
+        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-tile-collections')));
+        expect(billedRect.top, collectedRect.top);
+        expect(billedRect.height, collectedRect.height);
+        expect(billedRect.right, lessThan(collectedRect.left));
+        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 20);
+      } else if (display.$2 == 2) {
+        final billedRect = tester.getRect(find.byKey(const Key('store-metric-tile-billed')));
+        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-tile-collections')));
+        expect(billedRect.bottom, lessThan(collectedRect.top));
       }
       final billedInfo = find.byKey(
         const Key('store-overview-info-collections'),
