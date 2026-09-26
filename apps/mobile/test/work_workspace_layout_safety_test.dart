@@ -25518,7 +25518,9 @@ void main() {
       expect(find.text('Ready for customer activity'), findsNothing);
       expect(find.text('Ready for orders'), findsOneWidget);
       expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
-      expect(find.text('₹28,450'), findsOneWidget);
+      expect(find.text('₹28,450'), findsNothing);
+      expect(find.text('Sales today'), findsNothing);
+      expect(find.text('View statement'), findsOneWidget);
       expect(find.text('Sales'), findsOneWidget);
       expect(find.text('Buy stock'), findsOneWidget);
       expect(find.text('Buy together'), findsOneWidget);
