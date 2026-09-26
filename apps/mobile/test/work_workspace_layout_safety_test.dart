@@ -16396,6 +16396,15 @@ void main() {
       expect(input.decoration!.filled, false);
       expect(find.text('₹1,00,00,000.25'), findsNWidgets(2));
       expect(find.text('Retail customer with a long business name'), findsOneWidget);
+      expect(find.text('Payment status unavailable'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byKey(const Key('work-sales-action-content'))).right,
+        lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-sales-actions-panel'))).left));
+      expect(find.byKey(const Key('work-sales-actions-dismiss')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+      await tester.pumpAndSettle();
       await tester.enterText(search, 'Retail customer');
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('work-sales-invoice-SALES-ONE')), findsOneWidget);
@@ -16427,9 +16436,10 @@ void main() {
     expect(find.text('Voucher Type'), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
     await tester.pumpAndSettle();
-    for (final action in ['new-counter-sale', 'dues', 'statement', 'settlement']) {
+    for (final action in ['new-counter-sale', 'dues', 'statement']) {
       expect(find.byKey(Key('work-sales-$action')), findsOneWidget);
     }
+    expect(find.byKey(const Key('work-sales-settlement')), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-dues')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-dues')), findsOneWidget);
@@ -16441,15 +16451,89 @@ void main() {
     expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-sales-settlement')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-sales-search')), findsNothing);
-    await tester.tap(find.byKey(const Key('work-store-sell')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-sales-new-counter-sale')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-counter-fullscreen-back')), findsOneWidget);
     expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SALESHOME draft label dates and newest-first', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    work.workspaceInvoices.clear();
+    for (final entry in [('OLD', today), ('NEW', now)]) {
+      work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: entry.$1, orderId: entry.$1,
+        customer: 'Test', items: 'Goods', amount: 100, payment: 'Cash', issuedAt: entry.$2));
+    }
+    work.workspaceOrderSource = 'Counter';
+    work.workspaceOrderFulfilment = 'At the shop';
+    work.workspaceOrderCustomer = 'Saved customer';
+    work.currentWorkspaceOrderId = null;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-NEW'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-OLD'))).dy));
+    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Resume sale'), findsOneWidget);
+    expect(work.workspaceOrderCustomer, 'Saved customer');
+    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-statement-period')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(PopupMenuItem<String>, 'Custom range'));
+    await tester.pumpAndSettle();
+    final range = DateTimeRange(start: today.subtract(const Duration(days: 2)), end: today);
+    Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop(range);
+    await tester.pumpAndSettle();
+    String date(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    expect(find.text('Recorded sales · ${date(range.start)} – ${date(range.end)}'), findsOneWidget);
+    expect(work.workspaceInvoices, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SALESHOME payment identity and unavailable guard', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final seed = StoreReviewSeed(accountScope: 'review-draft-account', orderCount: 0, now: DateTime.now());
+    work.activeWorkspace = seed.workspace;
+    final saved = DateTime.now().subtract(const Duration(seconds: 1));
+    work.workspaceInvoices.clear();
+    final states = [WorkspacePaymentState.paid, WorkspacePaymentState.partPaid, WorkspacePaymentState.unpaid];
+    for (final state in states) {
+      work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: state.name, orderId: state.name,
+        customer: 'Customer', items: 'Goods', amount: 100, payment: 'Cash', issuedAt: saved));
+    }
+    WorkspaceFinanceSnapshot snapshot(int revision, {bool complete = true, bool mismatch = false}) => WorkspaceFinanceSnapshot(
+      accountScope: seed.accountScope, workspaceId: seed.storeId, revision: revision, asOf: saved,
+      salesTodayMinor: 30000, duesMinor: 15000, availableMinor: 0, heldMinor: 0, requestedMinor: 0,
+      paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      historyComplete: complete, payments: [for (final state in states) WorkspacePaymentRecord(
+        orderId: state.name, invoiceId: mismatch ? 'OTHER-${state.name}' : state.name,
+        customerId: 'Customer', customerName: 'Customer', revision: revision, updatedAt: saved,
+        amountMinor: 10000, paidMinor: state == WorkspacePaymentState.paid ? 10000 : state == WorkspacePaymentState.partPaid ? 5000 : 0,
+        dueMinor: state == WorkspacePaymentState.paid ? 0 : state == WorkspacePaymentState.partPaid ? 5000 : 10000,
+        refundedMinor: 0, state: state, channel: WorkspacePaymentChannel.cash)], payouts: const [], customerLedgers: const []);
+    work.applyWorkspaceFinance(snapshot(1));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    String? status(WorkspacePaymentState state) => tester.widget<Text>(find.byKey(ValueKey('work-sales-status-${state.name}'))).data;
+    expect(status(WorkspacePaymentState.paid), WorkspacePaymentState.paid.label);
+    expect(status(WorkspacePaymentState.partPaid), '${WorkspacePaymentState.partPaid.label} · Due ₹50');
+    expect(status(WorkspacePaymentState.unpaid), '${WorkspacePaymentState.unpaid.label} · Due ₹100');
+    work.applyWorkspaceFinance(snapshot(2, mismatch: true));
+    await tester.pumpAndSettle();
+    expect(status(WorkspacePaymentState.paid), 'Payment status unavailable');
+    work.applyWorkspaceFinance(snapshot(3, complete: false));
+    await tester.pumpAndSettle();
+    expect(status(WorkspacePaymentState.partPaid), 'Payment status unavailable');
+    work.applyWorkspaceFinance(snapshot(4));
+    work.markWorkspaceFinanceStale(accountScope: seed.accountScope, storeId: seed.storeId);
+    await tester.pumpAndSettle();
+    expect(status(WorkspacePaymentState.unpaid), 'Payment status unavailable');
     expect(tester.takeException(), isNull);
   });
 

@@ -11392,6 +11392,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   final _invoiceSearch = TextEditingController();
   Object? _salesScope;
   bool _salesActionsExpanded = false;
+  String get _salesPeriodLabel => _invoicePeriod == 'Custom range' && _invoiceRange != null
+      ? '${_registerDate(_invoiceRange!.start)} – ${_registerDate(_invoiceRange!.end)}'
+      : _invoicePeriod;
 
   void _changeSalesBrowse(VoidCallback change) {
     setState(change);
@@ -11442,7 +11445,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             )
             .toList()
           ..sort((a, b) {
-            final date = a.issuedAt.compareTo(b.issuedAt);
+            final date = widget.salesOnly
+                ? b.issuedAt.compareTo(a.issuedAt)
+                : a.issuedAt.compareTo(b.issuedAt);
             return date == 0 ? a.id.compareTo(b.id) : date;
           });
     final totalMinor = invoices.fold<int>(
@@ -11450,6 +11455,17 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       (sum, invoice) => sum + invoice.payableMinor,
     );
     if (widget.salesOnly) {
+      final finance = session.workspaceFinance;
+      final financeReady = finance != null && finance.valid && finance.historyComplete &&
+          finance.workspaceId == session.activeWorkspace?.id &&
+          !session.workspaceFinanceStale && !session.workspaceFinanceUsesLegacyReview &&
+          !finance.asOf.isAfter(now);
+      final payments = <(String, String?), List<WorkspacePaymentRecord>>{};
+      if (financeReady) {
+        for (final payment in finance.payments) {
+          payments.putIfAbsent((payment.orderId, payment.invoiceId), () => []).add(payment);
+        }
+      }
       final query = _invoiceSearch.text.trim().toLowerCase();
       final matches = invoices.where((invoice) =>
         '${invoice.id} ${invoice.orderId} ${invoice.customer} ${invoice.billingDetails.name} ${invoice.billingDetails.businessName}'.toLowerCase().contains(query)).toList();
@@ -11458,7 +11474,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           key: const Key('work-sales-period-summary'),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, runSpacing: 4, children: [
-            Text('Recorded sales · $_invoicePeriod', style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+            Text('Recorded sales · $_salesPeriodLabel', style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
             Text('₹${_formatStoreMinorAmount(totalMinor)}', key: const Key('work-sales-period-total'),
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink,
                 fontFeatures: [FontFeature.tabularFigures()])),
@@ -11475,10 +11491,14 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               child: Text(query.isEmpty ? 'No recorded invoices in this period.' : 'No matching invoices in this period. Clear search or change the period.',
                 style: const TextStyle(fontSize: 13, color: MoolColors.muted))); }
             final invoice = matches[index];
+            final candidates = payments[(invoice.orderId, invoice.id)] ?? const <WorkspacePaymentRecord>[];
+            final payment = candidates.length == 1 ? candidates.single : null;
+            final status = payment == null ? 'Payment status unavailable'
+                : '${payment.state.label}${payment.dueMinor > 0 ? ' · Due ₹${_formatStoreMinorAmount(payment.dueMinor)}' : ''}';
             final details = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_RecentCounterCustomer(invoice.customer, invoice.billingDetails).label,
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
-              Text('${_registerDate(invoice.issuedAt)} · ${invoice.id}',
+              Text(_registerDate(invoice.issuedAt),
                 style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
             ]);
             final amount = Text('₹${_formatStoreMinorAmount(invoice.payableMinor)}', textAlign: TextAlign.right,
@@ -11491,13 +11511,21 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 _invoiceStoreScope = session.activeWorkspace?.id;
                 _invoiceAccountScope = session.workspaceFinance?.accountScope;
               }); },
-              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: LayoutBuilder(builder: (context, box) =>
+              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                LayoutBuilder(builder: (context, box) =>
                   MediaQuery.textScalerOf(context).scale(13) > 19.5 || box.maxWidth < 300
                   ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [details, const SizedBox(height: 4), amount])
                   : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(flex: 3, child: details), const SizedBox(width: 12), Expanded(flex: 2, child: amount),
-                    ]))),
+                    ])),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: Text(invoice.id, style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy),
+                ]),
+                Text(status, key: ValueKey('work-sales-status-${invoice.id}'),
+                  style: TextStyle(fontSize: 11, color: payment != null && payment.dueMinor > 0 ? MoolColors.navy : MoolColors.muted)),
+              ])),
             );
           },
         )),
@@ -11593,7 +11621,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     final title = titleText;
     final periodControl = PopupMenuButton<String>(
       key: const Key('work-statement-period'),
-      tooltip: 'Statement period',
+      tooltip: widget.salesOnly ? 'Sales period · $_salesPeriodLabel' : 'Statement period',
       onSelected: (period) async {
         if (widget.salesOnly) {
           if (period == 'Custom range') {
@@ -11630,9 +11658,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            if (widget.salesOnly && _salesActionsExpanded)
+              const Icon(Icons.date_range_outlined, size: 20, color: MoolColors.navy)
+            else Text(
               widget.salesOnly
-                  ? _invoicePeriod
+                  ? (_invoicePeriod == 'Custom range' ? 'Dates' : _invoicePeriod)
                   : session.workspaceMoneyPeriod,
               style: const TextStyle(
                 color: MoolColors.navy,
@@ -11645,21 +11675,24 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       ),
     );
     if (widget.salesOnly) {
+      final hasDraft = session.workspaceOrderSource == 'Counter' &&
+          session.workspaceOrderFulfilment == 'At the shop' && session.currentWorkspaceOrderId == null &&
+          (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
       return _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
-        actionWords: 'New sale Collect dues View statement MoolSocial settlement',
+        actionWords: 'Counter sale Resume sale Collect dues View statement',
+        reflowContent: true,
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
         actions: [
           if (widget.showNewSaleAction)
-            _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: Icons.add_rounded, label: 'New sale', onTap: widget.onNewSale),
+            _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: hasDraft ? Icons.edit_note_rounded : Icons.add_rounded,
+              label: hasDraft ? 'Resume sale' : 'Counter sale', onTap: widget.onNewSale),
           if (widget.onOpenOperation != null) ...[
             _StoreEdgeAction(keyName: 'work-sales-dues', icon: Icons.account_balance_wallet_outlined,
               label: 'Collect dues', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.dues)),
             _StoreEdgeAction(keyName: 'work-sales-statement', icon: Icons.receipt_long_outlined,
               label: 'View statement', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.statement)),
-            _StoreEdgeAction(keyName: 'work-sales-settlement', icon: Icons.account_balance_outlined,
-              label: 'MoolSocial settlement', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.payments)),
           ],
         ],
         child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
@@ -14009,12 +14042,14 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.onToggle,
     this.keyPrefix = 'work-stock',
     this.actionWords = 'Add products Buy stock Purchases Buy together',
+    this.reflowContent = false,
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
   final String keyPrefix, actionWords;
+  final bool reflowContent;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -14098,6 +14133,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
+              right: expanded && reflowContent ? panelWidth : 0,
               child: ClipPath(
                 key: Key('$keyPrefix-action-content'),
                 clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
@@ -14105,7 +14141,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
               ),
             ),
             if (expanded) ...[
-              Positioned.fill(
+              if (!reflowContent) Positioned.fill(
                 child: GestureDetector(
                   key: Key('$keyPrefix-actions-dismiss'),
                   behavior: HitTestBehavior.opaque,
