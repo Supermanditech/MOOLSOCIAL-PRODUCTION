@@ -3913,7 +3913,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             child: _OperatingGroups(
               children: [
                 const Text(
-                  'Today · Store overview',
+                  'Store overview',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -3922,7 +3922,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Device records · update time unavailable',
+                  'Saved on this phone · not live',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
                 const SizedBox(height: 4),
@@ -3936,15 +3936,15 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   value: money(billed),
                   detail: invoiceReady
                       ? '${todayInvoices.length} invoices · before returns'
-                      : 'Invoice history not available',
+                      : 'Sales history is not available yet',
                 ),
                 _OperatingMetric(
                   id: 'collections',
                   label: 'Collected today',
                   value: money(collected),
                   detail: collectionsReady
-                      ? 'Recorded receipts · before refunds'
-                      : 'Complete collection history not available',
+                      ? 'Customer payments received · before refunds'
+                      : 'Complete payment history is not available yet',
                 ),
                 _OperatingMetric(
                   id: 'invoice-count',
@@ -3952,16 +3952,16 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   value: count(invoiceReady ? todayInvoices.length : null),
                   detail: invoiceReady
                       ? 'Invoices recorded today. Open Sales to review.'
-                      : 'Invoice history not available',
+                      : 'Sales history is not available yet',
                   onTap: widget.onSales,
                 ),
-                const _OperatingSection('Inventory'),
+                const _OperatingSection('Current stock'),
                 _OperatingMetric(
                   id: 'skus',
                   onTap: widget.onStock,
                   label: 'Saved products',
                   value: count(stockReady ? products.length : null),
-                  detail: 'Saved SKUs · not a count of units',
+                  detail: 'Number of saved products, not individual units',
                 ),
                 _OperatingMetric(
                   id: 'low-stock',
@@ -3985,14 +3985,14 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   ),
                   detail: 'Unavailable products',
                 ),
-                const _OperatingSection('Stock value'),
+                const _OperatingSection('Current stock value'),
                 _OperatingMetric(
                   id: 'stock-cost',
-                  label: 'Stock cost value',
+                  label: 'Money in stock',
                   value: money(cost),
                   detail: costsKnown
-                      ? 'Current quantities × saved purchase prices'
-                      : 'Needs exact quantities and purchase prices',
+                      ? 'Current stock at saved purchase prices · not an audited inventory valuation'
+                      : 'Exact stock quantities and purchase prices are needed',
                 ),
                 _OperatingMetric(
                   id: 'stock-sale',
@@ -4000,11 +4000,11 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   value: money(resale),
                   detail: pricesKnown
                       ? 'Potential sales value · not money received'
-                      : 'Needs exact quantities and selling prices',
+                      : 'Exact stock quantities and selling prices are needed',
                 ),
                 _OperatingMetric(
                   id: 'stock-spread',
-                  label: 'Potential profit*',
+                  label: 'Potential gross profit*',
                   value: money(
                     cost != null && resale != null ? resale - cost : null,
                   ),
@@ -4017,27 +4017,27 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   label: 'Average bill today',
                   value: money(billed != null && todayInvoices.isNotEmpty
                     ? (billed / todayInvoices.length).round() : null),
-                  detail: !invoiceReady ? 'Invoice history not available'
-                    : todayInvoices.isEmpty ? 'No invoices recorded today'
+                  detail: !invoiceReady ? 'Sales history is not available yet'
+                    : todayInvoices.isEmpty ? 'No bills saved today'
                     : 'Billed today divided by invoice count · before returns; not spend per visitor',
                 ),
                 if (session.workspaceOrders.isNotEmpty) ...[
                   _OperatingMetric(
                     id: 'recorded-open-orders',
-                    label: 'Recorded open orders',
+                    label: 'Open orders',
                     value: count(recordedOpenOrders),
-                    detail: 'Saved order records only · not a live or complete public order count',
+                    detail: 'Orders saved on this phone only. Online orders may not all be included.',
                     onTap: widget.onOrders,
                   ),
-                  const Text('On this device · remote queue not verified',
+                  const Text('Orders saved on this phone only',
                     style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 ],
                 const _OperatingSection('Money position'),
                 if (financeReady) ...[
                   _OperatingMetric(
-                    id: 'customer-dues', label: 'Customer dues',
+                    id: 'customer-dues', label: 'Receivables',
                     value: money(finance.duesMinor),
-                    detail: 'Outstanding amount in the Store finance snapshot; not cash received.',
+                    detail: 'Money customers owe you · not cash received',
                   ),
                   _OperatingMetric(
                     id: 'settlement-available', label: 'Settlement available',
@@ -4048,18 +4048,44 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   _OperatingMetric(
                     id: 'settlement-held', label: 'Settlement on hold',
                     value: money(finance.heldMinor),
-                    detail: 'Held amount in the finance snapshot · not available for payout',
+                    detail: 'Money held by MoolSocial · not yet available for payout',
                   ),
-                  Text('Finance snapshot · ${MaterialLocalizations.of(context).formatShortDate(finance.asOf.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(finance.asOf.toLocal()))}',
+                  Text('Balances as of · ${MaterialLocalizations.of(context).formatShortDate(finance.asOf.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(finance.asOf.toLocal()))}',
                     style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
                 ] else
-                  const Text('Dues and settlement await a complete, current finance snapshot.',
+                  const Text('Customer dues and settlement balances are not available yet.',
                     key: Key('store-insights-finance-unavailable'),
                     style: TextStyle(fontSize: 12, color: MoolColors.muted)),
+                const _OperatingSection('Working capital'),
+                const _OperatingMetric(
+                  id: 'payables', label: 'Payables', value: '—',
+                  detail: 'Money owed to suppliers. A complete set of supplier balances is not available yet; a few saved purchase bills cannot establish the total.',
+                ),
+                const _OperatingMetric(
+                  id: 'trade-cash', label: 'Cash tied up', value: '—',
+                  detail: 'Money in stock + customer receivables − supplier payables. This is trade cash tied up, not full accounting working capital. Complete matching balances are needed.',
+                ),
+                const _OperatingMetric(
+                  id: 'stock-days', label: 'Stock days', value: '—',
+                  detail: 'Estimated days current stock will last. Complete sales history and exact product quantities are needed. A partial order list cannot establish Store-wide stock days.',
+                ),
+                const Text(
+                  'Payables & cash tied up: supplier balances incomplete. Stock days: not enough history yet.',
+                  key: Key('store-working-capital-coverage'),
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted),
+                ),
+                const Text(
+                  'Credit sales / purchases · Not available yet',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted),
+                ),
+                const Text(
+                  'Collection days / payment days / cash cycle · Not enough history yet',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted),
+                ),
                 const SizedBox(height: 8),
                 const _OperatingSection('Decisions & next steps'),
                 if (!stockReady)
-                  const Text('Stock insights await saved inventory.',
+                  const Text('Stock details are unavailable. Please check Stock.',
                     style: TextStyle(fontSize: 12, color: MoolColors.muted)),
                 if (unavailable > 0)
                   _OperatingAttention(
@@ -4092,7 +4118,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   const Text('No availability, low-stock or below-cost alerts in saved inventory.',
                     style: TextStyle(fontSize: 12, color: MoolColors.muted)),
                 const Text(
-                  'Public activity & forecasts · Not connected',
+                  'Online activity & forecasts · Not available yet',
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.4,
@@ -4100,7 +4126,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   ),
                 ),
                 const Text(
-                  'Views → cart → orders, missed orders, repeat customers and slow movers need verified events and sufficient history. No estimates shown.',
+                  'Online views, carts, repeat purchases and forecasts need verified activity and more history.',
                   style: TextStyle(fontSize: 11, height: 1.4, color: MoolColors.muted),
                 ),
               ],
@@ -4153,17 +4179,23 @@ class _OperatingSection extends StatelessWidget {
   const _OperatingSection(this.title);
   final String title;
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => DecoratedBox(
+    key: Key('store-overview-section-line-$title'),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: Color(0xFFE5E8F1), width: 0.5)),
+    ),
+    child: Padding(
     padding: const EdgeInsets.only(top: 4, bottom: 2),
     child: Row(children: [
-      Icon(title == 'Inventory' || title == 'Stock value'
-          ? Icons.inventory_2_outlined : title == 'Money position'
+      Icon(title == 'Current stock' || title == 'Current stock value'
+          ? Icons.inventory_2_outlined : title == 'Money position' || title == 'Working capital'
           ? Icons.account_balance_wallet_outlined : Icons.notifications_none,
         size: 16, color: MoolColors.navy),
       const SizedBox(width: 6),
       Expanded(child: Text(title, style: const TextStyle(
         fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy))),
     ]),
+    ),
   );
 }
 
@@ -4224,7 +4256,11 @@ class _OperatingGroups extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (var col = 0; col < row.length; col++) ...[
-                  if (col > 0) const SizedBox(width: 10),
+                  if (col > 0) VerticalDivider(
+                    key: Key('store-overview-column-guide-${row[col].id}'),
+                    width: 10, thickness: 0.5, indent: 4, endIndent: 4,
+                    color: const Color(0xFFE5E8F1),
+                  ),
                   Expanded(child: _OperatingMetric(
                     id: row[col].id, label: row[col].label, value: row[col].value,
                     detail: row[col].detail, alertColor: row[col].alertColor,

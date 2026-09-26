@@ -2231,11 +2231,11 @@ void main() {
       expect(find.byKey(const Key('work-quick-add-products')), findsNothing);
       // An unhydrated or incomplete ledger must not become a zero sales total.
       expect(find.text('Today'), findsNothing);
-      expect(find.text('Inventory'), findsOneWidget);
-      expect(find.text('Stock value'), findsOneWidget);
+      expect(find.text('Current stock'), findsOneWidget);
+      expect(find.text('Current stock value'), findsOneWidget);
       for (final label in ['Billed today', 'Collected today', 'Invoices today',
-        'Saved products', 'Low stock', 'Out of stock', 'Stock cost value',
-        'Stock sale value', 'Potential profit*']) {
+        'Saved products', 'Low stock', 'Out of stock', 'Money in stock',
+        'Stock sale value', 'Potential gross profit*']) {
         expect(find.text(label), findsOneWidget);
         final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
         expect(paragraph.size.height,
@@ -2243,6 +2243,17 @@ void main() {
           reason: '$label must not clip its wrapped text');
       }
       expect(find.text('Decisions & next steps'), findsOneWidget);
+      expect(find.text('Store overview'), findsOneWidget);
+      expect(find.text('Saved on this phone · not live'), findsOneWidget);
+      expect(find.text('Working capital'), findsOneWidget);
+      for (final id in ['payables', 'trade-cash', 'stock-days']) {
+        expect(tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data, '—');
+        final metric = tester.widget<InkWell>(find.byKey(Key('store-overview-info-$id')));
+        expect(metric.onTap, isNotNull);
+        expect(find.descendant(of: find.byKey(Key('store-metric-band-$id')),
+          matching: find.byIcon(Icons.north_east_rounded)), findsNothing);
+      }
+      expect(find.byKey(const Key('store-working-capital-coverage')), findsOneWidget);
       expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
       expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
       expect(tester.widget<Text>(find.byKey(const Key('store-overview-average-bill'))).data, '—');
@@ -2252,6 +2263,11 @@ void main() {
         expect(billedRect.top, collectedRect.top);
         expect(billedRect.height, collectedRect.height);
         expect(billedRect.right, lessThan(collectedRect.left));
+        final guide = find.byKey(const Key('store-overview-column-guide-collections'));
+        expect(tester.getSize(guide).width, 10);
+        expect(tester.widget<VerticalDivider>(guide).thickness, 0.5);
+        expect(collectedRect.left - billedRect.right, 10);
+        expect(find.byKey(const Key('store-overview-section-line-Current stock')), findsOneWidget);
         expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 18);
         expect(tester.getRect(find.byKey(const Key('store-metric-band-invoice-count'))).top, billedRect.top);
         expect(tester.getRect(find.byKey(const Key('store-overview-stock-spread'))).bottom,
@@ -2263,6 +2279,7 @@ void main() {
         final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
         final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
         expect(billedRect.bottom, lessThan(collectedRect.top));
+        expect(find.byKey(const Key('store-overview-column-guide-collections')), findsNothing);
       }
       final billedInfo = find.byKey(
         const Key('store-overview-info-collections'),
@@ -2271,7 +2288,7 @@ void main() {
       await tester.tap(billedInfo);
       await tester.pumpAndSettle();
       expect(
-        find.text('Complete collection history not available'),
+        find.text('Complete payment history is not available yet'),
         findsOneWidget,
       );
       await tester.tap(find.text('Close'));
@@ -2289,7 +2306,7 @@ void main() {
         '—',
       );
       await tester.ensureVisible(
-        find.text('Public activity & forecasts · Not connected'),
+        find.text('Online activity & forecasts · Not available yet'),
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
