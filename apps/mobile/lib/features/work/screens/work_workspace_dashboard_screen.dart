@@ -11650,11 +11650,39 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     return true;
   }
 
+  bool _openingCustomerCredit = false;
+  Future<bool> _retryCustomerCredit(String message) async => mounted &&
+      await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Customer credit'), content: Text(message), actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Close')),
+          TextButton(key: const Key('customer-credit-retry'),
+            onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Retry')),
+        ])) == true;
+
   Future<void> _openCustomerCredit() async {
+    if (_openingCustomerCredit) return;
+    _openingCustomerCredit = true;
+    try {
+      while (mounted && await _chooseCustomerCredit()) {}
+    } finally { _openingCustomerCredit = false; }
+  }
+
+  Future<bool> _chooseCustomerCredit() async {
     final session = widget.session;
-    await session.recoverCustomerLedger();
+    final store = session.activeWorkspace?.id;
+    final recovered = await session.recoverCustomerLedger();
     final finance = session.workspaceFinance;
-    if (!mounted || finance == null || !finance.valid || session.workspaceFinanceStale) return;
+    if (!mounted) return false;
+    if (session.activeWorkspace?.id != store) {
+      session.showNotice('Store changed. Open Customer credit in the current Store.');
+      return false;
+    }
+    if (!recovered || finance == null || !finance.valid || session.workspaceFinanceStale) {
+      return _retryCustomerCredit('Customer credit could not be verified. Retry loading saved records. No sale or credit has been changed.');
+    }
+    final usable = finance.customerLedgers.where((ledger) =>
+      ledger.accountScope == finance.accountScope && ledger.workspaceId == finance.workspaceId &&
+      _availableCustomerCredit(ledger) > 0).toList();
     final search = TextEditingController();
     ModalRoute<dynamic>? creditRoute;
     final selected = await showModalBottomSheet<WorkspaceCustomerLedger>(context: context,
@@ -11672,16 +11700,17 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   filled: false, border: InputBorder.none, enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none)),
               Expanded(child: ListView(children: [
-                if (finance.customerLedgers.isEmpty) const Text('No saved customer credit yet.'),
-                if (finance.customerLedgers.isNotEmpty && !finance.customerLedgers.any((l) =>
+                if (usable.isEmpty) const Text('No available customer credit.'),
+                if (finance.customerLedgers.any((l) => !l.valid || !l.historyComplete))
+                  const Text('Some customer records are incomplete. Credit is shown only where it can be verified.'),
+                if (usable.isNotEmpty && !usable.any((l) =>
                     '${l.customerName} ${l.customerId}'.toLowerCase().contains(search.text.trim().toLowerCase())))
-                  const Text('No matching customer.'),
-                for (final ledger in finance.customerLedgers.where((l) =>
+                  const Text('No matching customer with available credit.'),
+                for (final ledger in usable.where((l) =>
                     '${l.customerName} ${l.customerId}'.toLowerCase().contains(search.text.trim().toLowerCase()))) ...[
                   _CustomerLedgerStatement(ledger: ledger),
-                  Row(children: [Expanded(child: Text(!ledger.historyComplete ? 'Credit unavailable: history incomplete'
-                      : 'Available credit ${_purchaseAmount(_availableCustomerCredit(ledger))}')),
-                    TextButton(onPressed: _availableCustomerCredit(ledger) <= 0 || widget.onNewSale == null
+                  Row(children: [Expanded(child: Text('Available credit ${_purchaseAmount(_availableCustomerCredit(ledger))}')),
+                    TextButton(onPressed: widget.onNewSale == null
                         ? null : () => Navigator.pop(sheetContext, ledger), child: const Text('Start sale'))]),
                   const Divider(height: 1),
                 ],
@@ -11690,9 +11719,18 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     // Dispose after the route's exit animation no longer uses its TextField.
     await creditRoute?.completed;
     search.dispose();
-    if (!mounted || selected == null || !identical(session.workspaceFinance, finance)) return;
+    if (!mounted || selected == null) return false;
+    if (session.activeWorkspace?.id != store ||
+        session.workspaceFinance?.accountScope != finance.accountScope) {
+      session.showNotice('Store or account changed. Open Customer credit again.');
+      return false;
+    }
+    if (!identical(session.workspaceFinance, finance) || session.workspaceFinanceStale) {
+      return _retryCustomerCredit('Customer credit changed while you were choosing. Reload the latest balances and select the customer again. No sale has been started.');
+    }
     await _startCustomerSale(account: finance.accountScope, store: finance.workspaceId,
       customerId: selected.customerId, customerName: selected.customerName);
+    return false;
   }
 
   String _book = 'Sales';

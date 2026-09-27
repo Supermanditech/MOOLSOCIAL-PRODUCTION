@@ -16689,6 +16689,103 @@ void main() {
     }
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final mode in ['filter', 'empty', 'changed', 'retry', 'start']) {
+      testWidgets('CREDITPICKER $mode $scale', (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(accountScope: 'review-draft-account', orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)));
+        work.activeWorkspace = seed.workspace;
+        final time = seed.finance.asOf;
+        WorkspaceCustomerLedger ledger(String id, String name, {bool credit = false, bool complete = true}) =>
+          WorkspaceCustomerLedger(accountScope: seed.accountScope, workspaceId: seed.storeId,
+            customerId: id, customerName: name, revision: 1, asOf: time,
+            openingBalanceMinor: 0, historyComplete: complete,
+            entries: [for (var i = 0; i < (credit ? 3 : 1); i++) WorkspaceCustomerLedgerEntry(
+              id: '$id-$i', operationId: '$id-$i', invoiceId: 'INV-$id', orderId: 'ORDER-$id',
+              sequence: i + 1, occurredAt: time,
+              kind: [WorkspaceLedgerEntryKind.invoice, WorkspaceLedgerEntryKind.collection,
+                WorkspaceLedgerEntryKind.creditNote][i], state: WorkspaceLedgerPostingState.posted,
+              amountMinor: 50000, channel: WorkspacePaymentChannel.cash)]);
+        final ledgers = [
+          if (mode != 'empty') ledger('9000000001', 'Usable credit customer', credit: true),
+          ledger('9000000002', 'No credit customer'),
+          ledger('9000000003', 'Incomplete customer', credit: true, complete: false),
+        ];
+        WorkspaceFinanceSnapshot snapshot(int revision) => WorkspaceFinanceSnapshot(
+          accountScope: seed.accountScope, workspaceId: seed.storeId, revision: revision, asOf: time,
+          salesTodayMinor: 0, duesMinor: 0, availableMinor: 0, heldMinor: 0, requestedMinor: 0,
+          paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0,
+          taxWithheldMinor: 0, payouts: [], payments: [], customerLedgers: ledgers, historyComplete: true);
+        final finance = snapshot(1);
+        expect(work.applyWorkspaceFinance(finance), isTrue);
+        void bindRecovery() => expect(work.bindCustomerCollectionGateway(accountScope: seed.accountScope,
+          storeId: seed.storeId, adapter: StoreReviewCustomerCollectionGateway(finance),
+          checkpointStore: _LedgerCheckpointFixtureStore()), isTrue);
+        if (mode != 'retry') bindRecovery();
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: const Size(360, 720), textScale: scale);
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        final action = find.byKey(const Key('work-sales-customer-credit'));
+        await reveal(tester, action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        if (mode == 'retry') {
+          expect(find.textContaining('Customer credit could not be verified.'), findsOneWidget);
+          bindRecovery();
+          await tester.tap(find.byKey(const Key('customer-credit-retry')));
+          await tester.pumpAndSettle();
+        }
+        expect(find.byKey(const Key('customer-credit-search')), findsOneWidget);
+        expect(find.text('No credit customer'), findsNothing);
+        expect(find.text('Incomplete customer'), findsNothing);
+        expect(find.textContaining('Some customer records are incomplete.'), findsOneWidget);
+        if (mode == 'empty') {
+          expect(find.text('No available customer credit.'), findsOneWidget);
+          expect(find.text('Start sale'), findsNothing);
+        } else if (mode == 'start') {
+          await reveal(tester, find.text('Start sale'));
+          await tester.tap(find.text('Start sale'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-counter-fullscreen-back')), findsOneWidget);
+          expect(work.workspaceOrderCustomer, '9000000001');
+          expect(work.workspaceFinance!.revision, 1);
+          expect(tester.takeException(), isNull);
+          return;
+        } else if (mode == 'changed') {
+          expect(work.applyWorkspaceFinance(snapshot(2)), isTrue);
+          await reveal(tester, find.text('Start sale'));
+          await tester.tap(find.text('Start sale'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('Customer credit changed while you were choosing.'), findsOneWidget);
+          expect(find.byKey(const Key('work-counter-fullscreen-back')), findsNothing);
+          await tester.tap(find.byKey(const Key('customer-credit-retry')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('customer-credit-search')), findsOneWidget);
+        } else {
+          await tester.enterText(find.byKey(const Key('customer-credit-search')), '9000000001');
+          await tester.pumpAndSettle();
+          tester.testTextInput.hide();
+          await tester.scrollUntilVisible(find.text('Start sale'), 150,
+            scrollable: find.descendant(of: find.byType(BottomSheet).last,
+              matching: find.byType(Scrollable)).last);
+          await tester.pumpAndSettle();
+          expect(find.text('Start sale'), findsOneWidget);
+          await tester.enterText(find.byKey(const Key('customer-credit-search')), 'No credit customer');
+          await tester.pumpAndSettle();
+          expect(find.text('No matching customer with available credit.'), findsOneWidget);
+          expect(find.text('Start sale'), findsNothing);
+        }
+        tester.testTextInput.hide();
+        await tester.tap(find.byTooltip('Close').last);
+        await tester.pumpAndSettle();
+        expect(work.workspaceFinance!.revision, mode == 'changed' ? 2 : 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('SALESHOME empty actions reuse existing destinations', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     work.workspaceInvoices.clear();
