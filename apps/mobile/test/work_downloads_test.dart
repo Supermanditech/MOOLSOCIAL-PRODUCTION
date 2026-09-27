@@ -259,6 +259,7 @@ void main() {
     int? opening = 1000,
     bool complete = true,
     bool transactions = true,
+    String? returnReason,
   }) {
     final kinds = [
       WorkspaceLedgerEntryKind.invoice,
@@ -290,6 +291,17 @@ void main() {
                   occurredAt: DateTime.utc(2026, 9, i + 2),
                   kind: kinds[i],
                   amountMinor: amounts[i],
+                  customerReturn: i == 2 && returnReason != null
+                      ? WorkspaceCustomerReturn(
+                          accountScope: account, workspaceId: 'store',
+                          customerId: id, invoiceId: 'invoice-$id',
+                          orderId: 'order-$id', operationId: 'operation-$id-$i',
+                          expectedRevision: 1, reason: returnReason,
+                          reasonCode: 'other',
+                          lines: [const WorkspaceCustomerReturnLine(
+                            productId: 'qa-product', quantity: 1, restockQuantity: 0)],
+                        )
+                      : null,
                   state: i == 4
                       ? WorkspaceLedgerPostingState.pending
                       : i == 5
@@ -315,8 +327,63 @@ void main() {
     expect(period.recorded(WorkspaceLedgerEntryKind.collection), 4000);
     expect(period.recorded(WorkspaceLedgerEntryKind.creditNote), 8000);
     expect(period.recorded(WorkspaceLedgerEntryKind.refund), 500);
+    expect(period.billedMinor, 0);
+    expect(period.report.rows, hasLength(2));
+    expect(period.report.rows.map((r) => r[7]), ['Credit note', 'Refund recorded']);
+    expect(period.report.rows.first[8], isNull); // Legacy reason not invented.
+    expect(period.report.rows.first[9], 80);
+    expect(period.report.rows.last[10], 5);
+    expect(period.report.rows.every((r) => r[4] == ''), isTrue);
+    expect(period.report.rows.map((r) => r[11]),
+        ['voucher-customer-01-2', 'voucher-customer-01-3']);
+    expect(make(DateTime.utc(2026, 9, 5)).adjustments, hasLength(1));
+    expect(make(DateTime.utc(2026, 9, 6)).adjustments, isEmpty);
+    expect(make(DateTime.utc(2026, 9), account: 'other').adjustments, isEmpty);
     expect(make(DateTime.utc(2026, 9, 27)).recorded(WorkspaceLedgerEntryKind.collection), isNull);
     expect(make(DateTime.utc(2026, 9), account: 'other').recorded(WorkspaceLedgerEntryKind.collection), isNull);
+  });
+  test('SALESSTATEMENT adjustment exports retain old invoice links and reasons', () async {
+    const reason = '=Evaluation reason, "damaged pack"';
+    final ledger = customer(returnReason: reason);
+    final f = WorkspaceFinanceSnapshot(accountScope: 'account', workspaceId: 'store',
+      revision: 1, asOf: DateTime.utc(2026, 9, 10), salesTodayMinor: 0, duesMinor: 0,
+      availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payments: [], payouts: [], customerLedgers: [ledger], historyComplete: true);
+    expect(f.valid, isTrue);
+    final statement = StoreSalesStatement(accountId: 'account', storeId: 'store',
+      storeName: 'Evaluation Store', from: DateTime.utc(2026, 9),
+      until: DateTime.utc(2026, 9, 6), generatedAt: DateTime.utc(2026, 9, 27),
+      reviewOnly: true, finance: f, invoices: [WorkspaceCustomerInvoice(
+        id: 'invoice-customer-01', orderId: 'order-customer-01', customer: 'Customer customer-01',
+        items: 'Evaluation item', amount: 100, payment: 'Cash', issuedAt: DateTime.utc(2026, 8, 31))]);
+    expect(statement.selected, isEmpty);
+    final report = statement.report;
+    expect(report.rows, hasLength(2));
+    expect(report.rows.first[1], 'invoice-customer-01');
+    expect(report.rows.first[8], reason);
+    expect(report.rows.last[8], 'Not linked to a specific return');
+    expect(report.rows.fold<num>(0, (sum, r) => sum + (r[9] is num ? r[9] as num : 0)) * 100,
+      statement.recorded(WorkspaceLedgerEntryKind.creditNote));
+    expect(report.rows.fold<num>(0, (sum, r) => sum + (r[10] is num ? r[10] as num : 0)) * 100,
+      statement.recorded(WorkspaceLedgerEntryKind.refund));
+    final csv = utf8.decode(await report.generate(StoreStockExportFormat.csv));
+    expect(csv, contains("'=Evaluation reason"));
+    expect(csv, contains('voucher-customer-01-2'));
+    expect(csv, isNot(contains('voucher-customer-01-5')));
+    final excel = xls.Excel.decodeBytes(await report.generate(StoreStockExportFormat.excel));
+    final last = excel.tables.values.single.rows.last;
+    // Excel may decode an integral decimal as IntCellValue; it must stay numeric.
+    expect(last[10]!.value, anyOf(isA<xls.DoubleCellValue>(), isA<xls.IntCellValue>()));
+    expect(last[10]!.value.toString(), '5');
+    expect(last[10]!.cellStyle!.numberFormat.formatCode, '#,##0.00');
+    final pdf = await report.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      Directory(output).createSync(recursive: true);
+      File('$output/sales-adjustments-qa.pdf').writeAsBytesSync(pdf);
+    }
   });
   testWidgets(
     'PRINT customer statement action cancels stale source and never claims queued completion',

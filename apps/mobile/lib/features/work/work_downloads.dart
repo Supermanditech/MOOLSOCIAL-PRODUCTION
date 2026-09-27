@@ -77,6 +77,25 @@ class StoreSalesStatement {
                   inPeriod(e.occurredAt),
             )
             .fold<int>(0, (sum, e) => sum + e.amountMinor);
+  // Use adjustment dates, not invoice dates: a return can follow an earlier sale.
+  List<({String customer, WorkspaceCustomerLedgerEntry entry})>
+  get adjustments {
+    if (!financeReady || finance!.asOf.isBefore(from)) return [];
+    final result = [
+      for (final ledger in finance!.customerLedgers)
+        for (final entry in ledger.entries)
+          if (entry.state == WorkspaceLedgerPostingState.posted &&
+              inPeriod(entry.occurredAt) &&
+              (entry.kind == WorkspaceLedgerEntryKind.creditNote ||
+                  entry.kind == WorkspaceLedgerEntryKind.refund))
+            (customer: ledger.customerName, entry: entry),
+    ];
+    result.sort((a, b) {
+      final date = a.entry.occurredAt.compareTo(b.entry.occurredAt);
+      return date == 0 ? a.entry.id.compareTo(b.entry.id) : date;
+    });
+    return result;
+  }
   static String date(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   String get period =>
@@ -92,6 +111,8 @@ class StoreSalesStatement {
             generatedAt.toIso8601String(),
             finance?.revision,
             for (final i in selected) i.toLedgerJson(),
+            for (final adjustment in adjustments)
+              [adjustment.customer, adjustment.entry.identityData.toString()],
           ]),
         ),
       )
@@ -99,6 +120,7 @@ class StoreSalesStatement {
       .substring(0, 16)
       .toUpperCase();
   StoreTabularReport get report {
+    final detail = adjustments;
     final monthly = <String, List<int>>{};
     for (final i in selected) {
       final key = date(i.issuedAt.toLocal()).substring(0, 7);
@@ -181,6 +203,11 @@ class StoreSalesStatement {
           'Accounting treatment',
           'Collections are not sales. Credits and refunds remain separate; consult original vouchers before calculating net sales.',
         ],
+        if (detail.isNotEmpty)
+          [
+            'Adjustment detail',
+            'By adjustment date, including earlier invoices. Blank amounts are not applicable. Recorded refunds do not confirm a money transfer.',
+          ],
         ['Monthly summary', 'Invoice count | discounts | invoice totals (INR)'],
         for (final entry in monthly.entries)
           [
@@ -194,7 +221,7 @@ class StoreSalesStatement {
         ['Period', period],
         if (reviewOnly) ['EVALUATION ONLY', 'Not for financial submission'],
       ],
-      headers: const [
+      headers: [
         'Date',
         'Invoice number',
         'Customer',
@@ -202,6 +229,13 @@ class StoreSalesStatement {
         'Invoice total (INR)',
         'Taxable / exempt / GST',
         'Order reference',
+        if (detail.isNotEmpty) ...[
+          'Entry type',
+          'Return reason',
+          'Credit (INR)',
+          'Refund recorded (INR)',
+          'Adjustment reference',
+        ],
       ],
       rows: [
         for (final i in selected)
@@ -213,9 +247,33 @@ class StoreSalesStatement {
             i.payableMinor / 100,
             null,
             i.orderId,
+            if (detail.isNotEmpty) ...['Invoice', '', '', '', ''],
+          ],
+        for (final adjustment in detail)
+          [
+            date(adjustment.entry.occurredAt.toLocal()),
+            adjustment.entry.invoiceId,
+            adjustment.customer,
+            '',
+            '',
+            '',
+            adjustment.entry.orderId,
+            adjustment.entry.kind == WorkspaceLedgerEntryKind.creditNote
+                ? 'Credit note'
+                : 'Refund recorded',
+            adjustment.entry.kind == WorkspaceLedgerEntryKind.creditNote
+                ? adjustment.entry.customerReturn?.reason
+                : 'Not linked to a specific return',
+            adjustment.entry.kind == WorkspaceLedgerEntryKind.creditNote
+                ? adjustment.entry.amountMinor / 100
+                : '',
+            adjustment.entry.kind == WorkspaceLedgerEntryKind.refund
+                ? adjustment.entry.amountMinor / 100
+                : '',
+            adjustment.entry.id,
           ],
       ],
-      moneyColumns: const {3, 4},
+      moneyColumns: {3, 4, if (detail.isNotEmpty) ...{9, 10}},
     );
   }
 }
