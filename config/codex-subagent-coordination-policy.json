@@ -191,7 +191,9 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
         "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart"
       ]
     },
     {
@@ -227,7 +229,6 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
         "apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart",
         "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart",

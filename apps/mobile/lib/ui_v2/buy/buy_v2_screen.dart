@@ -3353,7 +3353,15 @@ class _BuySearchBand extends StatelessWidget {
         !offersActive &&
         (session.destination == BuyV2Destination.shop ||
             session.destination == BuyV2Destination.wholesale);
-    final hint = storeSearch
+    final wholesaleSearch = session.destination == BuyV2Destination.wholesale;
+    final bulkSearch =
+        wholesaleSearch &&
+        session.wholesaleSaleType == BuyV2WholesaleSaleType.bulk;
+    final hint = !offersActive && wholesaleSearch
+        ? (bulkSearch
+              ? 'Search bulk products and suppliers'
+              : 'Search wholesale products and suppliers')
+        : storeSearch
         ? 'Search stores or products'
         : offersActive
         ? 'Search offers, products and sellers'
@@ -3363,8 +3371,10 @@ class _BuySearchBand extends StatelessWidget {
             BuyV2Destination.orders => 'Search orders, sellers or ID',
             _ => 'Search products, brands and codes',
           };
-    final compactHint = storeSearch
-        ? 'Stores or products'
+    final compactHint = !offersActive && wholesaleSearch
+        ? (bulkSearch ? 'Find bulk products' : 'Find wholesale products')
+        : storeSearch
+        ? 'Find stores or products'
         : offersActive
         ? 'Search current offers'
         : switch (session.destination) {

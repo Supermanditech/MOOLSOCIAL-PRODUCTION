@@ -1183,6 +1183,8 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart',
   '.gitignore',
   'docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json',
   '.gitattributes',
@@ -2076,7 +2078,6 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-W
         'apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart',
         'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
         'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',

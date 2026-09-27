@@ -5979,8 +5979,16 @@ class _BuyV2ShoppingHelpSheetState extends State<_BuyV2ShoppingHelpSheet> {
                               onTapOutside: (_) =>
                                   FocusScope.of(context).unfocus(),
                               decoration: InputDecoration(
-                                labelText: 'Find an order',
-                                hintText: 'Order number, product or seller',
+                                hintText: 'Find order, product or seller',
+                                hintMaxLines: 2,
+                                prefixIcon: const Icon(Icons.search_rounded),
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
                                 suffixIcon: _search.text.isEmpty
                                     ? null
                                     : IconButton(
