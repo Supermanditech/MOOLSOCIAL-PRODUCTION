@@ -11447,15 +11447,14 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             Align(alignment: Alignment.centerRight, child: IconButton(tooltip: 'Close statement',
               onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close))),
             Expanded(child: StoreSalesStatementPanel(statement: statement,
-              changes: session, isCurrent: () => mounted && session.workspaceStockHistoryScope()?.key == scope.key,
-              onOtherStatements: () { Navigator.pop(sheetContext); widget.onOpenOperation?.call(_WorkspaceOperation.statement); })),
+              changes: session, isCurrent: () => mounted && session.workspaceStockHistoryScope()?.key == scope.key)),
           ])));
     } on FormatException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
-  Widget _compactInvoices(WorkSession session) {
+  Widget _compactInvoices(WorkSession session, {Widget? salesPeriodControl}) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final start = !widget.salesOnly
@@ -11510,12 +11509,30 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           key: const Key('work-sales-period-summary'),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, runSpacing: 4, children: [
-            Text('Recorded sales · $_salesPeriodLabel', style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
-            Text('₹${_formatStoreMinorAmount(totalMinor)}', key: const Key('work-sales-period-total'),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink,
-                fontFeatures: [FontFeature.tabularFigures()])),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4, runSpacing: 0, children: [
+                ?salesPeriodControl,
+                Semantics(label: 'Billed sales for $_salesPeriodLabel', child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
+                    const Text('Billed', style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                    Text('₹${_formatStoreMinorAmount(totalMinor)}', key: const Key('work-sales-period-total'),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink,
+                        fontFeatures: [FontFeature.tabularFigures()])),
+                  ])),
+                TextButton.icon(key: const Key('work-sales-statement'), onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    _openSalesStatement();
+                  },
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4),
+                    minimumSize: const Size(48, 48), foregroundColor: MoolColors.navy),
+                  icon: const Icon(Icons.description_outlined, size: 16),
+                  label: const Text('Sales statement', style: TextStyle(fontSize: 12))),
+              ]),
+            if (_invoicePeriod == 'Custom range')
+              Padding(padding: const EdgeInsets.only(bottom: 4),
+                child: Text(_salesPeriodLabel, style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
           ]),
         ),
         Expanded(child: ListView.separated(
@@ -11692,13 +11709,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           PopupMenuItem(value: period, child: Text(period)),
       ],
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: widget.salesOnly
+            ? const EdgeInsets.symmetric(horizontal: 4, vertical: 14)
+            : const EdgeInsets.all(12),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.salesOnly && _salesActionsExpanded)
-              const Icon(Icons.date_range_outlined, size: 20, color: MoolColors.navy)
-            else Text(
+            Text(
               widget.salesOnly
                   ? (_invoicePeriod == 'Custom range' ? 'Dates' : _invoicePeriod)
                   : session.workspaceMoneyPeriod,
@@ -11747,6 +11764,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 decoration: InputDecoration(
                   hintText: 'Search invoices or customers', filled: false, isDense: true,
                   border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none, errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  fillColor: Colors.transparent, focusColor: Colors.transparent, hoverColor: Colors.transparent,
                   prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
                   suffixIcon: _invoiceSearch.text.isEmpty ? null : IconButton(
                     tooltip: 'Clear invoice search', onPressed: () => _changeSalesBrowse(_invoiceSearch.clear),
@@ -11755,12 +11775,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               )),
             ]),
           ),
-          Align(alignment: Alignment.centerRight, child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-            periodControl,
-            TextButton.icon(key: const Key('work-sales-statement'), onPressed: _openSalesStatement,
-              icon: const Icon(Icons.description_outlined, size: 18), label: const Text('Statement', style: TextStyle(fontSize: 12))),
-          ])),
-          Expanded(child: _compactInvoices(session)),
+          Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl)),
         ])),
       );
     }

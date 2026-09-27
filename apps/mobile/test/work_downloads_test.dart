@@ -147,7 +147,8 @@ void main() {
     var saves = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreSalesStatementPanel(
       statement: sales([request().invoice]), isCurrent: () => true, changes: changes,
-      onOtherStatements: () {}, saveFile: (bytes, name, format) async { saves++; return true; }))));
+      saveFile: (bytes, name, format) async { saves++; return true; }))));
+    expect(find.text('Other statements'), findsNothing);
     expect(find.byKey(const Key('sales-statement-download')), findsOneWidget);
     changes.value++;
     await tester.pump();

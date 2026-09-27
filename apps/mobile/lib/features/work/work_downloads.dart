@@ -228,13 +228,11 @@ class StoreSalesStatementPanel extends StatefulWidget {
     required this.statement,
     required this.isCurrent,
     required this.changes,
-    required this.onOtherStatements,
     this.saveFile = saveStoreStockFile,
   });
   final StoreSalesStatement statement;
   final bool Function() isCurrent;
   final Listenable changes;
-  final VoidCallback onOtherStatements;
   final StoreStockFileSaver saveFile;
   @override
   State<StoreSalesStatementPanel> createState() =>
@@ -355,7 +353,7 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
           Text('${statement.storeName}\n${statement.period}'),
           const SizedBox(height: 12),
           Text(
-            '${statement.selected.length} recorded invoices · INR ${(statement.billedMinor / 100).toStringAsFixed(2)}',
+            '${statement.selected.length} recorded ${statement.selected.length == 1 ? 'invoice' : 'invoices'} · INR ${(statement.billedMinor / 100).toStringAsFixed(2)}',
           ),
           const SizedBox(height: 8),
           const Text(
@@ -389,10 +387,6 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
           ),
           if (_busy) const LinearProgressIndicator(),
           if (_notice != null) Text(_notice!, semanticsLabel: _notice),
-          TextButton(
-            onPressed: _busy ? null : widget.onOtherStatements,
-            child: const Text('Other statements'),
-          ),
         ],
       ),
     );

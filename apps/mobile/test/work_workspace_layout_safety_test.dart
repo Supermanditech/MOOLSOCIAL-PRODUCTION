@@ -764,7 +764,11 @@ Future<void> openSalesCollections(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(sales);
   await tester.pumpAndSettle();
-  final collections = find.byTooltip('Collections and customer ledger');
+  if (find.byKey(const Key('work-sales-actions-panel')).evaluate().isEmpty) {
+    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+    await tester.pumpAndSettle();
+  }
+  final collections = find.byKey(const Key('work-sales-dues'));
   await tester.ensureVisible(collections);
   await tester.pumpAndSettle();
   await tester.tap(collections);
@@ -16394,6 +16398,14 @@ void main() {
       final input = tester.widget<TextField>(search);
       expect(input.decoration!.focusedBorder, InputBorder.none);
       expect(input.decoration!.filled, false);
+      expect(input.decoration!.contentPadding, const EdgeInsets.symmetric(vertical: 12));
+      final summary = find.byKey(const Key('work-sales-period-summary'));
+      for (final key in ['work-statement-period', 'work-sales-statement']) {
+        expect(find.descendant(of: summary, matching: find.byKey(Key(key))), findsOneWidget);
+      }
+      if (display.$2 == 1 && display.$1.width == 360) {
+        expect(tester.getSize(summary).height, lessThanOrEqualTo(60));
+      }
       expect(find.text('₹1,00,00,000.25'), findsNWidgets(2));
       expect(find.text('Retail customer with a long business name'), findsOneWidget);
       expect(find.text('Payment status unavailable'), findsOneWidget);
@@ -16407,6 +16419,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(search, 'Retail customer');
       await tester.pumpAndSettle();
+      final typedDecoration = tester.widget<InputDecorator>(find.descendant(
+        of: search, matching: find.byType(InputDecorator))).decoration;
+      expect(typedDecoration.filled, false);
+      expect(typedDecoration.focusedBorder, InputBorder.none);
+      expect(typedDecoration.errorBorder, InputBorder.none);
+      expect(typedDecoration.focusedErrorBorder, InputBorder.none);
       expect(find.byKey(const ValueKey('work-sales-invoice-SALES-ONE')), findsOneWidget);
       expect(find.byKey(const Key('work-sales-new-counter-sale')), findsNothing);
       await tester.enterText(search, 'absent');
@@ -16493,7 +16511,7 @@ void main() {
     Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop(range);
     await tester.pumpAndSettle();
     String date(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    expect(find.text('Recorded sales · ${date(range.start)} – ${date(range.end)}'), findsOneWidget);
+    expect(find.text('${date(range.start)} – ${date(range.end)}'), findsOneWidget);
     expect(work.workspaceInvoices, hasLength(2));
     expect(tester.takeException(), isNull);
   });
@@ -16659,7 +16677,8 @@ void main() {
             .data,
         '₹${includedCount * 125}',
       );
-      expect(find.text('Recorded sales · $label'), findsOneWidget);
+      expect(find.descendant(of: period, matching: find.text(label)), findsOneWidget);
+      expect(find.byTooltip('Sales period · $label'), findsOneWidget);
       for (var index = 0; index < dates.length; index++) {
         final included =
             !dates[index].isBefore(start) &&
@@ -37707,9 +37726,7 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
-        await reveal(tester, find.byKey(const Key('work-pulse-dues')));
-        await tester.tap(find.byKey(const Key('work-pulse-dues')));
-        await tester.pumpAndSettle();
+        await openSalesCollections(tester);
         final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
         await reveal(tester, button);
         await tester.tap(button);
@@ -38046,9 +38063,7 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
-        await reveal(tester, find.byKey(const Key('work-pulse-dues')));
-        await tester.tap(find.byKey(const Key('work-pulse-dues')));
-        await tester.pumpAndSettle();
+        await openSalesCollections(tester);
         final invoice = seed.finance.payments.first;
         final button = find.byKey(
           ValueKey('record-collection-${invoice.orderId}'),
@@ -38209,9 +38224,7 @@ void main() {
         viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
         textScale: scale,
       );
-      await reveal(tester, find.byKey(const Key('work-pulse-dues')));
-      await tester.tap(find.byKey(const Key('work-pulse-dues')));
-      await tester.pumpAndSettle();
+      await openSalesCollections(tester);
       await reveal(tester, find.text('Ledger test customer'));
       await tester.tap(find.text('Ledger test customer'));
       await tester.pumpAndSettle();
