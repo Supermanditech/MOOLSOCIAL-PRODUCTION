@@ -3,7 +3,7 @@ import 'dart:async';
 import 'buy_v2_qualified_provider_fixture.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_address_sheet_motion.dart';
 import 'dart:io';
-import 'dart:ui' show SemanticsAction, ImageByteFormat;
+import 'dart:ui' show SemanticsAction, Tristate, ImageByteFormat;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -485,6 +485,119 @@ void main() {
       expect(bounds.height, greaterThanOrEqualTo(44));
       expect(action.hitTestable(), findsOneWidget);
     }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('quiet current selection across public catalogue $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-tomato');
+      final total = session.cartTotal;
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      Finder control(String key) => find.byKey(ValueKey(key));
+      void checkCue(String active, String inactive) {
+        final owner = control(active);
+        final dot = find.descendant(
+          of: owner,
+          matching: find.byKey(const ValueKey('buy-current-selection-surface')),
+        );
+        expect(dot, findsOneWidget);
+        expect(tester.getRect(owner).contains(tester.getCenter(dot)), isTrue);
+        expect(
+          find.descendant(
+            of: control(inactive),
+            matching: find.byKey(
+              const ValueKey('buy-current-selection-surface'),
+            ),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester
+              .getSemantics(
+                active.startsWith('buy-offer-group-')
+                    ? find
+                          .ancestor(
+                            of: owner,
+                            matching: find.byType(MergeSemantics),
+                          )
+                          .first
+                    : owner,
+              )
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue,
+        );
+        expect(
+          tester
+              .getSemantics(
+                inactive.startsWith('buy-offer-group-')
+                    ? find
+                          .ancestor(
+                            of: control(inactive),
+                            matching: find.byType(MergeSemantics),
+                          )
+                          .first
+                    : control(inactive),
+              )
+              .flagsCollection
+              .isSelected,
+          Tristate.isFalse,
+        );
+      }
+
+      checkCue('buy-shop-sale-type-quick', 'buy-shop-sale-type-courier');
+      await tester.tap(control('buy-shop-sale-type-courier'));
+      await tester.pumpAndSettle();
+      checkCue('buy-shop-sale-type-courier', 'buy-shop-sale-type-quick');
+      final category = session.categories.firstWhere((c) => c.id != 'all').id;
+      BoxDecoration? categoryDecoration() =>
+          tester
+                  .widget<AnimatedContainer>(
+                    find.descendant(
+                      of: control('buy-category-picker'),
+                      matching: find.byType(AnimatedContainer),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration?;
+      session.chooseCategory(category);
+      await tester.pumpAndSettle();
+      expect(categoryDecoration()?.boxShadow, isNotEmpty);
+      expect(categoryDecoration()?.border, isNull);
+      session.chooseCategory('all');
+      await tester.pumpAndSettle();
+      expect(categoryDecoration(), isNull);
+      await tester.tap(control('buy-local-tab-wholesale'));
+      await tester.pumpAndSettle();
+      checkCue(
+        'buy-wholesale-sale-type-wholesale',
+        'buy-wholesale-sale-type-bulk',
+      );
+      await tester.tap(control('buy-wholesale-sale-type-bulk'));
+      await tester.pumpAndSettle();
+      checkCue(
+        'buy-wholesale-sale-type-bulk',
+        'buy-wholesale-sale-type-wholesale',
+      );
+      await tester.tap(control('buy-local-tab-offers'));
+      await tester.pumpAndSettle();
+      checkCue('buy-offer-group-suppliers', 'buy-offer-group-moolsocial');
+      await tester.tap(control('buy-offer-group-moolsocial'));
+      await tester.pumpAndSettle();
+      checkCue('buy-offer-group-moolsocial', 'buy-offer-group-suppliers');
+      semantics.dispose();
+      expect(session.cartTotal, total);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final destination in [

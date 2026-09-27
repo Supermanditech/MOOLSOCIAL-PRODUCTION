@@ -780,6 +780,7 @@ class _OffersCategoryControl extends StatelessWidget {
               tooltip: 'Offer categories · $label',
               icon: Icons.menu_rounded,
               emphasized: true,
+              active: categoryId != 'all',
               onTap: onTap,
             ),
             const SizedBox(width: 3),
@@ -800,30 +801,39 @@ class _OffersCategoryControl extends StatelessWidget {
                         flex: MediaQuery.textScalerOf(context).scale(1) > 1.3
                             ? 0
                             : 1,
-                        child: TextButton(
-                          key: ValueKey(
-                            'buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}',
-                          ),
-                          onPressed: () => onSourceChanged(mool),
-                          style: TextButton.styleFrom(
-                            animationDuration: Duration.zero,
-                            backgroundColor: BuyV2ActionStyle.primaryFill,
-                            foregroundColor: BuyV2ActionStyle.primaryForeground,
-                            side: BorderSide.none,
-                            minimumSize: const Size(0, 44),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 3,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            mool ? 'MoolSocial' : 'Suppliers',
-                            textAlign: TextAlign.center,
-                            style: _CatalogueSaleSegment.labelStyle(
-                              moolSocial == mool,
+                        child: MergeSemantics(
+                          child: Semantics(
+                            selected: moolSocial == mool,
+                            child: TextButton(
+                              key: ValueKey(
+                                'buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}',
+                              ),
+                              onPressed: () => onSourceChanged(mool),
+                              style: TextButton.styleFrom(
+                                animationDuration: Duration.zero,
+                                backgroundColor: BuyV2ActionStyle.primaryFill,
+                                foregroundColor:
+                                    BuyV2ActionStyle.primaryForeground,
+                                side: BorderSide.none,
+                                minimumSize: const Size(0, 44),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                  vertical: 6,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: _CatalogueSelectionSurface(
+                                selected: moolSocial == mool,
+                                child: Text(
+                                  mool ? 'MoolSocial' : 'Suppliers',
+                                  textAlign: TextAlign.center,
+                                  style: _CatalogueSaleSegment.labelStyle(
+                                    moolSocial == mool,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -850,7 +860,7 @@ class _OffersCategoryControl extends StatelessWidget {
               label: 'Filter offers. ${_offerPublisherLabel(publisher)}',
               tooltip: 'Filter offers',
               icon: Icons.tune_rounded,
-              emphasized: publisher != null,
+              active: publisher != null,
               onTap: onFilter,
             ),
           ],
@@ -2819,7 +2829,7 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
       textScaler: MediaQuery.textScalerOf(context),
       locale: Localizations.maybeLocaleOf(context),
     )..layout();
-    final width = 12 + 2 * painter.width.ceilToDouble();
+    final width = 28 + 2 * painter.width.ceilToDouble();
     painter.dispose();
     return width;
   }
@@ -2956,6 +2966,37 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
   }
 }
 
+class _CatalogueSelectionSurface extends StatelessWidget {
+  const _CatalogueSelectionSurface({
+    required this.selected,
+    required this.child,
+  });
+  final bool selected;
+  final Widget child;
+
+  static BoxDecoration? decoration(bool selected) => selected
+      ? BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x245C6578),
+              offset: Offset(0, 1),
+              blurRadius: 2,
+            ),
+          ],
+        )
+      : null;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: selected ? const ValueKey('buy-current-selection-surface') : null,
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+    decoration: decoration(selected),
+    child: child,
+  );
+}
+
 class _CatalogueSaleSegment extends StatelessWidget {
   const _CatalogueSaleSegment({
     super.key,
@@ -3020,56 +3061,59 @@ class _CatalogueSaleSegment extends StatelessWidget {
                   ),
                 );
               },
-              child: Row(
-                key: ValueKey('$title-$selected'),
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (showIcon) ...[
-                    AnimatedScale(
-                      duration: BuyV2Motion.resolved(
-                        context,
-                        BuyV2Motion.selection,
-                      ),
-                      curve: Curves.easeOutBack,
-                      scale: selected ? 1.08 : .94,
-                      child: AnimatedContainer(
-                        key: ValueKey('buy-sale-type-icon-surface-$title'),
+              child: _CatalogueSelectionSurface(
+                selected: selected,
+                child: Row(
+                  key: ValueKey('$title-$selected'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showIcon) ...[
+                      AnimatedScale(
                         duration: BuyV2Motion.resolved(
                           context,
                           BuyV2Motion.selection,
                         ),
-                        width: 20,
-                        height: 20,
-                        child: BuyV2DeliveryModeIcon(
-                          artwork: icon,
-                          size: 18,
-                          color: BuyV2ActionStyle.primaryForeground,
+                        curve: Curves.easeOutBack,
+                        scale: selected ? 1.08 : .94,
+                        child: AnimatedContainer(
+                          key: ValueKey('buy-sale-type-icon-surface-$title'),
+                          duration: BuyV2Motion.resolved(
+                            context,
+                            BuyV2Motion.selection,
+                          ),
+                          width: 20,
+                          height: 20,
+                          child: BuyV2DeliveryModeIcon(
+                            artwork: icon,
+                            size: 18,
+                            color: BuyV2ActionStyle.primaryForeground,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Flexible(
+                      child: AnimatedDefaultTextStyle(
+                        key: labelStyleKey,
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.selection,
+                        ),
+                        curve: Curves.easeOutCubic,
+                        style: DefaultTextStyle.of(
+                          context,
+                        ).style.merge(labelStyle(selected)),
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 5),
                   ],
-                  Flexible(
-                    child: AnimatedDefaultTextStyle(
-                      key: labelStyleKey,
-                      duration: BuyV2Motion.resolved(
-                        context,
-                        BuyV2Motion.selection,
-                      ),
-                      curve: Curves.easeOutCubic,
-                      style: DefaultTextStyle.of(
-                        context,
-                      ).style.merge(labelStyle(selected)),
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.fade,
-                        softWrap: false,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -4128,6 +4172,7 @@ class _CatalogueCategoryPickerButton extends StatelessWidget {
       tooltip: '${session.destination.label} categories · ${selected.label}',
       icon: Icons.menu_rounded,
       emphasized: true,
+      active: session.selectedCategoryId != 'all',
       onTap: () => showBuyV2CategoryPicker(context, session),
     );
   }
@@ -5091,6 +5136,7 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
               curve: Curves.easeOutCubic,
               width: 44,
               height: 44,
+              decoration: _CatalogueSelectionSurface.decoration(widget.active),
               child: Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
