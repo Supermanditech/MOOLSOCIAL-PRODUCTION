@@ -7287,6 +7287,44 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       : session.activeWorkspace?.name ?? session.workName;
   String? shareError;
   bool openingWhatsApp = false;
+  void _openAdjustments(WorkspacePaymentRecord payment) {
+    final account = invoiceAccount;
+    final store = invoiceStore;
+    if (account == null || store == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: .9,
+        child: AnimatedBuilder(
+          animation: session,
+          builder: (context, _) {
+            final finance = session.workspaceFinance;
+            final matching = finance?.payments.any(
+              (p) => p.valid && p.invoiceId == invoice.id &&
+                  p.orderId == payment.orderId &&
+                  p.customerId == payment.customerId,
+            ) ?? false;
+            if (session.activeWorkspace?.id != store ||
+                finance?.workspaceId != store ||
+                finance?.accountScope != account || !matching) {
+              return const Center(child: Text('Return to this invoice’s Store to view it.'));
+            }
+            return _StoreFinanceSurface(
+              session: session,
+              section: 'payments',
+              focus: (
+                accountScope: account, workspaceId: store,
+                orderId: payment.orderId, customerId: payment.customerId,
+                payoutId: null, operationId: null,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
   void _openPdf() {
     if (session.activeWorkspace?.id != invoiceStore ||
         session.workspaceFinance?.accountScope != invoiceAccount) {
@@ -7552,6 +7590,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
           'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
           style: const TextStyle(color: MoolColors.muted),
         ),
+        if (payment.refundedMinor > 0)
+          Text(
+            'Refunded ${_purchaseAmount(payment.refundedMinor)}',
+            key: const Key('work-invoice-refunded-summary'),
+            style: const TextStyle(color: MoolColors.muted),
+          ),
         _recordedPayments(payment),
         ExpansionTile(
           key: const Key('work-invoice-details'),
@@ -7677,6 +7721,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
         payment.dueMinor == 0 &&
         payment.paidMinor > 0 &&
         payment.paidMinor >= payment.amountMinor;
+    final adjusted = (payment?.refundedMinor ?? 0) > 0 ||
+        payment?.state == WorkspacePaymentState.refundPending ||
+        (finance?.customerLedgers.any(
+          (ledger) => ledger.customerId == payment?.customerId &&
+              (ledger.invoiceBalance(invoice.id)?.creditedMinor ?? 0) > 0,
+        ) ?? false);
     return StatefulBuilder(
       builder: (sheetContext, updateSheet) => SafeArea(
         top: false,
@@ -7827,7 +7877,24 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ],
                   ),
                 ],
-                if (session.workspaceOrders.any(
+                if (payment != null &&
+                    (session.workspaceOrders.any(
+                      (order) => order.id == invoice.orderId &&
+                          order.isCompleted && order.hasCompleteItemSnapshot,
+                    ) || (finance?.customerLedgers.any(
+                      (ledger) => ledger.customerId == payment.customerId &&
+                          (ledger.invoiceBalance(invoice.id)?.refundableMinor ?? 0) > 0,
+                    ) ?? false)))
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const Key('work-invoice-adjustments'),
+                      onPressed: () => _openAdjustments(payment),
+                      icon: const Icon(Icons.assignment_return_outlined, size: 18),
+                      label: const Text('Returns & refunds'),
+                    ),
+                  ),
+                if (!adjusted && session.workspaceOrders.any(
                   (order) =>
                       order.id == invoice.orderId &&
                       order.source == 'Counter' &&

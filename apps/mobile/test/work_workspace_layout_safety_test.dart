@@ -37922,6 +37922,15 @@ void main() {
           ),
           isTrue,
         );
+        work.workspaceInvoices.add(WorkspaceCustomerInvoice(
+          id: 'RETURN-INVOICE',
+          orderId: order.id,
+          customer: order.customer,
+          items: order.items,
+          amount: order.amount,
+          payment: order.payment,
+          issuedAt: order.createdAt,
+        ));
         await mount(
           tester,
           route: '/app/work/workspace/dashboard',
@@ -37929,7 +37938,16 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
-        await openSalesCollections(tester);
+        await tester.tap(find.byTooltip('Open Sales'));
+        await tester.pumpAndSettle();
+        final invoiceRow = find.byKey(const ValueKey('work-sales-invoice-RETURN-INVOICE'));
+        await reveal(tester, invoiceRow);
+        await tester.tap(invoiceRow);
+        await tester.pumpAndSettle();
+        final adjustments = find.byKey(const Key('work-invoice-adjustments'));
+        await reveal(tester, adjustments);
+        await tester.tap(adjustments);
+        await tester.pumpAndSettle();
         final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
         await reveal(tester, button);
         await tester.tap(button);
@@ -38030,6 +38048,10 @@ void main() {
           findsNothing,
         );
         expect(find.byKey(const Key('return-reason')), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-counter-handover-hint')), findsNothing);
+        expect(find.byKey(const Key('work-invoice-refunded-summary')), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
