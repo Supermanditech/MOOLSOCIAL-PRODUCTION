@@ -2484,14 +2484,13 @@ void main() {
       final edge = find.byKey(const Key('work-stock-actions-toggle'));
       final table = find.byKey(const Key('work-stock-action-content'));
       final fullWidth = tester.getSize(table).width;
-      expect(find.byKey(const Key('work-stock-entry-controls')), findsNothing);
+      expect(find.byKey(const Key('work-stock-entry-controls')), findsOneWidget);
       expect(
         tester.getRect(edge).right,
         closeTo(tester.getRect(table).right, 1),
       );
-      await tester.tap(edge);
-      await tester.pumpAndSettle();
       final panel = find.byKey(const Key('work-stock-actions-panel'));
+      expect(tester.getRect(table).overlaps(tester.getRect(panel)), isFalse);
       expect(
         tester.getRect(table).right,
         closeTo(tester.getRect(panel).right, 1),
@@ -2524,7 +2523,15 @@ void main() {
       expect(actionLabel.style?.fontSize, 11);
       expect(actionLabel.style?.height, 1.25);
       expect(actionLabel.style?.fontWeight, FontWeight.w600);
-      expect(actionLabel.style?.color, const Color(0xFF252B38));
+      expect(actionLabel.style?.color, MoolColors.navy);
+      final actionInk = tester.widget<Ink>(find.ancestor(of: add, matching: find.byType(Ink)).first);
+      final actionDecoration = actionInk.decoration! as BoxDecoration;
+      expect(actionDecoration.gradient, isNull);
+      expect(actionDecoration.border, isNull);
+      expect(actionDecoration.color, Colors.white);
+      for (final background in [Colors.white, const Color(0xFFE9EBEF)]) {
+        expect((background.computeLuminance() + .05) / (MoolColors.navy.computeLuminance() + .05), greaterThanOrEqualTo(4.5));
+      }
       final actionIcon = tester.widget<Icon>(
         find.descendant(of: add, matching: find.byIcon(Icons.add_box_outlined)),
       );
@@ -16573,6 +16580,10 @@ void main() {
       expect(find.text('₹1,00,00,000.25'), findsNWidgets(2));
       expect(find.text('Retail customer with a long business name'), findsOneWidget);
       expect(find.text('Payment status unavailable'), findsOneWidget);
+      expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
       final closedContent = tester.getRect(find.byKey(const Key('work-sales-action-content')));
       await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
       await tester.pumpAndSettle();
@@ -16589,6 +16600,8 @@ void main() {
       final exchange = find.byKey(const Key('work-sales-exchange'));
       expect(tester.getTopLeft(sale).dx, lessThan(tester.getTopLeft(exchange).dx));
       expect(sale.hitTestable(), findsOneWidget);
+      expect(tester.getSize(sale).width, greaterThan(tester.getSize(exchange).width),
+        reason: 'Each action fits its own label rather than sharing a fixed width');
       expect(search.hitTestable(), findsOneWidget);
       await reveal(tester, find.byKey(const Key('work-sales-statement')));
       expect(find.byKey(const Key('work-sales-statement')).hitTestable(), findsOneWidget);
@@ -16646,7 +16659,6 @@ void main() {
       final search = find.byKey(const Key('work-sales-search'));
       await tester.enterText(search, 'previous query');
       tester.testTextInput.hide();
-      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
       await tester.pumpAndSettle();
       final action = find.byKey(Key(exchange ? 'work-sales-exchange' : 'work-sales-returns'));
       await reveal(tester, action);
@@ -16685,8 +16697,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No recorded invoices in this period.'), findsOneWidget);
     expect(find.text('Voucher Type'), findsNothing);
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
     for (final action in ['new-counter-sale', 'dues', 'statement', 'returns']) {
       expect(find.byKey(Key('work-sales-$action')), findsOneWidget);
     }
@@ -16739,8 +16750,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-NEW'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-OLD'))).dy));
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-    await tester.pumpAndSettle();
     expect(find.text('Resume sale'), findsOneWidget);
     expect(work.workspaceOrderCustomer, 'Saved customer');
     await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
@@ -37986,8 +37995,6 @@ void main() {
         if (exchange) {
           await tester.tap(find.byKey(const Key('work-store-sell')));
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-          await tester.pumpAndSettle();
           await reveal(tester, find.byKey(const Key('work-sales-exchange')));
           await tester.tap(find.byKey(const Key('work-sales-exchange')));
           await tester.pumpAndSettle();
@@ -38293,8 +38300,7 @@ void main() {
         await tester.tap(find.byTooltip('Open Sales'));
         await tester.pumpAndSettle();
         if (refundChannel == WorkspacePaymentChannel.cash) {
-          await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
           expect(tester.takeException(), isNull, reason: 'Expanded returns action');
           await reveal(tester, find.byKey(const Key('work-sales-returns')));
           await tester.tap(find.byKey(const Key('work-sales-returns')));
@@ -38311,6 +38317,10 @@ void main() {
           await tester.tap(adjustments);
           await tester.pumpAndSettle();
         }
+        expect(find.descendant(of: find.byType(BottomSheet).last,
+          matching: find.text('Returns & refunds')), findsOneWidget);
+        expect(find.text('Payment details'), findsNothing);
+        expect(find.byKey(const ValueKey('record-collection-RETURN-ORDER')), findsNothing);
         final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
         await reveal(tester, button);
         await tester.tap(button);
@@ -38343,6 +38353,9 @@ void main() {
         final refundButton = find.byKey(
           const ValueKey('record-refund-RETURN-ORDER'),
         );
+        expect(button, findsNothing, reason: 'An exhausted invoice cannot open another return');
+        await reveal(tester, find.text('All items on this invoice have already been returned.'));
+        expect(find.text('All items on this invoice have already been returned.'), findsOneWidget);
         await reveal(tester, refundButton);
         await captureStoreView(
           tester,

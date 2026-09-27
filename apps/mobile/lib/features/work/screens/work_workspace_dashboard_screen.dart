@@ -592,7 +592,7 @@ class _WorkWorkspaceDashboardScreenState
   final _saleSearchController = TextEditingController();
   final Map<String, Map<String, String>> _requirementDrafts = {};
   final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
-  final Set<Object> _expandedStockActions = {};
+  final Set<Object> _collapsedStockActions = {};
   bool _requirementPickerOpen = false;
   _WorkspaceControlView _view = _WorkspaceControlView.dashboard;
   bool _draftAcceptingOrders = true;
@@ -1703,14 +1703,14 @@ class _WorkWorkspaceDashboardScreenState
             session: session,
             procurementSession: _activeProcurement,
             catalogueKey: _catalogueKey,
-            stockActionsExpanded: _expandedStockActions.contains(
+            stockActionsExpanded: !_collapsedStockActions.contains(
               session.workspaceStockHistoryScope()?.key ?? workspace.id,
             ),
             onToggleStockActions: () => setState(() {
               final scope =
                   session.workspaceStockHistoryScope()?.key ?? workspace.id;
-              if (!_expandedStockActions.remove(scope)) {
-                _expandedStockActions.add(scope);
+              if (!_collapsedStockActions.remove(scope)) {
+                _collapsedStockActions.add(scope);
               }
             }),
             counterKey: _counterKey,
@@ -7428,6 +7428,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
             return _StoreFinanceSurface(
               session: session,
               section: 'payments',
+              returnsOnly: true,
               focus: (
                 accountScope: account, workspaceId: store,
                 orderId: payment.orderId, customerId: payment.customerId,
@@ -11596,6 +11597,15 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         return;
       }
       var recorded = false;
+      final ledger = finance.customerLedgers.where((l) =>
+        l.accountScope == account && l.workspaceId == store &&
+        l.customerId == payment.customerId).firstOrNull;
+      final remaining = _remainingReturnUnits(order, payment, ledger);
+      if (remaining == null || remaining == 0) {
+        session.showNotice(remaining == 0 ? 'All items on this invoice have already been returned.'
+          : 'Recover this sale’s return records before starting an exchange.');
+        return;
+      }
       ModalRoute<dynamic>? returnRoute;
       await showModalBottomSheet<void>(context: context, isScrollControlled: true,
         useSafeArea: true, isDismissible: false, enableDrag: false,
@@ -11690,7 +11700,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   DateTimeRange? _invoiceRange;
   final _invoiceSearch = TextEditingController();
   Object? _salesScope;
-  bool _salesActionsExpanded = false;
+  bool _salesActionsExpanded = true;
   bool _returnSelection = false;
   bool _exchangeSelection = false;
   String _salesQueryBeforeReturns = '';
@@ -11982,7 +11992,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       _returnSelection = false;
       _exchangeSelection = false;
       _salesQueryBeforeReturns = '';
-      _salesActionsExpanded = false;
+      _salesActionsExpanded = true;
       _invoicePeriod = 'Today';
       _invoiceRange = null;
       final saved = PageStorage.maybeOf(context)?.readState(context, identifier: ('sales-browse', _salesScope));
@@ -12084,8 +12094,6 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
       final salesFrame = _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
-        avoidContentOverlap: true,
-        actionWords: 'Counter sale Resume sale Collect dues Returns & refunds Customer credit Exchange',
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
         actions: [
@@ -13568,22 +13576,22 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 class _WorkspaceCatalogueSurfaceState
     extends State<_WorkspaceCatalogueSurface> {
   final _stockActionKeys = <String, GlobalKey>{};
-  final Set<Object> _localExpandedActions = {};
+  final Set<Object> _localCollapsedActions = {};
   Object get _actionScope =>
       widget.session.workspaceStockHistoryScope()?.key ??
       widget.session.activeWorkspace?.id ??
       widget.session.workspaceId ??
       widget.session;
   bool get _actionsExpanded =>
-      widget.actionsExpanded ?? _localExpandedActions.contains(_actionScope);
+      widget.actionsExpanded ?? !_localCollapsedActions.contains(_actionScope);
   void _toggleActions() {
     unawaited(HapticFeedback.selectionClick());
     if (widget.onToggleActions case final toggle?) {
       toggle();
     } else {
       setState(() {
-        if (!_localExpandedActions.remove(_actionScope)) {
-          _localExpandedActions.add(_actionScope);
+        if (!_localCollapsedActions.remove(_actionScope)) {
+          _localCollapsedActions.add(_actionScope);
         }
       });
     }
@@ -14296,136 +14304,56 @@ class _StoreEdgeAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.semanticLabel,
-    this.detail,
-    this.progress,
-    this.compact = false,
-    this.horizontal = false,
-    this.showDetails = false,
   });
   final String keyName, label;
-  final String? detail;
   final IconData icon;
   final VoidCallback? onTap;
-  final String? semanticLabel;
-  final double? progress;
-  final bool compact, horizontal;
-  final bool showDetails;
 
-  _StoreEdgeAction asNamedTab(bool expanded) => _StoreEdgeAction(
-    keyName: keyName,
-    icon: icon,
-    label: label,
-    onTap: onTap,
-    semanticLabel: semanticLabel,
-    detail: detail,
-    progress: progress,
-    compact: compact,
-    horizontal: horizontal,
-    showDetails: expanded,
-  );
-
-  Widget _buildNamedTab(BuildContext context) => Semantics(
+  @override
+  Widget build(BuildContext context) => Semantics(
     button: true,
-    label: semanticLabel ?? (detail == null ? label : '$label, $detail'),
+    label: label,
     enabled: onTap != null,
     onTap: onTap,
     excludeSemantics: true,
     child: Tooltip(
-      message: semanticLabel ?? label,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          if (!horizontal)
-            Positioned.fill(
-              left: 3,
-              right: 3,
-              top: -3,
-              bottom: 3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F1F6),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-              ),
-            ),
-          Material(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
             color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(9),
-              side: const BorderSide(color: Color(0xFFE5E8F1)),
-            ),
-            child: InkWell(
-              key: Key(keyName),
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(9),
-              child: Container(
-                width: horizontal
-                    ? MediaQuery.textScalerOf(context).scale(110) + 32
-                    : double.infinity,
-                constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          icon,
-                          size: 15,
-                          color: onTap == null
-                              ? MoolColors.muted
-                              : MoolColors.navy,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.25,
-                              fontWeight: FontWeight.w600,
-                              color: onTap == null
-                                  ? MoolColors.muted
-                                  : const Color(0xFF252B38),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (showDetails && !horizontal && detail != null) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        detail!,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          height: 1.3,
-                          color: MoolColors.muted,
-                        ),
-                      ),
-                    ],
-                    if (showDetails && !horizontal && progress != null) ...[
-                      const SizedBox(height: 5),
-                      LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 2,
-                        color: MoolColors.navy,
-                        backgroundColor: const Color(0xFFE5E8F1),
-                      ),
-                    ],
-                  ],
-                ),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: InkWell(
+            key: Key(keyName),
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(9),
+            focusColor: const Color(0xFFE9EBEF),
+            hoverColor: const Color(0xFFF3F4F6),
+            highlightColor: const Color(0xFFE9EBEF),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 15, color: onTap == null
+                      ? MoolColors.muted : MoolColors.navy),
+                  const SizedBox(width: 5),
+                  Text(label, softWrap: false, style: TextStyle(
+                    fontSize: 11, height: 1.25, fontWeight: FontWeight.w600,
+                    color: onTap == null ? MoolColors.muted : MoolColors.navy,
+                  )),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     ),
   );
-
-  @override
-  Widget build(BuildContext context) => _buildNamedTab(context);
 }
 
 double _stockQuickTabHeight(BuildContext context) {
@@ -14444,8 +14372,7 @@ double _stockQuickTabHeight(BuildContext context) {
   return height;
 }
 
-/// Approved manual right-edge interaction, reused by Stock and Sales.
-/// Keeps the table under the same parents while expanding/collapsing.
+/// Shared horizontal action shelf, collapsed manually to the corner control.
 class _StockQuickActionsFrame extends StatelessWidget {
   const _StockQuickActionsFrame({
     required this.child,
@@ -14453,15 +14380,12 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     this.keyPrefix = 'work-stock',
-    this.actionWords = 'Add products Buy stock Purchases Buy together',
-    this.avoidContentOverlap = false,
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
-  final String keyPrefix, actionWords;
-  final bool avoidContentOverlap;
+  final String keyPrefix;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -14469,16 +14393,6 @@ class _StockQuickActionsFrame extends StatelessWidget {
       final desiredHeight = _stockQuickTabHeight(context);
       final short = box.maxHeight < desiredHeight + 12;
       final tabHeight = short ? 48.0 : desiredHeight;
-      final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
-      final readableWidth =
-          _storeRailWordWidth(
-            context,
-            actionWords,
-          ) +
-          17;
-      final panelWidth =
-          ((readableWidth > normalWidth ? readableWidth : normalWidth) + 20)
-              .clamp(48.0, box.maxWidth * .48);
       final label = expanded ? 'Hide Quick actions' : 'Show Quick actions';
       final toggle = Tooltip(
         message: label,
@@ -14540,10 +14454,8 @@ class _StockQuickActionsFrame extends StatelessWidget {
           ),
         ),
       );
-      if (expanded && avoidContentOverlap) {
-        // Keep Sales controls and invoice amounts outside the action footprint.
-        // Stock retains its separately approved edge-panel behavior.
-        final actionHeight = (MediaQuery.textScalerOf(context).scale(11) * 2.5 + 16)
+      if (expanded) {
+        final actionHeight = (MediaQuery.textScalerOf(context).scale(11) * 1.25 + 16)
             .clamp(48.0, double.infinity);
         return Column(
           children: [
@@ -14552,20 +14464,21 @@ class _StockQuickActionsFrame extends StatelessWidget {
               width: double.infinity,
               child: child,
             )),
-            SizedBox(
+            Container(
               key: Key('$keyPrefix-actions-panel'),
-              height: actionHeight + 16,
+              height: actionHeight + 6,
+              color: Colors.white,
               child: Row(
                 children: [
                   Expanded(child: SingleChildScrollView(
                     key: Key('$keyPrefix-entry-controls'),
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                     child: Row(children: [
                       for (final action in actions)
                         Padding(
                           padding: const EdgeInsets.only(right: 4),
-                          child: SizedBox(width: panelWidth, child: action),
+                          child: action,
                         ),
                     ]),
                   )),
@@ -14587,49 +14500,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
                 child: child,
               ),
             ),
-            if (expanded) ...[
-              Positioned.fill(
-                child: GestureDetector(
-                  key: Key('$keyPrefix-actions-dismiss'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onToggle,
-                  child: const SizedBox.expand(),
-                ),
-              ),
-              Positioned(
-                right: 0,
-                top: 0,
-                width: panelWidth,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: box.maxHeight),
-                  child: Material(
-                    key: Key('$keyPrefix-actions-panel'),
-                    type: MaterialType.transparency,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            key: Key('$keyPrefix-entry-controls'),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 12,
-                            ),
-                            itemCount: actions.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 4),
-                            itemBuilder: (_, i) => actions[i],
-                          ),
-                        ),
-                        Align(alignment: Alignment.centerRight, child: toggle),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            if (!expanded) Positioned(right: 0, bottom: 0, child: toggle),
+            Positioned(right: 0, bottom: 0, child: toggle),
           ],
         ),
       );
@@ -22376,17 +22247,41 @@ class _CustomerLedgerStatement extends StatelessWidget {
   }
 }
 
+// Unknown/pending credit history must not be treated as unused return capacity.
+int? _remainingReturnUnits(WorkspaceOrderRecord order,
+    WorkspacePaymentRecord payment, WorkspaceCustomerLedger? ledger) {
+  if (!order.isCompleted || !order.hasCompleteItemSnapshot ||
+      payment.invoiceId == null || ledger == null || !ledger.historyComplete ||
+      ledger.customerId != payment.customerId) { return null; }
+  final credits = ledger.entries.where((entry) =>
+    entry.invoiceId == payment.invoiceId && entry.kind == WorkspaceLedgerEntryKind.creditNote);
+  if (credits.any((entry) => entry.state == WorkspaceLedgerPostingState.pending ||
+      (entry.state == WorkspaceLedgerPostingState.posted && entry.customerReturn == null))) { return null; }
+  final returned = credits.where((entry) => entry.state == WorkspaceLedgerPostingState.posted)
+      .expand((entry) => entry.customerReturn!.lines);
+  var remaining = 0;
+  for (final item in order.itemSnapshots) {
+    final quantity = item.quantity - returned.where((line) => line.productId == item.productId)
+        .fold<int>(0, (sum, line) => sum + line.quantity);
+    if (quantity < 0) return null;
+    remaining += quantity;
+  }
+  return remaining;
+}
+
 class _StoreFinanceSurface extends StatelessWidget {
   const _StoreFinanceSurface({
     required this.session,
     this.section = 'settlement',
     this.focus,
     this.onOpenInvoice,
+    this.returnsOnly = false,
   });
   final WorkSession session;
   final String section;
   final _WorkspaceFinanceFocus? focus;
   final ValueChanged<WorkspaceCustomerInvoice>? onOpenInvoice;
+  final bool returnsOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -22486,7 +22381,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                 target != null
                     ? (target.payoutId != null
                           ? 'Settlement details'
-                          : 'Payment details')
+                          : returnsOnly ? 'Returns & refunds' : 'Payment details')
                     : section == 'settlement'
                     ? 'Settlement balance'
                     : section == 'dues'
@@ -22682,6 +22577,8 @@ class _StoreFinanceSurface extends StatelessWidget {
             ledger.customerId == payment.customerId).firstOrNull;
         final receiptChannels = receiptLedger?.recordedReceiptChannels(
             payment.invoiceId ?? '', payment.orderId) ?? <WorkspacePaymentChannel>{};
+        final remainingReturnUnits = order == null ? null
+            : _remainingReturnUnits(order, payment, receiptLedger);
         final mixedMethods = receiptChannels.length > 1
             ? 'Mixed payment · ${receiptChannels.map((channel) => switch (channel) {
                 WorkspacePaymentChannel.cash => 'Cash',
@@ -22754,7 +22651,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                     child: const Text('View invoice'),
                   ),
                 ),
-              if (payment.dueMinor > 0 &&
+              if (!returnsOnly && payment.dueMinor > 0 &&
                   payment.invoiceId != null &&
                   (section == 'dues' || section == 'payments'))
                 Align(
@@ -22822,9 +22719,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                     child: const Text('Record refund'),
                   ),
                 ),
-              if (payment.invoiceId != null &&
-                  order?.isCompleted == true &&
-                  order!.hasCompleteItemSnapshot)
+              if (remainingReturnUnits != null && remainingReturnUnits > 0)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(
@@ -22839,7 +22734,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                             builder: (_) => _CustomerReturnSheet(
                               session: session,
                               payment: payment,
-                              order: order,
+                              order: order!,
                               account: finance.accountScope,
                               store: finance.workspaceId,
                             ),
@@ -22848,6 +22743,10 @@ class _StoreFinanceSurface extends StatelessWidget {
                     child: const Text('Record return'),
                   ),
                 ),
+              if (returnsOnly && remainingReturnUnits == 0)
+                const Text('All items on this invoice have already been returned.'),
+              if (returnsOnly && remainingReturnUnits == null)
+                const Text('Return quantities unavailable. Recover the original invoice records before recording a return.'),
               if (payment.transactionId?.isNotEmpty == true)
                 Text('Transaction ${payment.transactionId}'),
               if (order != null)
@@ -22919,9 +22818,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
     final firstAvailable = widget.order.itemSnapshots
         .where((item) => remainingQuantity(item) > 0)
         .firstOrNull;
-    selectedProducts.add(
-      (firstAvailable ?? widget.order.itemSnapshots.first).productId,
-    );
+    if (firstAvailable != null) selectedProducts.add(firstAvailable.productId);
     draft = _LedgerFormAutosave(
       widget.session,
       widget.session.ledgerFormKey(widget.payment, 'return'),
