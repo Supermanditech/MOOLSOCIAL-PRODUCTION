@@ -11417,6 +11417,44 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     return true;
   }
 
+  Future<void> _openSalesStatement() async {
+    final session = widget.session;
+    final scope = session.workspaceStockHistoryScope();
+    if (scope == null || !session.workspaceInvoiceHistoryLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sales records are not ready. Please retry after loading.')));
+      return;
+    }
+    final now = DateTime.now(), today = DateUtils.dateOnly(DateTime.now());
+    final from = switch (_invoicePeriod) {
+      'Week' => DateTime(today.year, today.month, today.day - 6),
+      'Month' => DateTime(today.year, today.month),
+      'Year' => DateTime(today.year),
+      'Custom range' => _invoiceRange?.start ?? today,
+      _ => today,
+    };
+    final last = _invoicePeriod == 'Custom range' ? _invoiceRange?.end ?? today : today;
+    try {
+      final statement = StoreSalesStatement(accountId: scope.accountScope, storeId: scope.workspaceId,
+        reviewOnly: const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'),
+        storeName: session.activeWorkspace!.name, from: from,
+        until: DateTime(last.year, last.month, last.day + 1), generatedAt: now,
+        invoices: session.workspaceInvoices,
+        finance: !session.workspaceFinanceStale && !session.workspaceFinanceUsesLegacyReview ? session.workspaceFinance : null);
+      if (!mounted) return;
+      await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+        builder: (sheetContext) => SizedBox(height: MediaQuery.sizeOf(sheetContext).height * .78,
+          child: Column(children: [
+            Align(alignment: Alignment.centerRight, child: IconButton(tooltip: 'Close statement',
+              onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close))),
+            Expanded(child: StoreSalesStatementPanel(statement: statement,
+              changes: session, isCurrent: () => mounted && session.workspaceStockHistoryScope()?.key == scope.key,
+              onOtherStatements: () { Navigator.pop(sheetContext); widget.onOpenOperation?.call(_WorkspaceOperation.statement); })),
+          ])));
+    } on FormatException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   Widget _compactInvoices(WorkSession session) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -11680,7 +11718,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
       return _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
-        actionWords: 'Counter sale Resume sale Collect dues View statement',
+        actionWords: 'Counter sale Resume sale Collect dues',
         reflowContent: true,
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
@@ -11691,8 +11729,6 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           if (widget.onOpenOperation != null) ...[
             _StoreEdgeAction(keyName: 'work-sales-dues', icon: Icons.account_balance_wallet_outlined,
               label: 'Collect dues', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.dues)),
-            _StoreEdgeAction(keyName: 'work-sales-statement', icon: Icons.receipt_long_outlined,
-              label: 'View statement', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.statement)),
           ],
         ],
         child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
@@ -11717,9 +11753,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                     icon: const Icon(Icons.close_rounded, size: 18)),
                 ),
               )),
-              periodControl,
             ]),
           ),
+          Align(alignment: Alignment.centerRight, child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+            periodControl,
+            TextButton.icon(key: const Key('work-sales-statement'), onPressed: _openSalesStatement,
+              icon: const Icon(Icons.description_outlined, size: 18), label: const Text('Statement', style: TextStyle(fontSize: 12))),
+          ])),
           Expanded(child: _compactInvoices(session)),
         ])),
       );

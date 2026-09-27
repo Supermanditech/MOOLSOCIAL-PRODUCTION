@@ -1232,12 +1232,17 @@ class StoreTabularReport {
     this.rightAlignedColumns = const {},
     this.nullLabel = 'Unavailable',
     this.dateColumns = const {},
+    List<List<String>> summary = const [],
   }) : metadata = List.unmodifiable(
          metadata.map((r) => List<Object?>.unmodifiable(r)),
        ),
        headers = List.unmodifiable(headers),
        rows = List.unmodifiable(rows.map((r) => List<Object?>.unmodifiable(r))),
-       moneyColumns = Set.unmodifiable(moneyColumns);
+       moneyColumns = Set.unmodifiable(moneyColumns),
+       summary = List.unmodifiable(
+         summary.map((r) => List<String>.unmodifiable(r)),
+       );
+  final List<List<String>> summary;
   final String title, disclosure;
   final List<List<Object?>> metadata, rows;
   final List<String> headers;
@@ -1272,7 +1277,11 @@ Future<Uint8List> _generateStoreTable(
   List<int>? pages,
 }) async {
   final (report, format, fontData) = input;
-  final metadata = report.metadata, rows = report.rows;
+  final metadata = [
+        ...report.metadata,
+        if (format != StoreStockExportFormat.pdf) ...report.summary,
+      ],
+      rows = report.rows;
   final headers = report.headers, moneyColumns = report.moneyColumns;
   final headerRow = metadata.length;
   if (format == StoreStockExportFormat.csv) {
@@ -1413,10 +1422,56 @@ Future<Uint8List> _generateStoreTable(
     ...headers,
     ...metadata.expand((r) => r),
     ...rows.expand((r) => r),
+    ...report.summary.expand((r) => r),
   ].join(' ');
   if (text.runes.any((r) => r > 32 && !embedded.isRuneSupported(r))) {
     throw const FormatException(
       'Some characters cannot be shown in PDF. Choose Excel or CSV to keep all details.',
+    );
+  }
+  if (report.summary.isNotEmpty) {
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: paper ?? PdfPageFormat.a4,
+        maxPages: 100,
+        margin: pw.EdgeInsets.fromLTRB(
+          margins[0],
+          margins[1],
+          margins[2],
+          margins[3],
+        ),
+        theme: pw.ThemeData.withFont(base: font, bold: font),
+        header: (_) => pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 12),
+          child: pw.Text(
+            '${report.title} Statement — Summary',
+            style: const pw.TextStyle(
+              fontSize: 16,
+              color: PdfColor.fromInt(0xff080078),
+            ),
+          ),
+        ),
+        footer: (c) => pw.Text(
+          'Page ${c.pageNumber} · ${report.metadata.where((r) => r.first == 'Reference').map((r) => r.last).join()} · ${report.disclosure}',
+          style: const pw.TextStyle(fontSize: 8),
+        ),
+        build: (_) => [
+          pw.TableHelper.fromTextArray(
+            data: report.summary,
+            headerCount: 0,
+            border: null,
+            columnWidths: const {
+              0: pw.FlexColumnWidth(2),
+              1: pw.FlexColumnWidth(3),
+            },
+            cellPadding: const pw.EdgeInsets.all(7),
+            cellStyle: const pw.TextStyle(fontSize: 10),
+            oddRowDecoration: const pw.BoxDecoration(
+              color: PdfColor.fromInt(0xfff5f6fb),
+            ),
+          ),
+        ],
+      ),
     );
   }
   // Repeat identifying fields across column sections instead of shrinking an
@@ -1543,7 +1598,8 @@ Future<Uint8List> _generateStoreTable(
                   color: PdfColor.fromInt(0xfff5f6fb),
                 ),
               ),
-              pw.SizedBox(height: 12),
+              if (report.summary.isEmpty || columns != sections.last)
+                pw.SizedBox(height: 12),
             ],
           if (rows.isEmpty) pw.Text('No records for this period.'),
         ],

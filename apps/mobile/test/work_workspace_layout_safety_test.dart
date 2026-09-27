@@ -16449,6 +16449,9 @@ void main() {
     await tester.tap(find.byKey(const Key('work-sales-statement')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+    expect(find.text('View statement'), findsNothing);
+    // An unrecovered fixture must not export an apparently complete empty book.
+    expect(find.text('Sales records are not ready. Please retry after loading.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-sales-new-counter-sale')));

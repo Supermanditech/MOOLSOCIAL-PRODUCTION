@@ -8,6 +8,396 @@ import 'work_models.dart';
 import 'work_stock_export.dart';
 import 'screens/store_add_product_sheet.dart' show StoreRecentSearches;
 
+/// A read-only report of saved invoices, not a tax return or audited accounts.
+/// The caller supplies the entire scoped register, never its search results.
+class StoreSalesStatement {
+  StoreSalesStatement({
+    required this.accountId,
+    required this.storeId,
+    required this.storeName,
+    required this.from,
+    required this.until,
+    required this.generatedAt,
+    required List<WorkspaceCustomerInvoice> invoices,
+    this.finance,
+    this.reviewOnly = false,
+  }) : invoices = List.unmodifiable(invoices) {
+    if (accountId.trim().isEmpty ||
+        storeId.trim().isEmpty ||
+        !from.isBefore(until) ||
+        from.isAfter(generatedAt) ||
+        invoices.any(
+          (i) =>
+              !i.validBillAmounts ||
+              i.id.trim().isEmpty ||
+              i.orderId.trim().isEmpty ||
+              i.issuedAt.isAfter(generatedAt) ||
+              (i.seller != null &&
+                  (!i.seller!.valid || i.seller!.storeId != storeId)),
+        ) ||
+        invoices.map((i) => i.id).toSet().length != invoices.length ||
+        invoices.map((i) => i.orderId).toSet().length != invoices.length) {
+      throw const FormatException(
+        'Sales records need reconciliation before export.',
+      );
+    }
+  }
+  final String accountId, storeId, storeName;
+  final DateTime from, until, generatedAt;
+  final List<WorkspaceCustomerInvoice> invoices;
+  final WorkspaceFinanceSnapshot? finance;
+  final bool reviewOnly;
+  static const disclosure =
+      'Supporting business records only. Not a bank statement, filed GST return or audited financial statement.';
+  bool inPeriod(DateTime date) => !date.isBefore(from) && date.isBefore(until);
+  List<WorkspaceCustomerInvoice> get selected =>
+      invoices.where((i) => inPeriod(i.issuedAt)).toList()..sort((a, b) {
+        final date = a.issuedAt.compareTo(b.issuedAt);
+        return date == 0 ? a.id.compareTo(b.id) : date;
+      });
+  int get billedMinor => selected.fold(0, (sum, i) => sum + i.payableMinor);
+  int get discountMinor => selected.fold(0, (sum, i) => sum + i.discountMinor);
+  bool get financeReady =>
+      finance != null &&
+      finance!.valid &&
+      finance!.accountScope == accountId &&
+      finance!.workspaceId == storeId &&
+      !finance!.asOf.isAfter(generatedAt);
+  // Even a complete current snapshot does not prove historical receipt coverage.
+  // Report only supplied posted entries and label this limitation explicitly.
+  int? recorded(WorkspaceLedgerEntryKind kind) =>
+      !financeReady || finance!.customerLedgers.isEmpty
+      ? null
+      : finance!.customerLedgers
+            .expand((l) => l.entries)
+            .where(
+              (e) =>
+                  e.kind == kind &&
+                  e.state == WorkspaceLedgerPostingState.posted &&
+                  inPeriod(e.occurredAt),
+            )
+            .fold<int>(0, (sum, e) => sum + e.amountMinor);
+  static String date(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String get period =>
+      '${date(from)} to ${date(until.subtract(const Duration(microseconds: 1)))}';
+  String get reference => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            accountId,
+            storeId,
+            from.toIso8601String(),
+            until.toIso8601String(),
+            generatedAt.toIso8601String(),
+            finance?.revision,
+            for (final i in selected) i.toLedgerJson(),
+          ]),
+        ),
+      )
+      .toString()
+      .substring(0, 16)
+      .toUpperCase();
+  StoreTabularReport get report {
+    final monthly = <String, List<int>>{};
+    for (final i in selected) {
+      final key = date(i.issuedAt.toLocal()).substring(0, 7);
+      final values = monthly.putIfAbsent(key, () => [0, 0, 0]);
+      values[0]++;
+      values[1] += i.discountMinor;
+      values[2] += i.payableMinor;
+    }
+    String amount(int? minor) => minor == null
+        ? 'Unavailable'
+        : 'INR ${(minor / 100).toStringAsFixed(2)}';
+    final sellers = selected
+        .where((i) => i.seller != null)
+        .map((i) => i.seller!)
+        .toList();
+    final addresses = sellers
+        .map((s) => s.invoiceAddress)
+        .where((s) => s.trim().isNotEmpty)
+        .toSet();
+    final names = sellers
+        .map((s) => s.legalName)
+        .where((s) => s.trim().isNotEmpty)
+        .toSet();
+    return StoreTabularReport(
+      title: 'Sales & Collections',
+      disclosure: disclosure,
+      summary: [
+        if (reviewOnly)
+          [
+            'Evaluation only',
+            'Test/review environment. Not for submission to banks or authorities.',
+          ],
+        ['Business', storeName],
+        [
+          'Legal name at issue',
+          names.length == 1
+              ? names.single
+              : 'See invoice originals; unavailable or varying identities',
+        ],
+        [
+          'Address at issue',
+          addresses.length == 1
+              ? addresses.single
+              : 'See invoice originals; unavailable or varying addresses',
+        ],
+        ['Seller GSTIN', 'Unavailable in saved seller records'],
+        ['Period (phone local dates)', period],
+        ['Generated', generatedAt.toIso8601String()],
+        ['Recorded invoices', '${selected.length}'],
+        ['Invoice totals after discount', amount(billedMinor)],
+        ['Recorded discounts', amount(discountMinor)],
+        [
+          'Sales excluding GST / taxable / exempt values / GST',
+          'Unavailable: saved invoices do not contain a verified tax breakdown',
+        ],
+        [
+          'Recorded collections in period',
+          amount(recorded(WorkspaceLedgerEntryKind.collection)),
+        ],
+        [
+          'Recorded credit notes in period',
+          amount(recorded(WorkspaceLedgerEntryKind.creditNote)),
+        ],
+        [
+          'Recorded refunds in period',
+          amount(recorded(WorkspaceLedgerEntryKind.refund)),
+        ],
+        [
+          'Customer dues (current snapshot, not period closing)',
+          financeReady && finance!.historyComplete
+              ? '${amount(finance!.duesMinor)} as of ${finance!.asOf.toIso8601String()}'
+              : 'Unavailable',
+        ],
+        [
+          'Coverage',
+          'Saved Store invoices and supplied ledger entries only. Full business, receipt and adjustment history is not certified complete. No tax or missing balances inferred.',
+        ],
+        [
+          'Accounting treatment',
+          'Collections are not sales. Credits and refunds remain separate; consult original vouchers before calculating net sales.',
+        ],
+        ['Monthly summary', 'Invoice count | discounts | invoice totals (INR)'],
+        for (final entry in monthly.entries)
+          [
+            entry.key,
+            '${entry.value[0]} | ${(entry.value[1] / 100).toStringAsFixed(2)} | ${(entry.value[2] / 100).toStringAsFixed(2)}',
+          ],
+      ],
+      metadata: [
+        ['Sales & Collections Statement', storeName],
+        ['Reference', reference],
+        ['Period', period],
+        if (reviewOnly) ['EVALUATION ONLY', 'Not for financial submission'],
+      ],
+      headers: const [
+        'Date',
+        'Invoice number',
+        'Customer',
+        'Discount (INR)',
+        'Invoice total (INR)',
+        'Taxable / exempt / GST',
+        'Order reference',
+      ],
+      rows: [
+        for (final i in selected)
+          [
+            date(i.issuedAt.toLocal()),
+            i.id,
+            i.customer,
+            i.discountMinor / 100,
+            i.payableMinor / 100,
+            null,
+            i.orderId,
+          ],
+      ],
+      moneyColumns: const {3, 4},
+    );
+  }
+}
+
+/// Read-only report preview. Any session notification invalidates this captured
+/// snapshot before download/print; the user can reopen it with fresh records.
+class StoreSalesStatementPanel extends StatefulWidget {
+  const StoreSalesStatementPanel({
+    super.key,
+    required this.statement,
+    required this.isCurrent,
+    required this.changes,
+    required this.onOtherStatements,
+    this.saveFile = saveStoreStockFile,
+  });
+  final StoreSalesStatement statement;
+  final bool Function() isCurrent;
+  final Listenable changes;
+  final VoidCallback onOtherStatements;
+  final StoreStockFileSaver saveFile;
+  @override
+  State<StoreSalesStatementPanel> createState() =>
+      _StoreSalesStatementPanelState();
+}
+
+class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
+  bool _changed = false, _busy = false;
+  String? _notice;
+  final _printChanges = ValueNotifier<int>(0);
+  bool get current => mounted && !_changed && widget.isCurrent();
+  @override
+  void initState() {
+    super.initState();
+    widget.changes.addListener(_invalidate);
+  }
+
+  void _invalidate() {
+    _changed = true;
+    _printChanges.value++;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.changes.removeListener(_invalidate);
+    _changed = true;
+    _printChanges.value++;
+    _printChanges.dispose();
+    super.dispose();
+  }
+
+  Future<void> _export({bool print = false}) async {
+    if (_busy || !current) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+    try {
+      final report = widget.statement.report;
+      if (print) {
+        final status = await StoreDocumentPrinter.print(
+          name: 'Sales & Collections Statement',
+          initialFormat: StorePrintPaper.a4.initialFormat,
+          isCurrent: () => current,
+          scopeChanges: _printChanges,
+          render: report.forPrint,
+        );
+        if (current) {
+          setState(
+            () => _notice = switch (status) {
+              StorePrintState.completed =>
+                'The print service reports completion. Check your printer.',
+              StorePrintState.cancelled => 'Printing cancelled.',
+              StorePrintState.submitted =>
+                'Sent to the print queue. Check your printer.',
+              StorePrintState.unavailable =>
+                'No compatible print service is available.',
+              StorePrintState.failed =>
+                'Printing failed. Check the printer and retry.',
+              StorePrintState.blocked =>
+                'The print queue needs attention. Check your printer.',
+              StorePrintState.unknown =>
+                'Print status is unconfirmed. Check the queue before retrying.',
+            },
+          );
+        }
+      } else {
+        final bytes = await report.generate(StoreStockExportFormat.pdf);
+        if (!current) return;
+        final saved = await widget.saveFile(
+          bytes,
+          'sales-collections-${widget.statement.reference}.pdf',
+          StoreStockExportFormat.pdf,
+        );
+        if (current) {
+          setState(
+            () => _notice = saved ? 'PDF saved.' : 'Download cancelled.',
+          );
+        }
+      }
+    } catch (e) {
+      if (current) {
+        setState(
+          () => _notice = e is FormatException
+              ? e.message
+              : 'Could not prepare the statement. Please retry.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!current) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('Records changed. Close and reopen the statement.'),
+      );
+    }
+    final statement = widget.statement;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Sales & Collections Statement',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (statement.reviewOnly)
+            const Text('Evaluation only — not for financial submission'),
+          const SizedBox(height: 8),
+          Text('${statement.storeName}\n${statement.period}'),
+          const SizedBox(height: 12),
+          Text(
+            '${statement.selected.length} recorded invoices · INR ${(statement.billedMinor / 100).toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'A4 summary and complete invoice annexure. Search filters do not limit this statement.',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Tax details and missing ledger coverage are marked unavailable. Collections and current customer dues are shown separately from sales.',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            StoreSalesStatement.disclosure,
+            style: TextStyle(fontSize: 12),
+          ),
+          Wrap(
+            spacing: 12,
+            children: [
+              TextButton.icon(
+                key: const Key('sales-statement-download'),
+                onPressed: _busy ? null : _export,
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('Download PDF'),
+              ),
+              TextButton.icon(
+                key: const Key('sales-statement-print'),
+                onPressed: _busy ? null : () => _export(print: true),
+                icon: const Icon(Icons.print_outlined),
+                label: const Text('Print'),
+              ),
+            ],
+          ),
+          if (_busy) const LinearProgressIndicator(),
+          if (_notice != null) Text(_notice!, semanticsLabel: _notice),
+          TextButton(
+            onPressed: _busy ? null : widget.onOtherStatements,
+            child: const Text('Other statements'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Adapter over the existing ledger, not a second transaction or payment owner.
 /// Dated reports need the provider's opening-balance coverage date. A first
 /// visible transaction is not evidence of that date.

@@ -101,6 +101,60 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  StoreSalesStatement sales(List<WorkspaceCustomerInvoice> invoices) => StoreSalesStatement(
+    accountId: 'review-account', storeId: 'review-store', storeName: 'QA Store — evaluation only',
+    from: DateTime(2026, 9, 1), until: DateTime(2026, 10), generatedAt: DateTime(2026, 9, 27), invoices: invoices);
+  test('SALESSTATEMENT period totals and unavailable accounting remain distinct', () {
+    final report = sales([request().invoice]);
+    expect(report.billedMinor, 24000);
+    expect(report.discountMinor, 0);
+    expect(report.recorded(WorkspaceLedgerEntryKind.collection), isNull);
+    expect(report.report.rows.single[5], isNull);
+    expect(report.report.summary.firstWhere((r) => r.first == 'Seller GSTIN').last, contains('Unavailable'));
+    final outside = WorkspaceCustomerInvoice(id: 'old', orderId: 'old-order', customer: 'QA', items: '', amount: 99, payment: 'Cash', issuedAt: DateTime(2026, 8, 31));
+    expect(sales([outside, request().invoice]).selected, hasLength(1));
+    expect(sales([]).billedMinor, 0);
+    expect(sales([]).recorded(WorkspaceLedgerEntryKind.collection), isNull);
+  });
+  test('SALESSTATEMENT rejects duplicates foreign sellers and future invoices', () {
+    expect(() => sales([request().invoice, request().invoice]), throwsFormatException);
+    for (final foreign in [true, false]) {
+      final invoice = WorkspaceCustomerInvoice(id: 'invalid', orderId: 'order', customer: 'QA', items: '', amount: 1, payment: 'Cash',
+        seller: WorkspaceInvoiceSeller(storeId: foreign ? 'another-store' : 'review-store'),
+        issuedAt: foreign ? DateTime(2026, 9, 1) : DateTime(2026, 10));
+      expect(() => sales([invoice]), throwsFormatException);
+    }
+  });
+  test('SALESSTATEMENT A4 summary and full multi-page annexure', () async {
+    final invoices = List.generate(65, (i) => WorkspaceCustomerInvoice(
+      id: 'QA-INVOICE-2026-${i.toString().padLeft(4, '0')}', orderId: 'QA-ORDER-$i',
+      customer: 'Evaluation customer with a long business name $i', items: 'QA item',
+      amount: 10000000, remainderPaise: 25, payment: 'Cash', issuedAt: DateTime(2026, 9, 15), seller: request().invoice.seller));
+    final report = sales(invoices);
+    expect(report.report.rows, hasLength(65));
+    expect(report.billedMinor, 65000001625);
+    final bytes = await report.report.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      Directory(output).createSync(recursive: true);
+      File('$output/sales-statement-qa.pdf').writeAsBytesSync(bytes);
+    }
+  });
+  testWidgets('SALESSTATEMENT preview invalidates on changed scope without saving', (tester) async {
+    final changes = ValueNotifier(0);
+    addTearDown(changes.dispose);
+    var saves = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreSalesStatementPanel(
+      statement: sales([request().invoice]), isCurrent: () => true, changes: changes,
+      onOtherStatements: () {}, saveFile: (bytes, name, format) async { saves++; return true; }))));
+    expect(find.byKey(const Key('sales-statement-download')), findsOneWidget);
+    changes.value++;
+    await tester.pump();
+    expect(find.text('Records changed. Close and reopen the statement.'), findsOneWidget);
+    expect(find.byKey(const Key('sales-statement-download')), findsNothing);
+    expect(saves, 0);
+  });
   test(
     'PRINT stock current and complete empty ledger support reported media',
     () async {
