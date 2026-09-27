@@ -4157,11 +4157,14 @@ void main() {
         isNull,
       );
     });
-    for (final paid in [0, 600, 1000]) {
-      test('LEDGER01 return posts once with collected=$paid', () async {
+    for (final (paid, seededOrders) in [
+      for (final paid in [0, 600, 1000])
+        for (final seededOrders in [0, 12]) (paid, seededOrders),
+    ]) {
+      test('LEDGER01 return posts once with collected=$paid seededOrders=$seededOrders', () async {
         final seed = StoreReviewSeed(
           accountScope: 'account-A',
-          orderCount: 12,
+          orderCount: seededOrders,
           now: DateTime.utc(2026, 9, 14),
         );
         final adapter = StoreReviewCustomerCollectionGateway(seed.finance);
@@ -4204,6 +4207,7 @@ void main() {
           operationId: 'RETURN-A',
           expectedRevision: paid > 0 ? 2 : 1,
           reason: 'Two packs returned',
+          reasonCode: 'damaged',
           lines: const [
             WorkspaceCustomerReturnLine(
               productId: 'sku-A',
@@ -4244,6 +4248,13 @@ void main() {
           seed.storeId,
         ))!;
         expect(recoveredPending.pendingReturn!.toJson(), intent.toJson());
+        expect(recoveredPending.pendingReturn!.request.reasonCode, 'damaged');
+        final legacyReturn = returned.toJson()..remove('reasonCode');
+        expect(WorkspaceCustomerReturn.fromJson(legacyReturn).reasonCode, isNull);
+        expect(WorkspaceCustomerReturn.fromJson(legacyReturn).reason, 'Two packs returned');
+        expect(() => WorkspaceCustomerReturn.fromJson({
+          ...returned.toJson(), 'reasonCode': 'invented',
+        }), throwsFormatException);
         await expectLater(
           openJournal().save(
             WorkspaceLedgerCheckpoint(revision: 2, finance: before),
@@ -4284,6 +4295,16 @@ void main() {
             .singleWhere((item) => item.customerId == invoice.customer)
             .entries
             .last;
+        expect(creditEntry.customerReturn!.reasonCode, 'damaged');
+        final periodStart = creditEntry.occurredAt.subtract(const Duration(seconds: 1));
+        final periodEnd = creditEntry.occurredAt.add(const Duration(seconds: 1));
+        expect(result.returnReasonsBetween(periodStart, periodEnd), seededOrders == 0
+          ? {'damaged': (count: 1, creditMinor: 666)} : isNull);
+        expect(before.returnReasonsBetween(periodStart, periodEnd), seededOrders == 0 ? isEmpty : isNull,
+          reason: 'Pending intents and original collections are not confirmed returns');
+        expect(result.returnReasonsBetween(periodEnd, periodEnd.add(const Duration(days: 1))),
+          seededOrders == 0 ? isEmpty : isNull);
+        expect(result.returnReasonsBetween(periodEnd, periodStart), isNull);
         await expectLater(
           openJournal().save(
             WorkspaceLedgerCheckpoint(

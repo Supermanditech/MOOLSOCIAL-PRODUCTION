@@ -3939,6 +3939,11 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 )
                 .fold<int>(0, (sum, entry) => sum + entry.amountMinor)
           : null;
+      final returnReasons = collectionsReady
+          ? finance.returnReasonsBetween(
+              DateTime(_today.year, _today.month, _today.day),
+              DateTime(_today.year, _today.month, _today.day + 1))
+          : null;
       String money(int? value) =>
           value == null ? '—' : '₹${_formatStoreMinorAmount(value)}';
       String count(int? value) =>
@@ -4113,6 +4118,25 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                     : todayInvoices.isEmpty ? 'No bills saved today'
                     : 'Billed today divided by invoice count · before returns; not spend per visitor',
                 ),
+                _OperatingMetric(
+                  id: 'return-count', label: 'Returns today',
+                  value: count(returnReasons?.values.fold<int>(0, (sum, row) => sum + row.count)),
+                  detail: returnReasons == null ? 'Complete return history is not available yet'
+                    : 'Confirmed returns, not returned units or refunds',
+                ),
+                _OperatingMetric(
+                  id: 'return-credit', label: 'Return credit today',
+                  value: money(returnReasons?.values.fold<int>(0, (sum, row) => sum + row.creditMinor)),
+                  detail: 'Credit against original bills, not money refunded',
+                ),
+                if (returnReasons != null)
+                  for (final entry in returnReasons.entries)
+                    _OperatingMetric(
+                      id: 'return-reason-${entry.key}',
+                      label: WorkspaceCustomerReturn.reasonLabels[entry.key] ?? 'Reason not categorised',
+                      value: money(entry.value.creditMinor),
+                      detail: '${entry.value.count} confirmed ${entry.value.count == 1 ? 'return' : 'returns'} today · credited value',
+                    ),
                 ]),
                 _OperatingCategory(id: 'stock', title: 'Stock & visibility',
                   expanded: _expandedCategories.contains('stock'),
@@ -22627,6 +22651,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
   final sellableQuantities = <String, TextEditingController>{};
   final selectedProducts = <String>{};
   final reason = TextEditingController();
+  String? reasonCode;
   bool listenersAttached = false;
   late final _LedgerFormAutosave draft;
   bool saving = false;
@@ -22694,6 +22719,9 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
       sellableQuantities[id]!.text = fields['sellable'] ?? '0';
     }
     reason.text = fields['reason'] ?? '';
+    final savedReasonCode = fields['reasonCode'];
+    reasonCode = WorkspaceCustomerReturn.reasonLabels.containsKey(savedReasonCode)
+        ? savedReasonCode : null;
     if (!listenersAttached) {
       for (final controller in [...quantities.values, ...sellableQuantities.values, reason]) {
         controller.addListener(saveDraft);
@@ -22710,6 +22738,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
           id: [quantities[id]!.text, sellableQuantities[id]!.text],
       }),
       'reason': reason.text,
+      'reasonCode': ?reasonCode,
     });
   }
 
@@ -22806,6 +22835,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
       invoiceId: widget.payment.invoiceId!,
       lines: lines,
       reason: reason.text,
+      reasonCode: reasonCode,
       expectedCreditMinor: amount,
       expectedLedgerRevision: revision,
     );
@@ -22880,41 +22910,91 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
                   const SizedBox(height: 12),
                 ],
                 if (selectedProducts.contains(item.productId)) ...[
-                  TextField(
+                  LayoutBuilder(builder: (context, constraints) {
+                    final twoColumns = constraints.maxWidth >= 280 &&
+                        MediaQuery.textScalerOf(context).scale(14) <= 18.2;
+                    final fieldWidth = twoColumns
+                        ? ((constraints.maxWidth - 12) / 2).clamp(0.0, 180.0)
+                        : constraints.maxWidth.clamp(0.0, 240.0);
+                    return Wrap(spacing: 12, runSpacing: 12, children: [
+                  SizedBox(width: fieldWidth, child: TextField(
                     key: item == widget.order.itemSnapshots.first
                         ? const Key('return-quantity') : Key('return-quantity-${item.productId}'),
                     controller: quantities[item.productId],
                     enabled: !saving && draft.ready,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Units returned'),
+                    decoration: const InputDecoration(labelText: 'Units returned',
+                      isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
                     onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
+                  )),
+                  SizedBox(width: fieldWidth, child: TextField(
                     key: item == widget.order.itemSnapshots.first
                         ? const Key('return-sellable') : Key('return-sellable-${item.productId}'),
                     controller: sellableQuantities[item.productId],
                     enabled: !saving && draft.ready,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Units fit for resale',
-                      helperText: 'Damaged units must not go back into sellable stock.',
-                      helperMaxLines: 3,
+                      labelText: 'Fit for resale',
+                      isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                     onChanged: (_) => setState(() {}),
-                  ),
+                  )),
+                    ]);
+                  }),
+                  const SizedBox(height: 4),
+                  const Text('Damaged units must not go back into sellable stock.',
+                    style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 12),
                 ],
               ],
               const SizedBox(height: 12),
+              SingleChildScrollView(
+                key: const Key('return-reason-choices'),
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  for (final entry in WorkspaceCustomerReturn.reasonLabels.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Semantics(
+                        checked: reasonCode == entry.key,
+                        inMutuallyExclusiveGroup: true,
+                        child: InkWell(
+                          key: Key('return-reason-${entry.key}'),
+                          onTap: saving || !draft.ready ? null : () {
+                            if (reasonCode == entry.key) return;
+                            setState(() {
+                              reasonCode = entry.key;
+                              reason.text = entry.key == 'other' ? '' : entry.value;
+                            });
+                            saveDraft();
+                          },
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(reasonCode == entry.key
+                                ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                                size: 18, color: MoolColors.navy),
+                              const SizedBox(width: 5),
+                              Text(entry.value, style: const TextStyle(fontSize: 13)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ),
+                ]),
+              ),
               TextField(
                 key: const Key('return-reason'),
                 controller: reason,
                 enabled: !saving && draft.ready,
                 maxLength: 160,
-                decoration: const InputDecoration(
-                  labelText: 'Reason for return',
+                decoration: InputDecoration(
+                  labelText: reasonCode == 'other' ? 'Describe the reason' : 'Reason for return',
                 ),
+                onChanged: (_) {
+                  if (reasonCode == null) setState(() => reasonCode = 'other');
+                  saveDraft();
+                },
               ),
               Text(
                 credit == null

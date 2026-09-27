@@ -37797,9 +37797,33 @@ void main() {
           await tester.pumpAndSettle();
         }
         await captureStoreView(tester, 'ledger01-return-top-$scale-multi-$multi');
+        final returnedField = find.byKey(const Key('return-quantity'));
+        final resaleField = find.byKey(const Key('return-sellable'));
+        expect(tester.getSize(returnedField).width, lessThanOrEqualTo(scale == 1 ? 180 : 240));
+        if (scale == 1) {
+          expect(tester.getTopLeft(returnedField).dy, tester.getTopLeft(resaleField).dy);
+        }
+        await reveal(tester, returnedField);
+        await tester.enterText(returnedField, '10000000');
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(returnedField).controller!.text, '10000000');
+        expect(find.text('Enter valid quantities within the original bill.'), findsOneWidget);
+        await tester.enterText(returnedField, '1');
         await reveal(tester, find.byKey(const Key('return-sellable')));
         await tester.enterText(find.byKey(const Key('return-sellable')), '1');
         await reveal(tester, find.byKey(const Key('return-reason')));
+        expect(tester.widget<TextField>(find.byKey(const Key('return-reason'))).controller!.text, isEmpty);
+        final reasonChoices = find.byKey(const Key('return-reason-choices'));
+        await reveal(tester, reasonChoices);
+        await tester.tap(find.byKey(const Key('return-reason-damaged')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(find.byKey(const Key('return-reason'))).controller!.text, 'Damaged');
+        await tester.drag(reasonChoices, const Offset(-1600, 0));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('return-reason-other')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(find.byKey(const Key('return-reason'))).controller!.text, isEmpty);
+        expect(find.text('Describe the reason'), findsOneWidget);
         await tester.enterText(
           find.byKey(const Key('return-reason')),
           'Unopened pack',
@@ -37834,6 +37858,7 @@ void main() {
         );
         final draftStore =
             work.ledgerFormDraftStore! as _LedgerFormFixtureStore;
+        expect(draftStore.drafts.values.single.fields['reasonCode'], 'other');
         draftStore.failWrite = true;
         await reveal(tester, find.byKey(const Key('return-reason')));
         await tester.enterText(
@@ -37893,6 +37918,9 @@ void main() {
         expect(work.workspaceFinance!.payments.single.dueMinor, 0);
         expect(work.workspaceFinance!.payments.single.paidMinor, 0);
         expect(work.workspaceCatalogueItems.first.stock, product.stock + 1);
+        final savedReturn = work.workspaceFinance!.customerLedgers.single.entries.last.customerReturn!;
+        expect(savedReturn.reasonCode, 'other');
+        expect(savedReturn.reason, 'Retain this unsaved reason');
         if (multi) {
           expect(work.workspaceCatalogueItems[1].stock, second.stock,
             reason: 'Damaged returned units must not increase sellable stock');

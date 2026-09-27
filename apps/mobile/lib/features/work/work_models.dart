@@ -453,6 +453,14 @@ class WorkspaceCustomerReturnLine {
 }
 
 class WorkspaceCustomerReturn {
+  static const reasonLabels = <String, String>{
+    'damaged': 'Damaged',
+    'expired': 'Expired',
+    'wrong_item': 'Wrong item',
+    'quality_issue': 'Quality issue',
+    'changed_mind': 'Customer changed mind',
+    'other': 'Other',
+  };
   WorkspaceCustomerReturn({
     required this.accountScope,
     required this.workspaceId,
@@ -462,6 +470,7 @@ class WorkspaceCustomerReturn {
     required this.operationId,
     required this.expectedRevision,
     required this.reason,
+    this.reasonCode,
     required List<WorkspaceCustomerReturnLine> lines,
   }) : lines = List.unmodifiable(lines);
   final String accountScope,
@@ -472,6 +481,8 @@ class WorkspaceCustomerReturn {
       operationId,
       reason;
   final int expectedRevision;
+  // Absent on historical records; never infer a category from their free text.
+  final String? reasonCode;
   final List<WorkspaceCustomerReturnLine> lines;
   bool get valid =>
       [
@@ -484,6 +495,7 @@ class WorkspaceCustomerReturn {
         reason,
       ].every((value) => value.trim().isNotEmpty) &&
       expectedRevision > 0 &&
+      (reasonCode == null || reasonLabels.containsKey(reasonCode)) &&
       lines.isNotEmpty &&
       lines.every((line) => line.valid) &&
       lines.map((line) => line.productId).toSet().length == lines.length;
@@ -497,6 +509,7 @@ class WorkspaceCustomerReturn {
     'operationId': operationId,
     'expectedRevision': expectedRevision,
     'reason': reason,
+    if (reasonCode != null) 'reasonCode': reasonCode,
     'lines': [
       for (final line in lines)
         {
@@ -518,6 +531,7 @@ class WorkspaceCustomerReturn {
       operationId: value['operationId'] as String,
       expectedRevision: value['expectedRevision'] as int,
       reason: value['reason'] as String,
+      reasonCode: value['reasonCode'] as String?,
       lines: [
         for (final line in value['lines'] as List)
           WorkspaceCustomerReturnLine(
@@ -1141,6 +1155,39 @@ class WorkspaceFinanceSnapshot {
   final List<WorkspacePaymentRecord> payments;
   final List<WorkspacePayoutRecord> payouts;
   final List<WorkspaceCustomerLedger> customerLedgers;
+
+  /// Confirmed return operations, not units or cash refunds. End is exclusive.
+  /// Null means incomplete evidence; an empty map means no returns in the period.
+  Map<String, ({int count, int creditMinor})>? returnReasonsBetween(
+    DateTime start, DateTime end,
+  ) {
+    if (!valid || !historyComplete || !end.isAfter(start) ||
+        customerLedgers.any((ledger) => !ledger.historyComplete)) {
+      return null;
+    }
+    final result = <String, ({int count, int creditMinor})>{};
+    for (final ledger in customerLedgers) {
+      for (final entry in ledger.entries) {
+        if (entry.kind != WorkspaceLedgerEntryKind.creditNote ||
+            entry.state != WorkspaceLedgerPostingState.posted ||
+            entry.occurredAt.isBefore(start) || !entry.occurredAt.isBefore(end)) {
+          continue;
+        }
+        final returned = entry.customerReturn;
+        if (returned == null || !returned.valid ||
+            returned.accountScope != accountScope || returned.workspaceId != workspaceId ||
+            returned.customerId != ledger.customerId || returned.invoiceId != entry.invoiceId ||
+            returned.orderId != entry.orderId || returned.operationId != entry.operationId) {
+          return null;
+        }
+        final code = returned.reasonCode ?? 'uncategorised';
+        final previous = result[code] ?? (count: 0, creditMinor: 0);
+        result[code] = (count: previous.count + 1,
+          creditMinor: previous.creditMinor + entry.amountMinor);
+      }
+    }
+    return Map.unmodifiable(result);
+  }
 
   /// Compares the supplied paid-out total with its confirmed payout records.
   /// Requests, holds and processing states never count as received money.
@@ -4410,7 +4457,7 @@ class WorkspaceLedgerFormDraft {
                         'note',
                       ]
                     : key.kind == 'return'
-                    ? const ['product', 'quantity', 'sellable', 'reason', 'items']
+                    ? const ['product', 'quantity', 'sellable', 'reason', 'reasonCode', 'items']
                     : key.kind == 'refund'
                     ? const ['amount', 'channel', 'reference', 'sourceCollectionId']
                     : const ['amount', 'channel', 'reference'])

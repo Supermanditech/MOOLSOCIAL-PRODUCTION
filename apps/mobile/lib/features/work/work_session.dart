@@ -3298,6 +3298,7 @@ class WorkSession extends ChangeNotifier {
     required String invoiceId,
     required List<WorkspaceCustomerReturnLine> lines,
     required String reason,
+    String? reasonCode,
     int? expectedCreditMinor,
     int? expectedLedgerRevision,
   }) async {
@@ -3346,6 +3347,7 @@ class WorkSession extends ChangeNotifier {
       operationId: StoreCollectionController._id(),
       expectedRevision: ledger.revision,
       reason: reason.trim(),
+      reasonCode: reasonCode,
       lines: lines,
     );
     final credit = request.creditMinorFor(
