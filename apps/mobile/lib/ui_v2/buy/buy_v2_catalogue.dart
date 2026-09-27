@@ -8375,77 +8375,133 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               Expanded(
                 child: Semantics(
                   label: 'Search this store',
-                  child: TextField(
-                    key: const ValueKey('buy-store-product-search'),
-                    controller: _search,
-                    focusNode: _searchFocus,
-                    maxLength: 80,
-                    minLines: 1,
-                    maxLines: _searching ? 6 : 1,
-                    textInputAction: TextInputAction.search,
-                    style: const TextStyle(
-                      color: BuyV2Colors.ink,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    decoration: InputDecoration(
-                      hintText:
-                          MediaQuery.textScalerOf(context).scale(1) > 1.25 ||
-                              (widget.storefront &&
-                                  MediaQuery.sizeOf(context).width < 360)
-                          ? 'Search'
-                          : 'Search this store',
-                      counterText: '',
-                      hintStyle: const TextStyle(
-                        color: BuyV2Colors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: BuyV2Colors.navy,
-                        size: 21,
-                      ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 42,
-                        minHeight: 46,
-                      ),
-                      suffixIcon: !_searching
-                          ? widget.storefront
-                                ? IconButton(
-                                    key: const ValueKey(
-                                      'buy-store-info-control',
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final longQuery =
+                          _searching && _search.text.trim().length > 38;
+                      final enlarged =
+                          MediaQuery.textScalerOf(context).scale(1) >= 1.3;
+                      final maximumHeight = enlarged ? 162.0 : 120.0;
+                      var height = _searching ? 70.0 : 44.0;
+                      if (longQuery) {
+                        height = maximumHeight;
+                      } else if (_searching && _search.text.isNotEmpty) {
+                        final painter =
+                            TextPainter(
+                              text: TextSpan(
+                                text: _search.text,
+                                style: Theme.of(context).textTheme.bodyLarge!
+                                    .merge(
+                                      const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                    tooltip: 'Store details',
-                                    onPressed: _showStoreInfo,
-                                    icon: const Icon(
-                                      Icons.info_outline_rounded,
-                                    ),
-                                  )
-                                : null
-                          : _search.text.isEmpty
-                          ? null
-                          : IconButton(
-                              key: const ValueKey(
-                                'buy-store-product-search-clear',
                               ),
-                              tooltip: 'Clear store search',
-                              onPressed: () => setState(_search.clear),
-                              icon: const Icon(Icons.close_rounded),
+                              maxLines: 6,
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                              locale: Localizations.maybeLocaleOf(context),
+                            )..layout(
+                              maxWidth: (constraints.maxWidth - 42 - 48).clamp(
+                                1.0,
+                                double.infinity,
+                              ),
+                            );
+                        height = (painter.height + 24).ceilToDouble().clamp(
+                          70.0,
+                          maximumHeight,
+                        );
+                        painter.dispose();
+                      }
+                      return AnimatedContainer(
+                        key: const ValueKey('buy-store-search-control'),
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.expandCollapse,
+                        ),
+                        curve: Curves.easeOutCubic,
+                        height: height,
+                        alignment: longQuery
+                            ? Alignment.topCenter
+                            : Alignment.center,
+                        child: TextField(
+                          key: const ValueKey('buy-store-product-search'),
+                          controller: _search,
+                          focusNode: _searchFocus,
+                          maxLength: 80,
+                          minLines: 1,
+                          maxLines: _searching ? 6 : 1,
+                          textInputAction: TextInputAction.search,
+                          style: const TextStyle(
+                            color: BuyV2Colors.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          decoration: InputDecoration(
+                            hintText:
+                                MediaQuery.textScalerOf(context).scale(1) >
+                                        1.25 ||
+                                    (widget.storefront &&
+                                        MediaQuery.sizeOf(context).width < 360)
+                                ? 'Search'
+                                : 'Search this store',
+                            counterText: '',
+                            hintStyle: const TextStyle(
+                              color: BuyV2Colors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      focusedErrorBorder: InputBorder.none,
-                      filled: false,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _finishStoreSearch(),
-                    onTapOutside: (_) => _searchFocus.unfocus(),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              color: BuyV2Colors.navy,
+                              size: 21,
+                            ),
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 42,
+                              minHeight: 46,
+                            ),
+                            suffixIcon: !_searching
+                                ? widget.storefront
+                                      ? IconButton(
+                                          key: const ValueKey(
+                                            'buy-store-info-control',
+                                          ),
+                                          tooltip: 'Store details',
+                                          onPressed: _showStoreInfo,
+                                          icon: const Icon(
+                                            Icons.info_outline_rounded,
+                                          ),
+                                        )
+                                      : null
+                                : _search.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    key: const ValueKey(
+                                      'buy-store-product-search-clear',
+                                    ),
+                                    tooltip: 'Clear store search',
+                                    onPressed: () => setState(_search.clear),
+                                    icon: const Icon(Icons.close_rounded),
+                                  ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            filled: false,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                            ),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                          onSubmitted: (_) => _finishStoreSearch(),
+                          onTapOutside: (_) => _searchFocus.unfocus(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

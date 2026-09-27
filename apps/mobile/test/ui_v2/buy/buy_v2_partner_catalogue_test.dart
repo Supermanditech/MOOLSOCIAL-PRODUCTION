@@ -165,7 +165,13 @@ void main() {
           await tester.pumpAndSettle();
           await _revealPagedHeader(tester, scope, field);
           expect(field.hitTestable(), findsOneWidget);
+          final searchControl = find.byKey(
+            const ValueKey('buy-store-search-control'),
+          );
+          expect(tester.getSize(searchControl).height, 44);
           await tester.tap(field);
+          await tester.pumpAndSettle();
+          expect(tester.getSize(searchControl).height, 70);
           await tester.enterText(field, 'sku 4999');
           await tester.pumpAndSettle();
           expect(tester.getSize(field).width, closeTo(width, .1));
@@ -212,6 +218,10 @@ void main() {
           await tester.ensureVisible(field);
           await tester.pumpAndSettle();
           expect(tester.widget<TextField>(field).controller!.text, longQuery);
+          expect(
+            tester.getSize(searchControl).height,
+            scale >= 1.3 ? 162 : 120,
+          );
           expect(find.text('No matching products'), findsOneWidget);
           expect(find.text('Reset price filter'), findsNothing);
           expect(tester.takeException(), isNull);
@@ -234,6 +244,7 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(tester.getSize(field).width, closeTo(width, .1));
+          expect(tester.getSize(searchControl).height, 44);
           expect(
             find.byKey(const ValueKey('buy-store-product-search-clear')),
             findsNothing,
