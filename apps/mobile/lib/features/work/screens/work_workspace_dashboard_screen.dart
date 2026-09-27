@@ -22623,10 +22623,11 @@ class _CustomerReturnSheet extends StatefulWidget {
 }
 
 class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
-  final quantity = TextEditingController(text: '1');
-  final sellable = TextEditingController(text: '0');
+  final quantities = <String, TextEditingController>{};
+  final sellableQuantities = <String, TextEditingController>{};
+  final selectedProducts = <String>{};
   final reason = TextEditingController();
-  String? productId;
+  bool listenersAttached = false;
   late final _LedgerFormAutosave draft;
   bool saving = false;
   String? error;
@@ -22634,7 +22635,16 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
   @override
   void initState() {
     super.initState();
-    productId = widget.order.itemSnapshots.first.productId;
+    for (final item in widget.order.itemSnapshots) {
+      quantities[item.productId] = TextEditingController(text: '1');
+      sellableQuantities[item.productId] = TextEditingController(text: '0');
+    }
+    final firstAvailable = widget.order.itemSnapshots
+        .where((item) => remainingQuantity(item) > 0)
+        .firstOrNull;
+    selectedProducts.add(
+      (firstAvailable ?? widget.order.itemSnapshots.first).productId,
+    );
     draft = _LedgerFormAutosave(
       widget.session,
       widget.session.ledgerFormKey(widget.payment, 'return'),
@@ -22654,21 +22664,51 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
     if (!mounted || fields == null) {
       return;
     }
-    productId = fields['product'] ?? productId;
-    quantity.text = fields['quantity'] ?? '1';
-    sellable.text = fields['sellable'] ?? '0';
+    final savedItems = fields['items'];
+    if (savedItems != null) {
+      final items = (jsonDecode(savedItems) as Map).cast<String, dynamic>();
+      if (items.keys.any((id) => !quantities.containsKey(id))) {
+        draft.ready = false;
+        draft.error = 'Saved return items do not match this bill. Recover the original bill before continuing.';
+        setState(() {});
+        return;
+      }
+      selectedProducts
+        ..clear()
+        ..addAll(items.keys);
+      for (final entry in items.entries) {
+        quantities[entry.key]!.text = entry.value[0] as String;
+        sellableQuantities[entry.key]!.text = entry.value[1] as String;
+      }
+    } else {
+      // Retain a draft created by the previous single-product form.
+      final id = fields['product'] ?? selectedProducts.first;
+      if (!quantities.containsKey(id)) {
+        draft.ready = false;
+        draft.error = 'Saved return item does not match this bill. Recover the original bill before continuing.';
+        setState(() {});
+        return;
+      }
+      selectedProducts..clear()..add(id);
+      quantities[id]!.text = fields['quantity'] ?? '1';
+      sellableQuantities[id]!.text = fields['sellable'] ?? '0';
+    }
     reason.text = fields['reason'] ?? '';
-    quantity.addListener(saveDraft);
-    sellable.addListener(saveDraft);
-    reason.addListener(saveDraft);
+    if (!listenersAttached) {
+      for (final controller in [...quantities.values, ...sellableQuantities.values, reason]) {
+        controller.addListener(saveDraft);
+      }
+      listenersAttached = true;
+    }
     setState(() {});
   }
 
   void saveDraft() {
     draft.save({
-      'product': productId ?? '',
-      'quantity': quantity.text,
-      'sellable': sellable.text,
+      'items': jsonEncode({
+        for (final id in selectedProducts)
+          id: [quantities[id]!.text, sellableQuantities[id]!.text],
+      }),
       'reason': reason.text,
     });
   }
@@ -22677,8 +22717,9 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
   void dispose() {
     draft.removeListener(refreshDraft);
     draft.dispose();
-    quantity.dispose();
-    sellable.dispose();
+    for (final controller in [...quantities.values, ...sellableQuantities.values]) {
+      controller.dispose();
+    }
     reason.dispose();
     super.dispose();
   }
@@ -22690,12 +22731,21 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
       .where((item) => item.customerId == widget.payment.customerId)
       .firstOrNull;
   List<WorkspaceCustomerReturnLine> get lines => [
-    WorkspaceCustomerReturnLine(
-      productId: productId ?? '',
-      quantity: int.tryParse(quantity.text) ?? 0,
-      restockQuantity: int.tryParse(sellable.text) ?? -1,
-    ),
+    for (final item in widget.order.itemSnapshots)
+      if (selectedProducts.contains(item.productId))
+        WorkspaceCustomerReturnLine(
+          productId: item.productId,
+          quantity: int.tryParse(quantities[item.productId]!.text) ?? 0,
+          restockQuantity: int.tryParse(sellableQuantities[item.productId]!.text) ?? -1,
+        ),
   ];
+  int remainingQuantity(WorkspaceOrderItemSnapshot item) => item.quantity -
+      (ledger?.entries.where((entry) =>
+          entry.invoiceId == widget.payment.invoiceId &&
+          entry.state == WorkspaceLedgerPostingState.posted)
+        .expand((entry) => entry.customerReturn?.lines ?? const <WorkspaceCustomerReturnLine>[])
+        .where((line) => line.productId == item.productId)
+        .fold<int>(0, (sum, line) => sum + line.quantity) ?? 0);
   int? get credit {
     final history = ledger;
     if (history == null) return null;
@@ -22803,66 +22853,59 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
               Text('Invoice ${widget.payment.invoiceId}'),
               const SizedBox(height: 12),
               if (widget.order.itemSnapshots.length > 1)
-                DropdownButtonFormField<String>(
-                  initialValue: productId,
-                  itemHeight: null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Billed item'),
-                  selectedItemBuilder: (_) => [
-                    for (var i = 0; i < widget.order.itemSnapshots.length; i++)
-                      Text('Item ${i + 1}'),
-                  ],
-                  items: [
-                    for (final item in widget.order.itemSnapshots)
-                      DropdownMenuItem(
-                        value: item.productId,
-                        child: Text(
-                          '${item.name} · ${item.pack}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: saving || !draft.ready
-                      ? null
-                      : (value) {
-                          setState(() => productId = value);
-                          saveDraft();
-                        },
-                ),
-              const SizedBox(height: 12),
-              for (final item in widget.order.itemSnapshots.where(
-                (item) => item.productId == productId,
-              )) ...[
-                Text(
-                  '${item.name} · ${item.pack}',
-                  key: const Key('return-original-item'),
-                ),
-                Text('Billed quantity: ${item.quantity}'),
-                const SizedBox(height: 12),
+                Text('Select items to return · ${selectedProducts.length} selected'),
+              for (final item in widget.order.itemSnapshots) ...[
+                if (widget.order.itemSnapshots.length > 1)
+                  CheckboxListTile(
+                    key: Key('return-select-${item.productId}'),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: selectedProducts.contains(item.productId),
+                    title: Text('${item.name} · ${item.pack}'),
+                    subtitle: Text('Billed: ${item.quantity} · Available to return: ${remainingQuantity(item)}'),
+                    onChanged: saving || !draft.ready ? null : (value) {
+                      setState(() {
+                        if (value == true) {
+                          selectedProducts.add(item.productId);
+                        } else {
+                          selectedProducts.remove(item.productId);
+                        }
+                      });
+                      saveDraft();
+                    },
+                  )
+                else ...[
+                  Text('${item.name} · ${item.pack}', key: const Key('return-original-item')),
+                  Text('Billed quantity: ${item.quantity} · Available to return: ${remainingQuantity(item)}'),
+                  const SizedBox(height: 12),
+                ],
+                if (selectedProducts.contains(item.productId)) ...[
+                  TextField(
+                    key: item == widget.order.itemSnapshots.first
+                        ? const Key('return-quantity') : Key('return-quantity-${item.productId}'),
+                    controller: quantities[item.productId],
+                    enabled: !saving && draft.ready,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Units returned'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: item == widget.order.itemSnapshots.first
+                        ? const Key('return-sellable') : Key('return-sellable-${item.productId}'),
+                    controller: sellableQuantities[item.productId],
+                    enabled: !saving && draft.ready,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Units fit for resale',
+                      helperText: 'Damaged units must not go back into sellable stock.',
+                      helperMaxLines: 3,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                ],
               ],
-              TextField(
-                key: const Key('return-quantity'),
-                controller: quantity,
-                enabled: !saving && draft.ready,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Units returned'),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('return-sellable'),
-                controller: sellable,
-                enabled: !saving && draft.ready,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Units fit for resale',
-                  helperText:
-                      'Damaged units must not go back into sellable stock.',
-                  helperMaxLines: 3,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
               const SizedBox(height: 12),
               TextField(
                 key: const Key('return-reason'),

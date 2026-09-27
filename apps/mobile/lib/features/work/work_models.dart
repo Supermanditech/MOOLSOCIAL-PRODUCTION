@@ -4410,13 +4410,32 @@ class WorkspaceLedgerFormDraft {
                         'note',
                       ]
                     : key.kind == 'return'
-                    ? const ['product', 'quantity', 'sellable', 'reason']
+                    ? const ['product', 'quantity', 'sellable', 'reason', 'items']
                     : key.kind == 'refund'
                     ? const ['amount', 'channel', 'reference', 'sourceCollectionId']
                     : const ['amount', 'channel', 'reference'])
                 .contains(field),
       ) &&
-      fields.values.every((value) => value.length <= 512);
+      fields.entries.every((entry) =>
+          entry.key == 'items' && key.kind == 'return'
+              ? _validReturnItems(entry.value)
+              : entry.value.length <= 512);
+
+  // Unsubmitted text is retained (including invalid quantities) for correction.
+  // Financial validation still belongs to WorkspaceCustomerReturn.
+  static bool _validReturnItems(String value) {
+    if (value.length > 65536) return false;
+    try {
+      final items = jsonDecode(value);
+      return items is Map && items.length <= 1000 && items.entries.every((entry) =>
+          entry.key is String && (entry.key as String).isNotEmpty &&
+          (entry.key as String).length <= 512 && entry.value is List &&
+          (entry.value as List).length == 2 &&
+          (entry.value as List).every((v) => v is String && v.length <= 512));
+    } on FormatException {
+      return false;
+    }
+  }
   Map<String, Object?> toJson() => {
     'version': 1,
     'account': key.account,

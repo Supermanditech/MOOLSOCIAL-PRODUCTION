@@ -3906,6 +3906,22 @@ void main() {
           'reference': 'TEST-REF',
         },
       );
+      final multiReturn = WorkspaceLedgerFormDraft(
+        key: key(kind: 'return'), revision: 1,
+        fields: {'items': jsonEncode({'sku-A': ['2', '1'], 'sku-B': ['bad input', '0']}),
+          'reason': 'Two packs reviewed'},
+      );
+      final returnStorage = _OrderJournalStorage();
+      SecureWorkLedgerFormDraftStore returnDrafts() => SecureWorkLedgerFormDraftStore(
+        accountScope: () => account, storage: returnStorage);
+      await returnDrafts().save(multiReturn, expectedRevision: null);
+      expect((await returnDrafts().read(key(kind: 'return')))!.fields, multiReturn.fields);
+      for (final invalid in ['{broken', '[]', '{"sku-A":[1,0]}', '{"sku-A":["1"]}']) {
+        expect(WorkspaceLedgerFormDraft(key: key(kind: 'return'), revision: 2,
+          fields: {'items': invalid}).valid, isFalse);
+      }
+      expect(WorkspaceLedgerFormDraft(key: key(), revision: 1,
+        fields: multiReturn.fields).valid, isFalse);
       await open().save(draft, expectedRevision: null);
       expect((await open().read(key()))!.fields, draft.fields);
       expect(await open().read(key(store: 'store-B')), isNull);

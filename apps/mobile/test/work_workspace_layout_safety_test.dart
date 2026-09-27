@@ -37681,8 +37681,9 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+    for (final multi in [false, true]) {
     testWidgets(
-      'LEDGER01 return sheet confirms original bill and stock $scale',
+      'LEDGER01 return sheet confirms original bill and stock $scale multi=$multi',
       (tester) async {
         tester.view.padding = const FakeViewPadding(bottom: 44);
         addTearDown(tester.view.resetPadding);
@@ -37695,12 +37696,14 @@ void main() {
         work.activeWorkspace = seed.workspace;
         final product = seed.products.first;
         work.workspaceCatalogueItems.add(product);
+        final second = seed.products[1];
+        if (multi) work.workspaceCatalogueItems.add(second);
         final order = WorkspaceOrderRecord(
           id: 'RETURN-ORDER',
           customer: '9000000088',
           items: product.title,
-          quantities: {product.id: 1},
-          amount: product.sellingPrice,
+          quantities: {product.id: 1, if (multi) second.id: 1},
+          amount: product.sellingPrice + (multi ? second.sellingPrice : 0),
           source: 'Counter',
           fulfilment: 'At the shop',
           payment: 'Customer due',
@@ -37716,6 +37719,11 @@ void main() {
               quantity: 1,
               unitPricePaise: product.sellingPrice * 100,
               lineTotalPaise: product.sellingPrice * 100,
+            ),
+            if (multi) WorkspaceOrderItemSnapshot(
+              productId: second.id, name: second.title, pack: second.pack,
+              quantity: 1, unitPricePaise: second.sellingPrice * 100,
+              lineTotalPaise: second.sellingPrice * 100,
             ),
           ],
         );
@@ -37775,7 +37783,20 @@ void main() {
         await reveal(tester, button);
         await tester.tap(button);
         await tester.pumpAndSettle();
-        await captureStoreView(tester, 'ledger01-return-top-$scale');
+        if (multi) {
+          final selectSecond = find.byKey(Key('return-select-${second.id}'));
+          await reveal(tester, selectSecond);
+          await tester.tap(selectSecond);
+          await tester.pumpAndSettle();
+          expect(tester.widget<CheckboxListTile>(selectSecond).value, isTrue);
+          await reveal(tester, find.byKey(Key('return-quantity-${second.id}')));
+          await tester.enterText(find.byKey(Key('return-quantity-${second.id}')), '2');
+          await tester.pumpAndSettle();
+          expect(find.text('Enter valid quantities within the original bill.'), findsOneWidget);
+          await tester.enterText(find.byKey(Key('return-quantity-${second.id}')), '1');
+          await tester.pumpAndSettle();
+        }
+        await captureStoreView(tester, 'ledger01-return-top-$scale-multi-$multi');
         await reveal(tester, find.byKey(const Key('return-sellable')));
         await tester.enterText(find.byKey(const Key('return-sellable')), '1');
         await reveal(tester, find.byKey(const Key('return-reason')));
@@ -37791,6 +37812,12 @@ void main() {
         await reveal(tester, button);
         await tester.tap(button);
         await tester.pumpAndSettle();
+        if (multi) {
+          expect(tester.widget<CheckboxListTile>(
+            find.byKey(Key('return-select-${second.id}'))).value, isTrue);
+          expect(tester.widget<TextField>(
+            find.byKey(Key('return-quantity-${second.id}'))).controller!.text, '1');
+        }
         expect(
           tester
               .widget<TextField>(find.byKey(const Key('return-sellable')))
@@ -37848,7 +37875,7 @@ void main() {
           draftStore.drafts.values.single.fields['reason'],
           'Retain this unsaved reason',
         );
-        await captureStoreView(tester, 'ledger01-return-form-$scale');
+        await captureStoreView(tester, 'ledger01-return-form-$scale-multi-$multi');
         expect(tester.takeException(), isNull);
         await reveal(tester, find.text('Confirm return'));
         expect(
@@ -37865,7 +37892,14 @@ void main() {
         expect(work.pendingCustomerReturn, isNull);
         expect(work.workspaceFinance!.payments.single.dueMinor, 0);
         expect(work.workspaceFinance!.payments.single.paidMinor, 0);
-        expect(work.workspaceCatalogueItems.single.stock, product.stock + 1);
+        expect(work.workspaceCatalogueItems.first.stock, product.stock + 1);
+        if (multi) {
+          expect(work.workspaceCatalogueItems[1].stock, second.stock,
+            reason: 'Damaged returned units must not increase sellable stock');
+          final credit = work.workspaceFinance!.customerLedgers.single.entries.last;
+          expect(credit.customerReturn!.lines.length, 2);
+          expect(credit.amountMinor, order.amount * 100);
+        }
         expect(
           work.workspaceStockMovements.single.kind,
           WorkspaceStockMovementKind.returned,
@@ -37874,6 +37908,7 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+    }
 
     for (final refundChannel in [WorkspacePaymentChannel.cash,
       WorkspacePaymentChannel.directUpi, WorkspacePaymentChannel.bankTransfer]) {
