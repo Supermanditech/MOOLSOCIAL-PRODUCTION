@@ -101,6 +101,48 @@ String storeCounterSettlementHint(WorkspacePaymentRecord? payment,
   return 'Settled with ${parts.join(' + ')}. $handover';
 }
 
+@visibleForTesting
+String storeInvoicePaymentMethod(String selectedMethod,
+    WorkspacePaymentRecord? payment,
+    Iterable<WorkspaceCustomerLedgerEntry> entries) {
+  final original = 'Payment method: $selectedMethod';
+  if (payment == null || !payment.valid) return original;
+  var credit = 0;
+  var collected = 0;
+  final channels = <WorkspacePaymentChannel>{};
+  for (final entry in entries) {
+    if (!entry.valid || entry.invoiceId != payment.invoiceId ||
+        entry.orderId != payment.orderId ||
+        entry.state != WorkspaceLedgerPostingState.posted) { continue; }
+    if (entry.kind == WorkspaceLedgerEntryKind.creditReceived) {
+      credit += entry.amountMinor;
+    } else if (entry.kind == WorkspaceLedgerEntryKind.collection) {
+      collected += entry.amountMinor;
+      channels.add(entry.channel);
+    }
+  }
+  if (credit == 0 && payment.state != WorkspacePaymentState.creditApplied) {
+    return original;
+  }
+  final methods = <String>['Customer credit'];
+  if (payment.paidMinor > 0) {
+    if (collected == payment.paidMinor && channels.isNotEmpty) {
+      for (final channel in channels) {
+        methods.add(switch (channel) {
+          WorkspacePaymentChannel.cash => 'Cash',
+          WorkspacePaymentChannel.directUpi => 'UPI',
+          WorkspacePaymentChannel.bankTransfer => 'Bank transfer',
+          WorkspacePaymentChannel.platform => 'MoolSocial',
+          _ => 'Recorded payment',
+        });
+      }
+    } else {
+      methods.add('Recorded payments');
+    }
+  }
+  return 'Payment method: ${methods.join(' + ')}';
+}
+
 String _storeSummaryAmount(String exact) {
   final parts = RegExp(r'^(-?)(\d+)(?:\.(\d{1,2}))?$').firstMatch(
     exact.replaceAll('₹', '').replaceAll(',', '').replaceAll('−', '-'),
@@ -7908,7 +7950,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                         const Divider(height: 1),
                         _invoiceTotal(),
                         Text(
-                          'Payment method: ${invoice.payment}',
+                          storeInvoicePaymentMethod(invoice.payment, payment,
+                              settlementLedger?.entries ?? const []),
                           style: const TextStyle(color: MoolColors.muted),
                         ),
                       ],

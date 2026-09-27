@@ -842,12 +842,13 @@ void _expectHomeCategoryContrast(WidgetTester tester, String id) {
 
 void main() {
   group('SETTLEMENTCOPY', () {
-    WorkspacePaymentRecord payment({int paid = 23500, int due = 0}) =>
+    WorkspacePaymentRecord payment({int paid = 23500, int due = 0,
+        WorkspacePaymentState state = WorkspacePaymentState.creditApplied}) =>
       WorkspacePaymentRecord(orderId: 'order', invoiceId: 'invoice',
         customerId: '9000091941', customerName: 'Evaluation', revision: 1,
         updatedAt: DateTime(2026, 9, 27), amountMinor: 26000,
         paidMinor: paid, dueMinor: due, refundedMinor: 0,
-        state: WorkspacePaymentState.creditApplied, channel: WorkspacePaymentChannel.cash);
+        state: state, channel: WorkspacePaymentChannel.cash);
     WorkspaceCustomerLedgerEntry entry(String id, int amount,
         WorkspaceLedgerEntryKind kind, {WorkspacePaymentChannel channel = WorkspacePaymentChannel.cash,
         WorkspaceLedgerPostingState state = WorkspaceLedgerPostingState.posted,
@@ -869,6 +870,43 @@ void main() {
         ]), 'Settled with ₹25 customer credit + ₹235 ${method.value}. Hand over goods at the counter.');
       });
     }
+    test('payment method full and partial credit never implies cash received', () {
+      for (final due in [0, 10000]) {
+        expect(storeInvoicePaymentMethod('Cash', payment(paid: 0, due: due), [
+          entry('credit', 26000 - due, WorkspaceLedgerEntryKind.creditReceived),
+        ]), 'Payment method: Customer credit');
+      }
+    });
+    for (final method in {
+      WorkspacePaymentChannel.cash: 'Cash',
+      WorkspacePaymentChannel.directUpi: 'UPI',
+      WorkspacePaymentChannel.bankTransfer: 'Bank transfer',
+    }.entries) {
+      test('payment method credit plus ${method.value}', () {
+        expect(storeInvoicePaymentMethod('Cash', payment(), [
+          entry('credit', 2500, WorkspaceLedgerEntryKind.creditReceived),
+          entry('receipt', 23500, WorkspaceLedgerEntryKind.collection, channel: method.key),
+          entry('pending', 1000, WorkspaceLedgerEntryKind.collection,
+              state: WorkspaceLedgerPostingState.pending),
+          entry('other', 1000, WorkspaceLedgerEntryKind.collection, invoice: 'other'),
+        ]), 'Payment method: Customer credit + ${method.value}');
+      });
+    }
+    test('payment method incomplete receipts do not infer original channel', () {
+      expect(storeInvoicePaymentMethod('Cash', payment(), const []),
+          'Payment method: Customer credit + Recorded payments');
+      expect(storeInvoicePaymentMethod('Cash', payment(paid: 0), const []),
+          'Payment method: Customer credit');
+    });
+    test('payment method ordinary unpaid remains selected method', () {
+      final unpaid = payment(paid: 0, due: 26000, state: WorkspacePaymentState.unpaid);
+      expect(storeInvoicePaymentMethod('Cash', unpaid, [
+        entry('pending', 26000, WorkspaceLedgerEntryKind.creditReceived,
+            state: WorkspaceLedgerPostingState.pending),
+        entry('other', 26000, WorkspaceLedgerEntryKind.creditReceived, invoice: 'other'),
+      ]), 'Payment method: Cash');
+      expect(storeInvoicePaymentMethod('UPI', null, const []), 'Payment method: UPI');
+    });
     test('full credit and incomplete breakdown', () {
       expect(storeCounterSettlementHint(payment(paid: 0), [
         entry('credit', 26000, WorkspaceLedgerEntryKind.creditReceived),
@@ -16486,6 +16524,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Amount exceeds available credit or invoice due.'), findsOneWidget);
       expect(work.workspaceFinance, same(finance));
+      expect(tester.takeException(), isNull);
+      await reveal(tester, field);
+      await tester.enterText(field, '500');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await reveal(tester, confirm);
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(find.text('Payment method: Customer credit'), findsOneWidget);
+      expect(find.text('Payment method: Cash'), findsNothing);
+      final updatedPayment = work.workspaceFinance!.payments.single;
+      expect(updatedPayment.paidMinor, 0);
+      expect(updatedPayment.dueMinor, 30000);
       expect(tester.takeException(), isNull);
     });
   }
