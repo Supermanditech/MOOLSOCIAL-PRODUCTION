@@ -7748,6 +7748,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
         payment.dueMinor == 0 &&
         payment.paidMinor > 0 &&
         payment.paidMinor >= payment.amountMinor;
+    final settledWithCredit = payment?.state == WorkspacePaymentState.creditApplied &&
+        payment?.dueMinor == 0;
     final adjusted = (payment?.refundedMinor ?? 0) > 0 ||
         payment?.state == WorkspacePaymentState.refundPending ||
         (finance?.customerLedgers.any(
@@ -7929,7 +7931,9 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                 )) ...[
                   const SizedBox(height: 12),
                   Text(
-                    paid
+                    settledWithCredit
+                        ? 'Settled using customer credit. Hand over goods at the counter.'
+                        : paid
                         ? 'Hand over goods at the counter'
                         : 'Confirm payment before handing over goods.',
                     key: Key('work-counter-handover-hint'),
@@ -11480,6 +11484,63 @@ class _StoreStatementSurface extends StatefulWidget {
 }
 
 class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
+  Future<void> _openCustomerCredit() async {
+    final session = widget.session;
+    await session.recoverCustomerLedger();
+    final finance = session.workspaceFinance;
+    if (!mounted || finance == null || !finance.valid || session.workspaceFinanceStale) return;
+    final search = TextEditingController();
+    ModalRoute<dynamic>? creditRoute;
+    final selected = await showModalBottomSheet<WorkspaceCustomerLedger>(context: context,
+      isScrollControlled: true, useSafeArea: true,
+      builder: (sheetContext) { creditRoute = ModalRoute.of(sheetContext); return StatefulBuilder(builder: (context, update) =>
+        Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(context).bottom + 12),
+          child: SizedBox(height: (MediaQuery.sizeOf(context).height - MediaQuery.viewInsetsOf(context).bottom -
+              MediaQuery.paddingOf(context).vertical - 32) * .65,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [const Expanded(child: Text('Customer credit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+                IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close))]),
+              TextField(key: const Key('customer-credit-search'), controller: search,
+                onChanged: (_) => update(() {}), decoration: const InputDecoration(
+                  hintText: 'Search customer name or phone', prefixIcon: Icon(Icons.search),
+                  filled: false, border: InputBorder.none, enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none)),
+              Expanded(child: ListView(children: [
+                if (finance.customerLedgers.isEmpty) const Text('No saved customer credit yet.'),
+                if (finance.customerLedgers.isNotEmpty && !finance.customerLedgers.any((l) =>
+                    '${l.customerName} ${l.customerId}'.toLowerCase().contains(search.text.trim().toLowerCase())))
+                  const Text('No matching customer.'),
+                for (final ledger in finance.customerLedgers.where((l) =>
+                    '${l.customerName} ${l.customerId}'.toLowerCase().contains(search.text.trim().toLowerCase()))) ...[
+                  _CustomerLedgerStatement(ledger: ledger),
+                  Row(children: [Expanded(child: Text(!ledger.historyComplete ? 'Credit unavailable: history incomplete'
+                      : 'Available credit ${_purchaseAmount(_availableCustomerCredit(ledger))}')),
+                    TextButton(onPressed: _availableCustomerCredit(ledger) <= 0 || widget.onNewSale == null
+                        ? null : () => Navigator.pop(sheetContext, ledger), child: const Text('Start sale'))]),
+                  const Divider(height: 1),
+                ],
+              ])),
+            ])))); });
+    // Dispose after the route's exit animation no longer uses its TextField.
+    await creditRoute?.completed;
+    search.dispose();
+    if (!mounted || selected == null || !identical(session.workspaceFinance, finance)) return;
+    await session.loadWorkspaceCounterDraft();
+    if (!mounted || session.workspaceFinance?.accountScope != finance.accountScope ||
+        session.activeWorkspace?.id != finance.workspaceId) { return; }
+    if (session.currentWorkspaceOrderId == null && session.workspaceOrderCustomer.trim().isNotEmpty &&
+        workspaceCustomerMobile(session.workspaceOrderCustomer) != selected.customerId) {
+      session.showNotice('Resume or finish the existing customer bill before starting this sale.');
+      return;
+    }
+    if (!session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) return;
+    session.updateWorkspaceCounterDetails(customer: selected.customerName);
+    if (workspaceCustomerMobile(session.workspaceOrderCustomer) != selected.customerId) {
+      session.updateWorkspaceCounterDetails(customer: selected.customerId);
+    }
+    widget.onNewSale?.call();
+  }
+
   String _book = 'Sales';
   String _invoicePeriod = 'Today';
   DateTimeRange? _invoiceRange;
@@ -11875,11 +11936,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
       final salesFrame = _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
-        actionWords: 'Counter sale Resume sale Collect dues Returns & refunds',
-        reflowContent: true,
+        actionWords: 'Counter sale Resume sale Collect dues Returns & refunds Customer credit',
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
         actions: [
+          _StoreEdgeAction(keyName: 'work-sales-customer-credit', icon: Icons.account_balance_wallet_outlined,
+            label: 'Customer credit', onTap: _openCustomerCredit),
           _StoreEdgeAction(keyName: 'work-sales-returns', icon: Icons.assignment_return_outlined,
             label: 'Returns & refunds', onTap: _returnSelection ? null : _toggleReturnSelection),
           if (widget.showNewSaleAction)
@@ -14241,14 +14303,12 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.onToggle,
     this.keyPrefix = 'work-stock',
     this.actionWords = 'Add products Buy stock Purchases Buy together',
-    this.reflowContent = false,
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
   final String keyPrefix, actionWords;
-  final bool reflowContent;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -14332,7 +14392,6 @@ class _StockQuickActionsFrame extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              right: expanded && reflowContent ? panelWidth : 0,
               child: ClipPath(
                 key: Key('$keyPrefix-action-content'),
                 clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
@@ -14340,7 +14399,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
               ),
             ),
             if (expanded) ...[
-              if (!reflowContent) Positioned.fill(
+              Positioned.fill(
                 child: GestureDetector(
                   key: Key('$keyPrefix-actions-dismiss'),
                   behavior: HitTestBehavior.opaque,
@@ -22089,6 +22148,8 @@ class _CustomerLedgerStatement extends StatelessWidget {
                     WorkspaceLedgerEntryKind.collection => 'Payment received',
                     WorkspaceLedgerEntryKind.creditNote => 'Return credit',
                     WorkspaceLedgerEntryKind.refund => 'Refund',
+                    WorkspaceLedgerEntryKind.creditUsed => 'Customer credit used',
+                    WorkspaceLedgerEntryKind.creditReceived => 'Customer credit applied',
                   },
                   value: _purchaseAmount(ledger.entries[i].amountMinor),
                 ),
@@ -27165,6 +27226,84 @@ class _WorkspaceDeliverySurface extends StatelessWidget {
   }
 }
 
+int _availableCustomerCredit(WorkspaceCustomerLedger ledger) => !ledger.valid || !ledger.historyComplete ? 0
+    : ledger.entries.map((e) => e.invoiceId).toSet().fold<int>(0,
+        (sum, id) => sum + (ledger.invoiceBalance(id)?.availableCreditMinor ?? 0));
+
+class _CustomerCreditApplication extends StatefulWidget {
+  const _CustomerCreditApplication({required this.session, required this.ledger, required this.payment});
+  final WorkSession session;
+  final WorkspaceCustomerLedger ledger;
+  final WorkspacePaymentRecord payment;
+  @override
+  State<_CustomerCreditApplication> createState() => _CustomerCreditApplicationState();
+}
+
+class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> {
+  final amount = TextEditingController();
+  String? source;
+  String? error;
+  bool saving = false;
+  @override
+  void dispose() { amount.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    final candidates = widget.ledger.entries.map((e) => e.invoiceId).toSet().where((id) =>
+      id != widget.payment.invoiceId && (widget.ledger.invoiceBalance(id)?.availableCreditMinor ?? 0) > 0);
+    return PopScope(canPop: !saving, child: SafeArea(top: false, child: Padding(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
+      child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [const Expanded(child: Text('Use customer credit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            IconButton(tooltip: 'Close', onPressed: saving ? null : () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+          Text('Invoice due ${_purchaseAmount(widget.payment.dueMinor)}'),
+          for (final id in candidates)
+            ListTile(dense: true, contentPadding: EdgeInsets.zero,
+              leading: Icon(source == id ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+              selected: source == id,
+              title: Text(id), subtitle: Text('Available ${_purchaseAmount(widget.ledger.invoiceBalance(id)!.availableCreditMinor)}'),
+              onTap: saving ? null : () => setState(() {
+                source = id;
+                final credit = widget.ledger.invoiceBalance(id)!.availableCreditMinor;
+                amount.text = _formatStoreMinorAmount(credit < widget.payment.dueMinor ? credit : widget.payment.dueMinor);
+                error = null;
+              })),
+          Align(alignment: Alignment.centerLeft, child: SizedBox(width: 180, child: TextField(
+            key: const Key('customer-credit-amount'), controller: amount, enabled: !saving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Credit to use', prefixText: '₹ ')))),
+          const SizedBox(height: 12),
+          const Text('This reduces the invoice due. No money is collected or refunded.'),
+          if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+            key: const Key('customer-credit-confirm'), icon: const Icon(Icons.check, size: 18),
+            label: Text(saving ? 'Applying…' : 'Apply credit'), onPressed: saving ? null : () async {
+              final text = amount.text.trim();
+              if (source == null || !RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(text)) {
+                setState(() => error = 'Select a credit and enter a valid amount.'); return;
+              }
+              final parts = text.split('.');
+              final minor = int.parse(parts.first) * 100 + (parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0')));
+              if (minor <= 0 || minor > widget.payment.dueMinor || minor > widget.ledger.invoiceBalance(source!)!.availableCreditMinor) {
+                setState(() => error = 'Amount exceeds available credit or invoice due.'); return;
+              }
+              if (widget.session.workspaceFinance?.accountScope != widget.ledger.accountScope ||
+                  widget.session.activeWorkspace?.id != widget.ledger.workspaceId) {
+                setState(() => error = 'Store changed. Reopen the invoice.'); return;
+              }
+              setState(() { saving = true; error = null; });
+              final done = await widget.session.applyCustomerCredit(customerId: widget.ledger.customerId,
+                sourceInvoiceId: source!, targetInvoiceId: widget.payment.invoiceId!, amountMinor: minor,
+                expectedRevision: widget.ledger.revision);
+              if (!mounted || !context.mounted) return;
+              if (done) { Navigator.pop(context); } else {
+                setState(() { saving = false; error = 'Credit update not confirmed. Close and check saved records.'; });
+              }
+            })),
+        ])))));
+  }
+}
+
 class _InvoiceCollectionSummary extends StatelessWidget {
   const _InvoiceCollectionSummary({
     required this.session,
@@ -27217,6 +27356,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                 ledger.customerId == payment.customerId &&
                 ledger.historyComplete,
           );
+      final creditLedger = finance?.customerLedgers.where((l) => l.customerId == payment.customerId).firstOrNull;
       return Column(
         key: const Key('work-invoice-payment-totals'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -27224,6 +27364,18 @@ class _InvoiceCollectionSummary extends StatelessWidget {
           Text(
             'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
           ),
+          if (creditLedger != null && creditLedger.entries.any((e) => e.invoiceId == invoice.id &&
+              e.kind == WorkspaceLedgerEntryKind.creditReceived))
+            Text('Customer credit applied ${_purchaseAmount(creditLedger.entries.where((e) =>
+              e.invoiceId == invoice.id && e.kind == WorkspaceLedgerEntryKind.creditReceived &&
+              e.state == WorkspaceLedgerPostingState.posted).fold<int>(0, (sum, e) => sum + e.amountMinor))}'),
+          if (creditLedger != null && payment.dueMinor > 0 && _availableCustomerCredit(creditLedger) > 0)
+            Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+              key: const Key('work-invoice-use-credit'), icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+              label: Text('Use customer credit · ${_purchaseAmount(_availableCustomerCredit(creditLedger))} available'),
+              onPressed: !session.customerCreditAvailable ? null : () => showModalBottomSheet<void>(
+                context: context, isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
+                builder: (_) => _CustomerCreditApplication(session: session, ledger: creditLedger, payment: payment)))),
           if (receiptEditor != null)
             receiptEditor!
           else if (payment.dueMinor > 0 &&

@@ -2951,6 +2951,60 @@ class WorkSession extends ChangeNotifier {
       _storeData.pendingCustomerRefund == null &&
       !workspaceFinanceStale;
   String? get customerLedgerRecoveryError => _storeData.ledgerRecoveryError;
+  bool get customerCreditAvailable => customerCollectionAvailable &&
+      !customerCollectionBusy && pendingCustomerCollection == null &&
+      _storeData.customerCollectionGateway is StoreReviewCustomerCollectionGateway;
+
+  Future<bool> applyCustomerCredit({required String customerId,
+    required String sourceInvoiceId, required String targetInvoiceId,
+    required int amountMinor, required int expectedRevision}) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) ||
+        !customerCreditAvailable || data.ledgerCheckpointStore == null) { return false; }
+    final before = data.finance!;
+    final adapter = data.customerCollectionGateway as StoreReviewCustomerCollectionGateway;
+    data.customerCollectionBusy = true;
+    notifyListeners();
+    var saving = false;
+    try {
+      final next = adapter.previewCreditAllocation(customerId: customerId,
+        sourceInvoiceId: sourceInvoiceId, targetInvoiceId: targetInvoiceId,
+        amountMinor: amountMinor, expectedRevision: expectedRevision,
+        operationId: StoreCollectionController._id());
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1, finance: next,
+        inventory: data.ledgerInventory, billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices, purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data), expenses: _expenseCheckpointEntries(data));
+      saving = true;
+      await data.ledgerCheckpointStore!.save(checkpoint, expectedRevision: data.ledgerCheckpointRevision);
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      if (!_isStoreScopeCurrent(data, before.workspaceId, before.accountScope) ||
+          !adapter.acceptSavedCredit(before, next) || !applyWorkspaceFinance(next)) {
+        throw StateError('Saved credit requires recovery.');
+      }
+      showNotice('Customer credit applied. No money was collected or refunded.');
+      return true;
+    } catch (_) {
+      if (saving) {
+        // A save may have completed despite a lost acknowledgement. Reopen the
+        // atomic checkpoint before another allocation; never retry blindly.
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
+        data.financeStale = true;
+        data.ledgerRecoveryError = 'Reopen saved records to check the credit update before trying again.';
+        data.customerCollectionGateway = StoreReviewCustomerCollectionGateway(data.finance!);
+      }
+      if (!_disposed && identical(data, _storeData)) { showNotice(saving
+          ? 'Credit update needs checking. Reopen saved records before trying again.'
+          : 'Credit or invoice changed. Reopen and check the available amount.'); }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) notifyListeners();
+    }
+  }
   bool get workspaceInvoiceHistoryLoaded => _storeData.ledgerRecovered;
   bool get customerCollectionBusy => _storeData.customerCollectionBusy;
   WorkspaceCustomerRefund? get pendingCustomerRefund =>

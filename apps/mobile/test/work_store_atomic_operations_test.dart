@@ -11,6 +11,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_downloads.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
@@ -550,6 +551,130 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  WorkspaceCustomerLedger creditLedger() => WorkspaceCustomerLedger(
+    accountScope: 'account-A', workspaceId: 'credit-store', customerId: '9000091941',
+    customerName: 'Credit QA · 9000091941', revision: 1, asOf: DateTime.utc(2026, 9, 20),
+    openingBalanceMinor: 0, historyComplete: true, entries: [
+      for (var i = 0; i < 4; i++) WorkspaceCustomerLedgerEntry(id: 'entry-$i',
+        operationId: 'entry-$i', invoiceId: i < 3 ? 'source' : 'target',
+        orderId: i < 3 ? 'source-order' : 'target-order', sequence: i + 1,
+        occurredAt: DateTime.utc(2026, 9, 19, i),
+        kind: [WorkspaceLedgerEntryKind.invoice, WorkspaceLedgerEntryKind.collection,
+          WorkspaceLedgerEntryKind.creditNote, WorkspaceLedgerEntryKind.invoice][i],
+        state: WorkspaceLedgerPostingState.posted, amountMinor: i < 3 ? 50000 : 80000,
+        channel: WorkspacePaymentChannel.cash),
+    ]);
+  WorkspaceFinanceSnapshot creditFinance() => WorkspaceFinanceSnapshot(
+    accountScope: 'account-A', workspaceId: 'credit-store', revision: 1,
+    asOf: DateTime.utc(2026, 9, 20), salesTodayMinor: 0, duesMinor: 80000,
+    availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+    feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+    customerLedgers: [creditLedger()], payouts: [], historyComplete: true,
+    payments: [for (final source in [true, false]) WorkspacePaymentRecord(
+      orderId: source ? 'source-order' : 'target-order', customerId: '9000091941',
+      customerName: 'Credit QA · 9000091941', revision: 1, updatedAt: DateTime.utc(2026, 9, 20),
+      amountMinor: source ? 50000 : 80000, paidMinor: source ? 50000 : 0,
+      dueMinor: source ? 0 : 80000, refundedMinor: 0,
+      state: source ? WorkspacePaymentState.returnAdjusted : WorkspacePaymentState.unpaid,
+      channel: WorkspacePaymentChannel.cash, invoiceId: source ? 'source' : 'target')]);
+
+  test('CREDITUSE partial full replay and changed request limits', () {
+    final before = creditLedger();
+    final after = before.allocateCredit(sourceInvoiceId: 'source', targetInvoiceId: 'target',
+      amountMinor: 30000, expectedRevision: 1, operationId: 'use-1', at: DateTime.utc(2026, 9, 21));
+    expect(after.valid, isTrue);
+    expect(after.canFollow(before), isTrue);
+    expect(after.closingBalanceMinor, before.closingBalanceMinor);
+    expect(after.invoiceBalance('source')!.availableCreditMinor, 20000);
+    expect(after.invoiceBalance('target')!.dueMinor, 50000);
+    expect(after.invoiceBalance('target')!.collectedMinor, 0);
+    expect(identical(after.allocateCredit(sourceInvoiceId: 'source', targetInvoiceId: 'target',
+      amountMinor: 30000, expectedRevision: 1, operationId: 'use-1', at: DateTime.utc(2026, 9, 22)), after), isTrue);
+    for (final args in [(20001, 2, 'new'), (20000, 1, 'stale'), (1, 2, 'use-1')]) {
+      expect(() => after.allocateCredit(sourceInvoiceId: 'source', targetInvoiceId: 'target',
+        amountMinor: args.$1, expectedRevision: args.$2, operationId: args.$3, at: DateTime.utc(2026, 9, 22)), throwsFormatException);
+    }
+    final full = after.allocateCredit(sourceInvoiceId: 'source', targetInvoiceId: 'target',
+      amountMinor: 20000, expectedRevision: 2, operationId: 'use-2', at: DateTime.utc(2026, 9, 22));
+    expect(full.invoiceBalance('source')!.availableCreditMinor, 0);
+    expect(full.invoiceBalance('source')!.refundableMinor, 0);
+  });
+
+  test('CREDITUSE statement separates paired allocation from cash and return credit', () {
+    final gateway = StoreReviewCustomerCollectionGateway(creditFinance());
+    final after = gateway.previewCreditAllocation(customerId: '9000091941', sourceInvoiceId: 'source',
+      targetInvoiceId: 'target', amountMinor: 30000, expectedRevision: 1,
+      operationId: 'report-credit');
+    final statement = StoreSalesStatement(accountId: 'account-A', storeId: 'credit-store',
+      storeName: 'Evaluation credit Store', from: DateTime.utc(2026, 9), until: DateTime.utc(2026, 10),
+      generatedAt: after.asOf.add(const Duration(minutes: 1)), finance: after, reviewOnly: true,
+      invoices: [for (final source in [true, false]) WorkspaceCustomerInvoice(
+        id: source ? 'source' : 'target', orderId: source ? 'source-order' : 'target-order',
+        customer: '9000091941', items: 'Evaluation goods', amount: source ? 500 : 800,
+        payment: 'Cash', issuedAt: DateTime.utc(2026, 9, 19))]);
+    expect(statement.recorded(WorkspaceLedgerEntryKind.collection), 50000);
+    expect(statement.recorded(WorkspaceLedgerEntryKind.creditNote), 50000);
+    expect(statement.recorded(WorkspaceLedgerEntryKind.refund), 0);
+    expect(statement.recorded(WorkspaceLedgerEntryKind.creditReceived), 30000);
+    final allocations = statement.report.rows.where((r) => r[12] is num).toList();
+    expect(allocations, hasLength(2));
+    expect(allocations.map((r) => r[1]), ['source', 'target']);
+    expect(allocations.map((r) => r[12]), [300, 300]);
+    expect(allocations.every((r) => r[9] == '' && r[10] == ''), isTrue);
+    expect(statement.report.summary.any((r) => r[0] == 'Customer credit applied (non-cash)' && r[1] == 'INR 300.00'), isTrue);
+  });
+  test('CREDITUSE credit-funded returns cannot invent cash refunds', () {
+    final used = creditLedger().allocateCredit(sourceInvoiceId: 'source', targetInvoiceId: 'target',
+      amountMinor: 50000, expectedRevision: 1, operationId: 'use', at: DateTime.utc(2026, 9, 21));
+    final returned = WorkspaceCustomerLedger(accountScope: used.accountScope, workspaceId: used.workspaceId,
+      customerId: used.customerId, customerName: used.customerName, revision: 3,
+      asOf: DateTime.utc(2026, 9, 22), openingBalanceMinor: 0, historyComplete: true,
+      entries: [...used.entries, WorkspaceCustomerLedgerEntry(id: 'return-target', operationId: 'return-target',
+        invoiceId: 'target', orderId: 'target-order', sequence: 7, occurredAt: DateTime.utc(2026, 9, 22),
+        kind: WorkspaceLedgerEntryKind.creditNote, state: WorkspaceLedgerPostingState.posted, amountMinor: 80000)]);
+    expect(returned.invoiceBalance('target')!.availableCreditMinor, 50000);
+    expect(returned.invoiceBalance('target')!.refundableMinor, 0);
+  });
+  for (final failure in ['none', 'before-write', 'lost-response']) {
+    test('CREDITUSE atomic save restart and stale retry $failure', () async {
+      final storage = _OrderJournalStorage();
+      final original = creditFinance();
+      WorkSession open() {
+        final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _CommandAccountStore(),
+          pendingProofStore: _CommandAccountStore())..activeWorkspace = const WorkWorkspace(id: 'credit-store',
+            name: 'Credit evaluation', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'QA', verified: true);
+        expect(work.applyWorkspaceFinance(original), isTrue);
+        expect(work.bindCustomerCollectionGateway(accountScope: 'account-A', storeId: 'credit-store',
+          adapter: StoreReviewCustomerCollectionGateway(original), checkpointStore: SecureWorkLedgerCheckpointStore(
+            accountScope: () => 'account-A', storage: storage)), isTrue);
+        addTearDown(work.dispose);
+        return work;
+      }
+      final work = open();
+      expect(await work.recoverCustomerLedger(), isTrue);
+      storage.failWrite = failure == 'before-write';
+      storage.loseWriteResponseOnce = failure == 'lost-response';
+      final result = await work.applyCustomerCredit(customerId: '9000091941', sourceInvoiceId: 'source',
+        targetInvoiceId: 'target', amountMinor: 30000, expectedRevision: 1);
+      expect(result, failure == 'none');
+      storage.failWrite = false;
+      final restarted = open();
+      expect(await restarted.recoverCustomerLedger(), isTrue);
+      final f = restarted.workspaceFinance!;
+      final saved = failure != 'before-write';
+      expect(f.payments.last.dueMinor, saved ? 50000 : 80000);
+      expect(f.payments.last.paidMinor, 0);
+      expect(f.refundsMinor, 0);
+      expect(f.salesTodayMinor, original.salesTodayMinor);
+      if (saved) {
+        expect(await restarted.applyCustomerCredit(customerId: '9000091941', sourceInvoiceId: 'source',
+          targetInvoiceId: 'target', amountMinor: 30000, expectedRevision: 1), isFalse);
+        expect(f.customerLedgers.single.entries.where((e) => e.kind == WorkspaceLedgerEntryKind.creditUsed), hasLength(1));
+      }
+      expect(await restarted.applyCustomerCredit(customerId: 'different-customer', sourceInvoiceId: 'source',
+        targetInvoiceId: 'target', amountMinor: 1, expectedRevision: 1), isFalse);
+    });
+  }
   test('REFUNDSOURCE mixed receipts keep original identity and remaining limits', () {
     final now = DateTime.utc(2026, 9, 27);
     WorkspaceCustomerRefund request({String source = 'receipt-cash', int amount = 2000,

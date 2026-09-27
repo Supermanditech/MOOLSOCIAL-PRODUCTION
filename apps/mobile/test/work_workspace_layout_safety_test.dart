@@ -16378,6 +16378,67 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('CREDITUSE lookup and safe confirmation $scale', (tester) async {
+      tester.view.padding = const FakeViewPadding(bottom: 44);
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final seed = StoreReviewSeed(accountScope: 'review-draft-account', orderCount: 12,
+        now: DateTime.now().subtract(const Duration(minutes: 1)));
+      work.activeWorkspace = seed.workspace;
+      final time = seed.finance.asOf;
+      final ledger = WorkspaceCustomerLedger(accountScope: seed.accountScope,
+        workspaceId: seed.storeId, customerId: '9000091941', customerName: 'Evaluation credit customer',
+        revision: 1, asOf: time, openingBalanceMinor: 0, historyComplete: true,
+        entries: [for (var i = 0; i < 4; i++) WorkspaceCustomerLedgerEntry(
+          id: 'credit-$i', operationId: 'credit-$i', invoiceId: i < 3 ? 'CREDIT-SOURCE' : 'CREDIT-TARGET',
+          orderId: i < 3 ? 'SOURCE-ORDER' : 'TARGET-ORDER', sequence: i + 1, occurredAt: time,
+          kind: [WorkspaceLedgerEntryKind.invoice, WorkspaceLedgerEntryKind.collection,
+            WorkspaceLedgerEntryKind.creditNote, WorkspaceLedgerEntryKind.invoice][i],
+          state: WorkspaceLedgerPostingState.posted, amountMinor: i < 3 ? 50000 : 80000,
+          channel: WorkspacePaymentChannel.cash)]);
+      final finance = WorkspaceFinanceSnapshot(accountScope: seed.accountScope, workspaceId: seed.storeId,
+        revision: 1, asOf: time, salesTodayMinor: 80000, duesMinor: 80000, availableMinor: 0,
+        heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+        refundsMinor: 0, taxWithheldMinor: 0, payouts: [], customerLedgers: [ledger], historyComplete: true,
+        payments: [WorkspacePaymentRecord(orderId: 'TARGET-ORDER', customerId: '9000091941',
+          customerName: 'Evaluation credit customer', revision: 1, updatedAt: time, amountMinor: 80000,
+          paidMinor: 0, dueMinor: 80000, refundedMinor: 0, state: WorkspacePaymentState.unpaid,
+          channel: WorkspacePaymentChannel.cash, invoiceId: 'CREDIT-TARGET')]);
+      expect(work.applyWorkspaceFinance(finance), isTrue);
+      expect(work.bindCustomerCollectionGateway(accountScope: seed.accountScope, storeId: seed.storeId,
+        adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: _LedgerCheckpointFixtureStore()), isTrue);
+      work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'CREDIT-TARGET', orderId: 'TARGET-ORDER',
+        customer: '9000091941', items: 'Evaluation goods', amount: 800, payment: 'Cash', issuedAt: time));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 720), textScale: scale);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-sales-invoice-CREDIT-TARGET')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-invoice-use-credit')));
+      await tester.tap(find.byKey(const Key('work-invoice-use-credit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CREDIT-SOURCE'));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('customer-credit-amount'));
+      await reveal(tester, field);
+      expect(tester.getSize(field).width, lessThanOrEqualTo(180));
+      expect(tester.widget<TextField>(field).controller!.text, '500');
+      await tester.enterText(field, '0');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(const Key('customer-credit-confirm'));
+      await reveal(tester, confirm);
+      expect(tester.getRect(confirm).bottom, lessThanOrEqualTo(676));
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(find.text('Amount exceeds available credit or invoice due.'), findsOneWidget);
+      expect(work.workspaceFinance, same(finance));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final display in [(const Size(360, 720), 1.0), (const Size(320, 568), 2.0), (const Size(720, 360), 1.0)]) {
     testWidgets('SALESHOME Stock-style search and actions $display', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -16409,11 +16470,19 @@ void main() {
       expect(find.text('₹1,00,00,000.25'), findsNWidgets(2));
       expect(find.text('Retail customer with a long business name'), findsOneWidget);
       expect(find.text('Payment status unavailable'), findsOneWidget);
+      final closedContent = tester.getRect(find.byKey(const Key('work-sales-action-content')));
       await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
       await tester.pumpAndSettle();
-      expect(tester.getRect(find.byKey(const Key('work-sales-action-content'))).right,
-        lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-sales-actions-panel'))).left));
-      expect(find.byKey(const Key('work-sales-actions-dismiss')), findsNothing);
+      final salesContent = tester.getRect(find.byKey(const Key('work-sales-action-content')));
+      final actionsPanel = tester.getRect(find.byKey(const Key('work-sales-actions-panel')));
+      expect(salesContent, closedContent);
+      expect(salesContent.right, actionsPanel.right);
+      expect(actionsPanel.height, lessThanOrEqualTo(salesContent.height));
+      if (display.$1.height == 720) {
+        expect(actionsPanel.bottom, lessThan(salesContent.bottom - 100));
+      }
+      expect(find.byKey(const Key('work-sales-actions-dismiss')), findsOneWidget);
+      expect(find.byKey(const Key('work-sales-customer-credit')), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
       await tester.pumpAndSettle();
@@ -16508,13 +16577,21 @@ void main() {
     await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
+    await tester.tapAt(tester.getTopLeft(find.byKey(const Key('work-sales-action-content'))) + const Offset(12, 12));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-statement')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
     expect(find.text('View statement'), findsNothing);
     // An unrecovered fixture must not export an apparently complete empty book.
     expect(find.text('Sales records are not ready. Please retry after loading.'), findsOneWidget);
+    // Let the unavailable-records snackbar finish before using the bottom edge.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-sales-new-counter-sale')));
     await tester.pumpAndSettle();

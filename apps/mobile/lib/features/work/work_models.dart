@@ -272,6 +272,7 @@ enum WorkspacePaymentState {
   refundPending,
   refunded,
   returnAdjusted,
+  creditApplied,
   disputed,
   unknown;
 
@@ -284,6 +285,7 @@ enum WorkspacePaymentState {
     refundPending => 'Refund pending',
     refunded => 'Refunded',
     returnAdjusted => 'Adjusted for return',
+    creditApplied => 'Customer credit applied',
     disputed => 'Payment under review',
     unknown => 'Payment update unavailable',
   };
@@ -614,7 +616,7 @@ class WorkspaceCustomerReturn {
   }
 }
 
-enum WorkspaceLedgerEntryKind { invoice, collection, creditNote, refund }
+enum WorkspaceLedgerEntryKind { invoice, collection, creditNote, refund, creditUsed, creditReceived }
 
 enum WorkspaceLedgerPostingState { pending, posted, failed }
 
@@ -893,9 +895,11 @@ class WorkspaceCustomerLedgerEntry {
       ? 0
       : switch (kind) {
           WorkspaceLedgerEntryKind.invoice ||
-          WorkspaceLedgerEntryKind.refund => amountMinor,
+          WorkspaceLedgerEntryKind.refund ||
+          WorkspaceLedgerEntryKind.creditUsed => amountMinor,
           WorkspaceLedgerEntryKind.collection ||
-          WorkspaceLedgerEntryKind.creditNote => -amountMinor,
+          WorkspaceLedgerEntryKind.creditNote ||
+          WorkspaceLedgerEntryKind.creditReceived => -amountMinor,
         };
 }
 
@@ -930,17 +934,19 @@ class WorkspaceCustomerLedger {
     int refundedMinor,
     int dueMinor,
     int refundableMinor,
+    int availableCreditMinor,
   })?
   invoiceBalance(String invoiceId) {
     if (!valid || !historyComplete || invoiceId.trim().isEmpty) return null;
     final lines = entries.where((entry) => entry.invoiceId == invoiceId);
     int billed = 0, credited = 0, collected = 0, refunded = 0;
+    int used = 0, received = 0;
     String? orderId;
     for (final entry in lines) {
       if (orderId != null && orderId != entry.orderId) return null;
       orderId = entry.orderId;
       if (entry.state != WorkspaceLedgerPostingState.posted) continue;
-      final balance = billed - credited - collected + refunded;
+      final balance = billed - credited - collected + refunded + used - received;
       switch (entry.kind) {
         case WorkspaceLedgerEntryKind.invoice:
           if (billed != 0) return null;
@@ -958,17 +964,26 @@ class WorkspaceCustomerLedger {
             return null;
           }
           refunded += entry.amountMinor;
+        case WorkspaceLedgerEntryKind.creditUsed:
+          if (billed == 0 || entry.amountMinor > -balance) return null;
+          used += entry.amountMinor;
+        case WorkspaceLedgerEntryKind.creditReceived:
+          if (billed == 0 || entry.amountMinor > balance) return null;
+          received += entry.amountMinor;
       }
     }
     if (billed == 0) return null;
-    final balance = billed - credited - collected + refunded;
+    final balance = billed - credited - collected + refunded + used - received;
+    final available = balance < 0 ? -balance : 0;
+    final cashRemaining = collected - refunded;
     return (
       billedMinor: billed,
       creditedMinor: credited,
       collectedMinor: collected,
       refundedMinor: refunded,
       dueMinor: balance > 0 ? balance : 0,
-      refundableMinor: balance < 0 ? -balance : 0,
+      refundableMinor: available < cashRemaining ? available : cashRemaining,
+      availableCreditMinor: available,
     );
   }
 
@@ -1077,6 +1092,8 @@ class WorkspaceCustomerLedger {
     var previousSequence = 0;
     DateTime? previousTime;
     var balance = openingBalanceMinor ?? 0;
+    final creditPairs = <String, List<WorkspaceCustomerLedgerEntry>>{};
+    final invoiceRunning = <String, int>{};
     for (final entry in entries) {
       if (!entry.valid ||
           (entry.customerRefund != null &&
@@ -1097,11 +1114,69 @@ class WorkspaceCustomerLedger {
         return false;
       }
       balance += entry.balanceDeltaMinor;
+      if (entry.kind == WorkspaceLedgerEntryKind.creditUsed ||
+          entry.kind == WorkspaceLedgerEntryKind.creditReceived) {
+        if (entry.state != WorkspaceLedgerPostingState.posted ||
+            entry.channel != WorkspacePaymentChannel.credit ||
+            entry.customerReturn != null || entry.customerRefund != null) { return false; }
+        final available = invoiceRunning[entry.invoiceId];
+        if (available == null || !invoices.contains(entry.invoiceId) ||
+            (entry.kind == WorkspaceLedgerEntryKind.creditUsed
+                ? entry.amountMinor > -available : entry.amountMinor > available)) { return false; }
+        creditPairs.putIfAbsent(entry.operationId, () => []).add(entry);
+      }
+      invoiceRunning.update(entry.invoiceId, (value) => value + entry.balanceDeltaMinor,
+        ifAbsent: () => entry.balanceDeltaMinor);
       if (!_financeAmountValid(balance, signed: true)) return false;
       previousSequence = entry.sequence;
       previousTime = entry.occurredAt;
     }
+    for (final pair in creditPairs.values) {
+      if (pair.length != 2 || pair[0].kind != WorkspaceLedgerEntryKind.creditUsed ||
+          pair[1].kind != WorkspaceLedgerEntryKind.creditReceived ||
+          pair[0].amountMinor != pair[1].amountMinor ||
+          pair[0].invoiceId == pair[1].invoiceId || pair[0].orderId == pair[1].orderId ||
+          pair[1].sequence != pair[0].sequence + 1 ||
+          pair[0].occurredAt != pair[1].occurredAt) { return false; }
+    }
     return true;
+  }
+
+  /// Non-cash allocation within this exact customer ledger. The caller persists
+  /// the complete returned checkpoint atomically before exposing the new balance.
+  WorkspaceCustomerLedger allocateCredit({required String sourceInvoiceId,
+    required String targetInvoiceId, required int amountMinor,
+    required int expectedRevision, required String operationId, required DateTime at}) {
+    final replay = entries.where((e) => e.operationId == operationId).toList();
+    if (replay.isNotEmpty) {
+      if (valid && replay.length == 2 &&
+          replay[0].kind == WorkspaceLedgerEntryKind.creditUsed &&
+          replay[1].kind == WorkspaceLedgerEntryKind.creditReceived &&
+          replay[0].invoiceId == sourceInvoiceId && replay[1].invoiceId == targetInvoiceId &&
+          replay.every((e) => e.amountMinor == amountMinor)) { return this; }
+      throw const FormatException('Credit operation identity changed.');
+    }
+    final source = invoiceBalance(sourceInvoiceId);
+    final target = invoiceBalance(targetInvoiceId);
+    if (!historyComplete || revision != expectedRevision || operationId.trim().isEmpty ||
+        at.isBefore(asOf) || sourceInvoiceId == targetInvoiceId ||
+        source == null || target == null || amountMinor <= 0 ||
+        amountMinor > source.availableCreditMinor || amountMinor > target.dueMinor) {
+      throw const FormatException('Refresh customer credit and this invoice before applying.');
+    }
+    return WorkspaceCustomerLedger(accountScope: accountScope, workspaceId: workspaceId,
+      customerId: customerId, customerName: customerName, revision: revision + 1,
+      asOf: at, openingBalanceMinor: openingBalanceMinor, historyComplete: true,
+      entries: [...entries,
+        for (var i = 0; i < 2; i++)
+          WorkspaceCustomerLedgerEntry(id: 'CREDIT-$operationId-$i', operationId: operationId,
+            invoiceId: i == 0 ? sourceInvoiceId : targetInvoiceId,
+            orderId: entries.firstWhere((e) => e.invoiceId == (i == 0 ? sourceInvoiceId : targetInvoiceId)).orderId,
+            sequence: (entries.lastOrNull?.sequence ?? 0) + i + 1, occurredAt: at,
+            kind: i == 0 ? WorkspaceLedgerEntryKind.creditUsed : WorkspaceLedgerEntryKind.creditReceived,
+            state: WorkspaceLedgerPostingState.posted, amountMinor: amountMinor,
+            channel: WorkspacePaymentChannel.credit),
+      ]);
   }
 
   int? get closingBalanceMinor => !valid || !historyComplete

@@ -3946,6 +3946,50 @@ class StoreReviewCustomerCollectionGateway
   final _replies = <String, WorkspaceFinanceSnapshot>{};
   bool _hasRecordedInvoices = false;
 
+  /// Pure local preview: no money movement or adapter mutation before the
+  /// caller's atomic checkpoint save. Production requires its own capability.
+  WorkspaceFinanceSnapshot previewCreditAllocation({required String customerId,
+    required String sourceInvoiceId, required String targetInvoiceId,
+    required int amountMinor, required int expectedRevision, required String operationId}) {
+    final ledger = _finance.customerLedgers.singleWhere((l) => l.customerId == customerId);
+    final now = DateTime.now().toUtc();
+    final nextLedger = ledger.allocateCredit(sourceInvoiceId: sourceInvoiceId,
+      targetInvoiceId: targetInvoiceId, amountMinor: amountMinor,
+      expectedRevision: expectedRevision, operationId: operationId, at: now);
+    if (identical(ledger, nextLedger)) return _finance;
+    final payment = _finance.payments.singleWhere((p) => p.customerId == customerId && p.invoiceId == targetInvoiceId);
+    if (payment.dueMinor < amountMinor || payment.channel == WorkspacePaymentChannel.platform ||
+        _finance.duesMinor < amountMinor) { throw StateError('Invoice is not eligible for local credit.'); }
+    final next = WorkspaceFinanceSnapshot(accountScope: _finance.accountScope,
+      workspaceId: _finance.workspaceId, revision: _finance.revision + 1, asOf: now,
+      salesTodayMinor: _finance.salesTodayMinor, duesMinor: _finance.duesMinor - amountMinor,
+      availableMinor: _finance.availableMinor, heldMinor: _finance.heldMinor,
+      requestedMinor: _finance.requestedMinor, paidOutMinor: _finance.paidOutMinor,
+      feesMinor: _finance.feesMinor, deliveryAdjustmentsMinor: _finance.deliveryAdjustmentsMinor,
+      refundsMinor: _finance.refundsMinor, taxWithheldMinor: _finance.taxWithheldMinor,
+      historyComplete: _finance.historyComplete, payouts: _finance.payouts,
+      payments: [for (final p in _finance.payments)
+        if (identical(p, payment)) WorkspacePaymentRecord(orderId: p.orderId,
+          customerId: p.customerId, customerName: p.customerName, revision: p.revision + 1,
+          updatedAt: now, amountMinor: p.amountMinor, paidMinor: p.paidMinor,
+          dueMinor: p.dueMinor - amountMinor, refundedMinor: p.refundedMinor,
+          state: WorkspacePaymentState.creditApplied, channel: p.channel,
+          invoiceId: p.invoiceId, transactionId: p.transactionId)
+        else p],
+      customerLedgers: [for (final l in _finance.customerLedgers)
+        l.customerId == customerId ? nextLedger : l]);
+    if (!next.valid || !nextLedger.canFollow(ledger)) throw StateError('Credit projection is invalid.');
+    return next;
+  }
+
+  bool acceptSavedCredit(WorkspaceFinanceSnapshot before, WorkspaceFinanceSnapshot saved) {
+    if (!identical(before, _finance) || !saved.valid || saved.accountScope != before.accountScope ||
+        saved.workspaceId != before.workspaceId || saved.revision != before.revision + 1) { return false; }
+    _finance = saved;
+    _hasRecordedInvoices = true;
+    return true;
+  }
+
   @override
   Future<WorkspaceFinanceSnapshot> reconcileInvoice({
     required String accountScope,
@@ -4522,7 +4566,10 @@ class StoreReviewCustomerCollectionGateway
       state: due == 0
           ? payment.paidMinor + request.amountMinor == payment.amountMinor
                 ? WorkspacePaymentState.paid
-                : WorkspacePaymentState.returnAdjusted
+                : nextLedger.entries.any((e) => e.invoiceId == payment.invoiceId &&
+                    e.kind == WorkspaceLedgerEntryKind.creditReceived)
+                    ? WorkspacePaymentState.creditApplied
+                    : WorkspacePaymentState.returnAdjusted
           : WorkspacePaymentState.partPaid,
       channel: request.channel,
       invoiceId: payment.invoiceId,

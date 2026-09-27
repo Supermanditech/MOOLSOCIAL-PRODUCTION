@@ -87,7 +87,9 @@ class StoreSalesStatement {
           if (entry.state == WorkspaceLedgerPostingState.posted &&
               inPeriod(entry.occurredAt) &&
               (entry.kind == WorkspaceLedgerEntryKind.creditNote ||
-                  entry.kind == WorkspaceLedgerEntryKind.refund))
+                  entry.kind == WorkspaceLedgerEntryKind.refund ||
+                  entry.kind == WorkspaceLedgerEntryKind.creditUsed ||
+                  entry.kind == WorkspaceLedgerEntryKind.creditReceived))
             (customer: ledger.customerName, entry: entry),
     ];
     result.sort((a, b) {
@@ -189,6 +191,8 @@ class StoreSalesStatement {
           'Recorded refunds in period',
           amount(recorded(WorkspaceLedgerEntryKind.refund)),
         ],
+        if (detail.any((a) => a.entry.kind == WorkspaceLedgerEntryKind.creditReceived))
+          ['Customer credit applied (non-cash)', amount(recorded(WorkspaceLedgerEntryKind.creditReceived))],
         [
           'Customer dues (current snapshot, not period closing)',
           financeReady && finance!.historyComplete
@@ -208,11 +212,10 @@ class StoreSalesStatement {
             'Adjustment detail',
             'By adjustment date, including earlier invoices. Blank amounts are not applicable. Recorded refunds do not confirm a money transfer.',
           ],
-        ['Monthly summary', 'Invoice count | discounts | invoice totals (INR)'],
         for (final entry in monthly.entries)
           [
-            entry.key,
-            '${entry.value[0]} | ${(entry.value[1] / 100).toStringAsFixed(2)} | ${(entry.value[2] / 100).toStringAsFixed(2)}',
+            'Monthly sales · ${entry.key}',
+            '${entry.value[0]} invoices · Discounts ${amount(entry.value[1])} · Total ${amount(entry.value[2])}',
           ],
       ],
       metadata: [
@@ -235,6 +238,7 @@ class StoreSalesStatement {
           'Credit (INR)',
           'Refund recorded (INR)',
           'Adjustment reference',
+          'Customer credit allocation (INR)',
         ],
       ],
       rows: [
@@ -247,7 +251,7 @@ class StoreSalesStatement {
             i.payableMinor / 100,
             null,
             i.orderId,
-            if (detail.isNotEmpty) ...['Invoice', '', '', '', ''],
+            if (detail.isNotEmpty) ...['Invoice', '', '', '', '', ''],
           ],
         for (final adjustment in detail)
           [
@@ -258,12 +262,12 @@ class StoreSalesStatement {
             '',
             '',
             adjustment.entry.orderId,
-            adjustment.entry.kind == WorkspaceLedgerEntryKind.creditNote
-                ? 'Credit note'
-                : 'Refund recorded',
+            adjustment.entry.kind == WorkspaceLedgerEntryKind.refund ? 'Refund recorded'
+                : StoreCustomerStatement.particulars(adjustment.entry.kind),
             adjustment.entry.kind == WorkspaceLedgerEntryKind.creditNote
                 ? adjustment.entry.customerReturn?.reason
-                : 'Not linked to a specific return',
+                : adjustment.entry.kind == WorkspaceLedgerEntryKind.refund
+                    ? 'Not linked to a specific return' : 'Non-cash invoice allocation',
             adjustment.entry.kind == WorkspaceLedgerEntryKind.creditNote
                 ? adjustment.entry.amountMinor / 100
                 : '',
@@ -271,9 +275,12 @@ class StoreSalesStatement {
                 ? adjustment.entry.amountMinor / 100
                 : '',
             adjustment.entry.id,
+            adjustment.entry.kind == WorkspaceLedgerEntryKind.creditUsed ||
+                adjustment.entry.kind == WorkspaceLedgerEntryKind.creditReceived
+                ? adjustment.entry.amountMinor / 100 : '',
           ],
       ],
-      moneyColumns: {3, 4, if (detail.isNotEmpty) ...{9, 10}},
+      moneyColumns: {3, 4, if (detail.isNotEmpty) ...{9, 10, 12}},
     );
   }
 }
@@ -520,6 +527,8 @@ class StoreCustomerStatement {
     WorkspaceLedgerEntryKind.collection => 'Receipt',
     WorkspaceLedgerEntryKind.creditNote => 'Credit note',
     WorkspaceLedgerEntryKind.refund => 'Refund',
+    WorkspaceLedgerEntryKind.creditUsed => 'Customer credit used',
+    WorkspaceLedgerEntryKind.creditReceived => 'Customer credit applied',
   };
   List<List<Object?>> get rows {
     int? balance = opening;
@@ -549,7 +558,8 @@ class StoreCustomerStatement {
       final posted = e.state == WorkspaceLedgerPostingState.posted;
       final debit =
           e.kind == WorkspaceLedgerEntryKind.invoice ||
-          e.kind == WorkspaceLedgerEntryKind.refund;
+          e.kind == WorkspaceLedgerEntryKind.refund ||
+          e.kind == WorkspaceLedgerEntryKind.creditUsed;
       result.add([
         e.occurredAt.toUtc().toIso8601String(),
         particulars(e.kind),
