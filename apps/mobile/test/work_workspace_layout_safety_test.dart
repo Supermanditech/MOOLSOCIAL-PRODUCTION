@@ -16514,7 +16514,8 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('SALESRETURNS all saved dates search and restore $scale', (tester) async {
+    for (final exchange in [false, true]) {
+    testWidgets('SALESRETURNS all saved dates search and restore $scale exchange=$exchange', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
       work.workspaceInvoices..clear()..add(WorkspaceCustomerInvoice(
         id: 'RETURN-OLDER', orderId: 'RETURN-OLDER-ORDER', customer: '9000012345',
@@ -16530,10 +16531,11 @@ void main() {
       tester.testTextInput.hide();
       await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
       await tester.pumpAndSettle();
-      await reveal(tester, find.byKey(const Key('work-sales-returns')));
-      await tester.tap(find.byKey(const Key('work-sales-returns')));
+      final action = find.byKey(Key(exchange ? 'work-sales-exchange' : 'work-sales-returns'));
+      await reveal(tester, action);
+      await tester.tap(action);
       await tester.pumpAndSettle();
-      expect(find.text('Returns & refunds · All saved sales'), findsOneWidget);
+      expect(find.text(exchange ? 'Exchange · Find the original sale' : 'Returns & refunds · All saved sales'), findsOneWidget);
       expect(tester.widget<TextField>(search).decoration!.hintText,
           'Search by phone, customer name or invoice number');
       expect(tester.widget<TextField>(search).controller!.text, isEmpty);
@@ -16555,6 +16557,7 @@ void main() {
       expect(row, findsNothing);
       expect(tester.takeException(), isNull);
     });
+    }
   }
 
   testWidgets('SALESHOME empty actions reuse existing destinations', (tester) async {
@@ -37759,8 +37762,9 @@ void main() {
       });
     }
     for (final multi in [false, true]) {
+    for (final exchange in [false, if (!multi) true]) {
     testWidgets(
-      'LEDGER01 return sheet confirms original bill and stock $scale multi=$multi',
+      'LEDGER01 return sheet confirms original bill and stock $scale multi=$multi exchange=$exchange',
       (tester) async {
         tester.view.padding = const FakeViewPadding(bottom: 44);
         addTearDown(tester.view.resetPadding);
@@ -37805,6 +37809,12 @@ void main() {
           ],
         );
         work.workspaceOrders.add(order);
+        if (exchange) {
+          work.workspaceInvoices.add(WorkspaceCustomerInvoice(
+            id: 'RETURN-INVOICE', orderId: order.id, customer: order.customer,
+            items: order.items, amount: order.amount, payment: order.payment,
+            issuedAt: order.createdAt));
+        }
         final empty = WorkspaceFinanceSnapshot(
           accountScope: seed.accountScope,
           workspaceId: seed.storeId,
@@ -37855,8 +37865,32 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
-        await openSalesCollections(tester);
-        final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
+        if (exchange) {
+          await tester.tap(find.byKey(const Key('work-store-sell')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+          await tester.pumpAndSettle();
+          await reveal(tester, find.byKey(const Key('work-sales-exchange')));
+          await tester.tap(find.byKey(const Key('work-sales-exchange')));
+          await tester.pumpAndSettle();
+        } else {
+          await openSalesCollections(tester);
+        }
+        final button = find.byKey(ValueKey(exchange
+          ? 'work-sales-invoice-RETURN-INVOICE' : 'record-return-RETURN-ORDER'));
+        if (exchange) {
+          work.updateWorkspaceCounterDetails(customer: '9000000099');
+          await tester.pumpAndSettle();
+          await reveal(tester, button);
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('return-reason')), findsNothing);
+          expect(work.workspaceOrderCustomer, '9000000099');
+          expect(work.workspaceFinance!.payments.single.dueMinor, order.amount * 100);
+          expect(work.workspaceStockMovements, isEmpty);
+          work.updateWorkspaceCounterDetails(customer: '');
+          await tester.pumpAndSettle();
+        }
         await reveal(tester, button);
         await tester.tap(button);
         await tester.pumpAndSettle();
@@ -37910,6 +37944,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('return-reason')), findsNothing);
         expect(work.pendingCustomerReturn, isNull);
+        if (exchange) {
+          expect(find.text('Exchange · Find the original sale'), findsOneWidget);
+          expect(work.workspaceOrderQuantities, isEmpty);
+          expect(work.workspaceInvoices, hasLength(1));
+        }
         await reveal(tester, button);
         await tester.tap(button);
         await tester.pumpAndSettle();
@@ -38010,9 +38049,17 @@ void main() {
           WorkspaceStockMovementKind.returned,
         );
         expect(find.byKey(const Key('return-reason')), findsNothing);
+        if (exchange) {
+          expect(workspaceCustomerMobile(work.workspaceOrderCustomer), order.customer);
+          expect(work.workspaceOrderQuantities, isEmpty);
+          expect(work.workspaceInvoices, hasLength(1),
+            reason: 'Exchange must not create a replacement invoice automatically');
+          expect(find.text('Exchange · Find the original sale'), findsNothing);
+        }
         expect(tester.takeException(), isNull);
       },
     );
+    }
     }
 
     for (final refundChannel in [WorkspacePaymentChannel.cash,

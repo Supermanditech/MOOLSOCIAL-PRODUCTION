@@ -11484,6 +11484,78 @@ class _StoreStatementSurface extends StatefulWidget {
 }
 
 class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
+  bool _openingExchange = false;
+  Future<void> _openExchange(WorkspaceCustomerInvoice invoice, WorkspacePaymentRecord payment) async {
+    if (_openingExchange) return;
+    _openingExchange = true;
+    final session = widget.session;
+    final account = session.workspaceFinance?.accountScope;
+    final store = session.activeWorkspace?.id;
+    try {
+      await session.loadWorkspaceCounterDraft();
+      if (!mounted || account == null || store == null ||
+          !_exchangeSelection || session.workspaceFinance?.accountScope != account ||
+          session.activeWorkspace?.id != store) { return; }
+      if (session.currentWorkspaceOrderId == null &&
+          (session.workspaceOrderQuantities.isNotEmpty || session.workspaceOrderCustomer.trim().isNotEmpty)) {
+        session.showNotice('Resume or finish the existing bill before starting an exchange.');
+        return;
+      }
+      final order = session.workspaceOrders.where((o) => o.id == invoice.orderId).firstOrNull;
+      final finance = session.workspaceFinance;
+      if (widget.onNewSale == null || !session.customerReturnAvailable || order == null ||
+          !order.isCompleted || !order.hasCompleteItemSnapshot || finance == null ||
+          finance.workspaceId != store || session.workspaceFinanceStale ||
+          !finance.payments.any((p) => p.valid && p.invoiceId == invoice.id &&
+            p.orderId == order.id && p.customerId == payment.customerId && p.revision == payment.revision)) {
+        session.showNotice('Recover this sale’s return records before starting an exchange.');
+        return;
+      }
+      var recorded = false;
+      ModalRoute<dynamic>? returnRoute;
+      await showModalBottomSheet<void>(context: context, isScrollControlled: true,
+        useSafeArea: true, isDismissible: false, enableDrag: false,
+        builder: (sheetContext) {
+          returnRoute = ModalRoute.of(sheetContext);
+          return _CustomerReturnSheet(session: session, payment: payment, order: order,
+            account: account, store: store, onRecorded: () => recorded = true);
+        });
+      await returnRoute?.completed;
+      if (!mounted || !recorded || session.workspaceFinance?.accountScope != account ||
+          session.activeWorkspace?.id != store) { return; }
+      final started = await _startCustomerSale(account: account, store: store,
+        customerId: payment.customerId, customerName: invoice.customer, requireEmptyBill: true);
+      if (mounted && started) session.showNotice('Return saved. Choose replacement items, then apply available customer credit to the new invoice.');
+    } finally {
+      _openingExchange = false;
+    }
+  }
+
+  Future<bool> _startCustomerSale({required String account, required String store,
+      required String customerId, required String customerName, bool requireEmptyBill = false}) async {
+    final session = widget.session;
+    await session.loadWorkspaceCounterDraft();
+    if (!mounted || widget.onNewSale == null || session.workspaceFinance?.accountScope != account ||
+        session.activeWorkspace?.id != store) { return false; }
+    if (requireEmptyBill && session.currentWorkspaceOrderId == null &&
+        (session.workspaceOrderQuantities.isNotEmpty || session.workspaceOrderCustomer.trim().isNotEmpty)) {
+      session.showNotice('Return saved. Resume or finish the existing bill before choosing replacement items.');
+      return false;
+    }
+    if (session.currentWorkspaceOrderId == null && session.workspaceOrderCustomer.trim().isNotEmpty &&
+        workspaceCustomerMobile(session.workspaceOrderCustomer) != customerId) {
+      session.showNotice('Resume or finish the existing customer bill before starting this sale.');
+      return false;
+    }
+    if (!session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) return false;
+    session.updateWorkspaceCounterDetails(customer: customerName);
+    if (workspaceCustomerMobile(session.workspaceOrderCustomer) != customerId) {
+      session.updateWorkspaceCounterDetails(customer: customerId);
+    }
+    widget.onNewSale?.call();
+    return true;
+  }
+
   Future<void> _openCustomerCredit() async {
     final session = widget.session;
     await session.recoverCustomerLedger();
@@ -11525,20 +11597,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     await creditRoute?.completed;
     search.dispose();
     if (!mounted || selected == null || !identical(session.workspaceFinance, finance)) return;
-    await session.loadWorkspaceCounterDraft();
-    if (!mounted || session.workspaceFinance?.accountScope != finance.accountScope ||
-        session.activeWorkspace?.id != finance.workspaceId) { return; }
-    if (session.currentWorkspaceOrderId == null && session.workspaceOrderCustomer.trim().isNotEmpty &&
-        workspaceCustomerMobile(session.workspaceOrderCustomer) != selected.customerId) {
-      session.showNotice('Resume or finish the existing customer bill before starting this sale.');
-      return;
-    }
-    if (!session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) return;
-    session.updateWorkspaceCounterDetails(customer: selected.customerName);
-    if (workspaceCustomerMobile(session.workspaceOrderCustomer) != selected.customerId) {
-      session.updateWorkspaceCounterDetails(customer: selected.customerId);
-    }
-    widget.onNewSale?.call();
+    await _startCustomerSale(account: finance.accountScope, store: finance.workspaceId,
+      customerId: selected.customerId, customerName: selected.customerName);
   }
 
   String _book = 'Sales';
@@ -11548,9 +11608,10 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Object? _salesScope;
   bool _salesActionsExpanded = false;
   bool _returnSelection = false;
+  bool _exchangeSelection = false;
   String _salesQueryBeforeReturns = '';
   bool _salesActionsBeforeReturns = false;
-  void _toggleReturnSelection() {
+  void _toggleReturnSelection({bool exchange = false}) {
     FocusScope.of(context).unfocus();
     setState(() {
       if (_returnSelection) {
@@ -11563,6 +11624,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         _invoiceSearch.clear();
       }
       _returnSelection = !_returnSelection;
+      _exchangeSelection = _returnSelection && exchange;
     });
   }
   String get _salesPeriodLabel => _invoicePeriod == 'Custom range' && _invoiceRange != null
@@ -11688,8 +11750,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         if (_returnSelection)
           ConstrainedBox(constraints: BoxConstraints(maxHeight: viewport.maxHeight * .45), child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
-              const Expanded(child: Text('Returns & refunds · All saved sales',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+              Expanded(child: Text(_exchangeSelection ? 'Exchange · Find the original sale' : 'Returns & refunds · All saved sales',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
               IconButton(tooltip: 'Back to sales register', onPressed: _toggleReturnSelection,
                 icon: const Icon(Icons.close_rounded, size: 18)),
             ])))),
@@ -11752,6 +11814,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               key: ValueKey('work-sales-invoice-${invoice.id}'),
               onTap: () { FocusScope.of(context).unfocus();
                 if (_returnSelection && payment != null) {
+                  if (_exchangeSelection) { _openExchange(invoice, payment); return; }
                   _StoreInvoiceSurfaceState.openAdjustments(context, session, invoice, payment,
                     finance?.accountScope, session.activeWorkspace?.id);
                   return;
@@ -11833,6 +11896,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       _salesScope = salesScope;
       _invoiceSearch.clear();
       _returnSelection = false;
+      _exchangeSelection = false;
       _salesQueryBeforeReturns = '';
       _salesActionsExpanded = false;
       _invoicePeriod = 'Today';
@@ -11936,10 +12000,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
       final salesFrame = _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
-        actionWords: 'Counter sale Resume sale Collect dues Returns & refunds Customer credit',
+        actionWords: 'Counter sale Resume sale Collect dues Returns & refunds Customer credit Exchange',
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
         actions: [
+          _StoreEdgeAction(keyName: 'work-sales-exchange', icon: Icons.swap_horiz_rounded,
+            label: 'Exchange', onTap: () => _toggleReturnSelection(exchange: true)),
           _StoreEdgeAction(keyName: 'work-sales-customer-credit', icon: Icons.account_balance_wallet_outlined,
             label: 'Customer credit', onTap: _openCustomerCredit),
           _StoreEdgeAction(keyName: 'work-sales-returns', icon: Icons.assignment_return_outlined,
@@ -11955,7 +12021,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
           StoreRecentSearches(
             controller: _invoiceSearch,
-            history: session.workspaceRecentSearches(_returnSelection ? 'sales-returns' : 'sales'),
+            history: session.workspaceRecentSearches(_exchangeSelection ? 'sales-exchange' : _returnSelection ? 'sales-returns' : 'sales'),
             isCurrent: () => _salesScope == (session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id),
             onChanged: (_) => _changeSalesBrowse(() {}),
             child: Row(children: [
@@ -22698,11 +22764,13 @@ class _CustomerReturnSheet extends StatefulWidget {
     required this.order,
     required this.account,
     required this.store,
+    this.onRecorded,
   });
   final WorkSession session;
   final WorkspacePaymentRecord payment;
   final WorkspaceOrderRecord order;
   final String account, store;
+  final VoidCallback? onRecorded;
   @override
   State<_CustomerReturnSheet> createState() => _CustomerReturnSheetState();
 }
@@ -22902,6 +22970,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
     );
     if (!mounted) return;
     if (success) {
+      widget.onRecorded?.call();
       Navigator.pop(context);
       return;
     }
