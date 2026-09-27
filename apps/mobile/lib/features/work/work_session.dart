@@ -527,6 +527,17 @@ class _CounterDraftRecovery {
 }
 
 class WorkSession extends ChangeNotifier {
+  // New identities must not collide when the device clock repeats or changes.
+  // Persisted identities and submission/recovery markers remain authoritative.
+  static String _newCounterIdentity(String prefix) {
+    final random = Random.secure();
+    final suffix = List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    return '$prefix-$suffix';
+  }
+
   WorkSession({
     WorkGateway? gateway,
     WorkProofPicker? proofPicker,
@@ -1332,7 +1343,7 @@ class WorkSession extends ChangeNotifier {
         currentWorkspaceOrderId != null) {
       return false;
     }
-    recovery.editingId ??= 'BILL-${DateTime.now().microsecondsSinceEpoch}';
+    recovery.editingId ??= _newCounterIdentity('BILL');
     final snapshot = _counterDraftSnapshot(
       account: scope.account,
       store: scope.store,
@@ -1571,7 +1582,7 @@ class WorkSession extends ChangeNotifier {
       var record = recovery?.record;
       final id =
           currentWorkspaceOrderId ??
-          'ORD-${DateTime.now().microsecondsSinceEpoch}';
+          _newCounterIdentity('ORD');
       if (scope != null && recovery != null) {
         if (record == null || !_counterCatalogueMatches(record)) {
           recovery.error =
@@ -7719,7 +7730,7 @@ class WorkSession extends ChangeNotifier {
     final orderId =
         currentWorkspaceOrderId ??
         _counterSubmissionOrderId ??
-        'ORD-${DateTime.now().microsecondsSinceEpoch}';
+        _newCounterIdentity('ORD');
     currentWorkspaceOrderId = orderId;
     final record = WorkspaceOrderRecord(
       id: orderId,
@@ -7807,7 +7818,7 @@ class WorkSession extends ChangeNotifier {
     if (existing != null) return existing;
     final id =
         currentWorkspaceOrderId ??
-        'ORD-${DateTime.now().microsecondsSinceEpoch}';
+        _newCounterIdentity('ORD');
     currentWorkspaceOrderId = id;
     final created = WorkspaceOrderRecord(
       id: id,

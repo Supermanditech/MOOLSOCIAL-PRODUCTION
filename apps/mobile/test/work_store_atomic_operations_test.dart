@@ -7759,15 +7759,28 @@ void main() {
       () async {
         final work = session();
         await fill(work);
+        final firstDraft = (await journal.read('account-A', 'store-A'))!;
+        expect(firstDraft.id, matches(RegExp(r'^BILL-[0-9a-f]{32}$')));
+        expect(await work.saveWorkspaceCounterDraft(), isTrue);
+        expect(
+          (await journal.read('account-A', 'store-A'))!.id,
+          firstDraft.id,
+          reason: 'Saving again must preserve the original bill identity.',
+        );
         final first = await work.submitWorkspaceCounterBill();
         expect(first, isNotNull);
+        expect(first!.orderId, matches(RegExp(r'^ORD-[0-9a-f]{32}$')));
         expect(work.startNewWorkspaceOrder(), isTrue);
         expect(work.counterCustomerInput, isNull);
         await fill(work);
+        final secondDraft = (await journal.read('account-A', 'store-A'))!;
+        expect(secondDraft.id, matches(RegExp(r'^BILL-[0-9a-f]{32}$')));
+        expect(secondDraft.id, isNot(firstDraft.id));
         work.updateWorkspaceCounterDetails(customer: '9000000014');
         final second = await work.submitWorkspaceCounterBill();
         expect(second, isNotNull);
-        expect(second!.orderId, isNot(first!.orderId));
+        expect(second!.orderId, matches(RegExp(r'^ORD-[0-9a-f]{32}$')));
+        expect(second.orderId, isNot(first.orderId));
         expect(work.workspaceInvoices, hasLength(2));
         expect(work.workspaceCatalogueItems.single.stock, 6);
         final next = session();
