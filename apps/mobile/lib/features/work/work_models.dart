@@ -6107,6 +6107,7 @@ class WorkspaceCatalogueItem {
     this.compliance,
     this.available = true,
     this.publicListing = true,
+    this.counterSaleEnabled,
     this.stockMode = WorkspaceStockMode.exactQuantity,
     this.lowStockThreshold = 5,
     this.cataloguePhoto,
@@ -6144,6 +6145,9 @@ class WorkspaceCatalogueItem {
   final WorkspaceProductCompliance? compliance;
   final bool available;
   final bool publicListing;
+  // Null preserves the availability decision of older saved products.
+  final bool? counterSaleEnabled;
+  bool get counterSaleAllowed => counterSaleEnabled ?? available;
   final WorkspaceStockMode stockMode;
   final int lowStockThreshold;
   final WorkspaceCataloguePhoto? cataloguePhoto;
@@ -6254,6 +6258,7 @@ class WorkspaceCatalogueItem {
 
   // Public discovery and the retailer's own counter inventory are independent.
   bool get canSellAtCounter =>
+      counterSaleAllowed &&
       available &&
       (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
 
@@ -6423,6 +6428,7 @@ class WorkspaceCatalogueItem {
     'compliance': compliance?.toJson(),
     'available': available,
     'publicListing': publicListing,
+    'counterSaleEnabled': counterSaleEnabled,
     'stockMode': stockMode.name,
     'lowStockThreshold': lowStockThreshold,
     'cataloguePhoto': cataloguePhoto?.toJson(),
@@ -6518,6 +6524,8 @@ class WorkspaceCatalogueItem {
         compliance: compliance,
         available: flag('available'),
         publicListing: flag('publicListing'),
+        counterSaleEnabled: raw['counterSaleEnabled'] == null
+            ? null : flag('counterSaleEnabled'),
         stockMode: WorkspaceStockMode.values.byName(text('stockMode')),
         lowStockThreshold: number('lowStockThreshold'),
         cataloguePhoto: photo,
@@ -6567,6 +6575,7 @@ class WorkspaceCatalogueItem {
     WorkspaceProductCompliance? compliance,
     bool? available,
     bool? publicListing,
+    bool? counterSaleEnabled,
     WorkspaceStockMode? stockMode,
     int? lowStockThreshold,
     WorkspaceCataloguePhoto? cataloguePhoto,
@@ -6607,6 +6616,7 @@ class WorkspaceCatalogueItem {
     compliance: compliance ?? this.compliance,
     available: available ?? this.available,
     publicListing: publicListing ?? this.publicListing,
+    counterSaleEnabled: counterSaleEnabled ?? this.counterSaleEnabled,
     stockMode: stockMode ?? this.stockMode,
     lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
     cataloguePhoto: clearCataloguePhoto

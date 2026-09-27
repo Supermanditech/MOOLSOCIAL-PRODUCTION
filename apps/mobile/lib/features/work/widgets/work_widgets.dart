@@ -619,6 +619,7 @@ class WorkPageScaffold extends StatelessWidget {
     required this.body,
     this.headerTitle,
     this.headerHeight = 88,
+    this.contentMaxWidth = MoolMetrics.maximumContentWidth,
     this.wrapHeader = false,
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
@@ -645,6 +646,7 @@ class WorkPageScaffold extends StatelessWidget {
   final Widget body;
   final Widget? headerTitle;
   final double headerHeight;
+  final double contentMaxWidth;
   final bool wrapHeader;
   final String fallbackBackRoute;
   final bool showBack;
@@ -788,8 +790,8 @@ class WorkPageScaffold extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: MoolMetrics.maximumContentWidth,
+          constraints: BoxConstraints(
+            maxWidth: contentMaxWidth,
           ),
           child: Column(
             children: [

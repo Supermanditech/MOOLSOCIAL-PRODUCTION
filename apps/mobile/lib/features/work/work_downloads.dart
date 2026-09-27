@@ -315,11 +315,13 @@ class StoreSalesStatementPanel extends StatefulWidget {
     required this.isCurrent,
     required this.changes,
     this.saveFile = saveStoreStockFile,
+    this.onClose,
   });
   final StoreSalesStatement statement;
   final bool Function() isCurrent;
   final Listenable changes;
   final StoreStockFileSaver saveFile;
+  final VoidCallback? onClose;
   @override
   State<StoreSalesStatementPanel> createState() =>
       _StoreSalesStatementPanelState();
@@ -418,9 +420,14 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
   @override
   Widget build(BuildContext context) {
     if (!current) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(20),
-        child: Text('Records changed. Close and reopen the statement.'),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (widget.onClose != null) Align(alignment: Alignment.centerRight,
+            child: IconButton(tooltip: 'Close statement', onPressed: widget.onClose,
+              icon: const Icon(Icons.close))),
+          const Text('Records changed. Close and reopen the statement.'),
+        ]),
       );
     }
     final statement = widget.statement;
@@ -429,10 +436,11 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          Row(children: [Expanded(child: Text(
             'Sales & Collections Statement',
             style: Theme.of(context).textTheme.titleMedium,
-          ),
+          )), if (widget.onClose != null) IconButton(tooltip: 'Close statement',
+            onPressed: widget.onClose, icon: const Icon(Icons.close))]),
           if (statement.reviewOnly)
             const Text('Evaluation only — not for financial submission'),
           const SizedBox(height: 8),
@@ -441,6 +449,14 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
           Text(
             '${statement.selected.length} recorded ${statement.selected.length == 1 ? 'invoice' : 'invoices'} · INR ${(statement.billedMinor / 100).toStringAsFixed(2)}',
           ),
+          Wrap(spacing: 12, children: [
+            TextButton.icon(key: const Key('sales-statement-download'),
+              onPressed: _busy ? null : _export,
+              icon: const Icon(Icons.download_outlined), label: const Text('Download PDF')),
+            TextButton.icon(key: const Key('sales-statement-print'),
+              onPressed: _busy ? null : () => _export(print: true),
+              icon: const Icon(Icons.print_outlined), label: const Text('Print')),
+          ]),
           const SizedBox(height: 8),
           const Text(
             'A4 summary and complete invoice annexure. Search filters do not limit this statement.',
@@ -453,23 +469,6 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
           const Text(
             StoreSalesStatement.disclosure,
             style: TextStyle(fontSize: 12),
-          ),
-          Wrap(
-            spacing: 12,
-            children: [
-              TextButton.icon(
-                key: const Key('sales-statement-download'),
-                onPressed: _busy ? null : _export,
-                icon: const Icon(Icons.download_outlined),
-                label: const Text('Download PDF'),
-              ),
-              TextButton.icon(
-                key: const Key('sales-statement-print'),
-                onPressed: _busy ? null : () => _export(print: true),
-                icon: const Icon(Icons.print_outlined),
-                label: const Text('Print'),
-              ),
-            ],
           ),
           if (_busy) const LinearProgressIndicator(),
           if (_notice != null) Text(_notice!, semanticsLabel: _notice),

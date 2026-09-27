@@ -32,6 +32,7 @@ class _ProcurementBookmarks implements WorkProcurementBookmarkStore {
   final values = <String, WorkProcurementBookmark>{};
   Completer<void>? holdRead;
   bool failRead = false, failSave = false;
+  int saveAttempts = 0;
   @override
   Future<WorkProcurementBookmark?> read(
     String accountId,
@@ -44,6 +45,7 @@ class _ProcurementBookmarks implements WorkProcurementBookmarkStore {
 
   @override
   Future<bool> save(WorkProcurementBookmark bookmark) async {
+    saveAttempts++;
     if (failSave) return false;
     values[jsonEncode([bookmark.context.accountId, bookmark.context.storeId])] =
         bookmark;
@@ -1229,6 +1231,52 @@ void main() {
         );
       },
     );
+    test('STOCK-AUDIT-09 hiding survives restart without changing stock', () async {
+      final device = _OrderJournalStorage();
+      final owner = _CommandAccountStore();
+      WorkSession fresh() => WorkSession(
+        gateway: ReviewWorkGateway(),
+        contactDraftStore: owner,
+        inventoryStore: SecureWorkInventoryStore(
+          accountScope: () => owner.accountScope, storage: device,
+        ),
+      )..activeWorkspace = _commandStore;
+      final first = fresh();
+      expect(await first.loadWorkspaceInventory(), isTrue);
+      final product = record().products.single;
+      first.addOrUpdateWorkspaceProduct(product);
+      expect(await first.workspaceInventorySaved, isTrue);
+      final movementIds = first.workspaceStockMovements.map((m) => m.id).toList();
+      first.retireWorkspaceProduct(product.id);
+      expect(await first.workspaceInventorySaved, isTrue);
+      first.dispose();
+      final reopened = fresh();
+      addTearDown(reopened.dispose);
+      expect(await reopened.loadWorkspaceInventory(), isTrue);
+      final saved = reopened.workspaceCatalogueItems.single;
+      expect(saved.stock, product.stock);
+      expect(saved.id, product.id);
+      expect(saved.sku, product.sku);
+      expect(saved.available, product.available);
+      expect(saved.counterSaleAllowed, isFalse);
+      expect(saved.publicListing, product.publicListing);
+      expect(saved.canSellAtCounter, isFalse);
+      expect(reopened.workspaceStockMovements.map((m) => m.id), movementIds);
+      expect(reopened.workspaceInvoices, isEmpty);
+      expect(reopened.workspaceOrders, isEmpty);
+      reopened.restoreWorkspaceProduct(product.id);
+      expect(await reopened.workspaceInventorySaved, isTrue);
+      final restored = fresh();
+      addTearDown(restored.dispose);
+      expect(await restored.loadWorkspaceInventory(), isTrue);
+      expect(restored.workspaceCatalogueItems.single.available, isTrue);
+      expect(restored.workspaceCatalogueItems.single.publicListing, product.publicListing);
+      expect(restored.workspaceCatalogueItems.single.published, product.published);
+      expect(restored.workspaceCatalogueItems.single.counterSaleAllowed, isTrue);
+      expect(restored.workspaceCatalogueItems.single.stock, product.stock);
+      expect(restored.workspaceStockMovements.map((m) => m.id), movementIds);
+    });
+
     for (final interrupted in [false, true]) {
       test(
         'reviewed CSV stock survives restart interrupted=$interrupted',
@@ -5988,13 +6036,14 @@ void main() {
   );
   group('Store procurement controller', () {
     late String account, store;
+    var approved = true;
     late _ProcurementBookmarks bookmarks;
     late WorkProcurementController controller;
     final states = <String, _ProcurementCustomerState>{};
     WorkProcurementController create() => WorkProcurementController(
       currentAccountId: () => account,
       currentStoreId: () => store,
-      storeApproved: () => true,
+      storeApproved: () => approved,
       bookmarks: bookmarks,
       stateStoreFactory: (scope) =>
           states.putIfAbsent(scope, () => _ProcurementCustomerState(scope)),
@@ -6008,11 +6057,39 @@ void main() {
     setUp(() {
       account = 'a';
       store = 's';
+      approved = true;
       states.clear();
       bookmarks = _ProcurementBookmarks();
       controller = create();
     });
     tearDown(() => controller.dispose());
+    for (final failure in ['approval', 'identity', 'read', 'write']) {
+      test('opening failure guidance preserves saved purchase $failure', () async {
+        expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard'), isTrue);
+        final original = controller.bookmark!.context.customerStateOwnerScope;
+        final writes = bookmarks.saveAttempts;
+        approved = failure != 'approval';
+        if (failure == 'identity') account = '';
+        bookmarks.failRead = failure == 'read';
+        bookmarks.failSave = failure == 'write';
+        expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard'), isFalse);
+        expect(controller.openFailureMessage, contains(switch (failure) {
+          'approval' => 'verified Store', 'identity' => 'account is unavailable',
+          'read' => 'could not be read', _ => 'could not be saved',
+        }));
+        expect(bookmarks.saveAttempts - writes, failure == 'write' ? 1 : 0);
+        expect(controller.bookmark!.context.customerStateOwnerScope, original);
+        approved = true;
+        account = 'a';
+        bookmarks.failRead = bookmarks.failSave = false;
+        expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard'), isTrue);
+        expect(controller.openFailureMessage, isNull);
+        expect(controller.bookmark!.context.customerStateOwnerScope, original);
+      });
+    }
     for (final purpose in [
       BuyV2ProcurementPurpose.buyDirect,
       BuyV2ProcurementPurpose.groupBulkBuying,
@@ -13584,7 +13661,7 @@ void main() {
   }
 
   test(
-    'catalogue import updates by SKU and retirement removes public sale',
+    'catalogue import updates by SKU and retirement preserves stock and history',
     () {
       final session = liveSession();
       session.addOrUpdateWorkspaceProduct(_product(stock: 10));
@@ -13606,16 +13683,46 @@ void main() {
             .sellingPrice,
         299,
       );
+      final movements = List.of(session.workspaceStockMovements);
+      final invoices = List.of(session.workspaceInvoices);
       session.retireWorkspaceProduct('oil-1l');
       final retired = session.workspaceCatalogueItems.singleWhere(
         (item) => item.id == 'oil-1l',
       );
-      expect(retired.stock, 0);
-      expect(retired.available, isFalse);
-      expect(retired.publicListing, isFalse);
+      expect(retired.stock, 18);
+      expect(retired.sellingPrice, 155);
+      expect(retired.sku, 'OIL-1L');
+      expect(retired.available, isTrue);
+      expect(retired.counterSaleAllowed, isFalse);
+      expect(retired.publicListing, isTrue);
       expect(retired.published, isFalse);
+      expect(retired.canSellAtCounter, isFalse);
+      expect(session.workspaceStockMovements, orderedEquals(movements));
+      expect(session.workspaceInvoices, orderedEquals(invoices));
+      final activities = session.workspaceActivity.length;
+      session.retireWorkspaceProduct('oil-1l');
+      session.retireWorkspaceProduct('missing-product');
+      expect(session.workspaceActivity, hasLength(activities));
+      expect(session.workspaceStockMovements, orderedEquals(movements));
+      expect(session.workspaceCatalogueItems, hasLength(2));
     },
   );
+
+  test('STOCK-AUDIT-09 counter and public settings are independent and durable', () {
+    final product = _product(stock: 10);
+    final counterPaused = product.copyWith(counterSaleEnabled: false);
+    expect(counterPaused.publicListing, product.publicListing);
+    expect(counterPaused.published, product.published);
+    expect(counterPaused.canSellAtCounter, isFalse);
+    final saved = WorkspaceCatalogueItem.fromInventoryJson(counterPaused.toInventoryJson());
+    expect(saved.counterSaleAllowed, isFalse);
+    final publicHidden = product.copyWith(publicListing: false, counterSaleEnabled: true);
+    expect(publicHidden.canSellAtCounter, isTrue);
+    expect(publicHidden.published, isFalse);
+    final legacy = product.copyWith(available: false).toInventoryJson()
+      ..remove('counterSaleEnabled');
+    expect(WorkspaceCatalogueItem.fromInventoryJson(legacy).counterSaleAllowed, isFalse);
+  });
 
   test('workspace switch keeps both verified businesses available', () {
     final session = liveSession()

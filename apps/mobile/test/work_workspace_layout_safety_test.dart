@@ -259,6 +259,21 @@ class _InvoiceDeliveryFixtureStore
   }
 }
 
+class _InventoryWriteFailureFixture implements WorkInventoryStore {
+  _InventoryWriteFailureFixture(this.delegate);
+  final WorkInventoryStore delegate;
+  bool failSave = false;
+  @override
+  Future<WorkspaceSavedInventory?> read(String account, String store,
+      {required bool qa}) => delegate.read(account, store, qa: qa);
+  @override
+  Future<void> save(WorkspaceSavedInventory inventory,
+      {required int? expectedRevision}) async {
+    if (failSave) throw StateError('Test-only inventory write failure');
+    await delegate.save(inventory, expectedRevision: expectedRevision);
+  }
+}
+
 class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
   bool failWrite = false;
   final drafts = <WorkspaceLedgerFormKey, WorkspaceLedgerFormDraft>{};
@@ -283,6 +298,9 @@ class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
 }
 
 class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
+  _LedgerCheckpointFixtureStore({this.creditFailure = 'none'});
+  final String creditFailure;
+  int saveAttempts = 0;
   WorkspaceLedgerCheckpoint? value;
   @override
   Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async =>
@@ -295,10 +313,13 @@ class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
     WorkspaceLedgerCheckpoint checkpoint, {
     required int? expectedRevision,
   }) async {
+    saveAttempts++;
+    if (creditFailure == 'before-save') throw StateError('Fixture write failed');
     if (!checkpoint.valid || value?.revision != expectedRevision) {
       throw StateError('Stale fixture write');
     }
     value = checkpoint;
+    if (creditFailure == 'lost-ack') throw StateError('Fixture acknowledgement lost');
   }
 }
 
@@ -3021,6 +3042,10 @@ void main() {
     final statement = find.byKey(const Key('downloads-stock-movements'));
     await reveal(tester, statement);
     await tester.tap(statement);
+    await tester.pumpAndSettle();
+    expect(tester.widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>)).selected,
+        {true}, reason: 'Stock movements opens Changes, not the summary');
+    await tester.tap(find.descendant(of: find.byType(SegmentedButton<bool>), matching: find.text('Stock')));
     await tester.pumpAndSettle();
   }
 
@@ -10363,6 +10388,9 @@ void main() {
     tester.testTextInput.hide();
     tester.view.resetViewInsets();
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+    await tester.pumpAndSettle();
     expect(find.text('Catalogue'), findsOneWidget);
     expect(find.byKey(const Key('work-add-product-entry')), findsOneWidget);
     expect(work.workspaceCatalogueItems, isEmpty);
@@ -11919,6 +11947,14 @@ void main() {
       if (action == 'cancel') {
         await tester.pageBack();
         await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-product-keep-editing')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(stock).controller!.text, '12');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+        await tester.pumpAndSettle();
         expect(find.byKey(const Key('work-import-correct-2')), findsOneWidget);
         expect(work.workspaceCatalogueItems, before);
         expect(tester.widget<TextField>(search).controller!.text, 'RICE001');
@@ -12178,6 +12214,35 @@ void main() {
     expect(find.textContaining('Purchase price stays private'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final inStore in [true, false]) {
+    testWidgets('AUDITCSV duplicate correction explains its scope $inStore', (tester) async {
+      const header = 'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n';
+      const row = 'Rice,Local,1 kg,80,100,24,AUDIT-RICE';
+      final original = WorkspaceProductImport.parse('$header$row', catalogue: const [], owned: const [])
+          .rows.single.product!;
+      final report = WorkspaceProductImport.parse('$header$row${inStore ? '' : '\n$row'}',
+          catalogue: const [], owned: inStore ? [original] : const []);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: StoreProductImportReviewScreen(
+        fileName: 'evaluation-duplicate.csv', review: report,
+        editProduct: (product) async => product,
+        correctRow: (row, rows) async => null,
+        saveProducts: (_) async => null,
+      )));
+      await tester.pumpAndSettle();
+      if (!inStore) await chooseImportIssues(tester);
+      final details = find.byKey(Key('work-import-details-${inStore ? 2 : 3}'));
+      await tester.ensureVisible(details);
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      expect(find.text(inStore
+          ? 'Edit changes this import row, not your saved Stock product.'
+          : 'Edit this repeated row or keep only one copy in the file.'), findsOneWidget);
+      expect(find.text('Tap Edit to correct this product.'), findsNothing);
+      expect(original.stock, 24);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('CSV20 all invalid disables save and large review builds lazily', (
     tester,
@@ -14490,6 +14555,24 @@ void main() {
     );
     products.clear();
     expect(snapshot.rows, hasLength(2));
+    final localDate = DateTime(2026, 9, 28, 3, 6);
+    final localSnapshot = StoreStockSnapshot(
+      storeId: 'store-review', storeName: 'Review Store', scope: 'All Store stock',
+      generatedAt: localDate.toUtc(), products: [source],
+    );
+    final offset = localDate.timeZoneOffset.inMinutes;
+    final offsetText = '${offset < 0 ? '-' : '+'}'
+        '${(offset.abs() ~/ 60).toString().padLeft(2, '0')}:'
+        '${(offset.abs() % 60).toString().padLeft(2, '0')}';
+    expect(localSnapshot.displayTimestamp, '28/09/2026 03:06 UTC$offsetText (phone time)');
+    expect(localSnapshot.timestamp, localDate.toUtc().toIso8601String());
+    expect(snapshot.timestamp, '2026-09-21T10:00:00.000Z');
+    expect(StoreStockSnapshot.displayCategory('flour-grains'), 'Flour Grains');
+    expect(StoreStockSnapshot.displayCategory('other'), 'Other products');
+    expect(StoreStockSnapshot.displayCategory(''), 'Uncategorised');
+    expect(snapshot.rows.first[6], source.categoryId);
+    expect(snapshot.presentationRows.first[6],
+        StoreStockSnapshot.displayCategory(source.categoryId));
     final csv = (await tester.runAsync(
       () => snapshot.generate(StoreStockExportFormat.csv),
     ))!;
@@ -16475,7 +16558,8 @@ void main() {
   });
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('CREDITUSE lookup and safe confirmation $scale', (tester) async {
+    for (final failure in ['none', 'before-save', 'lost-ack']) {
+    testWidgets('CREDITUSE lookup and safe confirmation $scale $failure', (tester) async {
       tester.view.padding = const FakeViewPadding(bottom: 44);
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final seed = StoreReviewSeed(accountScope: 'review-draft-account', orderCount: 12,
@@ -16501,8 +16585,9 @@ void main() {
           paidMinor: 0, dueMinor: 80000, refundedMinor: 0, state: WorkspacePaymentState.unpaid,
           channel: WorkspacePaymentChannel.cash, invoiceId: 'CREDIT-TARGET')]);
       expect(work.applyWorkspaceFinance(finance), isTrue);
+      final checkpoints = _LedgerCheckpointFixtureStore(creditFailure: failure);
       expect(work.bindCustomerCollectionGateway(accountScope: seed.accountScope, storeId: seed.storeId,
-        adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: _LedgerCheckpointFixtureStore()), isTrue);
+        adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: checkpoints), isTrue);
       work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'CREDIT-TARGET', orderId: 'TARGET-ORDER',
         customer: '9000091941', items: 'Evaluation goods', amount: 800, payment: 'Cash', issuedAt: time));
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
@@ -16511,9 +16596,19 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-sales-invoice-CREDIT-TARGET')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-invoice-jump-actions')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-invoice-use-credit')).hitTestable(), findsOneWidget);
       await reveal(tester, find.byKey(const Key('work-invoice-use-credit')));
       await tester.tap(find.byKey(const Key('work-invoice-use-credit')));
       await tester.pumpAndSettle();
+      final sourceContext = tester.widget<Text>(
+          find.byKey(const ValueKey('customer-credit-source-context-CREDIT-SOURCE')));
+      final localDate = time.toLocal();
+      expect(sourceContext.data, contains('${localDate.day.toString().padLeft(2, '0')}/'
+          '${localDate.month.toString().padLeft(2, '0')}/${localDate.year}'));
+      expect(sourceContext.data, contains('Original invoice ₹500'));
+      expect(sourceContext.data, contains('Available credit ₹500'));
       await tester.tap(find.text('CREDIT-SOURCE'));
       await tester.pumpAndSettle();
       final field = find.byKey(const Key('customer-credit-amount'));
@@ -16540,6 +16635,25 @@ void main() {
       await reveal(tester, confirm);
       await tester.tap(confirm);
       await tester.pumpAndSettle();
+      if (failure != 'none') {
+        expect(find.text('Credit update not confirmed. Review the saved invoice before trying again.'), findsOneWidget);
+        expect(tester.widget<TextButton>(confirm).onPressed, isNull);
+        expect(tester.widget<TextField>(field).enabled, isFalse);
+        expect(checkpoints.saveAttempts, 1);
+        final review = find.byKey(const Key('customer-credit-review-saved'));
+        await reveal(tester, review);
+        await tester.tap(review);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('customer-credit-amount')), findsNothing);
+        expect(checkpoints.saveAttempts, 1, reason: 'Recovery must never repeat the allocation');
+        if (failure == 'before-save') {
+          expect(checkpoints.value, isNull);
+          expect(work.workspaceFinance!.payments.single.paidMinor, 0);
+          expect(work.workspaceFinance!.payments.single.dueMinor, 80000);
+          expect(tester.takeException(), isNull);
+          return;
+        }
+      }
       expect(find.text('Payment method: Customer credit'), findsOneWidget);
       expect(find.text('Payment method: Cash'), findsNothing);
       final updatedPayment = work.workspaceFinance!.payments.single;
@@ -16547,6 +16661,7 @@ void main() {
       expect(updatedPayment.dueMinor, 30000);
       expect(tester.takeException(), isNull);
     });
+    }
   }
 
   for (final display in [(const Size(360, 720), 1.0), (const Size(320, 568), 2.0), (const Size(720, 360), 1.0)]) {
@@ -16576,6 +16691,17 @@ void main() {
       }
       if (display.$2 == 1 && display.$1.width == 360) {
         expect(tester.getSize(summary).height, lessThanOrEqualTo(60));
+      }
+      if (display.$1.width == 720 && display.$2 == 1) {
+        expect(tester.getRect(summary).contains(tester.getCenter(search)), isTrue,
+          reason: 'Landscape search shares the period band instead of another lane');
+        final register = find.ancestor(
+          of: find.byKey(const ValueKey('work-sales-invoice-SALES-ONE')),
+          matching: find.byType(ListView));
+        expect(tester.getSize(register).height, greaterThanOrEqualTo(100),
+          reason: 'Expanded actions must leave useful invoice reading space; '
+            'summary=${tester.getRect(summary)}, search=${tester.getRect(search)}, '
+            'content=${tester.getRect(find.byKey(const Key('work-sales-action-content')))}');
       }
       expect(find.text('₹1,00,00,000.25'), findsNWidgets(2));
       expect(find.text('Retail customer with a long business name'), findsOneWidget);
@@ -16864,7 +16990,24 @@ void main() {
     await tester.tap(find.widgetWithText(PopupMenuItem<String>, 'Custom range'));
     await tester.pumpAndSettle();
     final range = DateTimeRange(start: today.subtract(const Duration(days: 2)), end: today);
-    Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop(range);
+    final dialog = find.byType(DateRangePickerDialog);
+    final delegate = tester.widget<DateRangePickerDialog>(dialog).calendarDelegate;
+    final localizations = MaterialLocalizations.of(tester.element(dialog));
+    expect(delegate.dateHelpText(localizations), 'DD/MM/YYYY');
+    expect(delegate.parseCompactDate('13/09/2026', localizations), DateTime(2026, 9, 13));
+    expect(delegate.parseCompactDate('29/02/2024', localizations), DateTime(2024, 2, 29));
+    for (final invalid in ['31/02/2026', '09/13/2026', '00/09/2026', '01/01/0000']) {
+      expect(delegate.parseCompactDate(invalid, localizations), isNull);
+    }
+    await tester.tap(find.byTooltip('Switch to input'));
+    await tester.pumpAndSettle();
+    final inputs = find.descendant(of: dialog, matching: find.byType(TextField));
+    expect(inputs, findsNWidgets(2));
+    await tester.enterText(inputs.first, delegate.formatCompactDate(range.start, localizations));
+    await tester.enterText(inputs.last, delegate.formatCompactDate(range.end, localizations));
+    tester.testTextInput.hide();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.tap(find.widgetWithText(TextButton, 'OK'));
     await tester.pumpAndSettle();
     String date(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
     expect(find.text('${date(range.start)} – ${date(range.end)}'), findsOneWidget);
@@ -16911,6 +17054,33 @@ void main() {
     work.markWorkspaceFinanceStale(accountScope: seed.accountScope, storeId: seed.storeId);
     await tester.pumpAndSettle();
     expect(status(WorkspacePaymentState.unpaid), 'Payment status unavailable');
+    work.workspaceOrders.add(WorkspaceOrderRecord(
+      id: 'paid', customer: 'Customer', items: 'Goods', quantities: const {'test-product': 1},
+      amount: 100, source: 'Counter', fulfilment: 'At the shop', payment: 'Cash',
+      address: '', stage: 'Completed', needsDelivery: false, createdAt: saved,
+      itemSnapshots: const [WorkspaceOrderItemSnapshot(productId: 'test-product',
+          name: 'Goods', pack: '1 pack', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000)],
+    ));
+    expect(work.applyWorkspaceFinance(snapshot(5)), isTrue);
+    await tester.pumpAndSettle();
+    await openSavedInvoiceFromSales(tester, 'paid');
+    final adjustments = find.byKey(const Key('work-invoice-adjustments'));
+    await reveal(tester, adjustments);
+    await tester.tap(adjustments);
+    await tester.pumpAndSettle();
+    expect(work.applyWorkspaceFinance(snapshot(6, mismatch: true)), isTrue);
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet).last;
+    expect(find.descendant(of: sheet, matching: find.text(
+        'This invoice’s payment record is unavailable. Close and check its saved records before recording an adjustment.')), findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text(
+        'Return to this invoice’s Store to view it.')), findsNothing);
+    work.activeWorkspace = null;
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: sheet, matching: find.text(
+        'Return to this invoice’s Store to view it.')), findsOneWidget);
+    expect(find.byKey(const ValueKey('record-return-paid')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -18174,12 +18344,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final interruption in ['back', 'stock', 'new-sale']) {
+  for (final interruption in ['back', 'stock', 'new-sale', 'empty-facts']) {
     testWidgets('COUNTER1919 Product page interruption $interruption', (
       tester,
     ) async {
       final work = liveStore();
-      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      if (interruption == 'empty-facts') {
+        final index = work.workspaceCatalogueItems.indexWhere((p) => p.id == 'oil-fortune-1l');
+        work.workspaceCatalogueItems[index] = work.workspaceCatalogueItems[index].copyWith(barcode: '', origin: '');
+      }
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          textScale: interruption == 'empty-facts' ? 2 : 1);
       await openCounterSaleFromSales(tester);
       await enterSaleCustomer(tester, '9000091916');
       const productId = 'oil-fortune-1l';
@@ -18192,6 +18367,19 @@ void main() {
         findsOneWidget,
       );
       expect(work.workspaceOrderQuantities[productId] ?? 0, 0);
+      final photo = tester.widget<StoreProductThumbnail>(find.byKey(const Key('work-counter-details-photo')));
+      expect(photo.product.id, productId);
+      expect(photo.session, same(work));
+      if (interruption == 'empty-facts') {
+        expect(find.text('Barcode'), findsNothing);
+        expect(find.text('Country of origin'), findsNothing);
+        expect(find.byKey(const Key('work-counter-product-add-confirm')).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderQuantities[productId] ?? 0, 0);
+        return;
+      }
       if (interruption == 'back') {
         final barcode = find.byKey(const Key('work-counter-product-barcode'));
         final barcodeText = tester.widget<Text>(barcode).data!;
@@ -28818,8 +29006,15 @@ void main() {
           await tester.ensureVisible(category);
           await tester.tap(category);
           await tester.pumpAndSettle();
-          final option = find.text('Dairy & bakery').last;
-          await tester.ensureVisible(option);
+          await tester.enterText(
+            find.byKey(const Key('work-catalogue-category-search')),
+            'Dairy',
+          );
+          await tester.pumpAndSettle();
+          final option = find.byKey(
+            const Key('work-catalogue-category-dairy-bakery'),
+          );
+          expect(option.hitTestable(), findsOneWidget);
           await tester.tap(option);
           await tester.pumpAndSettle();
           expect(find.text('Choose a category from the list.'), findsNothing);
@@ -28969,6 +29164,286 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('STOCK-AUDIT-10 failed inventory save retains edits and retries', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final storage = _InventoryWriteFailureFixture(SecureWorkInventoryStore(
+      accountScope: () => account.accountScope));
+    final work = WorkSession(contactDraftStore: account, inventoryStore: storage)
+      ..selectedProfile = workProfiles.first
+      ..workspaceId = 'qa-save-recovery'
+      ..activeWorkspace = const WorkWorkspace(id: 'qa-save-recovery',
+        name: 'Evaluation Store', profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery', area: 'Local QA', verified: true)
+      ..reviewStage = WorkReviewStage.live
+      ..initialWorkspaceStateLoaded = true
+      ..retailerSetupSaved = true;
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    final original = workspaceMasterCatalogue.first.copyWith(
+      stock: 3, purchasePrice: 20, sellingPrice: 30, publicListing: false);
+    work.addOrUpdateWorkspaceProduct(original);
+    expect(await work.workspaceInventorySaved, isTrue);
+    final movements = List.of(work.workspaceStockMovements);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('work-catalogue-stock-${original.id}')));
+    await tester.pumpAndSettle();
+    final title = find.byKey(const Key('work-product-title'));
+    await tester.enterText(title, 'Evaluation renamed product');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    storage.failSave = true;
+    await tester.tap(find.byKey(const Key('work-product-save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit product'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Saving is incomplete. Tap Save changes to retry before leaving.'), findsOneWidget);
+    expect(find.byKey(const Key('work-product-discard-edits')), findsNothing);
+    expect(tester.widget<TextField>(title).controller!.text, 'Evaluation renamed product');
+    storage.failSave = false;
+    await tester.tap(find.byKey(const Key('work-product-save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit product'), findsNothing);
+    expect(await work.workspaceInventorySaved, isTrue);
+    expect(work.workspaceCatalogueItems.single.title, 'Evaluation renamed product');
+    expect(work.workspaceCatalogueItems.single.stock, 3);
+    expect(work.workspaceStockMovements, orderedEquals(movements));
+    final persisted = await storage.read(account.accountScope, 'qa-save-recovery', qa: true);
+    expect(persisted, isNotNull);
+    expect(persisted!.products.single.id, original.id);
+    expect(persisted.products.single.title, 'Evaluation renamed product');
+    expect(persisted.products.single.stock, 3);
+    expect(persisted.movements.length, movements.length);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final method in ['manual', 'catalogue', 'csv-review', 'csv-correction']) {
+    for (final androidBack in [false, true]) {
+      testWidgets('STOCK-AUDIT-10 entry guard $method android=$androidBack', (tester) async {
+        final previous = FilePickerPlatform.instance;
+        FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile(
+          'title,brand,pack,purchasePrice,sellingPrice,stock,sku\n'
+          'Evaluation lentils,Evaluation,1 kg,40,50,${method == 'csv-correction' ? '-1' : '5'},GUARD-001');
+        addTearDown(() => FilePickerPlatform.instance = previous);
+        final work = storeViewFixture();
+        final before = List.of(work.workspaceCatalogueItems);
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+        await openAddProductsFromHome(tester);
+        if (method == 'manual') {
+          await chooseAddProductMode(tester, 'enter');
+        } else if (method == 'catalogue') {
+          final product = workspaceMasterCatalogue.firstWhere((candidate) =>
+            !before.any((owned) => owned.id == candidate.id));
+          final choice = find.byKey(Key('work-add-product-${product.id}'));
+          await reveal(tester, choice);
+          await tester.tap(choice);
+          await tester.pumpAndSettle();
+        } else {
+          await chooseAddProductMode(tester, 'import');
+          await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(Key(method == 'csv-review'
+            ? 'work-import-edit-2' : 'work-import-correct-2')));
+          await tester.pumpAndSettle();
+        }
+        final title = find.byKey(const Key('work-product-title'));
+        await reveal(tester, title);
+        await tester.enterText(title, 'Unsaved evaluation name');
+        tester.testTextInput.hide();
+        await tester.pumpAndSettle();
+        if (androidBack) {
+          await tester.binding.handlePopRoute();
+        } else if (method == 'manual') {
+          await chooseAddProductMode(tester, 'import');
+        } else {
+          await tester.pageBack();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-product-keep-editing')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(title).controller!.text, 'Unsaved evaluation name');
+        await tester.tap(find.byKey(const Key('work-product-cancel')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+        await tester.pumpAndSettle();
+        expect(title, findsNothing);
+        expect(work.workspaceCatalogueItems, orderedEquals(before));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final action in ['unchanged', 'keep', 'discard', 'android-back',
+    'reverted', 'save', 'invalid-save', 'landscape']) {
+    testWidgets('STOCK-AUDIT-10 unsaved editor $action', (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final original = work.workspaceCatalogueItems.first;
+      final movements = List.of(work.workspaceStockMovements);
+      await tester.tap(find.byKey(Key('work-catalogue-stock-${original.id}')));
+      await tester.pumpAndSettle();
+      tester.testTextInput.hide();
+      final title = find.byKey(const Key('work-product-title'));
+      if (action != 'unchanged') {
+        await tester.enterText(title, action == 'invalid-save' ? '' : 'Edited product');
+        if (action == 'reverted') await tester.enterText(title, original.title);
+      }
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      if (action == 'save' || action == 'invalid-save') {
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        if (action == 'save') {
+          expect(find.text('Edit product'), findsNothing);
+          expect(work.workspaceCatalogueItems.first.title, 'Edited product');
+          expect(find.byKey(const Key('work-product-unsaved-dialog')), findsNothing);
+          expect(tester.takeException(), isNull);
+          return;
+        }
+        expect(find.text('Edit product'), findsOneWidget);
+      }
+      if (action == 'android-back') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byKey(const Key('work-product-cancel')));
+      }
+      await tester.pumpAndSettle();
+      final dialog = find.byKey(const Key('work-product-unsaved-dialog'));
+      if (action == 'unchanged' || action == 'reverted') {
+        expect(dialog, findsNothing);
+        expect(find.text('Edit product'), findsNothing);
+      } else {
+        expect(dialog, findsOneWidget);
+        if (action == 'landscape') {
+          tester.view.physicalSize = const Size(800, 360);
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+        if (action == 'keep') {
+          await tester.tap(find.byKey(const Key('work-product-keep-editing')));
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(title).controller!.text, 'Edited product');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute(); // Dialog Back keeps edits.
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(title).controller!.text, 'Edited product');
+        } else {
+          final discard = find.byKey(const Key('work-product-discard-edits'));
+          await tester.ensureVisible(discard);
+          await tester.pumpAndSettle();
+          await tester.tap(discard);
+          await tester.pumpAndSettle();
+          expect(find.text('Edit product'), findsNothing);
+        }
+      }
+      expect(work.workspaceCatalogueItems.first, same(original));
+      expect(work.workspaceStockMovements, orderedEquals(movements));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final action in ['cancel', 'confirm', 'restore', 'save-hidden', 'back', 'store-change',
+    'landscape', 'large-text']) {
+    testWidgets('STOCK-AUDIT-09 retirement confirmation $action', (
+      tester,
+    ) async {
+      final work = liveStore();
+      final originalStore = work.activeWorkspace;
+      if (action == 'restore' || action == 'save-hidden') {
+        work.retireWorkspaceProduct(work.workspaceCatalogueItems.first.id);
+      }
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final original = work.workspaceCatalogueItems.first;
+      final movements = List.of(work.workspaceStockMovements);
+      await tester.tap(find.byKey(Key('work-catalogue-stock-${original.id}')));
+      await tester.pumpAndSettle();
+      tester.testTextInput.hide();
+      if (action == 'save-hidden') {
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pumpAndSettle();
+        expect(find.text('Edit product'), findsNothing);
+        final saved = work.workspaceCatalogueItems.singleWhere((p) => p.id == original.id);
+        expect(saved.counterSaleAllowed, isFalse);
+        expect(saved.published, original.published);
+        expect(saved.stock, original.stock);
+        expect(work.workspaceStockMovements, orderedEquals(movements));
+        expect(tester.takeException(), isNull);
+        return;
+      }
+      final remove = find.byKey(const Key('work-product-retire'));
+      await reveal(tester, remove);
+      await tester.tap(remove);
+      await tester.pumpAndSettle();
+      expect(find.text(action == 'restore'
+          ? 'Resume Counter sale?' : 'Pause Counter sale?'), findsOneWidget);
+      expect(work.workspaceCatalogueItems.first, same(original));
+      if (action == 'landscape' || action == 'large-text') {
+        tester.view.physicalSize = action == 'landscape'
+            ? const Size(800, 360) : const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+      if (action == 'store-change') {
+        work.activeWorkspace = const WorkWorkspace(
+          id: 'different-store', name: 'Second Store',
+          profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery',
+          area: 'Jodhpur', verified: true,
+        );
+      }
+      if (action == 'back') {
+        await tester.binding.handlePopRoute();
+      } else {
+        final actionButton = find.byKey(Key(
+          action == 'confirm' || action == 'restore' || action == 'store-change'
+              ? 'work-product-retire-confirm' : 'work-product-retire-cancel'));
+        await tester.ensureVisible(actionButton);
+        await tester.pumpAndSettle();
+        expect(actionButton.hitTestable(), findsOneWidget);
+        await tester.tap(
+        find.byKey(
+          Key(
+            action == 'confirm' || action == 'restore' || action == 'store-change'
+                ? 'work-product-retire-confirm'
+                : 'work-product-retire-cancel',
+          ),
+        ),
+      );
+      }
+      await tester.pumpAndSettle();
+      if (action == 'store-change') {
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(find.text('Edit product'), findsOneWidget);
+        work.activeWorkspace = originalStore;
+      }
+      final current = work.workspaceCatalogueItems.singleWhere(
+        (product) => product.id == original.id,
+      );
+      expect(current.stock, original.stock);
+      expect(work.workspaceStockMovements, orderedEquals(movements));
+      if (action == 'confirm' || action == 'restore') {
+        expect(current.counterSaleAllowed, action == 'restore');
+        expect(current.publicListing, original.publicListing);
+        expect(find.text('Edit product'), findsNothing);
+      } else {
+        expect(current, same(original));
+        expect(find.text('Edit product'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('STOCKEDIT exact field and resizable columns $scale', (
       tester,
@@ -29017,6 +29492,7 @@ void main() {
       expectAlignedColumnLines();
       final original = work.workspaceCatalogueItems.first;
       final movements = work.workspaceStockMovements.length;
+      expect(find.byKey(Key('work-catalogue-edit-${original.id}-pencil')), findsOneWidget);
       final nameStyle = tester
           .widget<Text>(find.text(original.title).first)
           .style!;
@@ -29034,6 +29510,8 @@ void main() {
           Key('work-catalogue-${pair.$1}-${original.id}'),
         );
         await reveal(tester, cell);
+        expect(find.byKey(Key('work-catalogue-${pair.$1}-${original.id}-pencil')),
+            findsOneWidget);
         final valueText = tester.widget<Text>(
           find.descendant(of: cell, matching: find.byType(Text)).first,
         );
@@ -29080,6 +29558,14 @@ void main() {
         tester.testTextInput.hide();
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
+        if (pair.$1 == 'stock') {
+          expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+          final discard = find.byKey(const Key('work-product-discard-edits'));
+          await tester.ensureVisible(discard);
+          await tester.pumpAndSettle();
+          await tester.tap(discard);
+          await tester.pumpAndSettle();
+        }
         expect(work.workspaceCatalogueItems.first.stock, original.stock);
         expect(
           work.workspaceCatalogueItems.first.sellingPrice,
@@ -29131,7 +29617,7 @@ void main() {
   }
 
   for (final display in [(360.0, 1.0), (320.0, 2.0)]) {
-    testWidgets('Stock unboxed search and full screen categories $display', (
+    testWidgets('Stock unboxed search and compact categories $display', (
       tester,
     ) async {
       final work = storeViewFixture();
@@ -29168,11 +29654,12 @@ void main() {
       await tester.tap(find.byKey(const Key('work-catalogue-category')));
       await tester.pumpAndSettle();
       final window = find.byKey(const Key('work-catalogue-category-window'));
-      expect(tester.getRect(window).top, lessThanOrEqualTo(24));
-      expect(tester.getSize(window).height, greaterThanOrEqualTo(740));
+      expect(tester.getRect(window).top, greaterThan(24));
+      expect(tester.getSize(window).height, lessThan(740));
+      expect(find.byKey(const Key('work-catalogue-category-list')), findsOneWidget);
       await captureStoreView(
         tester,
-        'stock-category-full-${display.$1}-${display.$2}',
+        'stock-category-compact-${display.$1}-${display.$2}',
       );
       final input = find.byKey(const Key('work-catalogue-category-search'));
       final decoration = tester.widget<TextField>(input).decoration!;
@@ -38141,6 +38628,23 @@ void main() {
         await tester.tap(button);
         await tester.pumpAndSettle();
         if (multi) {
+          final jump = find.byKey(const Key('return-jump-reason'));
+          await tester.tap(jump);
+          await tester.pumpAndSettle();
+          final reasonInput = find.byKey(const Key('return-reason'));
+          await tester.tap(reasonInput);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          addTearDown(tester.view.resetViewInsets);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(reasonInput).bottom,
+              lessThanOrEqualTo((scale == 1 ? 915 : 568) - 220));
+          expect(tester.getRect(reasonInput).top,
+              greaterThanOrEqualTo(tester.getRect(jump).bottom));
+          expect(tester.takeException(), isNull);
+          FocusManager.instance.primaryFocus?.unfocus();
+          tester.testTextInput.hide();
+          tester.view.resetViewInsets();
+          await tester.pumpAndSettle();
           final selectSecond = find.byKey(Key('return-select-${second.id}'));
           await reveal(tester, selectSecond);
           await tester.tap(selectSecond);
@@ -38502,6 +39006,8 @@ void main() {
         expect(refundButton.hitTestable(), findsOneWidget);
         await tester.tap(refundButton);
         await tester.pumpAndSettle();
+        expect(find.byKey(const Key('refund-limit-explanation')), findsOneWidget);
+        expect(find.textContaining('Maximum refund now'), findsOneWidget);
         if (refundChannel != WorkspacePaymentChannel.cash) {
           expect(find.text('Original transaction: ORIGINAL-RECEIPT-REFERENCE'), findsOneWidget);
           final refundReference = find.byKey(const Key('refund-reference'));
@@ -38541,7 +39047,10 @@ void main() {
           '${order.amount}',
         );
         await tester.pumpAndSettle();
-        await tester.binding.handlePopRoute();
+        final closeRefund = find.byKey(const Key('refund-close'));
+        await reveal(tester, closeRefund);
+        expect(tester.getSize(closeRefund).height, greaterThanOrEqualTo(48));
+        await tester.tap(closeRefund);
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('refund-amount')), findsNothing);
         expect(work.workspaceFinance!.payments.single.refundedMinor, 0);
@@ -38648,6 +39157,43 @@ void main() {
         );
         await tester.pumpAndSettle();
         await captureStoreView(tester, 'ledger01-collection-form-$scale');
+        if (scale == 1) {
+          final amountField = find.byKey(const Key('collection-amount'));
+          final smallWidth = tester.getSize(amountField).width;
+          expect(smallWidth, lessThan(300));
+          await tester.enterText(amountField, '999999999999.99');
+          await tester.pumpAndSettle();
+          expect(tester.getSize(amountField).width, greaterThanOrEqualTo(smallWidth));
+          expect(tester.widget<TextField>(amountField).controller!.text, '999999999999.99');
+          await tester.enterText(amountField, (amount / 100).toStringAsFixed(2));
+          await tester.pumpAndSettle();
+        }
+        final closeCollection = find.byKey(const Key('collection-close'));
+        await reveal(tester, closeCollection);
+        expect(tester.getSize(closeCollection).height, greaterThanOrEqualTo(48));
+        await tester.tap(closeCollection);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('collection-amount')), findsNothing);
+        expect(work.workspaceFinance!.payments.first.dueMinor, invoice.dueMinor);
+        await reveal(tester, button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(find.byKey(const Key('collection-amount')))
+            .controller!.text, (amount / 100).toStringAsFixed(2));
+        final formStore = work.ledgerFormDraftStore! as _LedgerFormFixtureStore;
+        formStore.failWrite = true;
+        await tester.enterText(find.byKey(const Key('collection-amount')), '1.23');
+        await tester.pumpAndSettle();
+        await reveal(tester, closeCollection);
+        await tester.tap(closeCollection);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('collection-amount')), findsOneWidget);
+        expect(find.text('Input is not saved yet. Retry saving before leaving.'), findsOneWidget);
+        expect(work.workspaceFinance!.payments.first.dueMinor, invoice.dueMinor);
+        formStore.failWrite = false;
+        await tester.enterText(find.byKey(const Key('collection-amount')),
+            (amount / 100).toStringAsFixed(2));
+        await tester.pumpAndSettle();
         await reveal(tester, find.text('Confirm collection'));
         expect(
           tester
@@ -40133,6 +40679,90 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  testWidgets('AUDIT landscape counter controls respect Android side insets', (tester) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(800, 360), textScale: 1, bottomInset: 0);
+    const sides = FakeViewPadding(left: 41, right: 38, top: 24);
+    tester.view.viewPadding = sides;
+    tester.view.padding = sides;
+    await tester.pumpAndSettle();
+    await openCounterSaleFromSales(tester);
+    // Complete the ordinary customer step before qualifying product controls;
+    // the entry form intentionally covers the product search initially.
+    await enterSaleCustomer(tester, '9829012345');
+    for (final key in ['work-counter-close', 'work-counter-camera-scan', 'work-counter-usb-scan']) {
+      final control = find.byKey(Key(key));
+      expect(control.hitTestable(), findsOneWidget, reason: key);
+      final bounds = tester.getRect(control);
+      expect(bounds.left, greaterThanOrEqualTo(41), reason: key);
+      expect(bounds.right, lessThanOrEqualTo(762), reason: key);
+      expect(bounds.width, greaterThanOrEqualTo(48), reason: key);
+      expect(bounds.height, greaterThanOrEqualTo(48), reason: key);
+    }
+    await tester.tap(find.byKey(const Key('work-counter-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final action in ['counter-close', 'counter-back', 'dues', 'purchases', 'group', 'report', 'report-large']) {
+    testWidgets('AUDIT-NAV originating section $action', (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: action == 'report-large' ? const Size(320, 568) : const Size(412, 915),
+          textScale: action == 'report-large' ? 2 : 1);
+      final report = action.startsWith('report');
+      final stock = action == 'purchases' || action == 'group' || report;
+      if (stock) {
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        final entry = find.byKey(Key(report ? 'work-stock-open-statement' : action == 'purchases'
+            ? 'work-incoming-purchases' : 'work-quick-group-buy'));
+        if (report) {
+          expect(find.descendant(of: find.byKey(const Key('work-catalogue-search-band')),
+              matching: entry), findsOneWidget);
+          expect(tester.getSize(entry).height, greaterThanOrEqualTo(48));
+        }
+        await tester.ensureVisible(entry);
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        if (report) {
+          expect(find.byKey(const Key('work-stock-statement-screen')), findsOneWidget);
+          expect(tester.widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>)).selected, {false});
+          final export = tester.widget<StoreStockDownloadControls>(find.byType(StoreStockDownloadControls));
+          expect(export.storeId, work.activeWorkspace!.id);
+          expect(export.filteredProducts.map((p) => p.id), work.workspaceCatalogueItems.map((p) => p.id));
+          expect(export.isCurrent(), isTrue);
+          expect(find.byKey(const Key('work-stock-download-pdf')), findsOneWidget);
+          await tester.tap(find.descendant(of: find.byType(SegmentedButton<bool>), matching: find.text('Changes')));
+          await tester.pumpAndSettle();
+          expect(tester.widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>)).selected, {true});
+          expect(find.byType(StoreStockDownloadControls), findsNothing);
+        }
+      } else if (action == 'dues') {
+        await openSalesCollections(tester);
+        expect(find.byKey(const Key('work-store-dues')), findsOneWidget);
+        expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).contextualActiveId, 'sell');
+      } else {
+        await openCounterSaleFromSales(tester);
+      }
+      if (action == 'counter-close') {
+        await tester.tap(find.byKey(const Key('work-counter-close')));
+      } else {
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key(stock ? 'work-dashboard-catalogue-screen'
+          : 'work-sales-actions-panel')), findsOneWidget);
+      expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).contextualActiveId,
+          stock ? 'stock' : 'sell');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('drafted sale leaves without loss and restores on return', (

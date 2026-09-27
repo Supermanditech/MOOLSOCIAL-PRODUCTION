@@ -1275,7 +1275,11 @@ class _StoreProductImportReviewScreenState
                                                     row.canCorrect &&
                                                             widget.correctRow !=
                                                                 null
-                                                        ? 'Tap Edit to correct this product.'
+                                                        ? row.issueKind == WorkspaceProductImportIssueKind.duplicateInStore
+                                                            ? 'Edit changes this import row, not your saved Stock product.'
+                                                            : row.issueKind == WorkspaceProductImportIssueKind.duplicateInFile
+                                                                ? 'Edit this repeated row or keep only one copy in the file.'
+                                                                : 'Tap Edit to correct this product.'
                                                         : 'Correct the CSV and import again.',
                                                     style: const TextStyle(
                                                       fontSize: 12,
@@ -1480,6 +1484,7 @@ class StoreAddProductSheet extends StatefulWidget {
     this.onSelected,
     this.onAdd,
     this.stockOnly = false,
+    this.onStockStatement,
     this.onlyLowStock = false,
     this.stockExportBuilder,
     this.stockListItemBuilder,
@@ -1499,6 +1504,7 @@ class StoreAddProductSheet extends StatefulWidget {
   final ValueChanged<WorkspaceCatalogueItem>? onSelected;
   final ValueChanged<WorkspaceCatalogueItem>? onAdd;
   final bool stockOnly;
+  final VoidCallback? onStockStatement;
   final bool onlyLowStock;
   // Store-scoped state is supplied by the existing session, not inventory.
   final Set<String>? savedCatalogueKeys;
@@ -1993,6 +1999,14 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                                               ).scale(1) >
                                               1.3)
                                         _viewControl(),
+                                      if (widget.stockOnly && widget.onStockStatement != null &&
+                                          !_searchFocus.hasFocus)
+                                        IconButton(
+                                          key: const Key('work-stock-open-statement'),
+                                          tooltip: 'Stock statement and changes',
+                                          onPressed: widget.onStockStatement,
+                                          icon: const Icon(Icons.receipt_long_outlined, size: 21),
+                                        ),
                                       if (!widget.stockOnly ||
                                           !_searchFocus.hasFocus)
                                         IconButton(

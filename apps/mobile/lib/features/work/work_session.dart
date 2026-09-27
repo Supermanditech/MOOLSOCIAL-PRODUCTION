@@ -8573,20 +8573,31 @@ class WorkSession extends ChangeNotifier {
     );
     if (index < 0) return;
     final product = workspaceCatalogueItems[index];
+    if (!product.counterSaleAllowed) return;
     workspaceCatalogueItems[index] = product.copyWith(
-      available: false,
-      publicListing: false,
-      stock: 0,
+      counterSaleEnabled: false,
     );
-    _recordWorkspaceStockMovement(
-      product: product,
-      kind: WorkspaceStockMovementKind.adjustment,
-      quantityDelta: -product.stock,
-      reason: 'Removed from active catalogue',
-    );
-    _recordWorkspaceActivity('${product.title} removed from active catalogue.');
-    showNotice('${product.title} is no longer shown to customers.');
+    _recordWorkspaceActivity('${product.title} paused for Counter sale.');
+    showNotice('Counter sale paused. Stock and public visibility unchanged.');
     _persistOperationalState('catalogue-retired');
+    _queueInventorySave();
+  }
+
+  void restoreWorkspaceProduct(String productId) {
+    final index = workspaceCatalogueItems.indexWhere((p) => p.id == productId);
+    if (index < 0) return;
+    final product = workspaceCatalogueItems[index];
+    if (product.counterSaleAllowed) return;
+    workspaceCatalogueItems[index] = product.copyWith(
+      counterSaleEnabled: true,
+      available: product.counterSaleEnabled == null ? true : product.available,
+    );
+    _recordWorkspaceActivity('${product.title} restored for Counter sale.');
+    showNotice(product.stock > 0 ||
+            product.stockMode == WorkspaceStockMode.availabilityOnly
+        ? 'Counter sale resumed. Public visibility unchanged.'
+        : 'Counter sale resumed. Add stock before selling. Public visibility unchanged.');
+    _persistOperationalState('catalogue-restored');
     _queueInventorySave();
   }
 

@@ -158,18 +158,29 @@ void main() {
     }
   });
   testWidgets('SALESSTATEMENT preview invalidates on changed scope without saving', (tester) async {
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final changes = ValueNotifier(0);
     addTearDown(changes.dispose);
-    var saves = 0;
+    var saves = 0, closes = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreSalesStatementPanel(
       statement: sales([request().invoice]), isCurrent: () => true, changes: changes,
+      onClose: () => closes++,
       saveFile: (bytes, name, format) async { saves++; return true; }))));
     expect(find.text('Other statements'), findsNothing);
     expect(find.byKey(const Key('sales-statement-download')), findsOneWidget);
+    for (final key in ['sales-statement-download', 'sales-statement-print']) {
+      expect(tester.getRect(find.byKey(Key(key))).bottom, lessThanOrEqualTo(360));
+      expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+    }
     changes.value++;
     await tester.pump();
     expect(find.text('Records changed. Close and reopen the statement.'), findsOneWidget);
     expect(find.byKey(const Key('sales-statement-download')), findsNothing);
+    await tester.tap(find.byTooltip('Close statement'));
+    expect(closes, 1);
     expect(saves, 0);
   });
   test(

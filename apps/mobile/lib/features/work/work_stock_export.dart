@@ -1777,6 +1777,30 @@ class StoreStockSnapshot {
     'Regulatory note',
   ];
   String get timestamp => generatedAt.toUtc().toIso8601String();
+  String get displayTimestamp {
+    final value = generatedAt.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final offset = value.timeZoneOffset.inMinutes;
+    final zone = 'UTC${offset < 0 ? '-' : '+'}'
+        '${two(offset.abs() ~/ 60)}:${two(offset.abs() % 60)}';
+    return '${two(value.day)}/${two(value.month)}/${value.year} '
+        '${two(value.hour)}:${two(value.minute)} $zone (phone time)';
+  }
+
+  // Presentation only. Machine exports retain the original category identity.
+  static String displayCategory(Object? value) {
+    final id = value?.toString().trim() ?? '';
+    if (id.isEmpty || id == 'uncategorised') return 'Uncategorised';
+    if (id == 'other') return 'Other products';
+    return id.split(RegExp('[-_]')).where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  List<List<Object?>> get presentationRows => [
+    for (final row in rows)
+      [for (var c = 0; c < row.length; c++) c == 6 ? displayCategory(row[c]) : row[c]],
+  ];
   Future<Uint8List> forPrint(
     PdfPageFormat paper,
     List<int>? pages,
@@ -1784,11 +1808,15 @@ class StoreStockSnapshot {
     title: 'Current stock snapshot',
     disclosure:
         'Current recorded balances; not a historical or audited statement. Full product metadata: Excel or CSV.',
-    metadata: exportRows.take(5).toList(),
+    metadata: [
+      ...exportRows.take(2),
+      ['Generated at', displayTimestamp],
+      ...exportRows.skip(3).take(2),
+    ],
     // The existing stock PDF includes position and reference fields, not
     // the full compliance export. Keep that same scope for print media.
     headers: headers.take(15).toList(),
-    rows: [for (final row in rows) row.take(15).toList()],
+    rows: [for (final row in presentationRows) row.take(15).toList()],
     moneyColumns: const {10, 11, 12},
     rightAlignedColumns: const {7, 13},
   ).forPrint(paper, pages);
@@ -1987,7 +2015,7 @@ Future<Uint8List> _generateStockFile(
                 style: const pw.TextStyle(fontSize: 10),
               ),
               pw.Text(
-                '${snapshot.timestamp} (UTC) | ${snapshot.scope} | ${snapshot.rows.length} products',
+                '${snapshot.displayTimestamp} | ${snapshot.scope} | ${snapshot.rows.length} products',
                 style: const pw.TextStyle(fontSize: 9),
               ),
             ],
@@ -2053,7 +2081,7 @@ Future<Uint8List> _generateStockFile(
                   '${r[0]}\n${r[1]}',
                   '${r[2]}',
                   '${r[3]}\n${r[4]}',
-                  '${r[6]}',
+                  StoreStockSnapshot.displayCategory(r[6]),
                   '${r[14]}',
                 ],
             ],

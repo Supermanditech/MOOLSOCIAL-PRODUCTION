@@ -54,6 +54,7 @@ class WorkProcurementController extends ChangeNotifier {
   final _identity = ValueNotifier<BuyV2ProcurementContext?>(null);
   BuyV2Session? session;
   WorkProcurementBookmark? bookmark;
+  String? openFailureMessage;
   int _epoch = 0;
   bool _disposed = false;
   Future<void> _writes = Future<void>.value();
@@ -156,6 +157,7 @@ class WorkProcurementController extends ChangeNotifier {
     BuyV2ProcurementContext? exactContext,
   }) async {
     final account = currentAccountId(), store = currentStoreId();
+    openFailureMessage = null;
     if (_disposed ||
         !storeApproved() ||
         account == null ||
@@ -169,6 +171,11 @@ class WorkProcurementController extends ChangeNotifier {
                 exactContext.accountId != account ||
                 exactContext.storeId != store ||
                 exactContext.purpose != purpose))) {
+      openFailureMessage = !storeApproved()
+          ? 'Buy stock requires a verified Store. Check your Store verification status.'
+          : account == null || account.trim().isEmpty || store == null || store.trim().isEmpty
+          ? 'Your Store account is unavailable. Reopen the Store before buying stock.'
+          : 'This purchase entry is unavailable. Return to Stock and try again.';
       return false;
     }
     final epoch = ++_epoch;
@@ -183,6 +190,9 @@ class WorkProcurementController extends ChangeNotifier {
       previous = await bookmarks.read(account, store);
     } on Object {
       // A failed read is not an empty cart. Preserve the saved operation.
+      if (current()) {
+        openFailureMessage = 'Your saved purchase could not be read. Nothing was replaced. Close and reopen Buy stock to retry.';
+      }
       return false;
     }
     if (!current()) return false;
@@ -217,6 +227,9 @@ class WorkProcurementController extends ChangeNotifier {
           );
     if (!await _write(() async => current() && await bookmarks.save(chosen)) ||
         !current()) {
+      if (current()) {
+        openFailureMessage = 'Your purchase could not be saved on this phone. Nothing was opened. Try again.';
+      }
       return false;
     }
     if (session != null &&

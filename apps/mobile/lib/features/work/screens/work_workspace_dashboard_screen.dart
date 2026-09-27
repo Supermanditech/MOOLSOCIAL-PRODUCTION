@@ -26,6 +26,7 @@ import '../widgets/store_settings_widgets.dart';
 import '../widgets/store_publication_settings.dart';
 import '../widgets/store_payment_terms.dart';
 import '../widgets/store_product_thumbnail.dart';
+import '../widgets/store_catalogue_categories.dart';
 import '../work_models.dart';
 import '../work_invoice_pdf.dart';
 import '../work_stock_export.dart';
@@ -1030,6 +1031,9 @@ class _WorkWorkspaceDashboardScreenState
       _ => null,
     };
     final storeActiveId = switch ((_view, _operation)) {
+      (_WorkspaceControlView.operation, _WorkspaceOperation.dues)
+          when _operationReturnView == _WorkspaceControlView.operation &&
+              _operationReturnOperation == _WorkspaceOperation.sales => 'sell',
       (_WorkspaceControlView.operation, _WorkspaceOperation.orders) => 'orders',
       (_WorkspaceControlView.operation, _WorkspaceOperation.delivery) =>
         'orders',
@@ -1288,6 +1292,9 @@ class _WorkWorkspaceDashboardScreenState
       session: session,
       title: title,
       subtitle: subtitle,
+      contentMaxWidth: salesOpen && MediaQuery.sizeOf(context).width >= 700 &&
+          MediaQuery.sizeOf(context).height <= 450
+          ? double.infinity : MoolMetrics.maximumContentWidth,
       headerHeight: compactSettings
           ? 64
           : storeRootSurface
@@ -2072,6 +2079,13 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
           (createBillFromOrders ||
+              (_operation == _WorkspaceOperation.sales &&
+                  (operation == _WorkspaceOperation.counterOrder ||
+                      operation == _WorkspaceOperation.dues)) ||
+              (_operation == _WorkspaceOperation.catalogue &&
+                  (operation == _WorkspaceOperation.sourcing ||
+                      operation == _WorkspaceOperation.stockStatement ||
+                      operation == _WorkspaceOperation.groupBuying)) ||
               _isNestedWorkspaceOperation(operation) ||
               (_operation == _WorkspaceOperation.stockStatement &&
                   (operation == _WorkspaceOperation.orders ||
@@ -2122,7 +2136,8 @@ class _WorkWorkspaceDashboardScreenState
       if (!mounted) return;
       if (!opened) {
         session.showNotice(
-          'Your Store purchase could not be reopened. Please try again.',
+          controller.openFailureMessage ??
+              'Your Store session changed. Return to Stock and try again.',
         );
         return;
       }
@@ -7366,6 +7381,14 @@ class _StoreInvoiceSurface extends StatefulWidget {
 
 class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
   final _invoiceScroll = ScrollController();
+  final _invoiceActions = GlobalKey();
+  void _showInvoiceActions() {
+    final target = _invoiceActions.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(target, alignment: 0,
+          duration: const Duration(milliseconds: 180));
+    }
+  }
 
   @override
   void didUpdateWidget(covariant _StoreInvoiceSurface oldWidget) {
@@ -7421,9 +7444,17 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   p.customerId == payment.customerId,
             ) ?? false;
             if (session.activeWorkspace?.id != store ||
-                finance?.workspaceId != store ||
-                finance?.accountScope != account || !matching) {
+                (finance != null && (finance.workspaceId != store ||
+                    finance.accountScope != account))) {
               return const Center(child: Text('Return to this invoice’s Store to view it.'));
+            }
+            if (finance == null || !matching) {
+              return Center(child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(finance == null
+                    ? 'Payment records are unavailable. Close and reopen this invoice after records have loaded.'
+                    : 'This invoice’s payment record is unavailable. Close and check its saved records before recording an adjustment.'),
+              ));
             }
             return _StoreFinanceSurface(
               session: session,
@@ -7811,6 +7842,10 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
 
   @override
   Widget build(BuildContext context) {
+    if (session.activeWorkspace?.id == invoiceStore &&
+        session.workspaceFinance == null && invoiceAccount != null) {
+      return const Center(child: Text('Payment records are unavailable. Close and reopen this invoice after records have loaded.'));
+    }
     if (session.activeWorkspace?.id != invoiceStore ||
         session.workspaceFinance?.accountScope != invoiceAccount) {
       return const Center(
@@ -7843,6 +7878,11 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
           (ledger) => ledger.customerId == payment?.customerId &&
               (ledger.invoiceBalance(invoice.id)?.creditedMinor ?? 0) > 0,
         ) ?? false);
+    final canAdjust = payment != null &&
+        (session.workspaceOrders.any((order) => order.id == invoice.orderId &&
+            order.isCompleted && order.hasCompleteItemSnapshot) ||
+        (finance?.customerLedgers.any((ledger) => ledger.customerId == payment.customerId &&
+            (ledger.invoiceBalance(invoice.id)?.refundableMinor ?? 0) > 0) ?? false));
     return StatefulBuilder(
       builder: (sheetContext, updateSheet) => SafeArea(
         top: false,
@@ -7869,6 +7909,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                    ),
+                    if (payment != null && (!paid || canAdjust)) IconButton(
+                      key: const Key('work-invoice-jump-actions'),
+                      tooltip: 'Payment and return actions',
+                      onPressed: _showInvoiceActions,
+                      icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
                     ),
                     IconButton(
                       key: const Key('work-invoice-open-pdf'),
@@ -7959,14 +8005,14 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _InvoiceCollectionSummary(
+                  KeyedSubtree(key: _invoiceActions, child: _InvoiceCollectionSummary(
                     session: session,
                     invoice: invoice,
                     accountScope: invoiceAccount,
                     storeId: invoiceStore,
                     onRecord: widget.onRecord,
                     receiptEditor: widget.receiptEditor,
-                  ),
+                  )),
                   if (payment != null) _recordedPayments(payment),
                   ExpansionTile(
                     key: const Key('work-invoice-details'),
@@ -7994,14 +8040,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ],
                   ),
                 ],
-                if (payment != null &&
-                    (session.workspaceOrders.any(
-                      (order) => order.id == invoice.orderId &&
-                          order.isCompleted && order.hasCompleteItemSnapshot,
-                    ) || (finance?.customerLedgers.any(
-                      (ledger) => ledger.customerId == payment.customerId &&
-                          (ledger.invoiceBalance(invoice.id)?.refundableMinor ?? 0) > 0,
-                    ) ?? false)))
+                if (paid && canAdjust) SizedBox(key: _invoiceActions),
+                if (canAdjust)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
@@ -11859,19 +11899,18 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         finance: !session.workspaceFinanceStale && !session.workspaceFinanceUsesLegacyReview ? session.workspaceFinance : null);
       if (!mounted) return;
       await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
-        builder: (sheetContext) => SizedBox(height: MediaQuery.sizeOf(sheetContext).height * .78,
-          child: Column(children: [
-            Align(alignment: Alignment.centerRight, child: IconButton(tooltip: 'Close statement',
-              onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close))),
-            Expanded(child: StoreSalesStatementPanel(statement: statement,
-              changes: session, isCurrent: () => mounted && session.workspaceStockHistoryScope()?.key == scope.key)),
-          ])));
+        showDragHandle: false,
+        builder: (sheetContext) => SizedBox(height: MediaQuery.sizeOf(sheetContext).height *
+            (MediaQuery.orientationOf(sheetContext) == Orientation.landscape ? 1 : .78),
+          child: StoreSalesStatementPanel(statement: statement,
+            onClose: () => Navigator.pop(sheetContext),
+            changes: session, isCurrent: () => mounted && session.workspaceStockHistoryScope()?.key == scope.key)));
     } on FormatException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
-  Widget _compactInvoices(WorkSession session, {Widget? salesPeriodControl}) {
+  Widget _compactInvoices(WorkSession session, {Widget? salesPeriodControl, Widget? inlineSearch}) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final start = !widget.salesOnly
@@ -11938,7 +11977,10 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         ConstrainedBox(constraints: BoxConstraints(maxHeight: viewport.maxHeight * .45), child: SingleChildScrollView(child: Padding(
           key: const Key('work-sales-period-summary'),
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child: Row(children: [
+            if (inlineSearch != null) Expanded(flex: 2, child: inlineSearch),
+            Expanded(flex: 5, child: Column(mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 4, runSpacing: 0, children: [
                 ?salesPeriodControl,
@@ -11961,12 +12003,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             if (_invoicePeriod == 'Custom range')
               Padding(padding: const EdgeInsets.only(bottom: 4),
                 child: Text(_salesPeriodLabel, style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
+          ])),
           ]),
         ))),
         Expanded(child: ListView.separated(
           key: PageStorageKey(('sales-invoices', _salesScope, _returnSelection, _invoicePeriod, _invoiceRange, query)),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.only(bottom: 150),
+          padding: const EdgeInsets.only(bottom: 12),
           itemCount: matches.isEmpty ? 1 : matches.length,
           separatorBuilder: (_, _) => const Divider(height: 1, thickness: .5),
           itemBuilder: (context, index) {
@@ -12129,6 +12172,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               firstDate: DateTime(2000),
               lastDate: DateTime.now(),
               initialDateRange: _invoiceRange,
+              calendarDelegate: const _StoreDayFirstCalendarDelegate(),
+              errorFormatText: 'Use DD/MM/YYYY',
             );
             if (!mounted || range == null) return;
             _changeSalesBrowse(() {
@@ -12177,6 +12222,38 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       final hasDraft = session.workspaceOrderSource == 'Counter' &&
           session.workspaceOrderFulfilment == 'At the shop' && session.currentWorkspaceOrderId == null &&
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
+      final landscapeBand = !_returnSelection &&
+          MediaQuery.sizeOf(context).width >= 700 &&
+          MediaQuery.sizeOf(context).height <= 450 &&
+          MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+      final searchControl = StoreRecentSearches(
+            controller: _invoiceSearch,
+            history: session.workspaceRecentSearches(_exchangeSelection ? 'sales-exchange' : _returnSelection ? 'sales-returns' : 'sales'),
+            isCurrent: () => _salesScope == (session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id),
+            onChanged: (_) => _changeSalesBrowse(() {}),
+            child: Row(children: [
+              Expanded(child: TextField(
+                key: const Key('work-sales-search'), controller: _invoiceSearch,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => _changeSalesBrowse(() {}),
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+                decoration: InputDecoration(
+                  hintText: _returnSelection ? 'Search phone, name or invoice'
+                      : landscapeBand ? 'Search sales' : 'Search invoices or customers',
+                  hintMaxLines: _returnSelection ? 3 : 1, filled: false, isDense: true,
+                  border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none, errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: _returnSelection ? 6 : 12),
+                  fillColor: Colors.transparent, focusColor: Colors.transparent, hoverColor: Colors.transparent,
+                  prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
+                  suffixIcon: _invoiceSearch.text.isEmpty ? null : IconButton(
+                    tooltip: 'Clear invoice search', onPressed: () => _changeSalesBrowse(_invoiceSearch.clear),
+                    icon: const Icon(Icons.close_rounded, size: 18)),
+                ),
+              )),
+            ]),
+          );
       final salesFrame = _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
         expanded: _salesActionsExpanded,
@@ -12197,34 +12274,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           ],
         ],
         child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
-          StoreRecentSearches(
-            controller: _invoiceSearch,
-            history: session.workspaceRecentSearches(_exchangeSelection ? 'sales-exchange' : _returnSelection ? 'sales-returns' : 'sales'),
-            isCurrent: () => _salesScope == (session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id),
-            onChanged: (_) => _changeSalesBrowse(() {}),
-            child: Row(children: [
-              Expanded(child: TextField(
-                key: const Key('work-sales-search'), controller: _invoiceSearch,
-                textInputAction: TextInputAction.search,
-                onChanged: (_) => _changeSalesBrowse(() {}),
-                onSubmitted: (_) => FocusScope.of(context).unfocus(),
-                style: const TextStyle(fontSize: 13, color: MoolColors.ink),
-                decoration: InputDecoration(
-                  hintText: _returnSelection ? 'Search phone, name or invoice' : 'Search invoices or customers',
-                  hintMaxLines: _returnSelection ? 3 : 1, filled: false, isDense: true,
-                  border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none, errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: _returnSelection ? 6 : 12),
-                  fillColor: Colors.transparent, focusColor: Colors.transparent, hoverColor: Colors.transparent,
-                  prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
-                  suffixIcon: _invoiceSearch.text.isEmpty ? null : IconButton(
-                    tooltip: 'Clear invoice search', onPressed: () => _changeSalesBrowse(_invoiceSearch.clear),
-                    icon: const Icon(Icons.close_rounded, size: 18)),
-                ),
-              )),
-            ]),
-          ),
-          Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl)),
+          if (!landscapeBand) searchControl,
+          Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl,
+            inlineSearch: landscapeBand ? searchControl : null)),
         ])),
       );
       return _returnSelection ? salesFrame.child : salesFrame;
@@ -13095,6 +13147,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                                     key: const Key('downloads-stock-movements'),
                                     onPressed: () {
                                       if (!current()) return;
+                                      stockStatementBookmark.history = true;
+                                      stockStatementBookmark.offset = 0;
                                       Navigator.of(downloadContext).pop();
                                       onOpenOperation(
                                         _WorkspaceOperation.stockStatement,
@@ -13230,6 +13284,11 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         onBuyStock: onBuyStock,
         onPurchases: () => onOpenOperation(_WorkspaceOperation.sourcing),
         onGroupBuying: () => onOpenOperation(_WorkspaceOperation.groupBuying),
+        onStatement: () {
+          stockStatementBookmark.history = false;
+          stockStatementBookmark.offset = 0;
+          onOpenOperation(_WorkspaceOperation.stockStatement);
+        },
       );
     }
     if (operation == _WorkspaceOperation.stockStatement) {
@@ -13644,6 +13703,7 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
     this.onBuyStock,
     this.onPurchases,
     this.onGroupBuying,
+    this.onStatement,
     super.key,
   });
 
@@ -13651,7 +13711,7 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
   final bool entryOnly;
   final bool? actionsExpanded;
   final VoidCallback? onToggleActions;
-  final VoidCallback? onBuyStock, onPurchases, onGroupBuying;
+  final VoidCallback? onBuyStock, onPurchases, onGroupBuying, onStatement;
 
   @override
   State<_WorkspaceCatalogueSurface> createState() =>
@@ -13743,6 +13803,8 @@ class _WorkspaceCatalogueSurfaceState
     var tab = 0;
     var manualProduct = _blankProduct();
     WorkspaceCatalogueItem? catalogueProduct;
+    var manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
+    var catalogueEditorKey = GlobalKey<_CatalogueProductEditorState>();
     bool storeUnchanged() {
       if (!mounted) return false;
       if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
@@ -13758,9 +13820,29 @@ class _WorkspaceCatalogueSurfaceState
         selectedIndex: tab,
         catalogueEditing: catalogueProduct != null,
         onCloseCatalogueEditor: () =>
-            setPageState(() => catalogueProduct = null),
+            catalogueEditorKey.currentState?._requestEditorExit(),
         onSelected: (index) {
-          if (storeUnchanged()) setPageState(() => tab = index);
+          if (!storeUnchanged() || index == tab) return;
+          final editor = tab == 1 ? manualEditorKey.currentState
+              : tab == 0 ? catalogueEditorKey.currentState : null;
+          void changeMode() {
+            if (!pageContext.mounted || !storeUnchanged()) return;
+            setPageState(() {
+              if (tab == 1) {
+                manualProduct = _blankProduct();
+                manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
+              } else if (tab == 0) {
+                catalogueProduct = null;
+                catalogueEditorKey = GlobalKey<_CatalogueProductEditorState>();
+              }
+              tab = index;
+            });
+          }
+          if (editor == null) {
+            changeMode();
+          } else {
+            unawaited(editor._requestEditorExit(afterExit: changeMode));
+          }
         },
         catalogue: IndexedStack(
           index: catalogueProduct == null ? 0 : 1,
@@ -13835,10 +13917,11 @@ class _WorkspaceCatalogueSurfaceState
             ),
             if (catalogueProduct != null)
               _CatalogueProductEditor(
-                key: ValueKey('catalogue-${catalogueProduct!.id}'),
+                key: catalogueEditorKey,
                 session: widget.session,
                 product: catalogueProduct!,
                 embeddedPage: true,
+                guardRouteExit: false,
                 onDone: () => setPageState(() => catalogueProduct = null),
                 onSaved: () => Navigator.of(pageContext).pop(true),
               )
@@ -13847,13 +13930,15 @@ class _WorkspaceCatalogueSurfaceState
           ],
         ),
         manual: _CatalogueProductEditor(
-          key: ValueKey('manual-${manualProduct.id}'),
+          key: manualEditorKey,
           session: widget.session,
           product: manualProduct,
           embeddedPage: true,
+          guardRouteExit: false,
           onSaved: () => Navigator.of(pageContext).pop(true),
           onDone: () => setPageState(() {
             manualProduct = _blankProduct();
+            manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
             tab = 0;
           }),
         ),
@@ -14334,6 +14419,7 @@ class _WorkspaceCatalogueSurfaceState
                 ),
                 embedded: true,
                 stockOnly: true,
+                onStockStatement: widget.onStatement,
                 recentSearches: widget.session.workspaceRecentSearches('stock'),
                 catalogue: const [],
                 ownedProducts: List.of(widget.session.workspaceCatalogueItems),
@@ -15487,11 +15573,19 @@ class _WorkspaceProductRow extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  value,
-                  textAlign: TextAlign.center,
-                  style: _stockStatementPrimaryStyle,
-                ),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Flexible(child: Text(
+                    value,
+                    textAlign: TextAlign.center,
+                    style: _stockStatementPrimaryStyle,
+                  )),
+                  if (onTap != null) ...[
+                    const SizedBox(width: 3),
+                    ExcludeSemantics(child: Icon(Icons.edit_outlined,
+                        key: Key('$keyName-pencil'), size: 12,
+                        color: MoolColors.navy)),
+                  ],
+                ]),
                 if (note != null) ...[
                   const SizedBox(height: 4),
                   Text(
@@ -15557,12 +15651,18 @@ class _WorkspaceProductRow extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                product.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: _stockStatementPrimaryStyle,
-                              ),
+                              Row(children: [
+                                Expanded(child: Text(
+                                  product.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: _stockStatementPrimaryStyle,
+                                )),
+                                const SizedBox(width: 3),
+                                ExcludeSemantics(child: Icon(Icons.edit_outlined,
+                                    key: Key('work-catalogue-edit-${product.id}-pencil'),
+                                    size: 12, color: MoolColors.navy)),
+                              ]),
                               const SizedBox(height: 3),
                               Text(
                                 '${product.pack} · ${product.sku}',
@@ -15571,7 +15671,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 10,
                                   height: 1.2,
-                                  color: MoolColors.muted,
+                                  color: MoolColors.navy,
                                 ),
                               ),
                             ],
@@ -15592,7 +15692,9 @@ class _WorkspaceProductRow extends StatelessWidget {
                 quantity,
                 onTap: onUpdateStock,
                 anchor: stockActionKey,
-                note: out
+                note: !product.counterSaleAllowed && !out
+                    ? 'Counter paused'
+                    : out
                     ? 'Out of stock'
                     : low
                     ? 'Low stock'
@@ -15895,6 +15997,25 @@ class _ProductQuickValue extends StatelessWidget {
   }
 }
 
+class _StoreDayFirstCalendarDelegate extends GregorianCalendarDelegate {
+  const _StoreDayFirstCalendarDelegate();
+  @override
+  String formatCompactDate(DateTime date, MaterialLocalizations localizations) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/'
+      '${date.year.toString().padLeft(4, '0')}';
+  @override
+  String dateHelpText(MaterialLocalizations localizations) => 'DD/MM/YYYY';
+  @override
+  DateTime? parseCompactDate(String? inputString, MaterialLocalizations localizations) {
+    final match = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(inputString?.trim() ?? '');
+    if (match == null) return null;
+    final day = int.parse(match[1]!), month = int.parse(match[2]!), year = int.parse(match[3]!);
+    if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+    final date = DateTime(year, month, day);
+    return date.year == year && date.month == month && date.day == day ? date : null;
+  }
+}
+
 class _StockStatementBookmark {
   bool history = false;
   double offset = 0;
@@ -16072,6 +16193,13 @@ class _WorkspaceStockStatementSurfaceState
         if (!known.contains(product.id)) product.id,
     ];
     final products = [for (final id in view.productIds!) byId[id]!];
+    final exportWorkspace = session.activeWorkspace;
+    final exportIdentity = session.counterDraftIdentity;
+    final exportAccount = session.workspaceStockHistoryScope()?.accountScope;
+    bool exportCurrent() => mounted &&
+        session.activeWorkspace?.id == exportWorkspace?.id &&
+        session.counterDraftIdentity == exportIdentity &&
+        session.workspaceStockHistoryScope()?.accountScope == exportAccount;
     final remote = session.stockHistoryGateway != null;
     final matching =
         remote && session.workspaceStockHistoryQuery?.key == _query?.key;
@@ -16189,6 +16317,18 @@ class _WorkspaceStockStatementSurfaceState
                         onSelectionChanged: (selection) =>
                             _changeView(selection.single),
                       ),
+                      if (!view.history && exportWorkspace != null)
+                        StoreStockDownloadControls(
+                          key: ValueKey(('stock-summary-export', exportIdentity,
+                              exportWorkspace.id, exportAccount)),
+                          storeId: exportWorkspace.id,
+                          storeName: exportWorkspace.name,
+                          accountId: exportAccount,
+                          filteredProducts: List.of(session.workspaceCatalogueItems),
+                          filterDescription: '',
+                          scopeChanges: session,
+                          isCurrent: exportCurrent,
+                        ),
                       const SizedBox(height: 10),
                       if (!view.history)
                         LayoutBuilder(
@@ -16618,6 +16758,7 @@ class _CatalogueProductEditor extends StatefulWidget {
     required this.session,
     required this.product,
     this.embeddedPage = false,
+    this.guardRouteExit = true,
     this.initialField,
     this.onDone,
     this.onSaved,
@@ -16630,6 +16771,7 @@ class _CatalogueProductEditor extends StatefulWidget {
   final WorkSession session;
   final WorkspaceCatalogueItem product;
   final bool embeddedPage;
+  final bool guardRouteExit;
   final String? initialField;
   final VoidCallback? onDone;
   final VoidCallback? onSaved;
@@ -16650,6 +16792,15 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   bool _savingInventory = false;
   bool _pendingInventorySave = false;
   bool _choosingPhoto = false;
+  bool _allowEditorExit = false;
+  bool _confirmingEditorExit = false;
+  late final Map<String, String> _initialEditValues;
+  bool get _hasUnsavedEdits => !_saved && (
+    _importControllers.entries.any(
+      (entry) => entry.value.text != _initialEditValues[entry.key]) ||
+    _public != widget.product.publicListing ||
+    _available != widget.product.available ||
+    _privatePhoto != widget.product.privatePhoto);
   late WorkspacePrivateProductPhoto? _privatePhoto =
       widget.product.privatePhoto;
 
@@ -16787,13 +16938,128 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     }
   }
 
-  void _finish() {
+  Future<void> _confirmRetirement() async {
+    if (_savingInventory || _choosingPhoto) return;
+    final restore = !widget.product.counterSaleAllowed;
     FocusManager.instance.primaryFocus?.unfocus();
-    if (widget.onDone != null) {
-      widget.onDone!();
-    } else {
-      Navigator.pop(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
+        titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        contentPadding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        titleTextStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+            color: MoolColors.navy),
+        contentTextStyle: const TextStyle(fontSize: 14, height: 1.35,
+            color: MoolColors.navy),
+        title: Text(restore ? 'Resume Counter sale?' : 'Pause Counter sale?'),
+        content: Text(
+          restore
+              ? 'Stock, history and public visibility stay unchanged. '
+                'Unsaved edits are not applied.'
+              : 'Stops Counter sale only. Stock, history and public visibility '
+                'stay unchanged. Unsaved edits are not applied.',
+        ),
+        actions: [
+          Flex(
+            direction: MediaQuery.textScalerOf(dialogContext).scale(14) > 22
+                ? Axis.vertical : Axis.horizontal,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+          Flexible(fit: FlexFit.loose, child: TextButton(
+            key: const Key('work-product-retire-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          )),
+          Flexible(fit: FlexFit.loose, child: TextButton(
+            key: const Key('work-product-retire-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(restore ? 'Resume' : 'Pause'),
+          )),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+        _storeId) {
+      _reject('Your store changed. Open this product in the correct store.');
+      return;
     }
+    if (!widget.session.workspaceCatalogueItems.any(
+      (product) => product.id == widget.product.id,
+    )) {
+      _reject('This product is no longer in your catalogue.');
+      return;
+    }
+    if (restore) {
+      widget.session.restoreWorkspaceProduct(widget.product.id);
+    } else {
+      widget.session.retireWorkspaceProduct(widget.product.id);
+    }
+    _finish();
+  }
+
+  Future<void> _requestEditorExit({VoidCallback? afterExit}) async {
+    if (_savingInventory || _choosingPhoto || _confirmingEditorExit) return;
+    if (_pendingInventorySave) {
+      _reject('Saving is incomplete. Tap Save changes to retry before leaving.');
+      return;
+    }
+    if (!_hasUnsavedEdits) {
+      _finish(afterExit: afterExit);
+      return;
+    }
+    _confirmingEditorExit = true;
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          key: const Key('work-product-unsaved-dialog'),
+          scrollable: true,
+          titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          contentPadding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          title: const Text('Discard changes?', style: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+          content: const Text('Your edits have not been saved.', style: TextStyle(
+            fontSize: 14, height: 1.35, color: MoolColors.navy)),
+          actions: [
+            TextButton(
+              key: const Key('work-product-keep-editing'),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              key: const Key('work-product-discard-edits'),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Discard changes'),
+            ),
+          ],
+        ),
+      );
+      if (mounted && discard == true) _finish(afterExit: afterExit);
+    } finally {
+      _confirmingEditorExit = false;
+    }
+  }
+
+  void _finish({VoidCallback? afterExit}) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    // Rebuild PopScope before the approved save/discard performs its route pop.
+    setState(() => _allowEditorExit = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final done = afterExit ?? widget.onDone;
+      if (done != null) {
+        done();
+      } else {
+        Navigator.pop(context);
+      }
+    });
   }
 
   @override
@@ -16851,6 +17117,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     ]) {
       field.addListener(_refreshIdentity);
     }
+    _initialEditValues = {
+      for (final entry in _importControllers.entries) entry.key: entry.value.text,
+    };
   }
 
   void _refreshIdentity() => setState(() {});
@@ -16934,7 +17203,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       }
       _saved = true;
       FocusManager.instance.primaryFocus?.unfocus();
-      widget.onImportReviewed!(corrected);
+      _finish(afterExit: () => widget.onImportReviewed!(corrected));
     } on FormatException catch (error) {
       final field = error.message.split(':').first;
       _reject(
@@ -17213,7 +17482,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
 
   Future<void> _save() async {
     if (_saved || _savingInventory || _choosingPhoto) return;
-    _savingInventory = true;
+    setState(() => _savingInventory = true);
     try {
       if (widget.importRow != null) {
         _applyImportCorrection();
@@ -17387,7 +17656,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         regulatoryNote: _regulatory.text.trim(),
         compliance: _packInformation,
         catalogueFactsRequireReview: _factsNeedReview || measureChanged,
-        available: _stockMode == WorkspaceStockMode.availabilityOnly
+        available: _stockMode == WorkspaceStockMode.availabilityOnly ||
+                (_wasOwned && !widget.product.available)
             ? _available
             : stock! > 0,
         publicListing:
@@ -17404,7 +17674,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       if (widget.onDraftReviewed != null) {
         _saved = true;
         FocusManager.instance.primaryFocus?.unfocus();
-        widget.onDraftReviewed!(reviewedProduct.copyWith(publicListing: false));
+        _finish(afterExit: () => widget.onDraftReviewed!(
+          reviewedProduct.copyWith(publicListing: false)));
         return;
       }
       widget.session.addOrUpdateWorkspaceProduct(reviewedProduct);
@@ -17430,12 +17701,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       if (widget.onSaved != null) {
         FocusManager.instance.primaryFocus?.unfocus();
         widget.session.showNotice('Saved to Store stock.');
-        widget.onSaved!();
+        _finish(afterExit: widget.onSaved);
       } else {
         _finish();
       }
     } finally {
-      _savingInventory = false;
+      if (mounted) setState(() => _savingInventory = false);
     }
   }
 
@@ -17737,48 +18008,30 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
 
   Widget _categoryField() => Container(
     key: _fieldKeys.putIfAbsent('categoryId', () => GlobalKey()),
-    child: DropdownButtonFormField<String>(
+    child: InkWell(
       key: const Key('work-product-category'),
-      initialValue: _categories.containsKey(_category.text)
-          ? _category.text
-          : null,
-      isExpanded: true,
-      itemHeight: null,
       focusNode: _fieldFocus.putIfAbsent('categoryId', () => FocusNode()),
-      decoration: InputDecoration(
-        labelText: 'Category',
-        errorText: _errorField == 'categoryId' ? _error : null,
-      ),
-      hint: const Text('Choose category'),
-      selectedItemBuilder: (context) => [
-        for (final entry in _categories.entries)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Tooltip(
-              message: entry.value,
-              child: Text(
-                entry.value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-      ],
-      items: [
-        for (final entry in _categories.entries)
-          DropdownMenuItem(
-            value: entry.key,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(entry.value),
-            ),
-          ),
-      ],
-      onChanged: (value) {
-        if (value == null) return;
-        _category.text = value;
+      onTap: () async {
+        FocusScope.of(context).unfocus();
+        final value = await showModalBottomSheet<String>(context: context,
+          isScrollControlled: true, useSafeArea: true, showDragHandle: false,
+          builder: (sheetContext) => Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+            child: StoreCatalogueCategories(selected: _category.text,
+              counts: {for (final id in _categories.keys) id: 0},
+              label: (id) => _categories[id] ?? id,
+              stockOnly: false, editorSelection: true)));
+        if (!mounted || value == null || !_categories.containsKey(value)) return;
+        setState(() => _category.text = value);
         _clearFieldError('categoryId');
       },
+      child: InputDecorator(decoration: InputDecoration(
+        labelText: 'Category',
+        errorText: _errorField == 'categoryId' ? _error : null,
+      ), child: Row(children: [
+        Expanded(child: Text(_categories[_category.text] ?? 'Choose category')),
+        const Icon(Icons.expand_more, size: 20),
+      ])),
     ),
   );
 
@@ -17812,7 +18065,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       barcode: _barcode.text.trim(),
       categoryId: _category.text.trim(),
     );
-    return StoreSettingsStyle(
+    return PopScope(
+      // Check live inputs even when Back arrives before the next rebuild.
+      canPop: !widget.guardRouteExit || _allowEditorExit,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && widget.guardRouteExit) unawaited(_requestEditorExit());
+      },
+      child: StoreSettingsStyle(
       child: Builder(
         builder: (context) => Material(
           color: const Color(0xfff7f8fc),
@@ -17837,7 +18096,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                       IconButton(
                         key: const Key('work-product-close'),
                         tooltip: 'Close product editor',
-                        onPressed: _finish,
+                        onPressed: _requestEditorExit,
                         icon: const Icon(Icons.close_rounded),
                       ),
                     ],
@@ -18006,18 +18265,15 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               SwitchListTile.adaptive(
                                 key: const Key('work-product-public'),
                                 contentPadding: EdgeInsets.zero,
-                                title: const Text('Show to customers'),
+                                title: const Text('Public visibility'),
                                 subtitle: Text(
                                   _catalogueMatched && !_factsNeedReview
-                                      ? 'Publication requires complete customer details'
+                                      ? 'Saved setting · online visibility not confirmed'
                                       : 'Private until product details are reviewed',
                                 ),
-                                value:
-                                    _catalogueMatched &&
-                                    !_factsNeedReview &&
-                                    _public,
+                                value: _public,
                                 onChanged:
-                                    _catalogueMatched && !_factsNeedReview
+                                    _public || (_catalogueMatched && !_factsNeedReview)
                                     ? (value) => setState(() => _public = value)
                                     : null,
                               ),
@@ -18321,16 +18577,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                         if (_wasOwned)
                           OutlinedButton.icon(
                             key: const Key('work-product-retire'),
-                            onPressed: () {
-                              widget.session.retireWorkspaceProduct(
-                                widget.product.id,
-                              );
-                              _finish();
-                            },
-                            icon: const Icon(
-                              Icons.remove_circle_outline_rounded,
+                            onPressed: _confirmRetirement,
+                            icon: Icon(
+                              widget.product.counterSaleAllowed
+                                  ? Icons.remove_circle_outline_rounded
+                                  : Icons.restore_rounded,
                             ),
-                            label: const Text('Remove from active catalogue'),
+                            label: Text(widget.product.counterSaleAllowed
+                                ? 'Pause Counter sale' : 'Resume Counter sale'),
                           ),
                       ],
                     ),
@@ -18363,7 +18617,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                             IconButton(
                               key: const Key('work-product-cancel'),
                               tooltip: 'Cancel changes',
-                              onPressed: _finish,
+                              onPressed: _requestEditorExit,
                               icon: const Icon(Icons.close_rounded),
                             ),
                             const SizedBox(width: 8),
@@ -18398,7 +18652,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -22882,11 +23136,25 @@ class _CustomerReturnSheet extends StatefulWidget {
   State<_CustomerReturnSheet> createState() => _CustomerReturnSheetState();
 }
 
-class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
+class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with WidgetsBindingObserver {
   final quantities = <String, TextEditingController>{};
   final sellableQuantities = <String, TextEditingController>{};
   final selectedProducts = <String>{};
   final reason = TextEditingController();
+  final _reasonFocus = FocusNode();
+  final _reasonAnchor = GlobalKey();
+  void _revealReason() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _reasonAnchor.currentContext;
+      if (mounted && target != null) {
+        Scrollable.ensureVisible(target, alignment: .2);
+      }
+    });
+  }
+  @override
+  void didChangeMetrics() {
+    if (_reasonFocus.hasFocus) _revealReason();
+  }
   String? reasonCode;
   bool listenersAttached = false;
   late final _LedgerFormAutosave draft;
@@ -22896,6 +23164,10 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _reasonFocus.addListener(() {
+      if (_reasonFocus.hasFocus) _revealReason();
+    });
     for (final item in widget.order.itemSnapshots) {
       quantities[item.productId] = TextEditingController(text: '1');
       sellableQuantities[item.productId] = TextEditingController(text: '0');
@@ -22978,6 +23250,8 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _reasonFocus.dispose();
     draft.removeListener(refreshDraft);
     draft.dispose();
     for (final controller in [...quantities.values, ...sellableQuantities.values]) {
@@ -23100,22 +23374,22 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
       },
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            16 + MediaQuery.viewInsetsOf(context).bottom,
-          ),
+        child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 4), child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Record return', style: Theme.of(context).textTheme.titleMedium),
+              Text('Invoice ${widget.payment.invoiceId}', style: const TextStyle(fontSize: 12)),
+            ])),
+            TextButton(key: const Key('return-jump-reason'),
+              onPressed: saving ? null : _revealReason, child: const Text('Reason')),
+          ])),
+        Flexible(child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Record return',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              Text('Invoice ${widget.payment.invoiceId}'),
               if (widget.onRecorded != null)
                 const Text('Exchange · Step 1: record returned items. Choose replacements after saving.',
                   style: TextStyle(fontSize: 12, color: MoolColors.ink)),
@@ -23221,9 +23495,11 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
                     ),
                 ]),
               ),
-              TextField(
+              Container(key: _reasonAnchor, child: TextField(
                 key: const Key('return-reason'),
                 controller: reason,
+                focusNode: _reasonFocus,
+                scrollPadding: const EdgeInsets.only(bottom: 100, top: 20),
                 enabled: !saving && draft.ready,
                 maxLength: 160,
                 decoration: InputDecoration(
@@ -23233,7 +23509,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
                   if (reasonCode == null) setState(() => reasonCode = 'other');
                   saveDraft();
                 },
-              ),
+              )),
               Text(
                 credit == null
                     ? 'Enter valid quantities within the original bill.'
@@ -23276,7 +23552,8 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
               ),
             ],
           ),
-        ),
+        )),
+        ])),
       ),
     );
   }
@@ -24514,7 +24791,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                     : 0,
               ),
               child: _StoreFormLayout(
-                compact: widget.counterSaleReceipt,
+                compact: true,
                 action: FilledButton(
                   key: Key(
                     widget.refund ? 'refund-confirm' : 'collection-confirm',
@@ -24550,19 +24827,33 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      widget.refund
-                          ? 'Record refund'
-                          : widget.counterSaleReceipt
-                          ? 'Payment receipt'
-                          : 'Record collection',
-                      style: widget.counterSaleReceipt
-                          ? const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: MoolColors.ink,
-                            )
-                          : Theme.of(context).textTheme.titleLarge,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.refund
+                                ? 'Record refund'
+                                : widget.counterSaleReceipt
+                                ? 'Payment receipt'
+                                : 'Record collection',
+                            style: widget.counterSaleReceipt
+                                ? const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: MoolColors.ink,
+                                  )
+                                : Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          key: Key(widget.refund ? 'refund-close' : 'collection-close'),
+                          tooltip: 'Close',
+                          onPressed: saving || confirming
+                              ? null
+                              : () => Navigator.maybePop(context),
+                          icon: const Icon(Icons.close, size: 20),
+                        ),
+                      ],
                     ),
                     if (widget.counterSaleReceipt) const SizedBox(height: 6),
                     Text(
@@ -24579,9 +24870,18 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                       Text(
                         widget.refund && !sourceRefundSupported
                             ? 'Select an original payment with verified refund availability.'
-                            : '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
+                            : '${widget.refund ? 'Maximum refund now' : 'Due'} ${_purchaseAmount(limitMinor)}',
                       ),
                     if (widget.refund) ...[
+                      if (sourceRefundSupported &&
+                          refundLedger?.invoiceBalance(widget.payment.invoiceId!) != null)
+                        Text(
+                          'Limited to the lower of invoice refund credit '
+                          '${_purchaseAmount(refundLedger!.invoiceBalance(widget.payment.invoiceId!)!.refundableMinor)} '
+                          'and the selected payment’s remaining refundable amount.',
+                          key: const Key('refund-limit-explanation'),
+                          style: const TextStyle(fontSize: 12, color: MoolColors.muted),
+                        ),
                       const Text('Original payment', style: TextStyle(fontWeight: FontWeight.w600)),
                       if (refundReceipts.isEmpty)
                         const Text('Original payment details unavailable.')
@@ -24601,7 +24901,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                             icon: Icon(sourceCollectionId == receipt.id ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 18),
                             label: Text('${receipt.channel.label} · ${_purchaseAmount(receipt.amountMinor)} · '
                                 '${MaterialLocalizations.of(context).formatShortDate(receipt.occurredAt.toLocal())}\n'
-                                'Remaining: ${receiptRemainingLabel(receipt)}'),
+                                'Payment refundable balance: ${receiptRemainingLabel(receipt)}'),
                           ),
                       if (sourceReceipt?.paymentReference?.isNotEmpty == true)
                         Text('Original transaction: ${sourceReceipt!.paymentReference}', key: const Key('refund-original-reference')),
@@ -24609,7 +24909,9 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                         const Text('Original payer account details unavailable. Confirm the customer’s destination before returning money. Original-payment refunds require a connected payment provider.', key: Key('refund-account-guidance')),
                       const SizedBox(height: 16),
                     ],
-                    TextField(
+                    _StoreAmountWidth(
+                      controller: amount,
+                      child: TextField(
                       key: Key(
                         widget.refund ? 'refund-amount' : 'collection-amount',
                       ),
@@ -24639,6 +24941,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                             ? 'Amount received'
                             : 'Amount received (₹)',
                         prefixText: widget.counterSaleReceipt ? '₹ ' : null,
+                      ),
                       ),
                     ),
                     if (widget.counterSaleReceipt)
@@ -27421,6 +27724,38 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
   String? source;
   String? error;
   bool saving = false;
+  bool needsReview = false;
+  bool get _sameStore => widget.session.activeWorkspace?.id == widget.ledger.workspaceId &&
+      widget.session.workspaceFinance?.accountScope == widget.ledger.accountScope;
+  Future<void> _reviewSavedInvoice() async {
+    if (!_sameStore) {
+      setState(() => error = 'Store changed. Close and return to the original invoice.');
+      return;
+    }
+    setState(() { saving = true; error = null; });
+    final recovered = await widget.session.recoverCustomerLedger();
+    if (!mounted) return;
+    if (recovered && _sameStore) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      saving = false;
+      error = _sameStore
+          ? 'Saved records could not be loaded. Try reviewing again before applying credit.'
+          : 'Store changed. Close and return to the original invoice.';
+    });
+  }
+  String _sourceContext(String id) {
+    final original = widget.ledger.entries.where((entry) => entry.invoiceId == id &&
+        entry.valid && entry.kind == WorkspaceLedgerEntryKind.invoice &&
+        entry.state == WorkspaceLedgerPostingState.posted).firstOrNull;
+    if (original == null) return 'Original invoice details unavailable';
+    final date = original.occurredAt.toLocal();
+    final label = '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/${date.year}';
+    return '$label · Original invoice ${_purchaseAmount(original.amountMinor)}';
+  }
   @override
   void dispose() { amount.dispose(); super.dispose(); }
   @override
@@ -27438,23 +27773,30 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
             ListTile(dense: true, contentPadding: EdgeInsets.zero,
               leading: Icon(source == id ? Icons.radio_button_checked : Icons.radio_button_unchecked),
               selected: source == id,
-              title: Text(id), subtitle: Text('Available ${_purchaseAmount(widget.ledger.invoiceBalance(id)!.availableCreditMinor)}'),
-              onTap: saving ? null : () => setState(() {
+              title: Text(id), subtitle: Text('${_sourceContext(id)}\n'
+                  'Available credit ${_purchaseAmount(widget.ledger.invoiceBalance(id)!.availableCreditMinor)}',
+                  key: ValueKey('customer-credit-source-context-$id')),
+              onTap: saving || needsReview ? null : () => setState(() {
                 source = id;
                 final credit = widget.ledger.invoiceBalance(id)!.availableCreditMinor;
                 amount.text = _formatStoreMinorAmount(credit < widget.payment.dueMinor ? credit : widget.payment.dueMinor);
                 error = null;
               })),
           Align(alignment: Alignment.centerLeft, child: SizedBox(width: 180, child: TextField(
-            key: const Key('customer-credit-amount'), controller: amount, enabled: !saving,
+            key: const Key('customer-credit-amount'), controller: amount, enabled: !saving && !needsReview,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(labelText: 'Credit to use', prefixText: '₹ ')))),
           const SizedBox(height: 12),
           const Text('This reduces the invoice due. No money is collected or refunded.'),
           if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          if (needsReview) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+            key: const Key('customer-credit-review-saved'),
+            onPressed: saving ? null : _reviewSavedInvoice,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: Text(saving ? 'Checking saved records…' : 'Review saved invoice'))),
           Align(alignment: Alignment.centerLeft, child: TextButton.icon(
             key: const Key('customer-credit-confirm'), icon: const Icon(Icons.check, size: 18),
-            label: Text(saving ? 'Applying…' : 'Apply credit'), onPressed: saving ? null : () async {
+            label: Text(saving && !needsReview ? 'Applying…' : 'Apply credit'), onPressed: saving || needsReview ? null : () async {
               final text = amount.text.trim();
               if (source == null || !RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(text)) {
                 setState(() => error = 'Select a credit and enter a valid amount.'); return;
@@ -27474,7 +27816,8 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
                 expectedRevision: widget.ledger.revision);
               if (!mounted || !context.mounted) return;
               if (done) { Navigator.pop(context); } else {
-                setState(() { saving = false; error = 'Credit update not confirmed. Close and check saved records.'; });
+                setState(() { saving = false; needsReview = true;
+                  error = 'Credit update not confirmed. Review the saved invoice before trying again.'; });
               }
             })),
         ])))));
@@ -29178,6 +29521,35 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
 
 /// Keeps the next step visible while the form scrolls above the keyboard.
 /// Very short windows retain one scroll surface instead of overflowing a footer.
+class _StoreAmountWidth extends StatelessWidget {
+  const _StoreAmountWidth({required this.controller, required this.child});
+  final TextEditingController controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      child: child,
+      builder: (context, value, field) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final measure = TextPainter(
+          text: TextSpan(text: '₹ ${value.text}',
+              style: Theme.of(context).textTheme.bodyLarge),
+          textDirection: Directionality.of(context), textScaler: scaler,
+        )..layout();
+        final preferred = measure.width + 56;
+        final minimum = scaler.scale(220);
+        final width = (preferred > minimum ? preferred : minimum)
+            .clamp(0.0, constraints.maxWidth).toDouble();
+        measure.dispose();
+        return Align(alignment: Alignment.centerLeft,
+            child: SizedBox(width: width, child: field));
+      },
+    ),
+  );
+}
+
 class _StoreFormLayout extends StatelessWidget {
   const _StoreFormLayout({
     required this.child,
@@ -29807,7 +30179,7 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
         key: const Key('work-counter-store-product-page'),
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Store Product'),
+          title: const Text('Product details', style: TextStyle(fontSize: 18)),
           flexibleSpace: const SizedBox.expand(
             child: DecoratedBox(
               decoration: BoxDecoration(gradient: _counterSaleHeaderGradient),
@@ -29816,7 +30188,7 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
         ),
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             children: [
               if (!current)
                 const Text(
@@ -29825,34 +30197,32 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
               else if (product == null)
                 const Text('This product is no longer in your store catalogue.')
               else ...[
-                Text(
-                  product.brand,
-                  style: const TextStyle(color: MoolColors.muted),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  product.title,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: MoolColors.navy,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text('${product.variant} · ${product.pack}'),
-                const SizedBox(height: 24),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  StoreProductThumbnail(key: const Key('work-counter-details-photo'),
+                    product: product, session: widget.session, extent: 64),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (product.brand.trim().isNotEmpty)
+                      Text(product.brand, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                    Text(product.title, style: const TextStyle(fontSize: 18,
+                      fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                    Text([product.variant, product.pack].where((value) => value.trim().isNotEmpty).join(' · '),
+                      style: const TextStyle(fontSize: 13, color: MoolColors.muted)),
+                  ])),
+                ]),
+                const SizedBox(height: 12),
                 Text(
                   '₹${_formatStoreAmount(product.sellingPrice)}',
                   style: const TextStyle(
                     color: MoolColors.navy,
-                    fontSize: 30,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                Text(product.unitPrice),
+                if (product.unitPrice.trim().isNotEmpty) Text(product.unitPrice),
                 if (product.mrp != null)
                   Text('MRP ₹${_formatStoreAmount(product.mrp!)}'),
-                const Divider(height: 32),
+                const Divider(height: 20),
                 _ProductPreviewLine(label: 'In this bill', value: '$quantity'),
                 _ProductPreviewLine(
                   label: 'Availability',
@@ -29862,7 +30232,9 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
                       ? 'Available'
                       : '${product.stock} in stock',
                 ),
-                _ProductPreviewLine(label: 'Product code', value: product.sku),
+                if (product.sku.trim().isNotEmpty)
+                  _ProductPreviewLine(label: 'Product code', value: product.sku),
+                if (product.barcode.trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 const Text(
                   'Barcode',
@@ -29877,11 +30249,14 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                ],
+                if (product.origin.trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 _ProductPreviewLine(
                   label: 'Country of origin',
                   value: product.origin,
                 ),
+                ],
                 if (product.composition?.isNotEmpty == true) ...[
                   const SizedBox(height: 16),
                   Text(product.composition!),

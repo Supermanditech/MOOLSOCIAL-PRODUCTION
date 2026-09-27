@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/design/mool_colors.dart';
 import '../../buy/buy_v2_models.dart';
-import '../../../ui_v2/buy/buy_v2_design.dart';
 
 /// Buy-style category window with Store catalogue inputs, never a customer cart.
 class StoreCatalogueCategories extends StatefulWidget {
@@ -14,6 +13,7 @@ class StoreCatalogueCategories extends StatefulWidget {
     required this.stockOnly,
     this.stockFilter = '',
     this.stockFilters = const {},
+    this.editorSelection = false,
   });
   final String selected;
   final Map<String, int> counts;
@@ -21,6 +21,7 @@ class StoreCatalogueCategories extends StatefulWidget {
   final bool stockOnly;
   final String stockFilter;
   final Map<String, String> stockFilters;
+  final bool editorSelection;
   @override
   State<StoreCatalogueCategories> createState() =>
       _StoreCatalogueCategoriesState();
@@ -38,7 +39,7 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
   @override
   Widget build(BuildContext context) {
     final ids = widget.counts.keys.toList()..sort();
-    final categories = ['', ...ids];
+    final categories = [if (!widget.editorSelection) '', ...ids];
     final publicLabels = {
       for (final item in [
         ...BuyV2Catalogue.shopCategories,
@@ -47,7 +48,8 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
         item.id: item.label,
     };
     String label(String key) =>
-        key.isEmpty ? 'All categories' : publicLabels[key] ?? widget.label(key);
+        key.isEmpty ? 'All categories' : widget.editorSelection
+            ? widget.label(key) : publicLabels[key] ?? widget.label(key);
     final filtered = categories
         .where((key) => label(key).toLowerCase().contains(_query.toLowerCase()))
         .toList();
@@ -63,7 +65,9 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
       _ => Icons.category_outlined,
     };
     return FractionallySizedBox(
-      heightFactor: 1,
+      heightFactor: widget.stockOnly || widget.editorSelection
+          ? (MediaQuery.orientationOf(context) == Orientation.landscape ||
+              MediaQuery.viewInsetsOf(context).bottom > 0 ? 1 : .72) : 1,
       child: Material(
         key: const Key('work-catalogue-category-window'),
         color: Colors.white,
@@ -80,7 +84,7 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        widget.stockOnly
+                        widget.editorSelection ? 'Choose category' : widget.stockOnly
                             ? 'Store stock categories'
                             : 'Catalogue categories',
                         style: const TextStyle(
@@ -161,6 +165,38 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
                     ? const Center(child: Text('No matching categories'))
                     : LayoutBuilder(
                         builder: (context, size) {
+                          if (widget.stockOnly || widget.editorSelection) {
+                            return ListView.separated(
+                              key: const Key('work-catalogue-category-list'),
+                              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, _) => const Divider(height: 1, color: MoolColors.line),
+                              itemBuilder: (context, index) {
+                                final id = filtered[index];
+                                final count = id.isEmpty
+                                    ? widget.counts.values.fold<int>(0, (a, b) => a + b)
+                                    : widget.counts[id]!;
+                                return ListTile(
+                                  key: Key('work-catalogue-category-$id'),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  minVerticalPadding: 10,
+                                  selected: id == widget.selected,
+                                  selectedTileColor: const Color(0xFFF0F2F8),
+                                  leading: Icon(icon(id), size: 22, color: MoolColors.navy),
+                                  title: Text(label(id), style: const TextStyle(fontSize: 14,
+                                      color: MoolColors.navy, fontWeight: FontWeight.w600)),
+                                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                    if (!widget.editorSelection) Text('$count',
+                                        style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                                    if (id == widget.selected) const Padding(
+                                        padding: EdgeInsets.only(left: 8),
+                                        child: Icon(Icons.check, size: 18, color: MoolColors.navy)),
+                                  ]),
+                                  onTap: () => Navigator.pop(context, id),
+                                );
+                              },
+                            );
+                          }
                           final scale = MediaQuery.textScalerOf(
                             context,
                           ).scale(1);
@@ -176,9 +212,7 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: columns,
-                                  mainAxisExtent: widget.stockOnly
-                                      ? 104 + 36 * (scale - 1)
-                                      : 68 + 36 * scale,
+                                  mainAxisExtent: 68 + 36 * scale,
                                   crossAxisSpacing: 8,
                                   mainAxisSpacing: 8,
                                 ),
@@ -196,19 +230,15 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
                                 button: true,
                                 child: Material(
                                   color: selected
-                                      ? (widget.stockOnly
-                                            ? const Color(0xFFFDF0E1)
-                                            : const Color(0xffedf0ff))
+                                      ? const Color(0xffedf0ff)
                                       : Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(
-                                      widget.stockOnly ? 16 : 14,
+                                      14,
                                     ),
                                     side: BorderSide(
                                       color: selected
-                                          ? (widget.stockOnly
-                                                ? MoolColors.orange
-                                                : MoolColors.navy)
+                                          ? MoolColors.navy
                                           : MoolColors.line,
                                     ),
                                   ),
@@ -222,28 +252,18 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          if (widget.stockOnly)
-                                            _StockCategoryThumbnail(
-                                              id: id,
-                                              label: label(id),
-                                            )
-                                          else
-                                            Icon(
+                                          Icon(
                                               icon(id),
                                               size: 22,
                                               color: MoolColors.navy,
                                             ),
-                                          if (widget.stockOnly)
-                                            const SizedBox(height: 5),
                                           Text(
                                             label(id),
                                             textAlign: TextAlign.center,
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              fontSize: widget.stockOnly
-                                                  ? 10
-                                                  : 12,
+                                              fontSize: 12,
                                               fontWeight: selected
                                                   ? FontWeight.w900
                                                   : FontWeight.w700,
@@ -269,118 +289,6 @@ class _StoreCatalogueCategoriesState extends State<StoreCatalogueCategories> {
                       ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Cursor Buy picker presentation, adapted to saved Store category IDs. Reuses
-// the existing bundled category atlas and crop model; no product-photo claim.
-class _StockCategoryThumbnail extends StatelessWidget {
-  const _StockCategoryThumbnail({required this.id, required this.label});
-  final String id, label;
-  @override
-  Widget build(BuildContext context) {
-    final entry = switch (id) {
-      'fruits-vegetables' => (BuyV2ProductPackshot.categoryAtlasAPath, 0),
-      'dairy-bakery' => (BuyV2ProductPackshot.categoryAtlasAPath, 1),
-      'eggs-poultry' => (BuyV2ProductPackshot.categoryAtlasAPath, 2),
-      'meat-seafood' => (BuyV2ProductPackshot.categoryAtlasAPath, 3),
-      'flour-grains' ||
-      'flour-rice-grains' ||
-      'dals-staples' => (BuyV2ProductPackshot.categoryAtlasAPath, 4),
-      'cooking-oil' ||
-      'oils-ghee' => (BuyV2ProductPackshot.categoryAtlasAPath, 5),
-      'salt-spices' ||
-      'ground-spices' => (BuyV2ProductPackshot.categoryAtlasAPath, 6),
-      'whole-spices' => (BuyV2ProductPackshot.categoryAtlasAPath, 7),
-      'breakfast-cereals' => (BuyV2ProductPackshot.categoryAtlasAPath, 8),
-      'instant-foods' => (BuyV2ProductPackshot.categoryAtlasAPath, 9),
-      'biscuits-chocolate' => (BuyV2ProductPackshot.categoryAtlasAPath, 10),
-      'namkeen-chips' => (BuyV2ProductPackshot.categoryAtlasAPath, 11),
-      'tea-coffee' => (BuyV2ProductPackshot.categoryAtlasBPath, 0),
-      'juices-water' => (BuyV2ProductPackshot.categoryAtlasBPath, 1),
-      'frozen-foods' => (BuyV2ProductPackshot.categoryAtlasBPath, 2),
-      'icecream-cheese' => (BuyV2ProductPackshot.categoryAtlasBPath, 3),
-      'oral-care' => (BuyV2ProductPackshot.categoryAtlasBPath, 4),
-      'bath-hand-care' => (BuyV2ProductPackshot.categoryAtlasBPath, 5),
-      'hair-care' => (BuyV2ProductPackshot.categoryAtlasBPath, 6),
-      'skin-care' => (BuyV2ProductPackshot.categoryAtlasBPath, 7),
-      'surface-cleaners' => (BuyV2ProductPackshot.categoryAtlasBPath, 8),
-      'laundry-dishwash' => (BuyV2ProductPackshot.categoryAtlasBPath, 9),
-      'air-waste-care' => (BuyV2ProductPackshot.categoryAtlasBPath, 10),
-      'diapers-wipes' => (BuyV2ProductPackshot.categoryAtlasBPath, 11),
-      'baby-care' => (BuyV2ProductPackshot.categoryAtlasCPath, 0),
-      'health-wellness' => (BuyV2ProductPackshot.categoryAtlasCPath, 1),
-      'dog-care' => (BuyV2ProductPackshot.categoryAtlasCPath, 2),
-      'cat-care' => (BuyV2ProductPackshot.categoryAtlasCPath, 3),
-      'food-storage-packs' ||
-      'horeca-food-packs' => (BuyV2ProductPackshot.categoryAtlasCPath, 4),
-      'cups-tissues' ||
-      'horeca-tableware' => (BuyV2ProductPackshot.categoryAtlasCPath, 5),
-      'shop-supplies' ||
-      'retail-supplies' => (BuyV2ProductPackshot.categoryAtlasCPath, 6),
-      'school-office' ||
-      'stationery-office' => (BuyV2ProductPackshot.categoryAtlasCPath, 7),
-      'sauces-spreads' => (BuyV2ProductPackshot.categoryAtlasCPath, 8),
-      _ => null,
-    };
-    final source = entry == null
-        ? null
-        : BuyV2ProductMediaSource(
-            assetPath: entry.$1,
-            cell: entry.$2,
-            kind: BuyV2ProductMediaKind.category,
-          );
-    final fallback = Icon(
-      id.isEmpty ? Icons.apps_rounded : Icons.category_outlined,
-      color: MoolColors.navy,
-      size: 20,
-    );
-    const size = 36.0;
-    return Semantics(
-      image: true,
-      label: '$label category illustration',
-      excludeSemantics: true,
-      child: SizedBox.square(
-        dimension: size,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(9),
-          child: ColoredBox(
-            color: BuyV2Colors.softBlue,
-            child: source == null
-                ? fallback
-                : Stack(
-                    clipBehavior: Clip.hardEdge,
-                    children: [
-                      Positioned(
-                        left:
-                            -source.sourceRect.left *
-                            size /
-                            source.sourceRect.width,
-                        top:
-                            -source.sourceRect.top *
-                            size /
-                            source.sourceRect.height,
-                        width:
-                            source.atlasSize.width *
-                            size /
-                            source.sourceRect.width,
-                        height:
-                            source.atlasSize.height *
-                            size /
-                            source.sourceRect.height,
-                        child: Image.asset(
-                          source.assetPath,
-                          fit: BoxFit.fill,
-                          errorBuilder: (_, _, _) =>
-                              SizedBox.square(dimension: size, child: fallback),
-                        ),
-                      ),
-                    ],
-                  ),
           ),
         ),
       ),
