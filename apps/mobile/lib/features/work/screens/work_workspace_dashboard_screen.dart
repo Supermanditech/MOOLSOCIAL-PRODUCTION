@@ -56,6 +56,51 @@ String _formatStoreMinorAmount(int value) {
       '${decimals == 0 ? '' : '.${decimals.toString().padLeft(2, '0')}'}';
 }
 
+@visibleForTesting
+String storeCounterSettlementHint(WorkspacePaymentRecord? payment,
+    Iterable<WorkspaceCustomerLedgerEntry> entries) {
+  const pending = 'Confirm payment before handing over goods.';
+  const handover = 'Hand over goods at the counter.';
+  if (payment == null || !payment.valid || payment.dueMinor != 0 ||
+      payment.refundedMinor != 0) { return pending; }
+  if (payment.state != WorkspacePaymentState.creditApplied) {
+    return payment.paidMinor > 0 && payment.paidMinor >= payment.amountMinor
+        ? 'Hand over goods at the counter' : pending;
+  }
+  var credit = 0;
+  final receipts = <WorkspacePaymentChannel, int>{};
+  for (final entry in entries) {
+    if (!entry.valid || entry.invoiceId != payment.invoiceId ||
+        entry.orderId != payment.orderId ||
+        entry.state != WorkspaceLedgerPostingState.posted) { continue; }
+    if (entry.kind == WorkspaceLedgerEntryKind.creditReceived) {
+      credit += entry.amountMinor;
+    } else if (entry.kind == WorkspaceLedgerEntryKind.collection) {
+      receipts.update(entry.channel, (value) => value + entry.amountMinor,
+          ifAbsent: () => entry.amountMinor);
+    }
+  }
+  final collected = receipts.values.fold<int>(0, (sum, value) => sum + value);
+  if (credit <= 0 || credit + payment.paidMinor != payment.amountMinor ||
+      collected != payment.paidMinor) {
+    return payment.paidMinor > 0
+        ? 'Settled with customer credit and recorded payments. $handover'
+        : 'Settled using customer credit. $handover';
+  }
+  final parts = ['${_purchaseAmount(credit)} customer credit'];
+  for (final entry in receipts.entries) {
+    final label = switch (entry.key) {
+      WorkspacePaymentChannel.cash => 'cash',
+      WorkspacePaymentChannel.directUpi => 'UPI',
+      WorkspacePaymentChannel.bankTransfer => 'bank transfer',
+      WorkspacePaymentChannel.platform => 'through MoolSocial',
+      _ => 'recorded payment',
+    };
+    parts.add('${_purchaseAmount(entry.value)} $label');
+  }
+  return 'Settled with ${parts.join(' + ')}. $handover';
+}
+
 String _storeSummaryAmount(String exact) {
   final parts = RegExp(r'^(-?)(\d+)(?:\.(\d{1,2}))?$').firstMatch(
     exact.replaceAll('₹', '').replaceAll(',', '').replaceAll('−', '-'),
@@ -7743,13 +7788,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
               .firstOrNull
         : null;
     final issued = invoice.issuedAt.toLocal();
-    final paid =
-        payment != null &&
-        payment.dueMinor == 0 &&
-        payment.paidMinor > 0 &&
-        payment.paidMinor >= payment.amountMinor;
-    final settledWithCredit = payment?.state == WorkspacePaymentState.creditApplied &&
-        payment?.dueMinor == 0;
+    final paid = payment != null && payment.dueMinor == 0 &&
+        payment.paidMinor > 0 && payment.paidMinor >= payment.amountMinor;
+    final settlementLedger = finance?.customerLedgers.where((ledger) =>
+        ledger.valid && ledger.accountScope == invoiceAccount &&
+        ledger.workspaceId == invoiceStore &&
+        ledger.customerId == payment?.customerId).firstOrNull;
     final adjusted = (payment?.refundedMinor ?? 0) > 0 ||
         payment?.state == WorkspacePaymentState.refundPending ||
         (finance?.customerLedgers.any(
@@ -7931,11 +7975,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                 )) ...[
                   const SizedBox(height: 12),
                   Text(
-                    settledWithCredit
-                        ? 'Settled using customer credit. Hand over goods at the counter.'
-                        : paid
-                        ? 'Hand over goods at the counter'
-                        : 'Confirm payment before handing over goods.',
+                    storeCounterSettlementHint(payment,
+                        settlementLedger?.entries ?? const []),
                     key: Key('work-counter-handover-hint'),
                     style: const TextStyle(
                       color: MoolColors.muted,
