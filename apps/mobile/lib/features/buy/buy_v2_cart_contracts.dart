@@ -296,12 +296,6 @@ const buyV2DeliveryInstructionOptions = <BuyV2DeliveryInstructionOption>[
     detail: 'Confirm access before unloading.',
   ),
   BuyV2DeliveryInstructionOption(
-    id: 'trade-cartons-together',
-    destination: BuyV2Destination.wholesale,
-    label: 'Keep boxes together',
-    detail: 'Keep this trade order grouped at handover.',
-  ),
-  BuyV2DeliveryInstructionOption(
     id: 'medicine-hand-recipient',
     destination: BuyV2Destination.medicine,
     label: 'Hand to the recipient',

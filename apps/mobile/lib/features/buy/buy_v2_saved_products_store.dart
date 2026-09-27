@@ -141,6 +141,7 @@ class BuyV2CustomerStateSnapshot {
     this.selectedAddressId,
     this.savedProductKeys = const {},
     this.deliveryInstructionIds = const {},
+    this.customDeliveryInstructions = const {},
     this.selectedPayment,
     this.purchaseOrderReference,
     this.pendingPurchaseOrderAccountId,
@@ -177,6 +178,7 @@ class BuyV2CustomerStateSnapshot {
   final String? selectedAddressId;
   final Set<String> savedProductKeys;
   final Map<BuyV2Destination, String> deliveryInstructionIds;
+  final Map<BuyV2Destination, String> customDeliveryInstructions;
   final String? selectedPayment;
   final String? purchaseOrderReference;
   final String? pendingPurchaseOrderAccountId;
@@ -281,6 +283,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ],
     'selectedAddressId': snapshot.selectedAddressId,
     'savedProductKeys': snapshot.savedProductKeys.toList(growable: false),
+    'customDeliveryInstructions': {
+      for (final entry in snapshot.customDeliveryInstructions.entries)
+        entry.key.name: entry.value,
+    },
     'deliveryInstructionIds': {
       for (final entry in snapshot.deliveryInstructionIds.entries)
         entry.key.name: entry.value,
@@ -339,6 +345,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
         ).map(_decodeAddress).whereType<BuyV2Address>().toList(growable: false),
         selectedAddressId: _string(source['selectedAddressId']),
         savedProductKeys: _stringList(source['savedProductKeys']).toSet(),
+        customDeliveryInstructions: _destinationStringMap(
+          source['customDeliveryInstructions'],
+        ),
         deliveryInstructionIds: _destinationStringMap(
           source['deliveryInstructionIds'],
         ),

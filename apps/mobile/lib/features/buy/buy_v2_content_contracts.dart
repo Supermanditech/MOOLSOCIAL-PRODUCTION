@@ -281,6 +281,7 @@ class BuyV2VariantFamilySnapshot {
   final DateTime observedAt;
   final DateTime validUntil;
   final bool complete;
+
   /// Publication membership, not a stock or delivery promise. Offer facts and
   /// checkout still authorize availability for the selected location.
   final bool selectedAvailable;
@@ -1758,6 +1759,7 @@ class BuyV2OrderPlacementRequest {
     required this.amountDueNow,
     required this.idempotencyKey,
     this.commercialPaymentTermIds = const {},
+    this.deliveryInstructionsByProductId = const {},
     this.checkoutQuoteId,
     this.purchaseOrderRequestId,
     this.purchaseOrderRevision,
@@ -1765,6 +1767,12 @@ class BuyV2OrderPlacementRequest {
   });
 
   final List<BuyV2CartLine> lines;
+
+  /// Optional buyer notes, keyed only by product IDs in this checkout.
+  /// The provider must copy each note to its matching fulfilment order and
+  /// expose it only to the fulfilling Store and assigned delivery partner.
+  /// Pickup instructions are for the fulfilling Store; never broadcast notes.
+  final Map<String, String> deliveryInstructionsByProductId;
   final BuyV2Address address;
   final String paymentMethod;
   final int total;

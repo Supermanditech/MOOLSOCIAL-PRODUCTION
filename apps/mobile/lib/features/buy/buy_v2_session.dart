@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 
 import '../work/scan_and_pick_contract.dart';
 import 'buy_session.dart';
@@ -5442,6 +5443,7 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, String> _liveDeliveryRefreshMessages = {};
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
+  final Map<BuyV2Destination, String> _customDeliveryInstructions = {};
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
       {};
   List<BuyV2CartBenefit> _liveCartBenefits = [];
@@ -7219,6 +7221,17 @@ class BuyV2Session extends ChangeNotifier {
     _deliveryInstructionIds
       ..clear()
       ..addAll(snapshot.deliveryInstructionIds);
+    _customDeliveryInstructions
+      ..clear()
+      ..addEntries(
+        snapshot.customDeliveryInstructions.entries
+            .where(
+              (entry) =>
+                  entry.value.trim().isNotEmpty &&
+                  entry.value.characters.length <= 200,
+            )
+            .map((entry) => MapEntry(entry.key, entry.value.trim())),
+      );
     final storedPayment = snapshot.selectedPayment;
     if (storedPayment != null &&
         supportedPaymentMethods.contains(storedPayment) &&
@@ -7453,6 +7466,7 @@ class BuyV2Session extends ChangeNotifier {
       selectedAddressId: _selectedAddressId,
       savedProductKeys: Set.unmodifiable(_savedKeys),
       deliveryInstructionIds: Map.unmodifiable(_deliveryInstructionIds),
+      customDeliveryInstructions: Map.unmodifiable(_customDeliveryInstructions),
       selectedPayment: selectedPayment.isEmpty ? null : selectedPayment,
       purchaseOrderReference: purchaseOrderReference.trim().isEmpty
           ? null
@@ -8198,12 +8212,43 @@ class BuyV2Session extends ChangeNotifier {
         .firstOrNull;
   }
 
+  String? customDeliveryInstructionFor(BuyV2Destination destination) =>
+      _customDeliveryInstructions[destination];
+
+  String? deliveryInstructionTextFor(BuyV2Destination destination) =>
+      customDeliveryInstructionFor(destination) ??
+      selectedDeliveryInstructionFor(destination)?.label;
+
+  bool setCustomDeliveryInstruction({
+    required BuyV2Destination destination,
+    required String text,
+  }) {
+    final note = text.trim();
+    if (note.characters.length > 200 ||
+        !_cart.values.any((line) => line.product.destination == destination)) {
+      notice = 'Use up to 200 characters for delivery instructions.';
+      notifyListeners();
+      return false;
+    }
+    _deliveryInstructionIds.remove(destination);
+    if (note.isEmpty) {
+      _customDeliveryInstructions.remove(destination);
+    } else {
+      _customDeliveryInstructions[destination] = note;
+    }
+    notice = null;
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
   bool chooseDeliveryInstruction({
     required BuyV2Destination destination,
     required String? instructionId,
   }) {
     if (instructionId == null) {
       _deliveryInstructionIds.remove(destination);
+      _customDeliveryInstructions.remove(destination);
       notice = null;
       _persistCustomerState();
       notifyListeners();
@@ -8219,6 +8264,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    _customDeliveryInstructions.remove(destination);
     _deliveryInstructionIds[destination] = instructionId;
     notice = null;
     _persistCustomerState();
@@ -12573,6 +12619,7 @@ class BuyV2Session extends ChangeNotifier {
     };
     _cart.clear();
     _deliveryInstructionIds.clear();
+    _customDeliveryInstructions.clear();
     _selectedCartBenefitRefs.clear();
     _tipsByFulfilmentKey.clear();
     destination = fallback;
@@ -13222,6 +13269,12 @@ class BuyV2Session extends ChangeNotifier {
     final placement = await commerceAdapter.placeOrder(
       BuyV2OrderPlacementRequest(
         lines: List.unmodifiable(lines),
+        deliveryInstructionsByProductId: Map.unmodifiable({
+          for (final line in lines)
+            line.product.id: ?deliveryInstructionTextFor(
+              line.product.destination,
+            ),
+        }),
         address: address,
         paymentMethod: selectedPayment,
         total: checkoutPayableTotal,
@@ -13880,9 +13933,7 @@ class BuyV2Session extends ChangeNotifier {
           : null,
       recipient: address.recipient,
       addressLine: '${address.line}, ${address.area} ${address.pinCode}',
-      deliveryInstruction: selectedDeliveryInstructionFor(
-        group.destination,
-      )?.label,
+      deliveryInstruction: deliveryInstructionTextFor(group.destination),
       tip: tipForGroup(group),
       discount: discount,
       paymentTermLabel: paymentTerm == null
@@ -13931,6 +13982,9 @@ class BuyV2Session extends ChangeNotifier {
         .map((line) => line.product.destination)
         .toSet();
     _deliveryInstructionIds.removeWhere(
+      (destination, _) => !destinations.contains(destination),
+    );
+    _customDeliveryInstructions.removeWhere(
       (destination, _) => !destinations.contains(destination),
     );
     _selectedCartBenefitRefs.removeWhere((key, _) {

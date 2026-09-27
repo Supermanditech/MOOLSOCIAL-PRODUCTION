@@ -1873,6 +1873,104 @@ void r669SharedProductTests() {
 
 void main() {
   test(
+    'custom delivery note codec restores only its customer and basket',
+    () async {
+      final preferences = _R669StringPreferences();
+      BuyV2Session make(String owner) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: owner,
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        return session;
+      }
+
+      final first = make('delivery-note-a');
+      await first.restoreCustomerState();
+      first.addProduct('s-tomato');
+      first.addProduct('w-notebook');
+      expect(
+        first.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Use side entrance',
+        ),
+        isTrue,
+      );
+      expect(
+        first.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.wholesale,
+          text: 'Warehouse gate 2',
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final restored = make('delivery-note-a');
+      await restored.restoreCustomerState();
+      expect(
+        restored.customDeliveryInstructionFor(BuyV2Destination.shop),
+        'Use side entrance',
+      );
+      expect(
+        restored.customDeliveryInstructionFor(BuyV2Destination.wholesale),
+        'Warehouse gate 2',
+      );
+      final other = make('delivery-note-b');
+      await other.restoreCustomerState();
+      expect(other.customDeliveryInstructionFor(BuyV2Destination.shop), isNull);
+      expect(
+        restored.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: ' ',
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final cleared = make('delivery-note-a');
+      await cleared.restoreCustomerState();
+      expect(cleared.deliveryInstructionTextFor(BuyV2Destination.shop), isNull);
+      expect(
+        cleared.deliveryInstructionTextFor(BuyV2Destination.wholesale),
+        'Warehouse gate 2',
+      );
+    },
+  );
+  test(
+    'delivery note placement binds only submitted product identities',
+    () async {
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      addTearDown(fixture.session.dispose);
+      final destination = fixture.session.cartLines.first.product.destination;
+      expect(
+        fixture.session.setCustomDeliveryInstruction(
+          destination: destination,
+          text: 'Use side entrance',
+        ),
+        isTrue,
+      );
+      expect(await fixture.session.submitOrder(), isFalse);
+      final request = fixture.adapter.requests.single;
+      expect(request.deliveryInstructionsByProductId, isNotEmpty);
+      expect(
+        request.deliveryInstructionsByProductId.keys.toSet(),
+        request.lines
+            .where((line) => line.product.destination == destination)
+            .map((line) => line.product.id)
+            .toSet(),
+      );
+      expect(request.deliveryInstructionsByProductId.values.toSet(), {
+        'Use side entrance',
+      });
+    },
+  );
+
+  test(
     'review comparison cart restores through exact catalogue resolver',
     () async {
       for (final destination in [

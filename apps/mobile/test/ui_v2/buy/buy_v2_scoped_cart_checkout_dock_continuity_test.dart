@@ -389,7 +389,10 @@ void main() {
           reason: 'Primary action should fit its text with modest padding.',
         );
         expect(face.height, greaterThanOrEqualTo(44));
-        await captureR66Visual(tester, 'pure-white-orders-$orders-scale-$scale');
+        await captureR66Visual(
+          tester,
+          'pure-white-orders-$orders-scale-$scale',
+        );
         await tester.tap(primary);
         await tester.pumpAndSettle();
         expect(session.itemCount, 1);
@@ -4382,6 +4385,20 @@ void main() {
         await tester.pumpAndSettle();
         await settleVisibleImages(tester);
         expectConnectedOwner(tester, session, BuyV2Destination.shop);
+        if (!viewport.checkout) {
+          // Offers now start open. Preserve the existing collapsed-state
+          // reference by explicitly exercising the customer's collapse action.
+          expect(
+            find.byKey(const ValueKey('buy-cart-benefits-inline')),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(const ValueKey('buy-cart-coupons')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-cart-benefits-inline')),
+            findsNothing,
+          );
+        }
         // These checkout captures render the same approved checkout as the
         // Cart-return suite. Share its successor reference, retaining originals.
         final reference = viewport.checkout

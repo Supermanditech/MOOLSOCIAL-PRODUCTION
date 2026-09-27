@@ -8622,7 +8622,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
     );
   }
 
-  bool _benefitsExpanded = false;
+  bool _benefitsExpanded = true;
   late BuyV2CartScope _scope;
   late ScrollController _scrollController;
 
@@ -22029,6 +22029,7 @@ class _CartDeliveryInstructionSections extends StatelessWidget {
           ),
           for (final destination in eligible)
             _CartDeliveryInstructionCard(
+              key: ValueKey('buy-delivery-note-owner-${destination.name}'),
               session: session,
               destination: destination,
               showDestination: eligible.length > 1,
@@ -22039,8 +22040,9 @@ class _CartDeliveryInstructionSections extends StatelessWidget {
   }
 }
 
-class _CartDeliveryInstructionCard extends StatelessWidget {
+class _CartDeliveryInstructionCard extends StatefulWidget {
   const _CartDeliveryInstructionCard({
+    super.key,
     required this.session,
     required this.destination,
     required this.showDestination,
@@ -22051,9 +22053,35 @@ class _CartDeliveryInstructionCard extends StatelessWidget {
   final bool showDestination;
 
   @override
+  State<_CartDeliveryInstructionCard> createState() =>
+      _CartDeliveryInstructionCardState();
+}
+
+class _CartDeliveryInstructionCardState
+    extends State<_CartDeliveryInstructionCard> {
+  final _noteController = TextEditingController();
+  bool _editing = false;
+  BuyV2Session get session => widget.session;
+  BuyV2Destination get destination => widget.destination;
+  bool get showDestination => widget.showDestination;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final noteActionStyle = TextButton.styleFrom(
+      foregroundColor: BuyV2ActionStyle.primaryForeground,
+      minimumSize: const Size(44, 44),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+    );
     final options = session.deliveryInstructionsFor(destination);
     final selected = session.selectedDeliveryInstructionFor(destination);
+    final customNote = session.customDeliveryInstructionFor(destination);
     return Column(
       key: ValueKey('buy-cart-delivery-instructions-${destination.name}'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -22098,6 +22126,18 @@ class _CartDeliveryInstructionCard extends StatelessWidget {
                   },
                   child: const Text('Clear'),
                 ),
+              TextButton.icon(
+                style: noteActionStyle,
+                key: ValueKey(
+                  'buy-cart-instruction-custom-${destination.name}',
+                ),
+                onPressed: () => setState(() {
+                  _noteController.text = customNote ?? '';
+                  _editing = true;
+                }),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Add instructions'),
+              ),
               for (var index = 0; index < options.length; index++)
                 Builder(
                   builder: (context) {
@@ -22164,6 +22204,89 @@ class _CartDeliveryInstructionCard extends StatelessWidget {
             ],
           ),
         ),
+        if (_editing)
+          Container(
+            key: ValueKey('buy-cart-instruction-composer-${destination.name}'),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDADDE5)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  key: ValueKey(
+                    'buy-cart-instruction-note-${destination.name}',
+                  ),
+                  controller: _noteController,
+                  autofocus: true,
+                  minLines: 1,
+                  maxLines: 3,
+                  maxLength: 200,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Delivery instructions (optional)',
+                    hintText: 'For example, use the side entrance',
+                    isDense: true,
+                    filled: false,
+                    contentPadding: EdgeInsets.fromLTRB(8, 12, 8, 4),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    counterText: '',
+                    labelStyle: TextStyle(
+                      color: BuyV2ActionStyle.primaryForeground,
+                    ),
+                  ),
+                ),
+                Wrap(
+                  spacing: 4,
+                  children: [
+                    TextButton(
+                      style: noteActionStyle,
+                      key: ValueKey(
+                        'buy-cart-instruction-clear-draft-${destination.name}',
+                      ),
+                      onPressed: _noteController.clear,
+                      child: const Text('Clear'),
+                    ),
+                    TextButton(
+                      style: noteActionStyle,
+                      key: ValueKey(
+                        'buy-cart-instruction-save-${destination.name}',
+                      ),
+                      onPressed: () {
+                        if (session.setCustomDeliveryInstruction(
+                          destination: destination,
+                          text: _noteController.text,
+                        )) {
+                          FocusScope.of(context).unfocus();
+                          setState(() => _editing = false);
+                        }
+                      },
+                      child: const Text('Save'),
+                    ),
+                    TextButton(
+                      style: noteActionStyle,
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        setState(() => _editing = false);
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          )
+        else if (customNote != null)
+          Text(
+            customNote,
+            key: ValueKey('buy-cart-instruction-saved-${destination.name}'),
+            style: context.buyBody,
+          ),
       ],
     );
   }

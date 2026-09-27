@@ -1348,8 +1348,17 @@ void main() {
           for (final kind in BuyV2CartBenefitKind.values) {
             final entry = find.byKey(const ValueKey('buy-cart-coupons'));
             await revealPurchaseTarget(tester, entry);
-            await tester.tap(entry);
-            await tester.pumpAndSettle();
+            if (find
+                .byKey(const ValueKey('buy-cart-benefits-inline'))
+                .evaluate()
+                .isEmpty) {
+              await tester.tap(entry);
+              await tester.pumpAndSettle();
+            }
+            expect(
+              find.byKey(const ValueKey('buy-cart-benefits-inline')),
+              findsOneWidget,
+            );
             expect(
               find.byKey(const ValueKey('buy-cart-benefits-page')),
               findsNothing,

@@ -611,6 +611,126 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'custom delivery note editor saves clears and isolates basket $scale',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.addProduct('s-tomato');
+        session.addProduct('w-notebook');
+        session.openCart(scope: BuyV2CartScope.all);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final edit = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-shop'),
+        );
+        await showInMainCartList(tester, edit);
+        await tester.ensureVisible(edit);
+        expect(
+          find.descendant(of: edit, matching: find.text('Add instructions')),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<TextButton>(edit).style!.foregroundColor!.resolve({}),
+          BuyV2ActionStyle.primaryForeground,
+        );
+        expect(
+          tester
+              .widget<TextButton>(edit)
+              .style!
+              .textStyle!
+              .resolve({})!
+              .fontSize,
+          11,
+        );
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        final field = find.byKey(
+          const ValueKey('buy-cart-instruction-note-shop'),
+        );
+        await tester.enterText(field, 'Use the side entrance');
+        final save = find.byKey(
+          const ValueKey('buy-cart-instruction-save-shop'),
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        final composer = find.byKey(
+          const ValueKey('buy-cart-instruction-composer-shop'),
+        );
+        final composerRect = tester.getRect(composer);
+        final fieldRect = tester.getRect(field);
+        final saveRect = tester.getRect(save);
+        expect(composerRect.contains(saveRect.center), isTrue);
+        expect(saveRect.top - fieldRect.bottom, lessThanOrEqualTo(4));
+        expect(
+          find.descendant(of: composer, matching: find.text('Clear')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: composer, matching: find.text('Cancel')),
+          findsOneWidget,
+        );
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.customDeliveryInstructionFor(BuyV2Destination.shop),
+          'Use the side entrance',
+        );
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.wholesale),
+          isNull,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-cart-instruction-saved-shop')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: edit, matching: find.text('Add instructions')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-cart-instruction-shop-none')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-cart-instruction-clear-draft-shop')),
+          findsNothing,
+        );
+        await tester.ensureVisible(edit);
+        await tester.pumpAndSettle();
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        final clearDraft = find.byKey(
+          const ValueKey('buy-cart-instruction-clear-draft-shop'),
+        );
+        await tester.ensureVisible(clearDraft);
+        await tester.pumpAndSettle();
+        await tester.tap(clearDraft);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+        expect(
+          session.customDeliveryInstructionFor(BuyV2Destination.shop),
+          'Use the side entrance',
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          isNull,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-cart-instruction-saved-shop')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
     testWidgets('Compact delivery radio mixed basket isolation $scale', (
       tester,
     ) async {
@@ -892,7 +1012,10 @@ void main() {
     expect(find.textContaining('Tip Shop delivery partner'), findsNothing);
     expect(find.textContaining('Tip pharmacy delivery partner'), findsNothing);
 
-    await tester.tap(coupons);
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-inline')),
+      findsOneWidget,
+    );
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('buy-cart-benefits-inline')),
@@ -1026,7 +1149,10 @@ void main() {
 
       final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
       await showInMainCartList(tester, coupons);
-      await tester.tap(coupons);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefits-inline')),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
 
       for (final destination in const [
@@ -1353,7 +1479,10 @@ void main() {
 
       final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
       await showInMainCartList(tester, coupons);
-      await tester.tap(coupons);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefits-inline')),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -1420,7 +1549,10 @@ void main() {
 
       final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
       await showInMainCartList(tester, coupons);
-      await tester.tap(coupons);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefits-inline')),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
 
       final select = find.byKey(
@@ -1480,8 +1612,18 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pump();
     final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
-    await showInMainCartList(tester, coupons);
-    await tester.tap(coupons);
+    // Loading now starts when the default-open section is built; do not
+    // wait for an indeterminate progress animation to settle.
+    await tester.scrollUntilVisible(
+      coupons,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-inline')),
+      findsOneWidget,
+    );
     await tester.pump();
     await tester.pump();
     expect(

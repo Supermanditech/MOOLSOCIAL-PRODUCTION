@@ -139,7 +139,10 @@ void main() {
         maxScrolls: 30,
       );
       await tester.pumpAndSettle();
-      await tester.tap(coupons);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefits-inline')),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
       expect(session.scopedPayableTotal, 444);
       expect(session.scopedCouponSaving, 0);
@@ -198,7 +201,10 @@ void main() {
       );
       await Scrollable.ensureVisible(tester.element(entry), alignment: .3);
       await tester.pumpAndSettle();
-      await tester.tap(entry);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefits-inline')),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
       final paymentKind = find.byKey(
         const ValueKey('buy-cart-benefit-kind-payment'),
@@ -391,6 +397,15 @@ void main() {
       session.openCart(scope: BuyV2CartScope.wholesale);
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
+      final collapse = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(
+        collapse,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(collapse);
+      await tester.pumpAndSettle();
       final status = find.byKey(
         const ValueKey('buy-cart-payment-offer-status-terms-offer'),
       );
@@ -430,7 +445,10 @@ void main() {
       maxScrolls: 30,
     );
     await tester.pumpAndSettle();
-    await tester.tap(coupons);
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-inline')),
+      findsOneWidget,
+    );
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('buy-cart-benefits-inline')),
@@ -476,7 +494,10 @@ void main() {
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position
           .pixels;
-      await tester.tap(coupons);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefits-inline')),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Return to Cart'), findsNothing);

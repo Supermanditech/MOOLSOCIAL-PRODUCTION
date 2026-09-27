@@ -23,6 +23,102 @@ class QualificationDeliveryFacts implements BuyV2ProductFactsAdapter {
 }
 
 void main() {
+  test(
+    'custom delivery notes stay basket scoped and reach confirmed orders',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const QualificationDeliveryFacts(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-tomato');
+      session.addProduct('w-notebook');
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: '  Use the side entrance  ',
+        ),
+        isTrue,
+      );
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.wholesale,
+          text: 'Call at the warehouse gate',
+        ),
+        isTrue,
+      );
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.wholesale,
+          text: 'x' * 201,
+        ),
+        isFalse,
+      );
+      expect(
+        session.deliveryInstructionTextFor(BuyV2Destination.wholesale),
+        'Call at the warehouse gate',
+      );
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+      expect(
+        session.confirmedOrders
+            .singleWhere((o) => o.destination == BuyV2Destination.shop)
+            .deliveryInstruction,
+        'Use the side entrance',
+      );
+      expect(
+        session.confirmedOrders
+            .singleWhere((o) => o.destination == BuyV2Destination.wholesale)
+            .deliveryInstruction,
+        'Call at the warehouse gate',
+      );
+    },
+  );
+  test(
+    'blank custom note clears instruction and presets replace custom note',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const QualificationDeliveryFacts(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-tomato');
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Side gate',
+        ),
+        isTrue,
+      );
+      expect(
+        session.chooseDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          instructionId: 'shop-call-arrival',
+        ),
+        isTrue,
+      );
+      expect(
+        session.customDeliveryInstructionFor(BuyV2Destination.shop),
+        isNull,
+      );
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: '   ',
+        ),
+        isTrue,
+      );
+      expect(session.deliveryInstructionTextFor(BuyV2Destination.shop), isNull);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+      expect(session.confirmedOrders.single.deliveryInstruction, isNull);
+    },
+  );
+
   test('missing delivery estimate preserves cart and creates no order', () {
     final session = BuyV2Session(
       core: BuySession(),
