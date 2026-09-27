@@ -281,6 +281,27 @@ class StoreSalesStatement {
           ],
       ],
       moneyColumns: {3, 4, if (detail.isNotEmpty) ...{9, 10, 12}},
+      pdfGroups: [
+        StoreReportPdfGroup('Invoices',
+            [0, 1, 2, 3, 4, 5, 6, if (detail.isNotEmpty) 7],
+            List<int>.generate(selected.length, (i) => i)),
+        if (detail.isNotEmpty) ...[
+          StoreReportPdfGroup('Returns and recorded refunds',
+              [0, 1, 2, 6, 7, 8, 9, 10, 11], [
+                for (var i = 0; i < detail.length; i++)
+                  if (detail[i].entry.kind == WorkspaceLedgerEntryKind.creditNote ||
+                      detail[i].entry.kind == WorkspaceLedgerEntryKind.refund)
+                    selected.length + i,
+              ]),
+          StoreReportPdfGroup('Customer credit allocations - non-cash',
+              [0, 1, 2, 6, 7, 8, 11, 12], [
+                for (var i = 0; i < detail.length; i++)
+                  if (detail[i].entry.kind == WorkspaceLedgerEntryKind.creditUsed ||
+                      detail[i].entry.kind == WorkspaceLedgerEntryKind.creditReceived)
+                    selected.length + i,
+              ]),
+        ],
+      ],
     );
   }
 }

@@ -1235,6 +1235,14 @@ Future<Uint8List> _generateStockLedgerFile(
 
 /// Shared renderer only. Callers must validate account, coverage and balances
 /// before constructing a report; this does not authorize or issue a document.
+class StoreReportPdfGroup {
+  StoreReportPdfGroup(this.title, List<int> columns, List<int> rowIndexes)
+      : columns = List.unmodifiable(columns),
+        rowIndexes = List.unmodifiable(rowIndexes);
+  final String title;
+  final List<int> columns, rowIndexes;
+}
+
 class StoreTabularReport {
   StoreTabularReport({
     required this.title,
@@ -1247,16 +1255,45 @@ class StoreTabularReport {
     this.nullLabel = 'Unavailable',
     this.dateColumns = const {},
     List<List<String>> summary = const [],
+    List<StoreReportPdfGroup> pdfGroups = const [],
   }) : metadata = List.unmodifiable(
          metadata.map((r) => List<Object?>.unmodifiable(r)),
        ),
        headers = List.unmodifiable(headers),
        rows = List.unmodifiable(rows.map((r) => List<Object?>.unmodifiable(r))),
        moneyColumns = Set.unmodifiable(moneyColumns),
+       pdfGroups = List.unmodifiable(pdfGroups),
        summary = List.unmodifiable(
          summary.map((r) => List<String>.unmodifiable(r)),
        );
   final List<List<String>> summary;
+  final List<StoreReportPdfGroup> pdfGroups;
+
+  void validatePdfGroups() {
+    if (pdfGroups.isEmpty) return;
+    final covered = <int>{};
+    for (final group in pdfGroups) {
+      if (group.title.trim().isEmpty || group.columns.length < 3 ||
+          group.columns.toSet().length != group.columns.length ||
+          group.columns.any((i) => i < 0 || i >= headers.length)) {
+        throw const FormatException('Invalid statement section.');
+      }
+      for (final r in group.rowIndexes) {
+        if (r < 0 || r >= rows.length || !covered.add(r) ||
+            rows[r].length != headers.length) {
+          throw const FormatException('Statement section records do not match.');
+        }
+        for (var c = 0; c < headers.length; c++) {
+          if (!group.columns.contains(c) && rows[r][c] != '') {
+            throw const FormatException('Statement section would omit a field.');
+          }
+        }
+      }
+    }
+    if (covered.length != rows.length) {
+      throw const FormatException('Statement section coverage is incomplete.');
+    }
+  }
   final String title, disclosure;
   final List<List<Object?>> metadata, rows;
   final List<String> headers;
@@ -1395,6 +1432,7 @@ Future<Uint8List> _generateStoreTable(
     return Uint8List.fromList(book.encode()!);
   }
   final document = pw.Document();
+  report.validatePdfGroups();
   if (headers.isEmpty || rows.any((row) => row.length != headers.length)) {
     throw const FormatException('Statement columns and values do not match.');
   }
@@ -1437,6 +1475,7 @@ Future<Uint8List> _generateStoreTable(
     ...metadata.expand((r) => r),
     ...rows.expand((r) => r),
     ...report.summary.expand((r) => r),
+    ...report.pdfGroups.map((group) => group.title),
   ].join(' ');
   if (text.runes.any((r) => r > 32 && !embedded.isRuneSupported(r))) {
     throw const FormatException(
@@ -1493,17 +1532,27 @@ Future<Uint8List> _generateStoreTable(
   final capacity = ((pageFormat.width - margins[0] - margins[2]) / 80)
       .floor()
       .clamp(4, 30);
-  final allColumns = List<int>.generate(headers.length, (i) => i);
+  final groups = report.pdfGroups.isEmpty || receipt
+      ? [StoreReportPdfGroup('', List<int>.generate(headers.length, (i) => i),
+          List<int>.generate(rows.length, (i) => i))]
+      : report.pdfGroups.where((group) => group.rowIndexes.isNotEmpty).toList();
+  if (groups.isEmpty) {
+    groups.add(StoreReportPdfGroup('Invoices',
+        List<int>.generate(headers.length, (i) => i), const []));
+  }
+  for (final group in groups) {
+  final groupRows = [for (final i in group.rowIndexes) rows[i]];
+  final allColumns = group.columns;
   final sections = <List<int>>[];
-  if (receipt || headers.length <= capacity) {
+  if (receipt || allColumns.length <= capacity) {
     sections.add(allColumns);
   } else {
-    for (var offset = 3; offset < headers.length; offset += capacity - 3) {
-      sections.add([0, 1, 2, ...allColumns.skip(offset).take(capacity - 3)]);
+    for (var offset = 3; offset < allColumns.length; offset += capacity - 3) {
+      sections.add([...allColumns.take(3), ...allColumns.skip(offset).take(capacity - 3)]);
     }
   }
-  for (var start = 0; start < (rows.isEmpty ? 1 : rows.length); start += 50) {
-    final batch = rows.skip(start).take(50);
+  for (var start = 0; start < (groupRows.isEmpty ? 1 : groupRows.length); start += 50) {
+    final batch = groupRows.skip(start).take(50);
     document.addPage(
       pw.MultiPage(
         pageFormat: pageFormat,
@@ -1520,6 +1569,9 @@ Future<Uint8List> _generateStoreTable(
           children: [
             for (final row in metadata)
               pw.Text(row.join('  '), style: const pw.TextStyle(fontSize: 9)),
+            if (group.title.isNotEmpty)
+              pw.Text(group.title, style: pw.TextStyle(fontSize: 11,
+                  fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
           ],
         ),
@@ -1578,7 +1630,9 @@ Future<Uint8List> _generateStoreTable(
                     ],
                 ],
                 border: null,
-                cellPadding: const pw.EdgeInsets.all(5),
+                cellPadding: group.title.isEmpty
+                    ? const pw.EdgeInsets.all(5)
+                    : const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                 headerDecoration: const pw.BoxDecoration(
                   color: PdfColor.fromInt(0xff080078),
                 ),
@@ -1615,10 +1669,11 @@ Future<Uint8List> _generateStoreTable(
               if (report.summary.isEmpty || columns != sections.last)
                 pw.SizedBox(height: 12),
             ],
-          if (rows.isEmpty) pw.Text('No records for this period.'),
+          if (groupRows.isEmpty) pw.Text('No records for this period.'),
         ],
       ),
     );
+  }
   }
   return saveCommercePrintPages(document, pages);
 }

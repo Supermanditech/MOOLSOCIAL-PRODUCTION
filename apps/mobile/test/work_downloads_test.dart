@@ -101,6 +101,22 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('PDFGROUP sections reject omitted fields duplicate or missing records', () {
+    StoreTabularReport grouped(List<StoreReportPdfGroup> groups) => StoreTabularReport(
+      title: 'Evaluation', disclosure: 'Evaluation only', metadata: const [],
+      headers: const ['Date', 'Invoice', 'Customer', 'Amount'],
+      rows: const [['2026-09-27', 'invoice', 'customer', 100]],
+      moneyColumns: const {3}, pdfGroups: groups);
+    final complete = StoreReportPdfGroup('Invoices', [0, 1, 2, 3], [0]);
+    expect(() => grouped([complete]).validatePdfGroups(), returnsNormally);
+    for (final groups in [
+      [StoreReportPdfGroup('Missing amount', [0, 1, 2], [0])],
+      [complete, complete],
+      [StoreReportPdfGroup('Missing record', [0, 1, 2, 3], [])],
+    ]) {
+      expect(() => grouped(groups).validatePdfGroups(), throwsFormatException);
+    }
+  });
   StoreSalesStatement sales(List<WorkspaceCustomerInvoice> invoices) => StoreSalesStatement(
     accountId: 'review-account', storeId: 'review-store', storeName: 'QA Store — evaluation only',
     from: DateTime(2026, 9, 1), until: DateTime(2026, 10), generatedAt: DateTime(2026, 9, 27), invoices: invoices);
@@ -360,6 +376,10 @@ void main() {
     expect(statement.selected, isEmpty);
     final report = statement.report;
     expect(report.rows, hasLength(2));
+    expect(() => report.validatePdfGroups(), returnsNormally);
+    expect(report.pdfGroups.singleWhere((g) => g.title == 'Returns and recorded refunds')
+        .rowIndexes, [0, 1]);
+    expect(report.pdfGroups.expand((g) => g.rowIndexes), [0, 1]);
     expect(report.rows.first[1], 'invoice-customer-01');
     expect(report.rows.first[8], reason);
     expect(report.rows.last[8], 'Not linked to a specific return');
