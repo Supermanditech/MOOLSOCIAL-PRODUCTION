@@ -7919,6 +7919,11 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
     _searchFocus.unfocus();
     final bottomClearance =
         BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
+    final storeName = buyV2CustomerStoreName(
+      widget.session.catalogueStore(widget.product.storeId!)?.name ??
+          widget.product.seller,
+      widget.product.storeId,
+    );
     var price = _maximumPrice;
     var sort = _sort;
     final applied = await showModalBottomSheet<bool>(
@@ -7928,164 +7933,204 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
       showDragHandle: false,
       backgroundColor: Colors.white,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, update) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
+        builder: (context, update) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: Text(
-                            'Store filters',
-                            style: context.buyTitle.copyWith(fontSize: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Filter this store',
+                                    style: context.buyTitle.copyWith(
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Text(
+                                    storeName,
+                                    key: const ValueKey(
+                                      'buy-store-filter-name',
+                                    ),
+                                    style: context.buyMeta,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Close store filters',
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Price per pack', style: context.buyMeta),
+                        RadioGroup<int>(
+                          key: const ValueKey('buy-store-price-options'),
+                          groupValue: price ?? 0,
+                          onChanged: (value) =>
+                              update(() => price = value == 0 ? null : value),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final limit in <int>{
+                                  0,
+                                  100,
+                                  500,
+                                  1000,
+                                  5000,
+                                  10000,
+                                  100000,
+                                  1000000,
+                                  10000000,
+                                  if (price != null) price!,
+                                })
+                                  InkWell(
+                                    key: ValueKey(
+                                      'buy-store-price-${limit == 0 ? 'any' : limit}',
+                                    ),
+                                    onTap: () => update(
+                                      () => price = limit == 0 ? null : limit,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Radio<int>(
+                                          value: limit,
+                                          activeColor: BuyV2ActionStyle
+                                              .primaryForeground,
+                                        ),
+                                        Text(
+                                          limit == 0
+                                              ? 'Any price'
+                                              : 'Up to ${buyV2Money(limit)}',
+                                          style: context.buyBody.copyWith(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Close store filters',
-                          onPressed: () => Navigator.of(sheetContext).pop(),
-                          icon: const Icon(Icons.close_rounded),
+                        const SizedBox(height: 4),
+                        Text('Sort products', style: context.buyMeta),
+                        RadioGroup<BuyV2ProductSort>(
+                          groupValue: sort,
+                          onChanged: (value) {
+                            if (value != null) update(() => sort = value);
+                          },
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final choice in const [
+                                  (BuyV2ProductSort.relevance, 'Relevance'),
+                                  (
+                                    BuyV2ProductSort.priceLowToHigh,
+                                    'Price: low to high',
+                                  ),
+                                  (
+                                    BuyV2ProductSort.priceHighToLow,
+                                    'Price: high to low',
+                                  ),
+                                ])
+                                  InkWell(
+                                    key: ValueKey(
+                                      'buy-store-sort-${choice.$1.name}',
+                                    ),
+                                    onTap: () => update(() => sort = choice.$1),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Radio<BuyV2ProductSort>(
+                                          value: choice.$1,
+                                          activeColor: BuyV2ActionStyle
+                                              .primaryForeground,
+                                        ),
+                                        Text(
+                                          choice.$2,
+                                          style: context.buyBody.copyWith(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    Text('Price per pack', style: context.buyBody),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final limit in <int?>[null, 100, 500, 1000])
-                          ChoiceChip(
-                            side: const BorderSide(
-                              color: BuyV2ActionStyle.primaryBorder,
-                            ),
-                            backgroundColor: BuyV2ActionStyle.primaryFill,
-                            selectedColor: BuyV2ActionStyle.pressedFill,
-                            visualDensity: VisualDensity.compact,
-                            checkmarkColor: BuyV2ActionStyle.primaryForeground,
-                            labelStyle:
-                                (TextStyle(
-                                  color: price == limit
-                                      ? Colors.white
-                                      : BuyV2Colors.navy,
-                                  fontSize: 12,
-                                  height: 1.15,
-                                  fontWeight: FontWeight.w700,
-                                )).copyWith(
-                                  color: BuyV2ActionStyle.primaryForeground,
-                                ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            key: ValueKey('buy-store-price-${limit ?? 'any'}'),
-                            label: Text(
-                              limit == null ? 'Any price' : 'Up to ₹$limit',
-                            ),
-                            selected: price == limit,
-                            onSelected: (_) => update(() => price = limit),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Sort products', style: context.buyBody),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final choice in const [
-                          (BuyV2ProductSort.relevance, 'Relevance'),
-                          (
-                            BuyV2ProductSort.priceLowToHigh,
-                            'Price: low to high',
-                          ),
-                          (
-                            BuyV2ProductSort.priceHighToLow,
-                            'Price: high to low',
-                          ),
-                        ])
-                          ChoiceChip(
-                            side: const BorderSide(
-                              color: BuyV2ActionStyle.primaryBorder,
-                            ),
-                            backgroundColor: BuyV2ActionStyle.primaryFill,
-                            selectedColor: BuyV2ActionStyle.pressedFill,
-                            visualDensity: VisualDensity.compact,
-                            checkmarkColor: BuyV2ActionStyle.primaryForeground,
-                            labelStyle:
-                                (TextStyle(
-                                  color: sort == choice.$1
-                                      ? Colors.white
-                                      : BuyV2Colors.navy,
-                                  fontSize: 12,
-                                  height: 1.15,
-                                  fontWeight: FontWeight.w700,
-                                )).copyWith(
-                                  color: BuyV2ActionStyle.primaryForeground,
-                                ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            key: ValueKey('buy-store-sort-${choice.$1.name}'),
-                            label: Text(choice.$2),
-                            selected: sort == choice.$1,
-                            onSelected: (_) => update(() => sort = choice.$1),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(12, 4, 12, 8 + bottomClearance),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => update(() {
-                        price = null;
-                        sort = BuyV2ProductSort.relevance;
-                      }),
-                      child: const Text(
-                        'Reset store filters',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Align(
-                      widthFactor: 1,
-                      heightFactor: 1,
-                      child: FilledButton(
-                        key: const ValueKey('buy-store-filters-apply'),
-                        onPressed: () => Navigator.of(sheetContext).pop(true),
-                        style: BuyV2ActionStyle.button(
-                          FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomClearance),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: TextButton(
+                          onPressed: () => update(() {
+                            price = null;
+                            sort = BuyV2ProductSort.relevance;
+                          }),
+                          style: TextButton.styleFrom(
+                            foregroundColor: BuyV2ActionStyle.primaryForeground,
+                          ),
+                          child: const Text(
+                            'Reset',
+                            style: TextStyle(fontSize: 12),
                           ),
                         ),
-                        child: const Text(
-                          'Show products',
-                          style: TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: FilledButton(
+                          key: const ValueKey('buy-store-filters-apply'),
+                          onPressed: () => Navigator.of(sheetContext).pop(true),
+                          style: BuyV2ActionStyle.button(
+                            FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                          ),
+                          child: const Text(
+                            'Apply',
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
     if (!mounted || applied != true) return;

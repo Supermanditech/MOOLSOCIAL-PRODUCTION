@@ -89,13 +89,19 @@ void main() {
           expect(paint.color, Colors.white);
           expect(paint.gradient, isNull);
           expect(paint.border, isNull);
-          expect(toolbarSurface.padding, const EdgeInsets.symmetric(horizontal: 6));
+          expect(
+            toolbarSurface.padding,
+            const EdgeInsets.symmetric(horizontal: 6),
+          );
           if (scale == 1) {
             expect(tester.getSize(toolbar).height, 44);
           }
           for (final control in ['category', 'saved', 'filter']) {
             final button = find.byKey(ValueKey('buy-store-$control-control'));
-            expect(tester.getSize(button).shortestSide, greaterThanOrEqualTo(44));
+            expect(
+              tester.getSize(button).shortestSide,
+              greaterThanOrEqualTo(44),
+            );
             for (final icon in tester.widgetList<Icon>(
               find.descendant(of: button, matching: find.byType(Icon)),
             )) {
@@ -510,11 +516,95 @@ void main() {
           find.byKey(const ValueKey('buy-store-toolbar-name')),
           findsOneWidget,
         );
+        final toolbarNameFinder = find.byKey(
+          const ValueKey('buy-store-toolbar-name'),
+        );
+        final nameText = tester.widget<Text>(toolbarNameFinder);
+        expect(nameText.data, contains(source.name));
+        expect(nameText.softWrap, isTrue);
+        expect(nameText.maxLines, isNull);
+        final nameBounds = tester.getRect(toolbarNameFinder);
+        final toolbarBounds = tester.getRect(
+          find.byKey(const ValueKey('buy-store-catalogue-toolbar')),
+        );
+        expect(nameBounds.top, greaterThanOrEqualTo(toolbarBounds.top));
+        expect(nameBounds.bottom, lessThanOrEqualTo(toolbarBounds.bottom));
+        expect(
+          nameBounds.left,
+          greaterThanOrEqualTo(
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('buy-store-category-control')),
+                )
+                .right,
+          ),
+        );
+        expect(
+          nameBounds.right,
+          lessThanOrEqualTo(
+            tester
+                .getRect(find.byKey(const ValueKey('buy-store-saved-control')))
+                .left,
+          ),
+        );
+        for (final control in ['category', 'saved', 'filter']) {
+          expect(
+            find.byKey(ValueKey('buy-store-$control-control')).hitTestable(),
+            findsOneWidget,
+          );
+        }
+        if (profile.$2 == 2) expect(toolbarBounds.height, greaterThan(44));
         final filter = find.byKey(const ValueKey('buy-store-filter-control'));
         await _revealPagedHeader(tester, scope, filter);
         await tester.tap(filter);
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('buy-store-price-100')));
+        expect(
+          find.byKey(const ValueKey('buy-store-filter-name')),
+          findsOneWidget,
+        );
+        for (final amount in [1000, 10000, 100000, 1000000, 10000000]) {
+          final amountOption = find.byKey(ValueKey('buy-store-price-$amount'));
+          await tester.ensureVisible(amountOption);
+          await tester.tap(amountOption);
+          await tester.pumpAndSettle();
+          expect(find.text('Up to ${buyV2Money(amount)}'), findsOneWidget);
+          expect(
+            tester
+                .widget<RadioGroup<int>>(
+                  find.byKey(const ValueKey('buy-store-price-options')),
+                )
+                .groupValue,
+            amount,
+          );
+          expect(tester.takeException(), isNull);
+        }
+        final highApply = find.byKey(const ValueKey('buy-store-filters-apply'));
+        await tester.tap(highApply);
+        await tester.pumpAndSettle();
+        expect(source.productQueries.last.maximumPrice, 10000000);
+        expect(source.productQueries.last.storeId, source.storeIdAt(0));
+        expect(session.catalogueQuery().key, homeQuery);
+        await _revealPagedHeader(tester, scope, filter);
+        await tester.tap(filter);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<RadioGroup<int>>(
+                find.byKey(const ValueKey('buy-store-price-options')),
+              )
+              .groupValue,
+          10000000,
+        );
+        final maximum = find.byKey(const ValueKey('buy-store-price-100'));
+        await tester.ensureVisible(maximum);
+        await tester.tap(maximum);
+        await tester.pumpAndSettle();
+        final sortChoice = find.byKey(
+          const ValueKey('buy-store-sort-priceLowToHigh'),
+        );
+        await tester.ensureVisible(sortChoice);
+        await tester.tap(sortChoice);
+        await tester.pumpAndSettle();
         final apply = find.byKey(const ValueKey('buy-store-filters-apply'));
         expect(apply.hitTestable(), findsOneWidget);
         final applySize = tester.getSize(apply);
@@ -540,17 +630,42 @@ void main() {
         await tester.tap(apply);
         await tester.pumpAndSettle();
         expect(source.productQueries.last.maximumPrice, 100);
+        expect(
+          source.productQueries.last.sort,
+          BuyV2ProductSort.priceLowToHigh,
+        );
         expect(source.productQueries.last.storeId, source.storeIdAt(0));
         expect(session.catalogueQuery().key, homeQuery);
         await _revealPagedHeader(tester, scope, filter);
         await tester.tap(filter);
         await tester.pumpAndSettle();
-        final reset = find.text('Reset store filters');
+        final reset = find.text('Reset');
         await tester.ensureVisible(reset);
         await tester.tap(reset);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<RadioGroup<int>>(
+                find.byKey(const ValueKey('buy-store-price-options')),
+              )
+              .groupValue,
+          0,
+        );
         await tester.ensureVisible(apply);
         await tester.tap(apply);
         await tester.pumpAndSettle();
+        expect(source.productQueries.last.maximumPrice, isNull);
+        await _revealPagedHeader(tester, scope, filter);
+        await tester.tap(filter);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(maximum);
+        await tester.tap(maximum);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Close store filters'));
+        await tester.pumpAndSettle();
+        expect(source.productQueries.last.maximumPrice, isNull);
+        expect(source.productQueries.last.storeId, source.storeIdAt(0));
+        expect(session.catalogueQuery().key, homeQuery);
         final category = find.byKey(
           const ValueKey('buy-store-category-control'),
         );
