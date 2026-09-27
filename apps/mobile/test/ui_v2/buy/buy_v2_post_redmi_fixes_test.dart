@@ -1445,6 +1445,10 @@ void main() {
       expect(mool.hitTestable(), findsOneWidget);
       expect(tester.getRect(mool).bottom, lessThanOrEqualTo(752));
       await captureR66Visual(tester, 'post-redmi-publisher-inset');
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('buy-offer-filter-all')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('buy-offer-filter-all')));
       await tester.pumpAndSettle();
       expect(session.featuredOffersMoolSocial, isFalse);

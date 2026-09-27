@@ -687,55 +687,128 @@ String _offerPublisherLabel(BuyV2OfferPublisherType? publisher) =>
 Future<({BuyV2OfferPublisherType? publisher})?> _chooseOfferPublisher(
   BuildContext context,
   BuyV2OfferPublisherType? selected,
-) => showModalBottomSheet<({BuyV2OfferPublisherType? publisher})>(
-  context: context,
-  showDragHandle: true,
-  useSafeArea: true,
-  isScrollControlled: true,
-  builder: (context) => SingleChildScrollView(
-    padding: EdgeInsets.only(
-      bottom: MediaQuery.viewPaddingOf(context).bottom + 12,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Text(
-            'Filter offers',
-            style: context.buyTitle.copyWith(fontSize: 16),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 2,
+) {
+  final selectedKey = GlobalKey();
+  var revealSelection = true;
+  return showModalBottomSheet<({BuyV2OfferPublisherType? publisher})>(
+    context: context,
+    showDragHandle: false,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    builder: (sheetContext) {
+      if (revealSelection) {
+        revealSelection = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final selectedContext = selectedKey.currentContext;
+          if (selectedContext != null && selectedContext.mounted) {
+            unawaited(Scrollable.ensureVisible(selectedContext, alignment: .5));
+          }
+        });
+      }
+      return SafeArea(
+        top: false,
+        child: Padding(
+          key: const ValueKey('buy-offers-filter-sheet'),
+          padding: const EdgeInsets.fromLTRB(12, 2, 8, 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final publisher in [null, ...BuyV2OfferPublisherType.values])
-                ChoiceChip(
-                  labelStyle: const TextStyle(
-                    color: BuyV2ActionStyle.primaryForeground,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Filter offers',
+                      style: context.buyTitle.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: BuyV2ActionStyle.primaryForeground,
+                      ),
+                    ),
                   ),
-                  side: const BorderSide(color: BuyV2ActionStyle.primaryBorder),
-                  checkmarkColor: BuyV2ActionStyle.primaryForeground,
-                  backgroundColor: BuyV2ActionStyle.primaryFill,
-                  selectedColor: BuyV2ActionStyle.pressedFill,
-                  key: ValueKey('buy-offer-filter-${publisher?.name ?? 'all'}'),
-                  label: Text(_offerPublisherLabel(publisher)),
-                  selected: selected == publisher,
-                  showCheckmark: true,
-                  materialTapTargetSize: MaterialTapTargetSize.padded,
-                  onSelected: (_) =>
-                      Navigator.pop(context, (publisher: publisher)),
+                  IconButton(
+                    key: const ValueKey('buy-offers-filter-close'),
+                    tooltip: 'Close filters',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      foregroundColor: BuyV2ActionStyle.primaryForeground,
+                      minimumSize: const Size(44, 44),
+                      side: BorderSide.none,
+                    ),
+                  ),
+                ],
+              ),
+              SingleChildScrollView(
+                key: const ValueKey('buy-offers-publisher-options'),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final publisher in [
+                      null,
+                      ...BuyV2OfferPublisherType.values,
+                    ])
+                      KeyedSubtree(
+                        key: selected == publisher ? selectedKey : null,
+                        child: MergeSemantics(
+                          child: Semantics(
+                            checked: selected == publisher,
+                            inMutuallyExclusiveGroup: true,
+                            child: TextButton(
+                              key: ValueKey(
+                                'buy-offer-filter-${publisher?.name ?? 'all'}',
+                              ),
+                              onPressed: () => Navigator.pop(sheetContext, (
+                                publisher: publisher,
+                              )),
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(44, 44),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                foregroundColor:
+                                    BuyV2ActionStyle.primaryForeground,
+                                backgroundColor: Colors.transparent,
+                                side: BorderSide.none,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    selected == publisher
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_unchecked,
+                                    size: 16,
+                                    color: BuyV2ActionStyle.primaryForeground,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _offerPublisherLabel(publisher),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: selected == publisher
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: BuyV2ActionStyle.primaryForeground,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
-      ],
-    ),
-  ),
-);
+      );
+    },
+  );
+}
 
 class _OffersCategoryControl extends StatelessWidget {
   const _OffersCategoryControl({

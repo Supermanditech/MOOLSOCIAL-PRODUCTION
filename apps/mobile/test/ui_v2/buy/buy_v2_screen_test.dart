@@ -488,6 +488,83 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('compact Offers radio popup scroll select dismiss $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-tomato');
+      final total = session.cartTotal;
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      final filter = find.byKey(const ValueKey('buy-offers-filter'));
+      await tester.tap(filter);
+      await tester.pumpAndSettle();
+      final sheet = find.byKey(const ValueKey('buy-offers-filter-sheet'));
+      final row = find.byKey(const ValueKey('buy-offers-publisher-options'));
+      expect(tester.getSize(sheet).width, 360);
+      expect(tester.getSize(sheet).height, lessThanOrEqualTo(110));
+      expect(
+        tester.widget<SingleChildScrollView>(row).scrollDirection,
+        Axis.horizontal,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.byType(ChoiceChip)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: sheet,
+          matching: find.byIcon(Icons.radio_button_checked),
+        ),
+        findsOneWidget,
+      );
+      final all = find.byKey(const ValueKey('buy-offer-filter-all'));
+      final allLabel = find.descendant(
+        of: all,
+        matching: find.text('All suppliers'),
+      );
+      expect(
+        tester.getSize(all).width - tester.getSize(allLabel).width,
+        lessThanOrEqualTo(34),
+      );
+      expect(tester.getSize(all).height, greaterThanOrEqualTo(44));
+      await tester.drag(row, const Offset(-240, 0));
+      await tester.pumpAndSettle();
+      final mool = find.byKey(const ValueKey('buy-offer-filter-moolSocial'));
+      await tester.ensureVisible(mool);
+      await tester.pumpAndSettle();
+      expect(mool.hitTestable(), findsOneWidget);
+      await tester.tap(mool);
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(session.featuredOffersMoolSocial, isTrue);
+      await tester.tap(filter);
+      await tester.pumpAndSettle();
+      expect(mool.hitTestable(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: mool,
+          matching: find.byIcon(Icons.radio_button_checked),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-offers-filter-close')));
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(session.featuredOffersMoolSocial, isTrue);
+      expect(session.cartTotal, total);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
     testWidgets('quiet current selection across public catalogue $scale', (
       tester,
     ) async {
