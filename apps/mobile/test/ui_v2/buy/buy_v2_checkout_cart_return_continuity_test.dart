@@ -1421,7 +1421,7 @@ void main() {
           final header = tester.widget<BuyV2FiniteValueTransition>(
             find.byKey(const ValueKey('buy-cart-header-value-motion')),
           );
-          expect(header.text, contains('Subtotal ${buyV2Money(subtotal)}'));
+          expect(header.text, contains('Items subtotal ${buyV2Money(subtotal)}'));
           final dock = find.byKey(const ValueKey('buy-cart-action-bar'));
           if (size.width > size.height) {
             await captureR66Visual(

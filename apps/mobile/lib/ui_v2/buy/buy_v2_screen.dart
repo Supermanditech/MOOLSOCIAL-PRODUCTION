@@ -2879,6 +2879,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         onBrowseStore: cartStoreAnchor == null
             ? null
             : () => _openPartnerCatalogue(cartStoreAnchor),
+        onOpenOffers: _openOffers,
+        onVisitComparisonProduct: (product) async {
+          await _openStoreProduct(product, returnLabel: 'Cart');
+        },
         onBrowseMore: () {
           if (_offersActive) {
             _openOffers();

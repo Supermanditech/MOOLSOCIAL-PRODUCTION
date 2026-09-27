@@ -1346,16 +1346,23 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.scopedPayableTotal, 3200);
           for (final kind in BuyV2CartBenefitKind.values) {
-            final entry = find.byKey(
-              ValueKey(
-                kind == BuyV2CartBenefitKind.coupon
-                    ? 'buy-cart-coupons'
-                    : 'buy-cart-payment-offers',
-              ),
-            );
+            final entry = find.byKey(const ValueKey('buy-cart-coupons'));
             await revealPurchaseTarget(tester, entry);
             await tester.tap(entry);
             await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-cart-benefits-page')),
+              findsNothing,
+            );
+            expect(session.view, BuyV2View.cart);
+            if (kind == BuyV2CartBenefitKind.paymentOffer) {
+              final paymentKind = find.byKey(
+                const ValueKey('buy-cart-benefit-kind-payment'),
+              );
+              await revealPurchaseTarget(tester, paymentKind);
+              await tester.tap(paymentKind);
+              await tester.pumpAndSettle();
+            }
             final benefit = session
                 .cartBenefits(
                   kind: kind,
@@ -1455,9 +1462,8 @@ void main() {
               await tester.pumpAndSettle();
               expect(session.scopedPayableTotal, 2900);
             }
-            await tester.tap(
-              find.byKey(const ValueKey('buy-cart-benefit-completion')),
-            );
+            await revealPurchaseTarget(tester, entry);
+            await tester.tap(entry);
             await tester.pumpAndSettle();
             expect(session.view, BuyV2View.cart);
             expect(session.cartScope, BuyV2CartScope.wholesale);
@@ -1477,7 +1483,8 @@ void main() {
           await revealPurchaseTarget(tester, remove);
           await tester.tap(remove);
           await tester.pumpAndSettle();
-          await tester.binding.handlePopRoute();
+          await revealPurchaseTarget(tester, coupons);
+          await tester.tap(coupons);
           await tester.pumpAndSettle();
           expect(session.scopedPayableTotal, 3200);
           expect(session.quantityFor('w-rice-50kg'), 1);

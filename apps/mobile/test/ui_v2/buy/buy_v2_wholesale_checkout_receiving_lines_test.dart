@@ -79,7 +79,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Line subtotal'), findsOneWidget);
+    expect(find.text('Item total'), findsOneWidget);
     expect(find.text(buyV2Money(product.price * 2)), findsWidgets);
     final line = find.byKey(
       ValueKey('buy-wholesale-checkout-receiving-line-${product.id}'),

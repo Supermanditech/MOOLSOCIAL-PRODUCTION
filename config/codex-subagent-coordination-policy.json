@@ -188,7 +188,8 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
-        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png"
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart"
       ]
     },
     {
@@ -240,7 +241,6 @@
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
         "apps/mobile/test/app/ui_review_language_store_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",

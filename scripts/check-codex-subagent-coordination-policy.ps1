@@ -1222,6 +1222,7 @@ $cursorReviewQualificationOwners = @(
   'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart',

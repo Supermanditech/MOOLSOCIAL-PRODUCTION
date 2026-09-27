@@ -291,7 +291,7 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
     expect(
-      find.text('1 product · 2 packs · Wholesale · Subtotal ₹1,550'),
+      find.text('1 product · 2 packs · Wholesale · Items subtotal ₹1,550'),
       findsOneWidget,
     );
 
@@ -320,7 +320,7 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
     expect(
-      find.text('2 products · 3 items · Shop + Wholesale · Subtotal ₹1,587'),
+      find.text('2 products · 3 items · Shop + Wholesale · Items subtotal ₹1,587'),
       findsOneWidget,
     );
     expect(find.textContaining('3 packs'), findsNothing);

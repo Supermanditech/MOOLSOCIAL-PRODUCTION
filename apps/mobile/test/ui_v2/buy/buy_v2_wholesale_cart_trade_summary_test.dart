@@ -112,7 +112,11 @@ void main() {
           addTearDown(core.dispose);
           await session.restoreCommerce();
           for (final product in products) {
-          expect(session.addProduct(product.id), isTrue, reason: session.notice);
+            expect(
+              session.addProduct(product.id),
+              isTrue,
+              reason: session.notice,
+            );
           }
           session.openCart(scope: BuyV2CartScope.wholesale);
           final totalBefore = session.scopedPayableTotal;
@@ -134,7 +138,10 @@ void main() {
             findsOneWidget,
           );
           expect(
-            find.text(included ? 'Landed cart total' : 'Cart subtotal'),
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-cart-action-bar')),
+              matching: find.text('Cart total'),
+            ),
             findsOneWidget,
           );
           if (!included) {
@@ -173,7 +180,7 @@ void main() {
     );
     expect(
       find.text(
-        '1 product · ${product.minimumOrder} packs · Wholesale · Subtotal '
+        '1 product · ${product.minimumOrder} packs · Wholesale · Items subtotal '
         '${buyV2Money(expectedTotal)}',
       ),
       findsOneWidget,
@@ -190,8 +197,14 @@ void main() {
       find.text('${product.unitPrice} · Freight included'),
       findsOneWidget,
     );
-    expect(find.text('Landed subtotal'), findsOneWidget);
-    expect(find.text('Landed cart total'), findsOneWidget);
+    expect(find.text('Item total'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-cart-action-bar')),
+        matching: find.text('Cart total'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.text('Freight included · GST invoice at checkout'),
       findsOneWidget,
@@ -234,7 +247,7 @@ void main() {
 
     expect(
       find.text(
-        '1 product · ${wholesale.minimumOrder} packs · Wholesale · Subtotal '
+        '1 product · ${wholesale.minimumOrder} packs · Wholesale · Items subtotal '
         '${buyV2Money(wholesaleTotal)}',
       ),
       findsOneWidget,
@@ -270,7 +283,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), product.minimumOrder + 1);
     expect(
-      find.text('1 product · 3 packs · Wholesale · Subtotal ₹2,325'),
+      find.text('1 product · 3 packs · Wholesale · Items subtotal ₹2,325'),
       findsOneWidget,
     );
     expect(find.byTooltip('Remove one trade pack'), findsOneWidget);
