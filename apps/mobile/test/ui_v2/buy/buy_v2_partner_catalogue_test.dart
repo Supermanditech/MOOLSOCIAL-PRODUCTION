@@ -428,6 +428,17 @@ void main() {
           find.byKey(const ValueKey('buy-store-details-name')),
         );
         expect(heading.data, source.name);
+        expect(heading.style!.fontSize, 15);
+        expect(
+          tester
+              .widget<BottomSheet>(find.byType(BottomSheet).last)
+              .showDragHandle,
+          isFalse,
+        );
+        expect(
+          tester.widget<Text>(find.text('Other stores')).style!.fontSize,
+          14,
+        );
         expect(
           find.descendant(
             of: find.byKey(ValueKey('buy-public-store-truth-$id')),
@@ -470,6 +481,12 @@ void main() {
           'store-details-safe-bottom-${profile.$1}-${profile.$2}-${profile.$3}',
         );
         detailsPosition.jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(ValueKey('buy-public-store-truth-$id')),
+          findsNothing,
+        );
+        await tester.tap(find.text('Store details'));
         await tester.pumpAndSettle();
         expect(
           find.byKey(ValueKey('buy-public-store-truth-$id')),
@@ -3237,7 +3254,7 @@ void main() {
               : 'buy-wholesale-supplier';
           final relatedProductId = source.productIdAt(10, 0);
           final relatedBranch = find.byKey(
-            ValueKey('buy-related-store-branch-$relatedProductId'),
+            ValueKey('buy-related-store-visit-$relatedProductId'),
           );
           final publicScroll = find
               .descendant(
@@ -3255,9 +3272,12 @@ void main() {
             scrollable: publicScroll,
           );
           await tester.pumpAndSettle();
+          expect(tester.widget<Text>(relatedBranch).data, 'Visit →');
           expect(
-            tester.widget<Text>(relatedBranch).data,
-            session.catalogueStore(source.storeIdAt(10))!.address,
+            find.byKey(ValueKey('buy-related-store-branch-$relatedProductId')),
+            findsNothing,
+            reason:
+                'Address is secondary; Visit must still open the exact branch',
           );
           expect(relatedBranch.hitTestable(), findsOneWidget);
           await captureR66Visual(tester, 'r5-store-$profile-related-branches');

@@ -11367,7 +11367,7 @@ void main() {
       expect(
         (tester.widget<Container>(priceHighlight).decoration! as BoxDecoration)
             .color,
-        const Color(0xFFFFE082),
+        Colors.transparent,
       );
       expect(
         tester.getSize(priceHighlight).width,
@@ -11376,12 +11376,44 @@ void main() {
       expect(tester.widget<Text>(priceText).style!.color, BuyV2Colors.ink);
       final relatedDecoration = relatedCard.decoration! as BoxDecoration;
       expect(relatedDecoration.gradient, isA<LinearGradient>());
-      expect(relatedDecoration.gradient!.colors, [
-        BuyV2Colors.softOrange,
-        BuyV2Colors.softBlue,
-      ]);
-      expect(relatedDecoration.border, isNull);
-      expect(relatedDecoration.boxShadow, isNull);
+      expect(relatedDecoration.gradient!.stops, [0, .6, 1]);
+      expect(relatedDecoration.color, Colors.white);
+      expect(relatedDecoration.border, isNotNull);
+      for (final foreground in [
+        BuyV2ActionStyle.primaryForeground,
+        BuyV2Colors.ink,
+        BuyV2Colors.muted,
+      ]) {
+        expect(
+          1.05 / (foreground.computeLuminance() + .05),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
+      expect(
+        find.descendant(of: relatedStore, matching: find.byType(Icon)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: relatedStore, matching: find.text('Visit →')),
+        findsOneWidget,
+      );
+      for (final tint in [
+        const Color(0xFFAA78C8),
+        const Color(0xFF639BC4),
+        const Color(0xFFD89579),
+      ]) {
+        final background = Color.alphaBlend(
+          tint.withValues(alpha: .26),
+          Colors.white,
+        );
+        expect(
+          (background.computeLuminance() + .05) /
+              (const Color(0xFF505568).computeLuminance() + .05),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
+      expect(relatedDecoration.boxShadow, hasLength(1));
+      expect(relatedDecoration.boxShadow!.single.offset, const Offset(0, 3));
       expect(
         tester
             .widget<Container>(
@@ -11395,16 +11427,23 @@ void main() {
       expect(
         find.descendant(
           of: relatedStore,
-          matching: find.text('MoolSocial Fulfilment Store · Retailer'),
+          matching: find.byTooltip('MoolSocial Fulfilment Store'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(of: relatedStore, matching: find.text('₹37')),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: relatedStore, matching: find.text('Quick')),
+        find.descendant(
+          of: relatedStore,
+          matching: find.textContaining(
+            session
+                .productFactsFor(session.product('s-tomato'))
+                .deliveryPromise,
+          ),
+        ),
         findsOneWidget,
       );
 

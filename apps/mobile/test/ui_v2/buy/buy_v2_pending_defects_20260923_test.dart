@@ -202,7 +202,11 @@ void _founderVisualCases() {
             final card = tester.widget<Container>(
               find.byKey(ValueKey('buy-related-store-card-${other.id}')),
             );
-            expect((card.decoration! as BoxDecoration).gradient, isNotNull);
+            expect(
+              (card.decoration! as BoxDecoration).gradient,
+              isA<LinearGradient>(),
+            );
+            expect((card.decoration! as BoxDecoration).color, Colors.white);
             expect(visit.hitTestable(), findsOneWidget);
             await _capture(tester, '$ticket-$width');
             await tester.tap(visit);
