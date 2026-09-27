@@ -16444,6 +16444,50 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('SALESRETURNS all saved dates search and restore $scale', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      work.workspaceInvoices..clear()..add(WorkspaceCustomerInvoice(
+        id: 'RETURN-OLDER', orderId: 'RETURN-OLDER-ORDER', customer: '9000012345',
+        billingDetails: const WorkspaceBillingDetails(name: 'Returning customer'),
+        items: 'Goods', amount: 100, payment: 'Cash',
+        issuedAt: DateTime.now().subtract(const Duration(days: 400))));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 720), textScale: scale);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      final search = find.byKey(const Key('work-sales-search'));
+      await tester.enterText(search, 'previous query');
+      tester.testTextInput.hide();
+      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-sales-returns')));
+      await tester.tap(find.byKey(const Key('work-sales-returns')));
+      await tester.pumpAndSettle();
+      expect(find.text('Returns & refunds · All saved sales'), findsOneWidget);
+      expect(tester.widget<TextField>(search).decoration!.hintText,
+          'Search by phone, customer name or invoice number');
+      expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+      expect(find.byKey(const Key('work-sales-period-summary')), findsNothing);
+      final row = find.byKey(const ValueKey('work-sales-invoice-RETURN-OLDER'));
+      for (final query in ['RETURN-OLDER', 'Returning customer', '9000012345']) {
+        await tester.enterText(search, query);
+        await tester.pumpAndSettle();
+        expect(row, findsOneWidget);
+      }
+      await tester.enterText(search, 'not found');
+      await tester.pumpAndSettle();
+      expect(find.text('No matching sale. Check the invoice number, customer name or phone.'), findsOneWidget);
+      tester.testTextInput.hide();
+      await tester.tap(find.byTooltip('Back to sales register'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).controller!.text, 'previous query');
+      expect(find.byKey(const Key('work-sales-period-summary')), findsOneWidget);
+      expect(row, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('SALESHOME empty actions reuse existing destinations', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     work.workspaceInvoices.clear();
@@ -16454,7 +16498,7 @@ void main() {
     expect(find.text('Voucher Type'), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
     await tester.pumpAndSettle();
-    for (final action in ['new-counter-sale', 'dues', 'statement']) {
+    for (final action in ['new-counter-sale', 'dues', 'statement', 'returns']) {
       expect(find.byKey(Key('work-sales-$action')), findsOneWidget);
     }
     expect(find.byKey(const Key('work-sales-settlement')), findsNothing);
@@ -37943,14 +37987,25 @@ void main() {
         );
         await tester.tap(find.byTooltip('Open Sales'));
         await tester.pumpAndSettle();
+        if (refundChannel == WorkspacePaymentChannel.cash) {
+          await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'Expanded returns action');
+          await reveal(tester, find.byKey(const Key('work-sales-returns')));
+          await tester.tap(find.byKey(const Key('work-sales-returns')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'All-date return search');
+        }
         final invoiceRow = find.byKey(const ValueKey('work-sales-invoice-RETURN-INVOICE'));
         await reveal(tester, invoiceRow);
         await tester.tap(invoiceRow);
         await tester.pumpAndSettle();
-        final adjustments = find.byKey(const Key('work-invoice-adjustments'));
-        await reveal(tester, adjustments);
-        await tester.tap(adjustments);
-        await tester.pumpAndSettle();
+        if (refundChannel != WorkspacePaymentChannel.cash) {
+          final adjustments = find.byKey(const Key('work-invoice-adjustments'));
+          await reveal(tester, adjustments);
+          await tester.tap(adjustments);
+          await tester.pumpAndSettle();
+        }
         final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
         await reveal(tester, button);
         await tester.tap(button);
@@ -38076,6 +38131,16 @@ void main() {
         expect(find.byKey(const Key('return-reason')), findsNothing);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
+        if (refundChannel == WorkspacePaymentChannel.cash) {
+          expect(tester.takeException(), isNull, reason: 'Return search after refund sheet');
+          expect(find.text('Returns & refunds · All saved sales'), findsOneWidget);
+          await tester.tap(find.byTooltip('Back to sales register'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'Restored Sales register');
+          await reveal(tester, invoiceRow);
+          await tester.tap(invoiceRow);
+          await tester.pumpAndSettle();
+        }
         expect(find.byKey(const Key('work-counter-handover-hint')), findsNothing);
         expect(find.byKey(const Key('work-invoice-refunded-summary')), findsOneWidget);
         expect(tester.takeException(), isNull);

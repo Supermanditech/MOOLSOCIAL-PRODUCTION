@@ -7288,8 +7288,11 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
   String? shareError;
   bool openingWhatsApp = false;
   void _openAdjustments(WorkspacePaymentRecord payment) {
-    final account = invoiceAccount;
-    final store = invoiceStore;
+    openAdjustments(context, session, invoice, payment, invoiceAccount, invoiceStore);
+  }
+  static void openAdjustments(BuildContext context, WorkSession session,
+      WorkspaceCustomerInvoice invoice, WorkspacePaymentRecord payment,
+      String? account, String? store) {
     if (account == null || store == null) return;
     showModalBottomSheet<void>(
       context: context,
@@ -11459,12 +11462,31 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   final _invoiceSearch = TextEditingController();
   Object? _salesScope;
   bool _salesActionsExpanded = false;
+  bool _returnSelection = false;
+  String _salesQueryBeforeReturns = '';
+  bool _salesActionsBeforeReturns = false;
+  void _toggleReturnSelection() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      if (_returnSelection) {
+        _invoiceSearch.text = _salesQueryBeforeReturns;
+        _salesActionsExpanded = _salesActionsBeforeReturns;
+      } else {
+        _salesQueryBeforeReturns = _invoiceSearch.text;
+        _salesActionsBeforeReturns = _salesActionsExpanded;
+        _salesActionsExpanded = false;
+        _invoiceSearch.clear();
+      }
+      _returnSelection = !_returnSelection;
+    });
+  }
   String get _salesPeriodLabel => _invoicePeriod == 'Custom range' && _invoiceRange != null
       ? '${_registerDate(_invoiceRange!.start)} – ${_registerDate(_invoiceRange!.end)}'
       : _invoicePeriod;
 
   void _changeSalesBrowse(VoidCallback change) {
     setState(change);
+    if (_returnSelection) return;
     PageStorage.maybeOf(context)?.writeState(context,
       (query: _invoiceSearch.text, period: _invoicePeriod, range: _invoiceRange, expanded: _salesActionsExpanded),
       identifier: ('sales-browse', _salesScope));
@@ -11479,6 +11501,10 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   String? _invoiceStoreScope;
   String? _invoiceAccountScope;
   bool closeSelectedInvoice() {
+    if (_selectedInvoice == null && _returnSelection) {
+      _toggleReturnSelection();
+      return true;
+    }
     if (_selectedInvoice == null) return false;
     setState(() => _selectedInvoice = null);
     return true;
@@ -11544,8 +11570,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         session.workspaceInvoices
             .where(
               (invoice) =>
-                  (start == null || !invoice.issuedAt.isBefore(start)) &&
-                  invoice.issuedAt.isBefore(end),
+                  (_returnSelection || start == null || !invoice.issuedAt.isBefore(start)) &&
+                  (_returnSelection || invoice.issuedAt.isBefore(end)),
             )
             .toList()
           ..sort((a, b) {
@@ -11573,8 +11599,17 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       final query = _invoiceSearch.text.trim().toLowerCase();
       final matches = invoices.where((invoice) =>
         '${invoice.id} ${invoice.orderId} ${invoice.customer} ${invoice.billingDetails.name} ${invoice.billingDetails.businessName}'.toLowerCase().contains(query)).toList();
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
+      return LayoutBuilder(builder: (context, viewport) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_returnSelection)
+          ConstrainedBox(constraints: BoxConstraints(maxHeight: viewport.maxHeight * .45), child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              const Expanded(child: Text('Returns & refunds · All saved sales',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+              IconButton(tooltip: 'Back to sales register', onPressed: _toggleReturnSelection,
+                icon: const Icon(Icons.close_rounded, size: 18)),
+            ])))),
+        if (!_returnSelection)
+        ConstrainedBox(constraints: BoxConstraints(maxHeight: viewport.maxHeight * .45), child: SingleChildScrollView(child: Padding(
           key: const Key('work-sales-period-summary'),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -11601,16 +11636,18 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               Padding(padding: const EdgeInsets.only(bottom: 4),
                 child: Text(_salesPeriodLabel, style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
           ]),
-        ),
+        ))),
         Expanded(child: ListView.separated(
-          key: PageStorageKey(('sales-invoices', _salesScope, _invoicePeriod, _invoiceRange, query)),
+          key: PageStorageKey(('sales-invoices', _salesScope, _returnSelection, _invoicePeriod, _invoiceRange, query)),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.only(bottom: 150),
           itemCount: matches.isEmpty ? 1 : matches.length,
           separatorBuilder: (_, _) => const Divider(height: 1, thickness: .5),
           itemBuilder: (context, index) {
             if (matches.isEmpty) { return Padding(padding: const EdgeInsets.all(16),
-              child: Text(query.isEmpty ? 'No recorded invoices in this period.' : 'No matching invoices in this period. Clear search or change the period.',
+              child: Text(_returnSelection
+                ? (query.isEmpty ? 'No saved invoices available. A return needs the original sale.' : 'No matching sale. Check the invoice number, customer name or phone.')
+                : query.isEmpty ? 'No recorded invoices in this period.' : 'No matching invoices in this period. Clear search or change the period.',
                 style: const TextStyle(fontSize: 13, color: MoolColors.muted))); }
             final invoice = matches[index];
             final candidates = payments[(invoice.orderId, invoice.id)] ?? const <WorkspacePaymentRecord>[];
@@ -11628,7 +11665,17 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 fontFeatures: [FontFeature.tabularFigures()]));
             return InkWell(
               key: ValueKey('work-sales-invoice-${invoice.id}'),
-              onTap: () { FocusScope.of(context).unfocus(); setState(() {
+              onTap: () { FocusScope.of(context).unfocus();
+                if (_returnSelection && payment != null) {
+                  _StoreInvoiceSurfaceState.openAdjustments(context, session, invoice, payment,
+                    finance?.accountScope, session.activeWorkspace?.id);
+                  return;
+                }
+                if (_returnSelection) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:
+                    Text('Payment records unavailable. Open the original invoice and recover its records before recording a return.')));
+                }
+                setState(() {
                 _selectedInvoice = invoice;
                 _invoiceStoreScope = session.activeWorkspace?.id;
                 _invoiceAccountScope = session.workspaceFinance?.accountScope;
@@ -11651,7 +11698,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             );
           },
         )),
-      ]);
+      ]));
     }
     final register = _StoreVoucherRegister(
       identity: (
@@ -11700,6 +11747,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     if (_salesScope != salesScope) {
       _salesScope = salesScope;
       _invoiceSearch.clear();
+      _returnSelection = false;
+      _salesQueryBeforeReturns = '';
       _salesActionsExpanded = false;
       _invoicePeriod = 'Today';
       _invoiceRange = null;
@@ -11800,13 +11849,15 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       final hasDraft = session.workspaceOrderSource == 'Counter' &&
           session.workspaceOrderFulfilment == 'At the shop' && session.currentWorkspaceOrderId == null &&
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
-      return _StockQuickActionsFrame(
+      final salesFrame = _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
-        actionWords: 'Counter sale Resume sale Collect dues',
+        actionWords: 'Counter sale Resume sale Collect dues Returns & refunds',
         reflowContent: true,
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
         actions: [
+          _StoreEdgeAction(keyName: 'work-sales-returns', icon: Icons.assignment_return_outlined,
+            label: 'Returns & refunds', onTap: _returnSelection ? null : _toggleReturnSelection),
           if (widget.showNewSaleAction)
             _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: hasDraft ? Icons.edit_note_rounded : Icons.add_rounded,
               label: hasDraft ? 'Resume sale' : 'Counter sale', onTap: widget.onNewSale),
@@ -11818,7 +11869,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
           StoreRecentSearches(
             controller: _invoiceSearch,
-            history: session.workspaceRecentSearches('sales'),
+            history: session.workspaceRecentSearches(_returnSelection ? 'sales-returns' : 'sales'),
             isCurrent: () => _salesScope == (session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id),
             onChanged: (_) => _changeSalesBrowse(() {}),
             child: Row(children: [
@@ -11829,7 +11880,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 onSubmitted: (_) => FocusScope.of(context).unfocus(),
                 style: const TextStyle(fontSize: 13, color: MoolColors.ink),
                 decoration: InputDecoration(
-                  hintText: 'Search invoices or customers', filled: false, isDense: true,
+                  hintText: _returnSelection ? 'Search by phone, customer name or invoice number' : 'Search invoices or customers',
+                  hintMaxLines: _returnSelection ? 3 : 1, filled: false, isDense: true,
                   border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
                   disabledBorder: InputBorder.none, errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -11845,6 +11897,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl)),
         ])),
       );
+      return _returnSelection ? salesFrame.child : salesFrame;
     }
     final content = Column(
       key: const Key('work-store-statement'),
