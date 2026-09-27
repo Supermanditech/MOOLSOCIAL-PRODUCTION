@@ -384,7 +384,7 @@ void _founderVisualCases() {
                 tester
                     .getSize(find.byKey(ValueKey('buy-$route-sale-type-thumb')))
                     .height,
-                3,
+                44,
               );
               final target = route == 'shop' ? 'courier' : 'bulk';
               await tester.tap(

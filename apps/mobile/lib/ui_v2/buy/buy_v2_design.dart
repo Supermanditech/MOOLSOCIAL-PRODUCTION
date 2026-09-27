@@ -988,17 +988,18 @@ abstract final class BuyV2Colors {
 }
 
 /// Shared public commerce action palette; geometry and callbacks stay with
-/// the existing controls. Primary actions use a raised cool-grey surface without a gradient.
+/// the existing controls. Action faces use the founder's pure white without a coloured gradient.
 abstract final class BuyV2ActionStyle {
   static const gradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [Color(0xFFE5EAFB), Color(0xFFE5F3F0)],
   );
-  static const primaryFill = Color(0xFFE7EAF0);
-  static const pressedFill = Color(0xFFDCE1E8);
+  static const primaryFill = Color(0xFFFFFFFF);
+  static const pressedFill = Color(0xFFF7F9FA);
+  static const disabledFill = primaryFill;
   static const primaryForeground = Color(0xFF25252A);
-  static const primaryBorder = Color(0xFFC6CDD7);
+  static const primaryBorder = Color(0xFFDEE4E8);
   static const foreground = BuyV2Colors.navy;
   static const border = Color(0x66000080);
 
@@ -1029,7 +1030,7 @@ abstract final class BuyV2ActionStyle {
             : primaryBorder,
       ),
       color: states.contains(WidgetState.disabled)
-          ? const Color(0xFFF0F1F4)
+          ? disabledFill
           : states.contains(WidgetState.pressed)
           ? pressedFill
           : primaryFill,
@@ -1060,9 +1061,9 @@ abstract final class BuyV2ActionStyle {
               ? 0
               : states.contains(WidgetState.pressed)
               ? 1
-              : 3,
+              : 1,
         ),
-        shadowColor: const WidgetStatePropertyAll(Color(0x665C5C68)),
+        shadowColor: const WidgetStatePropertyAll(Color(0x185C5C68)),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         side: WidgetStateProperty.resolveWith(
           (states) => BorderSide(

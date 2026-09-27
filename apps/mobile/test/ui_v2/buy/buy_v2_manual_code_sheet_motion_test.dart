@@ -586,12 +586,26 @@ void main() {
     final button = tester.widget<OutlinedButton>(
       find.byKey(const ValueKey('buy-scanner-enter-code')),
     );
-    final background = button.style!.backgroundColor!.resolve({})!;
+    final ink = tester.widget<Ink>(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('buy-scanner-enter-code')),
+            matching: find.byType(Ink),
+          )
+          .first,
+    );
+    final surface = ink.decoration! as BoxDecoration;
+    final background = surface.color!;
     final foreground = button.style!.foregroundColor!.resolve({})!;
+    expect(background, const Color(0xFFFFFFFF));
     expect(background.a, 1);
+    expect(surface.gradient, isNull);
+    final luminances = [
+      foreground.computeLuminance(),
+      background.computeLuminance(),
+    ]..sort();
     expect(
-      (foreground.computeLuminance() + .05) /
-          (background.computeLuminance() + .05),
+      (luminances.last + .05) / (luminances.first + .05),
       greaterThanOrEqualTo(4.5),
     );
   });

@@ -769,14 +769,9 @@ class _OffersCategoryControl extends StatelessWidget {
     return BuyV2CartAvoidanceRegion(
       child: Container(
         key: const ValueKey('buy-offers-publisher-summary'),
-        constraints: const BoxConstraints(minHeight: 60),
-        padding: const EdgeInsets.fromLTRB(6, 6, 6, 5),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFF9F2), Color(0xFFF8F8FF), Color(0xFFF5F8FF)],
-          ),
-          border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
-        ),
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: const BoxDecoration(color: BuyV2ActionStyle.primaryFill),
         child: Row(
           children: [
             _CatalogueChromeAction(
@@ -787,7 +782,7 @@ class _OffersCategoryControl extends StatelessWidget {
               emphasized: true,
               onTap: onTap,
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 3),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -812,15 +807,9 @@ class _OffersCategoryControl extends StatelessWidget {
                           onPressed: () => onSourceChanged(mool),
                           style: TextButton.styleFrom(
                             animationDuration: Duration.zero,
-                            backgroundColor: moolSocial == mool
-                                ? BuyV2ActionStyle.pressedFill
-                                : BuyV2ActionStyle.primaryFill,
+                            backgroundColor: BuyV2ActionStyle.primaryFill,
                             foregroundColor: BuyV2ActionStyle.primaryForeground,
-                            side: BorderSide(
-                              color: moolSocial == mool
-                                  ? BuyV2ActionStyle.primaryForeground
-                                  : BuyV2ActionStyle.primaryBorder,
-                            ),
+                            side: BorderSide.none,
                             minimumSize: const Size(0, 44),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 3,
@@ -833,9 +822,8 @@ class _OffersCategoryControl extends StatelessWidget {
                           child: Text(
                             mool ? 'MoolSocial' : 'Suppliers',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                            style: _CatalogueSaleSegment.labelStyle(
+                              moolSocial == mool,
                             ),
                           ),
                         ),
@@ -844,7 +832,7 @@ class _OffersCategoryControl extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 3),
             _CompactCatalogueAction(
               key: const ValueKey('buy-offers-saved'),
               icon: savedOnly
@@ -856,7 +844,7 @@ class _OffersCategoryControl extends StatelessWidget {
               active: savedOnly,
               onTap: onSaved,
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 3),
             _CatalogueChromeAction(
               key: const ValueKey('buy-offers-filter'),
               label: 'Filter offers. ${_offerPublisherLabel(publisher)}',
@@ -2906,7 +2894,7 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
               key: ValueKey(
                 'buy-${shop ? 'shop' : 'wholesale'}-sale-type-swipe',
               ),
-              height: vertical ? 96 : 48,
+              height: vertical ? 88 : 44,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -2920,15 +2908,17 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                     ),
                     curve: Curves.easeOutQuart,
                     left: vertical || selectedIndex == 0 ? 0 : segmentWidth,
-                    top: vertical ? selectedIndex * 48.0 + 44 : 44,
-                    bottom: vertical ? (1 - selectedIndex) * 48.0 + 1 : 1,
+                    top: vertical ? selectedIndex * 44.0 : 0,
+                    bottom: vertical ? (1 - selectedIndex) * 44.0 : 0,
                     width: segmentWidth,
                     child: DecoratedBox(
                       key: ValueKey(
                         'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
                         'thumb-surface',
                       ),
-                      decoration: const BoxDecoration(color: Color(0xFF1010A8)),
+                      decoration: const BoxDecoration(
+                        color: BuyV2ActionStyle.primaryFill,
+                      ),
                     ),
                   ),
                   Flex(
@@ -2983,11 +2973,11 @@ class _CatalogueSaleSegment extends StatelessWidget {
   final VoidCallback onTap;
 
   static TextStyle labelStyle(bool selected) => TextStyle(
-    color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
+    color: BuyV2ActionStyle.primaryForeground,
     fontSize: 11.25,
-    fontWeight: FontWeight.w900,
+    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
     height: 1,
-    letterSpacing: selected ? .15 : .05,
+    letterSpacing: .05,
   );
 
   @override
@@ -3051,7 +3041,7 @@ class _CatalogueSaleSegment extends StatelessWidget {
                         child: BuyV2DeliveryModeIcon(
                           artwork: icon,
                           size: 18,
-                          color: const Color(0xFF1010A8),
+                          color: BuyV2ActionStyle.primaryForeground,
                         ),
                       ),
                     ),
@@ -3999,7 +3989,7 @@ class _CatalogueToolbar extends StatelessWidget {
           final separateModeRow =
               (session.destination == BuyV2Destination.shop ||
                   session.destination == BuyV2Destination.wholesale) &&
-              constraints.maxWidth - 171 <
+              constraints.maxWidth - 153 <
                   _CatalogueSaleTypeSelector.minimumHorizontalWidth(
                     context,
                     session,
@@ -4040,7 +4030,7 @@ class _CatalogueToolbar extends StatelessWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              gradient: BuyV2ActionStyle.gradient,
+                              color: BuyV2ActionStyle.primaryFill,
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: AnimatedSwitcher(
@@ -4081,26 +4071,10 @@ class _CatalogueToolbar extends StatelessWidget {
                 );
           return Container(
             key: const ValueKey('buy-catalogue-toolbar'),
-            constraints: const BoxConstraints(minHeight: 60),
-            padding: const EdgeInsets.fromLTRB(6, 6, 6, 5),
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color(0xFFFFF9F2),
-                  Color(0xFFF8F8FF),
-                  Color(0xFFF5F8FF),
-                ],
-              ),
-              border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x10000080),
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
-                ),
-              ],
+              color: BuyV2ActionStyle.primaryFill,
             ),
             child: separateModeRow
                 ? Column(
@@ -4118,11 +4092,11 @@ class _CatalogueToolbar extends StatelessWidget {
                 : Row(
                     children: [
                       category,
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 3),
                       Expanded(child: feature),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 3),
                       saved,
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 3),
                       tools,
                     ],
                   ),
@@ -5094,7 +5068,6 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
 
   @override
   Widget build(BuildContext context) {
-    final highlighted = widget.active || widget.emphasized;
     return Semantics(
       label: widget.label,
       button: true,
@@ -5114,8 +5087,8 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
             child: AnimatedContainer(
               duration: BuyV2Motion.resolved(context, BuyV2Motion.selection),
               curve: Curves.easeOutCubic,
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               child: Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
@@ -5149,9 +5122,7 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
                         child: Icon(
                           widget.icon,
                           size: 22,
-                          color: highlighted
-                              ? BuyV2Colors.royal
-                              : BuyV2Colors.navy,
+                          color: BuyV2ActionStyle.primaryForeground,
                         ),
                       ),
                     ),
@@ -9448,17 +9419,21 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                                 ? 'Added'
                                 : 'Add',
                           ),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(
-                              76,
-                              BuyV2Metrics.minimumTap,
+                          style: BuyV2ActionStyle.button(
+                            FilledButton.styleFrom(
+                              minimumSize: const Size(
+                                76,
+                                BuyV2Metrics.minimumTap,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                              ),
+                              textStyle: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                             ),
-                            padding: const EdgeInsets.symmetric(horizontal: 9),
-                            textStyle: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
                           ),
                         ),
                       ),

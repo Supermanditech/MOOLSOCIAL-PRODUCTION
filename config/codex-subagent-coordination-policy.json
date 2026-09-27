@@ -83,6 +83,10 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
         "apps/mobile/lib/features/buy/buy_v2_models.dart",
         "apps/mobile/lib/features/buy/buy_v2_catalogue_data.dart",
@@ -177,7 +181,14 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
-        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png"
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png"
       ]
     },
     {
@@ -212,7 +223,6 @@
         "docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt",
         "docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt",
         "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",

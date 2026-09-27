@@ -369,11 +369,13 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
               onTap: _submit,
               child: FilledButton.icon(
                 key: const ValueKey('buy-use-product-code'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 44),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+                style: BuyV2ActionStyle.button(
+                  FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                 ),
                 onPressed: _submit,
@@ -1029,21 +1031,22 @@ class _ScannerActionPanel extends StatelessWidget {
           child: FilledButton.icon(
             key: const ValueKey('buy-scanner-scan-now'),
             onPressed: scanning || busy ? null : () => onScanNow(),
-            style: FilledButton.styleFrom(
-              backgroundColor: BuyV2Colors.royal,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: BuyV2Colors.royal,
-              disabledForegroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            style: BuyV2ActionStyle.button(
+              FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             icon: scanning
                 ? const SizedBox.square(
                     dimension: 16,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: BuyV2Colors.muted,
                       strokeWidth: 2,
                     ),
                   )
@@ -1059,15 +1062,15 @@ class _ScannerActionPanel extends StatelessWidget {
           child: OutlinedButton(
             key: const ValueKey('buy-scanner-enter-code'),
             onPressed: busy ? null : () => onEnterCode(),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: const Color(0xFF121230),
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: const Color(0xFF121230),
-              disabledForegroundColor: Colors.white60,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              side: const BorderSide(color: Colors.white70),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            style: BuyV2ActionStyle.button(
+              OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             child: const Text('Enter code', textAlign: TextAlign.center),

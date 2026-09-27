@@ -1080,6 +1080,18 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  # Founder-selected public button colour inventory: exact additional owners.
+  'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_shared_sku_fit_test.dart',
         'apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart',
         'apps/mobile/lib/app/moolsocial_app.dart',

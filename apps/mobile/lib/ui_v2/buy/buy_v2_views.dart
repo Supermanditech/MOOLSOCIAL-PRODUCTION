@@ -3572,9 +3572,7 @@ class _ProductAssuranceControls extends StatelessWidget {
       );
       return Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFAFBFD), Color(0xFFF3F7F8)],
-          ),
+          color: BuyV2ActionStyle.primaryFill,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: BuyV2Colors.line, width: .5),
         ),
@@ -5952,7 +5950,7 @@ class _BuyV2ZoomableMediaState extends State<_BuyV2ZoomableMedia>
                 label: 'Reset zoom for ${widget.product.customerTitle}',
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: BuyV2ActionStyle.gradient,
+                    color: BuyV2ActionStyle.primaryFill,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Material(
@@ -10842,10 +10840,7 @@ class _CheckoutProgressHeader extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          gradient: index == activeIndex
-                              ? BuyV2ActionStyle.gradient
-                              : null,
-                          color: index == activeIndex ? null : Colors.white,
+                          color: BuyV2ActionStyle.primaryFill,
                           borderRadius: BorderRadius.circular(11),
                           border: Border.all(
                             color: index <= activeIndex
@@ -19889,11 +19884,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                   excludeSemantics: true,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: commerce
-                          ? const LinearGradient(
-                              colors: [Color(0xFFE3DFF7), Color(0xFFEAF3FA)],
-                            )
-                          : null,
+                      color: commerce ? BuyV2ActionStyle.primaryFill : null,
                       borderRadius: BorderRadius.circular(12),
                       border: commerce
                           ? Border.all(color: const Color(0xFFAAA3CE))
@@ -24203,7 +24194,7 @@ class _PrescriptionChoice extends StatelessWidget {
                       height: 40,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        gradient: BuyV2ActionStyle.gradient,
+                        color: BuyV2ActionStyle.primaryFill,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
@@ -24279,7 +24270,7 @@ class _AddPrescriptionChoice extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        gradient: BuyV2ActionStyle.gradient,
+                        color: BuyV2ActionStyle.primaryFill,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(

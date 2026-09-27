@@ -253,7 +253,7 @@ void main() {
       );
     }
     expect(
-      contrast(BuyV2Colors.muted, const Color(0xFFF0F1F4)),
+      contrast(BuyV2Colors.muted, BuyV2ActionStyle.disabledFill),
       greaterThanOrEqualTo(4.5),
     );
   });
@@ -278,6 +278,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       final semantics = tester.ensureSemantics();
+
+      final faces = tester.widgetList<Ink>(
+        find.descendant(
+          of: find.byType(FilledButton),
+          matching: find.byType(Ink),
+        ),
+      );
+      expect(faces, isNotEmpty);
+      for (final face in faces) {
+        final decoration = face.decoration! as BoxDecoration;
+        expect(decoration.color, const Color(0xFFFFFFFF));
+        expect(decoration.gradient, isNull);
+      }
 
       expect(
         tester.getSemantics(find.byType(FilledButton)),
@@ -334,6 +347,14 @@ void main() {
             expect(session.cartScope, scope);
             expect(session.itemCount, 1);
             expect(tester.takeException(), isNull);
+            final scopeFace = tester.widget<Container>(
+              find
+                  .descendant(of: selector, matching: find.byType(Container))
+                  .first,
+            );
+            final decoration = scopeFace.decoration! as BoxDecoration;
+            expect(decoration.color, const Color(0xFFFFFFFF));
+            expect(decoration.gradient, isNull);
           }
         }
         final buttons = find.byType(FilledButton);
@@ -368,6 +389,7 @@ void main() {
           reason: 'Primary action should fit its text with modest padding.',
         );
         expect(face.height, greaterThanOrEqualTo(44));
+        await captureR66Visual(tester, 'pure-white-orders-$orders-scale-$scale');
         await tester.tap(primary);
         await tester.pumpAndSettle();
         expect(session.itemCount, 1);
@@ -4363,10 +4385,10 @@ void main() {
         // These checkout captures render the same approved checkout as the
         // Cart-return suite. Share its successor reference, retaining originals.
         final reference = viewport.checkout
-            ? 'cursor-approved-cool-grey-20260927/'
+            ? 'cursor-pure-white-20260927/'
                   'buy-v2-r58-8-6-c24f-checkout-cart-return-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
-            : 'cursor-approved-cool-grey-20260926/'
+            : 'cursor-pure-white-20260927/'
                   'buy-v2-r58-8-7-c24f-${viewport.label}.png';
         await expectLater(
           find.byType(BuyV2Screen),

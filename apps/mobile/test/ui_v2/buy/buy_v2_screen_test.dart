@@ -2733,7 +2733,7 @@ void main() {
 
       await captureR66Visual(tester, 'r669-three-line-shop-category');
       final categoryAction = find.byKey(const ValueKey('buy-category-picker'));
-      expect(tester.getSize(categoryAction), const Size(48, 48));
+      expect(tester.getSize(categoryAction), const Size(44, 44));
       expect(
         find.descendant(
           of: categoryAction,
@@ -2803,10 +2803,10 @@ void main() {
       final thumb = tester.getRect(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
-      expect(thumb.bottom, selector.bottom - 1);
+      expect(thumb.bottom, selector.bottom);
       expect(thumb.left, selector.left);
       expect(thumb.width, selector.width / 2);
-      expect(thumb.height, 3);
+      expect(thumb.height, 44);
       final thumbMotion = tester.widget<AnimatedPositioned>(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
@@ -2817,7 +2817,7 @@ void main() {
       );
       final thumbDecoration = thumbSurface.decoration as BoxDecoration;
       expect(thumbDecoration.gradient, isNull);
-      expect(thumbDecoration.color, const Color(0xFF1010A8));
+      expect(thumbDecoration.color, Colors.white);
       expect(thumbDecoration.borderRadius, isNull);
       expect(thumbDecoration.border, isNull);
       expect(thumbDecoration.boxShadow, isNull);
@@ -2837,6 +2837,7 @@ void main() {
         find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
       );
       expect(quickTypography.style.fontSize, 11.25);
+      expect(quickTypography.style.color, BuyV2ActionStyle.primaryForeground);
       expect(quickTypography.duration, BuyV2Motion.selection);
       final catalogueMotion = tester.widget<TweenAnimationBuilder<double>>(
         find.byKey(const ValueKey('buy-catalogue-motion-tween-shop')),
@@ -2917,10 +2918,10 @@ void main() {
         find.byKey(const ValueKey('buy-filter-button')),
       );
 
-      expect(toolbar.height, 60);
-      expect(category.size, const Size(48, 48));
-      expect(saved.size, const Size(48, 48));
-      expect(filters.size, const Size(48, 48));
+      expect(toolbar.height, 44);
+      expect(category.size, const Size(44, 44));
+      expect(saved.size, const Size(44, 44));
+      expect(filters.size, const Size(44, 44));
       expect(category.right, lessThan(selector.left));
       expect(selector.right, lessThan(saved.left));
       expect(saved.right, lessThan(filters.left));
@@ -12299,7 +12300,7 @@ void main() {
       );
       final shopThumb = find.byKey(const ValueKey('buy-shop-sale-type-thumb'));
       expect(shopSelector, findsOneWidget);
-      expect(tester.getSize(shopSelector).height, 48);
+      expect(tester.getSize(shopSelector).height, 44);
       final quickThumbLeft = tester.getTopLeft(shopThumb).dx;
       expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
       expect(
@@ -12325,7 +12326,7 @@ void main() {
         const ValueKey('buy-wholesale-sale-type-selector'),
       );
       expect(wholesaleSelector, findsOneWidget);
-      expect(tester.getSize(wholesaleSelector).height, 48);
+      expect(tester.getSize(wholesaleSelector).height, 44);
       expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.wholesale);
       expect(
         find.byKey(const ValueKey('buy-product-w-tomato')),
