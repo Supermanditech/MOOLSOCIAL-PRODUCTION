@@ -226,6 +226,20 @@ Future<bool> saveStoreStockFile(
   String fileName,
   StoreStockExportFormat format,
 ) async {
+  // The installed direct-download bridge admits stock/customer filenames only.
+  // Use the already-registered system picker for the separate Sales document;
+  // never disguise it as a stock/customer report or weaken native validation.
+  if (RegExp(r'^sales-collections-[A-F0-9]{16}\.pdf$').hasMatch(fileName) &&
+      format == StoreStockExportFormat.pdf) {
+    return await FilePicker.saveFile(
+      dialogTitle: 'Save Sales & Collections Statement',
+      fileName: fileName,
+      mimeType: format.mimeType,
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      bytes: bytes,
+    ) != null;
+  }
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     try {
       return await const MethodChannel(
