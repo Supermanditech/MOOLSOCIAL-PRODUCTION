@@ -1853,7 +1853,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                           widget.onResetFilters != null
                       ? 'Reset price filter'
                       : null,
-                  onAction: widget.onResetFilters,
+                  onAction: widget.query.maximumPrice != null
+                      ? widget.onResetFilters
+                      : null,
                 ),
               if (products.isNotEmpty)
                 _QuantityAwareGridLayout(
@@ -8378,6 +8380,8 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                     controller: _search,
                     focusNode: _searchFocus,
                     maxLength: 80,
+                    minLines: 1,
+                    maxLines: _searching ? 6 : 1,
                     textInputAction: TextInputAction.search,
                     style: const TextStyle(
                       color: BuyV2Colors.ink,
@@ -8397,27 +8401,17 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
-                      prefixIcon: _searching
-                          ? IconButton(
-                              key: const ValueKey('buy-store-search-finish'),
-                              tooltip: 'Finish store search',
-                              onPressed: _finishStoreSearch,
-                              icon: const Icon(
-                                Icons.arrow_back_rounded,
-                                size: 21,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.search_rounded,
-                              color: BuyV2Colors.navy,
-                              size: 21,
-                            ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: BuyV2Colors.navy,
+                        size: 21,
+                      ),
                       prefixIconConstraints: const BoxConstraints(
                         minWidth: 42,
                         minHeight: 46,
                       ),
-                      suffixIcon: _search.text.isEmpty
-                          ? widget.storefront && !_searching
+                      suffixIcon: !_searching
+                          ? widget.storefront
                                 ? IconButton(
                                     key: const ValueKey(
                                       'buy-store-info-control',
@@ -8429,6 +8423,8 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                                     ),
                                   )
                                 : null
+                          : _search.text.isEmpty
+                          ? null
                           : IconButton(
                               key: const ValueKey(
                                 'buy-store-product-search-clear',
@@ -8454,7 +8450,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (widget.storefront && !_searching)
+              if (widget.storefront || _searching)
                 IconButton(
                   key: ValueKey(
                     _searching

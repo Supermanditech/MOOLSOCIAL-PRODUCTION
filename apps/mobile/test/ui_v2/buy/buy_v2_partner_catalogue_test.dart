@@ -168,7 +168,7 @@ void main() {
           await tester.tap(field);
           await tester.enterText(field, 'sku 4999');
           await tester.pumpAndSettle();
-          expect(tester.getSize(field).width, greaterThan(width + 30));
+          expect(tester.getSize(field).width, closeTo(width, .1));
           expect(
             find.byKey(const ValueKey('buy-store-info-control')),
             findsNothing,
@@ -177,6 +177,23 @@ void main() {
             find.byKey(const ValueKey('buy-store-catalogue-toolbar')),
             findsNothing,
           );
+          final finish = find.byKey(const ValueKey('buy-store-search-finish'));
+          expect(finish.hitTestable(), findsOneWidget);
+          expect(
+            (tester.widget<IconButton>(finish).icon as Icon).icon,
+            Icons.check_rounded,
+          );
+          expect(
+            tester.getCenter(finish).dx,
+            greaterThan(tester.getCenter(field).dx),
+          );
+          expect(tester.widget<TextField>(field).maxLines, 6);
+          expect(
+            (tester.widget<TextField>(field).decoration!.prefixIcon as Icon)
+                .icon,
+            Icons.search_rounded,
+          );
+
           expect(
             session.retainedCatalogueQuery(scope)?.storeId,
             source.storeIdAt(0),
@@ -189,6 +206,20 @@ void main() {
           tester.view.viewInsets = const FakeViewPadding(bottom: 290);
           await tester.pumpAndSettle();
           expect(tester.getRect(field).bottom, lessThan(844 - 290));
+          final longQuery = List.filled(4, 'wholegrain product ').join().trim();
+          await tester.enterText(field, longQuery);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(field);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(field).controller!.text, longQuery);
+          expect(find.text('No matching products'), findsOneWidget);
+          expect(find.text('Reset price filter'), findsNothing);
+          expect(tester.takeException(), isNull);
+          expect(tester.getRect(field).bottom, lessThan(844 - 290));
+          expect(finish.hitTestable(), findsOneWidget);
+          await tester.enterText(field, 'sku 4999');
+          await tester.pumpAndSettle();
+
           await captureR66Visual(
             tester,
             'eight-store-search-${destination.name}-$scale',
@@ -203,6 +234,10 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(tester.getSize(field).width, closeTo(width, .1));
+          expect(
+            find.byKey(const ValueKey('buy-store-product-search-clear')),
+            findsNothing,
+          );
           await tester.tap(
             find.byKey(const ValueKey('buy-store-category-control')),
           );
@@ -279,7 +314,7 @@ void main() {
           await tester.tap(field);
           await tester.enterText(field, 'rice');
           await tester.pumpAndSettle();
-          expect(tester.getSize(field).width, greaterThan(width + 30));
+          expect(tester.getSize(field).width, greaterThanOrEqualTo(width));
           tester.testTextInput.hide();
           await tester.pumpAndSettle();
           await tester.binding.handlePopRoute();
