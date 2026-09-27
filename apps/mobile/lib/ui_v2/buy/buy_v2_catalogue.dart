@@ -8417,19 +8417,12 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
             ],
           ),
           if (widget.storefront && !_searching) ...[
-            const SizedBox(height: 8),
             Container(
               key: const ValueKey('buy-store-catalogue-toolbar'),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xFFFFF9F2),
-                    Color(0xFFF8F8FF),
-                    Color(0xFFF5F8FF),
-                  ],
-                ),
-                border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+                color: BuyV2ActionStyle.primaryFill,
               ),
               child: Row(
                 children: [

@@ -126,7 +126,7 @@
         "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
       ],
       "manifestPath": "config/buy-founder-regression.json",
-      "manifestSha256": "30D9E89707750E00FDBAC5D355C804B1FCB2453AEB891FFE643E1675E970ACDB",
+      "manifestSha256": "F53F30DBFF208003533CAE7D9F445D58A1854744F1DDEA4015D752A2EA16C404",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,

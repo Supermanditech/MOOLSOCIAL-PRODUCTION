@@ -81,6 +81,27 @@ void main() {
           );
           expect(tester.getSize(close).shortestSide, greaterThanOrEqualTo(44));
           expect(tester.widget<IconButton>(close).tooltip, 'Close store');
+          final toolbar = find.byKey(
+            const ValueKey('buy-store-catalogue-toolbar'),
+          );
+          final toolbarSurface = tester.widget<Container>(toolbar);
+          final paint = toolbarSurface.decoration! as BoxDecoration;
+          expect(paint.color, Colors.white);
+          expect(paint.gradient, isNull);
+          expect(paint.border, isNull);
+          expect(toolbarSurface.padding, const EdgeInsets.symmetric(horizontal: 6));
+          if (scale == 1) {
+            expect(tester.getSize(toolbar).height, 44);
+          }
+          for (final control in ['category', 'saved', 'filter']) {
+            final button = find.byKey(ValueKey('buy-store-$control-control'));
+            expect(tester.getSize(button).shortestSide, greaterThanOrEqualTo(44));
+            for (final icon in tester.widgetList<Icon>(
+              find.descendant(of: button, matching: find.byType(Icon)),
+            )) {
+              expect(icon.color, BuyV2ActionStyle.primaryForeground);
+            }
+          }
           final field = find.byKey(const ValueKey('buy-store-product-search'));
           expect(field.hitTestable(), findsOneWidget);
           final width = tester.getSize(field).width;
