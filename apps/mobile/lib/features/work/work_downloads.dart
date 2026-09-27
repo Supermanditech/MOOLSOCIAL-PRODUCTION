@@ -66,7 +66,7 @@ class StoreSalesStatement {
   // Even a complete current snapshot does not prove historical receipt coverage.
   // Report only supplied posted entries and label this limitation explicitly.
   int? recorded(WorkspaceLedgerEntryKind kind) =>
-      !financeReady || finance!.customerLedgers.isEmpty
+      !financeReady || finance!.asOf.isBefore(from) || finance!.customerLedgers.isEmpty
       ? null
       : finance!.customerLedgers
             .expand((l) => l.entries)
@@ -147,6 +147,7 @@ class StoreSalesStatement {
         ['Seller GSTIN', 'Unavailable in saved seller records'],
         ['Period (phone local dates)', period],
         ['Generated', generatedAt.toIso8601String()],
+        ['Ledger records as of', financeReady ? finance!.asOf.toIso8601String() : 'Unavailable'],
         ['Recorded invoices', '${selected.length}'],
         ['Invoice totals after discount', amount(billedMinor)],
         ['Recorded discounts', amount(discountMinor)],

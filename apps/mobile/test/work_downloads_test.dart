@@ -300,6 +300,23 @@ void main() {
     );
   }
 
+  test('SALESSTATEMENT separates posted collections and refuses later-day zero', () {
+    final f = WorkspaceFinanceSnapshot(accountScope: 'account', workspaceId: 'store',
+      revision: 1, asOf: DateTime.utc(2026, 9, 10), salesTodayMinor: 0, duesMinor: 0,
+      availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payments: [], payouts: [], customerLedgers: [customer()], historyComplete: true);
+    expect(f.valid, isTrue);
+    StoreSalesStatement make(DateTime from, {String account = 'account'}) => StoreSalesStatement(
+      accountId: account, storeId: 'store', storeName: 'QA', from: from,
+      until: DateTime.utc(2026, 10), generatedAt: DateTime.utc(2026, 9, 27), invoices: [], finance: f);
+    final period = make(DateTime.utc(2026, 9));
+    expect(period.recorded(WorkspaceLedgerEntryKind.collection), 4000);
+    expect(period.recorded(WorkspaceLedgerEntryKind.creditNote), 8000);
+    expect(period.recorded(WorkspaceLedgerEntryKind.refund), 500);
+    expect(make(DateTime.utc(2026, 9, 27)).recorded(WorkspaceLedgerEntryKind.collection), isNull);
+    expect(make(DateTime.utc(2026, 9), account: 'other').recorded(WorkspaceLedgerEntryKind.collection), isNull);
+  });
   testWidgets(
     'PRINT customer statement action cancels stale source and never claims queued completion',
     (tester) async {
