@@ -3563,6 +3563,7 @@ class WorkSession extends ChangeNotifier {
     required int amountMinor,
     required WorkspacePaymentChannel channel,
     String? reference,
+    String? sourceCollectionId,
   }) async {
     final data = _storeData;
     if (!await recoverCustomerLedger() ||
@@ -3598,8 +3599,9 @@ class WorkSession extends ChangeNotifier {
       amountMinor: amountMinor,
       channel: channel,
       reference: reference?.trim(),
+      sourceCollectionId: sourceCollectionId,
     );
-    if (!request.valid) {
+    if (!request.valid || !ledger.permitsReceiptRefund(request)) {
       return false;
     }
     data.pendingCustomerRefund = request;

@@ -550,6 +550,49 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  test('REFUNDSOURCE mixed receipts keep original identity and remaining limits', () {
+    final now = DateTime.utc(2026, 9, 27);
+    WorkspaceCustomerRefund request({String source = 'receipt-cash', int amount = 2000,
+      WorkspacePaymentChannel channel = WorkspacePaymentChannel.cash}) => WorkspaceCustomerRefund(
+        accountScope: 'qa-account', workspaceId: 'qa-store', customerId: 'qa-customer',
+        invoiceId: 'qa-invoice', orderId: 'qa-order', operationId: 'qa-refund',
+        expectedRevision: 1, amountMinor: amount, channel: channel,
+        reference: channel == WorkspacePaymentChannel.cash ? null : 'NEW-REFUND',
+        sourceCollectionId: source);
+    WorkspaceCustomerLedgerEntry entry(String id, int sequence, WorkspaceLedgerEntryKind kind,
+      int amount, {WorkspacePaymentChannel channel = WorkspacePaymentChannel.cash,
+      WorkspaceCustomerRefund? refund}) => WorkspaceCustomerLedgerEntry(
+        id: id, operationId: refund?.operationId ?? id, invoiceId: 'qa-invoice', orderId: 'qa-order',
+        sequence: sequence, occurredAt: now, kind: kind, state: WorkspaceLedgerPostingState.posted,
+        amountMinor: amount, channel: channel, customerRefund: refund, paymentReference: refund?.reference);
+    final base = [
+      entry('invoice', 1, WorkspaceLedgerEntryKind.invoice, 10000),
+      entry('receipt-cash', 2, WorkspaceLedgerEntryKind.collection, 4000),
+      entry('receipt-bank', 3, WorkspaceLedgerEntryKind.collection, 6000, channel: WorkspacePaymentChannel.bankTransfer),
+      entry('credit', 4, WorkspaceLedgerEntryKind.creditNote, 10000),
+    ];
+    WorkspaceCustomerLedger ledger(List<WorkspaceCustomerLedgerEntry> entries) => WorkspaceCustomerLedger(
+      accountScope: 'qa-account', workspaceId: 'qa-store', customerId: 'qa-customer', customerName: 'QA',
+      revision: 1, asOf: now, entries: entries, historyComplete: true, openingBalanceMinor: 0);
+    final before = ledger(base);
+    expect(before.valid, isTrue);
+    expect(before.receiptRemainingMinor('qa-invoice', 'receipt-cash'), 4000);
+    expect(before.receiptRemainingMinor('qa-invoice', 'receipt-bank'), 6000);
+    expect(before.permitsReceiptRefund(request(amount: 4001)), isFalse);
+    expect(before.permitsReceiptRefund(request(source: 'missing')), isFalse);
+    expect(before.permitsReceiptRefund(request(channel: WorkspacePaymentChannel.bankTransfer)), isFalse);
+    final bank = request(source: 'receipt-bank', channel: WorkspacePaymentChannel.bankTransfer);
+    expect(bank.valid, isTrue);
+    expect(before.permitsReceiptRefund(bank), isTrue);
+    expect(WorkspaceCustomerRefund.fromJson(bank.toJson()).identityData, bank.identityData);
+    final after = ledger([...base, entry('refund', 5, WorkspaceLedgerEntryKind.refund, 2000, refund: request())]);
+    expect(after.receiptRemainingMinor('qa-invoice', 'receipt-cash'), 2000);
+    expect(after.receiptRemainingMinor('qa-invoice', 'receipt-bank'), 6000);
+    expect(after.permitsReceiptRefund(request(amount: 2001)), isFalse);
+    final legacy = ledger([...base, entry('legacy', 5, WorkspaceLedgerEntryKind.refund, 2000)]);
+    expect(legacy.receiptRemainingMinor('qa-invoice', 'receipt-bank'), isNull);
+    expect(before.receiptRemainingMinor('other-invoice', 'receipt-cash'), isNull);
+  });
   test(
     'HOME latest invoice follows issue time not restored insertion order',
     () {

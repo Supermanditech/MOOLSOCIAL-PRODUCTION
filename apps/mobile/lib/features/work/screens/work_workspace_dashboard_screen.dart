@@ -23599,10 +23599,37 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
   bool get _inlineCounterReceipt =>
       widget.counterSaleReceipt && widget.onClose != null;
   late WorkspacePaymentChannel channel;
+  String? sourceCollectionId;
+  WorkspaceCustomerLedger? get refundLedger {
+    final finance = widget.session.workspaceFinance;
+    if (finance?.accountScope != widget.accountScope ||
+        finance?.workspaceId != widget.storeId ||
+        widget.session.activeWorkspace?.id != widget.storeId) {
+      return null;
+    }
+    return finance?.customerLedgers.where((l) =>
+        l.customerId == widget.payment.customerId && l.valid && l.historyComplete).firstOrNull;
+  }
+  List<WorkspaceCustomerLedgerEntry> get refundReceipts =>
+      refundLedger?.entries.where((e) => e.valid &&
+          e.invoiceId == widget.payment.invoiceId &&
+          e.orderId == widget.payment.orderId &&
+          e.kind == WorkspaceLedgerEntryKind.collection &&
+          e.state == WorkspaceLedgerPostingState.posted).toList() ?? [];
+  WorkspaceCustomerLedgerEntry? get sourceReceipt => refundReceipts
+      .where((e) => e.id == sourceCollectionId).firstOrNull;
+  String receiptRemainingLabel(WorkspaceCustomerLedgerEntry receipt) {
+    final remaining = refundLedger?.receiptRemainingMinor(widget.payment.invoiceId!, receipt.id);
+    return remaining == null ? 'Unavailable' : _purchaseAmount(remaining);
+  }
+  bool get sourceRefundSupported => sourceReceipt != null &&
+      const [WorkspacePaymentChannel.cash, WorkspacePaymentChannel.directUpi,
+        WorkspacePaymentChannel.bankTransfer].contains(sourceReceipt!.channel) &&
+      refundLedger?.receiptRemainingMinor(widget.payment.invoiceId!, sourceCollectionId!) != null;
   bool get _bankTransfer => channel == WorkspacePaymentChannel.bankTransfer;
   bool get _needsReference =>
       _bankTransfer || channel == WorkspacePaymentChannel.directUpi;
-  String get _referenceLabel => _bankTransfer
+  String get _referenceLabel => widget.refund ? 'Refund transaction reference' : _bankTransfer
       ? 'Bank transaction reference'
       : 'UPI transaction reference';
   bool saving = false;
@@ -23614,6 +23641,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
     'amount': amount.text,
     'reference': reference.text,
     'channel': channel.name,
+    if (widget.refund && sourceCollectionId != null) 'sourceCollectionId': sourceCollectionId!,
   };
   @override
   void initState() {
@@ -23644,6 +23672,15 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
       amount.text = _formatStoreMinorAmount(
         widget.payment.dueMinor,
       ).replaceAll(',', '');
+    }
+    if (widget.refund) {
+      final receipts = refundReceipts;
+      if (receipts.length == 1) {
+        sourceCollectionId = receipts.single.id;
+        channel = receipts.single.channel;
+      } else {
+        channel = WorkspacePaymentChannel.unknown;
+      }
     }
     draft = _LedgerFormAutosave(
       widget.session,
@@ -23719,6 +23756,11 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
         _ => channel,
       };
     }
+    if (widget.refund) {
+      final savedSource = fields['sourceCollectionId'];
+      if (refundReceipts.any((e) => e.id == savedSource)) sourceCollectionId = savedSource;
+      channel = sourceReceipt?.channel ?? WorkspacePaymentChannel.unknown;
+    }
     amount.addListener(saveDraft);
     reference.addListener(saveDraft);
     setState(() {});
@@ -23742,16 +23784,14 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
     super.dispose();
   }
 
-  int get limitMinor => widget.refund
-      ? widget.session.workspaceFinance?.customerLedgers
-                .where(
-                  (ledger) => ledger.customerId == widget.payment.customerId,
-                )
-                .firstOrNull
-                ?.invoiceBalance(widget.payment.invoiceId!)
-                ?.refundableMinor ??
-            0
-      : widget.payment.dueMinor;
+  int get limitMinor {
+    if (!widget.refund) return widget.payment.dueMinor;
+    final ledger = refundLedger;
+    final credit = ledger?.invoiceBalance(widget.payment.invoiceId!)?.refundableMinor ?? 0;
+    final remaining = sourceCollectionId == null ? 0 :
+        ledger?.receiptRemainingMinor(widget.payment.invoiceId!, sourceCollectionId!) ?? 0;
+    return remaining < credit ? remaining : credit;
+  }
 
   Future<void> submit() async {
     if (saving || confirming || !draft.ready || draft.error != null) return;
@@ -23775,6 +23815,10 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
       referenceError = null;
       error = null;
     });
+    if (widget.refund && !sourceRefundSupported) {
+      setState(() => error = 'Select a verified original receipt. Refund allocation is unavailable for incomplete records.');
+      return;
+    }
     final text = amount.text.trim();
     if (!RegExp(r'^\d{1,10}(\.\d{1,2})?$').hasMatch(text)) {
       setState(
@@ -23816,10 +23860,16 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
       saving = true;
       error = null;
     });
-    final record = widget.refund
-        ? widget.session.recordCustomerRefund
-        : widget.session.recordCustomerCollection;
-    final recorded = await record(
+    final recorded = widget.refund
+        ? await widget.session.recordCustomerRefund(
+            customerId: widget.payment.customerId,
+            invoiceId: widget.payment.invoiceId!,
+            amountMinor: minor,
+            channel: channel,
+            reference: reference.text,
+            sourceCollectionId: sourceCollectionId,
+          )
+        : await widget.session.recordCustomerCollection(
       customerId: widget.payment.customerId,
       invoiceId: widget.payment.invoiceId!,
       amountMinor: minor,
@@ -24055,7 +24105,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                           saving ||
                           confirming ||
                           (widget.refund &&
-                              widget.session.pendingCustomerRefund != null)
+                              (widget.session.pendingCustomerRefund != null || !sourceRefundSupported))
                       ? null
                       : submit,
                   child: Text(
@@ -24099,8 +24149,37 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                     if (widget.counterSaleReceipt) const SizedBox(height: 14),
                     if (!widget.counterSaleReceipt)
                       Text(
-                        '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
+                        widget.refund && !sourceRefundSupported
+                            ? 'Select an original payment with verified refund availability.'
+                            : '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
                       ),
+                    if (widget.refund) ...[
+                      const Text('Original payment', style: TextStyle(fontWeight: FontWeight.w600)),
+                      if (refundReceipts.isEmpty)
+                        const Text('Original payment details unavailable.')
+                      else
+                        for (final receipt in refundReceipts)
+                          TextButton.icon(
+                            key: ValueKey('refund-source-${receipt.id}'),
+                            onPressed: saving || confirming ? null : () {
+                              setState(() {
+                                sourceCollectionId = receipt.id;
+                                channel = receipt.channel;
+                                reference.clear();
+                                amountError = null;
+                              });
+                              saveDraft();
+                            },
+                            icon: Icon(sourceCollectionId == receipt.id ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 18),
+                            label: Text('${receipt.channel.label} · ${_purchaseAmount(receipt.amountMinor)} · '
+                                '${MaterialLocalizations.of(context).formatShortDate(receipt.occurredAt.toLocal())}\n'
+                                'Remaining: ${receiptRemainingLabel(receipt)}'),
+                          ),
+                      if (sourceReceipt?.paymentReference?.isNotEmpty == true)
+                        Text('Original transaction: ${sourceReceipt!.paymentReference}', key: const Key('refund-original-reference')),
+                      if (sourceReceipt != null && channel != WorkspacePaymentChannel.cash)
+                        const Text('Original payer account details unavailable. Confirm the customer’s destination before returning money. Original-payment refunds require a connected payment provider.'),
+                    ],
                     TextField(
                       key: Key(
                         widget.refund ? 'refund-amount' : 'collection-amount',
@@ -24145,7 +24224,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                           key: const Key('work-counter-receipt-method'),
                         ),
                       )
-                    else
+                    else if (!widget.refund)
                       Wrap(
                         spacing: 8,
                         children: [

@@ -4144,6 +4144,7 @@ class StoreReviewCustomerCollectionGateway
         payment == null ||
         balance == null ||
         request.amountMinor > balance.refundableMinor ||
+        !ledger.permitsReceiptRefund(request) ||
         payment.paidMinor != balance.collectedMinor ||
         payment.refundedMinor != balance.refundedMinor ||
         payment.channel == WorkspacePaymentChannel.platform) {

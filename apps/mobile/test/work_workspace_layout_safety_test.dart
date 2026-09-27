@@ -37831,8 +37831,10 @@ void main() {
       },
     );
 
+    for (final refundChannel in [WorkspacePaymentChannel.cash,
+      WorkspacePaymentChannel.directUpi, WorkspacePaymentChannel.bankTransfer]) {
     testWidgets(
-      'LEDGER01 refund sheet confirms credit without stock changes $scale',
+      'LEDGER01 refund sheet confirms credit without stock changes $scale $refundChannel',
       (tester) async {
         tester.view.padding = const FakeViewPadding(bottom: 44);
         addTearDown(tester.view.resetPadding);
@@ -37918,7 +37920,8 @@ void main() {
             customerId: order.customer,
             invoiceId: 'RETURN-INVOICE',
             amountMinor: order.amount * 100,
-            channel: WorkspacePaymentChannel.cash,
+            channel: refundChannel,
+            reference: refundChannel == WorkspacePaymentChannel.cash ? null : 'ORIGINAL-RECEIPT-REFERENCE',
           ),
           isTrue,
         );
@@ -37988,6 +37991,13 @@ void main() {
         expect(refundButton.hitTestable(), findsOneWidget);
         await tester.tap(refundButton);
         await tester.pumpAndSettle();
+        if (refundChannel != WorkspacePaymentChannel.cash) {
+          expect(find.text('Original transaction: ORIGINAL-RECEIPT-REFERENCE'), findsOneWidget);
+          final refundReference = find.byKey(const Key('refund-reference'));
+          await reveal(tester, refundReference);
+          expect(tester.widget<TextField>(refundReference).controller!.text, isEmpty);
+          await tester.enterText(refundReference, 'NEW-REFUND-REFERENCE');
+        }
         await reveal(tester, find.byKey(const Key('refund-amount')));
         await tester.enterText(
           find.byKey(const Key('refund-amount')),
@@ -38042,6 +38052,15 @@ void main() {
         );
         expect(work.workspaceCatalogueItems.single.stock, product.stock + 1);
         expect(work.workspaceStockMovements, hasLength(1));
+        final postedRefund = work.workspaceFinance!.customerLedgers.single.entries
+            .singleWhere((e) => e.kind == WorkspaceLedgerEntryKind.refund);
+        final postedReceipt = work.workspaceFinance!.customerLedgers.single.entries
+            .singleWhere((e) => e.kind == WorkspaceLedgerEntryKind.collection);
+        expect(postedRefund.customerRefund!.sourceCollectionId, postedReceipt.id);
+        expect(postedRefund.channel, refundChannel);
+        if (refundChannel != WorkspacePaymentChannel.cash) {
+          expect(postedRefund.paymentReference, 'NEW-REFUND-REFERENCE');
+        }
         expect(find.byKey(const Key('refund-amount')), findsNothing);
         expect(
           find.byKey(const ValueKey('record-refund-RETURN-ORDER')),
@@ -38056,6 +38075,7 @@ void main() {
       },
     );
 
+    }
     testWidgets(
       'LEDGER01 record partial collection against existing invoice $scale',
       (tester) async {

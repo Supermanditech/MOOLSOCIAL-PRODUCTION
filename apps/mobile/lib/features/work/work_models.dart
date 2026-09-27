@@ -671,6 +671,7 @@ class WorkspaceCustomerRefund {
     required this.amountMinor,
     required this.channel,
     this.reference,
+    this.sourceCollectionId,
   });
   final String accountScope,
       workspaceId,
@@ -681,6 +682,8 @@ class WorkspaceCustomerRefund {
   final int expectedRevision, amountMinor;
   final WorkspacePaymentChannel channel;
   final String? reference;
+  /// Original posted receipt; absent only on older unallocated refund records.
+  final String? sourceCollectionId;
   bool get valid =>
       [
         accountScope,
@@ -693,8 +696,10 @@ class WorkspaceCustomerRefund {
       expectedRevision > 0 &&
       amountMinor > 0 &&
       _financeAmountValid(amountMinor) &&
+      (sourceCollectionId == null || sourceCollectionId!.trim().isNotEmpty) &&
       (channel == WorkspacePaymentChannel.cash ||
-          (channel == WorkspacePaymentChannel.directUpi &&
+          ((channel == WorkspacePaymentChannel.directUpi ||
+                  channel == WorkspacePaymentChannel.bankTransfer) &&
               reference?.trim().isNotEmpty == true));
   Map<String, Object?> toJson() => {
     'accountScope': accountScope,
@@ -707,6 +712,7 @@ class WorkspaceCustomerRefund {
     'amountMinor': amountMinor,
     'channel': channel.name,
     'reference': reference,
+    if (sourceCollectionId != null) 'sourceCollectionId': sourceCollectionId,
   };
   factory WorkspaceCustomerRefund.fromJson(Object? value) {
     if (value is! Map) {
@@ -725,6 +731,7 @@ class WorkspaceCustomerRefund {
         value['channel'] as String,
       ),
       reference: value['reference'] as String?,
+      sourceCollectionId: value['sourceCollectionId'] as String?,
     );
     if (!result.valid) {
       throw const FormatException('Refund data is invalid.');
@@ -742,6 +749,7 @@ class WorkspaceCustomerRefund {
     amountMinor,
     channel,
     reference,
+    sourceCollectionId,
   );
 }
 
@@ -948,6 +956,49 @@ class WorkspaceCustomerLedger {
       dueMinor: balance > 0 ? balance : 0,
       refundableMinor: balance < 0 ? -balance : 0,
     );
+  }
+
+  /// Remaining original tender, not the invoice's currently available credit.
+  /// Old refunds without a receipt link cannot be allocated by guessing.
+  int? receiptRemainingMinor(String invoiceId, String receiptId) {
+    if (!valid || !historyComplete) return null;
+    final receipts = entries.where((e) =>
+        e.id == receiptId && e.invoiceId == invoiceId &&
+        e.kind == WorkspaceLedgerEntryKind.collection &&
+        e.state == WorkspaceLedgerPostingState.posted);
+    if (receipts.length != 1) return null;
+    final receipt = receipts.single;
+    var remaining = receipt.amountMinor;
+    for (final entry in entries.where((e) =>
+        e.invoiceId == invoiceId && e.kind == WorkspaceLedgerEntryKind.refund &&
+        e.state == WorkspaceLedgerPostingState.posted)) {
+      final source = entry.customerRefund?.sourceCollectionId;
+      if (source == null) return null;
+      final originals = entries.where((e) => e.id == source &&
+          e.invoiceId == invoiceId && e.orderId == entry.orderId &&
+          e.kind == WorkspaceLedgerEntryKind.collection &&
+          e.state == WorkspaceLedgerPostingState.posted && e.channel == entry.channel);
+      if (originals.length != 1) return null;
+      if (source == receiptId) {
+        if (entry.orderId != receipt.orderId || entry.channel != receipt.channel) return null;
+        remaining -= entry.amountMinor;
+      }
+    }
+    return remaining < 0 ? null : remaining;
+  }
+
+  bool permitsReceiptRefund(WorkspaceCustomerRefund request) {
+    if (request.accountScope != accountScope || request.workspaceId != workspaceId ||
+        request.customerId != customerId) {
+      return false;
+    }
+    final id = request.sourceCollectionId;
+    if (id == null) return true; // Retain legacy journal/reconciliation support.
+    final receipt = entries.where((e) => e.id == id &&
+        e.invoiceId == request.invoiceId && e.orderId == request.orderId &&
+        e.channel == request.channel).firstOrNull;
+    final remaining = receiptRemainingMinor(request.invoiceId, id);
+    return receipt != null && remaining != null && request.amountMinor <= remaining;
   }
 
   /// Refreshes preserve known events. Corrections to posted money require a
@@ -1803,6 +1854,7 @@ class WorkspaceLedgerCheckpoint {
         ledger?.revision == request.expectedRevision &&
         balance != null &&
         request.amountMinor <= balance.refundableMinor &&
+        ledger!.permitsReceiptRefund(request) &&
         finance.payments.any(
           (payment) =>
               payment.customerId == request.customerId &&
@@ -4351,6 +4403,8 @@ class WorkspaceLedgerFormDraft {
                       ]
                     : key.kind == 'return'
                     ? const ['product', 'quantity', 'sellable', 'reason']
+                    : key.kind == 'refund'
+                    ? const ['amount', 'channel', 'reference', 'sourceCollectionId']
                     : const ['amount', 'channel', 'reference'])
                 .contains(field),
       ) &&
