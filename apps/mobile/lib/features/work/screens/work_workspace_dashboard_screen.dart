@@ -11570,6 +11570,51 @@ class _StoreStatementSurface extends StatefulWidget {
 
 class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   bool _openingExchange = false;
+  Future<void> _resumeExchangeBill({bool returnSaved = false}) async {
+    final account = widget.session.workspaceFinance?.accountScope;
+    final store = widget.session.activeWorkspace?.id;
+    final resume = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      scrollable: true,
+      title: const Text('Unfinished sale'),
+      content: Text(returnSaved
+        ? 'Your return is saved. Resume or finish the existing bill before choosing replacement items. Nothing in that bill will be cleared.'
+        : 'Resume or finish the existing bill before starting an exchange. This return has not been recorded; your saved bill will not be cleared.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Close')),
+        TextButton(key: const Key('exchange-resume-sale'),
+          onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Resume sale')),
+      ]));
+    if (!mounted || resume != true) return;
+    if (widget.session.workspaceFinance?.accountScope != account || widget.session.activeWorkspace?.id != store) {
+      widget.session.showNotice('Store changed. Open the saved sale in the current Store.');
+      return;
+    }
+    widget.onNewSale?.call();
+  }
+
+  Future<bool> _exchangeSteps({bool returnSaved = false}) async =>
+    await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      scrollable: true,
+      title: Text(returnSaved ? 'Return saved · Choose replacements' : 'How exchange works'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (!returnSaved) const Text('1. Find the original invoice and record the items returned.'),
+          const Text('2. Create the replacement invoice without recording payment, then choose “Use customer credit” if credit is available.'),
+          const SizedBox(height: 8),
+          const Text('If money is still due, use Collect dues for the replacement invoice. If credit remains, open the original invoice → Returns & refunds to record the eligible refund. If both are zero, no further payment is needed.'),
+          const SizedBox(height: 8),
+          const Text('A return may only reduce an unpaid bill; use only the available credit shown. Credit is not a cash payment, and recording a refund does not send money.'),
+          if (returnSaved) ...[
+            const SizedBox(height: 8),
+            const Text('Continue later: use Resume sale for a saved replacement bill. To start a new bill, use Customer credit if available, otherwise Counter sale for the same customer. Do not record the same return again.'),
+          ],
+        ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(returnSaved ? 'Later' : 'Close')),
+        if (returnSaved) TextButton(key: const Key('exchange-choose-replacements'),
+          onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Choose replacements')),
+      ])) == true;
+
   Future<void> _openExchange(WorkspaceCustomerInvoice invoice, WorkspacePaymentRecord payment) async {
     if (_openingExchange) return;
     _openingExchange = true;
@@ -11583,7 +11628,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           session.activeWorkspace?.id != store) { return; }
       if (session.currentWorkspaceOrderId == null &&
           (session.workspaceOrderQuantities.isNotEmpty || session.workspaceOrderCustomer.trim().isNotEmpty)) {
-        session.showNotice('Resume or finish the existing bill before starting an exchange.');
+        await _resumeExchangeBill();
         return;
       }
       final order = session.workspaceOrders.where((o) => o.id == invoice.orderId).firstOrNull;
@@ -11617,9 +11662,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       await returnRoute?.completed;
       if (!mounted || !recorded || session.workspaceFinance?.accountScope != account ||
           session.activeWorkspace?.id != store) { return; }
-      final started = await _startCustomerSale(account: account, store: store,
+      if (!await _exchangeSteps(returnSaved: true) || !mounted) return;
+      await _startCustomerSale(account: account, store: store,
         customerId: payment.customerId, customerName: invoice.customer, requireEmptyBill: true);
-      if (mounted && started) session.showNotice('Return saved. Choose replacement items, then apply available customer credit to the new invoice.');
     } finally {
       _openingExchange = false;
     }
@@ -11633,7 +11678,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         session.activeWorkspace?.id != store) { return false; }
     if (requireEmptyBill && session.currentWorkspaceOrderId == null &&
         (session.workspaceOrderQuantities.isNotEmpty || session.workspaceOrderCustomer.trim().isNotEmpty)) {
-      session.showNotice('Return saved. Resume or finish the existing bill before choosing replacement items.');
+      await _resumeExchangeBill(returnSaved: true);
       return false;
     }
     if (session.currentWorkspaceOrderId == null && session.workspaceOrderCustomer.trim().isNotEmpty &&
@@ -11884,6 +11929,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             child: Row(children: [
               Expanded(child: Text(_exchangeSelection ? 'Exchange · Find the original sale' : 'Returns & refunds · All saved sales',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+              if (_exchangeSelection) IconButton(tooltip: 'How exchange works',
+                onPressed: () => _exchangeSteps(), icon: const Icon(Icons.info_outline, size: 18)),
               IconButton(tooltip: 'Back to sales register', onPressed: _toggleReturnSelection,
                 icon: const Icon(Icons.close_rounded, size: 18)),
             ])))),
@@ -23069,6 +23116,9 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               Text('Invoice ${widget.payment.invoiceId}'),
+              if (widget.onRecorded != null)
+                const Text('Exchange · Step 1: record returned items. Choose replacements after saving.',
+                  style: TextStyle(fontSize: 12, color: MoolColors.ink)),
               const SizedBox(height: 12),
               if (widget.order.itemSnapshots.length > 1)
                 Text('Select items to return · ${selectedProducts.length} selected'),

@@ -16665,6 +16665,14 @@ void main() {
       await tester.tap(action);
       await tester.pumpAndSettle();
       expect(find.text(exchange ? 'Exchange · Find the original sale' : 'Returns & refunds · All saved sales'), findsOneWidget);
+      if (exchange) {
+        await tester.tap(find.byTooltip('How exchange works'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Collect dues for the replacement invoice'), findsOneWidget);
+        expect(find.textContaining('Credit is not a cash payment'), findsOneWidget);
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+      }
       expect(tester.widget<TextField>(search).decoration!.hintText,
           'Search by phone, customer name or invoice number');
       expect(tester.widget<TextField>(search).controller!.text, isEmpty);
@@ -37986,9 +37994,10 @@ void main() {
       });
     }
     for (final multi in [false, true]) {
-    for (final exchange in [false, if (!multi) true]) {
+    for (final exchangeMode in [0, if (!multi) 1, if (!multi) 2, if (!multi) 3]) {
+    final exchange = exchangeMode > 0;
     testWidgets(
-      'LEDGER01 return sheet confirms original bill and stock $scale multi=$multi exchange=$exchange',
+      'LEDGER01 return sheet confirms original bill and stock $scale multi=$multi exchange=$exchange mode=$exchangeMode',
       (tester) async {
         tester.view.padding = const FakeViewPadding(bottom: 44);
         addTearDown(tester.view.resetPadding);
@@ -38110,6 +38119,21 @@ void main() {
           expect(work.workspaceOrderCustomer, '9000000099');
           expect(work.workspaceFinance!.payments.single.dueMinor, order.amount * 100);
           expect(work.workspaceStockMovements, isEmpty);
+          expect(find.byKey(const Key('exchange-resume-sale')), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'Resume guidance fits enlarged text');
+          if (exchangeMode == 2) {
+            await tester.tap(find.byKey(const Key('exchange-resume-sale')));
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('work-counter-fullscreen-back')), findsOneWidget);
+            expect(work.workspaceOrderCustomer, '9000000099');
+            expect(work.workspaceInvoices, hasLength(1));
+            expect(work.workspaceStockMovements, isEmpty);
+            expect(work.workspaceFinance!.payments.single.dueMinor, order.amount * 100);
+            expect(tester.takeException(), isNull);
+            return;
+          }
+          await tester.tap(find.text('Close'));
+          await tester.pumpAndSettle();
           work.updateWorkspaceCounterDetails(customer: '');
           await tester.pumpAndSettle();
         }
@@ -38272,6 +38296,23 @@ void main() {
         );
         expect(find.byKey(const Key('return-reason')), findsNothing);
         if (exchange) {
+          expect(find.text('Return saved · Choose replacements'), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'Saved-return guidance fits enlarged text');
+          expect(find.textContaining('Do not record the same return again.'), findsOneWidget);
+          expect(work.workspaceInvoices, hasLength(1));
+          if (exchangeMode == 3) {
+            await tester.tap(find.text('Later'));
+            await tester.pumpAndSettle();
+            expect(find.text('Exchange · Find the original sale'), findsOneWidget);
+            expect(find.byKey(const Key('work-counter-fullscreen-back')), findsNothing);
+            expect(work.workspaceOrderQuantities, isEmpty);
+            expect(work.workspaceInvoices, hasLength(1));
+            expect(work.workspaceStockMovements, hasLength(1));
+            expect(tester.takeException(), isNull);
+            return;
+          }
+          await tester.tap(find.byKey(const Key('exchange-choose-replacements')));
+          await tester.pumpAndSettle();
           expect(workspaceCustomerMobile(work.workspaceOrderCustomer), order.customer);
           expect(work.workspaceOrderQuantities, isEmpty);
           expect(work.workspaceInvoices, hasLength(1),
