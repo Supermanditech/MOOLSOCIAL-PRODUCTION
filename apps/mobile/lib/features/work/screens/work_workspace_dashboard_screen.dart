@@ -11927,7 +11927,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         if (_returnSelection)
           ConstrainedBox(constraints: BoxConstraints(maxHeight: viewport.maxHeight * .45), child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
-              Expanded(child: Text(_exchangeSelection ? 'Exchange · Find the original sale' : 'Returns & refunds · All saved sales',
+              Expanded(child: Text(_exchangeSelection ? 'Exchange' : 'Returns & refunds · All saved sales',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
               if (_exchangeSelection) IconButton(tooltip: 'How exchange works',
                 onPressed: () => _exchangeSteps(), icon: const Icon(Icons.info_outline, size: 18)),
@@ -12210,11 +12210,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 onSubmitted: (_) => FocusScope.of(context).unfocus(),
                 style: const TextStyle(fontSize: 13, color: MoolColors.ink),
                 decoration: InputDecoration(
-                  hintText: _returnSelection ? 'Search by phone, customer name or invoice number' : 'Search invoices or customers',
+                  hintText: _returnSelection ? 'Search phone, name or invoice' : 'Search invoices or customers',
                   hintMaxLines: _returnSelection ? 3 : 1, filled: false, isDense: true,
                   border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
                   disabledBorder: InputBorder.none, errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(vertical: _returnSelection ? 6 : 12),
                   fillColor: Colors.transparent, focusColor: Colors.transparent, hoverColor: Colors.transparent,
                   prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
                   suffixIcon: _invoiceSearch.text.isEmpty ? null : IconButton(

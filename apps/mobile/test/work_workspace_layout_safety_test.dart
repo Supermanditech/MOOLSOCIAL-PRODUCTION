@@ -16664,7 +16664,7 @@ void main() {
       await reveal(tester, action);
       await tester.tap(action);
       await tester.pumpAndSettle();
-      expect(find.text(exchange ? 'Exchange · Find the original sale' : 'Returns & refunds · All saved sales'), findsOneWidget);
+      expect(find.text(exchange ? 'Exchange' : 'Returns & refunds · All saved sales'), findsOneWidget);
       if (exchange) {
         await tester.tap(find.byTooltip('How exchange works'));
         await tester.pumpAndSettle();
@@ -16674,7 +16674,7 @@ void main() {
         await tester.pumpAndSettle();
       }
       expect(tester.widget<TextField>(search).decoration!.hintText,
-          'Search by phone, customer name or invoice number');
+          'Search phone, name or invoice');
       expect(tester.widget<TextField>(search).controller!.text, isEmpty);
       expect(find.byKey(const Key('work-sales-period-summary')), findsNothing);
       final row = find.byKey(const ValueKey('work-sales-invoice-RETURN-OLDER'));
@@ -38191,7 +38191,7 @@ void main() {
         expect(find.byKey(const Key('return-reason')), findsNothing);
         expect(work.pendingCustomerReturn, isNull);
         if (exchange) {
-          expect(find.text('Exchange · Find the original sale'), findsOneWidget);
+          expect(find.text('Exchange'), findsOneWidget);
           expect(work.workspaceOrderQuantities, isEmpty);
           expect(work.workspaceInvoices, hasLength(1));
         }
@@ -38303,7 +38303,7 @@ void main() {
           if (exchangeMode == 3) {
             await tester.tap(find.text('Later'));
             await tester.pumpAndSettle();
-            expect(find.text('Exchange · Find the original sale'), findsOneWidget);
+            expect(find.text('Exchange'), findsOneWidget);
             expect(find.byKey(const Key('work-counter-fullscreen-back')), findsNothing);
             expect(work.workspaceOrderQuantities, isEmpty);
             expect(work.workspaceInvoices, hasLength(1));
@@ -38317,7 +38317,7 @@ void main() {
           expect(work.workspaceOrderQuantities, isEmpty);
           expect(work.workspaceInvoices, hasLength(1),
             reason: 'Exchange must not create a replacement invoice automatically');
-          expect(find.text('Exchange · Find the original sale'), findsNothing);
+          expect(find.byTooltip('How exchange works'), findsNothing);
         }
         expect(tester.takeException(), isNull);
       },
