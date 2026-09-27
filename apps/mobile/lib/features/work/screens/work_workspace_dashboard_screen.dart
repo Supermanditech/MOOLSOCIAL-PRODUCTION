@@ -12084,19 +12084,20 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
       final salesFrame = _StockQuickActionsFrame(
         keyPrefix: 'work-sales',
+        avoidContentOverlap: true,
         actionWords: 'Counter sale Resume sale Collect dues Returns & refunds Customer credit Exchange',
         expanded: _salesActionsExpanded,
         onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
         actions: [
+          if (widget.showNewSaleAction)
+            _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: hasDraft ? Icons.edit_note_rounded : Icons.add_rounded,
+              label: hasDraft ? 'Resume sale' : 'Counter sale', onTap: widget.onNewSale),
           _StoreEdgeAction(keyName: 'work-sales-exchange', icon: Icons.swap_horiz_rounded,
             label: 'Exchange', onTap: () => _toggleReturnSelection(exchange: true)),
           _StoreEdgeAction(keyName: 'work-sales-customer-credit', icon: Icons.account_balance_wallet_outlined,
             label: 'Customer credit', onTap: _openCustomerCredit),
           _StoreEdgeAction(keyName: 'work-sales-returns', icon: Icons.assignment_return_outlined,
             label: 'Returns & refunds', onTap: _returnSelection ? null : _toggleReturnSelection),
-          if (widget.showNewSaleAction)
-            _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: hasDraft ? Icons.edit_note_rounded : Icons.add_rounded,
-              label: hasDraft ? 'Resume sale' : 'Counter sale', onTap: widget.onNewSale),
           if (widget.onOpenOperation != null) ...[
             _StoreEdgeAction(keyName: 'work-sales-dues', icon: Icons.account_balance_wallet_outlined,
               label: 'Collect dues', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.dues)),
@@ -14453,12 +14454,14 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.onToggle,
     this.keyPrefix = 'work-stock',
     this.actionWords = 'Add products Buy stock Purchases Buy together',
+    this.avoidContentOverlap = false,
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
   final String keyPrefix, actionWords;
+  final bool avoidContentOverlap;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -14537,6 +14540,42 @@ class _StockQuickActionsFrame extends StatelessWidget {
           ),
         ),
       );
+      if (expanded && avoidContentOverlap) {
+        // Keep Sales controls and invoice amounts outside the action footprint.
+        // Stock retains its separately approved edge-panel behavior.
+        final actionHeight = (MediaQuery.textScalerOf(context).scale(11) * 2.5 + 16)
+            .clamp(48.0, double.infinity);
+        return Column(
+          children: [
+            Expanded(child: SizedBox(
+              key: Key('$keyPrefix-action-content'),
+              width: double.infinity,
+              child: child,
+            )),
+            SizedBox(
+              key: Key('$keyPrefix-actions-panel'),
+              height: actionHeight + 16,
+              child: Row(
+                children: [
+                  Expanded(child: SingleChildScrollView(
+                    key: Key('$keyPrefix-entry-controls'),
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Row(children: [
+                      for (final action in actions)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: SizedBox(width: panelWidth, child: action),
+                        ),
+                    ]),
+                  )),
+                  toggle,
+                ],
+              ),
+            ),
+          ],
+        );
+      }
       return ColoredBox(
         color: const Color(0xFFF7F8FC),
         child: Stack(

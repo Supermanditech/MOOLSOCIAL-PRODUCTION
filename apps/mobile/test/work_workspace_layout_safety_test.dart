@@ -16578,14 +16578,28 @@ void main() {
       await tester.pumpAndSettle();
       final salesContent = tester.getRect(find.byKey(const Key('work-sales-action-content')));
       final actionsPanel = tester.getRect(find.byKey(const Key('work-sales-actions-panel')));
-      expect(salesContent, closedContent);
+      expect(salesContent.width, closedContent.width);
       expect(salesContent.right, actionsPanel.right);
-      expect(actionsPanel.height, lessThanOrEqualTo(salesContent.height));
-      if (display.$1.height == 720) {
-        expect(actionsPanel.bottom, lessThan(salesContent.bottom - 100));
-      }
-      expect(find.byKey(const Key('work-sales-actions-dismiss')), findsOneWidget);
+      expect(salesContent.overlaps(actionsPanel), isFalse,
+        reason: 'Expanded actions must not cover search, Statement or invoice amounts');
+      expect(actionsPanel.top, greaterThanOrEqualTo(salesContent.bottom));
+      expect(actionsPanel.height, lessThanOrEqualTo(closedContent.height * .35));
+      expect(find.byKey(const Key('work-sales-actions-dismiss')), findsNothing);
+      final sale = find.byKey(const Key('work-sales-new-counter-sale'));
+      final exchange = find.byKey(const Key('work-sales-exchange'));
+      expect(tester.getTopLeft(sale).dx, lessThan(tester.getTopLeft(exchange).dx));
+      expect(sale.hitTestable(), findsOneWidget);
+      expect(search.hitTestable(), findsOneWidget);
+      await reveal(tester, find.byKey(const Key('work-sales-statement')));
+      expect(find.byKey(const Key('work-sales-statement')).hitTestable(), findsOneWidget);
       expect(find.byKey(const Key('work-sales-customer-credit')), findsOneWidget);
+      await captureStoreView(tester, 'sales-access-expanded-${display.$1.width}-${display.$2}');
+      for (final action in ['new-counter-sale', 'exchange', 'customer-credit', 'returns', 'dues']) {
+        final target = find.byKey(Key('work-sales-$action'));
+        await reveal(tester, target);
+        expect(target.hitTestable(), findsOneWidget);
+        expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+      }
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
       await tester.pumpAndSettle();
@@ -16677,13 +16691,14 @@ void main() {
       expect(find.byKey(Key('work-sales-$action')), findsOneWidget);
     }
     expect(find.byKey(const Key('work-sales-settlement')), findsNothing);
+    await reveal(tester, find.byKey(const Key('work-sales-dues')));
     await tester.tap(find.byKey(const Key('work-sales-dues')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-dues')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
-    await tester.tapAt(tester.getTopLeft(find.byKey(const Key('work-sales-action-content'))) + const Offset(12, 12));
+    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-statement')));

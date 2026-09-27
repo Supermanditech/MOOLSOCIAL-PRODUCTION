@@ -372,6 +372,28 @@ function Assert-R679OwnerAdmission($Before, $After) {
 }
 
 function Test-StoreHistoricalAdmissionSubject([string]$Commit, [string]$Subject) {
+  # Founder-authorized 27 September reconciliation: preserve the exact already
+  # reviewed Store batch, without rewriting history or allowing future prefixes.
+  # Owner, merge, cleanliness and secret checks remain independent gates.
+  if ($AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+      $ProductionLane -ceq 'codex_ui' -and
+      $ProductionWorkId -ceq 'add-product-screen1-20260920' -and
+      $ProductionTicketId -ceq 'UAW-ADD-PRODUCT-SCREEN1-20260920' -and
+      $branch -ceq 'work/codex-ui/add-product-screen1-20260920' -and
+      $root.Replace('\','/').TrimEnd('/') -ceq
+        'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920') {
+    $reviewedTip = 'ab3f00056c4d6546436d610e2188716251ca5a5b'
+    $reviewedBase = 'cad74a7961c192424701d0b0524ffd1b39d0469e'
+    $reviewedTree = @(& git -C $root rev-parse "${reviewedTip}^{tree}")
+    if ($LASTEXITCODE -ne 0 -or $reviewedTree.Count -ne 1 -or
+        $reviewedTree[0] -cne 'ea37f57071c178cc8c9dfc4d0f22d7a43a1d9bb2') { return $false }
+    $reviewedCommits = @(& git -C $root rev-list --reverse "$reviewedBase..$reviewedTip")
+    if ($LASTEXITCODE -ne 0 -or $reviewedCommits.Count -ne 58 -or
+        $Commit -cnotin $reviewedCommits) { return $false }
+    $recordedSubject = @(& git -C $root show -s --format=%s $Commit)
+    return ($LASTEXITCODE -eq 0 -and $recordedSubject.Count -eq 1 -and
+      $Subject -ceq [string]$recordedSubject[0])
+  }
   # REG4620: preserve the already-pushed metadata label error without rewriting
   # history. This exact immutable tree contains only the four admission pins.
   if ($AgentRole -cne 'primary' -or $AgentTask -cne '/root' -or
