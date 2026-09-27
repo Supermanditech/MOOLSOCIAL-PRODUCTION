@@ -576,6 +576,14 @@ void main() {
       revision: 1, asOf: now, entries: entries, historyComplete: true, openingBalanceMinor: 0);
     final before = ledger(base);
     expect(before.valid, isTrue);
+    expect(before.recordedReceiptChannels('qa-invoice', 'qa-order'), {
+      WorkspacePaymentChannel.cash, WorkspacePaymentChannel.bankTransfer,
+    });
+    expect(before.recordedReceiptChannels('other-invoice', 'qa-order'), isEmpty);
+    expect(before.recordedReceiptChannels('qa-invoice', 'other-order'), isEmpty);
+    expect(ledger(base.take(2).toList()).recordedReceiptChannels('qa-invoice', 'qa-order'), {
+      WorkspacePaymentChannel.cash,
+    });
     expect(before.receiptRemainingMinor('qa-invoice', 'receipt-cash'), 4000);
     expect(before.receiptRemainingMinor('qa-invoice', 'receipt-bank'), 6000);
     expect(before.permitsReceiptRefund(request(amount: 4001)), isFalse);
@@ -587,6 +595,8 @@ void main() {
     expect(WorkspaceCustomerRefund.fromJson(bank.toJson()).identityData, bank.identityData);
     final after = ledger([...base, entry('refund', 5, WorkspaceLedgerEntryKind.refund, 2000, refund: request())]);
     expect(after.receiptRemainingMinor('qa-invoice', 'receipt-cash'), 2000);
+    expect(after.recordedReceiptChannels('qa-invoice', 'qa-order'),
+        before.recordedReceiptChannels('qa-invoice', 'qa-order'));
     expect(after.receiptRemainingMinor('qa-invoice', 'receipt-bank'), 6000);
     expect(after.permitsReceiptRefund(request(amount: 2001)), isFalse);
     final legacy = ledger([...base, entry('legacy', 5, WorkspaceLedgerEntryKind.refund, 2000)]);

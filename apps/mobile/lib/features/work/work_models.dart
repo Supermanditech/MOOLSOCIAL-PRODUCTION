@@ -958,6 +958,14 @@ class WorkspaceCustomerLedger {
     );
   }
 
+  Set<WorkspacePaymentChannel> recordedReceiptChannels(String invoiceId, String orderId) {
+    if (!valid || !historyComplete) return {};
+    return entries.where((entry) => entry.invoiceId == invoiceId &&
+        entry.orderId == orderId && entry.kind == WorkspaceLedgerEntryKind.collection &&
+        entry.state == WorkspaceLedgerPostingState.posted)
+        .map((entry) => entry.channel).toSet();
+  }
+
   /// Remaining original tender, not the invoice's currently available credit.
   /// Old refunds without a receipt link cannot be allocated by guessing.
   int? receiptRemainingMinor(String invoiceId, String receiptId) {

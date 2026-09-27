@@ -22349,6 +22349,20 @@ class _StoreFinanceSurface extends StatelessWidget {
         }
         final payment = payments[recordIndex - 1 - payouts.length];
         final order = orders[payment.orderId];
+        final receiptLedger = finance.customerLedgers.where((ledger) =>
+            ledger.accountScope == finance.accountScope &&
+            ledger.workspaceId == finance.workspaceId &&
+            ledger.customerId == payment.customerId).firstOrNull;
+        final receiptChannels = receiptLedger?.recordedReceiptChannels(
+            payment.invoiceId ?? '', payment.orderId) ?? <WorkspacePaymentChannel>{};
+        final mixedMethods = receiptChannels.length > 1
+            ? 'Mixed payment · ${receiptChannels.map((channel) => switch (channel) {
+                WorkspacePaymentChannel.cash => 'Cash',
+                WorkspacePaymentChannel.directUpi => 'UPI',
+                WorkspacePaymentChannel.bankTransfer => 'Bank transfer',
+                _ => channel.label,
+              }).join(' + ')}'
+            : null;
         return Padding(
           key: ValueKey('work-finance-payment-${payment.orderId}'),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -22369,8 +22383,8 @@ class _StoreFinanceSurface extends StatelessWidget {
                   color: MoolColors.navy,
                 ),
               ),
-              if (payment.state != WorkspacePaymentState.paid)
-                Text(payment.channel.label),
+              if (mixedMethods != null || payment.state != WorkspacePaymentState.paid)
+                Text(mixedMethods ?? payment.channel.label),
               if (order != null)
                 Text(
                   'Order · ${order.stage == 'Confirmed' ? 'Awaiting acceptance' : session.workspaceOrderStageLabel(order)}',
@@ -24178,7 +24192,8 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                       if (sourceReceipt?.paymentReference?.isNotEmpty == true)
                         Text('Original transaction: ${sourceReceipt!.paymentReference}', key: const Key('refund-original-reference')),
                       if (sourceReceipt != null && channel != WorkspacePaymentChannel.cash)
-                        const Text('Original payer account details unavailable. Confirm the customer’s destination before returning money. Original-payment refunds require a connected payment provider.'),
+                        const Text('Original payer account details unavailable. Confirm the customer’s destination before returning money. Original-payment refunds require a connected payment provider.', key: Key('refund-account-guidance')),
+                      const SizedBox(height: 16),
                     ],
                     TextField(
                       key: Key(
@@ -24248,6 +24263,8 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                             ),
                         ],
                       ),
+                    if (widget.refund && _needsReference)
+                      const SizedBox(height: 16),
                     if (_needsReference)
                       TextField(
                         key: Key(

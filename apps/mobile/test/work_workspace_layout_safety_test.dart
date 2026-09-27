@@ -37997,6 +37997,13 @@ void main() {
           await reveal(tester, refundReference);
           expect(tester.widget<TextField>(refundReference).controller!.text, isEmpty);
           await tester.enterText(refundReference, 'NEW-REFUND-REFERENCE');
+          await tester.pumpAndSettle();
+          final amountField = find.byKey(const Key('refund-amount'));
+          final guidance = find.byKey(const Key('refund-account-guidance'));
+          expect(tester.getTopLeft(amountField).dy - tester.getBottomLeft(guidance).dy,
+              greaterThanOrEqualTo(16));
+          expect(tester.getTopLeft(refundReference).dy - tester.getBottomLeft(amountField).dy,
+              greaterThanOrEqualTo(16));
         }
         await reveal(tester, find.byKey(const Key('refund-amount')));
         await tester.enterText(
