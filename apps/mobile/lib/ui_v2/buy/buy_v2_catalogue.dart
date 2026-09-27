@@ -12631,6 +12631,7 @@ class BuyV2ProductCard extends StatelessWidget {
     this.initialAddQuantity,
     this.beforeSave,
     this.comparisonSummary,
+    this.comparisonTotal,
   });
 
   final BuyV2Session session;
@@ -12644,6 +12645,7 @@ class BuyV2ProductCard extends StatelessWidget {
   final int? initialAddQuantity;
   final bool Function()? beforeSave;
   final Widget? comparisonSummary;
+  final String? comparisonTotal;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
@@ -12859,57 +12861,76 @@ class BuyV2ProductCard extends StatelessWidget {
       ),
     );
     if (comparisonSummary != null) {
+      final action = quantity == 0 ? cartAction : inlineQuantity;
+      final seller = TextButton(
+        key: ValueKey('buy-comparison-open-${product.id}'),
+        onPressed: openProduct,
+        style: TextButton.styleFrom(
+          alignment: Alignment.centerLeft,
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(48, 48),
+          foregroundColor: BuyV2ActionStyle.primaryForeground,
+        ),
+        child: Text(
+          product.customerSeller(product.seller),
+          style: context.buyBody.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: BuyV2ActionStyle.primaryForeground,
+          ),
+        ),
+      );
+      final save = _ProductSaveButton(
+        compactEdgeControls: true,
+        session: session,
+        product: product,
+        beforeToggle: beforeSave,
+      );
+      final totalStyle = context.buyBody.copyWith(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: BuyV2ActionStyle.primaryForeground,
+      );
+      final total = comparisonTotal == null
+          ? null
+          : Text(comparisonTotal!, style: totalStyle);
       return Container(
         key: ValueKey('buy-comparison-card-${product.id}'),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
+        padding: const EdgeInsets.fromLTRB(9, 2, 9, 7),
+        decoration: buyV2CardDecoration(radius: 10).copyWith(
           gradient: const LinearGradient(
-            colors: [Color(0xFFF4F2FB), Color(0xFFFAFCFA)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Colors.white, Color(0xFFE2EEFF)],
+            stops: [0, 0.5, 1],
           ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: BuyV2Colors.line),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    key: ValueKey('buy-comparison-open-${product.id}'),
-                    onPressed: openProduct,
-                    style: TextButton.styleFrom(
-                      alignment: Alignment.centerLeft,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(48, 48),
-                    ),
-                    child: Text(
-                      product.customerSeller(product.seller),
-                      style: context.buyBody.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                _ProductSaveButton(
-                  compactEdgeControls: true,
-                  session: session,
-                  product: product,
-                  beforeToggle: beforeSave,
-                ),
-              ],
-            ),
             LayoutBuilder(
               builder: (context, constraints) {
-                final action = quantity == 0 ? cartAction : inlineQuantity;
-                final scale = MediaQuery.textScalerOf(context).scale(1);
-                if (constraints.maxWidth >= 300 && scale <= 1.3) {
+                final totalWidth = comparisonTotal == null
+                    ? 0.0
+                    : buyV2ValueTextSize(
+                        context,
+                        comparisonTotal!,
+                        totalStyle,
+                      ).width;
+                final actionWidth = quantity == 0
+                    ? inlineActionWidth
+                    : _inlineQuantityWidth(
+                        context,
+                        quantity,
+                      ).clamp(inlineActionWidth, double.infinity);
+                if (constraints.maxWidth - totalWidth - actionWidth - 56 >=
+                    MediaQuery.textScalerOf(context).scale(76)) {
                   return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: comparisonSummary!),
-                      const SizedBox(width: 8),
+                      Expanded(child: seller),
+                      if (total != null) ...[const SizedBox(width: 4), total],
+                      save,
+                      const SizedBox(width: 4),
                       action,
                     ],
                   );
@@ -12917,12 +12938,27 @@ class BuyV2ProductCard extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    comparisonSummary!,
-                    Align(alignment: Alignment.centerRight, child: action),
+                    Row(
+                      children: [
+                        Expanded(child: seller),
+                        save,
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        if (total != null)
+                          Expanded(child: total)
+                        else
+                          const Spacer(),
+                        const SizedBox(width: 6),
+                        action,
+                      ],
+                    ),
                   ],
                 );
               },
             ),
+            comparisonSummary!,
           ],
         ),
       );

@@ -2657,19 +2657,15 @@ Future<void> _showBuyV2ProductComparison(
   context: context,
   useSafeArea: true,
   isScrollControlled: true,
-  showDragHandle: true,
+  showDragHandle: false,
   backgroundColor: Colors.white,
   constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
   shape: const RoundedRectangleBorder(
     borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
   ),
-  builder: (context) => ConstrainedBox(
-    constraints: BoxConstraints(
-      maxHeight:
-          (MediaQuery.sizeOf(context).height -
-              MediaQuery.viewInsetsOf(context).bottom) *
-          .88,
-    ),
+  builder: (context) => SizedBox(
+    height: MediaQuery.sizeOf(context).height,
+
     child: _ProductComparisonSheet(
       session: session,
       product: current,
@@ -2884,7 +2880,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
   String _date(DateTime time) {
     final local = time.toLocal();
     final labels = MaterialLocalizations.of(context);
-    return '${labels.formatMediumDate(local)}, '
+    return '${labels.formatShortMonthDay(local)}${local.year == widget.session.catalogueNow().toLocal().year ? '' : ', ${local.year}'}, '
         '${labels.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
   }
 
@@ -2920,12 +2916,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
       top: false,
       child: SingleChildScrollView(
         controller: _scroll,
-        padding: EdgeInsets.fromLTRB(
-          14,
-          0,
-          14,
-          18 + MediaQuery.viewPaddingOf(context).bottom,
-        ),
+        padding: EdgeInsets.fromLTRB(10, 4, 10, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2935,7 +2926,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                 Expanded(
                   child: Text(
                     'Compare prices',
-                    style: context.buyTitle.copyWith(fontSize: 18),
+                    style: context.buyTitle.copyWith(fontSize: 16),
                   ),
                 ),
                 IconButton(
@@ -2945,19 +2936,33 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                       ? null
                       : () => unawaited(_reload()),
                   icon: const Icon(Icons.refresh_rounded, size: 21),
-                  color: BuyV2Colors.navy,
+                  color: BuyV2ActionStyle.primaryForeground,
+                ),
+                IconButton(
+                  tooltip: 'Close comparison',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, size: 20),
+                  color: BuyV2ActionStyle.primaryForeground,
                 ),
               ],
             ),
-            const SizedBox(height: 3),
-            Text(widget.product.customerTitle, style: context.buyBody),
-            Text(widget.product.pack, style: context.buyMeta),
-            if (query != null)
-              Text(
-                '${query.requestedQuantityMilli ~/ query.identity.packQuantityMilli} '
-                'pack(s) · Same product and pack',
-                style: context.buyMeta,
-              ),
+            Wrap(
+              spacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  widget.product.customerTitle,
+                  style: context.buyBody.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '${widget.product.pack}${query == null ? '' : ' · ${_packCountLabel(query.requestedQuantityMilli ~/ query.identity.packQuantityMilli)}'}',
+                  style: context.buyMeta.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             if (message != null)
               Text(message, key: const ValueKey('buy-comparison-message')),
@@ -2973,14 +2978,18 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                 const Text(
                   'No other suppliers match this pack, quantity and delivery choice.',
                 ),
+              if (page.offers.isNotEmpty && controller!.storeOffers.isEmpty)
+                const Text(
+                  'No new Stores on this page. Continue to more Stores.',
+                ),
               Column(
                 key: const ValueKey('buy-vertical-product-grid-comparison'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final offer in page.offers)
+                  for (final offer in controller!.storeOffers)
                     Padding(
                       key: ValueKey('buy-product-compare-${offer.product.id}'),
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 6),
                       child: BuyV2ProductCard(
                         session: widget.session,
                         product: offer.product,
@@ -2994,6 +3003,11 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                         beforeSave: () => _beforeSave(offer),
                         beforeCartChange: (quantity) =>
                             _beforeCartChange(offer, quantity),
+                        comparisonTotal: _comparisonDeliveredTotal(
+                          offer,
+                          query,
+                          widget.session.catalogueNow(),
+                        ),
                         comparisonSummary: _ProductComparisonPrices(
                           offer: offer,
                           query: query,
@@ -3012,7 +3026,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                     if (page.previousCursor != null)
                       TextButton(
                         key: const ValueKey('buy-comparison-previous'),
-                        onPressed: controller!.canGoPrevious
+                        onPressed: controller.canGoPrevious
                             ? () => unawaited(_page(false))
                             : null,
                         child: const Text('Previous'),
@@ -3020,10 +3034,10 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                     if (page.nextCursor != null)
                       TextButton(
                         key: const ValueKey('buy-comparison-next'),
-                        onPressed: controller!.canGoNext
+                        onPressed: controller.canGoNext
                             ? () => unawaited(_page(true))
                             : null,
-                        child: const Text('More suppliers'),
+                        child: const Text('More Stores'),
                       ),
                   ],
                 ),
@@ -3037,6 +3051,22 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
       ),
     );
   }
+}
+
+String _comparisonDeliveredTotal(
+  BuyV2ComparisonOffer offer,
+  BuyV2ComparisonQuery query,
+  DateTime now,
+) {
+  final result = BuyV2ComparisonCalculation.evaluate(
+    query: query,
+    offer: offer,
+    now: now,
+  );
+  if (!result.available) return 'Offer changed';
+  return result.payableMinor == null
+      ? 'Delivered total not confirmed'
+      : '${_comparisonMoney(result.payableMinor!)} delivered';
 }
 
 class _ProductComparisonPrices extends StatelessWidget {
@@ -3078,43 +3108,41 @@ class _ProductComparisonPrices extends StatelessWidget {
     final arrival = start == null || end == null
         ? 'Arrival time not confirmed'
         : 'Arrives ${dateLabel(start)} – ${sameDay ? MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end)) : dateLabel(end)}';
-    final style = context.buyMeta.copyWith(fontSize: 12, height: 1.3);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(5, 7, 5, 3),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${_comparisonMoney(result.itemSubtotalMinor!)} item price',
-            key: ValueKey('buy-comparison-item-price-${offer.id}'),
-            style: style.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF24272B),
-            ),
-          ),
-          Text(
-            offer.charges.freightMinor == null
-                ? 'Delivery: Not confirmed'
-                : 'Delivery: ${_comparisonMoney(offer.charges.freightMinor!)}',
-            style: style,
-          ),
-          Text(
-            result.payableMinor == null
-                ? 'Delivered total not confirmed'
-                : '${_comparisonMoney(result.payableMinor!)} delivered',
-            style: style,
-          ),
-          Text(arrival, style: style),
-          if (badges.isNotEmpty)
+    final style = context.buyMeta.copyWith(
+      fontSize: 11,
+      height: 1.25,
+      color: const Color(0xFF505568),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 2,
+          children: [
             Text(
-              badges.join(' · '),
-              style: style.copyWith(
-                color: BuyV2Colors.green,
-                fontWeight: FontWeight.w800,
-              ),
+              'Items: ${_comparisonMoney(result.itemSubtotalMinor!)}',
+              key: ValueKey('buy-comparison-item-price-${offer.id}'),
+              style: style,
             ),
-        ],
-      ),
+            Text(
+              offer.charges.freightMinor == null
+                  ? 'Delivery: Not confirmed'
+                  : 'Delivery: ${_comparisonMoney(offer.charges.freightMinor!)}',
+              style: style,
+            ),
+          ],
+        ),
+        Text(arrival, style: style),
+        if (badges.isNotEmpty)
+          Text(
+            badges.join(' · '),
+            style: style.copyWith(
+              color: const Color(0xFF17652C),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+      ],
     );
   }
 }

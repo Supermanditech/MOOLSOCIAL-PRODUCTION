@@ -761,8 +761,16 @@ void main() {
           const ValueKey('buy-product-comparison-sheet'),
         );
         expect(sheet, findsOneWidget);
-        expect(tester.getSize(sheet).height, lessThan(650));
+        expect(tester.getSize(sheet).height, 844);
+        expect(tester.getRect(sheet).top, 0);
+        expect(
+          find.byTooltip('Close comparison').hitTestable(),
+          findsOneWidget,
+        );
         await captureR66Visual(tester, 'eight-compare-$scale');
+        await tester.tap(find.byTooltip('Close comparison'));
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });

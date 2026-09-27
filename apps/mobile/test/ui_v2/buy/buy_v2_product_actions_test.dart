@@ -13,6 +13,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
@@ -1285,6 +1286,68 @@ void main() {
     }
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Comparison compact header controls and large prices $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = session
+          .product('s-milk')
+          .copyWith(
+            seller:
+                'Long neighbourhood supplier and grocery distribution centre',
+          );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: BuyV2ProductCard(
+                  session: session,
+                  product: product,
+                  comparisonTotal: '₹1,00,00,000 delivered',
+                  comparisonSummary: const Text('Delivery: ₹0'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final seller = find.text('₹1,00,00,000 delivered');
+      final add = find.byKey(ValueKey('buy-add-${product.id}'));
+      if (scale == 1) {
+        expect(
+          (tester.getCenter(seller).dy - tester.getCenter(add).dy).abs(),
+          lessThan(25),
+        );
+      }
+      final price = find.text('₹1,00,00,000 delivered');
+      await tester.ensureVisible(price);
+      await tester.pumpAndSettle();
+      expect(
+        tester.renderObject<RenderParagraph>(price).didExceedMaxLines,
+        isFalse,
+      );
+      expect(find.text(product.customerSeller(product.seller)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('product actions fit, compare and retain exact Back at 320', (
     tester,
   ) async {
@@ -1382,6 +1445,8 @@ void main() {
     final comparisonSheet = find.byKey(
       const ValueKey('buy-product-comparison-sheet'),
     );
+    expect(tester.getRect(find.byType(BottomSheet)).height, 700);
+    expect(tester.getRect(find.byType(BottomSheet)).top, 0);
     expect(
       find.descendant(
         of: comparisonSheet,

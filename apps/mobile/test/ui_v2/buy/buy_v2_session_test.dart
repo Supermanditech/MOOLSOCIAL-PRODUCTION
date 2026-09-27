@@ -11730,7 +11730,7 @@ void r669ComparisonContractTests() {
           await tester.ensureVisible(priceC);
           await tester.pumpAndSettle();
           expect(
-            find.text('₹${90 * viewport.quantity} item price'),
+            find.text('Items: ₹${90 * viewport.quantity}'),
             findsOneWidget,
           );
           expect(find.text('Delivery: ₹30'), findsOneWidget);
@@ -11964,7 +11964,53 @@ void r669ComparisonContractTests() {
           'snapshot-a',
           'snapshot-a',
         ]);
-        expect(calls.every((value) => value.pageSize == 20), isTrue);
+        expect(calls.every((value) => value.pageSize == 40), isTrue);
+      },
+    );
+    test(
+      'controller shows each Store once across pages and resets on refresh',
+      () async {
+        final request = query();
+        final rows = List.generate(
+          4,
+          (i) => offer(
+            request,
+            id: 'offer-$i',
+            store: i < 3 ? 'store-a' : 'store-b',
+            listing: product.copyWith(storeId: i < 3 ? 'store-a' : 'store-b'),
+          ),
+        );
+        final source = _R669ComparisonSource(
+          identity(),
+          (load) async => load.cursor == 'second'
+              ? page(
+                  request,
+                  rows.skip(2).toList(),
+                  start: 2,
+                  previous: 'first',
+                  total: 4,
+                )
+              : page(request, rows.take(2).toList(), next: 'second', total: 4),
+        );
+        final controller = BuyV2ComparisonController(
+          source: source,
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.page!.offers, hasLength(2));
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-a']);
+        await controller.next();
+        expect(controller.page!.offers, hasLength(2));
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-b']);
+        await controller.previous();
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-a']);
+        await controller.refresh();
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-a']);
+        await controller.next();
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-b']);
       },
     );
     test(

@@ -2275,6 +2275,8 @@ class BuyV2ComparisonController extends ChangeNotifier {
   int _generation = 0;
   bool _disposed = false;
   bool _loading = false;
+  final Map<String, int> _firstStorePage = {};
+  static const _pageSize = 40;
   String? _message;
 
   BuyV2ComparisonQuery? get query => _query;
@@ -2295,6 +2297,21 @@ class BuyV2ComparisonController extends ChangeNotifier {
     return value;
   }
 
+  /// One supplied listing per Store, assigned to its first page in this snapshot.
+  /// Original rows remain intact for validation, ranking and cursor boundaries.
+  List<BuyV2ComparisonOffer> get storeOffers {
+    final current = page;
+    if (current == null) return const [];
+    final seen = <String>{};
+    return List.unmodifiable(
+      current.offers.where(
+        (offer) =>
+            _firstStorePage[offer.storeId] == current.startIndex &&
+            seen.add(offer.storeId),
+      ),
+    );
+  }
+
   String? get message {
     if (_disposed) return null;
     if (_query != null && !_contextCurrent) {
@@ -2311,10 +2328,13 @@ class BuyV2ComparisonController extends ChangeNotifier {
 
   Future<void> open(BuyV2ComparisonQuery query) {
     if (_disposed) return Future.value();
+    _firstStorePage.clear();
     _query = query;
     _page = null;
     _pageRequest = null;
-    return _request(BuyV2ComparisonPageRequest(query: query));
+    return _request(
+      BuyV2ComparisonPageRequest(query: query, pageSize: _pageSize),
+    );
   }
 
   Future<void> refresh() {
@@ -2330,6 +2350,7 @@ class BuyV2ComparisonController extends ChangeNotifier {
     return _request(
       BuyV2ComparisonPageRequest(
         query: _query!,
+        pageSize: _pageSize,
         snapshotId: current!.snapshotId,
         cursor: current.nextCursor,
       ),
@@ -2344,6 +2365,7 @@ class BuyV2ComparisonController extends ChangeNotifier {
     return _request(
       BuyV2ComparisonPageRequest(
         query: _query!,
+        pageSize: _pageSize,
         snapshotId: current!.snapshotId,
         cursor: current.previousCursor,
       ),
@@ -2456,6 +2478,9 @@ class BuyV2ComparisonController extends ChangeNotifier {
             }
           }
         }
+        for (final offer in result.offers) {
+          _firstStorePage.putIfAbsent(offer.storeId, () => result.startIndex);
+        }
         _page = result;
         _pageRequest = next.request;
         _message = null;
@@ -2501,6 +2526,7 @@ class BuyV2ComparisonController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _firstStorePage.clear();
     _generation++;
     _pending = null;
     _page = null;
