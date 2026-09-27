@@ -13,11 +13,13 @@ class QualificationDeliveryFacts implements BuyV2ProductFactsAdapter {
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
-      const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
-        sourceId: 'qualification-delivery-fixture',
-        deliveryPromise: 'Delivery time confirmed at checkout',
-        promisedByLabel: available ? '15 Sep 2026, 10 AM–12 PM' : '',
-      );
+      const BuyV2CatalogueProductFactsAdapter()
+          .snapshotFor(product)
+          .copyWith(
+            sourceId: 'qualification-delivery-fixture',
+            deliveryPromise: 'Delivery time confirmed at checkout',
+            promisedByLabel: available ? '15 Sep 2026, 10 AM–12 PM' : '',
+          );
 }
 
 void main() {
@@ -158,7 +160,10 @@ void main() {
           final quantity = (minimumSpend / product.price).ceil();
           expect(session.setCartQuantity(product.id, '$quantity'), isTrue);
         }
-        expect(session.totalForDestination(destination), greaterThanOrEqualTo(minimumSpend));
+        expect(
+          session.totalForDestination(destination),
+          greaterThanOrEqualTo(minimumSpend),
+        );
       }
       final originalTotal = session.cartTotal;
 
@@ -409,7 +414,49 @@ void main() {
         (order) => order.destination == BuyV2Destination.wholesale,
       );
       expect(shopOrder.deliveryInstruction, 'Call on arrival');
-      expect(wholesaleOrder.deliveryInstruction, 'Deliver to receiving');
+      expect(
+        wholesaleOrder.deliveryInstruction,
+        'Deliver to the receiving desk',
+      );
+    });
+
+    test('cleared delivery instruction is absent from confirmed order', () {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const QualificationDeliveryFacts(),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.shop,
+      );
+      session.addProduct(product.id);
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.shop),
+        isNull,
+      );
+      expect(
+        session.chooseDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          instructionId: 'shop-call-arrival',
+        ),
+        isTrue,
+      );
+      expect(
+        session.chooseDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          instructionId: null,
+        ),
+        isTrue,
+      );
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.shop),
+        isNull,
+      );
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+      expect(session.confirmedOrders.single.deliveryInstruction, isNull);
     });
 
     test('monetary tips fail closed without a quick-delivery policy', () {

@@ -610,6 +610,96 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Compact delivery radio mixed basket isolation $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final semantics = tester.ensureSemantics();
+
+      session.addProduct('s-tomato');
+      session.addProduct('w-notebook');
+      session.openCart(scope: BuyV2CartScope.all);
+      final total = session.cartTotal;
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final owner = find.byKey(
+          ValueKey('buy-cart-delivery-instructions-${destination.name}'),
+        );
+        await showInMainCartList(tester, owner);
+        expect(find.text('Delivery instructions'), findsOneWidget);
+        final option = session.deliveryInstructionsFor(destination).first;
+        final action = find.byKey(
+          ValueKey('buy-cart-instruction-${destination.name}-${option.id}'),
+        );
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        expect(tester.getSize(action).height, inInclusiveRange(48, 55));
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(
+          session.selectedDeliveryInstructionFor(destination)?.id,
+          option.id,
+        );
+        expect(
+          tester.getSemantics(action),
+          matchesSemantics(
+            isChecked: true,
+            hasCheckedState: true,
+            isInMutuallyExclusiveGroup: true,
+            isFocusable: true,
+            hasTapAction: true,
+            hasFocusAction: true,
+            label:
+                '${destination == BuyV2Destination.shop ? "Shop" : "Wholesale"} delivery: ${option.label}',
+          ),
+        );
+      }
+      final wholesale = session
+          .selectedDeliveryInstructionFor(BuyV2Destination.wholesale)
+          ?.id;
+      session.openCart(scope: BuyV2CartScope.shop);
+      await tester.pumpAndSettle();
+      final shop = find.byKey(
+        const ValueKey('buy-cart-delivery-instructions-shop'),
+      );
+      await showInMainCartList(tester, shop);
+      final clear = find.byKey(
+        const ValueKey('buy-cart-instruction-shop-none'),
+      );
+      await tester.ensureVisible(clear);
+      await tester.pumpAndSettle();
+      await tester.tap(clear);
+      await tester.pumpAndSettle();
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.shop),
+        isNull,
+      );
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.wholesale)?.id,
+        wholesale,
+      );
+      session.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpAndSettle();
+      expect(session.cartTotal, total);
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.wholesale)?.id,
+        wholesale,
+      );
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final destination in [
     BuyV2Destination.shop,
     BuyV2Destination.wholesale,
@@ -1044,7 +1134,7 @@ void main() {
     );
     await showInMainCartList(tester, instructions);
 
-    expect(find.text('Trade receiving'), findsOneWidget);
+    expect(find.text('Delivery instructions'), findsOneWidget);
     expect(find.text('Shop delivery'), findsNothing);
     expect(find.byKey(const ValueKey('buy-cart-tip-wholesale')), findsNothing);
 

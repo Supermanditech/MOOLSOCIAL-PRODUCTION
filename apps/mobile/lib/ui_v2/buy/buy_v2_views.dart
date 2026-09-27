@@ -20713,9 +20713,9 @@ String _cartMoreTitle(BuyV2Destination destination) => switch (destination) {
 String _deliveryInstructionOwner(BuyV2Destination destination) =>
     switch (destination) {
       BuyV2Destination.shop => 'Shop delivery',
-      BuyV2Destination.wholesale => 'Trade receiving',
-      BuyV2Destination.medicine => 'Medicine handover',
-      BuyV2Destination.orders => 'Delivery instruction',
+      BuyV2Destination.wholesale => 'Wholesale delivery',
+      BuyV2Destination.medicine => 'Medicine delivery',
+      BuyV2Destination.orders => 'Delivery instructions',
     };
 
 String _paymentOfferStatus(BuyV2Session session, BuyV2CartBenefit offer) {
@@ -21978,16 +21978,35 @@ class _CartDeliveryInstructionSections extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (final destination in destinations) ...[
-          _CartDeliveryInstructionCard(
-            session: session,
-            destination: destination,
+    final eligible = destinations
+        .where(
+          (destination) =>
+              session.deliveryInstructionsFor(destination).isNotEmpty,
+        )
+        .toList(growable: false);
+    if (eligible.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(9, 7, 9, 3),
+      decoration: buyV2CardDecoration(radius: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Delivery instructions',
+            style: context.buyBody.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: BuyV2ActionStyle.primaryForeground,
+            ),
           ),
-          const SizedBox(height: 10),
+          for (final destination in eligible)
+            _CartDeliveryInstructionCard(
+              session: session,
+              destination: destination,
+              showDestination: eligible.length > 1,
+            ),
         ],
-      ],
+      ),
     );
   }
 }
@@ -21996,130 +22015,130 @@ class _CartDeliveryInstructionCard extends StatelessWidget {
   const _CartDeliveryInstructionCard({
     required this.session,
     required this.destination,
+    required this.showDestination,
   });
 
   final BuyV2Session session;
   final BuyV2Destination destination;
+  final bool showDestination;
 
   @override
   Widget build(BuildContext context) {
     final options = session.deliveryInstructionsFor(destination);
     final selected = session.selectedDeliveryInstructionFor(destination);
-    final maximumLabelHeight = options.fold(0.0, (height, option) {
-      final labelHeight = buyV2ValueTextSize(
-        context,
-        option.label,
-        const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
-        maxWidth: 122,
-        maxLines: null,
-      ).height;
-      return height > labelHeight ? height : labelHeight;
-    });
-    final optionHeight = (maximumLabelHeight + 42)
-        .clamp(82.0, double.infinity)
-        .toDouble();
-    return Container(
+    return Column(
       key: ValueKey('buy-cart-delivery-instructions-${destination.name}'),
-      padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
-      decoration: buyV2CardDecoration(
-        color: destination == BuyV2Destination.wholesale
-            ? const Color(0xFFF0F8F3)
-            : BuyV2Colors.softBlue,
-        radius: 15,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _deliveryInstructionOwner(destination),
-            style: context.buyTitle.copyWith(fontSize: 14),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            destination == BuyV2Destination.wholesale
-                ? 'Choose one instruction for business receiving.'
-                : 'Choose one instruction for this delivery.',
-            style: context.buyMeta.copyWith(fontSize: 8),
-          ),
-          const SizedBox(height: 7),
-          SizedBox(
-            height: optionHeight,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: options.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 7),
-              itemBuilder: (context, index) {
-                final option = options[index];
-                final isSelected = selected?.id == option.id;
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? BuyV2ActionStyle.pressedFill
-                        : BuyV2ActionStyle.primaryFill,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      key: ValueKey(
-                        'buy-cart-instruction-${destination.name}-${option.id}',
-                      ),
-                      onTap: () => session.chooseDeliveryInstruction(
-                        destination: destination,
-                        instructionId: isSelected ? null : option.id,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 138,
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              _deliveryInstructionIcon(option.id),
-                              color: isSelected
-                                  ? BuyV2ActionStyle.primaryForeground
-                                  : BuyV2Colors.navy,
-                              size: 18,
-                            ),
-                            const Spacer(),
-                            Text(
-                              option.label,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? BuyV2ActionStyle.primaryForeground
-                                    : BuyV2Colors.ink,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showDestination)
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Text(
+              _deliveryInstructionOwner(destination),
+              style: context.buyMeta.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: BuyV2ActionStyle.primaryForeground,
+              ),
             ),
           ),
-        ],
-      ),
+        SingleChildScrollView(
+          key: PageStorageKey('buy-instruction-lane-${destination.name}'),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              if (selected != null)
+                TextButton(
+                  key: ValueKey(
+                    'buy-cart-instruction-${destination.name}-none',
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: BuyV2ActionStyle.primaryForeground,
+                    minimumSize: const Size(48, 48),
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    padding: const EdgeInsets.only(right: 14),
+                  ),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    session.chooseDeliveryInstruction(
+                      destination: destination,
+                      instructionId: null,
+                    );
+                  },
+                  child: const Text('Clear'),
+                ),
+              for (var index = 0; index < options.length; index++)
+                Builder(
+                  builder: (context) {
+                    final option = options[index];
+                    final isSelected = selected?.id == option.id;
+                    final label = option.label;
+                    return Semantics(
+                      checked: isSelected,
+                      inMutuallyExclusiveGroup: true,
+                      label:
+                          '${_deliveryInstructionOwner(destination)}: $label',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          key: ValueKey(
+                            'buy-cart-instruction-${destination.name}-${option.id}',
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            session.chooseDeliveryInstruction(
+                              destination: destination,
+                              instructionId: option.id,
+                            );
+                          },
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 14),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isSelected
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_unchecked,
+                                    size: 18,
+                                    color: BuyV2ActionStyle.primaryForeground,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  ExcludeSemantics(
+                                    child: Text(
+                                      label,
+                                      softWrap: false,
+                                      style: context.buyBody.copyWith(
+                                        fontSize: 11,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                        color:
+                                            BuyV2ActionStyle.primaryForeground,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
-}
-
-IconData _deliveryInstructionIcon(String id) {
-  if (id.contains('security')) return Icons.shield_outlined;
-  if (id.contains('door')) return Icons.door_front_door_outlined;
-  if (id.contains('bell')) return Icons.notifications_off_outlined;
-  if (id.contains('loading')) return Icons.local_shipping_outlined;
-  if (id.contains('cartons')) return Icons.inventory_2_outlined;
-  if (id.contains('receiving')) return Icons.store_mall_directory_outlined;
-  if (id.contains('hand') || id.contains('unattended')) {
-    return Icons.person_pin_circle_outlined;
-  }
-  return Icons.phone_in_talk_outlined;
 }
 
 class _CartTipSections extends StatelessWidget {

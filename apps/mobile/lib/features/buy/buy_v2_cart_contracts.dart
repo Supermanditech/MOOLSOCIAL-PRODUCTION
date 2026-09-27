@@ -274,37 +274,37 @@ const buyV2DeliveryInstructionOptions = <BuyV2DeliveryInstructionOption>[
   BuyV2DeliveryInstructionOption(
     id: 'shop-no-bell',
     destination: BuyV2Destination.shop,
-    label: 'Do not ring',
+    label: 'Do not ring the doorbell',
     detail: 'Call instead of using the doorbell.',
   ),
   BuyV2DeliveryInstructionOption(
     id: 'trade-call-receiving',
     destination: BuyV2Destination.wholesale,
-    label: 'Call receiving contact',
+    label: 'Call on arrival',
     detail: 'Use the saved business delivery phone.',
   ),
   BuyV2DeliveryInstructionOption(
     id: 'trade-receiving-desk',
     destination: BuyV2Destination.wholesale,
-    label: 'Deliver to receiving',
+    label: 'Deliver to the receiving desk',
     detail: 'Report to the business receiving point.',
   ),
   BuyV2DeliveryInstructionOption(
     id: 'trade-loading-access',
     destination: BuyV2Destination.wholesale,
-    label: 'Loading access needed',
+    label: 'Call before unloading',
     detail: 'Confirm access before unloading.',
   ),
   BuyV2DeliveryInstructionOption(
     id: 'trade-cartons-together',
     destination: BuyV2Destination.wholesale,
-    label: 'Keep cartons together',
+    label: 'Keep boxes together',
     detail: 'Keep this trade order grouped at handover.',
   ),
   BuyV2DeliveryInstructionOption(
     id: 'medicine-hand-recipient',
     destination: BuyV2Destination.medicine,
-    label: 'Hand to recipient',
+    label: 'Hand to the recipient',
     detail: 'Give the order to the named recipient.',
   ),
   BuyV2DeliveryInstructionOption(
@@ -316,7 +316,7 @@ const buyV2DeliveryInstructionOptions = <BuyV2DeliveryInstructionOption>[
   BuyV2DeliveryInstructionOption(
     id: 'medicine-no-bell',
     destination: BuyV2Destination.medicine,
-    label: 'Do not ring',
+    label: 'Do not ring the doorbell',
     detail: 'Call instead of using the doorbell.',
   ),
   BuyV2DeliveryInstructionOption(

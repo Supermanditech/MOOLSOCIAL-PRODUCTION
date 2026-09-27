@@ -189,7 +189,9 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
-        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
+        "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"
       ]
     },
     {
@@ -206,7 +208,6 @@
       "task": "/root/cursor_redmi_v6_audit_20260913",
       "role": "subagent",
       "owners": [
-        "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart",
         "apps/mobile/lib/features/buy/buy_v2_search_relevance.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_sheet_motion.dart",
@@ -233,7 +234,6 @@
         "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart",
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
