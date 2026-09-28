@@ -12084,13 +12084,13 @@ void main() {
         await tester.enterText(search, 'Rice');
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('work-import-select-4')), findsNothing);
-        await tester.tap(bulk);
+        await tester.tap(find.text('Clear results (2)'));
         await tester.pumpAndSettle();
         expect(
           find.text('Save 1 to Store'),
           findsOneWidget,
         ); // Hidden Dal stays selected.
-        await tester.tap(bulk);
+        await tester.tap(find.text('Select results (2)'));
         await tester.pumpAndSettle();
         expect(find.text('Save 3 to Store'), findsOneWidget);
         await tester.ensureVisible(find.byKey(const Key('work-import-edit-2')));
@@ -12153,8 +12153,17 @@ void main() {
         expect(find.text('Entered: -2'), findsOneWidget);
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pumpAndSettle();
+        await openImportFilters(tester);
+        await tester.tap(find.byKey(const Key('work-import-ready')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-import-clear-search')));
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('work-import-save')));
         await tester.pump();
+        expect(tester.widget<Checkbox>(bulk).onChanged, isNull);
+        await tester.tap(find.text('Clear all (3)'));
+        await tester.pump();
+        expect(tester.widget<Checkbox>(bulk).value, isTrue);
         await tester.tap(find.byKey(const Key('work-import-save')));
         await tester.pump();
         expect(calls, 1);

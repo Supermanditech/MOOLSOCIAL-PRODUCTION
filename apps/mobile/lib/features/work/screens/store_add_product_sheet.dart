@@ -941,6 +941,18 @@ class _StoreProductImportReviewScreenState
                   )),
         )
         .toList();
+    void toggleVisibleSelection() {
+      if (_busy) return;
+      setState(() {
+        final numbers = visible.map((e) => e.value.number).toSet();
+        if (numbers.every(_selected.contains)) {
+          _selected.removeAll(numbers);
+        } else {
+          _selected.addAll(numbers);
+        }
+      });
+    }
+
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
@@ -1054,52 +1066,47 @@ class _StoreProductImportReviewScreenState
                             ),
                             const SizedBox(height: 6),
                             if (!_issuesOnly && visible.isNotEmpty)
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    key: const Key(
-                                      'work-import-select-results',
-                                    ),
-                                    tristate: true,
-                                    value:
-                                        visible.every(
-                                          (e) => _selected.contains(
-                                            e.value.number,
-                                          ),
-                                        )
-                                        ? true
-                                        : visible.any(
-                                            (e) => _selected.contains(
-                                              e.value.number,
-                                            ),
-                                          )
-                                        ? null
-                                        : false,
-                                    onChanged: _busy
-                                        ? null
-                                        : (_) => setState(() {
-                                            final numbers = visible
-                                                .map((e) => e.value.number)
-                                                .toSet();
-                                            if (numbers.every(
-                                              _selected.contains,
-                                            )) {
-                                              _selected.removeAll(numbers);
-                                            } else {
-                                              _selected.addAll(numbers);
-                                            }
-                                          }),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      '${visible.every((e) => _selected.contains(e.value.number)) ? 'Clear' : 'Select'} ${_query.trim().isEmpty ? 'all' : 'results'} (${visible.length})',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: MoolColors.navy,
+                              MergeSemantics(
+                                child: InkWell(
+                                  excludeFromSemantics: true,
+                                  onTap: _busy ? null : toggleVisibleSelection,
+                                  child: Row(
+                                    children: [
+                                      Checkbox(
+                                        key: const Key(
+                                          'work-import-select-results',
+                                        ),
+                                        tristate: true,
+                                        value:
+                                            visible.every(
+                                              (e) => _selected.contains(
+                                                e.value.number,
+                                              ),
+                                            )
+                                            ? true
+                                            : visible.any(
+                                                (e) => _selected.contains(
+                                                  e.value.number,
+                                                ),
+                                              )
+                                            ? null
+                                            : false,
+                                        onChanged: _busy
+                                            ? null
+                                            : (_) => toggleVisibleSelection(),
                                       ),
-                                    ),
+                                      Expanded(
+                                        child: Text(
+                                          '${visible.every((e) => _selected.contains(e.value.number)) ? 'Clear' : 'Select'} ${_query.trim().isEmpty ? 'all' : 'results'} (${visible.length})',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: MoolColors.navy,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             if (!_issuesOnly)
                               const Text(
