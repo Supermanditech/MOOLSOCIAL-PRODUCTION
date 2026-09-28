@@ -3239,3 +3239,92 @@ Offers radio popup final qualification:829 selected cases/888 references passed 
 28 September founder approval: Annotation 2 explicitly approves the compact Offers radio popup implemented at 2f462ad6. This supersedes its founder-review-pending status; 829 local cases and prior native scroll/select/reopen evidence remain applicable. Separate queue audit requested for other Buy popups, Store selected cues and deferred bottom navigation; do not infer those are complete from this approval.
 
 Queue verification28Sep: restored current2f462ad6 source on Redmi r66.36 with original defines through attach/reload and in-process hot restart. Store category/filter/Saved active raised surfaces and resets passed at normal text portrait; filtered products and Cart2items/INR1160 verified. No runtime changes; existing829-case qualification retained. Native enlarged/landscape/all-modal closure is not claimed. Other-popup42-entry inventory remains only partially device-audited; Store filter header/spacing retained as visual-review candidate. Bottom-nav ticket stays deferred, unimplemented and untested. Offers popup visual approval is explicitly recorded above.
+
+
+## Customer ratings: definitive work-item specifications - 28 September 2026
+
+Parent BUY-PDP-REF-20260924-05. Seven scoped work items; IDs below are parent-scoped planning references, not central regression IDs. All remain OPEN / not implemented under these new acceptance criteria. Existing composer/drafts are partial foundations. Backend remains deferred. User requested precise tickets and current Redmi testing, not backend deployment.
+
+### 1. Verified-purchase eligibility and exact target
+Reference: `BUY-PDP-REF-20260924-05/ratings/eligibility`. Owner: Buy frontend + backend integration.
+
+Only authenticated owner of a delivered order line or confirmed collected line may rate. Placed, unpaid, cancelled before fulfilment and undelivered lines are ineligible. Partial deliveries unlock only fulfilled lines. A return after actual fulfilment must not erase eligibility. Server resolves customer/order/line/store/product/variant; never trust client eligibility or provider-supplied ratings.
+
+Acceptance:
+- Delivered/collected own line allowed; another account/Store/variant rejected
+- Mixed order resolves each eligible line to its actual Store
+- Offline/loading/expired eligibility prevents submit and preserves draft
+- Direct API call enforces the same checks
+
+### 2. One coherent ratings section and actionable composer
+Reference: `BUY-PDP-REF-20260924-05/ratings/public-ui`. Owner: Buy frontend.
+
+Shared PDP across Shop/Buy, Wholesale, Bulk, Offers and Store: display aggregate separately from Your review. Replace no-personal-review inference with You have not reviewed this purchase. No ratings yet only for authoritative zero published count; loading/unavailable separate. Compact stars1-5; optional written review up to 8000 characters; Write review/Update review; eligible order-detail entry deep-links exact line. Ineligible buyer sees Reviews available after delivery or collection and a factual reason. No redundant duplicate rating summary.
+
+Acceptance:
+- Aggregate nonzero and no personal review never says nobody reviewed
+- Normal/200percent, keyboard, long text, portrait/landscape no overflow or hidden action
+- Cancel/Back restores product/order scroll, variant and Cart
+- Empty/zero stars blocked; whitespace-only optional comment stored absent; edit original review instead of creating duplicate
+
+### 3. Authoritative review persistence and idempotent updates
+Reference: `BUY-PDP-REF-20260924-05/ratings/durable-storage`. Owner: Backend deferred; Buy connector later.
+
+Persist centrally: reviewId, authenticated customerId, orderId, orderLineId, storeId, productId, variantId, ratingType, stars, optional comment, verifiedFulfilmentAt, createdAt, updatedAt, version, moderationStatus. Delivery target additionally uses actual shipment/provider identity. Enforce uniqueness per customer/order-line/rating-type (Store service per Store suborder); idempotency and optimistic versioning. Backend returns saved record; UI claims success only after acknowledged save. Draft storage remains account-scoped and local.
+
+Acceptance:
+- Retry/timeouts/double taps create one review
+- Kill/reopen and second signed-in device recover acknowledged review
+- Account switch never shows another account draft or review
+- Failed save keeps draft, no false success or aggregate increment
+
+### 4. Respective Store reviews inbox and reply/report
+Reference: `BUY-PDP-REF-20260924-05/ratings/store-workspace`. Owner: Store workspace + backend deferred.
+
+Store owner sees only feedback linked to its Store, with product/variant, review, fulfilment reference and permitted customer display name. Separate product and Store-service ratings. Owner may reply publicly or report abuse through moderation; cannot change stars/customer text, self-approve moderation or hide negative feedback. Mixed orders never expose another Store private details. Notification/inbox delivery retries must not duplicate records.
+
+Acceptance:
+- Two Store accounts cannot read/reply to each other feedback
+- One owner reply can be updated with audit history
+- Negative valid reviews remain visible; moderation reason recorded independently
+- No customer phone/address/payment data in public review projection
+
+### 5. Separate completed-delivery rating
+Reference: `BUY-PDP-REF-20260924-05/ratings/delivery-feedback`. Owner: Buy frontend + delivery provider/backend deferred.
+
+Optional separate delivery-service rating after confirmed delivery, tied to delivered shipment and actual assigned provider. No delivery rating for customer collection; do not affect product or Store averages. Store may see an authorised service summary only, not unrelated courier/private records. Unassigned/unknown identity remains unavailable rather than guessing.
+
+Acceptance:
+- Collection suppresses rider rating
+- Split shipments resolve each feedback to correct provider
+- Wrong provider/account rejected; undelivered shipment blocked
+- Product rating does not change when delivery rating changes
+
+### 6. Server-owned rating summaries and published review list
+Reference: `BUY-PDP-REF-20260924-05/ratings/public-aggregates`. Owner: Backend deferred; shared Buy display.
+
+Public average/count derives only from published eligible reviews; expose rating distribution, verified count, target scope and paginated review list. Keep product, Store and delivery aggregates distinct. Exact variant remains on review; any family aggregate must declare scope. Seller cannot supply or override customer stars. Edit/moderation adjusts counters exactly once. Separate no data, zero ratings, unavailable and loading.
+
+Acceptance:
+- Published subset alone contributes; duplicate retry no count inflation
+- Edited stars replace prior contribution
+- Pagination has stable cursor and no duplicates
+- Provider product metadata cannot overwrite customer aggregates
+
+### 7. Complete rating journey and legacy reconciliation
+Reference: `BUY-PDP-REF-20260924-05/ratings/qualification`. Owner: Buy QA + backend/Store QA when dependencies ready.
+
+Inventory every active entry and retire superseded legacy local-only Store/rider success paths once route reachability is established. Qualify all five public entry paths, eligible delivered/collected and ineligible cases, mixed Store orders, exact variants, draft recovery, Store reply/report and public aggregate refresh. Native debug preview does not prove backend storage or notification.
+
+Acceptance:
+- Local tests for eligibility/identity/retry/account boundaries pass
+- Redmi real backend save -> reopen -> Store inbox -> public review readback
+- No real message/order/rating publication during frontend-only audit
+- Child failures recorded against owning item and repaired before closure
+
+Reuse and owners: existing buy_v2_views.dart composer, buy_v2_session.dart eligibility/submission, buy_v2_content_contracts.dart adapter and buy_v2_saved_products_store.dart account-scoped draft store. Store/backend exact owners require their lane mapping before implementation; no ownership grant or worktree integration implied. Existing frontend source is unchanged.
+
+Redmi result: current attached source f69d63f2 on r66.36, normal portrait. Fresh tomatoes500g, Test supplier000001: Write review opens ineligible delivered-purchase sheet; Check again retains state; no submission enabled or made. Cart badge2 preserved. Evidence paths/hashes are in ratingTicketDefinitions20260928.nativeAudit. Eligible submission, backend save, cross-device recovery, Store inbox and replies are UNTESTED dependencies, not successful checks. False global no-review wording is confirmed from source condition on personal review, not a native nonzero-aggregate reproduction.
+
+### Founder clarification: consumer-facing review discovery
+The public-UI ticket must provide visible Rate your purchase beside each delivered/collected order item, Write a review in the product ratings section, and Your review / Update review after submission. Rating summary scrolls to the section. No hidden-menu-only entry or technical eligibility/provider terminology. Both entry paths use the same exact-purchase composer. If several purchases qualify, show item/Store/delivery date choices rather than requesting IDs. Composer: How was your purchase?, clear product/variant/Store identity,1-5stars, Tell others about your experience (optional), max8000characters, Post review / Save changes. After acknowledged save: Thanks for your review and View your review. Sign-in, not-yet-delivered and retry messages are distinct and plain. Rate this store and Rate your delivery are optional separate targets, not mandatory extra steps; collection has no delivery rating. Back/Close preserves origin, scroll, Cart and account-scoped draft. Explicit discovery, semantics, keyboard and enlarged-text acceptance checks added. This defines pending implementation; it does not claim current UI already matches.

@@ -8738,6 +8738,261 @@
         },
         "caseCount": 10,
         "scope": "Exact registered acceptance cases only; native/provider/founder status remains separate."
+      },
+      "ratingTicketDefinitions20260928": {
+        "parent": "BUY-PDP-REF-20260924-05",
+        "identifierNote": "Scoped work-item references inside the existing parent, not invented central numeric regression IDs or ownership grants.",
+        "status": "seven_precise_open_work_items_frontend_and_deferred_integration",
+        "tickets": [
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/eligibility",
+            "displayNumber": 1,
+            "title": "Verified-purchase eligibility and exact target",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Buy frontend + backend integration",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Only authenticated owner of a delivered order line or confirmed collected line may rate. Placed, unpaid, cancelled before fulfilment and undelivered lines are ineligible. Partial deliveries unlock only fulfilled lines. A return after actual fulfilment must not erase eligibility. Server resolves customer/order/line/store/product/variant; never trust client eligibility or provider-supplied ratings.",
+            "acceptance": [
+              "Delivered/collected own line allowed; another account/Store/variant rejected",
+              "Mixed order resolves each eligible line to its actual Store",
+              "Offline/loading/expired eligibility prevents submit and preserves draft",
+              "Direct API call enforces the same checks"
+            ],
+            "dependencies": [],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation."
+          },
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/public-ui",
+            "displayNumber": 2,
+            "title": "One coherent ratings section and actionable composer",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Buy frontend",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Shared PDP across Shop/Buy, Wholesale, Bulk, Offers and Store: display aggregate separately from Your review. Replace no-personal-review inference with You have not reviewed this purchase. No ratings yet only for authoritative zero published count; loading/unavailable separate. Compact stars1-5; optional written review up to 8000 characters; Write review/Update review; eligible order-detail entry deep-links exact line. Ineligible buyer sees Reviews available after delivery or collection and a factual reason. No redundant duplicate rating summary.",
+            "acceptance": [
+              "Aggregate nonzero and no personal review never says nobody reviewed",
+              "Normal/200percent, keyboard, long text, portrait/landscape no overflow or hidden action",
+              "Cancel/Back restores product/order scroll, variant and Cart",
+              "Empty/zero stars blocked; whitespace-only optional comment stored absent; edit original review instead of creating duplicate",
+              "Customer can locate review action directly from delivered/collected order item and product rating section without opening a hidden menu",
+              "Both entries open same target-bound composer; multiple-purchase selection uses names/dates, not technical IDs",
+              "Screen-reader labels, minimum accessible tap targets, large text and keyboard preserve discoverability",
+              "Draft retained on Close; successful save changes action to Your review/Update review only after server acknowledgement"
+            ],
+            "dependencies": [
+              "Verified authoritative eligibility and exact target identity"
+            ],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation.",
+            "consumerFacingContract": {
+              "entryPoints": [
+                "Delivered/collected order item: Rate your purchase, visible beside item details, never overflow-menu-only",
+                "Product ratings section: Write a review; accessible from the rating summary by scroll-to-section",
+                "Existing review: Your review with Update review; do not show a second new-review action"
+              ],
+              "composer": [
+                "Title: How was your purchase?",
+                "Show product photo/name, selected variant/pack and Store so target is obvious",
+                "Choose1-5stars; optional field Tell others about your experience (optional), maximum8000characters",
+                "Submit: Post review; update: Save changes; Close preserves draft",
+                "After acknowledged save: Thanks for your review, plus View your review"
+              ],
+              "multiplePurchases": "If more than one eligible purchase exists, show compact choices with item, Store and delivered/collected date; never require manual order IDs or guess the target.",
+              "unavailableCopy": [
+                "Not fulfilled: You can review this item after delivery or collection.",
+                "Not purchased: Reviews are from customers who bought this item.",
+                "Signed out: Sign in to review your purchase.",
+                "Connection problem: We could not check your purchase. Try again."
+              ],
+              "relatedFeedback": "Separate optional labels Rate this store and Rate your delivery on their fulfilled Store/shipment section; no delivery action for collection. Do not force all ratings to submit one.",
+              "navigation": "Back/Close returns to exact originating order/product, preserves scroll/variant/Cart, and restores account-scoped draft. No internal provider/eligibility/canonical-ID terminology in consumer text."
+            }
+          },
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/durable-storage",
+            "displayNumber": 3,
+            "title": "Authoritative review persistence and idempotent updates",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Backend deferred; Buy connector later",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Persist centrally: reviewId, authenticated customerId, orderId, orderLineId, storeId, productId, variantId, ratingType, stars, optional comment, verifiedFulfilmentAt, createdAt, updatedAt, version, moderationStatus. Delivery target additionally uses actual shipment/provider identity. Enforce uniqueness per customer/order-line/rating-type (Store service per Store suborder); idempotency and optimistic versioning. Backend returns saved record; UI claims success only after acknowledged save. Draft storage remains account-scoped and local.",
+            "acceptance": [
+              "Retry/timeouts/double taps create one review",
+              "Kill/reopen and second signed-in device recover acknowledged review",
+              "Account switch never shows another account draft or review",
+              "Failed save keeps draft, no false success or aggregate increment"
+            ],
+            "dependencies": [
+              "Verified authoritative eligibility and exact target identity"
+            ],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation."
+          },
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/store-workspace",
+            "displayNumber": 4,
+            "title": "Respective Store reviews inbox and reply/report",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Store workspace + backend deferred",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Store owner sees only feedback linked to its Store, with product/variant, review, fulfilment reference and permitted customer display name. Separate product and Store-service ratings. Owner may reply publicly or report abuse through moderation; cannot change stars/customer text, self-approve moderation or hide negative feedback. Mixed orders never expose another Store private details. Notification/inbox delivery retries must not duplicate records.",
+            "acceptance": [
+              "Two Store accounts cannot read/reply to each other feedback",
+              "One owner reply can be updated with audit history",
+              "Negative valid reviews remain visible; moderation reason recorded independently",
+              "No customer phone/address/payment data in public review projection"
+            ],
+            "dependencies": [
+              "Verified authoritative eligibility and exact target identity"
+            ],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation."
+          },
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/delivery-feedback",
+            "displayNumber": 5,
+            "title": "Separate completed-delivery rating",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Buy frontend + delivery provider/backend deferred",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Optional separate delivery-service rating after confirmed delivery, tied to delivered shipment and actual assigned provider. No delivery rating for customer collection; do not affect product or Store averages. Store may see an authorised service summary only, not unrelated courier/private records. Unassigned/unknown identity remains unavailable rather than guessing.",
+            "acceptance": [
+              "Collection suppresses rider rating",
+              "Split shipments resolve each feedback to correct provider",
+              "Wrong provider/account rejected; undelivered shipment blocked",
+              "Product rating does not change when delivery rating changes"
+            ],
+            "dependencies": [
+              "Verified authoritative eligibility and exact target identity"
+            ],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation."
+          },
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/public-aggregates",
+            "displayNumber": 6,
+            "title": "Server-owned rating summaries and published review list",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Backend deferred; shared Buy display",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Public average/count derives only from published eligible reviews; expose rating distribution, verified count, target scope and paginated review list. Keep product, Store and delivery aggregates distinct. Exact variant remains on review; any family aggregate must declare scope. Seller cannot supply or override customer stars. Edit/moderation adjusts counters exactly once. Separate no data, zero ratings, unavailable and loading.",
+            "acceptance": [
+              "Published subset alone contributes; duplicate retry no count inflation",
+              "Edited stars replace prior contribution",
+              "Pagination has stable cursor and no duplicates",
+              "Provider product metadata cannot overwrite customer aggregates"
+            ],
+            "dependencies": [
+              "Verified authoritative eligibility and exact target identity"
+            ],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation."
+          },
+          {
+            "reference": "BUY-PDP-REF-20260924-05/ratings/qualification",
+            "displayNumber": 7,
+            "title": "Complete rating journey and legacy reconciliation",
+            "status": "open_specified_not_implemented",
+            "actor": "Public purchaser; respective Store/delivery owner only where specified",
+            "classification": "mvp_supporting",
+            "ownerLane": "Buy QA + backend/Store QA when dependencies ready",
+            "existingBuyOwners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart"
+            ],
+            "requirement": "Inventory every active entry and retire superseded legacy local-only Store/rider success paths once route reachability is established. Qualify all five public entry paths, eligible delivered/collected and ineligible cases, mixed Store orders, exact variants, draft recovery, Store reply/report and public aggregate refresh. Native debug preview does not prove backend storage or notification.",
+            "acceptance": [
+              "Local tests for eligibility/identity/retry/account boundaries pass",
+              "Redmi real backend save -> reopen -> Store inbox -> public review readback",
+              "No real message/order/rating publication during frontend-only audit",
+              "Child failures recorded against owning item and repaired before closure"
+            ],
+            "dependencies": [
+              "Verified authoritative eligibility and exact target identity"
+            ],
+            "exclusions": "No backend implementation, schema deployment, messages, real purchase, APK or other-worktree edit authorised by this planning/device-audit task.",
+            "reuse": "Reuse existing product review composer, session eligibility, commerceAdapter submission and account-scoped drafts; complete contracts instead of parallel rating implementation. Store/backend exact owners must be mapped in their lane before implementation."
+          }
+        ],
+        "nativeAudit": {
+          "sourceCommit": "f69d63f2d5f8d97e8c14491b51427016d12ae10f",
+          "device": "TG8HCYTGGQT885OF",
+          "installedCandidate": "r66.36",
+          "preview": "Existing attached current-source session after hot reload/hot restart; no APK",
+          "observations": [
+            "PDP exposes Customer ratings and Customer reviews separately",
+            "Write review opens Review your purchase for Fresh tomatoes500g / Test supplier000001",
+            "No eligible delivered purchase is reported; no stars/submission controls enabled",
+            "Check again retains ineligible state; no rating submitted",
+            "Cart badge remains2"
+          ],
+          "result": "Ineligible path observed; eligible submission, persistence and Store delivery NOT tested or passed",
+          "screenshots": [
+            {
+              "path": "apps/mobile/build/rating-audit-20260928/01-current.png",
+              "sha256": "f265eef5c2f893f04ca8eb8a44f8aea5d9f72202148e7d4c09be51ec8b285574"
+            },
+            {
+              "path": "apps/mobile/build/rating-audit-20260928/02-review-open.png",
+              "sha256": "a32e64ed9e2d61db74bdb400697e3f12eb3a564c87f918b403c0c08981068d30"
+            },
+            {
+              "path": "apps/mobile/build/rating-audit-20260928/03-after-check.png",
+              "sha256": "a32e64ed9e2d61db74bdb400697e3f12eb3a564c87f918b403c0c08981068d30"
+            }
+          ]
+        },
+        "confirmedCodeDefects": [
+          "Personal-review absence currently produces global No customer reviews yet copy",
+          "Live submission adapters fail unavailable; central persistence/Store routing unimplemented",
+          "Submission contract lacks explicit order-line review identity; existing canonical-product personal map is insufficient for per-purchase records"
+        ],
+        "implementationAuthority": "Definition and current Redmi audit only; backend stays deferred."
       }
     },
     {
