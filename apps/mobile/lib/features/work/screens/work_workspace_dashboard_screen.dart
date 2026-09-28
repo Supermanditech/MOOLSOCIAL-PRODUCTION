@@ -12174,6 +12174,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               initialDateRange: _invoiceRange,
               calendarDelegate: const _StoreDayFirstCalendarDelegate(),
               errorFormatText: 'Use DD/MM/YYYY',
+              helpText: 'Dates · DD/MM/YYYY',
+              fieldStartLabelText: 'From',
+              fieldEndLabelText: 'To',
+              fieldStartHintText: '',
+              fieldEndHintText: '',
             );
             if (!mounted || range == null) return;
             _changeSalesBrowse(() {

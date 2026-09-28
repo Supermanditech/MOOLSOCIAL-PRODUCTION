@@ -16991,6 +16991,12 @@ void main() {
     await tester.pumpAndSettle();
     final range = DateTimeRange(start: today.subtract(const Duration(days: 2)), end: today);
     final dialog = find.byType(DateRangePickerDialog);
+    final datePicker = tester.widget<DateRangePickerDialog>(dialog);
+    expect(datePicker.helpText, 'Dates · DD/MM/YYYY');
+    expect(datePicker.fieldStartLabelText, 'From');
+    expect(datePicker.fieldEndLabelText, 'To');
+    expect(datePicker.fieldStartHintText, '');
+    expect(datePicker.fieldEndHintText, '');
     final delegate = tester.widget<DateRangePickerDialog>(dialog).calendarDelegate;
     final localizations = MaterialLocalizations.of(tester.element(dialog));
     expect(delegate.dateHelpText(localizations), 'DD/MM/YYYY');
