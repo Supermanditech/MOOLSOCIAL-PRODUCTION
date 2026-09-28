@@ -18313,10 +18313,61 @@
             "label": "Final MoolSocial selection behind user-opened Offers popup",
             "sha256": "de2c59bd60e8a2c0f03dcfbf5b4e5c94c89ab84b520c783bbcc3b67b1ae7b7ea"
           }
-        ]
+        ],
+        "storeDeviceFollowup20260928": {
+          "status": "normal_text_redmi_category_filter_saved_activation_and_reset_passed",
+          "sourceCommit": "2f462ad6ac0336906b392dfd79f3a543377c8274",
+          "installedCandidate": "r66.36 / 2026092701",
+          "method": "Attached with original review/emulator defines; hot reload then in-process hot restart restored current source. No APK.",
+          "checks": [
+            "Store price cap100 applies and raised filter cue appears; Reset restores catalogue and clears cue",
+            "Fruits and vegetables category applies and raised category cue appears; All products restores catalogue and clears cue",
+            "Saved-only shows saved rice and raised bookmark cue; toggle restores catalogue and clears cue",
+            "Cart remains2items / INR1160 throughout; no products added or removed"
+          ],
+          "limits": "Normal text portrait device replay. No new enlarged-text/landscape/all-modal native closure. Existing829 selected local checks remain applicable; no runtime edits.",
+          "screenshots": [
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-categories.png",
+              "sha256": "5236dc76190d901ce9b65ceda1b2d562d11f0009160e04e1c5b143358cc5b318"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-category-active.png",
+              "sha256": "a4d202629685d67d032a994dd6e2032a62408fafc30c7e68fc827b5491b2696c"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-category-reset.png",
+              "sha256": "847fe93045d800e896c195346f3e1835a6a56aaf9be191538478497ac4f1da56"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-entry.png",
+              "sha256": "2f6ab7e6d63abdec32b2b4b4041975abfb6380d2c080802d69892831fdf4cf2a"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-filter-active.png",
+              "sha256": "bbc87298f2074e5372f3ced45c64caaf0a92d3ae6baa248eeda5ad2c061f597e"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-filter-reset.png",
+              "sha256": "f97d9241c8d222e756168da2f9e3470b12d28c3923c4f1890fe9acf5359bc53b"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-filter.png",
+              "sha256": "d17165cd9ad6ed0841d5dec1a068896e10864896718a95954c802b723f8ffe5a"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-saved-active.png",
+              "sha256": "8181e2a5d2c8c2a1005d18e0d8efcb94f7771e074da39c0758dbf3a7ff9f45a8"
+            },
+            {
+              "path": "apps/mobile/build/resume-queue-audit-20260928/store-saved-reset.png",
+              "sha256": "847fe93045d800e896c195346f3e1835a6a56aaf9be191538478497ac4f1da56"
+            }
+          ]
+        }
       },
       "offerPopupQueued20260928": {
-        "status": "implemented_local_qualified_redmi_preview_founder_review_pending",
+        "status": "implemented_local_qualified_redmi_verified_founder_approved",
         "actor": "Public buyer filtering supplied Offers",
         "classification": "mvp_supporting",
         "problem": "Native Filter offers modal has oversized centered heading/chips, excessive handle spacing, narrow content and inconsistent selection presentation.",
@@ -18445,7 +18496,18 @@
           "terminalSuccess": true,
           "apkBuilt": false
         },
-        "interaction": "Single-choice immediate apply: tapping a radio updates source and dismisses. Close/Back preserve current choice. No separate Apply button."
+        "interaction": "Single-choice immediate apply: tapping a radio updates source and dismisses. Close/Back preserve current choice. No separate Apply button.",
+        "founderApproval20260928": {
+          "approved": true,
+          "scope": "Compact horizontally scrollable Offers publisher radio popup with immediate apply",
+          "evidence": "Founder latest message, Annotation 2: annotation 2 is approved",
+          "implementationCommit": "2f462ad6ac0336906b392dfd79f3a543377c8274"
+        },
+        "queueAudit20260928": {
+          "otherBuyPopups": "Inventory complete for42 direct entry points; whole native visual audit remains incomplete. Store filter and category inspected today; no functional failure seen. Store filter larger header and row spacing remains visual-review candidate, not yet repaired or founder-approved.",
+          "storeSelectedCues": "Normal-text native category/filter/Saved activation and reset now passed; limits in storeDeviceFollowup20260928.",
+          "bottomNavigation": "BUY-BOTTOM-NAV-20260927-01 remains explicitly deferred until shared integration, unimplemented and untested. No scope change requested."
+        }
       }
     },
     {
