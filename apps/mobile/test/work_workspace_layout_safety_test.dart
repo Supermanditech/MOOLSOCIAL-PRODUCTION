@@ -16929,6 +16929,52 @@ void main() {
     }
   }
 
+  for (final section in ['sales', 'stock']) {
+    testWidgets('AUDIT large landscape $section content and actions remain reachable', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(806, 360), textScale: 1.6);
+      await tester.tap(find.byKey(Key(section == 'sales' ? 'work-store-sell' : 'work-store-stock')));
+      await tester.pumpAndSettle();
+      final prefix = 'work-$section';
+      final scroll = find.byKey(Key('$prefix-large-landscape-scroll'));
+      expect(scroll, findsOneWidget);
+      final content = find.byKey(Key('$prefix-readable-content'));
+      expect(tester.getSize(content).height, greaterThanOrEqualTo(300));
+      expect(find.byKey(Key('$prefix-actions-toggle')).hitTestable(), findsOneWidget,
+        reason: 'Quick actions stay immediately accessible without scrolling the list');
+      if (section == 'sales') {
+        final total = find.byKey(const Key('work-sales-period-total'));
+        await tester.ensureVisible(total);
+        await tester.pumpAndSettle();
+        expect(total.hitTestable(), findsOneWidget);
+        await tester.ensureVisible(find.byKey(const Key('work-statement-period')));
+        await tester.tap(find.byKey(const Key('work-statement-period')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Custom range').last);
+        await tester.pumpAndSettle();
+        expect(find.text('DD/MM/YYYY'), findsOneWidget);
+        await tester.tap(find.byTooltip('Close').last);
+        await tester.pumpAndSettle();
+      } else {
+        expect(tester.getSize(find.byKey(const Key('work-stock-statement-header'))).height,
+          lessThan(tester.getSize(content).height / 2));
+      }
+      final toggle = find.byKey(Key('$prefix-actions-toggle'));
+      await tester.ensureVisible(toggle);
+      await tester.pumpAndSettle();
+      expect(toggle.hitTestable(), findsOneWidget);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('$prefix-actions-panel')), findsNothing);
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('$prefix-actions-panel')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('SALESHOME empty actions reuse existing destinations', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     work.workspaceInvoices.clear();

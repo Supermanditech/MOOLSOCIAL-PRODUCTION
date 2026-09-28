@@ -12174,11 +12174,31 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               initialDateRange: _invoiceRange,
               calendarDelegate: const _StoreDayFirstCalendarDelegate(),
               errorFormatText: 'Use DD/MM/YYYY',
-              helpText: 'Dates · DD/MM/YYYY',
+              helpText: MediaQuery.orientationOf(context) == Orientation.landscape &&
+                      MediaQuery.textScalerOf(context).scale(1) > 1.3
+                  ? 'DD/MM/YYYY'
+                  : 'Dates · DD/MM/YYYY',
               fieldStartLabelText: 'From',
               fieldEndLabelText: 'To',
               fieldStartHintText: '',
               fieldEndHintText: '',
+              builder: (pickerContext, picker) {
+                if (MediaQuery.orientationOf(pickerContext) != Orientation.landscape ||
+                    MediaQuery.textScalerOf(pickerContext).scale(1) <= 1.3) {
+                  return picker!;
+                }
+                final theme = Theme.of(pickerContext);
+                return Theme(
+                  data: theme.copyWith(
+                    textTheme: theme.textTheme.copyWith(
+                      headlineSmall: theme.textTheme.headlineSmall?.copyWith(fontSize: 14)),
+                    datePickerTheme: theme.datePickerTheme.copyWith(
+                    headerHelpStyle: (theme.datePickerTheme.headerHelpStyle ??
+                        theme.textTheme.labelLarge)?.copyWith(fontSize: 11),
+                  )),
+                  child: picker!,
+                );
+              },
             );
             if (!mounted || range == null) return;
             _changeSalesBrowse(() {
@@ -14566,6 +14586,35 @@ class _StockQuickActionsFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
+      // Preserve full-sized text and targets in short accessibility viewports.
+      // Keep actions fixed while the register can use a readable scroll extent.
+      final textScaler = MediaQuery.textScalerOf(context);
+      final minimumHeight = textScaler.scale(200);
+      Widget readableContent = child;
+      if (MediaQuery.orientationOf(context) == Orientation.landscape &&
+          textScaler.scale(1) > 1.3 &&
+          box.hasBoundedHeight && box.maxHeight < minimumHeight + (expanded ? 54 : 0)) {
+        readableContent = SingleChildScrollView(
+          key: Key('$keyPrefix-large-landscape-scroll'),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Builder(builder: (scrollContext) => NotificationListener<OverscrollNotification>(
+            onNotification: (notification) {
+              if (notification.metrics.axis != Axis.vertical) return false;
+              final outer = Scrollable.of(scrollContext).position;
+              final target = (outer.pixels + notification.overscroll)
+                  .clamp(outer.minScrollExtent, outer.maxScrollExtent);
+              if (target == outer.pixels) return false;
+              outer.jumpTo(target);
+              return true;
+            },
+            child: SizedBox(
+              key: Key('$keyPrefix-readable-content'),
+              height: minimumHeight,
+              child: child,
+            ),
+          )),
+        );
+      }
       final desiredHeight = _stockQuickTabHeight(context);
       final short = box.maxHeight < desiredHeight + 12;
       final tabHeight = short ? 48.0 : desiredHeight;
@@ -14638,7 +14687,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
             Expanded(child: SizedBox(
               key: Key('$keyPrefix-action-content'),
               width: double.infinity,
-              child: child,
+              child: readableContent,
             )),
             Container(
               key: Key('$keyPrefix-actions-panel'),
@@ -14673,7 +14722,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
               child: ClipPath(
                 key: Key('$keyPrefix-action-content'),
                 clipper: _StockActionCutout(expanded ? 0 : tabHeight + 6),
-                child: child,
+                child: readableContent,
               ),
             ),
             Positioned(right: 0, bottom: 0, child: toggle),
