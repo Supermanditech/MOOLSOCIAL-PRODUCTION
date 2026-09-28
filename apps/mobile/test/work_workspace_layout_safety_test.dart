@@ -17031,7 +17031,8 @@ void main() {
   });
 
   testWidgets('SALESHOME payment identity and unavailable guard', (tester) async {
-    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final contactStore = _ContactDraftFixtureStore();
+    final work = storeViewFixture(null, contactStore);
     final seed = StoreReviewSeed(accountScope: 'review-draft-account', orderCount: 0, now: DateTime.now());
     work.activeWorkspace = seed.workspace;
     final saved = DateTime.now().subtract(const Duration(seconds: 1));
@@ -17083,9 +17084,34 @@ void main() {
     await reveal(tester, adjustments);
     await tester.tap(adjustments);
     await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet).last;
+    final originalFinance = work.workspaceFinance;
+    final originalInvoiceCount = work.workspaceInvoices.length;
+    const incompleteReturnHistory =
+        'Return quantities unavailable. Recover the original invoice records before recording a return.';
+    expect(find.descendant(of: sheet, matching: find.text(incompleteReturnHistory)), findsOneWidget);
+    expect(find.byKey(const ValueKey('record-return-paid')), findsNothing);
+    contactStore.accountScope = 'different-evaluation-account';
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    expect(work.workspaceFinance, isNull);
+    expect(find.descendant(of: sheet, matching: find.text(
+        'Payment records are unavailable. Close and reopen this invoice after records have loaded.')), findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text(
+        'Return to this invoice’s Store to view it.')), findsNothing);
+    expect(find.byKey(const ValueKey('record-return-paid')), findsNothing);
+    expect(find.byKey(const ValueKey('record-refund-paid')), findsNothing);
+    contactStore.accountScope = seed.accountScope;
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    expect(work.workspaceFinance, same(originalFinance));
+    expect(work.workspaceInvoices, hasLength(originalInvoiceCount));
+    expect(find.descendant(of: sheet, matching: find.text(
+        'Payment records are unavailable. Close and reopen this invoice after records have loaded.')), findsNothing);
+    expect(find.descendant(of: sheet, matching: find.text(incompleteReturnHistory)), findsOneWidget);
+    expect(find.byKey(const ValueKey('record-return-paid')), findsNothing);
     expect(work.applyWorkspaceFinance(snapshot(6, mismatch: true)), isTrue);
     await tester.pumpAndSettle();
-    final sheet = find.byType(BottomSheet).last;
     expect(find.descendant(of: sheet, matching: find.text(
         'This invoice’s payment record is unavailable. Close and check its saved records before recording an adjustment.')), findsOneWidget);
     expect(find.descendant(of: sheet, matching: find.text(
