@@ -106,10 +106,14 @@ class _BuyV2CartBenefitSelectionRef {
   const _BuyV2CartBenefitSelectionRef({
     required this.benefitId,
     required this.sourceId,
+    required this.revision,
+    required this.scopeKey,
   });
 
   final String benefitId;
   final String sourceId;
+  final int revision;
+  final String scopeKey;
 }
 
 @immutable
@@ -4356,6 +4360,8 @@ class BuyV2Session extends ChangeNotifier {
     _productContentMediaInputs.removeWhere((id, _) => !retained.contains(id));
     _marketplaceTrust.removeWhere((id, _) => !retained.contains(id));
     _productBenefits.removeWhere((id, _) => !retained.contains(id));
+    _productBenefitServerTimes.removeWhere((id, _) => !retained.contains(id));
+    _productBenefitReceivedTimes.removeWhere((id, _) => !retained.contains(id));
     _productBenefitStates.removeWhere((id, _) => !retained.contains(id));
     _productBenefitMessages.removeWhere((id, _) => !retained.contains(id));
     _productBenefitRequestSequences.removeWhere(
@@ -5540,6 +5546,21 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2CartBenefit> _liveCartBenefits = [];
   int _cartBenefitsRequestSequence = 0;
   final Map<String, List<BuyV2CartBenefit>> _productBenefits = {};
+  final Map<String, DateTime> _productBenefitServerTimes = {};
+  final Map<String, DateTime> _productBenefitReceivedTimes = {};
+  DateTime? _cartBenefitServerTime;
+  DateTime? _cartBenefitReceivedTime;
+
+  DateTime _benefitEvaluationTime(
+    DateTime? serverTime,
+    DateTime? receivedTime,
+  ) {
+    final now = catalogueNow();
+    if (serverTime == null || receivedTime == null) return now;
+    final elapsed = now.difference(receivedTime);
+    return serverTime.add(elapsed.isNegative ? Duration.zero : elapsed);
+  }
+
   // Ephemeral Offers presentation state survives product/store Back navigation.
   // Publication validity and product facts still come from the source contracts.
   String? featuredOfferPublicationId;
@@ -8204,7 +8225,7 @@ class BuyV2Session extends ChangeNotifier {
       destination: destination,
     );
     if (coupon == null) return 0;
-    return coupon.savingAmount.clamp(0, totalForDestination(destination));
+    return coupon.savingAmount.clamp(0, _benefitTotal(coupon, cartLines));
   }
 
   int get scopedCouponSaving => cartLines
@@ -8229,7 +8250,16 @@ class BuyV2Session extends ChangeNotifier {
       for (final group in checkoutFulfilmentGroups)
         group.key: () {
           final available = remainingDiscount[group.destination] ?? 0;
-          final discount = available > group.total ? group.total : available;
+          final coupon = selectedCartBenefit(
+            kind: BuyV2CartBenefitKind.coupon,
+            destination: group.destination,
+          );
+          final eligibleTotal = coupon == null
+              ? 0
+              : _benefitTotal(coupon, group.lines);
+          final discount = available > eligibleTotal
+              ? eligibleTotal
+              : available;
           remainingDiscount[group.destination] = available - discount;
           return discount;
         }(),
@@ -8391,7 +8421,14 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2CartBenefit> productBenefitsFor(BuyV2Product product) {
     if (liveCartBenefitsEnabled) {
-      return List.unmodifiable(_productBenefits[product.id] ?? const []);
+      return _validatedProductBenefits(
+        product,
+        _productBenefits[product.id] ?? const [],
+        evaluatedAt: _benefitEvaluationTime(
+          _productBenefitServerTimes[product.id],
+          _productBenefitReceivedTimes[product.id],
+        ),
+      );
     }
     final total = productFactsFor(product).price * product.minimumOrder;
     final candidates = [
@@ -8405,7 +8442,7 @@ class BuyV2Session extends ChangeNotifier {
     return _validatedProductBenefits(
       product,
       candidates,
-      evaluatedAt: DateTime.now(),
+      evaluatedAt: catalogueNow(),
     );
   }
 
@@ -8456,6 +8493,8 @@ class BuyV2Session extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+      _productBenefitServerTimes[product.id] = snapshot.evaluatedAt;
+      _productBenefitReceivedTimes[product.id] = catalogueNow();
       _productBenefits[product.id] = _validatedProductBenefits(
         product,
         snapshot.benefits,
@@ -8479,7 +8518,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String _productBenefitFingerprint(BuyV2Product product) =>
-      '${product.id}:${product.minimumOrder}:${productFactsFor(product).price}:'
+      '${product.id}:${product.storeId}:${product.minimumOrder}:${productFactsFor(product).price}:'
       '$selectedPayment';
 
   List<BuyV2CartBenefit> _validatedProductBenefits(
@@ -8491,7 +8530,7 @@ class BuyV2Session extends ChangeNotifier {
     final ids = <String>{};
     return List.unmodifiable([
       for (final benefit in benefits)
-        if (benefit.destination == product.destination &&
+        if (benefit.appliesTo(product) &&
             benefit.id.trim().isNotEmpty &&
             benefit.title.trim().isNotEmpty &&
             benefit.detail.trim().isNotEmpty &&
@@ -8514,7 +8553,8 @@ class BuyV2Session extends ChangeNotifier {
 
   String _cartBenefitsFingerprint() => _cart.values
       .map(
-        (line) => '${line.product.id}:${line.quantity}:${line.product.price}',
+        (line) =>
+            '${line.product.id}:${line.product.storeId}:${line.quantity}:${line.product.price}',
       )
       .followedBy([selectedPayment])
       .join('|');
@@ -8546,6 +8586,8 @@ class BuyV2Session extends ChangeNotifier {
           fingerprint != _cartBenefitsFingerprint()) {
         return false;
       }
+      _cartBenefitServerTime = snapshot.evaluatedAt;
+      _cartBenefitReceivedTime = catalogueNow();
       cartBenefitsLoadState = snapshot.state;
       cartBenefitsMessage = snapshot.customerMessage;
       if (snapshot.state != BuyV2CartBenefitsLoadState.ready) {
@@ -8579,32 +8621,26 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2CartBenefitsSnapshot snapshot,
   ) {
     final destinations = cartDestinations;
-    final totals = {
-      for (final destination in destinations)
-        destination: totalForDestination(destination),
-    };
-    final quantities = {
-      for (final destination in destinations)
-        destination: countForDestination(destination),
-    };
     final ids = <String>{};
     return List.unmodifiable([
       for (final benefit in snapshot.benefits)
         if (destinations.contains(benefit.destination) &&
+            benefit.validScope &&
+            _benefitTotal(benefit, cartLines) > 0 &&
             benefit.id.trim().isNotEmpty &&
             benefit.title.trim().isNotEmpty &&
             benefit.detail.trim().isNotEmpty &&
             benefit.sourceId.trim().isNotEmpty &&
             benefit.sponsorName.trim().isNotEmpty &&
             benefit.savingAmount >= 0 &&
-            benefit.savingAmount <= (totals[benefit.destination] ?? 0) &&
+            benefit.savingAmount <= _benefitTotal(benefit, cartLines) &&
             (benefit.kind == BuyV2CartBenefitKind.coupon ||
                 benefit.savingAmount == 0) &&
             _liveBenefitMatchesStrategy(
               benefit,
               evaluatedAt: snapshot.evaluatedAt,
-              destinationTotal: totals[benefit.destination] ?? 0,
-              destinationQuantity: quantities[benefit.destination] ?? 0,
+              destinationTotal: _benefitTotal(benefit, cartLines),
+              destinationQuantity: _benefitQuantity(benefit, cartLines),
             ) &&
             ids.add(
               '${benefit.destination.name}|${benefit.kind.name}|${benefit.id}',
@@ -8663,7 +8699,9 @@ class BuyV2Session extends ChangeNotifier {
             key ==
                 _cartBenefitSelectionKey(benefit.destination, benefit.kind) &&
             selection.benefitId == benefit.id &&
-            selection.sourceId == benefit.sourceId,
+            selection.sourceId == benefit.sourceId &&
+            selection.revision == benefit.revision &&
+            selection.scopeKey == _benefitScopeKey(benefit),
       );
       if (!available) removed = true;
       return !available;
@@ -8867,7 +8905,14 @@ class BuyV2Session extends ChangeNotifier {
         null,
       selectedPayment,
       for (final benefit in selectedCartBenefitsFor(cartDestinations))
-        [benefit.id, benefit.sourceId],
+        [
+          benefit.id,
+          benefit.sourceId,
+          benefit.revision,
+          benefit.scope.name,
+          benefit.storeId,
+          (benefit.productIds.toList()..sort()),
+        ],
     ]);
   }
 
@@ -9189,6 +9234,24 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
+  String _benefitScopeKey(BuyV2CartBenefit benefit) => jsonEncode([
+    benefit.scope.name,
+    benefit.storeId,
+    (benefit.productIds.toList()..sort()),
+  ]);
+
+  int _benefitTotal(BuyV2CartBenefit benefit, Iterable<BuyV2CartLine> lines) =>
+      lines
+          .where((line) => benefit.appliesTo(line.product))
+          .fold(0, (total, line) => total + line.product.price * line.quantity);
+
+  int _benefitQuantity(
+    BuyV2CartBenefit benefit,
+    Iterable<BuyV2CartLine> lines,
+  ) => lines
+      .where((line) => benefit.appliesTo(line.product))
+      .fold(0, (total, line) => total + line.quantity);
+
   List<BuyV2CartBenefit> cartBenefits({
     required BuyV2CartBenefitKind kind,
     BuyV2Destination? destination,
@@ -9212,7 +9275,20 @@ class BuyV2Session extends ChangeNotifier {
     final valid = <BuyV2CartBenefit>[];
     final ids = <String>{};
     for (final benefit in raw) {
-      if (benefit.kind != kind ||
+      if (!benefit.validScope ||
+          _benefitTotal(benefit, cartLines) <= 0 ||
+          benefit.savingAmount > _benefitTotal(benefit, cartLines) ||
+          (liveCartBenefitsEnabled &&
+              !_liveBenefitMatchesStrategy(
+                benefit,
+                evaluatedAt: _benefitEvaluationTime(
+                  _cartBenefitServerTime,
+                  _cartBenefitReceivedTime,
+                ),
+                destinationTotal: _benefitTotal(benefit, cartLines),
+                destinationQuantity: _benefitQuantity(benefit, cartLines),
+              )) ||
+          benefit.kind != kind ||
           !destinations.contains(benefit.destination) ||
           benefit.id.trim().isEmpty ||
           benefit.title.trim().isEmpty ||
@@ -9223,12 +9299,11 @@ class BuyV2Session extends ChangeNotifier {
           (benefit.kind == BuyV2CartBenefitKind.coupon &&
               benefit.minimumSpend != null &&
               (benefit.minimumSpend! <= 0 ||
-                  totalForDestination(benefit.destination) <
-                      benefit.minimumSpend!)) ||
+                  _benefitTotal(benefit, cartLines) < benefit.minimumSpend!)) ||
           (benefit.kind == BuyV2CartBenefitKind.coupon &&
               benefit.minimumQuantity != null &&
               (benefit.minimumQuantity! <= 0 ||
-                  countForDestination(benefit.destination) <
+                  _benefitQuantity(benefit, cartLines) <
                       benefit.minimumQuantity!)) ||
           !ids.add('${benefit.destination.name}|${benefit.id}')) {
         continue;
@@ -9254,7 +9329,9 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (benefit) =>
               benefit.id == selected.benefitId &&
-              benefit.sourceId == selected.sourceId,
+              benefit.sourceId == selected.sourceId &&
+              benefit.revision == selected.revision &&
+              _benefitScopeKey(benefit) == selected.scopeKey,
         )
         .firstOrNull;
   }
@@ -9291,7 +9368,9 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (candidate) =>
               candidate.id == benefit.id &&
-              candidate.sourceId == benefit.sourceId,
+              candidate.sourceId == benefit.sourceId &&
+              candidate.revision == benefit.revision &&
+              _benefitScopeKey(candidate) == _benefitScopeKey(benefit),
         )
         .firstOrNull;
     if (current == null) {
@@ -9305,6 +9384,8 @@ class BuyV2Session extends ChangeNotifier {
     )] = _BuyV2CartBenefitSelectionRef(
       benefitId: current.id,
       sourceId: current.sourceId,
+      revision: current.revision,
+      scopeKey: _benefitScopeKey(current),
     );
     _invalidateAndRefreshCheckoutPricingContracts();
     notice =

@@ -21242,6 +21242,13 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
     );
     Widget cardFor(BuyV2CartBenefit benefit) => _CartBenefitCard(
       benefit: benefit,
+      scopeLabel: benefit.scope == BuyV2CartBenefitScope.platform
+          ? null
+          : widget.session.cartLines
+                .where((line) => benefit.appliesTo(line.product))
+                .map((line) => line.product.customerTitle)
+                .toSet()
+                .join(' · '),
       colourIndex: benefits.indexOf(benefit),
       paymentStatus: benefit.kind == BuyV2CartBenefitKind.paymentOffer
           ? _paymentOfferStatus(widget.session, benefit)
@@ -21652,6 +21659,7 @@ class _CartBenefitCard extends StatelessWidget {
     required this.onSelect,
     required this.onRemove,
     this.paymentStatus,
+    this.scopeLabel,
   });
 
   final BuyV2CartBenefit benefit;
@@ -21660,6 +21668,7 @@ class _CartBenefitCard extends StatelessWidget {
   final VoidCallback onSelect;
   final VoidCallback onRemove;
   final String? paymentStatus;
+  final String? scopeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -21824,6 +21833,20 @@ class _CartBenefitCard extends StatelessWidget {
                       color: cardMuted,
                     ),
                   ),
+                  if (scopeLabel case final label?) ...[
+                    const SizedBox(height: 2),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Text(
+                        'For: $label',
+                        key: ValueKey('buy-benefit-products-${benefit.id}'),
+                        style: context.buyMeta.copyWith(
+                          fontSize: 9,
+                          color: BuyV2ActionStyle.primaryForeground,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (hasCampaignDetails) ...[
                     const SizedBox(height: 3),
                     Text(

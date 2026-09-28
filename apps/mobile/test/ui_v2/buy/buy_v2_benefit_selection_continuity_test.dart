@@ -1,3 +1,4 @@
+import 'buy_v2_qualified_provider_fixture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,10 +6,63 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
+class _ScopedBenefitCommerce implements BuyV2CommerceAdapter {
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [
+      for (final p in BuyV2Catalogue.allProducts)
+        p.copyWith(
+          storeId: p.id == 's-milk' ? 'store-b' : 'store-a',
+          offerClass: p.offerClass ?? BuyV2OfferClass.retail,
+        ),
+    ],
+  );
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError('unused');
+}
+
+class _ScopedBenefitAdapter implements BuyV2LiveCartBenefitsAdapter {
+  List<BuyV2CartBenefit> values = [];
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => values;
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  ) async => BuyV2CartBenefitsSnapshot(
+    state: BuyV2CartBenefitsLoadState.ready,
+    evaluatedAt: DateTime.now(),
+    benefits: values,
+  );
+}
+
+class _BenefitTermsCapture implements BuyV2CommercialPaymentTermsAdapter {
+  List<BuyV2FulfilmentGroup> groups = [];
+  Map<String, int> totals = {};
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async {
+    this.groups = groups;
+    totals = quotedTotalsByFulfilmentKey;
+    return const BuyV2CommercialPaymentTermsSnapshot(
+      state: BuyV2CommerceLoadState.unavailable,
+    );
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -79,6 +133,167 @@ void main() {
     expect(session.chooseCartBenefit(coupon), isTrue);
   });
 
+  test(
+    'Scoped checkout benefit follows exact SKU from product to cart and rejects another Store',
+    () async {
+      final core = BuySession();
+      final adapter = _ScopedBenefitAdapter();
+      final terms = _BenefitTermsCapture();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _ScopedBenefitCommerce(),
+        productFactsAdapter: const QualifiedTestProductFacts({
+          's-tomato',
+          's-milk',
+        }),
+        cartBenefitsAdapter: adapter,
+        commercialPaymentTermsAdapter: terms,
+        reviewDataEnabled: false,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      const benefit = BuyV2CartBenefit(
+        id: 'sku-benefit',
+        kind: BuyV2CartBenefitKind.coupon,
+        destination: BuyV2Destination.shop,
+        title: 'Tomato saving',
+        detail: 'For this tomato pack',
+        sourceId: 'store-a-offer',
+        scope: BuyV2CartBenefitScope.products,
+        storeId: 'store-a',
+        productIds: {'s-tomato'},
+        savingAmount: 10,
+        revision: 1,
+      );
+      adapter.values = [benefit];
+      await session.refreshProductBenefits('s-tomato');
+      expect(
+        session.productBenefitsFor(session.findProduct('s-tomato')!).single.id,
+        benefit.id,
+      );
+      await session.refreshProductBenefits('s-milk');
+      expect(
+        session.productBenefitsFor(session.findProduct('s-milk')!),
+        isEmpty,
+      );
+      expect(session.addProduct('s-milk'), isTrue);
+      await session.refreshCartBenefits();
+      expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+      expect(session.addProduct('s-tomato'), isTrue);
+      await session.refreshCartBenefits();
+      expect(session.chooseCartBenefit(benefit), isTrue);
+      expect(session.scopedCouponSaving, 10);
+      await session.refreshCommercialPaymentTerms();
+      expect(terms.groups, hasLength(2));
+      for (final group in terms.groups) {
+        final eligible = group.lines.any(
+          (line) => benefit.appliesTo(line.product),
+        );
+        expect(terms.totals[group.key], group.total - (eligible ? 10 : 0));
+      }
+
+      session.remove('s-tomato');
+      await session.refreshCartBenefits();
+      expect(session.scopedCouponSaving, 0);
+      expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+    },
+  );
+
+  test(
+    'Store benefit threshold excludes other Stores and changed revision needs reselection',
+    () async {
+      final core = BuySession();
+      final adapter = _ScopedBenefitAdapter();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _ScopedBenefitCommerce(),
+        productFactsAdapter: const QualifiedTestProductFacts({
+          's-tomato',
+          's-milk',
+        }),
+        cartBenefitsAdapter: adapter,
+        reviewDataEnabled: false,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      session.addProduct('s-tomato');
+      session.addProduct('s-milk');
+      final ownTotal = session.findProduct('s-tomato')!.price;
+      BuyV2CartBenefit offer(int revision) => BuyV2CartBenefit(
+        id: 'store-benefit',
+        kind: BuyV2CartBenefitKind.coupon,
+        destination: BuyV2Destination.shop,
+        title: 'Store saving',
+        detail: 'Eligible Store spend only',
+        sourceId: 'store-a-offer',
+        scope: BuyV2CartBenefitScope.store,
+        storeId: 'store-a',
+        savingAmount: 10,
+        minimumSpend: ownTotal * 2,
+        revision: revision,
+      );
+      adapter.values = [offer(1)];
+      await session.refreshCartBenefits();
+      expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+      session.setCartQuantity('s-tomato', '2');
+      await session.refreshCartBenefits();
+      expect(session.chooseCartBenefit(offer(1)), isTrue);
+      adapter.values = [offer(2)];
+      await session.refreshCartBenefits();
+      expect(session.scopedCouponSaving, 0);
+      expect(session.chooseCartBenefit(offer(1)), isFalse);
+      expect(session.chooseCartBenefit(offer(2)), isTrue);
+      expect(session.scopedCouponSaving, 10);
+    },
+  );
+
+  test(
+    'Cached scoped benefit expires without another provider refresh',
+    () async {
+      final core = BuySession();
+      final adapter = _ScopedBenefitAdapter();
+      var now = DateTime.now();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _ScopedBenefitCommerce(),
+        cartBenefitsAdapter: adapter,
+        reviewDataEnabled: false,
+        catalogueNow: () => now,
+        productFactsAdapter: const QualifiedTestProductFacts({'s-tomato'}),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      session.addProduct('s-tomato');
+      adapter.values = [
+        BuyV2CartBenefit(
+          id: 'expiry',
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+          title: 'Timed saving',
+          detail: 'For this Store',
+          sourceId: 'source',
+          scope: BuyV2CartBenefitScope.store,
+          storeId: 'store-a',
+          savingAmount: 10,
+          validUntil: now.add(const Duration(minutes: 1)),
+        ),
+      ];
+      await session.refreshProductBenefits('s-tomato');
+      await session.refreshCartBenefits();
+      expect(session.chooseCartBenefit(adapter.values.single), isTrue);
+      now = now.add(const Duration(minutes: 2));
+      expect(session.scopedCouponSaving, 0);
+      expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+      expect(
+        session.productBenefitsFor(session.findProduct('s-tomato')!),
+        isEmpty,
+      );
+    },
+  );
+
   Widget app(
     BuyV2Session session, {
     double textScale = 1,
@@ -102,6 +317,66 @@ void main() {
         initialView: session.view,
       ),
     );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Scoped benefit identifies cart products inline at $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 711));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final adapter = _ScopedBenefitAdapter();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _ScopedBenefitCommerce(),
+        cartBenefitsAdapter: adapter,
+        reviewDataEnabled: false,
+        productFactsAdapter: const QualifiedTestProductFacts({'s-tomato'}),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      session.addProduct('s-tomato');
+      adapter.values = [
+        const BuyV2CartBenefit(
+          id: 'inline-scope',
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+          title: 'Product benefit',
+          detail: 'Only for your selected tomato pack',
+          sourceId: 'store-a-offer',
+          scope: BuyV2CartBenefitScope.products,
+          storeId: 'store-a',
+          productIds: {'s-tomato'},
+          savingAmount: 10,
+        ),
+      ];
+      session.openCart();
+      await session.refreshCartBenefits();
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final label = find.byKey(
+        const ValueKey('buy-benefit-products-inline-scope'),
+      );
+      await tester.scrollUntilVisible(
+        label,
+        220,
+        scrollable:
+            find.byKey(const ValueKey('buy-cart-scroll')).evaluate().isNotEmpty
+            ? find
+                  .descendant(
+                    of: find.byKey(const ValueKey('buy-cart-scroll')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first
+            : find.byType(Scrollable).first,
+      );
+      expect(label, findsOneWidget);
+      expect(tester.widget<Text>(label).data, contains('Fresh tomatoes'));
+      expect(session.scopedCouponSaving, 0);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   BuyV2Product productFor(BuyV2Destination destination) =>

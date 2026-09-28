@@ -4,6 +4,8 @@ import 'buy_v2_models.dart';
 
 enum BuyV2CartBenefitKind { coupon, paymentOffer }
 
+enum BuyV2CartBenefitScope { platform, store, products }
+
 enum BuyV2CartBenefitStrategy {
   timedSale,
   publishedOffer,
@@ -53,6 +55,10 @@ class BuyV2CartBenefit {
     this.minimumSpend,
     this.minimumQuantity,
     this.eligiblePaymentMethods = const {},
+    this.scope = BuyV2CartBenefitScope.platform,
+    this.storeId,
+    this.productIds = const {},
+    this.revision = 0,
   });
 
   final String id;
@@ -72,6 +78,37 @@ class BuyV2CartBenefit {
   final int? minimumSpend;
   final int? minimumQuantity;
   final Set<String> eligiblePaymentMethods;
+  final BuyV2CartBenefitScope scope;
+  final String? storeId;
+
+  /// Exact public listing/variant IDs, never product-family display names.
+  final Set<String> productIds;
+  final int revision;
+
+  bool get validScope =>
+      revision >= 0 &&
+      switch (scope) {
+        BuyV2CartBenefitScope.platform => storeId == null && productIds.isEmpty,
+        BuyV2CartBenefitScope.store =>
+          storeId?.trim().isNotEmpty == true &&
+              storeId == storeId!.trim() &&
+              productIds.isEmpty,
+        BuyV2CartBenefitScope.products =>
+          storeId?.trim().isNotEmpty == true &&
+              storeId == storeId!.trim() &&
+              productIds.isNotEmpty &&
+              productIds.every((id) => id.trim().isNotEmpty && id == id.trim()),
+      };
+
+  bool appliesTo(BuyV2Product product) =>
+      validScope &&
+      product.destination == destination &&
+      switch (scope) {
+        BuyV2CartBenefitScope.platform => true,
+        BuyV2CartBenefitScope.store => product.storeId == storeId,
+        BuyV2CartBenefitScope.products =>
+          product.storeId == storeId && productIds.contains(product.id),
+      };
 }
 
 @immutable
