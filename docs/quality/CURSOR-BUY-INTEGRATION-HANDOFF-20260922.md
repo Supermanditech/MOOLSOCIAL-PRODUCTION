@@ -3440,3 +3440,539 @@ Redmi: hot reload succeeded; current rice basket remained 1 item / INR395. Coupo
 Additional native replay: selected the existing review-only payment offer, saw Not eligible / minimum Shop product subtotal INR499 and Payment savings are not included in this total. INR395 payable remained unchanged. Removed selection and restored the original one-item basket. No payment/order/provider write. Captures 05/06 hashed in ledger.
 
 Additional checkout benefits final local qualification: 841 selected scenarios passed; 900 references bound to source e0b20709371fd1d9044557b73edbe8c560a302d04aaed5387b6dd0d0cc4b9929. Analysis clean. Native inline tabs and conditional payment-offer selection/removal preserved INR395 Cart. Positive scoped-provider native acceptance and backend publication/final settlement remain deferred. Repository checkpoint validation is next.
+
+
+### Approved mixed Cart execution admission — T01 — 20260928
+Founder approved the five-step Add → Cart → Checkout → Final action → Order status flow and sequential frontend implementation with local tests, Redmi hot reload and founder visual review before advancing. Prior benefits UI accepted; positive provider integration remains deferred.
+
+Actor: public Shop customer / Wholesale or Bulk buyer using the shared Buy Cart. Capability: browse Cart by context without silently changing the committed purchase selection. Classification: mvp_supporting under the existing Buy lane, necessary to remove checkout ambiguity. Exact scoped reference: BUY-ACTION-POLISH-20260926-01/checkout/journey-consolidation/T01 (not a new numeric registry allocation).
+
+Reuse: buy_v2_session.dart owns cart/checkout state; buy_v2_models.dart supplies existing destination/sale-type identities; buy_v2_views.dart owns Cart display/actions. Focused existing checkout_cart_return_continuity, scoped_cart_checkout_dock_continuity and session tests are reused subject to recorded ownership. No new route, backend or application state owner. Implement display filtering independently from explicit purchase selection, totals and eligibility; preserve exact item/variant, account and pending-payment identities. Bulk is an existing sale type, not a new destination. Preserve Medicine/procurement behaviour outside this change.
+
+Exclusions: no Store worktree mutation, backend/provider implementation, payment, APK, policy relaxation or T02 redesign. Dependencies: source ownership and required machine gates passed for existing implementation continuation; backend deferred. Acceptance: filtering does not change selected purchase lines; explicit subset does; total/count and validation cover the same selection; Back/restart and pending attempts retain identity; local impacted checks and Redmi review required. Status: admitted, implementation pending. No completion claimed.
+
+Execution diagnostic: invoking task_start on this existing continuation rejected the exact-original-base check while Git was clean at 194bc172. The applicable implementation phase subsequently passed with registry 4618 and the existing recorded claim. No runtime edit preceded the pass; no gate was weakened.
+
+The following two founder-approved planning documents are preserved verbatim in this existing claimed handoff owner, with hashes. Their workspace copies remain review exports; this repository copy becomes durable when the normal commit/push gates pass.
+
+<details>
+<summary>MOOLSOCIAL-CART-USER-JOURNEY-20260928.md — SHA256 5ce7fee384370aa70755af122688b65049f7ed0117bdf0f730e68ca2feefa60b</summary>
+
+# MoolSocial Cart User Journey — Add to Delivered
+
+Date: 28 September 2026. Status: founder-approved five-step customer flow; amended implementation specification. Application implementation and test completion remain separate.
+
+Scope: customer-facing Buy, Shop, Wholesale, Bulk, Offers and Store entry paths; connected Store and delivery-workspace requirements. Related existing scope: `BUY-ACTION-POLISH-20260926-01/checkout/journey-consolidation`.
+
+## 1. Decision
+
+Keep **one mixed Cart**, with optional All / Shop / Wholesale / Bulk display filters. Filters must not silently change purchase scope. Purchasing a subset requires an explicit selection; Checkout identifies the selected item count. Do not force separate carts. Preserve exact variants and chosen supplier terms. Checkout groups actions by payment obligation and compatibility, not simply shopping type.
+
+**Approved customer flow: Add products → Cart → Checkout → Final action → Order status.**
+
+1. **Add products:** preserve exact variant, quantity and chosen terms. Do not force Cart navigation.
+2. **Cart:** adjust products and offers, then tap Checkout.
+3. **Checkout:** saved address, delivery commitments, selected terms and eligible payment method are populated. Change only what is needed.
+4. **Final action:** pay the displayed amount or confirm the displayed orders with no payment due now. Required bank authorisation follows without another review page.
+5. **Order status:** supplier allocation, acceptance and delivery proceed without compulsory customer steps unless an actual exception needs a decision. Delivered/collected is the fulfilment outcome; any authorised outstanding balance remains separately visible.
+
+For a returning customer with valid details and one compatible payment, target two in-app actions from Cart: **Checkout → Pay & place orders**, plus necessary bank authorisation. New address entry, changed commitments and exceptional recovery can require additional actions.
+
+Founder decision: direct purchase only, with product price, freight, eligibility and available terms already established before purchase. No customer Request quote or negotiation journey. Retail is fully prepaid to MoolSocial through its authorised payment collection arrangement. Retail Store rejection triggers eligible alternative-Store allocation; if supply cannot be secured, MoolSocial refunds the affected customer payment. Wholesale/Bulk retain supplier-authorised terms.
+
+Delivery availability, fees and promises are established before commitment. Actual delivery assignment follows supplier acceptance and operational readiness. Completed orders proceed independently; retail must not wait for an unfinished Bulk payment.
+
+## 2. Current source and required changes
+
+Audited Buy checkpoint: `194bc1720122701085609603d9f422f36635400a`. Store source read from committed branch `work/codex-ui/add-product-screen1-20260920`, checkpoint `eea11308dac52d1baa58be5b63c117daa2db3748`. This does not certify other branches or uncommitted Store work.
+
+Paths below are relative to `apps/mobile/lib/` in the respective branch.
+
+| Current owner / evidence | Required change |
+|---|---|
+| Buy `features/buy/buy_v2_models.dart`: checkout steps address/payment/confirm | Replace compulsory three-stage presentation with one editable Checkout; retain validation and recovery states. |
+| Buy `ui_v2/buy/buy_v2_views.dart`: `_CheckoutAddressStage`, `_CheckoutPaymentStage`, `_CheckoutConfirmStage` | Reuse sections in one screen; remove repeated review navigation and superseded UI after regression qualification. |
+| Buy `features/buy/buy_v2_session.dart`: one `selectedPayment`, fulfilment grouping | Support resumable payment groups and independent outcomes. Existing display grouping is not a durable backend order identity. |
+| Buy `features/buy/buy_v2_content_contracts.dart`: commercial terms, quotes, balance payment, pending-order recovery and live-delivery adapters | Extend/reuse contracts for authoritative mixed-order coordination; do not build a second commerce state owner. |
+| Buy `features/buy/buy_v2_cart_contracts.dart` and session: scoped benefits | Preserve exact product/Store eligibility and allocated savings across checkout splits. |
+| Store `features/work/widgets/store_payment_terms.dart`, `work_publication_data.dart` | Existing defaults/customer overrides support advance, balance-before-dispatch, balance-at-delivery, payment-at-delivery and credit preferences. Obtain authoritative customer eligibility and calculated obligations. |
+| Store retail wording says full advance; Buy exposes COD | Founder has resolved this: retail is fully prepaid through MoolSocial. Remove retail COD from the applicable purchase flow; Wholesale/Bulk delivery-time payment remains contextual. |
+| Store distinguishes Bulk offers, but inspected payment editor has Wholesale defaults | Define explicit Bulk applicability/inheritance and overrides; do not silently reuse Wholesale terms. |
+| Store `features/work/work_session.dart`: delivery assignment blocks some scoped orders | Complete authorised Store-order → shipment → delivery-workspace routing. Existing operations do not prove end-to-end readiness. |
+
+## 3. Customer screens and actions
+
+| Stage | What to implement |
+|---|---|
+| Browse/product | Add exact SKU/variant and quantity. Show only supplied/published options. Respect MOQ, pack increments, stock and current price. Adding does not force Cart navigation. |
+| Cart | Group products by Store with shopping-type labels. Allow quantity/removal. Keep coupons, payment offers and additional benefits inline, expanded by default. Show eligibility and actual versus conditional savings. One Checkout entry for the clearly identified selected scope. |
+| Unified Checkout | Address; compact Store-order sections; delivery/collection and estimates; optional instructions; applicable payment terms and invoice details; payment actions; final totals. Edit in place or through a returning sheet. No separate final-review page. |
+| Commit/payment | Explain the covered orders, amounts and any necessary payment count before the first commitment. Use the final-action rules below. No Request quote action or repeated per-Store confirmation. Each necessary external payment authorisation remains; no silent charging of later groups. |
+| Progress/resume | Update the same checkout summary after each action. Show completed, awaiting payment, pending verification and unfinished groups. Preserve unfinished items; committed items remain linked to Orders and cannot be purchased again accidentally. |
+| Order details | Show Store acceptance, payment and delivery separately. Keep balance payment, cancellation, help and invoice access with the relevant order. |
+| Completion | Verified delivered/collected quantities; eligible return/support actions; one optional “Rate your MoolSocial experience” prompt per completed purchase, not repeated per SKU. Overall feedback may be projected to participating Stores with its overall-order scope clearly labelled. |
+
+Use compact shared components, consistent typography and approved styling. Do not repeat product lists, promotional cards or payment explanations throughout checkout. Keep totals and necessary consent visible; support large amounts, long names, keyboard and enlarged text without clipping.
+
+## 4. One Checkout, separate obligations
+
+1. **Address:** reuse the selected address. Any change revalidates all affected Stores. Collection is offered only when supported.
+2. **Store orders:** products, type, delivery fee/freight, estimate, collection location if relevant, and optional custom instructions. Instructions go only to the relevant supplier/assigned delivery provider; empty instructions are not recorded.
+3. **Terms:** show authorised choices per Store/order type/customer. Retain the product-level selection; display order value, amount due now, balance and its exact due event/date with Change. Do not ask for the same decision again unless invalidated or materially changed. Credit requires approval; purchase-order documentation is not payment proof.
+4. **Invoice:** request applicable GST/business data without duplicating entry; separate seller invoices and identities.
+5. **Payment groups:** combine compatible due-now obligations only when the provider supports collection and exact allocation. Otherwise show explicit separate actions within this journey. Cash/COD, credit and bank transfer are available only under authorised terms and applicable limits.
+6. **Summary:** Order total / Pay now / Due on delivery / Other scheduled balances, as applicable. All purchased items require final available price, freight and terms. Missing commercial inputs block the affected item with a clear availability message; there is no quotation detour. No hidden freight or assumed free delivery.
+
+Example only: retail ₹2,000 full advance + Wholesale ₹50,000 with authorised 20% advance can produce ₹12,000 due now and ₹40,000 due on delivery. A Bulk credit order can require confirmation without immediate payment. Combine the ₹12,000 only if provider contracts permit it; do not invent these terms for real Stores.
+
+
+## 4A. Binding UX and commitment rules for the approved flow
+
+These rules refine sections 3–4 and govern their implementation. Payment grouping is an internal responsibility, not a compulsory Retail → Wholesale → Bulk wizard.
+
+### Screen responsibilities
+
+| Screen | Owns | Must not repeat |
+|---|---|---|
+| Product / SKU | Variant, quantity and applicable selected terms | Checkout or forced Cart opening after every Add |
+| Cart | Item editing, optional subset selection, coupons and offers | Address, payment and review as separate compulsory stages |
+| Checkout | Existing selections, delivery commitments, applied savings, final total and payment | Full promotional lists, repeated terms selection, per-Store forms, separate Review order page |
+| Order status | Submitted/paid/pending orders, delivery, refunds and later balances | Charging paid lines again or requiring all remaining orders to finish |
+
+Use compact summaries with expandable Store details. Only invalid/missing inputs expand automatically. Preserve scroll position and entered data after edits. Show Ready to place and, only when needed, Needs your attention. No generic checklist the customer must tick through.
+
+- Cart offers remain expanded by default as previously approved. Checkout shows applied savings and a returning Change action, not another offers catalogue.
+- Reuse saved address and applicable invoice details. Instructions remain optional. Show no empty-note step.
+- A payment-method change immediately updates conditional savings and actual total. Material changes must be visible and acknowledged before payment; never charge the old displayed amount with a new hidden total.
+- Checkout scope is explicit and independent of display filters. Items excluded by the buyer remain in Cart. A blocked item is not silently excluded: offer one clear Continue with ready items action showing what remains.
+- Keep one main action visible. Secondary actions serve correction or recovery; avoid competing Continue, Review, Confirm and Pay buttons for the same decision.
+
+### Mandatory compact design and immediate interaction
+
+Founder requirement: UI/UX and visual design may change wherever necessary to deliver this journey. Enhancement is required when the existing design wastes space, creates clutter, adds repeated actions or breaks brand consistency. Preserve approved behaviour and data while replacing superseded UI; do not retain competing old designs.
+
+- **Compact, balanced layout:** use available horizontal width before adding rows. Avoid empty half-cards, oversized headings, tall tab strips, duplicated labels and full-width buttons without a functional reason. Retain intentional spacing, readable text and accessible touch targets; compact does not mean cramped.
+- **Brand consistency:** reuse approved MoolSocial colours, typography, icon sizing, button shapes, selected states and spacing across Shop, Wholesale, Bulk, Offers, Store and Cart. Do not introduce unrelated gradients, decorative panels or inconsistent controls.
+- **Zero extra action by default:** retain valid selections and already-applied choices. Display necessary summaries without requiring a tap merely to discover essential charges, eligibility or payment obligations. Do not silently select optional paid services, borrowing or a new financial commitment.
+- **At most one tap for routine Cart choices:** selecting an eligible coupon, offer, delivery option or another available single-choice preference immediately selects it, starts validation and updates the result inline. Use compact radio controls or the equivalent existing shared control. No extra Apply, Save, confirmation popup or next-screen-and-back journey for that choice.
+- **Immediate, truthful feedback:** show the selected state and updated saving/total when validated. During validation, indicate progress and prevent stale checkout. A rejected selection shows its reason in the same area and preserves the last valid total; never display an unverified offer as applied.
+- **Choice layout:** use compact horizontal choices where suitable, with a visible scrolling affordance when more exist. Keep the chosen value identifiable. Let text adapt rather than clip; essential totals and final actions must not require horizontal scrolling to discover.
+- **Exceptions are purposeful:** typing a new address or custom instruction, explicit consent to changed financial terms, the final purchase action and bank authentication require their necessary interactions. The one-tap target must not remove those safeguards. Keep editors focused and their controls adjacent; return to the same position with state preserved.
+- **Design acceptance:** verify actual screens for wasted vertical space, empty right-hand areas, clutter, repeated text and hidden actions. Test ordinary and enlarged text, long names, many options and large amounts. Routine option selection must complete without a second confirmation tap; previously valid choices must not need reselection.
+
+### Final-action contract
+
+| Situation | Action and effect |
+|---|---|
+| One compatible online payment | Pay ₹X & place orders. Identify all covered orders and any later balances. No second order-review page. |
+| Nothing due now | Place orders under the displayed accepted terms. No dummy payment step. |
+| Several necessary payments | Explain the total number and covered orders upfront; Pay ₹X — payment 1 of N. Following authorisations cover only remaining unpaid groups. |
+| Bank transfer | Continue with bank transfer opens verified transfer details and establishes a pending-payment order/attempt. Do not claim it is paid or dispatch-eligible until verified. |
+| Partial completion | Continue remaining checkout and View placed orders. Completed items never return to payable Cart lines. |
+
+Before the first final action, state that eligible orders proceed independently. That action authorises the displayed no-payment-due orders and initiates the first payment group. Each group has its own durable result; an online payment failure does not silently cancel already-submitted credit orders. Show such partial completion explicitly. The backend must support this contract before enabling it; no client-only imitation of atomic multi-order success.
+
+No-payment-due orders need no repetitive per-Store confirmation once included in the explicit final commitment. Subsequent payment actions must not resubmit them. If a material term changes, pause only the affected group and obtain the necessary new agreement.
+
+### Recovery without trapping the buyer
+
+| Event | Required customer experience and system action |
+|---|---|
+| Pending payment | Permit safe exit. Recover and reconcile automatically from Orders/checkout; show Check status and contextual help. No second charge while the first remains unknown. |
+| Bank transfer | Copy beneficiary/reference details, leave and return. Automatic matching where supported; reference entry only for exceptions. Pending status does not require remaining on the screen. |
+| Definitive failure | Keep selections; offer retry or an eligible alternative. Preserve successful groups. |
+| Reservation expires before payment | Revalidate stock/price/terms before a fresh payment. Explain changes; do not reset unrelated selections. |
+| Payment arrives after cancellation/expiry | Reconcile to the original attempt. Do not silently reopen the order or substitute supply; return funds through the authorised refund process if the commitment is no longer valid. |
+| Cancellation races with reassignment | Record cancellation and allocation versions atomically. Once cancellation is accepted, prevent further allocation/dispatch; resolve in-flight payment and delivery events idempotently. |
+| Cross-Store discount and partial success | Freeze funded allocations for completed orders. Recalculate only unfinished commitments before their payment; no surprise recovery charge against completed orders. Unsupported promotion structures must not be offered. |
+| Supplier allocation delay | Show Payment received · Finding a Store, with the applicable deadline and help/cancellation options. No repeated buyer confirmation for equivalent, previously authorised replacement fulfilment. |
+| Delivered on supplier credit | Show Delivered plus balance and due date separately. Delivery completion and optional feedback must not wait for full credit repayment. |
+
+Timeouts must be explicit provider/platform contract fields: stock reservation expiry, payment-attempt reconciliation/escalation timing, supplier acceptance deadline and replacement-supply deadline. Show relevant customer deadlines/statuses. Do not invent durations in UI or activate an indefinite wait; exact values remain integration inputs.
+
+### Additional acceptance checks
+
+- Filter switching never changes checkout scope; explicit subset selection does.
+- Product-level terms survive Cart, Checkout, Back and process restart without repeated selection.
+- Ten Stores do not require ten forms or ten confirmations; only genuine incompatible payments require separate authorisations.
+- Retail-only flow never exposes COD, credit or business-only fields.
+- No-payment-due groups submit exactly once, including when a later online payment fails.
+- Exit/reopen restores completed, pending and unfinished groups correctly; account changes never expose another customer's attempt.
+- Changing payment method shows the revised offer/total before authorisation.
+- Large text, long names and high values remain usable without hiding final charges or correction actions.
+- No compulsory extra screen after payment; order status is the destination. Exceptions request only the missing decision.
+
+## 5. Provider data and identity
+
+Backend must supply stable IDs for checkout attempt, purchase, Store order, order line/exact variant, payment group/attempt, payment obligation, shipment, assignment and refund. Persist quote/term/offer revisions, validity, currency, integer minor-unit amounts and line allocations. Display strings or mutable SKU lists must not be authoritative IDs.
+
+Required Store inputs: published product/variant, price tiers, MOQ/steps, stock, applicable channel, offers and exclusions, delivery/collection capabilities, published freight rules, acceptance policy, payment terms, authorised customer overrides, invoice identity, cancellation/return rules.
+
+Backend resolves eligibility, inventory reservation/expiry, customer credit, payable amounts, compatible methods, provider limits and allocations. Client renders these results; it cannot grant credit, mark bank transfers paid or fabricate delivery assignments.
+
+UPI limits must follow current category/bank/provider eligibility, not a universal hardcoded maximum. Do not automatically split transfers to bypass limits. Bank-transfer reference entry or screenshots mean awaiting verification, not paid. Review method limits when integrating the provider.
+
+## 6. Placement, acceptance and delivery
+
+Maintain independent state dimensions:
+
+- Order: submitted / awaiting supplier / accepted / rejected / cancelled.
+- Payment: not due / unpaid / pending / partially paid / paid / refund pending / refunded.
+- Fulfilment: awaiting readiness / preparing / ready / assignment pending / assigned / dispatched / partially delivered / delivered or collected / failed or returned.
+
+Before charging, validate/reserve the quoted basket as supported by the backend. Specify authorisation/capture and rejection-refund behaviour; payment alone never proves supplier acceptance. A backend checkout quote means a calculated, versioned total, not a customer quotation request. All terms must already be available for direct purchase. Retail supplier rejection follows the replacement/refund policy below.
+
+After supplier acceptance, create an eligible delivery job against the shipment, subject to readiness and payment gates. Route it to the authorised MoolSocial or third-party delivery workspace. Dispatch requires any balance-before-dispatch obligation to be verified. Retry assignment with stable operation identity; do not create duplicate jobs.
+
+Delivery providers receive only assigned shipment items and necessary address/contact/instructions. Reassignment removes obsolete access. Store users see only their Store orders. Customers see only their own purchase and shipment records.
+
+Verify pickup/handover and delivery/collection through authoritative proof. Never infer delivery from payment or elapsed time. Separate shipments may complete independently; one delivered package does not complete the whole purchase. Do not expose fake live maps or stale locations as live.
+
+## 7. Required use cases and recovery
+
+| Case | Required outcome |
+|---|---|
+| Retail only; Wholesale only; Bulk only; mixed basket | Same journey, contextual fields and authorised obligations; no unnecessary business steps for retail. |
+| Same Store in multiple shopping types; many Stores | Preserve prices/terms per line; split Store orders where obligations require it, with one readable purchase overview. |
+| Conflicting payment methods | Explain separate payment groups before payment; preserve unsupported/unfinished items. |
+| Price, MOQ, stock, freight or quote changes | Revalidate and disclose changes; require consent for changed commitments. Never substitute silently. |
+| Expired offer or payment-condition failure | Recalculate affected unfinished groups; do not show potential savings as applied or rewrite completed allocations. |
+| Cart edited during checkout or in another session | Detect revision conflict and refresh before committing; retain already completed orders. |
+| One payment succeeds, another fails; app closes | Recover each immutable attempt; show partial completion; retry only unresolved actions. Unknown is not failed. |
+| Duplicate taps, callbacks or reordered events | Idempotent order/payment/refund/assignment effects and authoritative reconciliation. |
+| Retail supplier rejects, delays or partially accepts | Reallocate eligible unfulfilled lines under the replacement policy below; prevent double fulfilment; refund affected amounts if no supply is secured. No second customer charge. |
+| Bank transfer pending, underpaid or overpaid | Provider reconciles amount and destination; no premature paid state; explicit discrepancy resolution. |
+| Address unavailable; delivery plus collection | Explain affected groups; preserve others; revalidate changes and keep distinct fulfilment instructions. |
+| Delivery unavailable, reassigned, delayed or failed | Accurate status and resolution; no invented assignment, silent surcharge or premature dispatch. |
+| Partial delivery, cancellation, return or refund | Track exact quantities and allocated money; account for already paid/refunded amounts; do not affect unrelated orders. |
+| Credit expiry, balance overdue, payment terms changed | Enforce authoritative eligibility and dispatch conditions; never silently replace an agreed committed term. |
+| Customer abandons remaining checkout | Completed orders proceed; unfinished reservations expire according to disclosed rules; cart remains recoverable. |
+
+Cross-Store promotions require an explicit partial-completion/cancellation rule. Before first payment, disclose eligibility and allocation. Do not retroactively charge completed orders to recover a discount without an authorised, disclosed process.
+
+## 8. Implementation sequence and acceptance
+
+1. Apply founder decisions: no quotation journey; retail prepaid through MoolSocial; rejection triggers replacement supply then refund if unavailable. Reconcile explicit Bulk/Wholesale terms, collection combinations, acceptance/payment timing, freight responsibility and partial-failure contracts with provider owners.
+2. Reuse existing Cart, quote, terms and recovery owners; introduce only the state/contracts needed for payment groups and independent Store orders. Register exact ownership before code changes.
+3. Implement unified Checkout and resumable progress. Remove superseded stage UI after impact checks; preserve existing working navigation, benefits, instructions and ratings.
+4. Implement provider coordination separately: authoritative quotes/reservations, payment reconciliation/allocations, Store acceptance, delivery routing, balances, refunds and invoice records.
+5. Test the matrix above locally, including long Store names, ₹1 crore display, large carts, enlarged text, back navigation, process restart and account switching. Test state transitions and money conservation, not only widget appearance.
+6. Hot-reload onto Redmi for public UI/journey review. Record frontend/device results separately from real provider integration evidence. Native dependency changes require an authorised APK, not a hot-reload claim.
+7. Qualify integration with real authorised test providers: mixed-store partial failures, payment recovery, Store acceptance, delivery workspace assignment and delivered proof. No actual money movement without separate authorisation.
+8. Commit qualified source, tests and ticket/handoff records under existing repository gates; verify clean worktree and local/remote equality. Do not alter unrelated Store work or claim backend readiness from review fixtures.
+
+Track every applicable matrix row as: not implemented / implemented / locally tested / Redmi verified / provider integration pending / integrated verified. Founder visual approval and technical acceptance are separate. This document creates no completion claim for any row.
+
+## 9. Reference notes
+
+- Normal UPI and category-specific limits: [NPCI FAQ](https://www.npci.org.in/what-we-do/upi/faqs). Bank/provider restrictions still apply.
+- Bank-transfer characteristics: [RBI payment-systems FAQ](https://www.rbi.org.in/scripts/faqview.aspx/upload/FAQView.aspx?Id=144). Recheck applicable limits at integration time.
+- This mixed-cart specification supersedes the earlier proposal to force separate Shop/Wholesale/Bulk checkouts. It does not authorise backend deployment, a payment, a new APK or claim zero remaining defects.
+
+
+## 10. Retail replacement fulfilment and refunds — required behaviour
+
+- Collect retail payment once through MoolSocial's authorised collection partner/account arrangement. Keep customer payment identity stable while supplier allocation changes. Supplier settlement is separate from payment collection.
+- On rejection or acceptance timeout, retire the old allocation before assigning an eligible replacement. Use allocation versions and idempotent events so a late acceptance cannot cause duplicate dispatch or supplier settlement.
+- Automatic replacement requires a disclosed customer agreement to alternative-Store fulfilment and the same exact product/variant, pack, quantity, quality commitments, customer payable and acceptable delivery promise. Do not silently change brand, seller-specific benefits, warranty, invoice commitments or delivery time. Obtain consent for material changes; otherwise refund. Clearly identify the actual supplying Store.
+- Store-specific offers cannot simply be transferred to another Store. MoolSocial must fund the agreed saving under an approved rule or refund; never silently increase the customer's total. Resolve freight differences internally under a published rule, not by an unapproved second charge.
+- Set a published, bounded supply-attempt deadline and cancellation behaviour; do not search indefinitely. If no supply is secured, initiate refund of affected paid items and allocated refundable charges to the original payment route. Display refund reference, status and provider estimate; do not promise an invented instant timeline.
+- Partial supply affects only those lines; successful orders continue. Invoice, customer support, feedback, settlement and delivery assignment reference the actual supplier. Preserve the original seller/allocation audit trail.
+- Wholesale/Bulk credit and negotiated supplier terms are supplier-specific: do not automatically transfer them to a replacement supplier. Revalidate and obtain customer consent or cancel/refund the affected order.
+
+## 11. Standard Wholesale/Bulk payment terms
+
+These are supported vocabulary and configuration proposals, not automatic credit grants or a claim every Rajasthan trader uses them. Research found advance and short trade-credit patterns; no uniform Rajasthan-wide schedule was established. Supplier-published, customer-authorised terms prevail. Keep Wholesale and Bulk applicability explicit.
+
+| Term shown to customer | Required configuration and behaviour |
+|---|---|
+| Pay in full now | 100% due through MoolSocial before fulfilment. |
+| Advance now; balance before dispatch | Supplier-defined advance amount/percentage; balance due event. Dispatch blocked until verified paid. |
+| Advance now; balance on delivery | Advance collected now; remaining obligation assigned to an authorised collection route. |
+| Pay on delivery | Wholesale/Bulk only when authorised. Prefer a MoolSocial payment link/QR at delivery; physical cash only where supported and permitted. |
+| Supplier credit — pay by date | Customer credit eligibility/limit, outstanding exposure, credit days, due-date basis and overdue rules. Suggested configurable presets 7/15/30 days are UX choices, not mandatory market rules. |
+| Scheduled account settlement | Explicit weekly/fortnightly agreed schedule and invoice allocations; no vague unlimited running credit. Treat as controlled supplier credit. |
+| Early-payment discount | Published discount amount/rate and deadline; apply once to eligible obligations with correct invoice/credit-note treatment. |
+| Bank-guarantee/LC-backed terms or lender finance | Only with a real integrated bank/lender contract and verified approval. Record them as conditional capabilities, not universally available launch buttons. |
+
+Cheque/PDC is an instrument or security arrangement, not proof of cleared payment. If supported later, use pending-clearance/returned states and the supplier's release rules. A guarantee, PO number or uploaded bank receipt must never be treated as money received.
+
+Evidence: [IIFL's FMCG finance overview](https://www.iifl.com/blogs/business-loan/fmcg-distributor-finance-managing-daily-high-turnover-supply) describes upfront/short supplier cycles and 15–30-day retailer credit, with regional variation. [PGC's distributor terms](https://pgcnamkeen.com/distributor) provide one concrete example: initial advance and qualifying BG/LC-backed credit. These examples support configurability, not universal defaults.
+
+For qualifying micro/small-enterprise suppliers, enforce applicable payment-deadline requirements rather than allowing arbitrary credit days; the MSME guidance describes an agreed period not exceeding 45 days from acceptance. Supplier status and the statutory due-date basis must be authoritative. [MSME guidance](https://ramp.msme.gov.in/ramp/pdf-documents/scheme-guidelines/msefc.pdf).
+
+## 12. Payment methods, limits and cost handling
+
+Research date: 28 September 2026. These are reference rules, not a static promise that a bank will approve a transaction. Backend/provider capabilities, effective dates and bank/account limits remain authoritative.
+
+| Method | Reference limit / eligibility | Implementation |
+|---|---|---|
+| Bank-account UPI | NPCI FAQ lists normal UPI up to ₹1 lakh per transaction; higher category limits are conditional. Bank daily/count limits can bind earlier. | Never assume FMCG gets a higher category limit. Show supported UPI and obtain actual success from provider reconciliation. |
+| IMPS | NPCI lists up to ₹5 lakh per transaction except SMS/IVR channels; bank restrictions may be lower. | Offer bank transfer with verified beneficiary/reference and bank confirmation. |
+| NEFT | RBI imposes no floor/ceiling for account-funded NEFT; bank/channel limits apply. | Suitable for large amounts; do not mark paid from customer-entered UTR alone. |
+| RTGS | Minimum ₹2 lakh; no RBI upper ceiling. Bank/channel caps may apply. | Hide/disable below minimum with explanation; verify settlement through the collection arrangement. |
+| Net banking | Bank and payment-provider limits, no single app-wide universal cap. | Treat gateway net banking separately from manual NEFT/RTGS transfer; charges and reconciliation differ. |
+| Debit card | Issuer/customer-set online transaction limits, balance and acquirer controls. | No invented universal maximum; online use must be enabled. Provider authorisation determines outcome. |
+| Credit card | Available credit, customer-set online limit and issuer/acquirer/merchant-category rules. | No invented universal maximum. EMI or credit-card-on-UPI only if specifically supported. |
+| Wallet / other supported rail | Product/KYC/provider-specific limits. | Expose only enabled capabilities; do not inherit bank-account UPI rules. |
+| Physical cash | Applicable tax receipt restrictions and collection-provider limits. | Wholesale/Bulk exception only; enforce aggregated applicable restrictions, not just a per-tap cap. No splitting to evade restrictions. |
+
+Cash receipt rules include restrictions at ₹2 lakh or more by person/day, single transaction, or one event/occasion, subject to statutory scope/exceptions. Backend must evaluate the actual receiving party and related receipts. Do not advertise ₹1,99,999 as universally safe. [Income Tax Department guidance](https://www.incometaxindia.gov.in/w/which-transactions-are-covered-in-the-ambit-of-section-269st-?p_l_back_url=%2Fsearch%3Fq%3DSection%2B271C%26category%3D38317%26category%3D37782%26sort%3Dmodified-%26delta%3D60%26start%3D12%26category%3D39781&p_l_back_url_title=Search).
+
+Sources: [NPCI UPI](https://www.npci.org.in/what-we-do/upi/faqs), [NPCI IMPS](https://www.npci.org.in/product/imps), [RBI RTGS](https://www.rbi.org.in/scripts/FS_FAQs.aspx?Id=65), [RBI transfer overview](https://www.rbi.org.in/scripts/faqview.aspx/upload/FAQView.aspx?Id=144), [RBI card controls](https://systemhealth.rbi.org.in/Scripts/PublicationsView.aspx_id%3D20315%281%29.html).
+
+### Collect through MoolSocial wherever supported
+
+- Bank transfer can also pay MoolSocial: provide a bank/payment-partner-issued collection account or virtual account mapped to the purchase/customer, rather than automatically directing money to a supplier's personal account. Final account and settlement architecture must be approved by the authorised bank/payment partner.
+- Prefer supported MoolSocial UPI, bank transfer, net banking and cards for advances and later balances. Offer digital payment at delivery before physical cash, while respecting the accepted supplier/customer terms.
+- If direct supplier collection is explicitly supported, label the beneficiary and collection owner clearly and reconcile it separately. Never describe those funds as received by MoolSocial.
+- Show the previous eligible payment method where available and supported alternatives under More payment methods. Recommend using actual eligibility, verified customer cost and convenience. Never silently select borrowing or change accepted terms. Do not claim most buyers prefer bank transfer without product evidence.
+- Distinguish customer charges from merchant MDR/acquirer fees, gateway fees and bank charges. Do not blanket-label debit/credit cards or UPI expensive, or all bank transfers free. Show only actual permitted customer charges before commitment.
+- The Ministry of Finance's 15 September 2026 clarification states UPI MDR is not a customer charge and must not be passed to customers. Do not add a UPI surcharge based on merchant costs. Confirm current partner tariffs and applicable rules before activation. [Official clarification](https://www.pib.gov.in/PressReleaseIframePage.aspx?PRID=2310586&lang=2&reg=48).
+
+### Limit and reconciliation logic
+
+Represent method rules with currency, minimum, per-transaction maximum, known daily/count limits, merchant/category eligibility, bank/provider identity, customer fee, effective date and source. Unknown limits remain unknown; never pretend the app can see a customer's remaining bank limit without an authoritative API.
+
+Check the amount actually due in that payment group, not the full order value. Apply the strictest applicable known limit and provider authorisation. Do not automatically split payments to bypass limits. Use an eligible alternative after a verified failure; resolve pending attempts before another charge. Preserve the cart and existing successful orders throughout.
+
+Add acceptance cases for each method's below/at/above boundaries; customer-set lower limits; unavailable limit data; new-beneficiary restrictions; pending bank transfer; duplicate/mismatched UTR; under/overpayment; card failure; partial group success; replacement Store acceptance races; non-transferable coupons; no-supply refund; and late payment after cancellation. Amounts, charges, receipts, allocations and refunds must reconcile exactly.
+
+## 13. Latest Store handoff — evidence boundary
+
+The founder-supplied read-only shutdown handoff identifies Store commit `9fa3f5d94ef4a17280635e4968e03b128233fdfc`; remote readback matched on 28 September 2026. It supersedes the earlier Store checkpoint for future execution. It does not invalidate the earlier source observations, but affected owners must be re-read before editing.
+
+The handoff reports 26/27 findings corrected, with Restock deferred until authorised integration. Physical failed-write, unavailable-provider and save-in-progress recovery remain unverified. Explicit keyboard dismissal was verified on OPPO enlarged landscape; floating-keyboard occlusion is not established as fixed. Store evaluation data and mixed-refund screens do not establish production backend or payment-refund readiness.
+
+Preserve approved Store work; no integration or Store mutations follow from reading this handoff. The 14-ticket execution document records the affected dependencies. Source is pushed, but separate local Store evidence is not thereby remotely backed up. Detailed named evidence reports require review before relying on their acceptance results.
+
+## 14. Founder execution boundary — frontend first
+
+Supermandi payment-provider readiness is founder-confirmed. Current work prepares the frontend and maps to that existing provider; no replacement payment backend is requested. Store workspaces are under development and will map to the finalised public journey/contracts. Backend execution is deferred. MoolSocial and Wholesale/Bulk delivery-partner workspaces are still to be developed and will map to the frontend delivery requirements.
+
+Consequently, current acceptance covers frontend implementation, local checks and Redmi review, with explicit adapter contracts and handoff notes. Production payment/refund orchestration and delivery/workspace integration remain separately deferred. The execution-ticket document's founder scope amendment supersedes earlier backend-dependent current-phase closure wording. Do not infer live transaction success from frontend tests or invent unavailable provider capabilities.
+
+</details>
+
+<details>
+<summary>MOOLSOCIAL-CART-EXECUTION-TICKETS-20260928.md — SHA256 5c63f0e338bba62bb7ea5f313fa83065461679142b5028146cd186d3d896b4f6</summary>
+
+# MoolSocial Cart — source-mapped execution tickets
+
+Date: 28 September 2026. **14 execution work packages: 10 public-side, 3 frontend contract/handoff packages, 1 frontend qualification package.** Backend and workspace implementation are deferred. No new child defects confirmed by this planning pass. Counts exclude the pre-existing Buy backlog and do not imply implementation.
+
+Companion: [approved journey](MOOLSOCIAL-CART-USER-JOURNEY-20260928.md).
+
+## Registration and source boundary
+
+These are scoped ticket specifications under existing `BUY-ACTION-POLISH-20260926-01/checkout/journey-consolidation`. Suffixes `T01`–`T14` below are document references, not invented numeric regression-registry IDs. Registry admission/ownership must use the existing process before execution. This review document is outside the Git worktree; it is not a claim of registry registration or remote backup.
+
+Source pinned for mapping:
+
+- Buy: branch `work/cursor-ui/buy-ready-20260921`, commit `194bc1720122701085609603d9f422f36635400a`.
+- Store: branch `work/codex-ui/add-product-screen1-20260920`, commit `9fa3f5d94ef4a17280635e4968e03b128233fdfc`. Since the previously inspected `eea11308`, the scoped Work-source diff changes only the dashboard file; payment preference definitions inspected remain unchanged. Re-read affected live source immediately before execution.
+- Classification: launch-required commerce journey. Preserve unrelated Social, Medicine, Store, Counter Sale and backend owners. No APK, real charge, deployment or policy edits are authorised by this plan.
+
+## Owner map
+
+All aliases are existing paths under `apps/mobile/`:
+
+| Alias | Exact path |
+|---|---|
+| V | `lib/ui_v2/buy/buy_v2_views.dart` |
+| S | `lib/features/buy/buy_v2_session.dart` |
+| M | `lib/features/buy/buy_v2_models.dart` |
+| C | `lib/features/buy/buy_v2_content_contracts.dart` |
+| B | `lib/features/buy/buy_v2_cart_contracts.dart` |
+| WP | `lib/features/work/work_publication_data.dart` |
+| WE | `lib/features/work/widgets/store_payment_terms.dart` |
+| WS | `lib/features/work/work_session.dart` |
+| WG | `lib/features/work/work_services.dart` |
+| WV | `lib/features/work/screens/work_workspace_dashboard_screen.dart` |
+
+Aliases identify source areas, not permission to mutate another lane. Shared contracts C/M require coordinated ownership. Provider backend implementation paths were not audited to a current authoritative owner; T11–T13 must resolve those exact owners before implementation, rather than invent files or claim frontend completion is backend completion.
+
+## Conflict prevention
+
+- Execute Buy mutations serially: many tickets touch V/S. Never assign those files to concurrent writers.
+- T01 owns selection scope; T02 owns the unified layout/navigation; T03 owns terms; T04 owns benefits presentation; T05 owns payment-method eligibility; T06 owns attempt/group state; T07 owns recovery; T08 owns order status; T09 owns replacement presentation; T10 owns visual consolidation only. Later tickets extend these owners, not parallel copies.
+- Existing `BuyV2CartScope` is `all/shop/wholesale/medicine`; Bulk is `BuyV2WholesaleSaleType.bulk`, not a standalone destination. Add contextual display filtering without misclassifying Bulk or exposing Medicine as new launch scope.
+- Current S copies `cartScope` into `checkoutScope`. Deliberately replace that coupling in T01 and update tests that encode it; do not merely repaint the scope tabs.
+- Legacy checkout step enum and persisted state must be migrated/read safely. Remove obsolete screen transitions only after restore/back tests pass; do not break older saved pending-payment records.
+- Existing provider adapters, ratings, optional instructions, scoped offers and recovery logic are reused. No duplicate state owner or speculative payment service.
+- Old tests are classified: retain valid invariants, update deliberately superseded UX assertions, add missing behaviour tests. Never delete failing checks solely to obtain green status. Respect test ownership; e.g. `buy_v2_product_benefits_preview_test.dart` is a reuse/read candidate, not an assumed current-lane write owner.
+
+## T01 — Mixed Cart scope and exact-item continuity
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** None.
+- **Where:** V: BuyV2CartView, _CartScopeBar; S: cartScope/checkoutScope, _linesForScope and checkout entry; M: scope and sale-type models.
+- **Logic/change:** Separate display filter from explicit selected purchase lines. Default to all eligible cart lines; preserve excluded lines. Carry SKU/variant, Store, quantity and chosen terms without conversion. Bulk filtering uses saleType. Persist selection without reviving already committed lines.
+- **Expected Redmi UI/UX:** All/Shop/Wholesale/Bulk filters change visible items only. Checkout clearly shows purchase item count; explicit subset selection updates it. Switching filters does not silently buy fewer items.
+- **Acceptance/evidence:** Exercise five entry paths, mixed Store/types, Back and restore; extend scoped_cart_checkout_dock_continuity and cart_line_continuity tests. Redmi: add retail+Wholesale+Bulk, switch filters, verify same purchase scope and exact variants.
+
+## T02 — Unified Checkout and removal of repeated stages
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T01.
+- **Where:** V: BuyV2CheckoutView, _CheckoutAddressStage, _CheckoutPaymentStage, _CheckoutConfirmStage, progress/action bar; S: continueCheckoutFromAddress/Payment and checkout Back handling; M: BuyV2CheckoutStep.
+- **Logic/change:** Recompose existing sections into one editable screen. Retain valid address, terms and method; expand only missing/invalid information. Remove compulsory Address→Payment→Confirm progression. Map restored legacy steps to the correct section/recovery state without resetting attempts.
+- **Expected Redmi UI/UX:** Cart→Checkout opens populated compact summaries and one main action. Change opens an inline editor/returning sheet; no Review order screen or repeated confirmation. Focus/scroll return correctly.
+- **Acceptance/evidence:** Extend checkout_cart_return_continuity and payment_sheet_motion tests. Redmi: saved address needs no extra selection; edit/back/keyboard restores state; restart on each legacy stage safely resumes.
+
+## T03 — Contextual terms, address, invoices and instructions
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T02; authoritative terms from T11 for integrated closure.
+- **Where:** V: _CheckoutCommercialPaymentTerms, BuyV2CheckoutGstDetails, collection/receiving sections and existing instruction composer; S/C: commercial terms, address validation and collection contracts.
+- **Logic/change:** Retain product-selected terms; show due-now/balance/date once. Retail prepaid only. Wholesale/Bulk use independently scoped supplier/customer eligibility. Reuse saved GST/address; optional instructions stay optional. Revalidate affected groups on address changes. Do not transfer credit between Stores.
+- **Expected Redmi UI/UX:** Retail sees no credit/COD/business-only clutter. Wholesale/Bulk show compact accepted terms with Change. No required instruction or GST step where inapplicable; invalid delivery identifies only affected items.
+- **Acceptance/evidence:** Reuse wholesale_checkout_receiving_location/lines and wholesale_payment_attribution tests. Redmi: mixed terms, collection versus delivery, empty note, address invalidating one Store, changed term requiring new consent.
+
+## T04 — One-tap offers and final-total continuity
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T01–T03.
+- **Where:** V: _CartBenefitsInline, _InlineCartBenefitPanel, _CartBenefitCard, checkout savings summary; S/B: existing scoped benefit eligibility and allocation.
+- **Logic/change:** One tap selects and validates an eligible offer; no Apply page. Keep Cart panel expanded per approval. Checkout shows applied summary only. Recalculate conditional payment savings on method change and preserve committed allocations; show reason for invalid selection inline.
+- **Expected Redmi UI/UX:** Tap radio→selected state→validated saving/total in same card. Checkout contains no duplicate offers catalogue. Changed method displays changed payable before authorisation.
+- **Acceptance/evidence:** Extend benefit_selection_continuity; preserve existing product preview tests. Redmi: eligible/ineligible/expired offer, Store mismatch, quantity change and method-change savings; no second Apply tap.
+
+## T05 — Payment methods, amount limits and collection destination
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T03–T04; T11 method capabilities.
+- **Where:** V: _buyV2CustomerPaymentChoices and shared payment chooser; S: choosePayment/available methods; C: extend current payment/term capability contracts under coordinated ownership.
+- **Logic/change:** Remove retail COD; retain authorised Wholesale/Bulk alternatives. Evaluate actual due-now amount against authoritative method minima/maxima and eligibility. Prior valid method first; more methods secondary. Show verified recipient and customer fee. Unknown bank remaining limit is not a fabricated number.
+- **Expected Redmi UI/UX:** Eligible UPI/card/bank transfer shown with meaningful labels. RTGS below applicable minimum explains unavailability. Large amount keeps readable digits. No claim transfer is always free or auto-split to evade limits.
+- **Acceptance/evidence:** Test lower/equal/upper boundaries, unknown capabilities, changed bank limit and fee/offer refresh. Redmi: ₹1,000 through ₹1 crore, eligible method changes, no dead-end disabled action without a reason/alternative.
+
+## T06 — Payment groups and explicit final commitment
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T01–T05; T11 authoritative orchestration.
+- **Where:** S: submitOrder, checkout submission state, existing placement/reconciliation methods; C/M: placement request/result and durable group identities; V: _CheckoutPrimaryActionBar.
+- **Logic/change:** Replace single-method assumptions with compatible obligation groups while reusing state owner. Display scope/payment count before first action. No-payment-due orders submit once within explicit commitment. Each payment authorisation covers only its group. Persist independent results; no frontend pretend-atomic success.
+- **Expected Redmi UI/UX:** One Pay ₹X & place orders for a compatible basket; otherwise clearly explained payment 1 of N. No-payment-due uses Place orders. Payment success does not claim supplier acceptance.
+- **Acceptance/evidence:** Test mixed paid/credit orders, second payment failure, repeated taps and out-of-order responses. Redmi with authorised test provider: no duplicate orders; already-submitted credit group survives payment failure. Integrated acceptance blocked until T11.
+
+## T07 — Resume, bank-transfer pending and safe recovery
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T06.
+- **Where:** S/C: pending-order recovery, reconciliation, existing account-scoped persistence and balance-payment adapters; V: _CheckoutPaymentStateRow and confirmation/continuation UI.
+- **Logic/change:** Reconcile original immutable attempt before retry. Allow exit during pending transfer/payment; do not require screenshot/UTR as ordinary success proof. Restore completed/pending/unfinished groups separately. Handle late payment after cancellation through original attempt/refund policy.
+- **Expected Redmi UI/UX:** Customer may leave safely and resume remaining checkout. Paid lines are not payable again. Pending says payment being checked with status/help; verified failure offers retry/change method.
+- **Acceptance/evidence:** Reuse order_resolution and order_issue_recovery_continuity tests. Redmi: process restart, network loss, callback delay, account switch and bank transfer pending. Do not equate emulator/fake-provider proof with live payment proof.
+
+## T08 — Order status, later balances, delivered and feedback
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T06–T07; T13 fulfilment events.
+- **Where:** V: BuyV2ConfirmationView, BuyV2OrdersView, order detail/balance/rating sections; S/M/C: order refresh, payment and shipment snapshots.
+- **Logic/change:** Render separate order/payment/fulfilment dimensions as concise public status. One purchase may have independent Store orders and shipments. Attach invoice/help/cancel/balance actions to correct order. Preserve existing overall-purchase rating flow; do not recreate it.
+- **Expected Redmi UI/UX:** Payment received · Finding a Store, Store confirmed · Preparing, and delivered statuses are truthful. Successful retail proceeds while Bulk remains unpaid. Delivered credit order still shows balance/date without blocking feedback.
+- **Acceptance/evidence:** Reuse order_progress, honest_order_motion, orders_purchased_item_continuity and live_delivery_tracking tests. Redmi: partial delivery, credit balance after delivery, eligible optional overall rating, help returning to same order.
+
+## T09 — Alternative-Store fulfilment and refund presentation
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T08; T12 allocation/refund events.
+- **Where:** V/S/C: existing order status, issue/recovery contracts, actual supplier attribution and refund representation; coordinate any new event fields.
+- **Logic/change:** Show replacement status without charging again. Same-product/commitment replacement follows disclosed permission; changed product/price/time requires consent. Actual supplier owns invoice/review attribution. Cancellation blocks further allocation; no-supply displays verified refund status.
+- **Expected Redmi UI/UX:** Finding another Store remains on order details. Equivalent authorised replacement needs no repeated checkout. If unavailable, refund reference/status appears; other orders continue.
+- **Acceptance/evidence:** Test Store-offer preservation, partial replacement, late acceptance/cancellation races and no-supply refund via provider contract fixtures. Redmi positive end-to-end closure requires T12; no fabricated supply/refund evidence.
+
+## T10 — Compact brand-consistent sweep across the new journey
+
+- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T01–T09.
+- **Where:** V and already-approved shared Buy style owners only after literal ownership check; no global app/theme rewrite.
+- **Logic/change:** Remove wasted rows, half-empty cards, duplicate labels and oversized controls. Reuse existing approved visual tokens. Routine available options apply in one tap; retain accessible touch targets and necessary bank/consent steps. Remove superseded visual paths after checks.
+- **Expected Redmi UI/UX:** Compact Cart and Checkout use width effectively; quiet clear selected states; no repeated Apply/Save for radio choices; no clipping or competing primary actions.
+- **Acceptance/evidence:** Redmi portrait/landscape, normal/200% text, long Store names, ten Stores, many offers and ₹1 crore. Screen-by-screen founder review plus technical geometry/navigation checks.
+
+## T11 — Authoritative direct-buy terms, totals and payment coordination
+
+- **Lane:** Frontend contract and future-workspace handoff. **Status:** specified; frontend work pending; backend/workspace implementation deferred.
+- **Depends on:** Contract mapping before T03/T05/T06 integrated closure.
+- **Where:** Store WP/WE/WS/WG and Buy C adapters; backend bank/payment/commerce owners require exact admission before edits.
+- **Logic/change:** Publish explicit Wholesale/Bulk applicability/customer terms. Calculate versioned prices/freight/offers/credit/limits, reservations and obligation groups. Collect via authorised MoolSocial routes; allocate receipts, preserve idempotency, reconcile partial/late transfers and supply refund inputs. Define exact deadlines rather than invent UI values.
+- **Expected Redmi UI/UX:** Checkout receives valid pre-established terms and totals, no quotation route. Real supported methods and pending/paid events drive T03–T07.
+- **Acceptance/evidence:** Provider permission/idempotency/money conservation tests plus real authorised test-account integration. Redmi verifies actual payment group outcomes; not closable by UI tests alone.
+
+## T12 — Retail allocation, replacement and no-supply refunds
+
+- **Lane:** Frontend contract and future-workspace handoff. **Status:** specified; frontend work pending; backend/workspace implementation deferred.
+- **Depends on:** T11; feeds T09.
+- **Where:** Store WS/WG/WV order acceptance and authoritative allocation/refund backend owner to be admitted; Buy C event mapping.
+- **Logic/change:** Allocate paid retail orders; bound acceptance/replacement search. Atomic versioned acceptance/cancel/reassignment prevents double supply. Preserve exact item and agreed customer amount; fund non-transferable savings under explicit rule or refund. Original-route refund and actual-seller settlement/invoice mapping.
+- **Expected Redmi UI/UX:** T09 receives truthful replacement/refund updates; customer does not re-pay or repeat address/checkout.
+- **Acceptance/evidence:** Race tests, original Store late acceptance, partial supply, no supply, changed commitment consent, refund retry and actual supplier attribution. Redmi observe controlled test lifecycle without real charge unless separately authorised.
+
+## T13 — Store acceptance to delivery-workspace completion
+
+- **Lane:** Frontend contract and future-workspace handoff. **Status:** specified; frontend work pending; backend/workspace implementation deferred.
+- **Depends on:** T11–T12; feeds T08.
+- **Where:** Store WS/WG/WV assignment/handover; Buy C live-delivery/order adapters; exact delivery workspace/backend owner admission required.
+- **Logic/change:** Create shipment jobs only after acceptance and required readiness/payment gates. Route to assigned MoolSocial/third-party provider with scoped access. Handle rejection/reassignment, dispatch balance gate, proof, partial delivery/collection and failed delivery.
+- **Expected Redmi UI/UX:** Customer sees accurate per-shipment status; provider workspace receives only its job. No fabricated live map, premature delivery or retail waiting on unrelated Bulk.
+- **Acceptance/evidence:** Cross-role authorisation and duplicate-job tests; Redmi linked to provider test workspace verifies acceptance→assignment→handover→delivery. Native Maps work remains separately gated if needed.
+
+## T14 — Cumulative qualification, superseded-path removal and Git handoff
+
+- **Lane:** Qualification. **Status:** specified; not implemented or newly tested.
+- **Depends on:** T01–T13 frontend scope for current-phase closure; production integration closure is deferred.
+- **Where:** Existing Buy regression manifest/ticket handoff and scope records under registered ownership; all changed source/test owners.
+- **Logic/change:** Map every journey-document case to evidence; classify UI-only versus integrated. Remove obsolete implementation only after restored-state compatibility checks. Commit qualified changes under existing gates and verify local/remote equality. Register only actually discovered child defects.
+- **Expected Redmi UI/UX:** Approved five-step journey works on Redmi without repeated choices; exceptions have working recovery. Report separate public completion and backend integration status, never a combined false green.
+- **Acceptance/evidence:** Run impacted then required cumulative checks, analysis and repository gates. Hot reload proves live preview only; cold-start/native changes require authorised build qualification. No automatic new APK or real payment.
+
+## Execution and reporting
+
+Public execution order: T01 → T02 → T03 → T04 → T05 → T06 → T07 → T08 → T09 → T10. T11–T13 define frontend interfaces, states and handoffs in this phase; their backend/workspace execution is deferred. They must not block frontend completion solely because future services are unavailable. T14 qualifies the frontend phase and records separate deferred production integration. Early public previews may use existing authorised review contracts, explicitly labelled; provider absence remains pending, never simulated as production success.
+
+Before each source edit: verify pinned-source drift and owner claim, map existing assertions, implement smallest complete change, test affected behaviour, then hot-reload and inspect Redmi. Record status independently as source implemented / local checks passed / Redmi verified / founder approved / provider integration pending or verified. A single status cannot hide missing evidence.
+
+No extra child-ticket count is invented. Register confirmed regressions against the relevant scoped package using the existing registry rules. Source drift may require revising a package; do not silently expand or duplicate an existing ticket.
+
+## Store shutdown handoff reconciliation — 28 September 2026
+
+Read founder-supplied `C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/CURSOR-READ-ONLY-SHUTDOWN-HANDOFF-20260928.md`. Fresh remote readback confirms Store `9fa3f5d94ef4a17280635e4968e03b128233fdfc`, already used above. No ticket renumbering or additional execution package is needed: total remains 14.
+
+The handoff reports 53 commits pushed, clean application worktree, 26 of 27 original findings corrected, Restock deferred, 31 focused checks passed and clean analysis. These are Store-lane reported results, not new Cursor verification or closure of all findings. The earlier narrow source comparison in this plan was from `eea11308`, not from the previous remote `a4583427`; it must not be interpreted as covering all 53 commits.
+
+| Affected ticket | Amendment / execution constraint |
+|---|---|
+| T02, T03, T10 | Preserve approved Store layout conventions and shared keyboard/focus behaviour. Test editor open, keyboard visible, explicit dismissal, Back and enlarged landscape. Store reports explicit keyboard-dismiss recovery; floating-keyboard occlusion is not resolved merely by that check. Do not copy Store UI wholesale into Buy or overwrite its approved components. |
+| T01, T11 | Preserve existing catalogue/inventory identity owners. Restock is deferred to separately authorised integration; these Cart tickets do not authorise a parallel Restock implementation. If readiness depends on it, record the exact dependency rather than inventing availability. |
+| T07, T11, T14 | Physical failed-write, unavailable-provider and in-progress-save checks remain unverified in Store handoff. Add these as required linked recovery evidence where the integrated Buy journey depends on those operations; do not inherit a green status. |
+| T09, T12 | Store mixed-refund evaluation is not proof of MoolSocial customer-payment refund, replacement allocation or settlement integration. Retain the need for exact line/payment/refund IDs and authoritative confirmation. Do not close T12 from a Store refund screen demonstration. |
+| T11–T13 | Existing evaluation data are not production commerce; backend reuse is unproven. Read and reconcile existing owners before proposing changes. No integration, cherry-pick, worktree synchronisation, backend mutation or deployment authority is granted by this handoff. |
+| T14 | Separate source push from device/test evidence. Store evidence lives outside application Git and was not uploaded by that source push. Preserve original findings and unresolved acceptance. Hot reload does not update the installed APK; restoration/cold-start evidence must identify the exact source and binary. |
+
+Store source and its external evidence were not modified. Only these founder-requested local planning documents were amended. Referenced detailed Store evidence reports have not been freshly inspected in this reconciliation; review the relevant named report before accepting a dependent ticket's device evidence. The handoff's reported results must not be promoted to independently verified results.
+
+## Founder scope amendment — frontend now; workspace/backend mapping later
+
+This amendment governs the execution scope above wherever earlier wording implies backend delivery is required to finish the current frontend phase. Total remains **14 packages**; no duplicate tickets are added.
+
+1. **Payment:** founder confirms the Supermandi payment provider is ready. Record readiness as founder-confirmed, not independently reverified here. Do not create a new payment provider or redo its backend. Prepare the MoolSocial frontend payment experience and adapter mapping against the existing provider contract. Exact API access, supported methods, limits and response shapes must be read from that contract when available; readiness is not permission to invent them or assume every proposed method is supported.
+2. **Store workspaces:** under development. Finalise the public journey and required input/output contracts here; hand them off for Store mapping. Preserve current Store implementation and flag discrepancies for its owner, without changing another worktree.
+3. **Backend:** implementation, deployment and production integration are deferred. All earlier T11–T13 backend logic remains future acceptance requirements, not current execution assignments.
+4. **Delivery workspaces:** MoolSocial delivery and Wholesale/Bulk delivery-partner workspaces are not yet developed. Prepare public delivery states and the required shipment/assignment/handover/completion contract; future workspaces map to it. Do not assume existing Store assignment helpers prove those workspaces exist.
+
+| Ticket | Current executable frontend scope | Deferred implementation |
+|---|---|---|
+| T11 | Define/map checkout totals, terms, payment capability, initiation, reconciliation and balance interfaces. Prepare the existing-provider frontend adapter and readable pending/success/failure/recovery UI. Reuse a callable existing provider only within authorised access; no new backend. Document unavailable contract details explicitly. | Any missing server coordination, money allocation, reservations, settlement and backend integration. |
+| T12 | Finalise public replacement/refund states, actual-supplier attribution, customer-consent exceptions and required event/identity fields. Prepare adapter boundaries and test the frontend's handling of each supplied outcome. | Alternative-Store search/allocation, acceptance races, refund execution and supplier settlement. |
+| T13 | Finalise public delivery/collection tracking, readiness/balance gating displays, partial completion and failure recovery. Specify the exact data/events future MoolSocial and Wholesale/Bulk delivery workspaces must supply. | Delivery workspace construction, assignment operations, access enforcement, proof verification and backend tracking. |
+| T14 | Qualify implemented frontend behaviour locally and through Redmi hot reload, preserve evidence, record founder review and follow Git gates. Report frontend completion independently. | Live end-to-end money movement, workspace integration and production delivery/refund qualification. |
+
+T01–T10 consume these contracts and must handle loading, unavailable, pending, failed and successful responses accurately. Finalising a frontend contract establishes the requested mapping, not evidence that its future server operation works. If existing payment-provider behaviour differs, reconcile the interface explicitly rather than replacing the ready provider.
+
+Testing: local controlled responses may exercise contract/error handling. Any device review scenario must use authorised, clearly identified review data; never display test outcomes as real payment, refund or delivery completion. No real payment is authorised by this document. Missing live services are labelled **backend/workspace integration deferred**, not **frontend implementation blocked**, unless a specific missing contract genuinely prevents an exact implementation; identify that field or operation precisely.
+
+Updated reporting: **frontend implemented / local tests / Redmi verified / founder approved / future integration deferred**. Frontend tickets can close against their frontend acceptance scope with the deferred mapping clearly retained; they must not be reported as production end-to-end complete.
+
+</details>
