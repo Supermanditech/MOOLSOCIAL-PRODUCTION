@@ -24846,7 +24846,24 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
               ),
               child: _StoreFormLayout(
                 compact: true,
-                action: FilledButton(
+                action: ListenableBuilder(
+                  listenable: Listenable.merge([amountFocus, referenceFocus]),
+                  builder: (context, action) => Row(
+                    children: [
+                      if (amountFocus.hasFocus || referenceFocus.hasFocus)
+                        IconButton(
+                          key: const Key('ledger-hide-keyboard'),
+                          tooltip: 'Hide keyboard',
+                          onPressed: () {
+                            amountFocus.unfocus();
+                            referenceFocus.unfocus();
+                          },
+                          icon: const Icon(Icons.keyboard_hide_outlined),
+                        ),
+                      Expanded(child: action!),
+                    ],
+                  ),
+                  child: FilledButton(
                   key: Key(
                     widget.refund ? 'refund-confirm' : 'collection-confirm',
                   ),
@@ -24876,6 +24893,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                         ? 'Record receipt'
                         : 'Confirm collection',
                   ),
+                ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

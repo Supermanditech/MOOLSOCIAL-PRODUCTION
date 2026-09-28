@@ -39114,6 +39114,26 @@ void main() {
           find.byKey(const Key('refund-amount')),
           '${order.amount + 1}',
         );
+        await tester.pumpAndSettle();
+        final hideKeyboard = find.byKey(const Key('ledger-hide-keyboard'));
+        expect(hideKeyboard.hitTestable(), findsOneWidget);
+        await tester.tap(hideKeyboard);
+        await tester.pumpAndSettle();
+        expect(hideKeyboard, findsNothing);
+        expect(tester.testTextInput.isVisible, isFalse);
+        expect(
+          tester.widget<TextField>(find.byKey(const Key('refund-amount')))
+              .controller!.text,
+          '${order.amount + 1}',
+        );
+        expect(work.workspaceFinance!.payments.single.refundedMinor, 0);
+        if (refundChannel != WorkspacePaymentChannel.cash) {
+          expect(
+            tester.widget<TextField>(find.byKey(const Key('refund-reference')))
+                .controller!.text,
+            'NEW-REFUND-REFERENCE',
+          );
+        }
         await reveal(tester, find.text('Confirm refund'));
         expect(
           tester
