@@ -8792,7 +8792,8 @@
               "Customer can locate review action directly from delivered/collected order item and product rating section without opening a hidden menu",
               "Both entries open same target-bound composer; multiple-purchase selection uses names/dates, not technical IDs",
               "Screen-reader labels, minimum accessible tap targets, large text and keyboard preserve discoverability",
-              "Draft retained on Close; successful save changes action to Your review/Update review only after server acknowledgement"
+              "Draft retained on Close; successful save changes action to Your review/Update review only after server acknowledgement",
+              "Star-only rating succeeds with absent/whitespace comment; zero stars stays disabled; changing stars before submit sends final value once; optional text uses same submission."
             ],
             "dependencies": [
               "Verified authoritative eligibility and exact target identity"
@@ -8802,14 +8803,14 @@
             "consumerFacingContract": {
               "entryPoints": [
                 "Delivered/collected order item: Rate your purchase, visible beside item details, never overflow-menu-only",
-                "Product ratings section: Write a review; accessible from the rating summary by scroll-to-section",
+                "Product ratings section: Rate or review; accessible from the rating summary by scroll-to-section",
                 "Existing review: Your review with Update review; do not show a second new-review action"
               ],
               "composer": [
                 "Title: How was your purchase?",
                 "Show product photo/name, selected variant/pack and Store so target is obvious",
                 "Choose1-5stars; optional field Tell others about your experience (optional), maximum8000characters",
-                "Submit: Post review; update: Save changes; Close preserves draft",
+                "Submit: Submit rating; update: Save changes; Close preserves draft",
                 "After acknowledged save: Thanks for your review, plus View your review"
               ],
               "multiplePurchases": "If more than one eligible purchase exists, show compact choices with item, Store and delivered/collected date; never require manual order IDs or guess the target.",
@@ -8820,7 +8821,8 @@
                 "Connection problem: We could not check your purchase. Try again."
               ],
               "relatedFeedback": "Separate optional labels Rate this store and Rate your delivery on their fulfilled Store/shipment section; no delivery action for collection. Do not force all ratings to submit one.",
-              "navigation": "Back/Close returns to exact originating order/product, preserves scroll/variant/Cart, and restores account-scoped draft. No internal provider/eligibility/canonical-ID terminology in consumer text."
+              "navigation": "Back/Close returns to exact originating order/product, preserves scroll/variant/Cart, and restores account-scoped draft. No internal provider/eligibility/canonical-ID terminology in consumer text.",
+              "starOnlySubmission": "Stars1-5 required; written text optional. Selecting stars only enables Submit rating. Whitespace comment normalizes to absent. Do not auto-submit on star tap; allow correction before explicit submit. Disable repeat submit while sending, preserve stars on failure, and show Thank you for your rating only after acknowledgement."
             }
           },
           {
