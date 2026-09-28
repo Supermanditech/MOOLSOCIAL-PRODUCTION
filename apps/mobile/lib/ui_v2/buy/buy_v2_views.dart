@@ -7492,7 +7492,7 @@ class _ProductReviewsPanel extends StatelessWidget {
             const SizedBox(height: 5),
             if (review == null)
               Text(
-                'No customer reviews yet. Share your experience after purchase.',
+                'Rate your purchase. A written review is optional.',
                 style: context.buyMeta.copyWith(fontSize: 11, height: 1.4),
               )
             else
@@ -7511,7 +7511,8 @@ class _ProductReviewsPanel extends StatelessWidget {
                       style: context.buyEyebrow.copyWith(fontSize: 11),
                     ),
                     const SizedBox(height: 3),
-                    Text(review!.comment, style: context.buyBody),
+                    if (review!.comment.trim().isNotEmpty)
+                      Text(review!.comment, style: context.buyBody),
                   ],
                 ),
               ),
@@ -7541,7 +7542,7 @@ class _ProductReviewsPanel extends StatelessWidget {
                           : const Color(0xFF326C76),
                     ),
                     label: Text(
-                      review == null ? 'Write review' : 'Edit review',
+                      review == null ? 'Rate or review' : 'Update review',
                     ),
                   ),
                   TextButton.icon(
@@ -7581,13 +7582,53 @@ class _ProductReviewsPanel extends StatelessWidget {
   }
 }
 
+Future<void> _showPurchaseRatingSheet(
+  BuildContext context,
+  BuyV2Session session,
+  String purchaseId,
+) async {
+  final bottom = BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
+    builder: (context) => AnimatedPadding(
+      duration: BuyV2ProductFeedbackSheetMotion.resolveKeyboardInsetDuration(
+        context,
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom + bottom,
+      ),
+      child: AnimatedBuilder(
+        animation: session,
+        builder: (context, _) => _ProductReviewSheet(
+          session: session,
+          purchaseId: purchaseId,
+          kind: BuyV2RatingKind.purchase,
+          existing: null,
+        ),
+      ),
+    ),
+  );
+}
+
 Future<void> _showProductReviewSheet(
   BuildContext context,
   BuyV2Session session,
-  BuyV2Product product,
-) async {
+  BuyV2Product product, {
+  String? orderId,
+  BuyV2RatingKind kind = BuyV2RatingKind.product,
+}) async {
   final existing = session.customerReviewFor(product.id);
-  var editorOpened = session.productReviewUnavailableReason(product.id) == null;
+  var editorOpened =
+      session.productReviewUnavailableReason(product.id, kind: kind) == null;
   final exportedBottomClearance =
       BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
   await showModalBottomSheet<void>(
@@ -7616,6 +7657,7 @@ Future<void> _showProductReviewSheet(
         builder: (context, _) {
           final unavailable = session.productReviewUnavailableReason(
             product.id,
+            kind: kind,
           );
           if (editorOpened || unavailable == null) {
             // Once editing starts, retain the draft during a failed refresh.
@@ -7625,6 +7667,8 @@ Future<void> _showProductReviewSheet(
               session: session,
               product: product,
               existing: existing,
+              orderId: orderId,
+              kind: kind,
             );
           }
           final loading =
@@ -7638,8 +7682,8 @@ Future<void> _showProductReviewSheet(
               children: [
                 const _ProductFeedbackSheetHeader(
                   icon: Icons.rate_review_outlined,
-                  title: 'Review your purchase',
-                  detail: 'Reviews are available after delivery.',
+                  title: 'Rate your purchase',
+                  detail: 'After delivery or collection.',
                   closeKey: ValueKey('buy-close-product-review'),
                 ),
                 const SizedBox(height: 10),
@@ -7830,13 +7874,19 @@ double _productFeedbackSheetHeight(BuildContext context) {
 class _ProductReviewSheet extends StatefulWidget {
   const _ProductReviewSheet({
     required this.session,
-    required this.product,
+    this.product,
+    this.purchaseId,
     required this.existing,
+    this.orderId,
+    this.kind = BuyV2RatingKind.product,
   });
 
   final BuyV2Session session;
-  final BuyV2Product product;
+  final BuyV2Product? product;
+  final String? purchaseId;
   final BuyV2CustomerReview? existing;
+  final String? orderId;
+  final BuyV2RatingKind kind;
 
   @override
   State<_ProductReviewSheet> createState() => _ProductReviewSheetState();
@@ -7846,31 +7896,67 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   late final TextEditingController _commentController;
   late final FocusNode _commentFocus;
   late int _rating;
+  String? _targetId;
+  String get _subjectId =>
+      widget.product?.id ?? 'purchase:${widget.purchaseId}';
+  List<BuyV2RatingTarget> get _targets => widget.purchaseId != null
+      ? [?widget.session.purchaseRatingTarget(widget.purchaseId!)]
+      : widget.session.ratingTargetsFor(
+          _subjectId,
+          orderId: widget.orderId,
+          kind: widget.kind,
+        );
+
+  BuyV2RatingTarget? get _target =>
+      _targets.where((t) => t.id == _targetId).firstOrNull;
   late final String? _draftOwnerScope;
   bool _submissionRejected = false;
   bool _submitting = false;
 
+  bool get _canCompose =>
+      (widget.purchaseId == null && widget.session.reviewDataEnabled) ||
+      _target != null;
+
   bool get _isValid =>
-      _rating >= 1 && _rating <= 5 && _commentController.text.trim().isNotEmpty;
+      _rating >= 1 &&
+      _rating <= 5 &&
+      _commentController.text.characters.length <= 8000 &&
+      ((widget.purchaseId == null && widget.session.reviewDataEnabled) ||
+          _target != null);
 
   @override
   void initState() {
     super.initState();
     _draftOwnerScope = widget.session.reviewDraftOwnerScope;
-    final draft = widget.session.productReviewDraft(widget.product.id);
-    _rating = draft?.rating ?? widget.existing?.rating ?? 0;
+    _targetId = _targets.length == 1 ? _targets.single.id : null;
+    final draft = _canCompose
+        ? widget.session.productReviewDraft(_subjectId, targetId: _targetId)
+        : null;
+    _rating =
+        draft?.rating ??
+        _target?.rating ??
+        (widget.session.reviewDataEnabled ? widget.existing?.rating : null) ??
+        0;
     _commentController = TextEditingController(
-      text: draft?.comment ?? widget.existing?.comment ?? '',
+      text:
+          draft?.comment ??
+          _target?.comment ??
+          (widget.session.reviewDataEnabled
+              ? widget.existing?.comment
+              : null) ??
+          '',
     )..addListener(_retainDraft);
     _commentFocus = FocusNode()..addListener(_focusChanged);
   }
 
   void _retainDraft() {
+    if (!_canCompose) return;
     widget.session.retainProductReviewDraft(
-      productId: widget.product.id,
+      productId: _subjectId,
       rating: _rating,
       comment: _commentController.text,
       ownerScope: _draftOwnerScope,
+      targetId: _targetId,
     );
   }
 
@@ -7884,11 +7970,19 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
       _submitting = true;
       _submissionRejected = false;
     });
-    final saved = await widget.session.submitProductReviewOnline(
-      productId: widget.product.id,
-      rating: _rating,
-      comment: _commentController.text,
-    );
+    final saved = widget.purchaseId != null
+        ? await widget.session.submitPurchaseRating(
+            purchaseId: widget.purchaseId!,
+            rating: _rating,
+            comment: _commentController.text,
+          )
+        : await widget.session.submitProductReviewOnline(
+            productId: _subjectId,
+            rating: _rating,
+            comment: _commentController.text,
+            targetId: _targetId,
+            kind: widget.kind,
+          );
     if (!mounted) return;
     if (saved) {
       Navigator.of(context).pop();
@@ -7913,9 +8007,26 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (_draftOwnerScope != widget.session.reviewDraftOwnerScope) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Your account changed. Open your purchase to rate it.'),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
     final stateDuration =
         BuyV2ProductFeedbackSheetMotion.resolveFormStateDuration(context);
-    final routeTitle = 'Review ${widget.product.customerTitle}';
+    final routeTitle = widget.product == null
+        ? 'Review your purchase'
+        : 'Review ${widget.product!.customerTitle}';
     return PopScope<void>(
       canPop: !_commentFocus.hasFocus,
       onPopInvokedWithResult: (didPop, _) {
@@ -7947,13 +8058,74 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                       children: [
                         _ProductFeedbackSheetHeader(
                           icon: Icons.rate_review_outlined,
-                          title: 'Write a review',
-                          detail:
-                              'Rate what you received. Keep personal or medical information out.',
+                          title: 'Rate your MoolSocial experience',
+                          detail: switch (widget.kind) {
+                            BuyV2RatingKind.purchase =>
+                              "Overall order rating. Add a review if you'd like.",
+                            BuyV2RatingKind.product =>
+                              "Product rating. Add a review if you'd like.",
+                            BuyV2RatingKind.store =>
+                              "Store service rating. Add a review if you'd like.",
+                            BuyV2RatingKind.delivery =>
+                              "Delivery rating. Add a review if you'd like.",
+                          },
                           closeKey: const ValueKey('buy-close-product-review'),
                         ),
                         const SizedBox(height: 8),
-                        _ProductFeedbackIdentity(product: widget.product),
+                        if (widget.product case final product?)
+                          _ProductFeedbackIdentity(product: product)
+                        else ...[
+                          Text(
+                            _target?.purchaseLabel ?? 'Your completed purchase',
+                            style: context.buyBody,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Your overall feedback is shared with the stores in this order.',
+                            style: context.buyMeta,
+                          ),
+                        ],
+                        if (_targets.length > 1) ...[
+                          const SizedBox(height: 8),
+                          Text('Choose your purchase', style: context.buyBody),
+                          for (final target in _targets)
+                            Semantics(
+                              checked: _targetId == target.id,
+                              inMutuallyExclusiveGroup: true,
+                              child: TextButton.icon(
+                                key: ValueKey(
+                                  'buy-rating-purchase-${target.id}',
+                                ),
+                                icon: Icon(
+                                  _targetId == target.id
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_unchecked,
+                                ),
+                                label: Text(target.purchaseLabel),
+                                onPressed: _submitting
+                                    ? null
+                                    : () {
+                                        _retainDraft();
+                                        setState(() {
+                                          _targetId = target.id;
+                                          final draft = widget.session
+                                              .productReviewDraft(
+                                                _subjectId,
+                                                targetId: target.id,
+                                              );
+                                          _rating =
+                                              draft?.rating ??
+                                              target.rating ??
+                                              0;
+                                          _commentController.text =
+                                              draft?.comment ?? target.comment;
+                                          _submissionRejected = false;
+                                        });
+                                      },
+                              ),
+                            ),
+                        ] else if (_target != null)
+                          Text(_target!.purchaseLabel, style: context.buyMeta),
                         const SizedBox(height: 8),
                         Semantics(
                           label: _rating == 0
@@ -7975,11 +8147,11 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                                   ),
                                   child: IconButton(
                                     key: ValueKey(
-                                      'buy-review-rating-${widget.product.id}-$value',
+                                      'buy-review-rating-$_subjectId-$value',
                                     ),
                                     tooltip:
                                         '$value ${value == 1 ? 'star' : 'stars'}',
-                                    onPressed: _submitting
+                                    onPressed: _submitting || !_canCompose
                                         ? null
                                         : () => setState(() {
                                             _rating = value;
@@ -8006,19 +8178,20 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                           multiline: true,
                           focusable: true,
                           focused: _commentFocus.hasFocus,
-                          isRequired: true,
-                          maxValueLength: 500,
+                          isRequired: false,
+                          maxValueLength: 8000,
                           currentValueLength:
                               _commentController.text.characters.length,
-                          label: 'Your review',
+                          label: 'Your review (optional)',
                           value: _commentController.text,
-                          hint: 'Required. Up to 500 characters.',
+                          hint: 'Optional. Up to 8000 characters.',
                           onTap: _commentFocus.requestFocus,
                           onFocus: _commentFocus.requestFocus,
                           onSetText: (value) {
+                            if (!_canCompose || _submitting) return;
                             final nextValue =
                                 LengthLimitingTextInputFormatter(
-                                  500,
+                                  8000,
                                   maxLengthEnforcement:
                                       MaxLengthEnforcement.enforced,
                                 ).formatEditUpdate(
@@ -8035,28 +8208,26 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                             setState(() => _submissionRejected = false);
                           },
                           child: TextFormField(
-                            key: ValueKey(
-                              'buy-review-comment-${widget.product.id}',
-                            ),
+                            key: ValueKey('buy-review-comment-$_subjectId'),
                             controller: _commentController,
                             focusNode: _commentFocus,
                             autofocus: false,
                             onChanged: (_) => setState(() {
                               _submissionRejected = false;
                             }),
-                            enabled: !_submitting,
+                            enabled: !_submitting && _canCompose,
                             minLines: 2,
                             maxLines: 4,
-                            maxLength: 500,
+                            maxLength: 8000,
                             scrollPadding: EdgeInsets.only(
                               bottom:
                                   MediaQuery.viewInsetsOf(context).bottom + 132,
                             ),
                             textCapitalization: TextCapitalization.sentences,
                             decoration: const InputDecoration(
-                              labelText: 'Your review',
+                              labelText: 'Your review (optional)',
                               hintText:
-                                  'What was useful, good or needs improvement?',
+                                  'Tell others about your experience (optional)',
                               counterText: '',
                               border: OutlineInputBorder(),
                             ),
@@ -8068,13 +8239,13 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Required · up to 500 characters',
+                                  'Optional · up to 8000 characters',
                                   style: context.buyMeta.copyWith(fontSize: 9),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${_commentController.text.characters.length}/500',
+                                '${_commentController.text.characters.length}/8000',
                                 style: context.buyMeta.copyWith(fontSize: 9),
                               ),
                             ],
@@ -8095,14 +8266,23 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                             ),
                             liveRegion: true,
                             child: Text(
-                              _submissionRejected
+                              !widget.session.reviewDataEnabled &&
+                                      _targetId != null &&
+                                      _target == null
+                                  ? (widget.session
+                                            .productReviewUnavailableReason(
+                                              _subjectId,
+                                              kind: widget.kind,
+                                            ) ??
+                                        'This purchase can no longer be rated. Close and try again.')
+                                  : _submissionRejected
                                   ? (widget.session.notice ??
                                         'This review could not be saved.')
                                   : _submitting
                                   ? 'Saving your review…'
                                   : _isValid
-                                  ? 'Ready to save to this product.'
-                                  : 'Choose a rating and write a review to enable Save.',
+                                  ? 'You can submit stars only or add a review.'
+                                  : 'Choose 1–5 stars to submit your rating.',
                               style: context.buyMeta.copyWith(
                                 color: _submissionRejected
                                     ? BuyV2Colors.orange
@@ -8148,9 +8328,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                               heightFactor: 1,
                               child: FilledButton.icon(
                                 style: BuyV2ActionStyle.button(),
-                                key: ValueKey(
-                                  'buy-submit-review-${widget.product.id}',
-                                ),
+                                key: ValueKey('buy-submit-review-$_subjectId'),
                                 onPressed: _isValid && !_submitting
                                     ? _submit
                                     : null,
@@ -8163,7 +8341,12 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                                       )
                                     : const Icon(Icons.check_rounded, size: 18),
                                 label: Text(
-                                  _submitting ? 'Saving…' : 'Save review',
+                                  _submitting
+                                      ? 'Submitting…'
+                                      : _target?.reviewId != null ||
+                                            widget.existing != null
+                                      ? 'Save changes'
+                                      : 'Submit rating',
                                 ),
                               ),
                             ),
@@ -13529,6 +13712,26 @@ class BuyV2OrdersView extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (group.purchaseId case final purchaseId?
+                          when session.purchaseRatingTarget(purchaseId) != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            key: ValueKey('buy-rate-purchase-$purchaseId'),
+                            onPressed: () => _showPurchaseRatingSheet(
+                              context,
+                              session,
+                              purchaseId,
+                            ),
+                            icon: const Icon(
+                              Icons.star_outline_rounded,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Rate your MoolSocial experience',
+                            ),
+                          ),
+                        ),
                       for (final (orderIndex, order) in group.orders.indexed)
                         Padding(
                           key: ValueKey(

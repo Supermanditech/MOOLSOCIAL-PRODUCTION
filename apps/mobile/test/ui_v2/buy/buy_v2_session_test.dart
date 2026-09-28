@@ -204,7 +204,8 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
   }
 }
 
-final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
+final class _ShopCommerceAdapter
+    implements BuyV2CommerceAdapter, BuyV2VerifiedRatingAdapter {
   _ShopCommerceAdapter({required this.snapshot, required this.placement});
 
   final BuyV2CommerceSnapshot snapshot;
@@ -295,6 +296,30 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   }) async {
     reportCalls += 1;
     return reportResult;
+  }
+
+  @override
+  Future<BuyV2RatingResult> submitRating(BuyV2RatingRequest request) async {
+    reviewCalls++;
+    final t = request.target;
+    return BuyV2RatingResult(
+      customerMessage: reviewResult.customerMessage,
+      saved: !reviewResult.accepted
+          ? null
+          : BuyV2RatingTarget(
+              id: t.id,
+              ownerScope: t.ownerScope,
+              orderId: t.orderId,
+              orderLineId: t.orderLineId,
+              storeId: t.storeId,
+              productId: t.productId,
+              purchaseLabel: t.purchaseLabel,
+              reviewId: t.reviewId ?? 'server-rating',
+              version: t.version + 1,
+              rating: request.stars,
+              comment: request.comment ?? '',
+            ),
+    );
   }
 
   @override
@@ -503,6 +528,20 @@ _openProductionCheckout({
       businessVerificationState: businessVerificationState,
       productReportsAvailable: productReportsAvailable,
       reviewableProductIds: productReviewAvailable ? {product.id} : const {},
+      ratingTargets: productReviewAvailable
+          ? [
+              BuyV2RatingTarget(
+                id: 'delivered-rating',
+                ownerScope:
+                    customerStateStore?.ownerScope ?? 'review-fixture-buyer',
+                orderId: 'prior-delivered-order',
+                orderLineId: 'delivered-line',
+                storeId: product.storeId!,
+                productId: product.id,
+                purchaseLabel: 'Delivered purchase',
+              ),
+            ]
+          : [],
     ),
     placement: placement,
   );
@@ -512,7 +551,11 @@ _openProductionCheckout({
       delegate: factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
     ),
     commerceAdapter: adapter,
-    customerStateStore: customerStateStore,
+    customerStateStore:
+        customerStateStore ??
+        (productReviewAvailable
+            ? _MemoryCustomerStateStore('review-fixture-buyer')
+            : null),
     reviewDataEnabled: false,
   );
   await session.restoreCommerce();

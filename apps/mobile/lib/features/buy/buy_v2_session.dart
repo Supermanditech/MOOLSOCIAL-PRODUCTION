@@ -5106,22 +5106,97 @@ class BuyV2Session extends ChangeNotifier {
       commerceLoadState == BuyV2CommerceLoadState.ready &&
       !customerStateRecoveryPending;
 
-  bool canReviewProduct(String productId) =>
-      _reviewableProductIds.contains(productId);
+  List<BuyV2RatingTarget> ratingTargetsFor(
+    String productId, {
+    String? orderId,
+    BuyV2RatingKind kind = BuyV2RatingKind.product,
+  }) {
+    final product = findProduct(productId);
+    if (product == null || !procurementScopeCurrent) return const [];
+    return List.unmodifiable(
+      _ratingTargets.values.where(
+        (target) =>
+            target.valid &&
+            target.ownerScope == reviewDraftOwnerScope &&
+            target.productId == productId &&
+            target.storeId == product.storeId &&
+            target.kind == kind &&
+            (orderId == null || target.orderId == orderId),
+      ),
+    );
+  }
+
+  BuyV2RatingTarget? purchaseRatingTarget(String purchaseId) {
+    if (!procurementScopeCurrent ||
+        commerceLoadState != BuyV2CommerceLoadState.ready ||
+        commerceAdapter is! BuyV2VerifiedRatingAdapter) {
+      return null;
+    }
+    final targets = _ratingTargets.values.where(
+      (t) =>
+          t.valid &&
+          t.kind == BuyV2RatingKind.purchase &&
+          t.purchaseId == purchaseId &&
+          t.ownerScope == reviewDraftOwnerScope,
+    );
+    if (targets.length != 1) return null;
+    final target = targets.single;
+    final orders = _orders.where((o) => o.purchaseId == purchaseId).toList();
+    if (orders.isEmpty ||
+        orders.length != target.orderStoreIds.length ||
+        orders.map((o) => o.id).toSet().length != orders.length ||
+        orders.any(
+          (o) =>
+              !target.orderStoreIds.containsKey(o.id) ||
+              o.status != BuyV2OrderStatus.delivered,
+        )) {
+      return null;
+    }
+    return target;
+  }
+
+  Future<bool> submitPurchaseRating({
+    required String purchaseId,
+    required int rating,
+    required String comment,
+  }) async {
+    final target = purchaseRatingTarget(purchaseId);
+    if (target == null) {
+      notice =
+          'This purchase cannot be rated right now. Try again after delivery or collection.';
+      notifyListeners();
+      return false;
+    }
+    return _submitVerifiedRating(
+      target,
+      rating,
+      comment,
+      'purchase:$purchaseId',
+    );
+  }
+
+  bool canReviewProduct(
+    String productId, {
+    BuyV2RatingKind kind = BuyV2RatingKind.product,
+  }) => reviewDataEnabled
+      ? kind == BuyV2RatingKind.product &&
+            _reviewableProductIds.contains(productId)
+      : commerceAdapter is BuyV2VerifiedRatingAdapter &&
+            ratingTargetsFor(productId, kind: kind).isNotEmpty;
 
   String? productReviewUnavailableReason(
-    String productId,
-  ) => switch (commerceLoadState) {
-    BuyV2CommerceLoadState.loading =>
-      'Checking whether your purchase is eligible for a review.',
+    String productId, {
+    BuyV2RatingKind kind = BuyV2RatingKind.product,
+  }) => switch (commerceLoadState) {
+    BuyV2CommerceLoadState.loading => 'Checking your purchase…',
     BuyV2CommerceLoadState.offline =>
-      'Review eligibility could not be checked. Reconnect and try again.',
+      'We could not check your purchase. Reconnect and try again.',
     BuyV2CommerceLoadState.unavailable =>
       'Reviews are unavailable right now. Try again later.',
     BuyV2CommerceLoadState.ready =>
-      canReviewProduct(productId)
+      canReviewProduct(productId, kind: kind)
           ? null
-          : 'You can review this product after a delivered purchase. No eligible purchase is available for this product.',
+          : 'You can review this item after delivery or collection.',
   };
 
   bool canReportProduct(String productId) =>
@@ -5366,6 +5441,7 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
+  final Map<String, BuyV2RatingTarget> _ratingTargets = {};
   final Map<String, BuyV2ProductReviewDraft> _reviewDrafts = {};
   String? _reviewDraftOwnerScope;
 
@@ -5377,9 +5453,16 @@ class BuyV2Session extends ChangeNotifier {
     _reviewDraftOwnerScope = reviewDraftOwnerScope;
   }
 
-  BuyV2ProductReviewDraft? productReviewDraft(String productId) {
+  BuyV2ProductReviewDraft? productReviewDraft(
+    String productId, {
+    String? targetId,
+  }) {
     _ensureReviewDraftOwner();
-    return findProduct(productId) == null ? null : _reviewDrafts[productId];
+    return findProduct(productId) == null &&
+            !(targetId != null &&
+                _ratingTargets[targetId]?.kind == BuyV2RatingKind.purchase)
+        ? null
+        : _reviewDrafts[targetId == null ? productId : 'rating:$targetId'];
   }
 
   void retainProductReviewDraft({
@@ -5387,15 +5470,22 @@ class BuyV2Session extends ChangeNotifier {
     required int rating,
     required String comment,
     required String? ownerScope,
+    String? targetId,
   }) {
     if (ownerScope != reviewDraftOwnerScope || !procurementScopeCurrent) return;
     _ensureReviewDraftOwner();
     final draft = BuyV2ProductReviewDraft(rating: rating, comment: comment);
-    if (findProduct(productId) == null || !draft.valid) return;
+    if ((findProduct(productId) == null &&
+            !(targetId != null &&
+                _ratingTargets[targetId]?.kind == BuyV2RatingKind.purchase)) ||
+        !draft.valid) {
+      return;
+    }
+    final key = targetId == null ? productId : 'rating:$targetId';
     if (rating == 0 && comment.isEmpty) {
-      _reviewDrafts.remove(productId);
+      _reviewDrafts.remove(key);
     } else {
-      _reviewDrafts[productId] = draft;
+      _reviewDrafts[key] = draft;
     }
     _persistCustomerState();
   }
@@ -5404,14 +5494,15 @@ class BuyV2Session extends ChangeNotifier {
     String productId,
     int rating,
     String comment,
-    String? ownerScope,
-  ) {
+    String? ownerScope, {
+    String? targetId,
+  }) {
     if (ownerScope != reviewDraftOwnerScope) return;
-    final draft = productReviewDraft(productId);
+    final draft = productReviewDraft(productId, targetId: targetId);
     if (draft?.rating != rating || draft?.comment.trim() != comment.trim()) {
       return;
     }
-    _reviewDrafts.remove(productId);
+    _reviewDrafts.remove(targetId == null ? productId : 'rating:$targetId');
     _persistCustomerState();
   }
 
@@ -6335,6 +6426,18 @@ class BuyV2Session extends ChangeNotifier {
       _reviewableProductIds
         ..clear()
         ..addAll(snapshot.reviewableProductIds);
+      _ratingTargets.clear();
+      final targetCounts = <String, int>{};
+      for (final target in snapshot.ratingTargets) {
+        targetCounts.update(target.id, (n) => n + 1, ifAbsent: () => 1);
+      }
+      for (final target in snapshot.ratingTargets) {
+        if (target.valid &&
+            targetCounts[target.id] == 1 &&
+            target.ownerScope == reviewDraftOwnerScope) {
+          _ratingTargets[target.id] = target;
+        }
+      }
       availablePaymentMethods = Set.unmodifiable(
         isStoreProcurement
             ? snapshot.paymentMethods.where(supportedPaymentMethods.contains)
@@ -11775,7 +11878,21 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2CustomerReview? customerReviewFor(String productId) {
     final product = findProduct(productId);
-    return product == null ? null : _customerReviews[product.canonicalId];
+    if (product == null) return null;
+    if (!reviewDataEnabled) {
+      final targets = ratingTargetsFor(
+        productId,
+      ).where((t) => t.rating != null).toList();
+      if (targets.length != 1) return null;
+      final target = targets.single;
+      return BuyV2CustomerReview(
+        productCanonicalId: product.canonicalId,
+        rating: target.rating!,
+        comment: target.comment,
+        updatedLabel: 'Your purchase',
+      );
+    }
+    return _customerReviews[product.id];
   }
 
   bool submitProductReview({
@@ -11785,12 +11902,15 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     final product = findProduct(productId);
     final cleanComment = comment.trim();
-    if (product == null || rating < 1 || rating > 5 || cleanComment.isEmpty) {
-      notice = 'Add a rating and a short review to continue.';
+    if (product == null ||
+        rating < 1 ||
+        rating > 5 ||
+        cleanComment.characters.length > 8000) {
+      notice = 'Choose 1–5 stars. Written feedback is optional.';
       notifyListeners();
       return false;
     }
-    _customerReviews[product.canonicalId] = BuyV2CustomerReview(
+    _customerReviews[product.id] = BuyV2CustomerReview(
       productCanonicalId: product.canonicalId,
       rating: rating,
       comment: cleanComment,
@@ -11802,7 +11922,7 @@ class BuyV2Session extends ChangeNotifier {
       comment,
       reviewDraftOwnerScope,
     );
-    notice = 'Your review was added.';
+    notice = 'Thank you for your rating.';
     notifyListeners();
     return true;
   }
@@ -11831,61 +11951,125 @@ class BuyV2Session extends ChangeNotifier {
     required String productId,
     required int rating,
     required String comment,
+    String? targetId,
+    BuyV2RatingKind kind = BuyV2RatingKind.product,
   }) async {
-    final unavailable = productReviewUnavailableReason(productId);
+    final unavailable = productReviewUnavailableReason(productId, kind: kind);
     if (unavailable != null) {
       notice = unavailable;
       notifyListeners();
       return false;
     }
-    if (reviewDataEnabled) {
+    if (reviewDataEnabled && targetId == null) {
       return submitProductReview(
         productId: productId,
         rating: rating,
         comment: comment,
       );
     }
-    final product = findProduct(productId);
-    final cleanComment = comment.trim();
-    if (product == null || rating < 1 || rating > 5 || cleanComment.isEmpty) {
-      notice = 'Add a rating and a short review to continue.';
+    final candidates = ratingTargetsFor(productId, kind: kind);
+    final target = targetId == null
+        ? (candidates.length == 1 ? candidates.single : null)
+        : candidates.where((t) => t.id == targetId).firstOrNull;
+    final adapter = commerceAdapter;
+    final clean = comment.trim();
+    if (target == null ||
+        adapter is! BuyV2VerifiedRatingAdapter ||
+        rating < 1 ||
+        rating > 5 ||
+        clean.characters.length > 8000) {
+      notice = target == null
+          ? 'Choose the purchase you want to rate.'
+          : 'Choose 1–5 stars. Written feedback is optional.';
       notifyListeners();
       return false;
     }
-    if (!canReviewProduct(productId)) {
-      notice = 'You can review this product after a delivered purchase.';
-      notifyListeners();
+    return _submitVerifiedRating(target, rating, comment, productId);
+  }
+
+  Future<bool> _submitVerifiedRating(
+    BuyV2RatingTarget target,
+    int rating,
+    String comment,
+    String productId,
+  ) async {
+    final adapter = commerceAdapter;
+    final clean = comment.trim();
+    if (adapter is! BuyV2VerifiedRatingAdapter ||
+        rating < 1 ||
+        rating > 5 ||
+        clean.characters.length > 8000) {
       return false;
     }
     if (!_productFeedbackBusyIds.add(productId)) return false;
+    final owner = reviewDraftOwnerScope;
     notice = null;
     notifyListeners();
-    final draftOwnerScope = reviewDraftOwnerScope;
     try {
-      final result = await commerceAdapter.submitProductReview(
-        product: product,
-        rating: rating,
-        comment: cleanComment,
+      final request = BuyV2RatingRequest(
+        target: target,
+        stars: rating,
+        comment: clean.isEmpty ? null : clean,
+        idempotencyKey: sha256
+            .convert(
+              utf8.encode(
+                jsonEncode([
+                  target.ownerScope,
+                  target.id,
+                  target.version,
+                  rating,
+                  clean,
+                ]),
+              ),
+            )
+            .toString(),
       );
-      if (result.accepted) {
-        _customerReviews[product.canonicalId] = BuyV2CustomerReview(
-          productCanonicalId: product.canonicalId,
-          rating: rating,
-          comment: cleanComment,
-          updatedLabel: 'Added just now',
-        );
-        _discardSubmittedReviewDraft(
-          productId,
-          rating,
-          comment,
-          draftOwnerScope,
-        );
+      final result = await (adapter as BuyV2VerifiedRatingAdapter).submitRating(
+        request,
+      );
+      final saved = result.saved;
+      if (owner != reviewDraftOwnerScope ||
+          !procurementScopeCurrent ||
+          !identical(_ratingTargets[target.id], target)) {
+        return false;
       }
-      notice = result.customerMessage;
-      return result.accepted;
+      final accepted =
+          saved != null &&
+          saved.valid &&
+          saved.id == target.id &&
+          saved.ownerScope == target.ownerScope &&
+          saved.orderId == target.orderId &&
+          saved.orderLineId == target.orderLineId &&
+          saved.productId == target.productId &&
+          saved.storeId == target.storeId &&
+          saved.kind == target.kind &&
+          saved.purchaseId == target.purchaseId &&
+          mapEquals(saved.orderStoreIds, target.orderStoreIds) &&
+          saved.providerId == target.providerId &&
+          saved.shipmentId == target.shipmentId &&
+          saved.version > target.version &&
+          (target.reviewId == null || saved.reviewId == target.reviewId) &&
+          saved.rating == rating &&
+          saved.comment.trim() == clean;
+      if (!accepted) {
+        notice = saved != null || result.customerMessage.isEmpty
+            ? 'Your rating could not be saved. Try again.'
+            : result.customerMessage;
+        return false;
+      }
+      _ratingTargets[target.id] = saved;
+      _discardSubmittedReviewDraft(
+        productId,
+        rating,
+        comment,
+        owner,
+        targetId: target.id,
+      );
+      notice = 'Thank you for your rating.';
+      return true;
     } on Object {
       notice =
-          'Your review could not be sent. Check your connection and retry.';
+          'Your rating could not be sent. Check your connection and retry.';
       return false;
     } finally {
       _productFeedbackBusyIds.remove(productId);

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 
 import '../work/scan_and_pick_contract.dart';
 import 'buy_v2_cart_contracts.dart';
@@ -1731,6 +1732,7 @@ class BuyV2CommerceSnapshot {
     this.businessVerificationState = BuyV2BusinessVerificationState.unavailable,
     this.productReportsAvailable = false,
     this.reviewableProductIds = const {},
+    this.ratingTargets = const [],
     this.customerMessage,
     this.procurementBuyerGrant,
   });
@@ -1745,8 +1747,120 @@ class BuyV2CommerceSnapshot {
   final BuyV2BusinessVerificationState businessVerificationState;
   final bool productReportsAvailable;
   final Set<String> reviewableProductIds;
+
+  /// Authenticated, fulfilled purchase targets. The server must revalidate on save.
+  final List<BuyV2RatingTarget> ratingTargets;
   final String? customerMessage;
   final BuyV2ProcurementBuyerGrant? procurementBuyerGrant;
+}
+
+enum BuyV2RatingKind { product, store, delivery, purchase }
+
+/// Public projection of a server-authorized purchase, never a client grant.
+@immutable
+class BuyV2RatingTarget {
+  const BuyV2RatingTarget({
+    required this.id,
+    required this.ownerScope,
+    required this.orderId,
+    required this.orderLineId,
+    required this.storeId,
+    required this.productId,
+    required this.purchaseLabel,
+    this.kind = BuyV2RatingKind.product,
+    this.purchaseId,
+    this.orderStoreIds = const {},
+    this.shipmentId,
+    this.providerId,
+    this.reviewId,
+    this.version = 0,
+    this.rating,
+    this.comment = '',
+  });
+  final String id, ownerScope, orderId, orderLineId, storeId, productId;
+  final String purchaseLabel;
+  final BuyV2RatingKind kind;
+  final String? purchaseId;
+
+  /// Authoritative participating suborder -> Store mapping for overall feedback.
+  final Map<String, String> orderStoreIds;
+  final String? shipmentId, providerId, reviewId;
+  final int version;
+  final int? rating;
+  final String comment;
+
+  bool get valid =>
+      [
+        id,
+        ownerScope,
+        if (kind != BuyV2RatingKind.purchase) ...[
+          orderId,
+          orderLineId,
+          storeId,
+          productId,
+        ],
+        purchaseLabel,
+      ].every((value) => value.isNotEmpty && value.trim() == value) &&
+      (kind != BuyV2RatingKind.purchase ||
+          (purchaseId?.trim().isNotEmpty == true &&
+              purchaseId == purchaseId!.trim() &&
+              orderId.isEmpty &&
+              orderLineId.isEmpty &&
+              storeId.isEmpty &&
+              productId.isEmpty &&
+              shipmentId == null &&
+              providerId == null &&
+              orderStoreIds.isNotEmpty &&
+              orderStoreIds.entries.every(
+                (e) =>
+                    e.key.trim().isNotEmpty &&
+                    e.key == e.key.trim() &&
+                    e.value.trim().isNotEmpty &&
+                    e.value == e.value.trim(),
+              ))) &&
+      version >= 0 &&
+      comment.characters.length <= 8000 &&
+      (rating == null || (rating! >= 1 && rating! <= 5)) &&
+      ((reviewId == null && rating == null && version == 0) ||
+          (reviewId != null &&
+              reviewId!.trim().isNotEmpty &&
+              rating != null &&
+              version > 0)) &&
+      (kind != BuyV2RatingKind.delivery ||
+          (shipmentId?.trim().isNotEmpty == true &&
+              providerId?.trim().isNotEmpty == true));
+}
+
+@immutable
+class BuyV2RatingRequest {
+  const BuyV2RatingRequest({
+    required this.target,
+    required this.stars,
+    required this.comment,
+    required this.idempotencyKey,
+  });
+  final BuyV2RatingTarget target;
+  final int stars;
+
+  /// Null for a stars-only rating; never an invented customer review.
+  final String? comment;
+  final String idempotencyKey;
+}
+
+@immutable
+class BuyV2RatingResult {
+  const BuyV2RatingResult({required this.customerMessage, this.saved});
+  final String customerMessage;
+
+  /// Acknowledged, versioned record. Null means no successful save.
+  final BuyV2RatingTarget? saved;
+}
+
+/// Implement beside BuyV2CommerceAdapter when the backend is connected.
+/// Validate authenticated owner, fulfilment, Store/line and version atomically;
+/// deduplicate idempotencyKey, store centrally, and return the saved record.
+abstract interface class BuyV2VerifiedRatingAdapter {
+  Future<BuyV2RatingResult> submitRating(BuyV2RatingRequest request);
 }
 
 @immutable

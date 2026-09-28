@@ -3364,11 +3364,11 @@ void main() {
     );
     expect(tabParagraph.text.style?.fontFamily, isNotNull);
     final reviewParagraph = tester.renderObject<RenderParagraph>(
-      find.text('Write review'),
+      find.text('Rate or review'),
     );
     expect(
       reviewParagraph.getBoxesForSelection(
-        const TextSelection(baseOffset: 6, extentOffset: 12),
+        const TextSelection(baseOffset: 8, extentOffset: 14),
       ),
       hasLength(1),
     );

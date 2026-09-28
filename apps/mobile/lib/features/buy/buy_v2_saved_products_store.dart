@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'buy_v2_content_contracts.dart';
@@ -124,7 +125,8 @@ class BuyV2ProductReviewDraft {
   const BuyV2ProductReviewDraft({required this.rating, required this.comment});
   final int rating;
   final String comment;
-  bool get valid => rating >= 0 && rating <= 5 && comment.length <= 8000;
+  bool get valid =>
+      rating >= 0 && rating <= 5 && comment.characters.length <= 8000;
 }
 
 @immutable
