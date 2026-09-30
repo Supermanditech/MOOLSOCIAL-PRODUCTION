@@ -9482,10 +9482,72 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  String cartPurchaseTypeFor(BuyV2Product product) =>
+      product.destination == BuyV2Destination.wholesale
+      ? (product.offerClass == BuyV2OfferClass.bulk ? 'bulk' : 'wholesale')
+      : product.destination.name;
+
+  bool canPageCartDiscovery(BuyV2Destination destination) =>
+      _sourceForCatalogue(destination) != null;
+
+  bool _cartDealSourceCurrent(BuyV2Product product) {
+    if (!product.catalogueListing ||
+        product.storeId?.trim().isNotEmpty != true ||
+        !_procurementDiscoveryAllows(product) ||
+        !_availableForDiscovery(product)) {
+      return false;
+    }
+    final grant = product.procurementSupplierGrant;
+    return grant == null ||
+        (grant.approved &&
+            grant.published &&
+            grant.storeId == product.storeId &&
+            grant.listingId == product.id &&
+            grant.productCanonicalId == product.canonicalId &&
+            grant.offerId.trim().isNotEmpty &&
+            grant.offerRevision.trim().isNotEmpty &&
+            catalogueNow().isBefore(grant.validUntil));
+  }
+
+  BuyV2PackPriceTier? nextCartDealTierFor(BuyV2Product product) {
+    if (!_cartDealSourceCurrent(product)) return null;
+    final terms = product.packTerms;
+    if (terms == null ||
+        !product.hasValidPackTerms ||
+        !terms.pricingCurrentAt(catalogueNow())) {
+      return null;
+    }
+    final quantity = math.max(product.minimumOrder, quantityFor(product.id));
+    final price = productFactsFor(product).price;
+    for (final tier in terms.priceTiers) {
+      if (tier.minimumPacks <= quantity || tier.price >= price) continue;
+      final target =
+          product.minimumOrder +
+          ((tier.minimumPacks -
+                      product.minimumOrder +
+                      product.quantityStep -
+                      1) ~/
+                  product.quantityStep) *
+              product.quantityStep;
+      if (target > 9007199254740991) return null;
+      final targetPrice = terms.priceForQuantity(target, price);
+      if (targetPrice < price) {
+        return BuyV2PackPriceTier(minimumPacks: target, price: targetPrice);
+      }
+    }
+    return null;
+  }
+
+  bool hasCartStoreDeal(BuyV2Product product) =>
+      _cartDealSourceCurrent(product) &&
+      ((product.mrp != null && product.mrp! > productFactsFor(product).price) ||
+          nextCartDealTierFor(product) != null);
+
   List<BuyV2Product> cartRecommendationsFor(
     BuyV2Destination destination, {
     Set<String> excludedProductIds = const {},
     bool specialOffersOnly = false,
+    String? purchaseType,
     int limit = 6,
   }) {
     if (destination == BuyV2Destination.orders || limit <= 0) {
@@ -9519,13 +9581,16 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == destination &&
+              (purchaseType == null ||
+                  purchaseType == 'all' ||
+                  cartPurchaseTypeFor(product) == purchaseType) &&
               product.catalogueListing &&
               !cartProductIds.contains(product.id) &&
               !excludedProductIds.contains(product.id),
         )
         .where(_procurementDiscoveryAllows)
         .where(_availableForDiscovery)
-        .where((product) => !specialOffersOnly || hasOffer(product))
+        .where((product) => !specialOffersOnly || hasCartStoreDeal(product))
         .toList(growable: false);
     candidates.sort((left, right) {
       final scoreOrder = score(right).compareTo(score(left));

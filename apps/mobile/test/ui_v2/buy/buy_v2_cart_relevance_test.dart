@@ -308,6 +308,96 @@ void main() {
       );
       expect(paged.quantityFor(originalId), 1);
       expect(paged.quantityFor(repeatedId), 0);
+      final beforeDiscovery = session.cartTotal;
+      for (final type in ['shop', 'wholesale', 'bulk']) {
+        final destination = type == 'shop'
+            ? BuyV2Destination.shop
+            : BuyV2Destination.wholesale;
+        final choices = session.cartRecommendationsFor(
+          destination,
+          purchaseType: type,
+          limit: 1000,
+        );
+        expect(choices, isNotEmpty);
+        expect(
+          choices.every((p) => session.cartPurchaseTypeFor(p) == type),
+          isTrue,
+        );
+        expect(session.cartTotal, beforeDiscovery);
+      }
+      expect(
+        session.cartRecommendationsFor(
+          BuyV2Destination.shop,
+          purchaseType: 'bulk',
+        ),
+        isEmpty,
+      );
+      final reviewSource = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+        providerCount: 1,
+        includeVariantReviewFixtures: true,
+      );
+      var clockOffset = Duration.zero;
+      final reviewCore = BuySession();
+      final review = BuyV2Session(
+        core: reviewCore,
+        cataloguePageSource: reviewSource,
+        catalogueNow: () => DateTime.now().add(clockOffset),
+      );
+      addTearDown(review.dispose);
+      addTearDown(reviewCore.dispose);
+      final phoneId = reviewSource.productIdAt(0, templates.length);
+      expect(await review.openLinkedProduct(phoneId), isTrue);
+      BuyV2Product? suppliedPack;
+      for (var offset = 1; offset <= 12; offset++) {
+        final id = reviewSource.productIdAt(0, templates.length + offset);
+        expect(await review.openLinkedProduct(id), isTrue);
+        final candidate = review.product(id);
+        if (candidate.packTerms?.priceTiers.isNotEmpty == true) {
+          suppliedPack = candidate;
+          break;
+        }
+      }
+      expect(suppliedPack, isNotNull);
+      final pack = suppliedPack!;
+      final packId = pack.id;
+      expect(pack.hasValidPackTerms, isTrue);
+      final packFacts = review.productFactsFor(pack);
+      expect(
+        review.nextCartDealTierFor(pack)?.minimumPacks,
+        5,
+        reason:
+            'pack=${pack.id} store=${pack.storeId} listing=${pack.catalogueListing} '
+            'price=${packFacts.price} state=${packFacts.orderabilityLabel} stale=${packFacts.stale} '
+            'terms=${pack.packTerms?.priceTiers.map((t) => "${t.minimumPacks}:${t.price}").join(",")} '
+            'current=${pack.packTerms?.pricingCurrentAt(DateTime.now())}',
+      );
+      expect(review.nextCartDealTierFor(pack)?.price, 380);
+      final deals = review.cartRecommendationsFor(
+        BuyV2Destination.shop,
+        specialOffersOnly: true,
+        limit: 1000,
+      );
+      expect(deals.map((p) => p.id), containsAll([phoneId, packId]));
+      expect(deals.every(review.hasCartStoreDeal), isTrue);
+      expect(review.cartTotal, 0);
+      expect(review.addProduct(packId), isTrue);
+      expect(
+        review.quantityFor(packId),
+        2,
+        reason: 'A deal does not auto-add its tier quantity',
+      );
+      review.increase(packId);
+      expect(review.quantityFor(packId), 5);
+      expect(review.nextCartDealTierFor(pack)?.minimumPacks, 8);
+      expect(review.nextCartDealTierFor(pack)?.price, 360);
+      clockOffset = const Duration(days: 2);
+      expect(review.nextCartDealTierFor(pack), isNull);
+      expect(review.hasCartStoreDeal(pack), isFalse);
+      final unidentified = BuyV2Catalogue.products.firstWhere(
+        (p) => p.storeId == null,
+      );
+      expect(review.hasCartStoreDeal(unidentified), isFalse);
     });
 
     test('bill savings derive only from current MRP and quantities', () {

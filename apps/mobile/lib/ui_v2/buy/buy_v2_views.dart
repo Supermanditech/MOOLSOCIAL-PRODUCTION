@@ -22042,58 +22042,322 @@ class _CartDiscoverySections extends StatefulWidget {
 
 class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
   String _category = 'all';
-  late String _filter;
+  String _purchaseType = 'all';
+  bool _showDeals = false;
+  bool _restored = false;
+  int _limit = 24;
+  int _candidateCount = 0;
+  int _candidateCategoryCount = 0;
+  int _browseEpoch = 0;
+  int _pageRound = 0;
+  bool _loadingMore = false;
+  bool _moreGestureHandled = false;
+  final _pagers = <String, BuyV2CataloguePager<BuyV2Product>>{};
+  final _pagerScopes = <String, String>{};
+  String? _scopeOwner;
+  int _moreRequest = 0;
 
-  String get _storageId => 'buy-cart-category-$_filter';
+  String get _storageId =>
+      'buy-cart-category-$_purchaseType-${_showDeals ? 'deals' : 'products'}';
+
+  String get _limitId => '$_storageId-$_category-limit';
+  String _pagerScope(String type) =>
+      'cart-explore-${widget.session.cartScope.name}-$type';
+  BuyV2Destination _typeDestination(String type) => type == 'shop'
+      ? BuyV2Destination.shop
+      : type == 'medicine'
+      ? BuyV2Destination.medicine
+      : BuyV2Destination.wholesale;
+  List<String> get _pagingTypes {
+    final types = widget.session.usesMixedCartSelection
+        ? (_purchaseType == 'all'
+              ? ['shop', 'wholesale', 'bulk']
+              : [_purchaseType])
+        : widget.destinations.map((destination) => destination.name).toList();
+    return types
+        .where(
+          (type) =>
+              (_category == 'all' ||
+                  _category.startsWith('${_typeDestination(type).name}:')) &&
+              widget.session.canPageCartDiscovery(_typeDestination(type)),
+        )
+        .toList();
+  }
+
+  BuyV2CatalogueQuery _pagingQuery(String type) => BuyV2CatalogueQuery(
+    destination: _typeDestination(type),
+    procurementContext: widget.session.procurementContext,
+    regionId: widget.session.catalogueRegionId,
+    customerLocationKey: widget.session.eligibilityLocationKey,
+    areaScope: widget.session.catalogueAreaScope,
+    wholesaleSaleType: type == 'bulk'
+        ? BuyV2WholesaleSaleType.bulk
+        : type == 'wholesale'
+        ? BuyV2WholesaleSaleType.wholesale
+        : null,
+    categoryId: _category == 'all' ? 'all' : _category.split(':').last,
+  );
+  bool _canPage(String type) {
+    final pager = _pagers[type];
+    return pager == null ||
+        pager.query != _pagingQuery(type) ||
+        pager.page == null ||
+        pager.message != null ||
+        pager.page?.nextCursor != null;
+  }
+
+  bool get _canBrowseMore => _hasMoreLoaded || _pagingTypes.any(_canPage);
+  bool get _hasMoreLoaded =>
+      _candidateCount > _limit ||
+      _category == 'all' && _candidateCategoryCount > _limit ~/ 6;
+  String get _moreLabel => _loadingMore
+      ? 'Loading products…'
+      : _pagingTypes.any((type) => _pagers[type]?.message != null)
+      ? 'Try again'
+      : 'More products';
+
+  Future<void> _browseMore() async {
+    if (_loadingMore || !_canBrowseMore) return;
+    if (_hasMoreLoaded) {
+      setState(() => _limit += 24);
+      PageStorage.maybeOf(
+        context,
+      )?.writeState(context, _limit, identifier: _limitId);
+      return;
+    }
+    final types = _pagingTypes.where(_canPage).toList();
+    if (types.isEmpty) return;
+    final type = types[_pageRound++ % types.length];
+    final epoch = _browseEpoch;
+    final request = ++_moreRequest;
+    final pager = _pagers.putIfAbsent(type, () {
+      final scope = _pagerScope(type);
+      _pagerScopes[type] = scope;
+      return widget.session.acquireCatalogueProducts(scope);
+    });
+    final query = _pagingQuery(type);
+    setState(() => _loadingMore = true);
+    if (pager.query != query || pager.page == null && pager.message == null) {
+      await pager.open(query);
+    } else if (pager.message != null) {
+      await pager.retry();
+    } else {
+      await pager.next();
+    }
+    if (!mounted || request != _moreRequest) return;
+    if (epoch == _browseEpoch && pager.message == null) {
+      for (final product in pager.page?.items ?? const <BuyV2Product>[]) {
+        if (widget.session.quantityFor(product.id) == 0) {
+          widget.session.refreshProductFacts(product.id);
+        }
+      }
+    }
+    setState(() {
+      _loadingMore = false;
+      if (epoch == _browseEpoch && pager.message == null) _limit += 24;
+    });
+    if (epoch == _browseEpoch) {
+      PageStorage.maybeOf(
+        context,
+      )?.writeState(context, _limit, identifier: _limitId);
+    }
+  }
+
+  bool _browseScroll(ScrollNotification notice) {
+    if (notice.depth != 0 || notice.metrics.axis != Axis.horizontal) {
+      return false;
+    }
+    if (notice is ScrollStartNotification && notice.dragDetails != null) {
+      _moreGestureHandled = false;
+    }
+    final dragging =
+        notice is ScrollUpdateNotification && notice.dragDetails != null ||
+        notice is OverscrollNotification &&
+            notice.dragDetails != null &&
+            notice.overscroll > 0;
+    if (dragging &&
+        notice.metrics.extentAfter < 32 &&
+        !_moreGestureHandled &&
+        _canBrowseMore) {
+      _moreGestureHandled = true;
+      unawaited(_browseMore());
+    }
+    return false;
+  }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _filter = widget.session.cartDisplayFilter;
-    _category =
-        PageStorage.maybeOf(context)?.readState(context, identifier: _storageId)
-            as String? ??
-        'all';
+  void dispose() {
+    _releasePagers(widget.session);
+    super.dispose();
+  }
+
+  void _releasePagers(BuyV2Session session) {
+    _moreRequest++;
+    for (final scope in _pagerScopes.values) {
+      session.releaseCatalogueProducts(scope);
+    }
+    _pagers.clear();
+    _pagerScopes.clear();
+    _loadingMore = false;
   }
 
   @override
   void didUpdateWidget(covariant _CartDiscoverySections oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_filter != widget.session.cartDisplayFilter) {
-      _filter = widget.session.cartDisplayFilter;
-      _category =
-          PageStorage.maybeOf(
-                context,
-              )?.readState(context, identifier: _storageId)
-              as String? ??
-          'all';
+    if (oldWidget.session != widget.session || _scopeOwner != _pagerScope('')) {
+      _releasePagers(oldWidget.session);
+      _scopeOwner = _pagerScope('');
+      _restoreCategory();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_restored) return;
+    _restored = true;
+    _scopeOwner = _pagerScope('');
+    final storage = PageStorage.maybeOf(context);
+    final types = widget.session.cartLines
+        .map((line) => widget.session.cartPurchaseTypeFor(line.product))
+        .toSet();
+    _purchaseType =
+        storage?.readState(context, identifier: 'buy-cart-discovery-type')
+            as String? ??
+        (types.length == 1 && types.single != 'medicine'
+            ? types.single
+            : 'all');
+    _showDeals =
+        storage?.readState(context, identifier: 'buy-cart-discovery-deals')
+            as bool? ??
+        false;
+    _restoreCategory();
+  }
+
+  void _restoreCategory() {
+    _category =
+        PageStorage.maybeOf(context)?.readState(context, identifier: _storageId)
+            as String? ??
+        'all';
+    _limit =
+        PageStorage.maybeOf(context)?.readState(context, identifier: _limitId)
+            as int? ??
+        24;
+    _browseEpoch++;
+    _moreGestureHandled = false;
+  }
+
+  void _chooseType(String type) {
+    if (_purchaseType == type) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _purchaseType = type;
+      _restoreCategory();
+    });
+    PageStorage.maybeOf(
+      context,
+    )?.writeState(context, type, identifier: 'buy-cart-discovery-type');
+  }
+
+  void _toggleDeals() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _showDeals = !_showDeals;
+      _restoreCategory();
+    });
+    PageStorage.maybeOf(
+      context,
+    )?.writeState(context, _showDeals, identifier: 'buy-cart-discovery-deals');
   }
 
   void _chooseCategory(String category) {
     if (_category == category) return;
     HapticFeedback.selectionClick();
-    setState(() => _category = category);
+    setState(() {
+      _category = category;
+      _limit = 24;
+      _browseEpoch++;
+      _moreGestureHandled = false;
+    });
     PageStorage.maybeOf(
       context,
     )?.writeState(context, category, identifier: _storageId);
   }
 
+  Widget _choice(String key, String label, bool selected, VoidCallback onTap) =>
+      Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          key: ValueKey(key),
+          label: Text(label),
+          selected: selected,
+          showCheckmark: false,
+          side: BorderSide.none,
+          backgroundColor: BuyV2ActionStyle.primaryFill,
+          selectedColor: BuyV2ActionStyle.pressedFill,
+          elevation: selected ? 2 : 0,
+          materialTapTargetSize: MaterialTapTargetSize.padded,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            color: BuyV2ActionStyle.primaryForeground,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+          onSelected: (_) => onTap(),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final destinations = widget.destinations;
+    final mixed = session.usesMixedCartSelection;
+    final destinations = mixed
+        ? [
+            BuyV2Destination.shop,
+            BuyV2Destination.wholesale,
+            if (widget.destinations.contains(BuyV2Destination.medicine))
+              BuyV2Destination.medicine,
+          ]
+        : widget.destinations;
+    final hasDeals = destinations.any(
+      (destination) => session
+          .cartRecommendationsFor(
+            destination,
+            specialOffersOnly: true,
+            limit: 1,
+          )
+          .isNotEmpty,
+    );
+    if (_showDeals && !hasDeals) {
+      _showDeals = false;
+      PageStorage.maybeOf(
+        context,
+      )?.writeState(context, false, identifier: 'buy-cart-discovery-deals');
+      _restoreCategory();
+    }
     final products = <BuyV2Product>[];
     final seen = <String>{};
     for (final destination in destinations) {
       for (final product in session.cartRecommendationsFor(
         destination,
-        limit: 24,
+        limit: 1000,
+        purchaseType: mixed ? _purchaseType : null,
+        specialOffersOnly: _showDeals,
       )) {
         if (seen.add(product.id)) products.add(product);
       }
     }
-    if (products.isEmpty) return const SizedBox.shrink();
+    final basketProducts = session.cartLines
+        .map((line) => line.product)
+        .toList();
+    bool fromBasketStore(BuyV2Product product) =>
+        basketProducts.any(product.isFromSameStoreAs);
+    final storeFirst = [
+      ...products.where(fromBasketStore),
+      ...products.where((product) => !fromBasketStore(product)),
+    ];
+    products
+      ..clear()
+      ..addAll(storeFirst);
     final categories = <(String, String)>[
       for (final destination in destinations)
         for (final category in session.categoriesFor(destination))
@@ -22105,8 +22369,8 @@ class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
               ))
             (
               '${destination.name}:${category.id}',
-              destinations.length > 1
-                  ? '${_cartDestinationLabel(session, destination)} · ${category.label}'
+              mixed && _purchaseType == 'all'
+                  ? '${destination == BuyV2Destination.wholesale ? 'Wholesale & Bulk' : destination.label} · ${category.label}'
                   : category.label,
             ),
     ];
@@ -22116,7 +22380,7 @@ class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
         context,
       )?.writeState(context, _category, identifier: _storageId);
     }
-    final visible = _category == 'all'
+    final matching = _category == 'all'
         ? products
         : products
               .where(
@@ -22125,6 +22389,39 @@ class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
                     _category,
               )
               .toList(growable: false);
+    _candidateCount = matching.length;
+    _candidateCategoryCount = matching
+        .map((product) => '${product.destination.name}:${product.categoryId}')
+        .toSet()
+        .length;
+    final storage = PageStorage.maybeOf(context);
+    final orderId = '$_storageId-$_category-order';
+    final previous =
+        storage?.readState(context, identifier: orderId) as List<String>? ??
+        const [];
+    final byId = {for (final product in matching) product.id: product};
+    final ordered = [
+      for (final id in previous)
+        if (byId.containsKey(id)) byId.remove(id)!,
+      ...byId.values,
+    ];
+    final visible = [
+      ...ordered.where(fromBasketStore),
+      ...ordered.where((product) => !fromBasketStore(product)),
+    ].take(_limit).toList();
+    storage?.writeState(
+      context,
+      visible.map((product) => product.id).toList(),
+      identifier: orderId,
+    );
+    final shelves = <String, List<BuyV2Product>>{};
+    for (final product in visible) {
+      final id = '${product.destination.name}:${product.categoryId}';
+      shelves.putIfAbsent(id, () => []).add(product);
+    }
+    final categoryLabels = {
+      for (final category in categories) category.$1: category.$2,
+    };
     return ExpansionTile(
       key: const PageStorageKey('buy-cart-discovery'),
       initiallyExpanded: true,
@@ -22136,52 +22433,188 @@ class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
       childrenPadding: EdgeInsets.zero,
       shape: const Border(),
       collapsedShape: const Border(),
-      title: Text(
-        'More products & offers',
-        style: context.buyBody.copyWith(fontSize: 14),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _showDeals ? 'Store deals' : 'Explore products',
+              style: context.buyBody.copyWith(fontSize: 14),
+            ),
+          ),
+          if (hasDeals)
+            TextButton(
+              key: const ValueKey('buy-cart-deal-switch'),
+              style: TextButton.styleFrom(
+                foregroundColor: BuyV2ActionStyle.primaryForeground,
+                minimumSize: const Size(44, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                textStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: _toggleDeals,
+              child: Text(_showDeals ? 'Products' : 'Store deals'),
+            ),
+        ],
       ),
       children: [
-        if (categories.length > 1 || _category != 'all')
+        if (mixed)
           SingleChildScrollView(
-            key: PageStorageKey('buy-cart-category-scroll-$_filter'),
+            key: const PageStorageKey('buy-cart-discovery-type-scroll'),
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                for (final category in [('all', 'All products'), ...categories])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      key: ValueKey('buy-cart-category-${category.$1}'),
-                      label: Text(category.$2),
-                      selected: _category == category.$1,
-                      showCheckmark: false,
-                      side: BorderSide.none,
-                      backgroundColor: BuyV2ActionStyle.primaryFill,
-                      selectedColor: BuyV2ActionStyle.pressedFill,
-                      elevation: _category == category.$1 ? 2 : 0,
-                      materialTapTargetSize: MaterialTapTargetSize.padded,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        color: BuyV2ActionStyle.primaryForeground,
-                        fontWeight: _category == category.$1
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                      onSelected: (_) => _chooseCategory(category.$1),
-                    ),
+                for (final type in const ['all', 'shop', 'wholesale', 'bulk'])
+                  _choice(
+                    'buy-cart-discovery-type-$type',
+                    switch (type) {
+                      'all' => 'All products',
+                      'shop' => 'Retail products',
+                      'wholesale' => 'Wholesale packs',
+                      _ => 'Bulk lots',
+                    },
+                    _purchaseType == type,
+                    () => _chooseType(type),
                   ),
               ],
             ),
           ),
-        KeyedSubtree(
-          key: PageStorageKey('buy-cart-category-lane-$_filter-$_category'),
-          child: _CartProductLane(
-            session: session,
-            destination: destinations.first,
-            laneId: 'recommendations',
-            products: visible,
+        if (categories.length > 1 || _category != 'all')
+          SingleChildScrollView(
+            key: PageStorageKey(
+              'buy-cart-category-scroll-$_purchaseType-$_showDeals',
+            ),
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final category in [
+                  ('all', 'All categories'),
+                  ...categories,
+                ])
+                  _choice(
+                    'buy-cart-category-${category.$1}',
+                    category.$2,
+                    _category == category.$1,
+                    () => _chooseCategory(category.$1),
+                  ),
+              ],
+            ),
           ),
-        ),
+        if (visible.isEmpty)
+          Padding(
+            key: const ValueKey('buy-cart-discovery-empty'),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            child: Text(
+              'No ${switch (_purchaseType) {
+                'shop' => 'retail ',
+                'wholesale' => 'wholesale ',
+                'bulk' => 'bulk ',
+                _ => '',
+              }}${_showDeals ? 'deals' : 'products'} shown here.',
+              style: context.buyMeta.copyWith(fontSize: 12),
+            ),
+          ),
+        if (visible.isNotEmpty)
+          KeyedSubtree(
+            key: PageStorageKey(
+              'buy-cart-category-lane-$_purchaseType-$_showDeals-$_category',
+            ),
+            child: _category != 'all'
+                ? _CartProductLane(
+                    session: session,
+                    destination: visible.first.destination,
+                    laneId: 'recommendations',
+                    products: visible,
+                    showDeal: _showDeals,
+                    onBrowseScroll: _browseScroll,
+                  )
+                : Container(
+                    key: ValueKey(
+                      'buy-cart-recommendations-${visible.first.destination.name}',
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final shelf in shelves.entries.take(_limit ~/ 6))
+                          Padding(
+                            key: ValueKey(
+                              'buy-cart-category-shelf-${shelf.key}',
+                            ),
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Semantics(
+                                        header: true,
+                                        child: Text(
+                                          categoryLabels[shelf.key] ??
+                                              'Other products',
+                                          style: context.buyBody.copyWith(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (categoryLabels.containsKey(shelf.key))
+                                      TextButton(
+                                        key: ValueKey(
+                                          'buy-cart-category-view-${shelf.key}',
+                                        ),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: BuyV2ActionStyle
+                                              .primaryForeground,
+                                          minimumSize: const Size(44, 44),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        onPressed: () =>
+                                            _chooseCategory(shelf.key),
+                                        child: const Text('See all'),
+                                      ),
+                                  ],
+                                ),
+                                _CartProductLane(
+                                  session: session,
+                                  destination: shelf.value.first.destination,
+                                  laneId: 'recommendations-${shelf.key}',
+                                  products: shelf.value,
+                                  showDeal: _showDeals,
+                                  onBrowseScroll: _browseScroll,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
+        if (_canBrowseMore)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const ValueKey('buy-cart-discovery-more'),
+              style: TextButton.styleFrom(
+                foregroundColor: BuyV2ActionStyle.primaryForeground,
+                minimumSize: const Size(44, 44),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: _loadingMore ? null : _browseMore,
+              icon: const Icon(Icons.expand_more, size: 18),
+              label: Text(_moreLabel),
+            ),
+          ),
       ],
     );
   }
@@ -22193,12 +22626,16 @@ class _CartProductLane extends StatelessWidget {
     required this.destination,
     required this.laneId,
     required this.products,
+    this.showDeal = false,
+    this.onBrowseScroll,
   });
 
   final BuyV2Session session;
   final BuyV2Destination destination;
   final String laneId;
   final List<BuyV2Product> products;
+  final bool showDeal;
+  final bool Function(ScrollNotification)? onBrowseScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -22208,20 +22645,27 @@ class _CartProductLane extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SingleChildScrollView(
-            key: PageStorageKey('buy-cart-$laneId-scroll-${destination.name}'),
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var index = 0; index < products.length; index++) ...[
-                  if (index > 0) const SizedBox(width: 7),
-                  _CartRecommendationCard(
-                    session: session,
-                    product: products[index],
-                  ),
+          NotificationListener<ScrollNotification>(
+            onNotification: onBrowseScroll,
+            child: SingleChildScrollView(
+              key: PageStorageKey(
+                'buy-cart-$laneId-scroll-${destination.name}',
+              ),
+              scrollDirection: Axis.horizontal,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < products.length; index++) ...[
+                    if (index > 0) const SizedBox(width: 7),
+                    _CartRecommendationCard(
+                      session: session,
+                      product: products[index],
+                      showDeal: showDeal,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ],
@@ -22231,15 +22675,21 @@ class _CartProductLane extends StatelessWidget {
 }
 
 class _CartRecommendationCard extends StatelessWidget {
-  const _CartRecommendationCard({required this.session, required this.product});
+  const _CartRecommendationCard({
+    required this.session,
+    required this.product,
+    this.showDeal = false,
+  });
 
   final BuyV2Session session;
   final BuyV2Product product;
+  final bool showDeal;
 
   @override
   Widget build(BuildContext context) {
     final facts = session.productFactsFor(product);
     final hasSaving = product.mrp != null && product.mrp! > facts.price;
+    final tier = showDeal ? session.nextCartDealTierFor(product) : null;
     final priceWidth = buyV2ValueTextSize(
       context,
       buyV2Money(hasSaving ? product.mrp! : facts.price),
@@ -22314,6 +22764,11 @@ class _CartRecommendationCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   [
+                    product.destination == BuyV2Destination.medicine
+                        ? product.destination.label
+                        : _cartFilterLabel(
+                            session.cartPurchaseTypeFor(product),
+                          ),
                     product.customerVariantPack,
                     if (facts.price == product.price) product.unitPrice,
                   ].where((text) => text.trim().isNotEmpty).join(' · '),
@@ -22338,6 +22793,18 @@ class _CartRecommendationCard extends StatelessWidget {
                     style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
                   ),
                 const SizedBox(height: 4),
+                if (showDeal && (tier != null || hasSaving))
+                  Text(
+                    tier != null
+                        ? 'Buy ${tier.minimumPacks}+ at ${buyV2Money(tier.price)} each'
+                        : 'Save ${buyV2Money(product.mrp! - facts.price)} each',
+                    key: ValueKey('buy-cart-deal-${product.id}'),
+                    style: context.buyMeta.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: BuyV2ActionStyle.primaryForeground,
+                    ),
+                  ),
                 Row(
                   children: [
                     Expanded(

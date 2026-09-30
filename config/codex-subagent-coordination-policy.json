@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "465F811B8C519F753A2228CFC16BBFB219E2043ED66CDF5A3C83E55786FD7A6F"
+    "sha256": "CA6C48772A67A3625F52E2060B4694CAA63FF31A431D8627E5D9F729C7ED58B8"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -207,7 +207,11 @@
         "docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-1.jsonl",
         "docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-2.jsonl",
         "docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-1.jsonl",
-        "docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-2.jsonl"
+        "docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-CART-EXPLORE-DEALS-20260930-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-CART-EXPLORE-DEALS-20260930-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-CART-EXPLORE-REVIEW-20260930-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-CART-EXPLORE-REVIEW-20260930-SELECTED-2.jsonl"
       ]
     },
     {

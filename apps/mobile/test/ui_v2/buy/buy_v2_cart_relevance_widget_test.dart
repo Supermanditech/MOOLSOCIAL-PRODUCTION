@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
@@ -36,142 +37,6 @@ void main() {
     );
   }
 
-  for (final scale in [1.0, 2.0]) {
-    testWidgets(
-      'T01 mixed Cart filters and deselection remain usable at $scale',
-      (tester) async {
-        tester.view.physicalSize = const Size(720, 1600);
-        tester.view.devicePixelRatio = 2;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final core = BuySession();
-        final session = BuyV2Session(core: core);
-        addTearDown(session.dispose);
-        addTearDown(core.dispose);
-        session.addProduct('s-tomato');
-        session.addProduct('w-notebook');
-        session.openCart();
-        await tester.pumpWidget(app(session, textScale: scale));
-        await tester.pumpAndSettle();
-        final selectedFilter = tester.widget<ChoiceChip>(
-          find.byKey(const ValueKey('buy-cart-filter-all')),
-        );
-        expect(
-          selectedFilter.labelStyle?.color,
-          BuyV2ActionStyle.primaryForeground,
-        );
-        expect(
-          selectedFilter.labelStyle?.color,
-          isNot(selectedFilter.selectedColor),
-        );
-        final cardRect = tester.getRect(
-          find.byKey(const ValueKey('buy-cart-line-s-tomato')),
-        );
-        final selectionRect = tester.getRect(
-          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
-        );
-        expect(
-          cardRect.contains(selectionRect.center),
-          isTrue,
-          reason: 'Selection shares card width instead of a separate gutter',
-        );
-        expect(cardRect.width, greaterThan(320));
-        final total = session.scopedPayableTotal;
-        await tester.tap(find.byKey(const ValueKey('buy-cart-filter-shop')));
-        await tester.pumpAndSettle();
-        expect(session.visibleCartLines.single.product.id, 's-tomato');
-        expect(session.scopedPayableTotal, total);
-        await tester.tap(
-          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
-        );
-        await tester.pumpAndSettle();
-        expect(session.cartLines.single.product.id, 'w-notebook');
-        expect(
-          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
-          findsOneWidget,
-        );
-        await tester.tap(
-          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
-        );
-        await tester.pumpAndSettle();
-        expect(session.scopedPayableTotal, total);
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox());
-        for (var mask = 1; mask < 8; mask++) {
-          final combinationCore = BuySession();
-          final combination = BuyV2Session(core: combinationCore);
-          const ids = ['s-tomato', 'w-notebook', 'w-rice'];
-          for (var i = 0; i < ids.length; i++) {
-            if ((mask & (1 << i)) != 0) {
-              expect(combination.addProduct(ids[i]), isTrue);
-            }
-          }
-          combination.openCart();
-          await tester.pumpWidget(app(combination, textScale: scale));
-          await tester.pumpAndSettle();
-          final payable = combination.scopedPayableTotal;
-          for (final filter in ['shop', 'wholesale', 'bulk', 'all']) {
-            final chip = find.byKey(ValueKey('buy-cart-filter-$filter'));
-            await tester.ensureVisible(chip);
-            await tester.tap(chip);
-            await tester.pumpAndSettle();
-            final visible = combination.visibleCartLines;
-            final quantity = visible.fold<int>(
-              0,
-              (sum, line) => sum + line.quantity,
-            );
-            final trade =
-                visible.isNotEmpty &&
-                visible.every(
-                  (line) =>
-                      line.product.destination == BuyV2Destination.wholesale,
-                );
-            final contextLabel = switch (filter) {
-              'shop' => 'Shop · ',
-              'wholesale' => 'Wholesale · ',
-              'bulk' => 'Bulk · ',
-              _ => '',
-            };
-            final quantityLabel = trade
-                ? '$quantity ${quantity == 1 ? 'pack' : 'packs'}'
-                : '$quantity ${quantity == 1 ? 'item' : 'items'}';
-            final header = tester.widget<BuyV2FiniteValueTransition>(
-              find.byKey(const ValueKey('buy-cart-header-value-motion')),
-            );
-            expect(
-              header.text,
-              '$contextLabel${visible.length} ${visible.length == 1 ? 'product' : 'products'} · $quantityLabel',
-              reason: 'Combination $mask / $filter',
-            );
-            expect(combination.scopedPayableTotal, payable);
-            final hidden = combination.cartLines.length - visible.length;
-            expect(
-              find.byKey(const ValueKey('buy-cart-view-hidden-selection')),
-              hidden > 0 ? findsOneWidget : findsNothing,
-            );
-            expect(tester.takeException(), isNull);
-          }
-          for (final line in combination.cartLines.toList()) {
-            combination.selectCartProduct(line.product.id, false);
-          }
-          await tester.pumpAndSettle();
-          expect(find.text('Select products to checkout'), findsOneWidget);
-          expect(combination.visibleCartLines, isNotEmpty);
-          await tester.pumpWidget(const SizedBox());
-          combination.dispose();
-          combinationCore.dispose();
-        }
-      },
-    );
-  }
-
-  BuyV2Product productFor(BuyV2Destination destination) =>
-      BuyV2Catalogue.products.firstWhere(
-        (candidate) =>
-            candidate.destination == destination &&
-            !candidate.requiresPrescription,
-      );
-
   Future<void> showInMainCartList(
     WidgetTester tester,
     Finder target, {
@@ -199,6 +64,223 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T01 mixed Cart filters and deselection remain usable at $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(720, 1600);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-tomato');
+      session.addProduct('w-notebook');
+      session.openCart();
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final selectedFilter = tester.widget<ChoiceChip>(
+        find.byKey(const ValueKey('buy-cart-filter-all')),
+      );
+      expect(
+        selectedFilter.labelStyle?.color,
+        BuyV2ActionStyle.primaryForeground,
+      );
+      expect(
+        selectedFilter.labelStyle?.color,
+        isNot(selectedFilter.selectedColor),
+      );
+      final cardRect = tester.getRect(
+        find.byKey(const ValueKey('buy-cart-line-s-tomato')),
+      );
+      final selectionRect = tester.getRect(
+        find.byKey(const ValueKey('buy-cart-select-s-tomato')),
+      );
+      expect(
+        cardRect.contains(selectionRect.center),
+        isTrue,
+        reason: 'Selection shares card width instead of a separate gutter',
+      );
+      expect(cardRect.width, greaterThan(320));
+      final total = session.scopedPayableTotal;
+      await tester.tap(find.byKey(const ValueKey('buy-cart-filter-shop')));
+      await tester.pumpAndSettle();
+      expect(session.visibleCartLines.single.product.id, 's-tomato');
+      expect(session.scopedPayableTotal, total);
+      await tester.tap(find.byKey(const ValueKey('buy-cart-select-s-tomato')));
+      await tester.pumpAndSettle();
+      expect(session.cartLines.single.product.id, 'w-notebook');
+      expect(
+        find.byKey(const ValueKey('buy-cart-select-s-tomato')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-cart-select-s-tomato')));
+      await tester.pumpAndSettle();
+      expect(session.scopedPayableTotal, total);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      for (var mask = 1; mask < 8; mask++) {
+        final combinationCore = BuySession();
+        final combination = BuyV2Session(core: combinationCore);
+        const ids = ['s-tomato', 'w-notebook', 'w-rice'];
+        for (var i = 0; i < ids.length; i++) {
+          if ((mask & (1 << i)) != 0) {
+            expect(combination.addProduct(ids[i]), isTrue);
+          }
+        }
+        combination.openCart();
+        await tester.pumpWidget(app(combination, textScale: scale));
+        await tester.pumpAndSettle();
+        final payable = combination.scopedPayableTotal;
+        final initialType = mask == 1
+            ? 'shop'
+            : mask == 2
+            ? 'wholesale'
+            : mask == 4
+            ? 'bulk'
+            : 'all';
+        final discoveryType = find.byKey(
+          ValueKey('buy-cart-discovery-type-$initialType'),
+        );
+        await showInMainCartList(tester, discoveryType);
+        expect(tester.widget<ChoiceChip>(discoveryType).selected, isTrue);
+        final quantitiesBefore = {
+          for (final line in combination.cartLines)
+            line.product.id: line.quantity,
+        };
+        for (final type in ['shop', 'wholesale', 'bulk', 'all']) {
+          final choice = find.byKey(ValueKey('buy-cart-discovery-type-$type'));
+          await showInMainCartList(tester, choice);
+          await tester.ensureVisible(choice);
+          await tester.pumpAndSettle();
+          await tester.tap(choice);
+          await tester.pumpAndSettle();
+          expect(tester.widget<ChoiceChip>(choice).selected, isTrue);
+          expect(combination.cartDisplayFilter, 'all');
+          expect(combination.scopedPayableTotal, payable);
+          expect({
+            for (final line in combination.cartLines)
+              line.product.id: line.quantity,
+          }, quantitiesBefore);
+          final expected = [
+            ...combination.cartRecommendationsFor(
+              BuyV2Destination.shop,
+              purchaseType: type,
+              limit: 1000,
+            ),
+            ...combination.cartRecommendationsFor(
+              BuyV2Destination.wholesale,
+              purchaseType: type,
+              limit: 1000,
+            ),
+          ];
+          final discovery = find.byKey(
+            const PageStorageKey('buy-cart-discovery'),
+          );
+          final cards = find.descendant(
+            of: discovery,
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is InkWell &&
+                  w.key.toString().contains('buy-cart-recommendation-'),
+            ),
+          );
+          expect(cards.evaluate().length, lessThanOrEqualTo(24));
+          final basketProducts = combination.cartLines
+              .map((line) => line.product)
+              .toList();
+          final storeFirst = [
+            ...expected.where((p) => basketProducts.any(p.isFromSameStoreAs)),
+            ...expected.where((p) => !basketProducts.any(p.isFromSameStoreAs)),
+          ].take(24).toList();
+          final categoryRows = <String, List<BuyV2Product>>{};
+          for (final product in storeFirst) {
+            final id = '${product.destination.name}:${product.categoryId}';
+            categoryRows.putIfAbsent(id, () => []).add(product);
+          }
+          expect(
+            cards.evaluate().map((e) => e.widget.key),
+            categoryRows.values
+                .take(4)
+                .expand((row) => row)
+                .map((p) => ValueKey('buy-cart-recommendation-${p.id}')),
+            reason:
+                'Distinct category rows retain each exact SKU once and basket Stores first within each category',
+          );
+          for (final row in categoryRows.entries.take(4)) {
+            final shelf = find.byKey(
+              ValueKey('buy-cart-category-shelf-${row.key}'),
+            );
+            expect(shelf, findsOneWidget);
+            expect(
+              find.descendant(of: shelf, matching: find.byType(BuyV2AddFace)),
+              findsNWidgets(row.value.length),
+            );
+          }
+        }
+        for (final filter in ['shop', 'wholesale', 'bulk', 'all']) {
+          final chip = find.byKey(ValueKey('buy-cart-filter-$filter'));
+          await tester.ensureVisible(chip);
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          final visible = combination.visibleCartLines;
+          final quantity = visible.fold<int>(
+            0,
+            (sum, line) => sum + line.quantity,
+          );
+          final trade =
+              visible.isNotEmpty &&
+              visible.every(
+                (line) =>
+                    line.product.destination == BuyV2Destination.wholesale,
+              );
+          final contextLabel = switch (filter) {
+            'shop' => 'Shop · ',
+            'wholesale' => 'Wholesale · ',
+            'bulk' => 'Bulk · ',
+            _ => '',
+          };
+          final quantityLabel = trade
+              ? '$quantity ${quantity == 1 ? 'pack' : 'packs'}'
+              : '$quantity ${quantity == 1 ? 'item' : 'items'}';
+          final header = tester.widget<BuyV2FiniteValueTransition>(
+            find.byKey(const ValueKey('buy-cart-header-value-motion')),
+          );
+          expect(
+            header.text,
+            '$contextLabel${visible.length} ${visible.length == 1 ? 'product' : 'products'} · $quantityLabel',
+            reason: 'Combination $mask / $filter',
+          );
+          expect(combination.scopedPayableTotal, payable);
+          final hidden = combination.cartLines.length - visible.length;
+          expect(
+            find.byKey(const ValueKey('buy-cart-view-hidden-selection')),
+            hidden > 0 ? findsOneWidget : findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        }
+        for (final line in combination.cartLines.toList()) {
+          combination.selectCartProduct(line.product.id, false);
+        }
+        await tester.pumpAndSettle();
+        expect(find.text('Select products to checkout'), findsOneWidget);
+        expect(combination.visibleCartLines, isNotEmpty);
+        await tester.pumpWidget(const SizedBox());
+        combination.dispose();
+        combinationCore.dispose();
+      }
+    });
+  }
+
+  BuyV2Product productFor(BuyV2Destination destination) =>
+      BuyV2Catalogue.products.firstWhere(
+        (candidate) =>
+            candidate.destination == destination &&
+            !candidate.requiresPrescription,
+      );
 
   for (final scale in [1.0, 2.0]) {
     for (final multiple in [false, true]) {
@@ -1508,12 +1590,16 @@ void main() {
         final category = find.byKey(
           const ValueKey('buy-cart-category-shop:fruits-vegetables'),
         );
+        final categoryView = find.byKey(
+          const ValueKey('buy-cart-category-view-shop:fruits-vegetables'),
+        );
+        await showInMainCartList(tester, categoryView);
+        await tester.ensureVisible(categoryView);
+        await tester.pumpAndSettle();
+        expect(categoryView.hitTestable(), findsOneWidget);
+        await tester.tap(categoryView);
+        await tester.pumpAndSettle();
         await showInMainCartList(tester, category);
-        await tester.ensureVisible(category);
-        await tester.pumpAndSettle();
-        expect(category.hitTestable(), findsOneWidget);
-        await tester.tap(category);
-        await tester.pumpAndSettle();
         expect(tester.widget<ChoiceChip>(category).selected, isTrue);
         expect(session.cartTotal, total);
         expect(session.cartDisplayFilter, 'all');
@@ -1532,8 +1618,9 @@ void main() {
         );
         expect(cards, isNotEmpty);
         final expected = session
-            .cartRecommendationsFor(BuyV2Destination.shop, limit: 24)
+            .cartRecommendationsFor(BuyV2Destination.shop, limit: 1000)
             .where((p) => p.categoryId == 'fruits-vegetables')
+            .take(24)
             .toList();
         expect(cards.length, expected.length);
         expect(
@@ -1592,6 +1679,186 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.widget<ChoiceChip>(category).selected, isFalse);
         expect(tester.widget<ChoiceChip>(allProducts).selected, isTrue);
+        final switcher = find.byKey(const ValueKey('buy-cart-deal-switch'));
+        await showInMainCartList(tester, switcher);
+        await tester.ensureVisible(switcher);
+        await tester.pumpAndSettle();
+        final beforeDeals = session.cartTotal;
+        await tester.tap(switcher);
+        await tester.pumpAndSettle();
+        expect(find.text('Products'), findsOneWidget);
+        expect(session.cartTotal, beforeDeals);
+        expect(session.cartDisplayFilter, 'all');
+        final dealCard = find.byKey(
+          ValueKey('buy-cart-recommendation-$phoneId'),
+        );
+        await showInMainCartList(tester, dealCard);
+        await tester.ensureVisible(dealCard);
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('buy-cart-deal-$phoneId')), findsOneWidget);
+        final dealTitle = find.descendant(
+          of: dealCard,
+          matching: find.text(phone.customerTitle),
+        );
+        await tester.tap(dealTitle);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, phoneId);
+        session.goBack();
+        await tester.pumpAndSettle();
+        await showInMainCartList(tester, switcher);
+        expect(
+          find.text('Products'),
+          findsOneWidget,
+          reason: 'Deal view survives Product and Back',
+        );
+        await tester.ensureVisible(switcher);
+        await tester.pumpAndSettle();
+        await tester.tap(switcher);
+        await tester.pumpAndSettle();
+        expect(find.text('Explore products'), findsOneWidget);
+        expect(session.cartTotal, beforeDeals);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        final pagingSource = _CartDiscoveryPagingSource();
+        final pagingCore = BuySession();
+        final pagingSession = BuyV2Session(
+          core: pagingCore,
+          cataloguePageSource: pagingSource,
+        );
+        addTearDown(pagingSession.dispose);
+        addTearDown(pagingCore.dispose);
+        pagingSession.chooseCatalogueArea(
+          null,
+          BuyV2CatalogueAreaScope.allAreas,
+        );
+        pagingSession.addProduct('s-tomato');
+        pagingSession.openCart();
+        await tester.pumpWidget(app(pagingSession, textScale: scale));
+        await tester.pumpAndSettle();
+        final pagingTotal = pagingSession.cartTotal;
+        final retailChoice = find.byKey(
+          const ValueKey('buy-cart-discovery-type-shop'),
+        );
+        await showInMainCartList(tester, retailChoice);
+        expect(
+          find.descendant(
+            of: retailChoice,
+            matching: find.text('Retail products'),
+          ),
+          findsOneWidget,
+        );
+        final more = find.byKey(const ValueKey('buy-cart-discovery-more'));
+        Future<void> moreProducts() async {
+          await showInMainCartList(tester, more);
+          await tester.ensureVisible(more);
+          await tester.pumpAndSettle();
+          expect(
+            find.ancestor(
+              of: more,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    axisDirectionToAxis(widget.axisDirection) ==
+                        Axis.horizontal,
+              ),
+            ),
+            findsNothing,
+            reason:
+                'More products is below the rows, never hidden at a sideways lane end',
+          );
+          final discovery = find.byKey(
+            const PageStorageKey('buy-cart-discovery'),
+          );
+          final cards = find.descendant(
+            of: discovery,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is InkWell &&
+                  widget.key.toString().contains('buy-cart-recommendation-'),
+            ),
+          );
+          for (final card in cards.evaluate()) {
+            expect(
+              tester.getTopLeft(more).dy + .1,
+              greaterThanOrEqualTo(
+                tester.getBottomRight(find.byKey(card.widget.key!)).dy,
+              ),
+            );
+          }
+          expect(more.hitTestable(), findsOneWidget);
+          await tester.tap(more);
+          await tester.pumpAndSettle();
+          expect(pagingSession.cartTotal, pagingTotal);
+          expect(pagingSession.quantityFor('s-tomato'), 1);
+        }
+
+        pagingSource.failNext = true;
+        for (
+          var attempt = 0;
+          attempt < 12 && pagingSource.requests == 0;
+          attempt++
+        ) {
+          await moreProducts();
+        }
+        expect(pagingSource.requests, 1);
+        expect(find.text('Try again'), findsOneWidget);
+        await moreProducts();
+        expect(pagingSource.requests, 2);
+        expect(pagingSource.lastQuery?.query, isEmpty);
+        expect(pagingSource.lastQuery?.shopSaleType, isNull);
+        expect(
+          pagingSource.lastQuery?.areaScope,
+          BuyV2CatalogueAreaScope.allAreas,
+        );
+        expect(
+          pagingSource.lastTotal,
+          greaterThan(40),
+          reason: 'The review cohort must cross a real catalogue cursor',
+        );
+        for (
+          var attempt = 0;
+          attempt < 12 && pagingSource.requests < 3;
+          attempt++
+        ) {
+          await moreProducts();
+        }
+        expect(pagingSource.requests, 3);
+        final pagingScope = 'cart-explore-${pagingSession.cartScope.name}-shop';
+        final pager = pagingSession.acquireCatalogueProducts(pagingScope);
+        expect(pager.page?.startIndex, greaterThan(0));
+        expect(
+          pager.retainedItemCount,
+          lessThanOrEqualTo(pager.pageSize * pager.maximumCachedPages),
+        );
+        pagingSession.releaseCatalogueProducts(pagingScope);
+        expect(pagingSource.productObjectsCreated, lessThan(200));
+        final hold = Completer<void>();
+        pagingSource.holdNext = hold.future;
+        for (
+          var attempt = 0;
+          attempt < 12 && pagingSource.requests < 4;
+          attempt++
+        ) {
+          await showInMainCartList(tester, more);
+          await tester.ensureVisible(more);
+          await tester.pumpAndSettle();
+          await tester.tap(more);
+          await tester.pump();
+        }
+        expect(pagingSource.requests, 4);
+        final wholesaleChoice = find.byKey(
+          const ValueKey('buy-cart-discovery-type-wholesale'),
+        );
+        await showInMainCartList(tester, wholesaleChoice);
+        await tester.ensureVisible(wholesaleChoice);
+        await tester.pumpAndSettle();
+        await tester.tap(wholesaleChoice);
+        await tester.pump();
+        hold.complete();
+        await tester.pumpAndSettle();
+        expect(tester.widget<ChoiceChip>(wholesaleChoice).selected, isTrue);
+        expect(pagingSession.cartTotal, pagingTotal);
+        expect(pagingSession.cartDisplayFilter, 'all');
         expect(tester.takeException(), isNull);
       },
     );
@@ -1619,7 +1886,10 @@ void main() {
     final bill = find.byKey(const ValueKey('buy-cart-bill-summary'));
     await showInMainCartList(tester, bill);
     expect(bill, findsOneWidget);
-    expect(find.text('Wholesale packs'), findsOneWidget);
+    expect(
+      find.descendant(of: bill, matching: find.text('Wholesale packs')),
+      findsOneWidget,
+    );
     expect(find.text('Bill summary'), findsOneWidget);
     double contentY(Finder target) =>
         tester.getTopLeft(target).dy +
@@ -1646,7 +1916,7 @@ void main() {
     expect(recommendations, findsOneWidget);
     final heading = find.descendant(
       of: discovery,
-      matching: find.text('More products & offers'),
+      matching: find.text('Explore products'),
     );
     final total = session.scopedPayableTotal;
     final originalQuantity = session.quantityFor(wholesale.id);
@@ -1664,7 +1934,10 @@ void main() {
     );
     expect(session.scopedPayableTotal, total);
     final addition = session
-        .cartRecommendationsFor(BuyV2Destination.wholesale)
+        .cartRecommendationsFor(
+          BuyV2Destination.wholesale,
+          purchaseType: 'wholesale',
+        )
         .first;
     expect(session.quantityFor(addition.id), 0);
     final add = find.byKey(ValueKey('buy-cart-add-${addition.id}'));
@@ -2227,5 +2500,44 @@ class _AvailableBenefitsAdapter implements BuyV2CartBenefitsAdapter {
           sourceId: 'test-payment-source',
         ),
     ];
+  }
+}
+
+class _CartDiscoveryPagingSource extends BuyV2DevelopmentCatalogueSource {
+  _CartDiscoveryPagingSource()
+    : super(
+        destination: BuyV2Destination.shop,
+        providerCount: 11,
+        skusPerStore: 5000,
+      );
+  int requests = 0;
+  bool failNext = false;
+  Future<void>? holdNext;
+  BuyV2CatalogueQuery? lastQuery;
+  int? lastTotal;
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    requests++;
+    lastQuery = query;
+    if (failNext) {
+      failNext = false;
+      throw StateError('Catalogue test failure');
+    }
+    final hold = holdNext;
+    holdNext = null;
+    if (hold != null) {
+      await hold;
+    }
+    final page = await super.loadProducts(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    lastTotal = page.totalCount;
+    return page;
   }
 }
