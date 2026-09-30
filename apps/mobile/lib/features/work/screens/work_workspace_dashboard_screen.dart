@@ -2062,8 +2062,15 @@ class _WorkWorkspaceDashboardScreenState
     } else if (!retainDirectFilter) {
       _releaseDirectFilter();
     }
+    final openingOrderFromQueue =
+        _view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.orders &&
+        operation == _WorkspaceOperation.orders &&
+        _focusedOrderId == null &&
+        focusedOrderId != null;
     setState(() {
       _focusedOrderId = focusedOrderId;
+
       _focusedCustomerId = focusedCustomerId;
       _focusedFinance = focusedFinance;
       if (returnView != null) {
@@ -2076,7 +2083,8 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnView = _WorkspaceControlView.status;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
-          ((_operation == _WorkspaceOperation.sales &&
+          (openingOrderFromQueue ||
+              (_operation == _WorkspaceOperation.sales &&
                   (operation == _WorkspaceOperation.counterOrder ||
                       operation == _WorkspaceOperation.dues)) ||
               (_operation == _WorkspaceOperation.catalogue &&
@@ -2499,6 +2507,10 @@ class _WorkWorkspaceDashboardScreenState
     if (_operationReturnView == _WorkspaceControlView.operation &&
         parent != null) {
       setState(() {
+        if (parent == _WorkspaceOperation.orders &&
+            _operation == _WorkspaceOperation.orders) {
+          _focusedOrderId = null;
+        }
         _operation = parent;
         _operationReturnView = _WorkspaceControlView.dashboard;
         _operationReturnOperation = null;
@@ -13246,6 +13258,12 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _OrdersDestinationSurface(
         session: session,
         orderId: focusedOrderId,
+        onOpenOrder: (id) => onOpenRoute(
+          Uri(
+            path: '/app/retailer/orders',
+            queryParameters: {'order': id},
+          ).toString(),
+        ),
         onOpenCollection: onOpenStore,
         onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
       );
@@ -20220,6 +20238,7 @@ class _PaymentMetric extends StatelessWidget {
 
 class _OrdersDestinationSurface extends StatefulWidget {
   const _OrdersDestinationSurface({
+    required this.onOpenOrder,
     required this.session,
     required this.onOpenCollection,
     required this.onOpenDelivery,
@@ -20230,6 +20249,8 @@ class _OrdersDestinationSurface extends StatefulWidget {
   final VoidCallback onOpenCollection;
   final VoidCallback onOpenDelivery;
   final String? orderId;
+
+  final ValueChanged<String> onOpenOrder;
 
   @override
   State<_OrdersDestinationSurface> createState() =>
@@ -20298,7 +20319,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   @override
   void didUpdateWidget(covariant _OrdersDestinationSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_filter != widget.session.workspaceOrderFilter) {
+    if (_filter != widget.session.workspaceOrderFilter ||
+        (oldWidget.orderId != null && widget.orderId == null)) {
       _filter = widget.session.workspaceOrderFilter;
       _revealSelectedFilter();
     }
@@ -20335,7 +20357,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     };
     final counts = {for (final filter in filterLabels.keys) filter: 0};
     final visibleOrders = <WorkspaceOrderRecord>[];
-    final indices = <String, int>{};
     for (final order in allOrders) {
       for (final filter in filterLabels.keys) {
         if (!matches(order, filter)) continue;
@@ -20344,10 +20365,20 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       if (widget.orderId != null
           ? order.id == widget.orderId
           : matches(order, _filter)) {
-        indices[order.id] = visibleOrders.length;
         visibleOrders.add(order);
       }
     }
+    final history = widget.orderId == null && _filter == 'Done';
+    if (history) {
+      visibleOrders.sort((a, b) {
+        final placed = b.createdAt.compareTo(a.createdAt);
+        return placed != 0 ? placed : a.id.compareTo(b.id);
+      });
+    }
+    final indices = {
+      for (var index = 0; index < visibleOrders.length; index++)
+        visibleOrders[index].id: index,
+    };
     int countFor(String filter) => counts[filter] ?? 0;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     _scheduleFilterMetrics();
@@ -20502,8 +20533,14 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                       final order = visibleOrders[index];
                       return Padding(
                         key: ValueKey<(String?, String)>((storeId, order.id)),
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _LiveOrderTicket(
+                        padding: EdgeInsets.only(bottom: history ? 0 : 8),
+                        child: history
+                            ? _OrdersHistoryRow(
+                                session: session,
+                                order: order,
+                                onOpen: () => widget.onOpenOrder(order.id),
+                              )
+                            : _LiveOrderTicket(
                           session: session,
                           detailed: widget.orderId != null,
                           onOpenCollection: widget.onOpenCollection,
@@ -20756,6 +20793,152 @@ class _ExactOrderInformation extends StatelessWidget {
           ],
         ],
       ],
+    );
+  }
+}
+
+// History presentation only: exact details and commands retain their owners.
+class _OrdersHistoryRow extends StatelessWidget {
+  const _OrdersHistoryRow({
+    required this.session,
+    required this.order,
+    required this.onOpen,
+  });
+
+  final WorkSession session;
+  final WorkspaceOrderRecord order;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final placed = order.createdAt.toLocal();
+    final localizations = MaterialLocalizations.of(context);
+    final stage = session.workspaceOrderStageLabel(order);
+    final payment = session.workspaceOrderPaymentLabel(order);
+    final source = order.source == 'App' ? 'MoolSocial app' : order.source;
+    final preview = order.hasCompleteItemSnapshot
+        ? order.itemSnapshots
+              .take(2)
+              .map(
+                (item) =>
+                    '${item.name}${item.pack.isEmpty ? '' : ' · ${item.pack}'}',
+              )
+              .join(' · ')
+        : order.items;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        key: Key('work-order-history-open-${order.id}'),
+        onTap: () {
+          if (storeId != (session.activeWorkspace?.id ?? session.workspaceId)) {
+            return;
+          }
+          onOpen();
+        },
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFE8EAF0))),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _StoreMoneyLine(
+                alignAmountToEnd: true,
+                leading: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        order.customer,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: MoolColors.navy,
+                      size: 18,
+                    ),
+                  ],
+                ),
+                value: '₹${_formatStoreMinorAmount(order.payableMinor)}',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                order.id,
+                key: Key('work-order-history-reference-${order.id}'),
+                style: const TextStyle(color: MoolColors.ink, fontSize: 11),
+              ),
+              Text(
+                '${localizations.formatShortDate(placed)} · ${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(placed))}',
+                key: Key('work-order-history-date-${order.id}'),
+                style: const TextStyle(color: MoolColors.muted, fontSize: 11),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 2,
+                children: [
+                  Text(
+                    stage,
+                    key: Key('work-order-stage-label-${order.id}'),
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    payment,
+                    style: const TextStyle(color: MoolColors.ink, fontSize: 11),
+                  ),
+                  if (source.isNotEmpty || order.fulfilment.isNotEmpty)
+                    Text(
+                      [
+                        source,
+                        order.isCustomerCollection
+                            ? 'Collect at store'
+                            : order.fulfilment,
+                      ].where((part) => part.isNotEmpty).join(' · '),
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                ],
+              ),
+              if (preview.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  preview,
+                  key: Key('work-order-history-items-${order.id}'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: MoolColors.ink, fontSize: 11),
+                ),
+              ],
+              if (order.hasCompleteItemSnapshot &&
+                  order.itemSnapshots.length > 2)
+                Text(
+                  '+${order.itemSnapshots.length - 2} more products',
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

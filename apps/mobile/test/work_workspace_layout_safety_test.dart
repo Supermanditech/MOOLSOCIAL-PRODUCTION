@@ -23346,6 +23346,193 @@ void main() {
     (320.0, 568.0, 2.0),
     (915.0, 412.0, 2.0),
   ]) {
+    testWidgets('O03 History compact references and exact details $display', (
+      tester,
+    ) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      final lines = List.generate(
+        30,
+        (index) => WorkspaceOrderItemSnapshot(
+          productId: 'history-product-$index',
+          name: 'Long original product name number $index',
+          pack: '1 kg pack',
+          quantity: 1,
+          unitPricePaise: index == 0 ? 10050 : 10000,
+          lineTotalPaise: index == 0 ? 10050 : 10000,
+        ),
+      );
+      final order = WorkspaceOrderRecord(
+        id: 'ORD-HISTORY-LONG-ORIGINAL-REFERENCE-20260930',
+        customer:
+            'Long customer name for the original saved order · 9001234567',
+        items: lines.map((line) => line.name).join(' · '),
+        quantities: {for (final line in lines) line.productId: line.quantity},
+        amount: 3000,
+        remainderPaise: 50,
+        source: 'App',
+        fulfilment: 'Pickup',
+        payment: 'Paid online',
+        address: '',
+        stage: 'Completed',
+        needsDelivery: false,
+        createdAt: DateTime(2026, 9, 30, 9, 45),
+        itemSnapshots: lines,
+      );
+      expect(order.hasCompleteItemSnapshot, isTrue);
+      // Make this test's long record the only History row; active fixture stays.
+      work.workspaceOrders.removeWhere((record) => record.isClosed);
+      work.workspaceOrders.add(order);
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      final activeId = work.currentWorkspaceOrderId;
+      work.workspacePackedProductIds.add('summary-0');
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=orders',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      expect(tester.takeException(), isNull);
+      final row = find.byKey(Key('work-order-history-open-${order.id}'));
+      expect(row, findsOneWidget);
+      expect(tester.getSize(row).height, greaterThanOrEqualTo(48));
+      expect(
+        find.byKey(Key('work-order-history-reference-${order.id}')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(Key('work-order-history-date-${order.id}')),
+            )
+            .data,
+        contains(MaterialLocalizations.of(tester.element(row))
+            .formatShortDate(order.createdAt.toLocal())),
+      );
+      final preview = tester.widget<Text>(
+        find.byKey(Key('work-order-history-items-${order.id}')),
+      );
+      expect(preview.maxLines, 2);
+      expect(preview.data, isNot(contains(lines.last.name)));
+      expect(find.text('+28 more products'), findsOneWidget);
+      expect(find.text('₹3,000.50'), findsOneWidget);
+      await tester.ensureVisible(row);
+      await tester.tapAt(tester.getTopLeft(row) + const Offset(12, 12));
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('work-focused-order-id')))
+            .data,
+        order.id,
+      );
+      expect(
+        find.byKey(Key('work-exact-order-item-${lines.last.productId}')),
+        findsOneWidget,
+      );
+      expect(work.currentWorkspaceOrderId, activeId);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Customer orders'), findsOneWidget);
+      expect(row, findsOneWidget);
+      expect(find.byKey(const Key('work-orders-filter-done')).hitTestable(), findsOneWidget);
+      expect(work.workspaceOrderFilter, 'Done');
+      expect(work.currentWorkspaceOrderId, activeId);
+      expect(work.workspacePackedProductIds, contains('summary-0'));
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'O03 History newest first preserves lazy scroll and active priority',
+    (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      final activeId = work.currentWorkspaceOrderId;
+      work.workspaceOrders.addAll(
+        List.generate(
+          50,
+          (index) => customerOrder(
+            id: 'PAST-${index.toString().padLeft(2, '0')}',
+            customer: 'Customer $index',
+            createdAt: DateTime(2026, 9, 1).add(Duration(days: index)),
+            stage: index == 49 ? 'Cancelled' : 'Completed',
+            payment: index == 48 ? 'Refunded' : 'Paid online',
+          ),
+        ),
+      );
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=orders',
+        work: work,
+      );
+      expect(
+        find.byKey(const Key('work-order-history-open-PAST-49')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-order-history-open-PAST-00')),
+        findsNothing,
+      );
+      final list = find.ancestor(
+        of: find.byKey(const Key('work-order-history-open-PAST-49')),
+        matching: find.byType(ListView),
+      );
+      await tester.drag(list, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      final rows = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is InkWell &&
+                widget.key.toString().contains('work-order-history-open-PAST-'),
+          )
+          .hitTestable();
+      final row = rows.first;
+      final key = tester.widget<InkWell>(row).key;
+      final before = tester.getTopLeft(row);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Customer orders'), findsOneWidget);
+      expect(tester.getTopLeft(find.byKey(key!)).dy, closeTo(before.dy, 1));
+      expect(find.byKey(const Key('work-orders-filter-done')).hitTestable(), findsOneWidget);
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.currentWorkspaceOrderId, activeId);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'O03 History rejects an unavailable original order without writes',
+    (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=orders',
+        work: work,
+      );
+      final row = find.byKey(const Key('work-order-history-open-SALE-1042'));
+      final open = tester.widget<InkWell>(row).onTap!;
+      work.workspaceOrders.removeWhere((order) => order.id == 'SALE-1042');
+      open();
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsNothing);
+      expect(work.noticeMessage, 'This order is no longer available.');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 2.0),
+    (915.0, 412.0, 2.0),
+  ]) {
     testWidgets('O02 compact empty Orders retains useful viewport $display', (
       tester,
     ) async {
