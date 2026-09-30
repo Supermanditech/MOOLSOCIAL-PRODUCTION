@@ -4419,7 +4419,7 @@ void main() {
             ? 'cursor-pure-white-20260927/'
                   'buy-v2-r58-8-6-c24f-checkout-cart-return-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
-            : 'cursor-cart-t01-20260930/'
+            : 'cursor-cart-child-20260930/'
                   'buy-v2-r58-8-7-c24f-${viewport.label}.png';
         await expectLater(
           find.byType(BuyV2Screen),

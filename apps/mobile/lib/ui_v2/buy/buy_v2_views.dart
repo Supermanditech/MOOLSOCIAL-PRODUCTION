@@ -9066,7 +9066,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             minimumSize: const Size(44, 44),
           ),
           child: Text(
-            '$hiddenSelected other ${hiddenSelected == 1 ? 'product' : 'products'} selected · View all',
+            'Selected purchase · ${session.scopedCartFamilyTotals.keys.map((d) => _cartDestinationLabel(session, d)).join(' + ')} · View all',
             style: context.buyMeta.copyWith(
               fontSize: 11,
               color: BuyV2ActionStyle.primaryForeground,
@@ -21009,13 +21009,6 @@ List<String> _purchaseProtectionLines(BuyV2Product product) {
   ];
 }
 
-String _cartFamilyLabel(BuyV2Destination destination) => switch (destination) {
-  BuyV2Destination.shop => 'Shop basket',
-  BuyV2Destination.wholesale => 'Wholesale order',
-  BuyV2Destination.medicine => 'Medicine order',
-  BuyV2Destination.orders => 'Order',
-};
-
 String _cartItemFamilyLabel(BuyV2Destination destination) =>
     switch (destination) {
       BuyV2Destination.shop => 'Products',
@@ -21233,16 +21226,6 @@ String _cartBenefitEmptyTitle(
   return kind == BuyV2CartBenefitKind.coupon
       ? 'No $owner coupons right now'
       : 'No $owner payment offers right now';
-}
-
-String _cartBenefitEmptyDetail(
-  BuyV2Destination destination,
-  BuyV2CartBenefitKind kind,
-) {
-  final family = _cartFamilyLabel(destination);
-  return kind == BuyV2CartBenefitKind.coupon
-      ? 'Nothing eligible for the current $family.'
-      : 'Nothing compatible with the current $family.';
 }
 
 class _CartBenefitsInline extends StatefulWidget {
@@ -21710,23 +21693,9 @@ class _CartBenefitEmptyState extends StatelessWidget {
           ),
           const SizedBox(width: 9),
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _cartBenefitEmptyTitle(destination, kind),
-                  style: context.buyBody.copyWith(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _cartBenefitEmptyDetail(destination, kind),
-                  style: context.buyMeta.copyWith(fontSize: 11),
-                ),
-              ],
+            child: Text(
+              _cartBenefitEmptyTitle(destination, kind),
+              style: context.buyMeta.copyWith(fontSize: 12),
             ),
           ),
         ],
@@ -22081,21 +22050,21 @@ class _CartDiscoverySections extends StatelessWidget {
       key: const PageStorageKey('buy-cart-discovery'),
       iconColor: BuyV2ActionStyle.primaryForeground,
       collapsedIconColor: BuyV2ActionStyle.primaryForeground,
-      tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 9),
+      dense: true,
+      visualDensity: VisualDensity.compact,
       childrenPadding: EdgeInsets.zero,
       shape: const Border(),
       collapsedShape: const Border(),
       title: Text(
         'More products & offers',
-        style: context.buyBody.copyWith(fontSize: 12),
+        style: context.buyBody.copyWith(fontSize: 14),
       ),
       children: [
         _CartProductLane(
           session: session,
           destination: destinations.first,
           laneId: 'recommendations',
-          title: 'Browse products',
-          detail: 'Check the pack and price before adding',
           products: products,
         ),
       ],
@@ -22108,31 +22077,22 @@ class _CartProductLane extends StatelessWidget {
     required this.session,
     required this.destination,
     required this.laneId,
-    required this.title,
-    required this.detail,
     required this.products,
   });
 
   final BuyV2Session session;
   final BuyV2Destination destination;
   final String laneId;
-  final String title;
-  final String detail;
   final List<BuyV2Product> products;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       key: ValueKey('buy-cart-$laneId-${destination.name}'),
-      padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
-      decoration: buyV2CardDecoration(radius: 15),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
-          const SizedBox(height: 2),
-          Text(detail, style: context.buyMeta.copyWith(fontSize: 8)),
-          const SizedBox(height: 7),
           SingleChildScrollView(
             key: PageStorageKey('buy-cart-$laneId-scroll-${destination.name}'),
             scrollDirection: Axis.horizontal,
@@ -22325,7 +22285,7 @@ class _CartDeliveryInstructionSectionsState
     final selected = eligible.contains(_selected) ? _selected! : eligible.first;
     return Container(
       key: const ValueKey('buy-cart-instruction-panel'),
-      padding: const EdgeInsets.fromLTRB(9, 7, 9, 3),
+      padding: const EdgeInsets.fromLTRB(9, 5, 9, 1),
       decoration: buyV2CardDecoration(radius: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -22334,7 +22294,7 @@ class _CartDeliveryInstructionSectionsState
             'Delivery instructions · optional',
             style: context.buyBody.copyWith(
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: BuyV2ActionStyle.primaryForeground,
             ),
           ),
@@ -22420,6 +22380,18 @@ class _CartDeliveryInstructionCardState
   BuyV2Session get session => widget.session;
   BuyV2Destination get destination => widget.destination;
   bool get showDestination => widget.showDestination;
+
+  void _closeEditor() {
+    setState(() => _editing = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Scrollable.ensureVisible(
+          context,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -22619,7 +22591,7 @@ class _CartDeliveryInstructionCardState
                           text: _noteController.text,
                         )) {
                           FocusScope.of(context).unfocus();
-                          setState(() => _editing = false);
+                          _closeEditor();
                         }
                       },
                       child: const Text('Save'),
@@ -22628,7 +22600,7 @@ class _CartDeliveryInstructionCardState
                       style: noteActionStyle,
                       onPressed: () {
                         FocusScope.of(context).unfocus();
-                        setState(() => _editing = false);
+                        _closeEditor();
                       },
                       child: const Text('Cancel'),
                     ),
@@ -22788,12 +22760,13 @@ class _CartBillSummary extends StatelessWidget {
                 'Bill summary',
                 style: context.buyTitle.copyWith(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 9),
+          const SizedBox(height: 5),
           for (final entry in familyTotals.entries)
             _CartAmountRow(
               label:
@@ -22826,7 +22799,7 @@ class _CartBillSummary extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             'Delivery charges, if any, are confirmed at checkout.',
-            style: context.buyMeta.copyWith(fontSize: 10),
+            style: context.buyMeta.copyWith(fontSize: 11),
           ),
         ],
       ),
@@ -22863,7 +22836,7 @@ class _CartAmountRow extends StatelessWidget {
             value,
             style: TextStyle(
               color: valueColor ?? BuyV2Colors.ink,
-              fontSize: strong ? 13 : 11,
+              fontSize: strong ? 14 : 12,
               fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
@@ -22904,13 +22877,13 @@ class _CartSavingsSummary extends StatelessWidget {
                   savings > 0
                       ? 'You save ${buyV2Money(savings)}'
                       : 'Latest listed prices',
-                  style: context.buyBody.copyWith(fontSize: 10),
+                  style: context.buyBody.copyWith(fontSize: 11),
                 ),
                 Text(
                   savings > 0
                       ? 'Calculated only from listed MRP and current product price.'
                       : 'No additional product saving is shown for these items.',
-                  style: context.buyMeta.copyWith(fontSize: 8),
+                  style: context.buyMeta.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -22962,6 +22935,16 @@ class _CartLine extends StatelessWidget {
       session.openProduct(product.id);
     }
 
+    final photo = SizedBox(
+      key: ValueKey('buy-cart-packshot-${product.id}'),
+      width: thumbnailExtent,
+      height: thumbnailExtent,
+      child: GestureDetector(
+        excludeFromSemantics: true,
+        onTap: openProductDetails,
+        child: BuyV2ProductPackshot(product: product, borderRadius: 11),
+      ),
+    );
     final productDetails = BuyV2IntentDepth(
       key: ValueKey('buy-cart-product-depth-${product.id}'),
       spatial: true,
@@ -22980,90 +22963,46 @@ class _CartLine extends StatelessWidget {
             onTap: openProductDetails,
             borderRadius: BorderRadius.circular(11),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 60),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final fields = [
-                    (text: product.customerTitle, style: context.buyBody),
-                    (
-                      text:
-                          product.packTerms != null ||
-                              product.hasStructuredVariants
-                          ? product.customerVariantPack
-                          : '${product.customerVariant} · ${product.pack}',
-                      style: context.buyMeta.copyWith(fontSize: 11),
-                    ),
-                    (
-                      text: automaticFulfilment
-                          ? '$buyerPromise · ${product.customerSeller(facts.partner)}'
-                          : '${product.deliveryPromise} · ${product.customerSeller(product.seller)}',
-                      style: context.buyMeta.copyWith(fontSize: 11),
-                    ),
-                  ];
-                  final titleWidth =
-                      constraints.maxWidth - thumbnailExtent - 28;
-                  final stackMedia = fields.any(
-                    (field) => field.text
-                        .split(RegExp(r'\s+'))
-                        .any(
-                          (word) =>
-                              buyV2ValueTextSize(
-                                context,
-                                word,
-                                field.style,
-                              ).width >
-                              titleWidth,
-                        ),
-                  );
-                  final photo = SizedBox(
-                    key: ValueKey('buy-cart-packshot-${product.id}'),
-                    width: thumbnailExtent,
-                    height: thumbnailExtent,
-                    child: BuyV2ProductPackshot(
-                      product: product,
-                      borderRadius: 11,
-                    ),
-                  );
-                  final metadata = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var index = 0; index < fields.length; index++) ...[
-                        if (index == 2) const SizedBox(height: 3),
-                        Text(fields[index].text, style: fields[index].style),
-                      ],
-                    ],
-                  );
-                  const chevron = Padding(
-                    padding: EdgeInsets.only(top: 20, right: 2),
-                    child: Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: BuyV2Colors.ink,
-                    ),
-                  );
-                  if (stackMedia) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [photo, const Spacer(), chevron],
+                        Text(
+                          product.customerTitle,
+                          style: context.buyBody.copyWith(fontSize: 14),
                         ),
-                        const SizedBox(height: 8),
-                        metadata,
+                        Text(
+                          product.packTerms != null ||
+                                  product.hasStructuredVariants
+                              ? product.customerVariantPack
+                              : '${product.customerVariant} · ${product.pack}',
+                          style: context.buyMeta.copyWith(fontSize: 11),
+                        ),
+                        Text(
+                          product.customerSeller(
+                            automaticFulfilment
+                                ? facts.partner
+                                : product.seller,
+                          ),
+                          style: context.buyMeta.copyWith(fontSize: 11),
+                        ),
+                        Text(
+                          buyerPromise,
+                          style: context.buyMeta.copyWith(fontSize: 11),
+                        ),
                       ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      photo,
-                      const SizedBox(width: 8),
-                      Expanded(child: metadata),
-                      chevron,
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: BuyV2Colors.ink,
+                  ),
+                ],
               ),
             ),
           ),
@@ -23113,17 +23052,9 @@ class _CartLine extends StatelessWidget {
           )
         : null;
 
-    final productBody = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        productDetails,
-        if (tradeFacts != null) ...[const SizedBox(height: 5), tradeFacts],
-      ],
-    );
-
     const lineTotalStyle = TextStyle(
       color: BuyV2Colors.ink,
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: FontWeight.w700,
     );
     final lineTotalText = priceUnavailable
@@ -23162,6 +23093,14 @@ class _CartLine extends StatelessWidget {
           textAlign: TextAlign.end,
           style: lineTotalStyle,
         ),
+        if (!wholesale &&
+            !priceUnavailable &&
+            product.packTerms?.priceTiers.isNotEmpty != true &&
+            product.unitPrice.trim().isNotEmpty)
+          Text(
+            product.unitPrice,
+            style: context.buyMeta.copyWith(fontSize: 11),
+          ),
         if (product.mrp != null && product.mrp! > product.price)
           Text(
             buyV2Money(product.mrp! * line.quantity),
@@ -23287,95 +23226,66 @@ class _CartLine extends StatelessWidget {
             ],
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 9, 9),
+            padding: const EdgeInsets.fromLTRB(10, 0, 9, 7),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final controlsWidth =
-                    (88 + quantitySize.width.clamp(44.0, double.infinity))
-                        .clamp(lineTotalSize.width, double.infinity);
-                // Image, chevron and gaps also share the inline product row.
-                final inlineTitleWidth =
-                    constraints.maxWidth - controlsWidth - thumbnailExtent - 36;
-                final metadataNeedsMoreWidth =
+                final metadataWidth =
+                    constraints.maxWidth - thumbnailExtent - 8;
+                final stackMedia =
+                    MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
+                    metadataWidth < 160 ||
                     [
-                      (text: product.customerTitle, style: context.buyBody),
-                      (
-                        text:
-                            product.packTerms != null ||
-                                product.hasStructuredVariants
-                            ? product.customerVariantPack
-                            : '${product.customerVariant} ${product.pack}',
-                        style: context.buyMeta.copyWith(fontSize: 11),
-                      ),
-                      (
-                        text:
-                            '$buyerPromise ${product.customerSeller(automaticFulfilment ? facts.partner : product.seller)}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      product.customerTitle,
+                      product.customerVariantPack,
+                      product.customerSeller(
+                        automaticFulfilment ? facts.partner : product.seller,
                       ),
                     ].any(
-                      (field) =>
-                          inlineTitleWidth <= 0 ||
-                          field.text
-                              .split(RegExp(r'\s+'))
-                              .any(
-                                (word) =>
-                                    buyV2ValueTextSize(
-                                      context,
-                                      word,
-                                      field.style,
-                                    ).width >
-                                    inlineTitleWidth,
-                              ) ||
-                          buyV2ValueTextSize(
-                                context,
-                                field.text,
-                                field.style,
-                                maxWidth: math.max(1, inlineTitleWidth),
-                                maxLines: null,
-                              ).height >
-                              buyV2ValueTextSize(
-                                    context,
-                                    'Ag',
-                                    field.style,
-                                  ).height *
-                                  2,
+                      (text) => text
+                          .split(RegExp(r'\s+'))
+                          .any(
+                            (word) =>
+                                buyV2ValueTextSize(
+                                  context,
+                                  word,
+                                  context.buyBody.copyWith(fontSize: 14),
+                                ).width >
+                                metadataWidth - 18,
+                          ),
                     );
-                final compactDetails =
-                    (wholesale && constraints.maxWidth < 340) ||
-                    MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
-                    metadataNeedsMoreWidth;
-                if (compactDetails) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      productBody,
-                      const SizedBox(height: 2),
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 12,
-                        runSpacing: 8,
-                        children: [price, quantityControl],
-                      ),
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                final purchaseControls = Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [price, quantityControl],
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: productBody),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        price,
-                        const SizedBox(height: 5),
-                        quantityControl,
-                      ],
-                    ),
+                    if (stackMedia) ...[
+                      photo,
+                      const SizedBox(height: 4),
+                      productDetails,
+                      purchaseControls,
+                    ] else
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          photo,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [productDetails, purchaseControls],
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (tradeFacts != null) ...[
+                      const SizedBox(height: 4),
+                      tradeFacts,
+                    ],
                   ],
                 );
               },
