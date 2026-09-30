@@ -205,7 +205,9 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",
         "docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-1.jsonl",
-        "docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-2.jsonl"
+        "docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-2.jsonl"
       ]
     },
     {

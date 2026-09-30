@@ -1094,6 +1094,8 @@ $cursorStorefrontOwners = @(
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-child-20260930/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
   'docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-1.jsonl',
   'docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-2.jsonl',
   'docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-1.jsonl',
   'docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-2.jsonl',
   'docs/quality/CURSOR-BUY-CART-CHILD-20260930-SELECTED-1.jsonl',

@@ -22536,6 +22536,7 @@ class _CartDeliveryInstructionCard extends StatefulWidget {
 class _CartDeliveryInstructionCardState
     extends State<_CartDeliveryInstructionCard> {
   final _noteController = TextEditingController();
+  final _choiceScrollController = ScrollController();
   bool _editing = false;
   BuyV2Session get session => widget.session;
   BuyV2Destination get destination => widget.destination;
@@ -22556,6 +22557,7 @@ class _CartDeliveryInstructionCardState
   @override
   void dispose() {
     _noteController.dispose();
+    _choiceScrollController.dispose();
     super.dispose();
   }
 
@@ -22586,110 +22588,123 @@ class _CartDeliveryInstructionCardState
               ),
             ),
           ),
-        SingleChildScrollView(
-          key: PageStorageKey('buy-instruction-lane-${destination.name}'),
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              if (selected != null)
-                TextButton(
-                  key: ValueKey(
-                    'buy-cart-instruction-${destination.name}-none',
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: BuyV2ActionStyle.primaryForeground,
-                    minimumSize: const Size(48, 48),
-                    textStyle: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+        RawScrollbar(
+          key: ValueKey('buy-instruction-scroll-cue-${destination.name}'),
+          controller: _choiceScrollController,
+          thumbColor: BuyV2Colors.muted,
+          thumbVisibility: true,
+          interactive: false,
+          thickness: 2.5,
+          radius: const Radius.circular(2),
+          notificationPredicate: (notification) =>
+              notification.depth == 0 &&
+              notification.metrics.axis == Axis.horizontal,
+          child: SingleChildScrollView(
+            key: PageStorageKey('buy-instruction-lane-${destination.name}'),
+            controller: _choiceScrollController,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (selected != null)
+                  TextButton(
+                    key: ValueKey(
+                      'buy-cart-instruction-${destination.name}-none',
                     ),
-                    padding: const EdgeInsets.only(right: 14),
+                    style: TextButton.styleFrom(
+                      foregroundColor: BuyV2ActionStyle.primaryForeground,
+                      minimumSize: const Size(48, 48),
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      padding: const EdgeInsets.only(right: 14),
+                    ),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      session.chooseDeliveryInstruction(
+                        destination: destination,
+                        instructionId: null,
+                      );
+                    },
+                    child: const Text('Clear'),
                   ),
-                  onPressed: () {
-                    HapticFeedback.selectionClick();
-                    session.chooseDeliveryInstruction(
-                      destination: destination,
-                      instructionId: null,
-                    );
-                  },
-                  child: const Text('Clear'),
+                TextButton.icon(
+                  style: noteActionStyle,
+                  key: ValueKey(
+                    'buy-cart-instruction-custom-${destination.name}',
+                  ),
+                  onPressed: () => setState(() {
+                    _noteController.text = customNote ?? '';
+                    _editing = true;
+                  }),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Add instructions'),
                 ),
-              TextButton.icon(
-                style: noteActionStyle,
-                key: ValueKey(
-                  'buy-cart-instruction-custom-${destination.name}',
-                ),
-                onPressed: () => setState(() {
-                  _noteController.text = customNote ?? '';
-                  _editing = true;
-                }),
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                label: const Text('Add instructions'),
-              ),
-              for (var index = 0; index < options.length; index++)
-                Builder(
-                  builder: (context) {
-                    final option = options[index];
-                    final isSelected = selected?.id == option.id;
-                    final label = option.label;
-                    return Semantics(
-                      checked: isSelected,
-                      inMutuallyExclusiveGroup: true,
-                      label:
-                          '${_deliveryInstructionOwner(destination)}: $label',
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          key: ValueKey(
-                            'buy-cart-instruction-${destination.name}-${option.id}',
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            session.chooseDeliveryInstruction(
-                              destination: destination,
-                              instructionId: option.id,
-                            );
-                          },
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 48),
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 14),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isSelected
-                                        ? Icons.radio_button_checked
-                                        : Icons.radio_button_unchecked,
-                                    size: 18,
-                                    color: BuyV2ActionStyle.primaryForeground,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  ExcludeSemantics(
-                                    child: Text(
-                                      label,
-                                      softWrap: false,
-                                      style: context.buyBody.copyWith(
-                                        fontSize: 11,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                        color:
-                                            BuyV2ActionStyle.primaryForeground,
+                for (var index = 0; index < options.length; index++)
+                  Builder(
+                    builder: (context) {
+                      final option = options[index];
+                      final isSelected = selected?.id == option.id;
+                      final label = option.label;
+                      return Semantics(
+                        checked: isSelected,
+                        inMutuallyExclusiveGroup: true,
+                        label:
+                            '${_deliveryInstructionOwner(destination)}: $label',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            key: ValueKey(
+                              'buy-cart-instruction-${destination.name}-${option.id}',
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              session.chooseDeliveryInstruction(
+                                destination: destination,
+                                instructionId: option.id,
+                              );
+                            },
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48),
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 14),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isSelected
+                                          ? Icons.radio_button_checked
+                                          : Icons.radio_button_unchecked,
+                                      size: 18,
+                                      color: BuyV2ActionStyle.primaryForeground,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    ExcludeSemantics(
+                                      child: Text(
+                                        label,
+                                        softWrap: false,
+                                        style: context.buyBody.copyWith(
+                                          fontSize: 11,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                          color: BuyV2ActionStyle
+                                              .primaryForeground,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-            ],
+                      );
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
         if (_editing)

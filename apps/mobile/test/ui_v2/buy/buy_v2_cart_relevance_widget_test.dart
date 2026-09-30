@@ -882,6 +882,36 @@ void main() {
         await showInMainCartList(tester, owner);
         expect(find.text('Add instructions'), findsOneWidget);
         expect(find.text('Delivery instructions · optional'), findsOneWidget);
+        final cue = find.byKey(
+          ValueKey('buy-instruction-scroll-cue-${destination.name}'),
+        );
+        final lane = find.byKey(
+          PageStorageKey('buy-instruction-lane-${destination.name}'),
+        );
+        final scrollbar = tester.widget<RawScrollbar>(cue);
+        final position = scrollbar.controller!.position;
+        expect(scrollbar.thumbVisibility, isTrue);
+        expect(scrollbar.interactive, isFalse);
+        expect(scrollbar.thumbColor, BuyV2Colors.muted);
+        expect(position.maxScrollExtent, greaterThan(0));
+        expect(tester.getSize(cue).height, tester.getSize(lane).height);
+        expect(tester.getSize(cue).height, 48);
+        await tester.drag(lane, const Offset(-2000, 0));
+        await tester.pumpAndSettle();
+        expect(position.pixels, closeTo(position.maxScrollExtent, 0.5));
+        final lastOption = session.deliveryInstructionsFor(destination).last;
+        final lastAction = find.byKey(
+          ValueKey('buy-cart-instruction-${destination.name}-${lastOption.id}'),
+        );
+        expect(
+          tester.getRect(lastAction).right,
+          lessThanOrEqualTo(tester.getRect(cue).right + 0.5),
+        );
+        expect(session.selectedDeliveryInstructionFor(destination), isNull);
+        expect(session.cartTotal, total);
+        await tester.drag(lane, const Offset(2000, 0));
+        await tester.pumpAndSettle();
+        expect(position.pixels, closeTo(position.minScrollExtent, 0.5));
         final option = session.deliveryInstructionsFor(destination).first;
         final action = find.byKey(
           ValueKey('buy-cart-instruction-${destination.name}-${option.id}'),
@@ -945,6 +975,33 @@ void main() {
       expect(
         session.selectedDeliveryInstructionFor(BuyV2Destination.wholesale)?.id,
         wholesale,
+      );
+      await tester.binding.setSurfaceSize(const Size(2200, 800));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: Scaffold(
+            body: BuyV2CartView(session: session, onBrowseMore: () {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await showInMainCartList(tester, shop);
+      final fittingCue = tester.widget<RawScrollbar>(
+        find.byKey(const ValueKey('buy-instruction-scroll-cue-shop')),
+      );
+      // Flutter's scrollbar suppresses its thumb when the lane has no overflow.
+      expect(fittingCue.controller!.position.maxScrollExtent, 0);
+      await tester.drag(
+        find.byKey(const PageStorageKey('buy-instruction-lane-shop')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(fittingCue.controller!.position.pixels, 0);
+      expect(session.cartTotal, total);
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.shop),
+        isNull,
       );
       semantics.dispose();
       expect(tester.takeException(), isNull);
