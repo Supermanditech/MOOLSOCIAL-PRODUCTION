@@ -863,12 +863,12 @@ void _expectHomeCategoryContrast(WidgetTester tester, String id) {
 
 void main() {
   group('SETTLEMENTCOPY', () {
-    WorkspacePaymentRecord payment({int paid = 23500, int due = 0,
+    WorkspacePaymentRecord payment({int paid = 23500, int due = 0, int refunded = 0,
         WorkspacePaymentState state = WorkspacePaymentState.creditApplied}) =>
       WorkspacePaymentRecord(orderId: 'order', invoiceId: 'invoice',
         customerId: '9000091941', customerName: 'Evaluation', revision: 1,
         updatedAt: DateTime(2026, 9, 27), amountMinor: 26000,
-        paidMinor: paid, dueMinor: due, refundedMinor: 0,
+        paidMinor: paid, dueMinor: due, refundedMinor: refunded,
         state: state, channel: WorkspacePaymentChannel.cash);
     WorkspaceCustomerLedgerEntry entry(String id, int amount,
         WorkspaceLedgerEntryKind kind, {WorkspacePaymentChannel channel = WorkspacePaymentChannel.cash,
@@ -928,6 +928,41 @@ void main() {
       ]), 'Payment method: Cash');
       expect(storeInvoicePaymentMethod('UPI', null, const []), 'Payment method: UPI');
     });
+    test('Orders recorded payment methods reconcile mixed receipts', () {
+      for (final state in [WorkspacePaymentState.paid,
+          WorkspacePaymentState.refundPending, WorkspacePaymentState.refunded]) {
+        final original = payment(paid: 26000, state: state,
+            refunded: state == WorkspacePaymentState.refunded ? 26000 : 0);
+        expect(original.valid, isTrue);
+        final receipts = [
+          entry('cash', 10000, WorkspaceLedgerEntryKind.collection),
+          entry('upi', 16000, WorkspaceLedgerEntryKind.collection,
+              channel: WorkspacePaymentChannel.directUpi),
+          entry('pending', 1000, WorkspaceLedgerEntryKind.collection,
+              state: WorkspaceLedgerPostingState.pending),
+          entry('foreign', 1000, WorkspaceLedgerEntryKind.collection, invoice: 'other'),
+        ];
+        expect(storeInvoicePaymentMethod('Cash', original, receipts,
+            preferRecordedMethods: true), 'Payment method: Cash + UPI');
+        expect(storeInvoicePaymentMethod('Cash', original, receipts),
+            'Payment method: Cash');
+        expect(storeInvoicePaymentMethod('Cash', original, receipts.take(1),
+            preferRecordedMethods: true),
+            'Payment method: Recorded payments · details unavailable');
+      }
+    });
+    for (final method in {
+      WorkspacePaymentChannel.cash: 'Cash',
+      WorkspacePaymentChannel.directUpi: 'UPI',
+      WorkspacePaymentChannel.bankTransfer: 'Bank transfer',
+    }.entries) {
+      test('Orders recorded single payment ${method.value}', () {
+        expect(storeInvoicePaymentMethod('Cash',
+            payment(paid: 26000, state: WorkspacePaymentState.paid), [
+          entry('receipt', 26000, WorkspaceLedgerEntryKind.collection, channel: method.key),
+        ], preferRecordedMethods: true), 'Payment method: ${method.value}');
+      });
+    }
     test('full credit and incomplete breakdown', () {
       expect(storeCounterSettlementHint(payment(paid: 0), [
         entry('credit', 26000, WorkspaceLedgerEntryKind.creditReceived),
@@ -23904,7 +23939,9 @@ void main() {
     final button = find.byKey(Key('work-order-invoice-open-${order.id}'));
     expect(button, findsNothing);
     expect(find.byKey(const Key('work-order-inline-invoice')), findsOneWidget);
-    expect(find.text('Invoice · ${invoice.id}'), findsOneWidget);
+    expect(find.byKey(const Key('work-order-invoice-reference')), findsOneWidget);
+    expect(find.text(invoice.id), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'PDF'), findsOneWidget);
     expect(find.text('Original customer name'), findsOneWidget);
     expect(find.byKey(const Key('work-invoice-payment-unavailable')), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
@@ -23924,7 +23961,7 @@ void main() {
   });
 
   // Separately labelled automated payment/layout fixtures, not device records.
-  for (final variant in ['paid', 'part-paid', 'refunded', 'stale', 'name-missing', 'large-value']) {
+  for (final variant in ['paid', 'part-paid', 'refunded', 'stale', 'name-missing', 'large-value', 'mixed-reference']) {
     for (final display in [(412.0, 915.0, 1.0), (320.0, 568.0, 2.0), (915.0, 412.0, 2.0)]) {
     testWidgets('O03 details inline payment evidence $variant $display', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -23948,7 +23985,22 @@ void main() {
           salesTodayMinor: amount, duesMinor: due, availableMinor: 0,
           heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
           deliveryAdjustmentsMinor: 0, refundsMinor: refunded, taxWithheldMinor: 0,
-          payments: [payment], payouts: const []);
+          payments: [payment], payouts: const [],
+          customerLedgers: variant == 'mixed-reference' ? [WorkspaceCustomerLedger(
+            accountScope: seed.accountScope, workspaceId: seed.storeId,
+            customerId: payment.customerId, customerName: payment.customerName,
+            revision: 1, asOf: seed.finance.asOf, openingBalanceMinor: 0,
+            historyComplete: true, entries: [
+              for (var i = 0; i < 3; i++) WorkspaceCustomerLedgerEntry(
+                id: 'reference-entry-$i', operationId: 'reference-operation-$i',
+                invoiceId: payment.invoiceId!, orderId: payment.orderId,
+                sequence: i + 1, occurredAt: seed.finance.asOf,
+                kind: i == 0 ? WorkspaceLedgerEntryKind.invoice : WorkspaceLedgerEntryKind.collection,
+                state: WorkspaceLedgerPostingState.posted,
+                amountMinor: i == 0 ? amount : i == 1 ? 10000 : 15000,
+                channel: i == 2 ? WorkspacePaymentChannel.directUpi : WorkspacePaymentChannel.cash,
+                paymentReference: i == 2 ? 'QA-UPI-ORIGINAL-REFERENCE-20260930' : null),
+            ])] : const []);
       expect(work.applyWorkspaceFinance(finance), isTrue);
       final order = WorkspaceOrderRecord(id: payment.orderId, customer: payment.customerId,
           billingDetails: variant == 'part-paid'
@@ -24008,6 +24060,38 @@ void main() {
       await tester.ensureVisible(find.text('Sunflower oil'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      if (variant == 'mixed-reference') {
+        expect(find.text('Payment method: Cash + UPI'), findsOneWidget);
+        final title = find.descendant(
+            of: find.byKey(const Key('work-invoice-recorded-payments')),
+            matching: find.text('Recorded payments'));
+        for (var cycle = 0; cycle < 3; cycle++) {
+          await Scrollable.ensureVisible(tester.element(title), alignment: .5);
+          await tester.pumpAndSettle();
+          expect(title.hitTestable(), findsOneWidget);
+          await tester.tap(title);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final reference = find.byWidgetPredicate((widget) => widget is SelectableText &&
+              widget.data == 'Reference: QA-UPI-ORIGINAL-REFERENCE-20260930');
+          await tester.ensureVisible(reference);
+          await tester.pumpAndSettle();
+          expect(reference.hitTestable(), findsOneWidget);
+          expect(find.byType(ErrorWidget), findsNothing);
+          final selectable = tester.widget<SelectableText>(reference);
+          expect(selectable.key, isA<PageStorageKey>());
+          expect((selectable.key! as PageStorageKey).value, (seed.accountScope, seed.storeId,
+              payment.invoiceId!, 'receipt-reference', 'reference-entry-2'));
+          expect(find.text(WorkspacePaymentChannel.cash.label), findsWidgets);
+          expect(find.text(WorkspacePaymentChannel.directUpi.label), findsWidgets);
+          await Scrollable.ensureVisible(tester.element(title), alignment: .5);
+          await tester.pumpAndSettle();
+          expect(title.hitTestable(), findsOneWidget);
+          await tester.tap(title);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      }
       expect(work.workspaceInvoices.single.id, payment.invoiceId);
       expect(work.workspaceFinance!.payments.single, same(payment));
       await tester.tap(find.byKey(const Key('work-operation-back')));
@@ -24015,6 +24099,22 @@ void main() {
       expect(find.byKey(const Key('work-dashboard-search')), findsOneWidget);
       expect(find.text('Customer orders'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      if (variant == 'mixed-reference') {
+        await tester.ensureVisible(entry);
+        await tester.tapAt(tester.getTopLeft(entry) + const Offset(12, 12));
+        await tester.pumpAndSettle();
+        final title = find.text('Recorded payments');
+        await Scrollable.ensureVisible(tester.element(title), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(title.hitTestable(), findsOneWidget);
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Reference: QA-UPI-ORIGINAL-REFERENCE-20260930'));
+        await tester.pumpAndSettle();
+        expect(find.byType(ErrorWidget), findsNothing);
+        expect(tester.takeException(), isNull);
+        expect(work.workspaceFinance!.customerLedgers.single.entries, hasLength(3));
+      }
     });
     }
   }

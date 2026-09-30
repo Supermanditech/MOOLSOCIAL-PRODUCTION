@@ -105,7 +105,9 @@ String storeCounterSettlementHint(WorkspacePaymentRecord? payment,
 @visibleForTesting
 String storeInvoicePaymentMethod(String selectedMethod,
     WorkspacePaymentRecord? payment,
-    Iterable<WorkspaceCustomerLedgerEntry> entries) {
+    Iterable<WorkspaceCustomerLedgerEntry> entries, {
+    bool preferRecordedMethods = false,
+  }) {
   final original = 'Payment method: $selectedMethod';
   if (payment == null || !payment.valid) return original;
   var credit = 0;
@@ -123,6 +125,18 @@ String storeInvoicePaymentMethod(String selectedMethod,
     }
   }
   if (credit == 0 && payment.state != WorkspacePaymentState.creditApplied) {
+    if (preferRecordedMethods && payment.paidMinor > 0) {
+      if (collected != payment.paidMinor || channels.isEmpty) {
+        return 'Payment method: Recorded payments · details unavailable';
+      }
+      return 'Payment method: ${channels.map((channel) => switch (channel) {
+        WorkspacePaymentChannel.cash => 'Cash',
+        WorkspacePaymentChannel.directUpi => 'UPI',
+        WorkspacePaymentChannel.bankTransfer => 'Bank transfer',
+        WorkspacePaymentChannel.platform => 'MoolSocial',
+        _ => 'Recorded payment',
+      }).join(' + ')}';
+    }
     return original;
   }
   final methods = <String>['Customer credit'];
@@ -7658,6 +7672,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
     final tile = ExpansionTile(
       key: const Key('work-invoice-recorded-payments'),
       minTileHeight: widget.orderDetails ? 48 : null,
+      shape: widget.orderDetails ? const Border() : null,
+      collapsedShape: widget.orderDetails ? const Border() : null,
       tilePadding: EdgeInsets.zero,
       title: Text('Recorded payments', style: widget.orderDetails
           ? const TextStyle(fontSize: 12, color: MoolColors.muted) : null),
@@ -7668,14 +7684,29 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
+                if (widget.orderDetails)
+                  _StoreMoneyLine(
+                    alignAmountToEnd: true,
+                    leading: Text(entry.channel.label,
+                      style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+                    value: _purchaseAmount(entry.amountMinor),
+                    style: const TextStyle(fontSize: 12, color: MoolColors.navy,
+                        fontWeight: FontWeight.w600),
+                  )
+                else Text(
                   '${entry.channel.label} · ${_purchaseAmount(entry.amountMinor)}',
                   style: TextStyle(fontWeight: FontWeight.w600,
                       fontSize: widget.orderDetails ? 12 : null,
                       color: widget.orderDetails ? MoolColors.ink : null),
                 ),
+                if (widget.orderDetails)
+                  Text('${MaterialLocalizations.of(context).formatShortDate(entry.occurredAt.toLocal())} · '
+                    '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(entry.occurredAt.toLocal()))}',
+                    style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
                 if (entry.paymentReference?.trim().isNotEmpty == true)
                   SelectableText('Reference: ${entry.paymentReference}',
+                      key: PageStorageKey((invoiceAccount, invoiceStore,
+                          invoice.id, 'receipt-reference', entry.id)),
                       style: widget.orderDetails ? const TextStyle(
                           fontSize: 11, color: MoolColors.muted) : null),
               ],
@@ -7880,16 +7911,18 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Text('Invoice · ${invoice.id}',
-                  style: const TextStyle(fontSize: 12, color: MoolColors.navy,
-                      fontWeight: FontWeight.w600)),
-                Text('Issued ${localizations.formatShortDate(issued)}',
-                    style: const TextStyle(fontSize: 11, color: MoolColors.muted))])),
-          IconButton(key: const Key('work-invoice-open-pdf'),
-              tooltip: 'Open invoice PDF', onPressed: _openPdf,
-              icon: const Icon(Icons.picture_as_pdf_outlined, size: 20)),
+          Expanded(child: Text('Invoice · Issued ${localizations.formatShortDate(issued)}',
+              style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
+          TextButton.icon(key: const Key('work-invoice-open-pdf'),
+              onPressed: _openPdf,
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  textStyle: const TextStyle(fontSize: 12)),
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+              label: const Text('PDF')),
         ]),
+        Text(invoice.id, key: const Key('work-order-invoice-reference'),
+            style: const TextStyle(fontSize: 11, color: MoolColors.ink)),
         const SizedBox(height: 4),
         _InvoiceCollectionSummary(session: session, invoice: invoice,
             accountScope: invoiceAccount, storeId: invoiceStore, orderDetails: true),
@@ -21324,12 +21357,17 @@ class _LiveOrderTicket extends StatelessWidget {
             children: [
               if (detailed) ...[
                 Wrap(spacing: 10, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [Text(hasCustomerName ? customerName : 'Customer name not recorded',
-                    key: const Key('work-order-customer-name'), style: const TextStyle(
+                    children: [Text(hasCustomerName ? customerName : order.customer,
+                    key: hasCustomerName ? const Key('work-order-customer-name') : null,
+                    style: const TextStyle(
                     color: MoolColors.ink, fontSize: 13, fontWeight: FontWeight.w600)),
-                if (!hasCustomerName || customerName != order.customer)
+                if (hasCustomerName && customerName != order.customer)
                   Text(order.customer, style: const TextStyle(
-                      color: MoolColors.muted, fontSize: 11))]),
+                      color: MoolColors.muted, fontSize: 11)),
+                if (!hasCustomerName)
+                  const Text('Customer name not recorded',
+                      key: Key('work-order-customer-name'),
+                      style: TextStyle(color: MoolColors.muted, fontSize: 11))]),
                 Text(order.id, key: const Key('work-focused-order-id'),
                     style: const TextStyle(color: MoolColors.muted, fontSize: 11)),
                 const SizedBox(height: 2),
@@ -28539,7 +28577,8 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                 key: const Key('work-order-payment-state'),
                 style: const TextStyle(color: MoolColors.navy, fontWeight: FontWeight.w600)),
               Text(storeInvoicePaymentMethod(invoice.payment, payment,
-                  creditLedger?.entries ?? const []), style: const TextStyle(
+                  creditLedger?.historyComplete == true ? creditLedger!.entries : const [],
+                  preferRecordedMethods: true), style: const TextStyle(
                       fontSize: 11, color: MoolColors.muted)),
             ]),
             Text('Recorded ${MaterialLocalizations.of(context).formatShortDate(payment.updatedAt.toLocal())} · '
