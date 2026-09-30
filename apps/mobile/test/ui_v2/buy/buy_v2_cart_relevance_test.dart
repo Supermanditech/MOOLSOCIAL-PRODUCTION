@@ -7,9 +7,17 @@ import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
 class QualificationDeliveryFacts implements BuyV2ProductFactsAdapter {
-  const QualificationDeliveryFacts({this.available = true});
+  const QualificationDeliveryFacts({
+    this.available = true,
+    this.unavailableIds = const {},
+    this.closedIds = const {},
+    this.priceOverrides = const {},
+  });
 
   final bool available;
+  final Set<String> unavailableIds;
+  final Set<String> closedIds;
+  final Map<String, int> priceOverrides;
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
@@ -19,6 +27,14 @@ class QualificationDeliveryFacts implements BuyV2ProductFactsAdapter {
             sourceId: 'qualification-delivery-fixture',
             deliveryPromise: 'Delivery time confirmed at checkout',
             promisedByLabel: available ? '15 Sep 2026, 10 AM–12 PM' : '',
+            price: priceOverrides[product.id],
+            stale: unavailableIds.contains(product.id),
+            storeOperatingState: closedIds.contains(product.id)
+                ? BuyV2StoreOperatingState.closed
+                : null,
+            nextOpeningLabel: closedIds.contains(product.id)
+                ? 'Next opening confirmed by the Store'
+                : null,
           );
 }
 
@@ -145,7 +161,7 @@ void main() {
   });
 
   group('R37 Cart relevance contracts', () {
-    test('recommendations stay in-family and exclude Cart products', () {
+    test('recommendations stay in-family and exclude Cart products', () async {
       final session = BuyV2Session(core: BuySession());
       for (final destination in const [
         BuyV2Destination.shop,
@@ -172,7 +188,126 @@ void main() {
           recommendations.any((candidate) => candidate.id == product.id),
           isFalse,
         );
+        final all = session.cartRecommendationsFor(destination, limit: 1000);
+        final sameStore = all.where(product.isFromSameStoreAs).toList();
+        expect(
+          all.take(sameStore.length).map((candidate) => candidate.id),
+          sameStore.map((candidate) => candidate.id),
+          reason: 'Basket Stores precede offers from other Stores',
+        );
+        final excluded = all.first;
+        expect(
+          session
+              .cartRecommendationsFor(
+                destination,
+                excludedProductIds: {excluded.id},
+                limit: 1000,
+              )
+              .any((candidate) => candidate.id == excluded.id),
+          isFalse,
+        );
+        expect(session.cartRecommendationsFor(destination, limit: 0), isEmpty);
+        expect(
+          session
+              .cartRecommendationsFor(destination, limit: 1000)
+              .map((candidate) => candidate.id),
+          all.map((candidate) => candidate.id),
+        );
       }
+      final anchor = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            BuyV2Catalogue.products.any(
+              (other) =>
+                  other.id != product.id &&
+                  other.destination == product.destination &&
+                  product.isFromSameStoreAs(other),
+            ),
+      );
+      session.addProduct(anchor.id);
+      final storeFirst = session.cartRecommendationsFor(
+        BuyV2Destination.shop,
+        limit: 1000,
+      );
+      expect(storeFirst.any(anchor.isFromSameStoreAs), isTrue);
+      expect(storeFirst.first.isFromSameStoreAs(anchor), isTrue);
+      final unavailable = session.cartRecommendationsFor(BuyV2Destination.shop);
+      final saving = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.medicine &&
+            product.mrp != null &&
+            product.mrp! > product.price &&
+            !product.requiresPrescription,
+      );
+      final guarded = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: QualificationDeliveryFacts(
+          unavailableIds: {unavailable.first.id},
+          closedIds: {unavailable.last.id},
+          priceOverrides: {saving.id: saving.mrp!},
+        ),
+      );
+      addTearDown(guarded.dispose);
+      expect(
+        guarded
+            .cartRecommendationsFor(BuyV2Destination.shop, limit: 1000)
+            .map((product) => product.id),
+        isNot(contains(unavailable.first.id)),
+      );
+      expect(
+        guarded
+            .cartRecommendationsFor(BuyV2Destination.shop, limit: 1000)
+            .map((product) => product.id),
+        isNot(contains(unavailable.last.id)),
+      );
+      final offers = guarded.cartRecommendationsFor(
+        BuyV2Destination.medicine,
+        specialOffersOnly: true,
+        limit: 1000,
+      );
+      expect(offers.map((product) => product.id), isNot(contains(saving.id)));
+      expect(
+        offers.every(
+          (product) =>
+              product.mrp != null &&
+              product.mrp! > guarded.productFactsFor(product).price,
+        ),
+        isTrue,
+      );
+      final templates = BuyV2Catalogue.products
+          .where((product) => product.destination == BuyV2Destination.shop)
+          .toList();
+      final source = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+        providerCount: 1,
+        skusPerStore: templates.length * 2,
+      );
+      final pagedCore = BuySession();
+      final paged = BuyV2Session(core: pagedCore, cataloguePageSource: source);
+      addTearDown(paged.dispose);
+      addTearDown(pagedCore.dispose);
+      final index = templates.indexWhere(
+        (p) => p.packTerms == null && p.variantAttributes.isEmpty,
+      );
+      final originalId = source.productIdAt(0, index);
+      final repeatedId = source.productIdAt(0, index + templates.length);
+      final differentId = source.productIdAt(0, (index + 1) % templates.length);
+      expect(await paged.openLinkedProduct(originalId), isTrue);
+      expect(paged.addProduct(originalId), isTrue);
+      expect(await paged.openLinkedProduct(repeatedId), isTrue);
+      expect(await paged.openLinkedProduct(differentId), isTrue);
+      final retained = paged.cartRecommendationsFor(
+        BuyV2Destination.shop,
+        limit: 1000,
+      );
+      expect(retained.map((p) => p.id), isNot(contains(repeatedId)));
+      expect(retained.map((p) => p.id), contains(differentId));
+      expect(
+        retained.first.isFromSameStoreAs(paged.product(originalId)),
+        isTrue,
+      );
+      expect(paged.quantityFor(originalId), 1);
+      expect(paged.quantityFor(repeatedId), 0);
     });
 
     test('bill savings derive only from current MRP and quantities', () {

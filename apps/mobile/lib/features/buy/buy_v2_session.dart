@@ -9492,20 +9492,21 @@ class BuyV2Session extends ChangeNotifier {
       return const [];
     }
     final cartProductIds = _cart.keys.toSet();
-    final categoryIds = _cart.values
+    final basketProducts = cartLines
         .where((line) => line.product.destination == destination)
-        .map((line) => line.product.categoryId)
+        .map((line) => line.product)
+        .toList(growable: false);
+    final categoryIds = basketProducts
+        .map((product) => product.categoryId)
         .toSet();
     bool hasOffer(BuyV2Product product) {
-      final badge = product.badge.toLowerCase();
-      return (product.mrp != null && product.mrp! > product.price) ||
-          badge.contains('off') ||
-          badge.contains('lowest') ||
-          badge.contains('best');
+      final price = productFactsFor(product).price;
+      return product.mrp != null && product.mrp! > price;
     }
 
     int score(BuyV2Product product) {
-      var value = categoryIds.contains(product.categoryId) ? 8 : 0;
+      var value = basketProducts.any(product.isFromSameStoreAs) ? 32 : 0;
+      if (categoryIds.contains(product.categoryId)) value += 16;
       if (hasOffer(product)) value += 4;
       if (destination == BuyV2Destination.medicine &&
           !product.requiresPrescription) {
@@ -9514,25 +9515,68 @@ class BuyV2Session extends ChangeNotifier {
       return value;
     }
 
-    final candidates = _catalogueProducts
-        .where(_procurementDiscoveryAllows)
+    final candidates = _knownCatalogueProducts
         .where(
           (product) =>
               product.destination == destination &&
               product.catalogueListing &&
               !cartProductIds.contains(product.id) &&
-              !excludedProductIds.contains(product.id) &&
-              (!specialOffersOnly || hasOffer(product)),
+              !excludedProductIds.contains(product.id),
         )
+        .where(_procurementDiscoveryAllows)
+        .where(_availableForDiscovery)
+        .where((product) => !specialOffersOnly || hasOffer(product))
         .toList(growable: false);
     candidates.sort((left, right) {
       final scoreOrder = score(right).compareTo(score(left));
       if (scoreOrder != 0) return scoreOrder;
-      final priceOrder = left.price.compareTo(right.price);
+      final priceOrder = productFactsFor(
+        left,
+      ).price.compareTo(productFactsFor(right).price);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
-    return List.unmodifiable(candidates.take(limit));
+    // Repeated unstructured listings must not fill the lane with the same
+    // purchasable choice. Keep distinct variants, packs, prices and trade terms.
+    bool sameChoice(BuyV2Product left, BuyV2Product right) {
+      if (left.id == right.id) return true;
+      if (left.packTerms != null ||
+          right.packTerms != null ||
+          left.variantAttributes.isNotEmpty ||
+          right.variantAttributes.isNotEmpty) {
+        return false;
+      }
+      final leftFacts = productFactsFor(left);
+      final rightFacts = productFactsFor(right);
+      return left.canonicalId == right.canonicalId &&
+          left.destination == right.destination &&
+          left.isFromSameStoreAs(right) &&
+          left.brand == right.brand &&
+          left.title == right.title &&
+          left.variant == right.variant &&
+          left.pack == right.pack &&
+          left.minimumOrder == right.minimumOrder &&
+          left.offerClass == right.offerClass &&
+          left.freightIncluded == right.freightIncluded &&
+          left.mrp == right.mrp &&
+          left.requiresPrescription == right.requiresPrescription &&
+          left.returnPolicy == right.returnPolicy &&
+          left.purchaseProtection == right.purchaseProtection &&
+          leftFacts.price == rightFacts.price &&
+          leftFacts.deliveryPromise == rightFacts.deliveryPromise &&
+          leftFacts.deliveryFeeLabel == rightFacts.deliveryFeeLabel;
+    }
+
+    final recommendations = <BuyV2Product>[];
+    for (final product in candidates) {
+      if (_cart.values.any((line) => sameChoice(line.product, product)) ||
+          recommendations.any((previous) => sameChoice(previous, product))) {
+        continue;
+      }
+      recommendations.add(product);
+      if (recommendations.length == limit) break;
+    }
+    return List.unmodifiable(recommendations);
   }
 
   /// Returns deterministic continuation products from the current catalogue.

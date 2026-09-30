@@ -21681,7 +21681,7 @@ class _CartBenefitEmptyState extends StatelessWidget {
     return Container(
       key: ValueKey('buy-cart-${kind.name}-empty-${destination.name}'),
       color: Colors.transparent,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Row(
         children: [
           Icon(
@@ -22027,7 +22027,7 @@ class _CartBenefitCard extends StatelessWidget {
   }
 }
 
-class _CartDiscoverySections extends StatelessWidget {
+class _CartDiscoverySections extends StatefulWidget {
   const _CartDiscoverySections({
     required this.session,
     required this.destinations,
@@ -22037,15 +22037,94 @@ class _CartDiscoverySections extends StatelessWidget {
   final List<BuyV2Destination> destinations;
 
   @override
+  State<_CartDiscoverySections> createState() => _CartDiscoverySectionsState();
+}
+
+class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
+  String _category = 'all';
+  late String _filter;
+
+  String get _storageId => 'buy-cart-category-$_filter';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _filter = widget.session.cartDisplayFilter;
+    _category =
+        PageStorage.maybeOf(context)?.readState(context, identifier: _storageId)
+            as String? ??
+        'all';
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartDiscoverySections oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_filter != widget.session.cartDisplayFilter) {
+      _filter = widget.session.cartDisplayFilter;
+      _category =
+          PageStorage.maybeOf(
+                context,
+              )?.readState(context, identifier: _storageId)
+              as String? ??
+          'all';
+    }
+  }
+
+  void _chooseCategory(String category) {
+    if (_category == category) return;
+    HapticFeedback.selectionClick();
+    setState(() => _category = category);
+    PageStorage.maybeOf(
+      context,
+    )?.writeState(context, category, identifier: _storageId);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
+    final destinations = widget.destinations;
     final products = <BuyV2Product>[];
     final seen = <String>{};
     for (final destination in destinations) {
-      for (final product in session.cartRecommendationsFor(destination)) {
+      for (final product in session.cartRecommendationsFor(
+        destination,
+        limit: 24,
+      )) {
         if (seen.add(product.id)) products.add(product);
       }
     }
     if (products.isEmpty) return const SizedBox.shrink();
+    final categories = <(String, String)>[
+      for (final destination in destinations)
+        for (final category in session.categoriesFor(destination))
+          if (category.id != 'all' &&
+              products.any(
+                (product) =>
+                    product.destination == destination &&
+                    product.categoryId == category.id,
+              ))
+            (
+              '${destination.name}:${category.id}',
+              destinations.length > 1
+                  ? '${_cartDestinationLabel(session, destination)} · ${category.label}'
+                  : category.label,
+            ),
+    ];
+    if (!categories.any((category) => category.$1 == _category)) {
+      _category = 'all';
+      PageStorage.maybeOf(
+        context,
+      )?.writeState(context, _category, identifier: _storageId);
+    }
+    final visible = _category == 'all'
+        ? products
+        : products
+              .where(
+                (product) =>
+                    '${product.destination.name}:${product.categoryId}' ==
+                    _category,
+              )
+              .toList(growable: false);
     return ExpansionTile(
       key: const PageStorageKey('buy-cart-discovery'),
       initiallyExpanded: true,
@@ -22062,11 +22141,46 @@ class _CartDiscoverySections extends StatelessWidget {
         style: context.buyBody.copyWith(fontSize: 14),
       ),
       children: [
-        _CartProductLane(
-          session: session,
-          destination: destinations.first,
-          laneId: 'recommendations',
-          products: products,
+        if (categories.length > 1 || _category != 'all')
+          SingleChildScrollView(
+            key: PageStorageKey('buy-cart-category-scroll-$_filter'),
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final category in [('all', 'All products'), ...categories])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      key: ValueKey('buy-cart-category-${category.$1}'),
+                      label: Text(category.$2),
+                      selected: _category == category.$1,
+                      showCheckmark: false,
+                      side: BorderSide.none,
+                      backgroundColor: BuyV2ActionStyle.primaryFill,
+                      selectedColor: BuyV2ActionStyle.pressedFill,
+                      elevation: _category == category.$1 ? 2 : 0,
+                      materialTapTargetSize: MaterialTapTargetSize.padded,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        color: BuyV2ActionStyle.primaryForeground,
+                        fontWeight: _category == category.$1
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                      onSelected: (_) => _chooseCategory(category.$1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        KeyedSubtree(
+          key: PageStorageKey('buy-cart-category-lane-$_filter-$_category'),
+          child: _CartProductLane(
+            session: session,
+            destination: destinations.first,
+            laneId: 'recommendations',
+            products: visible,
+          ),
         ),
       ],
     );
@@ -22125,11 +22239,11 @@ class _CartRecommendationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = session.productFactsFor(product);
-    final hasSaving = product.mrp != null && product.mrp! > product.price;
+    final hasSaving = product.mrp != null && product.mrp! > facts.price;
     final priceWidth = buyV2ValueTextSize(
       context,
-      buyV2Money(product.price),
-      const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      buyV2Money(hasSaving ? product.mrp! : facts.price),
+      const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
     ).width;
     return SizedBox(
       width: (priceWidth + 60)
@@ -22139,7 +22253,9 @@ class _CartRecommendationCard extends StatelessWidget {
           )
           .toDouble(),
       child: Material(
-        color: BuyV2Colors.canvas,
+        color: Colors.white,
+        elevation: 1,
+        shadowColor: BuyV2Colors.ink.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(13),
         child: InkWell(
           key: ValueKey('buy-cart-recommendation-${product.id}'),
@@ -22151,33 +22267,76 @@ class _CartRecommendationCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                BuyV2ProductEdgeControls(session: session, product: product),
-                SizedBox(
-                  height: 68,
-                  width: double.infinity,
-                  child: BuyV2ProductPackshot(
-                    product: product,
-                    borderRadius: 10,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 72,
+                        child: BuyV2ProductPackshot(
+                          product: product,
+                          borderRadius: 10,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: IconButton(
+                        key: ValueKey('buy-save-${product.id}'),
+                        tooltip: session.isSaved(product.id)
+                            ? 'Remove ${product.customerTitle} from Saved'
+                            : 'Save ${product.customerTitle}',
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          session.toggleSaved(product.id);
+                        },
+                        icon: Icon(
+                          session.isSaved(product.id)
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_border_rounded,
+                          size: 20,
+                          color: BuyV2ActionStyle.primaryForeground,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 5),
                 Text(
                   product.customerTitle,
-                  style: context.buyBody.copyWith(fontSize: 13, height: 1.2),
+                  style: context.buyBody.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  product.pack,
+                  [
+                    product.customerVariantPack,
+                    if (facts.price == product.price) product.unitPrice,
+                  ].where((text) => text.trim().isNotEmpty).join(' · '),
                   style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
                 ),
-                Text(
-                  product.unitPrice,
-                  style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
-                ),
+                if (product.minimumOrder > 1)
+                  Text(
+                    'Min. qty ${product.minimumOrder}',
+                    style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
+                  ),
                 Text(
                   product.customerSeller(facts.partner),
                   style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
                 ),
+                if (facts.deliveryPromise.trim().isNotEmpty ||
+                    facts.deliveryFeeLabel?.trim().isNotEmpty == true)
+                  Text(
+                    [
+                      facts.deliveryPromise,
+                      facts.deliveryFeeLabel ?? '',
+                    ].where((text) => text.trim().isNotEmpty).join(' · '),
+                    style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
+                  ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -22186,11 +22345,11 @@ class _CartRecommendationCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            buyV2Money(product.price),
+                            buyV2Money(facts.price),
                             style: const TextStyle(
                               color: BuyV2Colors.ink,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           if (hasSaving)
