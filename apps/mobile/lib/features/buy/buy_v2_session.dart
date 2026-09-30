@@ -9597,6 +9597,17 @@ class BuyV2Session extends ChangeNotifier {
       if (target > 9007199254740991) return null;
       final targetPrice = terms.priceForQuantity(target, price);
       if (targetPrice < price) {
+        if (BigInt.from(target) *
+                BigInt.from(targetPrice) *
+                BigInt.from(10000) >
+            BigInt.from(9007199254740991)) {
+          return null;
+        }
+        if (_cart.containsKey(product.id) &&
+            (checkoutRequiresResolution ||
+                cartQuantityError(product.id, '$target') != null)) {
+          return null;
+        }
         return BuyV2PackPriceTier(minimumPacks: target, price: targetPrice);
       }
     }

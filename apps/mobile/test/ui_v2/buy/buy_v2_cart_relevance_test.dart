@@ -388,10 +388,64 @@ void main() {
         2,
         reason: 'A deal does not auto-add its tier quantity',
       );
+      BuyV2Product withTiers(
+        List<BuyV2PackPriceTier> tiers, {
+        String? pricingStoreId,
+      }) {
+        final terms = pack.packTerms!;
+        return pack.copyWith(
+          packTerms: BuyV2PackTerms(
+            skuId: pack.id,
+            revision: terms.revision,
+            sellUnit: terms.sellUnit,
+            containedUnits: terms.containedUnits,
+            netContentMilli: terms.netContentMilli,
+            contentUnit: terms.contentUnit,
+            quantityStep: terms.quantityStep,
+            pricingStoreId: pricingStoreId ?? terms.pricingStoreId,
+            priceObservedAt: terms.priceObservedAt,
+            priceValidUntil: terms.priceValidUntil,
+            priceTiers: tiers,
+          ),
+        );
+      }
+
+      final rounded = withTiers(const [
+        BuyV2PackPriceTier(minimumPacks: 2, price: 400),
+        BuyV2PackPriceTier(minimumPacks: 4, price: 380),
+      ]);
+      expect(review.nextCartDealTierFor(rounded)?.minimumPacks, 5);
+      expect(review.nextCartDealTierFor(rounded)?.price, 380);
+      expect(
+        review.nextCartDealTierFor(
+          withTiers(
+            rounded.packTerms!.priceTiers,
+            pricingStoreId: 'another-store',
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        review.nextCartDealTierFor(
+          withTiers(const [
+            BuyV2PackPriceTier(minimumPacks: 2, price: 400),
+            BuyV2PackPriceTier(minimumPacks: 9007199254740991, price: 380),
+          ]),
+        ),
+        isNull,
+        reason: 'An unsafe increased spending commitment is not advertised',
+      );
       review.increase(packId);
       expect(review.quantityFor(packId), 5);
+      expect(review.cartTotal, 1900);
       expect(review.nextCartDealTierFor(pack)?.minimumPacks, 8);
       expect(review.nextCartDealTierFor(pack)?.price, 360);
+      expect(review.setCartQuantity(packId, '8'), isTrue);
+      expect(review.cartTotal, 2880);
+      expect(review.nextCartDealTierFor(pack), isNull);
+      review.decrease(packId);
+      expect(review.cartTotal, 1900);
+      expect(review.nextCartDealTierFor(pack)?.minimumPacks, 8);
       clockOffset = const Duration(days: 2);
       expect(review.nextCartDealTierFor(pack), isNull);
       expect(review.hasCartStoreDeal(pack), isFalse);

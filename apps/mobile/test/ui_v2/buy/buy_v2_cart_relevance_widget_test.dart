@@ -15,6 +15,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'buy_v2_qualified_provider_fixture.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -2186,6 +2187,123 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    for (final offerClass in [
+      BuyV2OfferClass.wholesale,
+      BuyV2OfferClass.bulk,
+    ]) {
+      testWidgets('C07 Cart quantity choice confirms $offerClass at $scale', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final source = BuyV2DevelopmentCatalogueSource(
+          destination: BuyV2Destination.wholesale,
+          providerCount: 1,
+          includeVariantReviewFixtures: true,
+        );
+        final templates = BuyV2Catalogue.products
+            .where((p) => p.destination == BuyV2Destination.wholesale)
+            .length;
+        final probeCore = BuySession();
+        final probe = BuyV2Session(
+          core: probeCore,
+          cataloguePageSource: source,
+        );
+        addTearDown(probe.dispose);
+        addTearDown(probeCore.dispose);
+        BuyV2Product? suppliedPack;
+        for (var offset = 0; offset <= 12; offset++) {
+          final id = source.productIdAt(0, templates + offset);
+          expect(await probe.openLinkedProduct(id), isTrue);
+          final candidate = probe.product(id);
+          if (candidate.packTerms?.priceTiers.isNotEmpty == true) {
+            suppliedPack = candidate.copyWith(offerClass: offerClass);
+            break;
+          }
+        }
+        expect(suppliedPack, isNotNull);
+        final product = suppliedPack!;
+        var now = DateTime.now();
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: _QuantityTierCommerce(product),
+          reviewDataEnabled: false,
+          productFactsAdapter: QualifiedTestProductFacts({product.id}),
+          catalogueNow: () => now,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(
+          session.addProduct(product.id),
+          isTrue,
+          reason:
+              '${session.notice}; '
+              'pack valid=${product.hasValidPackTerms}; '
+              'facts=${session.productFactsFor(product).orderabilityLabel}',
+        );
+        session.openCart();
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final cue = find.byKey(
+          ValueKey('buy-cart-quantity-tier-${product.id}'),
+        );
+        await showInMainCartList(tester, cue);
+        await Scrollable.ensureVisible(tester.element(cue), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('3 packs more'), findsOneWidget);
+        expect(find.textContaining('Item total ₹1,900'), findsOneWidget);
+        expect(session.quantityFor(product.id), 2);
+        expect(session.cartTotal, 800);
+        expect(tester.takeException(), isNull);
+        await tester.tap(cue);
+        await tester.pumpAndSettle();
+        final input = find.byKey(const ValueKey('buy-quantity-input'));
+        expect(tester.widget<TextField>(input).controller!.text, '5');
+        expect(session.cartTotal, 800);
+        await tester.ensureVisible(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(product.id), 2);
+        await showInMainCartList(tester, cue, scrollDelta: -450);
+        await Scrollable.ensureVisible(tester.element(cue), alignment: .5);
+        await tester.pumpAndSettle();
+        await tester.tap(cue);
+        await tester.pumpAndSettle();
+        final save = find.byKey(const ValueKey('buy-quantity-save'));
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(product.id), 5);
+        expect(session.cartLines.single.product.price, 380);
+        expect(session.cartTotal, 1900);
+        await showInMainCartList(tester, cue, scrollDelta: -450);
+        expect(find.textContaining('Item total ₹2,880'), findsOneWidget);
+        await Scrollable.ensureVisible(tester.element(cue), alignment: .5);
+        await tester.pumpAndSettle();
+        await tester.tap(cue);
+        await tester.pumpAndSettle();
+        now = now.add(const Duration(days: 2));
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Pack prices have expired'), findsOneWidget);
+        expect(session.quantityFor(product.id), 5);
+        expect(session.cartTotal, 1900);
+        await tester.ensureVisible(find.text('Cancel'));
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(cue, findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('R37 Cart sections fit compact Android and iOS-size viewports', (
     tester,
   ) async {
@@ -2585,6 +2703,20 @@ Future<void> _captureR66MainCart(WidgetTester tester, String label) async {
       image.dispose();
     }
   });
+}
+
+class _QuantityTierCommerce extends Fake implements BuyV2CommerceAdapter {
+  _QuantityTierCommerce(this.product);
+  final BuyV2Product product;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [product],
+    paymentMethods: const {'Cash on Delivery'},
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+  );
 }
 
 class _R66PayableDisplayFixture extends BuyV2Session {

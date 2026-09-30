@@ -20489,6 +20489,7 @@ Future<void> showBuyV2QuantityEditor(
   BuyV2Session session,
   BuyV2Product product, {
   Future<bool> Function(int)? beforeSave,
+  int? proposedQuantity,
 }) async {
   final bottomClearance = BuyV2AddressSheetMotion.resolveModalActionBottomInset(
     context,
@@ -20513,6 +20514,7 @@ Future<void> showBuyV2QuantityEditor(
         session: session,
         product: product,
         beforeSave: beforeSave,
+        proposedQuantity: proposedQuantity,
       ),
     ),
   );
@@ -20523,11 +20525,13 @@ class _QuantityEditor extends StatefulWidget {
     required this.session,
     required this.product,
     this.beforeSave,
+    this.proposedQuantity,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final Future<bool> Function(int)? beforeSave;
+  final int? proposedQuantity;
 
   @override
   State<_QuantityEditor> createState() => _QuantityEditorState();
@@ -20542,7 +20546,8 @@ class _QuantityEditorState extends State<_QuantityEditor> {
   @override
   void initState() {
     super.initState();
-    final text = '${widget.session.quantityFor(widget.product.id)}';
+    final text =
+        '${widget.proposedQuantity ?? widget.session.quantityFor(widget.product.id)}';
     _controller = TextEditingController(text: text)
       ..selection = TextSelection(baseOffset: 0, extentOffset: text.length);
   }
@@ -23625,6 +23630,9 @@ class _CartLine extends StatelessWidget {
     );
     final facts = session.productFactsFor(product);
     final wholesale = product.destination == BuyV2Destination.wholesale;
+    final quantityTier = priceUnavailable
+        ? null
+        : session.nextCartDealTierFor(product);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
@@ -24003,6 +24011,42 @@ class _CartLine extends StatelessWidget {
                       const SizedBox(height: 4),
                       tradeFacts,
                     ],
+                    if (quantityTier != null)
+                      TextButton(
+                        key: ValueKey('buy-cart-quantity-tier-${product.id}'),
+                        style: TextButton.styleFrom(
+                          alignment: Alignment.centerLeft,
+                          foregroundColor: BuyV2ActionStyle.primaryForeground,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          minimumSize: const Size(44, 44),
+                        ),
+                        onPressed: () => showBuyV2QuantityEditor(
+                          context,
+                          session,
+                          product,
+                          proposedQuantity: quantityTier.minimumPacks,
+                        ),
+                        child: Text(
+                          '${_packCountLabel(quantityTier.minimumPacks - line.quantity)} more'
+                          ' → ${buyV2Money(quantityTier.price)}/pack'
+                          ' · Item total ${buyV2Money(quantityTier.minimumPacks * quantityTier.price)}'
+                          '${product.packTerms?.pricesIncludeTax == null
+                              ? ''
+                              : product.packTerms!.pricesIncludeTax!
+                              ? ' · Tax included'
+                              : ' · Tax extra'}'
+                          '${product.packTerms?.pricesIncludeFreight == null
+                              ? ''
+                              : product.packTerms!.pricesIncludeFreight!
+                              ? ' · Delivery included'
+                              : ' · Delivery extra'}',
+                          style: context.buyBody.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
                   ],
                 );
               },
