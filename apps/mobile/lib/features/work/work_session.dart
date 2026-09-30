@@ -554,6 +554,7 @@ class WorkSession extends ChangeNotifier {
     this.invoiceDeliveryPreferenceStore,
     this.reviewStoreSelectionStore,
     this.inventoryStore,
+    this.purchaseEntryStore,
     this.catalogueReference,
     this.productPhotoSupportDirectory,
   }) : _productionSession = false,
@@ -596,6 +597,7 @@ class WorkSession extends ChangeNotifier {
     this.invoiceDeliveryPreferenceStore,
     this.reviewStoreSelectionStore,
     this.inventoryStore,
+    this.purchaseEntryStore,
     this.catalogueReference,
     this.productPhotoSupportDirectory,
   }) : _productionSession = true,
@@ -627,6 +629,7 @@ class WorkSession extends ChangeNotifier {
   final WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryPreferenceStore;
   final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
   final WorkInventoryStore? inventoryStore;
+  final WorkPurchaseEntryStore? purchaseEntryStore;
   final List<WorkspaceCatalogueItem>? catalogueReference;
 
   /// Optional filesystem location injection; the real scoped media store is
@@ -654,6 +657,124 @@ class WorkSession extends ChangeNotifier {
           const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
           const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'));
   String? get workspaceInventoryError => _storeData.inventoryError;
+  late final WorkPurchaseEntryStore _supplierStorage = purchaseEntryStore ??
+      SecureWorkPurchaseEntryStore(accountScope: () => _disposed ? null : _contactAccountScope);
+  final _supplierDirectories = <(String, String, bool), WorkspacePurchaseEntryBook?>{};
+  final _supplierLoads = <(String, String, bool), Future<bool>>{};
+  final _supplierErrors = <(String, String, bool), String>{};
+  final _supplierWrites = <(String, String, bool)>{};
+  final _supplierNeedsReload = <(String, String, bool)>{};
+  (String, String, bool)? get _supplierKey {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    return !_disposed && account != null && account.isNotEmpty && store != null &&
+        (purchaseEntryStore != null || _productionSession || localInventoryEnabled)
+        ? (account, store, !_productionSession) : null;
+  }
+  bool get workspaceSuppliersLoaded => _supplierDirectories.containsKey(_supplierKey);
+  (String, String, bool)? get workspaceSupplierScope => _supplierKey;
+  String newWorkspaceSupplierId() => _newCounterIdentity('local-supplier');
+  String newWorkspacePurchaseDraftId() => _newCounterIdentity('manual-purchase-draft');
+  WorkspacePurchaseEntryDraft? get workspacePurchaseEntryDraft =>
+      _supplierDirectories[_supplierKey]?.draft;
+  bool get workspaceSupplierSaving => _supplierWrites.contains(_supplierKey);
+  String? get workspaceSupplierError => _supplierErrors[_supplierKey];
+  List<WorkspaceSupplierProfile> get workspaceSuppliers =>
+      _supplierDirectories[_supplierKey]?.profiles ?? const [];
+  Future<bool> loadWorkspaceSuppliers({bool retry = false}) {
+    final key = _supplierKey;
+    if (key == null) return Future.value(false);
+    if (_supplierLoads[key] != null) return _supplierLoads[key]!;
+    if (workspaceSupplierSaving) return Future.value(false);
+    if (!retry && !_supplierNeedsReload.contains(key) && _supplierDirectories.containsKey(key)) {
+      return Future.value(true);
+    }
+    final operation = () async {
+      try {
+        final saved = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+        if (_supplierKey != key) return false;
+        _supplierDirectories[key] = saved;
+        _supplierNeedsReload.remove(key);
+        _supplierErrors.remove(key);
+        return true;
+      } on Object {
+        if (_supplierKey == key) {
+          _supplierErrors[key] = 'Purchase draft could not be opened. Retry; saved details have been kept.';
+        }
+        return false;
+      } finally {
+        _supplierLoads.remove(key);
+        if (_supplierKey == key) notifyListeners();
+      }
+    }();
+    _supplierLoads[key] = operation;
+    return operation;
+  }
+  Future<bool> saveWorkspacePurchaseEntry(WorkspaceSupplierProfile profile, {
+    required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft,
+    required int? expectedRevision,
+  }) async {
+    final key = _supplierKey;
+    if (key == null || key != scope || !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key)) {
+      return false;
+    }
+    final old = _supplierDirectories[key];
+    if (old?.revision != expectedRevision || !draft.valid || draft.supplierId != profile.id ||
+        (old?.draft != null && (old!.draft!.id != draft.id ||
+          old.draft!.createdAt != draft.createdAt))) {
+      _supplierErrors[key] = 'This purchase draft changed. Reopen it before saving again.';
+      notifyListeners();
+      return false;
+    }
+    final error = profile.validationError;
+    if (error != null) {
+      _supplierErrors[key] = error;
+      notifyListeners();
+      return false;
+    }
+    final profiles = old?.profiles ?? const <WorkspaceSupplierProfile>[];
+    final duplicate = profiles.where((p) => p.id != profile.id &&
+      ((profile.phone.isNotEmpty && p.phone == profile.phone) ||
+       (profile.gstin.isNotEmpty && p.gstin == profile.gstin))).firstOrNull;
+    if (duplicate != null) {
+      _supplierErrors[key] = 'These contact details belong to ${duplicate.name}. Select that supplier in the Supplier name or phone field.';
+      notifyListeners();
+      return false;
+    }
+    final existing = profiles.where((p) => p.id == profile.id).firstOrNull;
+    if (existing != null && (existing.createdAt != profile.createdAt ||
+        profile.updatedAt.isBefore(existing.updatedAt))) {
+      _supplierErrors[key] = 'Supplier details changed. Reopen that supplier before editing again.';
+      notifyListeners();
+      return false;
+    }
+    final saved = WorkspacePurchaseEntryBook(account: key.$1, store: key.$2,
+      qa: key.$3, revision: (old?.revision ?? 0) + 1,
+      profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft);
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    notifyListeners();
+    try {
+      await _supplierStorage.save(saved, expectedRevision: old?.revision);
+      if (_supplierKey != key) {
+        _supplierNeedsReload.add(key);
+        return false;
+      }
+      _supplierDirectories[key] = saved;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (_supplierKey == key) {
+        _supplierErrors[key] = 'Purchase draft could not be saved. Your changes are still here. Retry, or reopen the saved draft.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (_supplierKey == key) notifyListeners();
+    }
+  }
+  int? get workspacePurchaseEntryRevision => _supplierDirectories[_supplierKey]?.revision;
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
 

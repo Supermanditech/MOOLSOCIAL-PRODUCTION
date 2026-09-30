@@ -553,6 +553,65 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  // Local automated fixture evidence only; no runtime supplier/bill injection.
+  WorkspacePurchaseEntryBook entryFixture({int revision = 1, String reference = 'EVAL-P-001'}) {
+    final at = DateTime.utc(2026, 9, 30);
+    return WorkspacePurchaseEntryBook(account: 'account-A', store: 'store-A', qa: true,
+      revision: revision, profiles: [WorkspaceSupplierProfile(id: 'private-supplier-A',
+        name: 'Evaluation supply house', createdAt: at, updatedAt: at)],
+      draft: WorkspacePurchaseEntryDraft(id: 'manual-draft-A', supplierId: 'private-supplier-A',
+        invoiceReference: reference, invoiceDate: '2026-09-30', createdAt: at, updatedAt: at,
+        goods: [const {'productId': 'saved-product-A', 'name': 'Evaluation rice', 'pack': '1 kg',
+          'quantity': '12', 'cost': '45.50'}]));
+  }
+  test('P02 purchase entry secure restart and scope isolation', () async {
+    final storage = _OrderJournalStorage();
+    String account = 'account-A';
+    SecureWorkPurchaseEntryStore owner() => SecureWorkPurchaseEntryStore(
+      accountScope: () => account, storage: storage);
+    await owner().save(entryFixture(), expectedRevision: null);
+    final restored = await owner().read('account-A', 'store-A', qa: true);
+    expect(restored!.toJson(), entryFixture().toJson());
+    expect(await owner().read('account-A', 'other-store', qa: true), isNull);
+    expect(await owner().read('account-A', 'store-A', qa: false), isNull);
+    account = 'other-account';
+    await expectLater(owner().read('account-A', 'store-A', qa: true), throwsA(isA<WorkGatewayException>()));
+    expect(await owner().read('other-account', 'store-A', qa: true), isNull);
+  });
+  test('P02 purchase entry stale revision and corrupt record preserve prior data', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(entryFixture(), expectedRevision: null);
+    await expectLater(owner.save(entryFixture(revision: 2, reference: 'changed'), expectedRevision: null),
+      throwsA(isA<WorkGatewayException>()));
+    expect((await owner.read('account-A', 'store-A', qa: true))!.draft!.invoiceReference, 'EVAL-P-001');
+    final key = storage.values.keys.single;
+    storage.values[key] = '{broken';
+    await expectLater(owner.read('account-A', 'store-A', qa: true), throwsA(isA<WorkGatewayException>()));
+    await expectLater(owner.save(entryFixture(), expectedRevision: null), throwsA(isA<WorkGatewayException>()));
+    expect(storage.values[key], '{broken');
+  });
+  test('P02 purchase entry lost response and failed write recovery', () async {
+    final storage = _OrderJournalStorage()..loseWriteResponseOnce = true;
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(entryFixture(), expectedRevision: null);
+    expect((await owner.read('account-A', 'store-A', qa: true))!.revision, 1);
+    storage.failWrite = true;
+    await expectLater(owner.save(entryFixture(revision: 2, reference: 'changed'), expectedRevision: 1),
+      throwsStateError);
+    expect((await owner.read('account-A', 'store-A', qa: true))!.draft!.invoiceReference, 'EVAL-P-001');
+  });
+  test('P02 purchase entry rejects dangling supplier and posted or oversized drafts', () {
+    final raw = entryFixture().toJson();
+    raw['profiles'] = [];
+    expect(() => WorkspacePurchaseEntryBook.fromJson(raw), throwsFormatException);
+    final posted = entryFixture().toJson();
+    (posted['draft'] as Map)['stage'] = 'posted';
+    expect(() => WorkspacePurchaseEntryBook.fromJson(posted), throwsFormatException);
+    final oversized = entryFixture().toJson();
+    (oversized['draft'] as Map)['goods'] = List.filled(201, entryFixture().draft!.goods.single);
+    expect(() => WorkspacePurchaseEntryBook.fromJson(oversized), throwsFormatException);
+  });
   WorkspaceCustomerLedger creditLedger() => WorkspaceCustomerLedger(
     accountScope: 'account-A', workspaceId: 'credit-store', customerId: '9000091941',
     customerName: 'Credit QA · 9000091941', revision: 1, asOf: DateTime.utc(2026, 9, 20),

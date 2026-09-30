@@ -5881,6 +5881,127 @@ String? validateWorkspaceProductValues({
   delivery: delivery,
 )?.message;
 
+/// Private contact identity, not a public supplier or an accounting balance.
+class WorkspaceSupplierProfile {
+  const WorkspaceSupplierProfile({required this.id, required this.name,
+    required this.createdAt, required this.updatedAt,
+    this.phone = '', this.address = '', this.gstin = ''});
+  final String id, name, phone, address, gstin;
+  final DateTime createdAt, updatedAt;
+  String? get validationError {
+    if (id.trim().isEmpty || name.trim().isEmpty || name.length > 120) {
+      return 'Enter a supplier name, up to 120 characters.';
+    }
+    if (phone.isNotEmpty && !RegExp(r'^\+?[0-9]{7,15}$').hasMatch(phone)) {
+      return 'Enter a valid phone number, or leave it blank.';
+    }
+    if (address.length > 500) return 'Keep the address within 500 characters.';
+    if (gstin.isNotEmpty && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(gstin)) {
+      return 'Enter the 15-character GSTIN, or leave it blank.';
+    }
+    if (updatedAt.isBefore(createdAt)) return 'Supplier dates need recovery.';
+    return null;
+  }
+  Map<String, Object?> toJson() => {'id': id, 'name': name, 'phone': phone,
+    'address': address, 'gstin': gstin, 'source': 'manual',
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String()};
+  static WorkspaceSupplierProfile fromJson(Object? raw) {
+    const keys = {'id', 'name', 'phone', 'address', 'gstin', 'source', 'createdAt', 'updatedAt'};
+    if (raw is! Map || raw.length != keys.length ||
+        !raw.keys.every(keys.contains) || raw['source'] != 'manual') {
+      throw const FormatException('Supplier record needs recovery');
+    }
+    final result = WorkspaceSupplierProfile(id: raw['id'] as String,
+      name: raw['name'] as String, phone: raw['phone'] as String,
+      address: raw['address'] as String, gstin: raw['gstin'] as String,
+      createdAt: DateTime.parse(raw['createdAt'] as String),
+      updatedAt: DateTime.parse(raw['updatedAt'] as String));
+    if (result.validationError != null) throw const FormatException('Invalid supplier');
+    return result;
+  }
+}
+
+/// Manual bill input only: saving cannot post stock, dues or payments.
+class WorkspacePurchaseEntryDraft {
+  WorkspacePurchaseEntryDraft({required this.id, required this.supplierId,
+    required this.invoiceReference, required this.invoiceDate,
+    required this.createdAt, required this.updatedAt,
+    required List<Map<String, String>> goods})
+      : goods = List.unmodifiable(goods.map((line) => Map<String, String>.unmodifiable(line)));
+  final String id, supplierId, invoiceReference, invoiceDate;
+  final DateTime createdAt, updatedAt;
+  final List<Map<String, String>> goods;
+  bool get valid => id.isNotEmpty && supplierId.isNotEmpty &&
+      invoiceReference.length <= 120 && invoiceDate.length <= 10 &&
+      !updatedAt.isBefore(createdAt) && goods.length <= 200 &&
+      goods.every((line) => line.length == 5 &&
+        const ['productId', 'name', 'pack', 'quantity', 'cost'].every(line.containsKey) &&
+        line.values.every((value) => value.length <= 200));
+  Map<String, Object?> toJson() => {'id': id, 'supplierId': supplierId,
+    'invoiceReference': invoiceReference, 'invoiceDate': invoiceDate,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+    'source': 'manual', 'stage': 'draft', 'goods': goods};
+  static WorkspacePurchaseEntryDraft fromJson(Object? raw) {
+    const keys = {'id', 'supplierId', 'invoiceReference', 'invoiceDate',
+      'createdAt', 'updatedAt', 'source', 'stage', 'goods'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+        raw['source'] != 'manual' || raw['stage'] != 'draft' || raw['goods'] is! List) {
+      throw const FormatException('Invalid purchase draft');
+    }
+    final draft = WorkspacePurchaseEntryDraft(id: raw['id'] as String,
+      supplierId: raw['supplierId'] as String,
+      invoiceReference: raw['invoiceReference'] as String,
+      invoiceDate: raw['invoiceDate'] as String,
+      createdAt: DateTime.parse(raw['createdAt'] as String),
+      updatedAt: DateTime.parse(raw['updatedAt'] as String),
+      goods: [for (final line in raw['goods'] as List) (line as Map).cast<String, String>()]);
+    if (!draft.valid) throw const FormatException('Invalid purchase draft');
+    return draft;
+  }
+}
+
+/// One recoverable entry plus its private supplier identities, atomically saved.
+/// This is not the posted purchase register or a financial journal.
+class WorkspacePurchaseEntryBook {
+  WorkspacePurchaseEntryBook({required this.account, required this.store,
+    required this.qa, required this.revision, required List<WorkspaceSupplierProfile> profiles,
+    this.draft})
+      : profiles = List.unmodifiable(profiles);
+  final String account, store;
+  final bool qa;
+  final int revision;
+  final List<WorkspaceSupplierProfile> profiles;
+  final WorkspacePurchaseEntryDraft? draft;
+  Map<String, Object?> toJson() => {'version': 1, 'account': account, 'store': store,
+    'qa': qa, 'revision': revision, 'profiles': profiles.map((p) => p.toJson()).toList(),
+    'draft': draft?.toJson()};
+  static WorkspacePurchaseEntryBook fromJson(Object? raw) {
+    const keys = {'version', 'account', 'store', 'qa', 'revision', 'profiles', 'draft'};
+    try {
+      if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+          raw['version'] != 1 || raw['profiles'] is! List ||
+          (raw['profiles'] as List).length > 10000) {
+        throw const FormatException('Invalid supplier directory');
+      }
+      final result = WorkspacePurchaseEntryBook(account: raw['account'] as String,
+        store: raw['store'] as String, qa: raw['qa'] as bool, revision: raw['revision'] as int,
+        profiles: [for (final p in raw['profiles'] as List) WorkspaceSupplierProfile.fromJson(p)],
+        draft: raw['draft'] == null ? null : WorkspacePurchaseEntryDraft.fromJson(raw['draft']));
+      final ids = <String>{};
+      if (result.account.trim().isEmpty || result.store.trim().isEmpty || result.revision < 1 ||
+          result.profiles.any((p) => !ids.add(p.id)) ||
+          (result.draft != null && !ids.contains(result.draft!.supplierId))) {
+        throw const FormatException('Invalid supplier scope');
+      }
+      return result;
+    } on Object {
+      throw const FormatException('Saved suppliers need recovery. Records have been kept.');
+    }
+  }
+}
+
 /// Device-owned inventory only. QA data cannot be restored into production.
 /// This checkpoint carries no invoice, payment, publication or backend authority.
 class WorkspaceSavedInventory {

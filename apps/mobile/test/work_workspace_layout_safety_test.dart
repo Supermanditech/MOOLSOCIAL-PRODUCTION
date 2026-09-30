@@ -1981,11 +1981,13 @@ void main() {
     WorkReceiptDraftStore? receiptDraftStore,
     WorkPendingProofStore? pendingProofStore,
     WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryStore,
+    WorkPurchaseEntryStore? purchaseEntryStore,
   ]) {
     final work =
         WorkSession(
             gateway: gateway,
             contactDraftStore: contactStore,
+            purchaseEntryStore: purchaseEntryStore,
             pendingProofStore: pendingProofStore,
             counterDraftStore: _CounterDraftFixtureStore(),
             ledgerFormDraftStore: _LedgerFormFixtureStore(),
@@ -3250,6 +3252,160 @@ void main() {
       await tester.tap(reset);
       await tester.pumpAndSettle();
       expect(searchController.text, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  // Automated fixtures only, never runtime purchase acceptance data.
+  WorkSession manualPurchaseFixture(_PurchaseEntryFixtureStore entry) =>
+    storeViewFixture(null, _ContactDraftFixtureStore(), null, null, null, null, null, null, null, entry);
+
+  Future<void> revealPurchaseInput(WidgetTester tester, Finder target, {double delta = 60}) async {
+    final scroll = find.descendant(of: find.byKey(const Key('work-record-purchase')),
+      matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+        widget.axisDirection == AxisDirection.down));
+    await tester.scrollUntilVisible(target, delta, scrollable: scroll);
+    await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(tester.element(target), alignment: .5);
+    await tester.pumpAndSettle();
+    expect(target.hitTestable(), findsOneWidget);
+  }
+
+  testWidgets('P02 record purchase draft saves and resumes without stock or money posting', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final products = List.of(work.workspaceCatalogueItems);
+    final finance = work.workspaceFinance;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(find.text('Suppliers'), findsNothing);
+    for (final key in ['work-purchase-supplier-name', 'work-purchase-item-0']) {
+      final field = tester.widget<TextField>(find.byKey(Key(key)));
+      expect(field.decoration!.enabledBorder, InputBorder.none);
+      expect(field.decoration!.focusedBorder, InputBorder.none);
+      expect(field.decoration!.filled, isFalse);
+      expect(field.decoration!.labelStyle!.fontSize, 12);
+    }
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supply house');
+    await tester.enterText(find.byKey(const Key('work-purchase-reference')), 'EVAL-P-001');
+    await tester.enterText(find.byKey(const Key('work-purchase-item-0')), 'Evaluation rice');
+    await tester.enterText(find.byKey(const Key('work-purchase-quantity-0')), '12');
+    await tester.enterText(find.byKey(const Key('work-purchase-cost-0')), '45.50');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    final saved = entry.value!;
+    expect(saved.draft!.invoiceReference, 'EVAL-P-001');
+    expect(saved.draft!.goods.single['quantity'], '12');
+    expect(saved.draft!.goods.single['cost'], '45.50');
+    expect(saved.draft!.supplierId, saved.profiles.single.id);
+    expect(saved.qa, isTrue);
+    expect(work.workspaceCatalogueItems, orderedEquals(products));
+    expect(work.workspaceFinance, same(finance));
+    expect(work.workspacePurchases, isEmpty);
+    expect(find.text('Resume purchase'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text, 'EVAL-P-001');
+    expect(work.workspacePurchaseEntryDraft!.id, saved.draft!.id);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    final fresh = manualPurchaseFixture(entry);
+    expect(fresh.activeWorkspace!.id, saved.store);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: fresh);
+    await openPurchaseList(tester);
+    expect(find.text('Resume purchase'), findsOneWidget,
+      reason: 'The saved draft must be discoverable before reopening its form.');
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(fresh.workspacePurchaseEntryDraft!.id, saved.draft!.id);
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text, 'EVAL-P-001');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P02 failed draft save retains fields and dirty Back protects input', (tester) async {
+    final entry = _PurchaseEntryFixtureStore()..failSave = true;
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    expect(entry.value, isNull);
+    expect(find.byKey(const Key('work-purchase-entry-error')), findsOneWidget);
+    await revealPurchaseInput(tester, find.byKey(const Key('work-record-purchase-back')), delta: -60);
+    await tester.tap(find.byKey(const Key('work-record-purchase-back')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-supplier-name'))).controller!.text,
+      'Evaluation supplier');
+    entry.failSave = false;
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    expect(entry.value!.profiles.single.name, 'Evaluation supplier');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P02 Android Back and section navigation protect unsaved purchase input', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    final supplier = find.byKey(const Key('work-purchase-supplier-name'));
+    await tester.enterText(supplier, 'Evaluation supplier retained');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Leave purchase draft?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+    expect(tester.widget<TextField>(supplier).controller!.text, 'Evaluation supplier retained');
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    expect(find.text('Leave purchase draft?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+    expect(tester.widget<TextField>(supplier).controller!.text, 'Evaluation supplier retained');
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard changes'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-record-purchase')), findsNothing);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final display in [(360.0, 800.0, 1.0, 280.0), (800.0, 360.0, 1.5, 180.0),
+      (320.0, 568.0, 2.0, 240.0)]) {
+    testWidgets('P02 purchase entry keyboard and large text remain reachable $display', (tester) async {
+      final work = manualPurchaseFixture(_PurchaseEntryFixtureStore());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+      await openPurchaseList(tester);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-supplier-name')));
+      await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+      expect(find.byKey(const Key('work-purchase-draft-save')).hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -43540,6 +43696,18 @@ class _ReceiptDraftFixtureStore implements WorkReceiptDraftStore {
       throw StateError('Fixture revision conflict');
     }
     values[draft.key] = WorkspaceReceiptDraft.fromJson(draft.toJson())!;
+  }
+}
+
+class _PurchaseEntryFixtureStore implements WorkPurchaseEntryStore {
+  WorkspacePurchaseEntryBook? value;
+  bool failSave = false;
+  @override
+  Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) async => value;
+  @override
+  Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision}) async {
+    if (failSave || value?.revision != expectedRevision) throw StateError('Fixture write failure');
+    value = WorkspacePurchaseEntryBook.fromJson(directory.toJson());
   }
 }
 

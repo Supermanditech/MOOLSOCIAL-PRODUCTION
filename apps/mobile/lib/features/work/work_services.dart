@@ -1335,6 +1335,75 @@ class SecureWorkUpiDestinationStore implements WorkUpiDestinationStore {
       });
 }
 
+abstract interface class WorkPurchaseEntryStore {
+  Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa});
+  Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision});
+}
+
+/// Uses the existing encrypted, serialized, revision-checked checkpoint pattern.
+/// Contacts never share an inventory or financial-journal key.
+class SecureWorkPurchaseEntryStore implements WorkPurchaseEntryStore {
+  SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
+    : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static final _tails = <String, Future<void>>{};
+  String _key(String account, String store, bool qa) =>
+    'moolsocial.workspace.purchase-entry.${qa ? 'qa' : 'production'}.v1.'
+    '${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+  void _check(String account, String store) {
+    if (account.trim().isEmpty || store.trim().isEmpty || accountScope() != account) {
+      throw const WorkGatewayException('Return to the same account to recover your purchase draft.');
+    }
+  }
+  Future<T> _serial<T>(String key, Future<T> Function() action) {
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<WorkspacePurchaseEntryBook?> _read(String account, String store, bool qa) async {
+    _check(account, store);
+    final raw = await _storage.read(key: _key(account, store, qa));
+    _check(account, store);
+    if (raw == null) return null;
+    try {
+      final saved = WorkspacePurchaseEntryBook.fromJson(jsonDecode(raw));
+      if (saved.account != account || saved.store != store || saved.qa != qa) {
+        throw const FormatException('Supplier scope mismatch');
+      }
+      return saved;
+    } on FormatException {
+      throw const WorkGatewayException('Your saved purchase draft needs recovery. Records have been kept.');
+    }
+  }
+  @override
+  Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) =>
+    _serial(_key(account, store, qa), () => _read(account, store, qa));
+  @override
+  Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision}) async {
+    final bytes = jsonEncode(directory.toJson());
+    final frozen = WorkspacePurchaseEntryBook.fromJson(jsonDecode(bytes));
+    final key = _key(frozen.account, frozen.store, frozen.qa);
+    await _serial(key, () async {
+      _check(frozen.account, frozen.store);
+      final previous = await _read(frozen.account, frozen.store, frozen.qa);
+      if (previous != null && jsonEncode(previous.toJson()) == bytes) return;
+      if (previous?.revision != expectedRevision || frozen.revision != (expectedRevision ?? 0) + 1) {
+        throw const WorkGatewayException('Your purchase draft changed. Reopen Purchases before saving again.');
+      }
+      try {
+        await _storage.write(key: key, value: bytes);
+      } on Object {
+        _check(frozen.account, frozen.store);
+        if (await _storage.read(key: key) != bytes) rethrow;
+      }
+      _check(frozen.account, frozen.store);
+    });
+  }
+}
+
 abstract interface class WorkInventoryStore {
   Future<WorkspaceSavedInventory?> read(
     String account,

@@ -603,6 +603,7 @@ class _WorkWorkspaceDashboardScreenState
   String? _focusedOrderId, _focusedCustomerId;
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
+  final _purchaseEntryKey = GlobalKey<_StoreRecordPurchaseState>();
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
   final _saleSearchController = TextEditingController();
@@ -1750,6 +1751,7 @@ class _WorkWorkspaceDashboardScreenState
               }
             }),
             counterKey: _counterKey,
+            purchaseEntryKey: _purchaseEntryKey,
             saleQuery: _saleSearchController.text,
             stockStatementBookmark: _stockStatementViews.putIfAbsent(
               session.workspaceStockHistoryScope()?.key ?? workspace.id,
@@ -2417,6 +2419,12 @@ class _WorkWorkspaceDashboardScreenState
           session.workspaceOrderQuantities.isNotEmpty);
 
   Future<bool> _confirmDiscardCounterOrder() async {
+    if (_view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.sourcing &&
+        !await (_purchaseEntryKey.currentState?.confirmLeave() ??
+            Future.value(true))) {
+      return false;
+    }
     if (_operation == _WorkspaceOperation.counterOrder &&
         !await (_counterKey.currentState?.flushForNavigation() ??
             Future.value(true))) {
@@ -11326,17 +11334,273 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   }
 }
 
+class _PurchaseGoodsInput {
+  _PurchaseGoodsInput([Map<String, String>? saved])
+      : productId = saved?['productId'] ?? '',
+        name = TextEditingController(text: saved?['name'] ?? ''),
+        pack = TextEditingController(text: saved?['pack'] ?? ''),
+        quantity = TextEditingController(text: saved?['quantity'] ?? ''),
+        cost = TextEditingController(text: saved?['cost'] ?? '');
+  String productId;
+  final TextEditingController name, pack, quantity, cost;
+  final focus = FocusNode(debugLabel: 'purchase-goods');
+  Map<String, String> get fields => {'productId': productId, 'name': name.text,
+    'pack': pack.text, 'quantity': quantity.text, 'cost': cost.text};
+  void dispose() { name.dispose(); pack.dispose(); quantity.dispose(); cost.dispose(); focus.dispose(); }
+}
+
+class _StoreRecordPurchaseSurface extends StatefulWidget {
+  const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack});
+  final WorkSession session;
+  final VoidCallback onBack;
+  @override
+  State<_StoreRecordPurchaseSurface> createState() => _StoreRecordPurchaseState();
+}
+
+class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
+  final _name = TextEditingController(), _phone = TextEditingController(),
+      _address = TextEditingController(), _gstin = TextEditingController(),
+      _reference = TextEditingController(), _date = TextEditingController();
+  final _supplierFocus = FocusNode(debugLabel: 'purchase-supplier');
+  final _goods = <_PurchaseGoodsInput>[];
+  late final (String, String, bool)? _scope = widget.session.workspaceSupplierScope;
+  WorkspaceSupplierProfile? _supplier;
+  WorkspacePurchaseEntryDraft? _original;
+  int? _revision;
+  String _supplierId = '', _draftId = '', _baseline = '';
+  bool _loading = true, _busy = false, _moreSupplier = false, _leaving = false;
+  String? _error;
+  bool get _current => _scope != null && _scope == widget.session.workspaceSupplierScope;
+  String get _input => jsonEncode([_name.text, _phone.text, _address.text, _gstin.text,
+    _reference.text, _date.text, _goods.map((line) => line.fields).toList(), _supplierId]);
+  bool get _dirty => !_loading && _baseline != _input;
+  @override
+  void initState() { super.initState(); unawaited(_load()); }
+  Future<void> _load({bool retry = false}) async {
+    final session = widget.session;
+    final opened = await session.loadWorkspaceSuppliers(retry: retry);
+    if (!mounted) return;
+    if (!_current || !opened) {
+      setState(() { _loading = false; _error = session.workspaceSupplierError ??
+        'Your Store account is unavailable. Reopen this Store.'; });
+      return;
+    }
+    _original = session.workspacePurchaseEntryDraft;
+    _revision = session.workspacePurchaseEntryRevision;
+    _draftId = _original?.id ?? session.newWorkspacePurchaseDraftId();
+    _supplier = session.workspaceSuppliers.where((p) => p.id == _original?.supplierId).firstOrNull;
+    _supplierId = _supplier?.id ?? session.newWorkspaceSupplierId();
+    _name.text = _supplier?.name ?? '';
+    _phone.text = _supplier?.phone ?? '';
+    _address.text = _supplier?.address ?? '';
+    _gstin.text = _supplier?.gstin ?? '';
+    _reference.text = _original?.invoiceReference ?? '';
+    final now = DateTime.now();
+    _date.text = _original?.invoiceDate ??
+      '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    for (final line in _goods) { line.dispose(); }
+    _goods
+      ..clear()
+      ..addAll((_original?.goods ?? [<String, String>{}]).map(_PurchaseGoodsInput.new));
+    _baseline = _input;
+    setState(() { _loading = false; _error = null; });
+  }
+  void _chooseSupplier(WorkspaceSupplierProfile p) {
+    setState(() { _supplier = p; _supplierId = p.id; _name.text = p.name;
+      _phone.text = p.phone; _address.text = p.address; _gstin.text = p.gstin; });
+    _supplierFocus.unfocus();
+  }
+  Future<bool> confirmLeave() async {
+    if (_busy || _leaving) return false;
+    _leaving = true;
+    FocusScope.of(context).unfocus();
+    final discard = !_dirty || await showDialog<bool>(context: context, builder: (context) =>
+      AlertDialog(title: const Text('Leave purchase draft?'),
+        content: const Text('Unsaved changes will be discarded. Your last saved draft stays available.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))])) == true;
+    _leaving = false;
+    return mounted && discard;
+  }
+  Future<void> _back() async {
+    if (await confirmLeave() && mounted) widget.onBack();
+  }
+  Future<void> _save() async {
+    if (_busy || !_current || _scope == null) return;
+    final now = DateTime.now();
+    final profile = WorkspaceSupplierProfile(id: _supplierId, name: _name.text.trim(),
+      phone: _phone.text.trim().replaceAll(RegExp(r'[\s()-]'), ''),
+      address: _address.text.trim(), gstin: _gstin.text.trim().toUpperCase(),
+      createdAt: _supplier?.createdAt ?? now, updatedAt: now);
+    final draft = WorkspacePurchaseEntryDraft(id: _draftId, supplierId: profile.id,
+      invoiceReference: _reference.text.trim(), invoiceDate: _date.text.trim(),
+      createdAt: _original?.createdAt ?? now, updatedAt: now,
+      goods: _goods.map((line) => line.fields).toList());
+    if (profile.validationError != null || !draft.valid) {
+      setState(() => _error = profile.validationError ?? 'Keep each field within its displayed limit.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() { _busy = true; _error = null; });
+    final saved = await widget.session.saveWorkspacePurchaseEntry(profile, scope: _scope!,
+      draft: draft, expectedRevision: _revision);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (saved && _current) {
+      _baseline = _input;
+      widget.onBack();
+    } else {
+      setState(() => _error = widget.session.workspaceSupplierError ??
+        'This Store changed. Your input is still here; return to the original Store.');
+    }
+  }
+  @override
+  void dispose() {
+    for (final c in [_name, _phone, _address, _gstin, _reference, _date]) { c.dispose(); }
+    _supplierFocus.dispose();
+    for (final line in _goods) { line.dispose(); }
+    super.dispose();
+  }
+  Widget _field(String label, TextEditingController controller, String key, {
+      int limit = 200, TextInputType? keyboard, FocusNode? focus,
+      ValueChanged<String>? changed, String? hint, bool lookup = false}) => TextField(key: Key(key), controller: controller,
+    focusNode: focus, maxLength: limit, keyboardType: keyboard,
+    textInputAction: TextInputAction.next, onChanged: changed ?? (_) => setState(() {}),
+    style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+    decoration: InputDecoration(labelText: label, hintText: hint, counterText: '', filled: false,
+      labelStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
+      hintStyle: const TextStyle(fontSize: 13, color: MoolColors.ink),
+      isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      border: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
+      enabledBorder: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
+      focusedBorder: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
+      disabledBorder: InputBorder.none, errorBorder: InputBorder.none,
+      focusedErrorBorder: InputBorder.none));
+  Widget _heading(String label) => Padding(padding: const EdgeInsets.only(top: 12, bottom: 6),
+    child: Text(label, style: const TextStyle(fontSize: 13,
+      fontWeight: FontWeight.w800, color: MoolColors.navy)));
+  @override
+  Widget build(BuildContext context) {
+    final suppliers = widget.session.workspaceSuppliers.where((p) =>
+      '${p.name} ${p.phone} ${p.gstin}'.toLowerCase().contains(_name.text.trim().toLowerCase())).take(5);
+    return ListView(key: const Key('work-record-purchase'), primary: false,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(12, 0, 12, 80 + MediaQuery.viewInsetsOf(context).bottom),
+        children: [
+          Row(children: [IconButton(key: const Key('work-record-purchase-back'),
+            tooltip: 'Back to purchases', onPressed: _busy ? null : _back,
+            icon: const Icon(Icons.arrow_back_rounded, color: MoolColors.navy)),
+            const Expanded(child: Text('Record purchase', style: TextStyle(fontSize: 16,
+              fontWeight: FontWeight.w800, color: MoolColors.navy))),
+            const Text('Draft', style: TextStyle(fontSize: 12, color: MoolColors.navy))]),
+          const Text('Save the bill first. Stock and payments remain unchanged.',
+            style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+          if (_loading) const Padding(padding: EdgeInsets.all(12), child: Text('Opening purchase draft…'))
+          else if (!widget.session.workspaceSuppliersLoaded || !_current) ...[
+            Text(_error ?? 'Return to the same Store to continue.'),
+            TextButton(onPressed: _current ? () { setState(() => _loading = true);
+              unawaited(_load(retry: true)); } : null, child: const Text('Retry')),
+          ] else AbsorbPointer(absorbing: _busy, child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              _heading('Supplier'),
+              _field('Supplier name or phone', _name, 'work-purchase-supplier-name',
+                focus: _supplierFocus, limit: 120, lookup: true, changed: (_) => setState(() {
+                  if (_supplier != null && _name.text != _supplier!.name) {
+                    _supplier = null; _supplierId = widget.session.newWorkspaceSupplierId();
+                    _phone.clear(); _address.clear(); _gstin.clear();
+                  }
+                })),
+              if (_supplierFocus.hasFocus && _supplier == null)
+                for (final p in suppliers) TextButton(onPressed: () => _chooseSupplier(p),
+                  style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+                  child: Text(p.phone.isEmpty ? p.name : '${p.name} · ${p.phone}',
+                    style: const TextStyle(fontSize: 13, color: MoolColors.navy))),
+              Align(alignment: Alignment.centerLeft, child: TextButton(
+                key: const Key('work-purchase-supplier-more'),
+                onPressed: () => setState(() => _moreSupplier = !_moreSupplier),
+                child: Text(_moreSupplier ? 'Less supplier detail' : 'Phone, address & GSTIN',
+                  style: const TextStyle(fontSize: 12, color: MoolColors.navy)))),
+              if (_moreSupplier) ...[
+                _field('Phone (optional)', _phone, 'work-purchase-supplier-phone',
+                  limit: 20, keyboard: TextInputType.phone),
+                _field('Address (optional)', _address, 'work-purchase-supplier-address', limit: 500),
+                _field('GSTIN from invoice (optional)', _gstin, 'work-purchase-supplier-gstin', limit: 15)],
+              _heading('Supplier invoice'),
+              LayoutBuilder(builder: (context, constraints) {
+                final fields = [_field('Invoice number', _reference, 'work-purchase-reference', limit: 120),
+                  _field('Date', _date, 'work-purchase-date', limit: 10, hint: 'DD/MM/YYYY',
+                    keyboard: TextInputType.datetime)];
+                return constraints.maxWidth < 330 || MediaQuery.textScalerOf(context).scale(1) > 1.3
+                  ? Column(children: fields)
+                  : Row(children: [Expanded(child: fields[0]), const SizedBox(width: 12),
+                      Expanded(child: fields[1])]);
+              }),
+              _heading('Goods on this bill'),
+              for (var i = 0; i < _goods.length; i++) _goodsRow(i),
+              Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                key: const Key('work-purchase-add-line'), onPressed: _goods.length >= 200 ? null
+                  : () => setState(() => _goods.add(_PurchaseGoodsInput())),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add item', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
+              if (_error != null) Text(_error!, key: const Key('work-purchase-entry-error'),
+                style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
+              Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4,
+                children: [TextButton(onPressed: _back, child: const Text('Cancel')),
+                FilledButton(key: const Key('work-purchase-draft-save'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(48, 48),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  onPressed: _save, child: Text(_busy ? 'Saving…' : 'Save draft'))]),
+            ])),
+        ]);
+  }
+  Widget _goodsRow(int index) {
+    final line = _goods[index];
+    final query = line.name.text.toLowerCase().trim();
+    final matches = widget.session.workspaceCatalogueItems.where((p) =>
+      '${p.title} ${p.sku} ${p.barcode}'.toLowerCase().contains(query)).take(5);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [Expanded(child: _field('Product name / SKU', line.name, 'work-purchase-item-$index',
+        focus: line.focus, lookup: true, changed: (_) => setState(() => line.productId = ''))),
+        IconButton(tooltip: 'Remove item ${index + 1}', onPressed: _goods.length == 1 ? null : () {
+          setState(() => _goods.removeAt(index)); line.dispose();
+        }, icon: const Icon(Icons.close_rounded, size: 18, color: MoolColors.navy))]),
+      if (line.focus.hasFocus && line.productId.isEmpty && query.isNotEmpty)
+        for (final p in matches) TextButton(onPressed: () {
+          setState(() { line.productId = p.id; line.name.text = p.title; line.pack.text = p.pack;
+            if (line.cost.text.isEmpty) line.cost.text = p.purchasePrice.toString(); });
+          line.focus.unfocus();
+        }, style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+          child: Text('${p.title} · ${p.pack}', style: const TextStyle(fontSize: 12, color: MoolColors.navy))),
+      if (query.isNotEmpty && line.productId.isEmpty)
+        const Text('Not yet linked to Stock — matching is required before receipt.',
+          style: TextStyle(fontSize: 11, color: MoolColors.ink)),
+      Row(children: [
+        Expanded(child: _field('Pack / unit', line.pack, 'work-purchase-pack-$index')),
+        const SizedBox(width: 12),
+        SizedBox(width: 76, child: _field('Qty', line.quantity, 'work-purchase-quantity-$index',
+          limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
+        const SizedBox(width: 12),
+        SizedBox(width: 96, child: _field('Cost ₹', line.cost, 'work-purchase-cost-$index',
+          limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
+      ]),
+      const Divider(height: 12, thickness: .5, color: Color(0xffdce1eb)),
+    ]);
+  }
+}
+
 class _StorePurchasesSurface extends StatefulWidget {
   const _StorePurchasesSurface({
     required this.session,
     this.statement = false,
     this.onTrackPurchase,
     this.onPurchaseBack,
+    this.purchaseEntryKey,
   });
   final WorkSession session;
   final bool statement;
   final ValueChanged<String>? onTrackPurchase;
   final VoidCallback? onPurchaseBack;
+  final GlobalKey<_StoreRecordPurchaseState>? purchaseEntryKey;
 
   @override
   State<_StorePurchasesSurface> createState() => _StorePurchasesSurfaceState();
@@ -11352,6 +11616,20 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   final _purchaseSearchFocus = FocusNode(debugLabel: 'purchase-search');
   List<String>? _purchaseHistory;
   String _purchaseFilter = 'All';
+  bool _recordPurchase = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!statement) {
+      unawaited(_loadEntry());
+    }
+  }
+
+  Future<void> _loadEntry() async {
+    await session.loadWorkspaceSuppliers();
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -11386,6 +11664,12 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       _purchaseHistory = history;
       _purchaseSearch.clear();
       _purchaseFilter = 'All';
+      _recordPurchase = false;
+    }
+    if (_recordPurchase && !statement) {
+      return _StoreRecordPurchaseSurface(
+        key: widget.purchaseEntryKey ?? ValueKey(('record-purchase', session.workspaceSupplierScope)), session: session,
+        onBack: () => setState(() => _recordPurchase = false));
     }
     final selected = session.focusedWorkspacePurchase;
     final returning =
@@ -11585,7 +11869,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 : session.workspacePurchases)
             .toList()
           ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    if (!session.workspacePurchasesConnected) {
+    if (statement && !session.workspacePurchasesConnected) {
       return ListView(
         primary: false,
         padding: const EdgeInsets.all(16),
@@ -11658,8 +11942,18 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Text('Purchases', style: TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w800, color: MoolColors.navy)),
+            Row(children: [
+              const Expanded(child: Text('Purchases', style: TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w800, color: MoolColors.navy))),
+              TextButton.icon(key: const Key('work-purchase-record'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                  foregroundColor: MoolColors.navy),
+                onPressed: () { _purchaseSearchFocus.unfocus();
+                  setState(() => _recordPurchase = true); },
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: Text(session.workspacePurchaseEntryDraft == null
+                  ? 'Record purchase' : 'Resume purchase', style: const TextStyle(fontSize: 12))),
+            ]),
             StoreRecentSearches(
               controller: _purchaseSearch,
               focusNode: _purchaseSearchFocus,
@@ -11716,7 +12010,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
             if (index == 0) { return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (!session.workspacePurchasesComplete)
+            if (!session.workspacePurchasesConnected)
+              const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
+                'MoolSocial purchase updates unavailable · manual bill drafts remain available',
+                style: TextStyle(fontSize: 11, color: MoolColors.ink)))
+            else if (!session.workspacePurchasesComplete)
               const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
                 'Available updates only · full history unavailable',
                 style: TextStyle(fontSize: 11, color: MoolColors.muted))),
@@ -13138,6 +13436,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.stockActionsExpanded,
     required this.onToggleStockActions,
     required this.counterKey,
+    required this.purchaseEntryKey,
     required this.saleQuery,
     required this.requirementDraft,
     required this.stockStatementBookmark,
@@ -13158,6 +13457,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final bool stockActionsExpanded;
   final VoidCallback onToggleStockActions;
   final GlobalKey<_CounterOrderSurfaceState> counterKey;
+  final GlobalKey<_StoreRecordPurchaseState> purchaseEntryKey;
   final String saleQuery;
   final Map<String, String> requirementDraft;
   final _StockStatementBookmark stockStatementBookmark;
@@ -13213,6 +13513,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         key: const Key('work-store-track-stock'),
         child: _StorePurchasesSurface(
           session: session,
+          purchaseEntryKey: purchaseEntryKey,
           onTrackPurchase: onTrackPurchase,
           onPurchaseBack: onPurchaseBack,
         ),
