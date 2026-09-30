@@ -27213,7 +27213,7 @@ void main() {
   );
 
   for (final scale in [1.4, 2.0]) {
-    for (final filter in ['Ready', 'Delivery']) {
+    for (final filter in ['Ready', 'Delivery', 'Done']) {
       testWidgets('FVC002 Orders reveals selected $filter at $scale', (
         tester,
       ) async {

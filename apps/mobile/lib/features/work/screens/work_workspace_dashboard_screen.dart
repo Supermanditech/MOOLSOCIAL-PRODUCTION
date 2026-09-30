@@ -20266,11 +20266,15 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       final position = _filterScroll.position;
       final overflow = position.maxScrollExtent > 1;
       final atEnd = position.extentAfter <= 1;
+      final cueWidthChanged = overflow != _filterOverflow;
       if (overflow != _filterOverflow || atEnd != _atFilterEnd) {
         setState(() {
           _filterOverflow = overflow;
           _atFilterEnd = atEnd;
         });
+        // The cue takes space after the first layout. Reveal again in the
+        // final viewport, but never snap the strip during manual scrolling.
+        if (cueWidthChanged) _revealSelectedFilter();
       }
     });
   }
