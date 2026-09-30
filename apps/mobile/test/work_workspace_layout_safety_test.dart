@@ -23754,7 +23754,7 @@ void main() {
       expect(find.text('₹3,000'), findsOneWidget);
       expect(find.text('−₹10'), findsOneWidget);
       expect(find.text('₹2,990'), findsOneWidget);
-      expect(find.text('Line amounts after bill discount'), findsOneWidget);
+      expect(find.text('Line amounts after bill discount'), findsNothing);
       expect(find.byKey(const Key('work-order-breakdown-unavailable')), findsNothing);
       expect(find.text('Accept'), findsNothing);
       expect(find.text('Mark ready'), findsNothing);
@@ -23808,7 +23808,7 @@ void main() {
       expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
       if (kind == 'fixed') {
-        final subtotalRight = tester.getRect(find.text('₹260')).right;
+        final subtotalRight = tester.getRect(find.text('₹260').last).right;
         final discountRight = tester.getRect(find.text('−₹10')).right;
         final totalRight = tester.getRect(find.text('₹250').last).right;
         expect(subtotalRight, closeTo(totalRight, 1));
@@ -23822,6 +23822,7 @@ void main() {
     final order = work.workspaceOrders.singleWhere((o) => o.id == 'SALE-1042');
     final invoice = WorkspaceCustomerInvoice(id:'INV-SALE-1042', orderId:order.id,
         customer:order.customer, items:order.items, amount:order.amount,
+        billingDetails: const WorkspaceBillingDetails(name: 'Original customer name'),
         payment:order.payment, issuedAt:order.createdAt);
     work.workspaceInvoices.add(invoice);
     await mount(tester,route:'/app/work/workspace/dashboard?section=orders',work:work);
@@ -23830,19 +23831,139 @@ void main() {
     await tester.tap(entry);
     await tester.pumpAndSettle();
     final button = find.byKey(Key('work-order-invoice-open-${order.id}'));
-    expect(button, findsOneWidget);
-    final open = tester.widget<TextButton>(button).onPressed!;
+    expect(button, findsNothing);
+    expect(find.byKey(const Key('work-order-inline-invoice')), findsOneWidget);
+    expect(find.text('Invoice · ${invoice.id}'), findsOneWidget);
+    expect(find.text('Original customer name'), findsOneWidget);
+    expect(find.byKey(const Key('work-invoice-payment-unavailable')), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
     work.workspaceInvoices.clear();
-    open();
+    work.notifyListeners();
     await tester.pumpAndSettle();
-    expect(work.noticeMessage,'The linked invoice is unavailable. Reopen the order.');
+    expect(find.byKey(const Key('work-order-inline-invoice')), findsNothing);
+    expect(find.text('No linked invoice in the saved records.'), findsOneWidget);
     expect(work.workspaceInvoices,isEmpty);
     work.workspaceInvoices.addAll([invoice,invoice]);
     work.notifyListeners();
     await tester.pumpAndSettle();
     expect(button,findsNothing);
+    expect(find.byKey(const Key('work-order-inline-invoice')), findsNothing);
+    expect(find.byKey(const Key('work-order-invoice-link-unavailable')), findsOneWidget);
     expect(tester.takeException(),isNull);
   });
+
+  // Separately labelled automated payment/layout fixtures, not device records.
+  for (final variant in ['paid', 'part-paid', 'refunded', 'stale', 'name-missing']) {
+    testWidgets('O03 details inline payment evidence $variant', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final seed = StoreReviewSeed(accountScope: 'review-draft-account',
+          orderCount: 12, now: DateTime.now().subtract(const Duration(minutes: 1)));
+      work.activeWorkspace = seed.workspace;
+      final paid = variant == 'part-paid' ? 15000 : 25000;
+      final due = 25000 - paid;
+      final refunded = variant == 'refunded' ? 25000 : 0;
+      final payment = WorkspacePaymentRecord(orderId: 'INLINE-ORDER',
+          invoiceId: 'INLINE-INVOICE', customerId: '9001234567',
+          customerName: variant == 'name-missing' ? '9001234567' : 'Recorded customer',
+          revision: 1, updatedAt: seed.finance.asOf,
+          amountMinor: 25000, paidMinor: paid, dueMinor: due, refundedMinor: refunded,
+          state: variant == 'refunded' ? WorkspacePaymentState.refunded
+              : due > 0 ? WorkspacePaymentState.partPaid : WorkspacePaymentState.paid,
+          channel: WorkspacePaymentChannel.cash);
+      final finance = WorkspaceFinanceSnapshot(accountScope: seed.accountScope,
+          workspaceId: seed.storeId, revision: 1, asOf: seed.finance.asOf,
+          salesTodayMinor: 25000, duesMinor: due, availableMinor: 0,
+          heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
+          deliveryAdjustmentsMinor: 0, refundsMinor: refunded, taxWithheldMinor: 0,
+          payments: [payment], payouts: const []);
+      expect(work.applyWorkspaceFinance(finance), isTrue);
+      final order = WorkspaceOrderRecord(id: payment.orderId, customer: payment.customerId,
+          billingDetails: variant == 'part-paid'
+              ? const WorkspaceBillingDetails(name: 'Original order customer')
+              : const WorkspaceBillingDetails(),
+          items: 'Sunflower oil', quantities: const {'oil': 1}, amount: 250,
+          discount: const WorkspaceBillDiscount.fixed(1000), discountMinor: 1000,
+          source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: '',
+          stage: 'Completed', needsDelivery: false, createdAt: seed.finance.asOf,
+          itemSnapshots: const [WorkspaceOrderItemSnapshot(productId: 'oil',
+              name: 'Sunflower oil', pack: '1 L', quantity: 1,
+              unitPricePaise: 26000, lineTotalPaise: 25000)]);
+      work.workspaceOrders.clear();
+      work.workspaceOrders.add(order);
+      work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: payment.invoiceId!,
+          orderId: order.id, customer: order.customer,
+          billingDetails: variant == 'paid'
+              ? const WorkspaceBillingDetails(name: 'Recorded customer')
+              : const WorkspaceBillingDetails(),
+          items: order.items, amount: 250,
+          discount: order.discount, discountMinor: 1000,
+          payment: 'Cash', issuedAt: order.createdAt));
+      if (variant == 'stale') {
+        work.markWorkspaceFinanceStale(
+            accountScope: seed.accountScope, storeId: seed.storeId);
+      }
+      work.setWorkspaceOrderFilter('Done');
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
+          work: work, viewport: const Size(915, 412), textScale: 2);
+      final entry = find.byKey(Key('work-order-history-open-${order.id}'));
+      await tester.ensureVisible(entry);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-inline-invoice')), findsOneWidget);
+      expect(find.text(variant == 'part-paid' ? 'Original order customer'
+          : variant == 'name-missing' ? 'Customer name not recorded'
+          : 'Recorded customer'), findsOneWidget);
+      expect(find.text(payment.customerId), findsOneWidget);
+      expect(find.text('Received ₹${paid ~/ 100} · Due ₹${due ~/ 100}'), findsOneWidget);
+      expect(find.byKey(const Key('work-order-refunded-amount')),
+          refunded > 0 ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('work-order-payment-stale')),
+          variant == 'stale' ? findsOneWidget : findsNothing);
+      expect(find.text('−₹10'), findsOneWidget);
+      expect(find.text('Open invoice'), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('Sunflower oil'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(work.workspaceInvoices.single.id, payment.invoiceId);
+      expect(work.workspaceFinance!.payments.single, same(payment));
+    });
+  }
+
+  for (final display in [(320.0, 568.0), (915.0, 412.0)]) {
+    testWidgets('O03 details inline full thirty item bill $display', (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      final order = WorkspaceOrderRecord(id: 'THIRTY-INLINE', customer: '9001234567',
+          billingDetails: const WorkspaceBillingDetails(name: 'Saved order buyer'),
+          items: 'Thirty original products',
+          quantities: {for (var i = 0; i < 30; i++) 'INLINE-$i': 1}, amount: 3000,
+          source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: '',
+          stage: 'Completed', needsDelivery: false, createdAt: DateTime(2026, 9, 30),
+          itemSnapshots: [for (var i = 0; i < 30; i++) WorkspaceOrderItemSnapshot(
+              productId: 'INLINE-$i', name: 'Long original invoice product $i',
+              pack: '1 kg pack', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000)]);
+      work.workspaceOrders.removeWhere((record) => record.isClosed);
+      work.workspaceOrders.add(order);
+      work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'ORIGINAL-THIRTY-INVOICE',
+          orderId: order.id, customer: order.customer, items: order.items,
+          amount: order.amount, payment: 'Cash', issuedAt: order.createdAt));
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
+          work: work, viewport: Size(display.$1, display.$2), textScale: 2);
+      final entry = find.byKey(Key('work-order-history-open-${order.id}'));
+      await tester.ensureVisible(entry);
+      await tester.tapAt(tester.getTopLeft(entry) + const Offset(12, 12));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved order buyer'), findsOneWidget);
+      expect(find.byKey(const Key('work-order-inline-invoice')), findsOneWidget);
+      await tester.ensureVisible(find.text('Long original invoice product 29'));
+      await tester.pumpAndSettle();
+      expect(find.text('Long original invoice product 29').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(work.workspaceInvoices.single.id, 'ORIGINAL-THIRTY-INVOICE');
+      expect(find.byType(BottomSheet), findsNothing);
+    });
+  }
 
   for (final scale in [1.0, 2.0]) {
     testWidgets('Exact order purchased facts have no repeated summary $scale', (
