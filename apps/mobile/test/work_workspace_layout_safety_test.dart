@@ -3341,8 +3341,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(entry.value, isNull);
     expect(find.byKey(const Key('work-purchase-entry-error')), findsOneWidget);
-    await revealPurchaseInput(tester, find.byKey(const Key('work-record-purchase-back')), delta: -60);
-    await tester.tap(find.byKey(const Key('work-record-purchase-back')));
+    await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
@@ -3411,6 +3410,99 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('P05-VISUAL one Back and truthful retailer invoice actions', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+    expect(find.byKey(const Key('work-record-purchase-back')), findsNothing);
+    expect(find.text('Photograph invoice'), findsOneWidget);
+    expect(find.text('Choose photo / PDF'), findsOneWidget);
+    expect(find.text('Attach a copy for your records. Details won’t fill automatically.'), findsOneWidget);
+    expect(find.text('Supplier'), findsNothing, reason: 'The supplier field has its own persistent label.');
+    for (final key in ['work-purchase-camera', 'work-purchase-attach']) {
+      expect(tester.getSize(find.byKey(Key(key))).height, greaterThanOrEqualTo(48));
+    }
+    final supplier = tester.widget<TextField>(find.byKey(const Key('work-purchase-supplier-name')));
+    final label = supplier.decoration!.labelStyle!.color!;
+    expect((Colors.white.computeLuminance() + .05) / (label.computeLuminance() + .05), greaterThanOrEqualTo(4.5));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P05-VISUAL header Back returns to Purchases and guards dirty input', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-record')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    final supplier = find.byKey(const Key('work-purchase-supplier-name'));
+    await tester.enterText(supplier, 'Unsaved evaluation supplier');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('Leave purchase draft?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(supplier).controller!.text, 'Unsaved evaluation supplier');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard changes'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-record')), findsOneWidget);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P05-VISUAL compact detail panels preserve entered fields', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
+    final controls = find.byKey(const Key('work-purchase-optional-controls'));
+    await revealPurchaseInput(tester, controls);
+    expect(tester.getSize(controls).height, lessThanOrEqualTo(100),
+      reason: 'Available ${tester.getSize(controls).width}; buttons ${[
+        for (final key in ['work-purchase-tax-details', 'work-purchase-buyer-details',
+          'work-purchase-receipt-details', 'work-purchase-payment-details'])
+          tester.getSize(find.byKey(Key(key)))
+      ]}');
+    await tester.tap(find.byKey(const Key('work-purchase-tax-details')));
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-cgst')));
+    await tester.enterText(find.byKey(const Key('work-purchase-cgst')), '30.30');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-payment-details')), delta: -60);
+    await tester.tap(find.byKey(const Key('work-purchase-payment-details')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-cgst')), findsNothing);
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-paidAmount')));
+    await tester.enterText(find.byKey(const Key('work-purchase-paidAmount')), '100');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-tax-details')), delta: -60);
+    await tester.tap(find.byKey(const Key('work-purchase-tax-details')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-cgst'))).controller!.text, '30.30');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    expect(entry.value!.draft!.details['cgst'], '30.30');
+    expect(entry.value!.draft!.details['paidAmount'], '100');
+    expect(work.workspacePurchases, isEmpty, reason: 'A layout change must not post the bill.');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('P05 expanded purchase details save and resume without posting', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
@@ -3627,8 +3719,8 @@ void main() {
     await revealPurchaseInput(tester, attachment);
     await tester.tap(attachment);
     await tester.pumpAndSettle();
-    await revealPurchaseInput(tester, find.text('Use detected details'));
-    await tester.tap(find.text('Use detected details'));
+    await revealPurchaseInput(tester, find.text('Fill empty fields'));
+    await tester.tap(find.text('Fill empty fields'));
     await tester.pumpAndSettle();
     for (final expected in {'work-purchase-supplier-name': 'Entered supplier',
       'work-purchase-reference': 'MANUAL-KEPT', 'work-purchase-date': '30/09/2026',
