@@ -23583,7 +23583,8 @@ void main() {
       await tester.tap(find.byKey(const Key('work-dashboard-search')));
       await tester.pumpAndSettle();
       expect(find.text('unrelated product'), findsNothing);
-      expect(find.text('SALE-1042'), findsOneWidget);
+      // One recent term plus the compact result's visible order reference.
+      expect(find.text('SALE-1042'), findsNWidgets(2));
       expect(find.byKey(const Key('work-search-order-SALE-1042')), findsOneWidget);
       expect(find.byKey(const Key('work-search-product-oil-fortune-1l')), findsNothing);
       final field = find.byKey(const Key('work-dashboard-search-field'));
@@ -23615,6 +23616,76 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // Orders lookup fixtures are automated engineering evidence, not saved device data.
+  for (final display in [(412.0, 915.0, 1.0), (320.0, 568.0, 2.0),
+      (915.0, 412.0, 2.0)]) {
+    testWidgets('O03 lookup scoped name payment date and recovery $display', (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Packing');
+      final order = WorkspaceOrderRecord(id: 'LOOKUP-ORIGINAL-123',
+        customer: '9000012345', items: 'Long original product description',
+        quantities: const {'oil-fortune-1l': 1}, amount: 123456,
+        source: 'App', fulfilment: 'Pickup', payment: 'Refunded', address: '',
+        stage: 'Completed', needsDelivery: false, createdAt: DateTime(2026,9,30,14,30),
+        billingDetails: const WorkspaceBillingDetails(name: 'Original saved buyer'));
+      work.workspaceOrders.add(order);
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
+          work: work, viewport: Size(display.$1, display.$2), textScale: display.$3);
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      for (final query in ['Original saved buyer', '9000012345', 'LOOKUP-ORIGINAL-123']) {
+        await tester.enterText(field, query);
+        await tester.pumpAndSettle();
+        expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).contextualActiveId, 'orders');
+        final entry = find.byKey(Key('work-search-order-${order.id}'));
+        expect(entry, findsOneWidget);
+        expect(find.descendant(of: entry, matching: find.text('Original saved buyer')), findsOneWidget);
+        expect(find.descendant(of: entry, matching: find.text('9000012345')), findsOneWidget);
+        expect(find.text('Refunded'), findsOneWidget);
+        expect(find.text('MoolSocial app · Pickup'), findsOneWidget);
+        expect(find.byKey(Key('work-order-history-date-${order.id}')), findsOneWidget);
+        expect(find.text('₹1,23,456'), findsOneWidget);
+        expect(tester.getSize(entry).height, greaterThanOrEqualTo(48));
+        expect(find.descendant(of: entry, matching: find.byType(CircleAvatar)), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+      final entry = find.byKey(Key('work-search-order-${order.id}'));
+      await tester.tapAt(tester.getTopLeft(entry) + const Offset(12, 12));
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.workspaceSearchQuery, 'LOOKUP-ORIGINAL-123');
+      await tester.enterText(field, 'no-such-original-order');
+      await tester.pumpAndSettle();
+      expect(find.text('No matching order'), findsOneWidget);
+      expect(find.text('Try the customer’s name, phone or order number.'), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-search-clear')), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-search-close')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-dashboard-search-clear')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-search-results')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-dashboard-search-close')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderFilter, 'Packing');
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('O03 lookup no records does not invent results or duplicate clear', (tester) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard?section=orders', work: work);
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    expect(find.text('No saved orders yet'), findsOneWidget);
+    expect(find.byKey(const Key('work-dashboard-search-clear')), findsNothing);
+    expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).contextualActiveId, 'orders');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('O02 scrolled queue keeps scope visible and opens real history', (
     tester,

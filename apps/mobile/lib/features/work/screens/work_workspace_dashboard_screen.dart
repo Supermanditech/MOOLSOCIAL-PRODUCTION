@@ -1030,6 +1030,8 @@ class _WorkWorkspaceDashboardScreenState
       _ => null,
     };
     final storeActiveId = switch ((_view, _operation)) {
+      (_WorkspaceControlView.search, _) when
+          _ordersSearchStoreId == workspace.id => 'orders',
       (_WorkspaceControlView.operation, _WorkspaceOperation.dues)
           when _operationReturnView == _WorkspaceControlView.operation &&
               _operationReturnOperation == _WorkspaceOperation.sales => 'sell',
@@ -10777,7 +10779,8 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = query.trim().toLowerCase();
-    final results = _workspaceSearchRecords(session, normalized)
+    final results = _workspaceSearchRecords(session, normalized,
+        ordersOnly: ordersOnly)
         .where((record) =>
             !ordersOnly || record.kind == _WorkspaceSearchKind.order)
         .toList();
@@ -10791,7 +10794,29 @@ class _WorkspaceSearchSurface extends StatelessWidget {
           ? Duration.zero
           : const Duration(milliseconds: 160),
       child: results.isEmpty
-          ? Center(
+          ? ordersOnly
+              ? Align(
+                  key: const Key('work-dashboard-search-empty'),
+                  alignment: AlignmentDirectional.topStart,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(normalized.isEmpty ? 'No saved orders yet' : 'No matching order',
+                          style: const TextStyle(color: MoolColors.navy,
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text(normalized.isEmpty
+                            ? 'Saved orders will appear here.'
+                            : 'Try the customer’s name, phone or order number.',
+                          style: const TextStyle(color: MoolColors.ink, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                )
+              : Center(
               key: const Key('work-dashboard-search-empty'),
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
@@ -10855,6 +10880,16 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                   const SizedBox(height: MoolSpacing.xs),
               itemBuilder: (context, index) {
                 final destination = results[index];
+                if (ordersOnly) {
+                  final order = session.visibleWorkspaceOrders
+                      .where((record) => record.id == destination.entityId).firstOrNull;
+                  if (order == null) return const SizedBox.shrink();
+                  return _OrdersHistoryRow(
+                    session: session, order: order,
+                    searchResult: true,
+                    onOpen: () => onOpenRecord(destination),
+                  );
+                }
                 return _WorkspaceNavigationRow(
                   keyName: 'work-search-${destination.id}',
                   icon: destination.icon,
@@ -21027,11 +21062,13 @@ class _OrdersHistoryRow extends StatelessWidget {
     required this.session,
     required this.order,
     required this.onOpen,
+    this.searchResult = false,
   });
 
   final WorkSession session;
   final WorkspaceOrderRecord order;
   final VoidCallback onOpen;
+  final bool searchResult;
 
   @override
   Widget build(BuildContext context) {
@@ -21053,7 +21090,8 @@ class _OrdersHistoryRow extends StatelessWidget {
     return Material(
       color: Colors.white,
       child: InkWell(
-        key: Key('work-order-history-open-${order.id}'),
+        key: Key(searchResult ? 'work-search-order-${order.id}'
+            : 'work-order-history-open-${order.id}'),
         onTap: () {
           if (storeId != (session.activeWorkspace?.id ?? session.workspaceId)) {
             return;
@@ -21076,7 +21114,7 @@ class _OrdersHistoryRow extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        order.customer,
+                        searchResult ? _savedOrderCustomerName(session, order) : order.customer,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -21101,6 +21139,9 @@ class _OrdersHistoryRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
+              if (searchResult && _savedOrderCustomerName(session, order) != order.customer)
+                Text(order.customer, style: const TextStyle(
+                    color: MoolColors.ink, fontSize: 11)),
               Text(
                 order.id,
                 key: Key('work-order-history-reference-${order.id}'),
@@ -32580,9 +32621,32 @@ typedef _WorkspaceSearchRecord = ({
   WorkspacePurchaseRecord? purchase,
 });
 
+// Original scoped snapshots only; never substitute another customer's directory name.
+String _savedOrderCustomerName(WorkSession session, WorkspaceOrderRecord order) {
+  String name(WorkspaceBillingDetails? billing) => billing == null ? ''
+      : billing.business && billing.businessName.trim().isNotEmpty
+      ? billing.businessName.trim() : billing.name.trim();
+  final invoices = session.workspaceInvoices
+      .where((invoice) => invoice.orderId == order.id).toList();
+  final invoiceName = invoices.length == 1 ? name(invoices.single.billingDetails) : '';
+  final orderName = name(order.billingDetails);
+  if (invoiceName.isNotEmpty) return invoiceName;
+  if (orderName.isNotEmpty) return orderName;
+  final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+  final payments = session.workspaceFinance?.workspaceId == storeId
+      ? session.workspaceFinance!.payments.where((payment) => payment.valid &&
+          payment.orderId == order.id &&
+          (invoices.length != 1 || payment.invoiceId == invoices.single.id)).toList()
+      : <WorkspacePaymentRecord>[];
+  return payments.length == 1 && payments.single.customerName.trim().isNotEmpty
+      ? payments.single.customerName.trim() : order.customer;
+}
+
 List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   WorkSession session,
-  String normalized,
+  String normalized, {
+  bool ordersOnly = false,
+}
 ) {
   bool matches(String value) => value.toLowerCase().contains(normalized);
   final records = <_WorkspaceSearchRecord>[];
@@ -32607,10 +32671,12 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       icon: Icons.inventory_2_outlined,
     ));
   }
-  for (final order in session.visibleWorkspaceOrders) {
+  final orders = session.visibleWorkspaceOrders.toList();
+  if (ordersOnly) orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  for (final order in orders) {
     final stage = session.workspaceOrderStageLabel(order);
     if (!matches(
-      '${order.id} ${order.customer} ${order.source} ${order.items} ${_formatStoreMinorAmount(order.payableMinor)} ${_formatStoreMinorAmount(order.payableMinor)} $stage',
+      '${order.id} ${order.customer} ${ordersOnly ? _savedOrderCustomerName(session, order) : ''} ${order.source} ${order.items} ${_formatStoreMinorAmount(order.payableMinor)} ${_formatStoreMinorAmount(order.payableMinor)} $stage',
     )) {
       continue;
     }
