@@ -9144,10 +9144,6 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       ),
       _CartTipSections(session: session),
       _CartBillSummary(session: session),
-      if (session.scopedCartSavings > 0) ...[
-        const SizedBox(height: 8),
-        _CartSavingsSummary(session: session),
-      ],
       const SizedBox(height: 8),
       _CartDiscoverySections(
         session: session,
@@ -21327,6 +21323,9 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
       kind: _kind,
       destination: _destination,
     );
+    final opportunity = _kind == BuyV2CartBenefitKind.coupon
+        ? widget.session.cartOfferOpportunity(destination: _destination)
+        : null;
     Widget cardFor(BuyV2CartBenefit benefit) => _CartBenefitCard(
       benefit: benefit,
       scopeLabel: benefit.scope == BuyV2CartBenefitScope.platform
@@ -21428,6 +21427,36 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
                 ],
               ),
             ),
+          ),
+        if (opportunity case final value?)
+          ExpansionTile(
+            key: const ValueKey('buy-cart-offer-opportunity'),
+            dense: true,
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 6),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            title: Text(
+              'Add ${buyV2Money(value.remainingSpend)} more to qualify',
+              style: context.buyBody.copyWith(fontSize: 12),
+            ),
+            subtitle: Text(
+              '${value.benefit.title} · '
+              '${value.benefit.scope == BuyV2CartBenefitScope.platform ? '${_destination.label} products' : widget.session.cartLines.where((line) => value.benefit.appliesTo(line.product)).map((line) => value.benefit.scope == BuyV2CartBenefitScope.store ? line.product.seller : '${line.product.customerTitle} · ${line.product.seller}').toSet().join(' · ')}',
+              style: context.buyMeta.copyWith(fontSize: 11),
+            ),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${value.benefit.detail}\n'
+                  'Save ${buyV2Money(value.benefit.savingAmount)} on eligible products. '
+                  'Minimum ${buyV2Money(value.benefit.minimumSpend!)}. '
+                  'Select the coupon when eligible; it is not applied automatically.',
+                  style: context.buyMeta.copyWith(fontSize: 11),
+                ),
+              ),
+            ],
           ),
       ],
     );
@@ -23471,18 +23500,8 @@ class _CartBillSummary extends StatelessWidget {
                   '${_cartDestinationLabel(session, entry.key)} ${_cartItemFamilyLabel(entry.key).toLowerCase()}',
               value: buyV2Money(entry.value),
             ),
-          if (session.scopedCartSavings > 0)
-            _CartAmountRow(
-              label: 'Product savings',
-              value: '−${buyV2Money(session.scopedCartSavings)}',
-              valueColor: BuyV2Colors.green,
-            ),
-          if (session.scopedCouponSaving > 0)
-            _CartAmountRow(
-              label: 'Coupon saving',
-              value: '−${buyV2Money(session.scopedCouponSaving)}',
-              valueColor: BuyV2Colors.green,
-            ),
+          if (session.scopedCartSavings + session.scopedCouponSaving > 0)
+            _CartSavingsSummary(session: session),
           if (session.scopedTipTotal > 0)
             _CartAmountRow(
               label: 'Optional delivery tips',
@@ -23551,20 +23570,19 @@ class _CartSavingsSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final savings = session.scopedCartSavings;
-    return Container(
+    final productSaving = session.scopedCartSavings;
+    final couponSaving = session.scopedCouponSaving;
+    final savings = productSaving + couponSaving;
+    return Padding(
       key: const ValueKey('buy-cart-savings-summary'),
-      padding: const EdgeInsets.all(10),
-      decoration: buyV2CardDecoration(
-        color: savings > 0 ? BuyV2Colors.softGreen : BuyV2Colors.softBlue,
-        border: savings > 0 ? const Color(0x33138808) : BuyV2Colors.line,
-        radius: 15,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            savings > 0 ? Icons.savings_outlined : Icons.price_check_outlined,
-            color: savings > 0 ? BuyV2Colors.green : BuyV2Colors.navy,
+          const Icon(
+            Icons.savings_outlined,
+            color: BuyV2Colors.green,
+            size: 18,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -23572,15 +23590,16 @@ class _CartSavingsSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  savings > 0
-                      ? 'You save ${buyV2Money(savings)}'
-                      : 'Latest listed prices',
-                  style: context.buyBody.copyWith(fontSize: 11),
+                  'You save ${buyV2Money(savings)}',
+                  style: context.buyBody.copyWith(fontSize: 12),
                 ),
                 Text(
-                  savings > 0
-                      ? 'Calculated only from listed MRP and current product price.'
-                      : 'No additional product saving is shown for these items.',
+                  [
+                    if (productSaving > 0)
+                      'Listed MRP saving ${buyV2Money(productSaving)}',
+                    if (couponSaving > 0)
+                      'Applied coupon ${buyV2Money(couponSaving)}',
+                  ].join(' · '),
                   style: context.buyMeta.copyWith(fontSize: 11),
                 ),
               ],

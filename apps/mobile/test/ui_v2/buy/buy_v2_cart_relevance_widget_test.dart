@@ -2341,6 +2341,31 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Applied to Cart total'), findsOneWidget);
       expect(session.cartTotal, originalTotal);
+      final bill = find.byKey(const ValueKey('buy-cart-bill-summary'));
+      await showInMainCartList(tester, bill);
+      expect(
+        find.descendant(
+          of: bill,
+          matching: find.byKey(const ValueKey('buy-cart-savings-summary')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'You save ${buyV2Money(session.scopedCartSavings + session.scopedCouponSaving)}',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Applied coupon ₹10'), findsOneWidget);
+      expect(find.text('Product savings'), findsNothing);
+      expect(find.text('Coupon saving'), findsNothing);
+      expect(session.scopedPayableTotal, originalTotal - 10);
+      await showInMainCartList(
+        tester,
+        find.byKey(const ValueKey('buy-cart-benefit-remove-shop-coupon')),
+        scrollDelta: -250,
+      );
+      await tester.pumpAndSettle();
 
       await tester.tap(
         find.byKey(const ValueKey('buy-cart-benefit-remove-shop-coupon')),
@@ -2386,7 +2411,7 @@ void main() {
     expect(session.addProduct(shop.id), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
 
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, textScale: 2));
     await tester.pump();
     final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
     // Loading now starts when the default-open section is built; do not
@@ -2433,7 +2458,42 @@ void main() {
             savingAmount: 10,
             validUntil: evaluatedAt.add(const Duration(hours: 4)),
           ),
+          BuyV2CartBenefit(
+            id: 'live-spend-opportunity',
+            kind: BuyV2CartBenefitKind.coupon,
+            destination: BuyV2Destination.shop,
+            title: 'Selected product saving',
+            detail: 'Only these exact products qualify.',
+            sourceId: 'provider-published-scope',
+            savingAmount: 10,
+            minimumSpend: session.scopedCartTotal + 20,
+            scope: BuyV2CartBenefitScope.platform,
+            validUntil: evaluatedAt.add(const Duration(hours: 4)),
+          ),
         ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    final opportunity = find.byKey(
+      const ValueKey('buy-cart-offer-opportunity'),
+    );
+    await showInMainCartList(tester, opportunity);
+    expect(opportunity, findsOneWidget);
+    expect(find.text('Add ₹20 more to qualify'), findsOneWidget);
+    await tester.ensureVisible(opportunity);
+    await tester.pumpAndSettle();
+    await tester.tap(opportunity);
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Only these exact products qualify.'),
+      findsOneWidget,
+    );
+    expect(session.scopedCouponSaving, 0);
+    expect(tester.takeException(), isNull);
+    await showInMainCartList(
+      tester,
+      find.byKey(
+        const PageStorageKey('buy-cart-benefit-details-live-retailer-sale'),
       ),
     );
     await tester.pumpAndSettle();
@@ -2448,12 +2508,19 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Save ₹10 now'), findsOneWidget);
-    await tester.tap(
-      find.byKey(const ValueKey('buy-cart-benefit-select-live-retailer-sale')),
+    final selectLive = find.byKey(
+      const ValueKey('buy-cart-benefit-select-live-retailer-sale'),
     );
+    await Scrollable.ensureVisible(tester.element(selectLive), alignment: .5);
+    await tester.pumpAndSettle();
+    await tester.tap(selectLive);
     await tester.pumpAndSettle();
     expect(find.text('Applied to Cart total'), findsOneWidget);
     expect(session.scopedCouponSaving, 10);
+    expect(
+      find.byKey(const ValueKey('buy-cart-offer-opportunity')),
+      findsNothing,
+    );
 
     adapter.begin();
     unawaited(session.refreshCartBenefits());

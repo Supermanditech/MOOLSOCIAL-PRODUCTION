@@ -1,3 +1,4 @@
+import 'buy_v2_qualified_provider_fixture.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
@@ -992,6 +993,167 @@ void main() {
           isEmpty,
         );
         expect(session.scopedCouponSaving, 0);
+
+        // Published opportunities remain separate from applicable coupons.
+        var localNow = DateTime.now();
+        final opportunityAdapter = _LiveBenefitsAdapter(adapter.snapshot);
+        final opportunitySession = BuyV2Session(
+          core: BuySession(),
+          cartBenefitsAdapter: opportunityAdapter,
+          catalogueNow: () => localNow,
+          commerceAdapter: _ScopedOpportunityCommerce(),
+          productFactsAdapter: QualifiedTestProductFacts({
+            for (final p in BuyV2Catalogue.allProducts) p.id,
+          }),
+          reviewDataEnabled: false,
+        );
+        addTearDown(opportunitySession.dispose);
+        await opportunitySession.restoreCommerce();
+        final opportunityProduct = opportunitySession.product(product.id);
+        final otherStore = BuyV2Catalogue.products
+            .map((p) => opportunitySession.product(p.id))
+            .firstWhere(
+              (candidate) =>
+                  candidate.destination == BuyV2Destination.shop &&
+                  candidate.storeId != opportunityProduct.storeId &&
+                  !candidate.requiresPrescription,
+            );
+        expect(opportunitySession.addProduct(opportunityProduct.id), isTrue);
+        expect(opportunitySession.addProduct(otherStore.id), isTrue);
+        opportunitySession.openCart(scope: BuyV2CartScope.all);
+        BuyV2CartBenefit opportunity({
+          BuyV2CartBenefitScope scope = BuyV2CartBenefitScope.products,
+          int? minimumSpend,
+          int? minimumQuantity,
+          Set<String> methods = const {},
+          DateTime? expiry,
+          bool freeDelivery = false,
+          String sourceId = 'provider-published-opportunity',
+        }) => BuyV2CartBenefit(
+          id: 'spend-opportunity',
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+          title: 'Eligible basket saving',
+          detail: 'Provider saving on the specified eligible products.',
+          sourceId: sourceId,
+          savingAmount: 10,
+          minimumSpend:
+              minimumSpend ??
+              opportunityProduct.price * opportunityProduct.minimumOrder + 40,
+          minimumQuantity: minimumQuantity,
+          eligiblePaymentMethods: methods,
+          scope: scope,
+          storeId: scope == BuyV2CartBenefitScope.platform
+              ? null
+              : opportunityProduct.storeId,
+          productIds: scope == BuyV2CartBenefitScope.products
+              ? {opportunityProduct.id}
+              : {},
+          validUntil: expiry ?? evaluatedAt.add(const Duration(hours: 1)),
+          freeDelivery: freeDelivery,
+        );
+        Future<bool> publish(List<BuyV2CartBenefit> benefits) {
+          opportunityAdapter.snapshot = BuyV2CartBenefitsSnapshot(
+            state: BuyV2CartBenefitsLoadState.ready,
+            evaluatedAt: evaluatedAt,
+            benefits: benefits,
+          );
+          return opportunitySession.refreshCartBenefits();
+        }
+
+        for (final scope in BuyV2CartBenefitScope.values) {
+          final matchingTotal = scope == BuyV2CartBenefitScope.platform
+              ? opportunitySession.scopedCartTotal
+              : opportunityProduct.price * opportunityProduct.minimumOrder;
+          final candidate = opportunity(
+            scope: scope,
+            minimumSpend: matchingTotal + 40,
+          );
+          await publish([candidate]);
+          expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+          expect(
+            opportunitySession.cartBenefits(kind: BuyV2CartBenefitKind.coupon),
+            isEmpty,
+          );
+          expect(opportunitySession.chooseCartBenefit(candidate), isFalse);
+          expect(opportunitySession.scopedCouponSaving, 0);
+        }
+        await publish([opportunity()]);
+        opportunitySession.selectCartProduct(otherStore.id, false);
+        await opportunitySession.refreshCartBenefits();
+        expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+        opportunitySession.selectCartProduct(opportunityProduct.id, false);
+        await opportunitySession.refreshCartBenefits();
+        expect(opportunitySession.cartOfferOpportunity(), isNull);
+        opportunitySession.selectCartProduct(opportunityProduct.id, true);
+        await opportunitySession.refreshCartBenefits();
+        expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+
+        for (final candidate in [
+          opportunity(expiry: evaluatedAt),
+          opportunity(minimumQuantity: opportunityProduct.minimumOrder + 10),
+          opportunity(methods: {'unsupported-method'}),
+          opportunity(freeDelivery: true),
+          opportunity(sourceId: ''),
+        ]) {
+          await publish([candidate]);
+          expect(opportunitySession.cartOfferOpportunity(), isNull);
+        }
+        final threshold = opportunity(
+          minimumSpend:
+              opportunityProduct.price *
+              (opportunityProduct.minimumOrder +
+                  opportunityProduct.quantityStep),
+        );
+        await publish([threshold]);
+        expect(
+          opportunitySession.cartOfferOpportunity()?.remainingSpend,
+          opportunityProduct.price * opportunityProduct.quantityStep,
+        );
+        opportunitySession.increase(opportunityProduct.id);
+        await opportunitySession.refreshCartBenefits();
+        expect(opportunitySession.cartOfferOpportunity(), isNull);
+        expect(opportunitySession.chooseCartBenefit(threshold), isTrue);
+        expect(opportunitySession.scopedCouponSaving, 10);
+        opportunitySession.decrease(opportunityProduct.id);
+        expect(await opportunitySession.refreshCartBenefits(), isFalse);
+        expect(opportunitySession.scopedCouponSaving, 0);
+        expect(
+          opportunitySession.selectedCartBenefitsFor({BuyV2Destination.shop}),
+          isEmpty,
+        );
+
+        final applied = BuyV2CartBenefit(
+          id: 'already-eligible',
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+          title: 'Current coupon',
+          detail: 'Only one coupon for these products.',
+          sourceId: 'provider-current',
+          savingAmount: 5,
+          scope: BuyV2CartBenefitScope.products,
+          storeId: opportunityProduct.storeId,
+          productIds: {opportunityProduct.id},
+        );
+        await publish([opportunity(), applied]);
+        expect(opportunitySession.chooseCartBenefit(applied), isTrue);
+        expect(opportunitySession.cartOfferOpportunity(), isNull);
+        expect(opportunitySession.scopedCouponSaving, 5);
+        opportunitySession.removeCartBenefit(
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+        );
+        expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+        localNow = localNow.add(const Duration(hours: 2));
+        expect(opportunitySession.cartOfferOpportunity(), isNull);
+        opportunityAdapter.snapshot = BuyV2CartBenefitsSnapshot(
+          state: BuyV2CartBenefitsLoadState.offline,
+          evaluatedAt: evaluatedAt,
+        );
+        await opportunitySession.refreshCartBenefits();
+        expect(opportunitySession.cartOfferOpportunity(), isNull);
+        opportunitySession.decrease(opportunityProduct.id);
+        expect(opportunitySession.cartOfferOpportunity(), isNull);
       },
     );
 
@@ -1188,4 +1350,21 @@ class _MemorySavedProductsStore implements BuyV2SavedProductsStore {
     _value = Set.of(savedProductKeys);
     return true;
   }
+}
+
+class _ScopedOpportunityCommerce implements BuyV2CommerceAdapter {
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [
+      for (final p in BuyV2Catalogue.allProducts)
+        p.copyWith(
+          storeId: p.id == 's-milk' ? 'store-b' : 'store-a',
+          offerClass: p.offerClass ?? BuyV2OfferClass.retail,
+        ),
+    ],
+  );
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError('unused');
 }

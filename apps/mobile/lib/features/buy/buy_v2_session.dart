@@ -8704,7 +8704,9 @@ class BuyV2Session extends ChangeNotifier {
             benefit.sourceId.trim().isNotEmpty &&
             benefit.sponsorName.trim().isNotEmpty &&
             benefit.savingAmount >= 0 &&
-            benefit.savingAmount <= _benefitTotal(benefit, cartLines) &&
+            (benefit.savingAmount <= _benefitTotal(benefit, cartLines) ||
+                (benefit.kind == BuyV2CartBenefitKind.coupon &&
+                    benefit.savingAmount <= (benefit.minimumSpend ?? 0))) &&
             (benefit.kind == BuyV2CartBenefitKind.coupon ||
                 benefit.savingAmount == 0) &&
             _liveBenefitMatchesStrategy(
@@ -8712,6 +8714,7 @@ class BuyV2Session extends ChangeNotifier {
               evaluatedAt: snapshot.evaluatedAt,
               destinationTotal: _benefitTotal(benefit, cartLines),
               destinationQuantity: _benefitQuantity(benefit, cartLines),
+              allowUnmetSpend: benefit.kind == BuyV2CartBenefitKind.coupon,
             ) &&
             ids.add(
               '${benefit.destination.name}|${benefit.kind.name}|${benefit.id}',
@@ -8725,6 +8728,7 @@ class BuyV2Session extends ChangeNotifier {
     required DateTime evaluatedAt,
     required int destinationTotal,
     required int destinationQuantity,
+    bool allowUnmetSpend = false,
   }) {
     if (benefit.validFrom case final validFrom?
         when evaluatedAt.isBefore(validFrom)) {
@@ -8735,7 +8739,8 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (benefit.minimumSpend case final minimumSpend?
-        when minimumSpend <= 0 || destinationTotal < minimumSpend) {
+        when minimumSpend <= 0 ||
+            (!allowUnmetSpend && destinationTotal < minimumSpend)) {
       return false;
     }
     if (benefit.minimumQuantity case final minimumQuantity?
@@ -8765,15 +8770,20 @@ class BuyV2Session extends ChangeNotifier {
   bool _removeIneligibleCartBenefitSelections() {
     var removed = false;
     _selectedCartBenefitRefs.removeWhere((key, selection) {
-      final available = _liveCartBenefits.any(
-        (benefit) =>
-            key ==
-                _cartBenefitSelectionKey(benefit.destination, benefit.kind) &&
-            selection.benefitId == benefit.id &&
-            selection.sourceId == benefit.sourceId &&
-            selection.revision == benefit.revision &&
-            selection.scopeKey == _benefitScopeKey(benefit),
-      );
+      final available = BuyV2CartBenefitKind.values
+          .expand((kind) => cartBenefits(kind: kind))
+          .any(
+            (benefit) =>
+                key ==
+                    _cartBenefitSelectionKey(
+                      benefit.destination,
+                      benefit.kind,
+                    ) &&
+                selection.benefitId == benefit.id &&
+                selection.sourceId == benefit.sourceId &&
+                selection.revision == benefit.revision &&
+                selection.scopeKey == _benefitScopeKey(benefit),
+          );
       if (!available) removed = true;
       return !available;
     });
@@ -9382,6 +9392,61 @@ class BuyV2Session extends ChangeNotifier {
       valid.add(benefit);
     }
     return List.unmodifiable(valid);
+  }
+
+  /// A published spend opportunity is information, never an applied coupon.
+  ({BuyV2CartBenefit benefit, int remainingSpend})? cartOfferOpportunity({
+    BuyV2Destination? destination,
+  }) {
+    if (!liveCartBenefitsEnabled ||
+        cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready ||
+        scopedProcurementPricesUnavailable) {
+      return null;
+    }
+    final opportunities = <({BuyV2CartBenefit benefit, int remainingSpend})>[];
+    for (final benefit in _liveCartBenefits) {
+      final total = _benefitTotal(benefit, cartLines);
+      final minimumSpend = benefit.minimumSpend;
+      if (benefit.kind != BuyV2CartBenefitKind.coupon ||
+          (destination != null && benefit.destination != destination) ||
+          total <= 0 ||
+          minimumSpend == null ||
+          minimumSpend <= total ||
+          benefit.savingAmount <= 0 ||
+          benefit.savingAmount > minimumSpend ||
+          benefit.freeDelivery ||
+          benefit.strategy == BuyV2CartBenefitStrategy.freeDelivery ||
+          (benefit.eligiblePaymentMethods.isNotEmpty &&
+              !benefit.eligiblePaymentMethods.contains(selectedPayment)) ||
+          selectedCartBenefit(
+                kind: BuyV2CartBenefitKind.coupon,
+                destination: benefit.destination,
+              ) !=
+              null ||
+          !_liveBenefitMatchesStrategy(
+            benefit,
+            evaluatedAt: _benefitEvaluationTime(
+              _cartBenefitServerTime,
+              _cartBenefitReceivedTime,
+            ),
+            destinationTotal: total,
+            destinationQuantity: _benefitQuantity(benefit, cartLines),
+            allowUnmetSpend: true,
+          )) {
+        continue;
+      }
+      opportunities.add((
+        benefit: benefit,
+        remainingSpend: minimumSpend - total,
+      ));
+    }
+    opportunities.sort((a, b) {
+      final remaining = a.remainingSpend.compareTo(b.remainingSpend);
+      if (remaining != 0) return remaining;
+      final saving = b.benefit.savingAmount.compareTo(a.benefit.savingAmount);
+      return saving != 0 ? saving : a.benefit.id.compareTo(b.benefit.id);
+    });
+    return opportunities.firstOrNull;
   }
 
   String _cartBenefitSelectionKey(
