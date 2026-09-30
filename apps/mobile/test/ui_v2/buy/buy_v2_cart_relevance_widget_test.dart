@@ -1426,16 +1426,22 @@ void main() {
       tester.getTopLeft(discovery).dy,
       greaterThan(tester.getTopLeft(bill).dy),
     );
-    expect(
-      find.byKey(const ValueKey('buy-cart-recommendations-wholesale')),
-      findsNothing,
-    );
-    final total = session.scopedPayableTotal;
-    await tester.tap(discovery);
-    await tester.pumpAndSettle();
     final recommendations = find.byKey(
       const ValueKey('buy-cart-recommendations-wholesale'),
     );
+    expect(recommendations, findsOneWidget);
+    final heading = find.descendant(
+      of: discovery,
+      matching: find.text('More products & offers'),
+    );
+    final total = session.scopedPayableTotal;
+    final originalQuantity = session.quantityFor(wholesale.id);
+    await tester.tap(heading);
+    await tester.pumpAndSettle();
+    expect(recommendations, findsNothing);
+    expect(session.scopedPayableTotal, total);
+    await tester.tap(heading);
+    await tester.pumpAndSettle();
     await showInMainCartList(tester, recommendations);
     expect(recommendations, findsOneWidget);
     expect(
@@ -1443,6 +1449,23 @@ void main() {
       findsWidgets,
     );
     expect(session.scopedPayableTotal, total);
+    final addition = session
+        .cartRecommendationsFor(BuyV2Destination.wholesale)
+        .first;
+    expect(session.quantityFor(addition.id), 0);
+    final add = find.byKey(ValueKey('buy-cart-add-${addition.id}'));
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
+    expect(add.hitTestable(), findsOneWidget);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(addition.id), addition.minimumOrder);
+    expect(session.quantityFor(wholesale.id), originalQuantity);
+    expect(session.view, BuyV2View.cart);
+    expect(
+      session.cartLines.any((line) => line.product.id == addition.id),
+      isTrue,
+    );
     expect(tester.takeException(), isNull);
   });
 

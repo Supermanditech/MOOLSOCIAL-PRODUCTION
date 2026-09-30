@@ -22048,6 +22048,7 @@ class _CartDiscoverySections extends StatelessWidget {
     if (products.isEmpty) return const SizedBox.shrink();
     return ExpansionTile(
       key: const PageStorageKey('buy-cart-discovery'),
+      initiallyExpanded: true,
       iconColor: BuyV2ActionStyle.primaryForeground,
       collapsedIconColor: BuyV2ActionStyle.primaryForeground,
       tilePadding: const EdgeInsets.symmetric(horizontal: 9),
