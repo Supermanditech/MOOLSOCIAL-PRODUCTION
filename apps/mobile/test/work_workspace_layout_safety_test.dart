@@ -3115,6 +3115,146 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // Unit/layout fixtures only: not real-user-flow acceptance or runtime seeding.
+  WorkSession purchaseListFixture({bool complete = true, bool empty = false}) {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final store = work.activeWorkspace!;
+    final savedAt = DateTime.now().subtract(const Duration(days: 2));
+    WorkspacePurchaseRecord record(String id, int hour, WorkspaceReceiptState receipt,
+        WorkspaceSupplyStage stage) => WorkspacePurchaseRecord(
+      accountScope: 'review-draft-account', workspaceId: store.id,
+      supplierId: 'supplier-$id', supplierName: 'Supplier $id',
+      orderId: 'PO-$id', shipmentId: 'SHIP-$id', revision: 1,
+      createdAt: savedAt.add(Duration(hours: hour)), updatedAt: savedAt.add(Duration(hours: hour)),
+      stage: stage, amountMinor: 123456789, itemSummary: 'Rice pack $id',
+      invoiceReference: 'BILL-$id', paymentLabel: '', receiptState: receipt, lines: const [],
+    );
+    expect(work.applyWorkspacePurchases(accountScope: 'review-draft-account', storeId: store.id,
+      feedRevision: 1, complete: complete, records: empty ? [] : [
+        record('old', 1, WorkspaceReceiptState.confirmed, WorkspaceSupplyStage.delivered),
+        record('new', 4, WorkspaceReceiptState.awaiting, WorkspaceSupplyStage.delivered),
+        record('transit', 3, WorkspaceReceiptState.awaiting, WorkspaceSupplyStage.dispatched),
+        record('unknown', 2, WorkspaceReceiptState.unavailable, WorkspaceSupplyStage.unknown),
+        record('cancelled', 0, WorkspaceReceiptState.partial, WorkspaceSupplyStage.cancelled),
+      ]), isTrue);
+    return work;
+  }
+
+  Future<void> openPurchaseList(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    final purchases = find.byKey(const Key('work-incoming-purchases'));
+    await reveal(tester, purchases);
+    await tester.tap(purchases);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('P01 purchase search filters and exact detail return', (tester) async {
+    final work = purchaseListFixture();
+    final original = List<WorkspacePurchaseRecord>.of(work.workspacePurchases);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    final search = find.byKey(const Key('work-purchase-search'));
+    final field = tester.widget<TextField>(search);
+    expect(field.decoration!.filled, isFalse);
+    expect(field.decoration!.border, InputBorder.none);
+    expect(field.decoration!.focusedBorder, InputBorder.none);
+    expect(tester.getTopLeft(find.byKey(const Key('work-purchase-SHIP-new'))).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('work-purchase-SHIP-transit'))).dy));
+    await tester.enterText(search, 'BILL-new');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-SHIP-new')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-SHIP-old')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-purchase-filter-needs-receipt')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-purchase-SHIP-new')));
+    await tester.pumpAndSettle();
+    expect(work.focusedWorkspacePurchaseId, 'SHIP-new');
+    expect(find.text('Order PO-new'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-purchase-back')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).controller!.text, 'BILL-new');
+    await tester.enterText(search, 'no match');
+    await tester.pumpAndSettle();
+    expect(find.text('No matching purchases'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-purchase-reset')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+    await tester.tap(find.byKey(const Key('work-purchase-filter-incoming')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-SHIP-transit')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-SHIP-unknown')), findsNothing);
+    expect(find.byKey(const Key('work-purchase-SHIP-new')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-purchase-filter-needs-receipt')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-SHIP-new')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-SHIP-cancelled')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-purchase-filter-received')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-SHIP-old')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-SHIP-new')), findsNothing);
+    expect(work.workspacePurchases, orderedEquals(original));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final display in [(360.0, 800.0, 1.0), (320.0, 568.0, 2.0), (800.0, 360.0, 2.0)]) {
+    testWidgets('P01 purchase compact search and filters fit $display', (tester) async {
+      final work = purchaseListFixture();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.$1, display.$2), textScale: display.$3);
+      await openPurchaseList(tester);
+      await tester.enterText(find.byKey(const Key('work-purchase-search')), 'Supplier new');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-SHIP-new')), findsOneWidget);
+      expect(find.text('Payment update unavailable'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final complete in [true, false]) {
+    testWidgets('P01 empty purchase coverage remains truthful $complete', (tester) async {
+      final work = purchaseListFixture(complete: complete, empty: true);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      expect(find.text('No linked supplier deliveries'), findsOneWidget);
+      expect(find.text('Available updates only · full history unavailable'),
+          complete ? findsNothing : findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-search')), findsOneWidget);
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final display in [(320.0, 568.0, 2.0, 240.0), (800.0, 360.0, 1.0, 180.0)]) {
+    testWidgets('P01 purchase keyboard keeps search and recovery reachable $display', (tester) async {
+      final work = purchaseListFixture(empty: true);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.$1, display.$2), textScale: display.$3,
+          bottomInset: display.$4);
+      await openPurchaseList(tester);
+      final search = find.byKey(const Key('work-purchase-search'));
+      await tester.ensureVisible(search);
+      final searchController = tester.widget<TextField>(search).controller!;
+      await tester.enterText(search, 'no match');
+      await tester.pumpAndSettle();
+      final reset = find.byKey(const Key('work-purchase-reset'));
+      final purchaseScroll = find.descendant(
+        of: find.byKey(const Key('work-store-track-stock')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+            widget.axisDirection == AxisDirection.down));
+      await tester.scrollUntilVisible(reset, 80, scrollable: purchaseScroll);
+      await tester.pumpAndSettle();
+      await tester.tap(reset);
+      await tester.pumpAndSettle();
+      expect(searchController.text, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   Future<void> captureStoreView(
     WidgetTester tester,
     String name, {

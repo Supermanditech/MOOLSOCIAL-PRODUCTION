@@ -11348,14 +11348,44 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   String? _storeId, _lastViewedId;
   bool _showedDetails = false;
   final _returnRowKey = GlobalKey();
+  final _purchaseSearch = TextEditingController();
+  final _purchaseSearchFocus = FocusNode(debugLabel: 'purchase-search');
+  List<String>? _purchaseHistory;
+  String _purchaseFilter = 'All';
+
+  @override
+  void dispose() {
+    _purchaseSearch.dispose();
+    _purchaseSearchFocus.dispose();
+    super.dispose();
+  }
+
+  bool _matchesReceiptFilter(WorkspacePurchaseRecord record) =>
+      switch (_purchaseFilter) {
+        'Incoming' => record.stage != WorkspaceSupplyStage.unknown &&
+            record.stage.incoming,
+        'Needs receipt' =>
+          record.stage != WorkspaceSupplyStage.cancelled &&
+          record.stage != WorkspaceSupplyStage.returned &&
+          (record.receiptState == WorkspaceReceiptState.partial ||
+           record.receiptState == WorkspaceReceiptState.disputed ||
+           (record.stage == WorkspaceSupplyStage.delivered &&
+            record.receiptState == WorkspaceReceiptState.awaiting)),
+        'Received' => record.receiptState == WorkspaceReceiptState.confirmed,
+        _ => true,
+      };
 
   @override
   Widget build(BuildContext context) {
     final storeId = session.activeWorkspace?.id;
-    if (_storeId != storeId) {
+    final history = session.workspaceRecentSearches('purchases');
+    if (_storeId != storeId || !identical(_purchaseHistory, history)) {
       _storeId = storeId;
       _lastViewedId = null;
       _showedDetails = false;
+      _purchaseHistory = history;
+      _purchaseSearch.clear();
+      _purchaseFilter = 'All';
     }
     final selected = session.focusedWorkspacePurchase;
     final returning =
@@ -11608,101 +11638,162 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         },
       );
     }
-    return ListView.builder(
+    records.sort((a, b) {
+      final byDate = b.createdAt.compareTo(a.createdAt);
+      return byDate != 0 ? byDate : a.shipmentId.compareTo(b.shipmentId);
+    });
+    final terms = _purchaseSearch.text.trim().toLowerCase().split(RegExp(r'\s+'));
+    final visible = records.where((record) {
+      final searchable = [record.supplierName, record.orderId, record.shipmentId,
+        record.purchaseId, record.invoiceReference, record.purchaseOrderReference,
+        record.itemSummary, ...record.lines.map((line) => '${line.name} ${line.pack}')]
+          .whereType<String>().join(' ').toLowerCase();
+      return _matchesReceiptFilter(record) && terms.every(searchable.contains);
+    }).toList();
+    return CustomScrollView(
       key: PageStorageKey('work-purchases-$storeId-$statement'),
       primary: false,
-      padding: const EdgeInsets.all(16),
-      itemCount: records.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!statement)
-                  const Text(
-                    'Incoming stock',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: MoolColors.navy,
-                    ),
-                  ),
-                if (!session.workspacePurchasesComplete)
-                  const Text(
-                    'Showing available shipment updates. Full history is not available yet.',
-                  ),
-                if (records.isEmpty)
-                  Text(
-                    !session.workspacePurchasesComplete
-                        ? 'No shipment updates available'
-                        : statement
-                        ? 'No linked purchases in this period'
-                        : 'No linked supplier deliveries',
-                  ),
-              ],
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      slivers: [
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('Purchases', style: TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w800, color: MoolColors.navy)),
+            StoreRecentSearches(
+              controller: _purchaseSearch,
+              focusNode: _purchaseSearchFocus,
+              history: history,
+              isCurrent: () => identical(history, session.workspaceRecentSearches('purchases')),
+              onChanged: (_) => setState(() {}),
+              child: TextField(
+                key: const Key('work-purchase-search'),
+                controller: _purchaseSearch,
+                focusNode: _purchaseSearchFocus,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _purchaseSearchFocus.unfocus(),
+                style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+                decoration: InputDecoration(
+                  hintText: 'Search supplier, order or invoice',
+                  filled: false, isDense: true,
+                  border: InputBorder.none, enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none, disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
+                  prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
+                  suffixIcon: _purchaseSearch.text.isEmpty ? null : IconButton(
+                    tooltip: 'Clear purchase search',
+                    onPressed: () => setState(_purchaseSearch.clear),
+                    icon: const Icon(Icons.close_rounded, size: 18)),
+                ),
+              ),
             ),
-          );
-        }
-        final record = records[index - 1];
-        void openPurchase() {
-          if (session.activeWorkspace?.id != storeId) return;
-          session.selectWorkspacePurchase(record.shipmentId);
-        }
-
-        final row = ListTile(
-          key: ValueKey('work-purchase-${record.shipmentId}'),
-          contentPadding: EdgeInsets.zero,
-          title: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  record.supplierName,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(width: 8),
-              KeyedSubtree(
-                key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
-                child: FilledButton(
-                  key: ValueKey('work-purchase-open-${record.shipmentId}'),
-                  onPressed:
-                      record.stage.incoming && widget.onTrackPurchase != null
-                      ? () {
-                          if (session.activeWorkspace?.id != storeId) return;
-                          _lastViewedId = record.shipmentId;
-                          widget.onTrackPurchase!(record.shipmentId);
-                        }
-                      : openPurchase,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: MoolColors.navy,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(48, 48),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                  ),
-                  child: Text(
-                    record.stage.incoming ? 'Track' : 'Review',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
+            SizedBox(
+              height: 28 + MediaQuery.textScalerOf(context).scale(20),
+              child: ListView(scrollDirection: Axis.horizontal, children: [
+                for (final filter in const ['All', 'Incoming', 'Needs receipt', 'Received'])
+                  Padding(padding: const EdgeInsets.only(right: 6),
+                    child: TextButton(
+                      key: Key('work-purchase-filter-${filter.toLowerCase().replaceAll(' ', '-')}'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: MoolColors.navy,
+                        backgroundColor: _purchaseFilter == filter
+                            ? MoolColors.navy.withValues(alpha: .06) : Colors.transparent,
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8)),
+                      onPressed: () { _purchaseSearchFocus.unfocus();
+                        setState(() => _purchaseFilter = filter); },
+                      child: Semantics(selected: _purchaseFilter == filter,
+                        child: Text(filter, style: TextStyle(fontSize: 12,
+                            fontWeight: _purchaseFilter == filter ? FontWeight.w800 : FontWeight.w500))),
+                    )),
+              ]),
+            ),
+          ]),
+        )),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+          sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
+            if (index == 0) { return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (!session.workspacePurchasesComplete)
+              const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
+                'Available updates only · full history unavailable',
+                style: TextStyle(fontSize: 11, color: MoolColors.muted))),
+            if (visible.isEmpty) ...[
+              Text(records.isEmpty ? 'No linked supplier deliveries' : 'No matching purchases',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+              Text(records.isEmpty
+                  ? 'MoolSocial supplier orders and receipt updates will appear here.'
+                  : 'Try another supplier or reference, or clear the filters.',
+                  style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+              if (_purchaseFilter != 'All' || _purchaseSearch.text.isNotEmpty)
+                Align(alignment: Alignment.centerLeft, child: TextButton(
+                  key: const Key('work-purchase-reset'),
+                  onPressed: () { _purchaseSearchFocus.unfocus();
+                    setState(() { _purchaseSearch.clear(); _purchaseFilter = 'All'; }); },
+                  child: const Text('Show all purchases'))),
             ],
-          ),
-          subtitle: Text(
-            '${record.orderId}${record.shipmentId == record.orderId ? '' : ' · ${record.shipmentId}'} · ${record.stage.label}\n${record.itemSummary}\nOrder total ${_purchaseAmount(record.amountMinor)} · ${record.paymentLabel}',
-          ),
-          onTap: openPurchase,
-        );
-        return row;
-      },
+            ]); }
+            final record = visible[index - 1];
+            return KeyedSubtree(
+                key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
+                child: InkWell(
+                  key: ValueKey('work-purchase-${record.shipmentId}'),
+                  onTap: () {
+                    if (session.activeWorkspace?.id != storeId ||
+                        !identical(history, session.workspaceRecentSearches('purchases'))) { return; }
+                    _purchaseSearchFocus.unfocus();
+                    session.selectWorkspacePurchase(record.shipmentId);
+                  },
+                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      _StoreMoneyLine(
+                        alignAmountToEnd: true,
+                        leading: Text(record.supplierName, style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                        value: _purchaseAmount(record.amountMinor),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: MoolColors.navy)),
+                      Text('${_registerDate(record.createdAt)} · ${record.orderId}',
+                          style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                      if (record.invoiceReference?.isNotEmpty == true)
+                        Text('Invoice ${record.invoiceReference}', style: const TextStyle(fontSize: 11)),
+                      Text(record.itemSummary, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+                      Wrap(spacing: 8, runSpacing: 2, children: [
+                        Text(record.stage.label, style: const TextStyle(fontSize: 11, color: MoolColors.navy)),
+                        Text(record.receiptState.label, style: const TextStyle(fontSize: 11, color: MoolColors.ink)),
+                      ]),
+                      Row(children: [
+                        Expanded(child: Text(record.paymentLabel.trim().isEmpty
+                            ? 'Payment update unavailable' : record.paymentLabel,
+                            style: const TextStyle(fontSize: 11, color: MoolColors.ink))),
+                        TextButton(
+                          key: ValueKey('work-purchase-open-${record.shipmentId}'),
+                          style: TextButton.styleFrom(foregroundColor: MoolColors.navy,
+                              minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 6)),
+                          onPressed: () {
+                            if (session.activeWorkspace?.id != storeId ||
+                                !identical(history, session.workspaceRecentSearches('purchases'))) { return; }
+                            _purchaseSearchFocus.unfocus();
+                            _lastViewedId = record.shipmentId;
+                            if (record.stage != WorkspaceSupplyStage.unknown &&
+                                record.stage.incoming && widget.onTrackPurchase != null) {
+                              widget.onTrackPurchase!(record.shipmentId);
+                            } else { session.selectWorkspacePurchase(record.shipmentId); }
+                          },
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(record.stage != WorkspaceSupplyStage.unknown && record.stage.incoming
+                                ? 'Track' : 'Details', style: const TextStyle(fontSize: 11)),
+                            const Icon(Icons.chevron_right_rounded, size: 16),
+                          ])),
+                      ]),
+                      const Divider(height: 1),
+                    ])),
+                ),
+              );
+          }, childCount: visible.length + 1)),
+        ),
+      ],
     );
   }
 }
