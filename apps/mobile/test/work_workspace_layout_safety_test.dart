@@ -3468,6 +3468,143 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  testWidgets('P05-MATCH product cancel and Android Back retain the same bill', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final products = List.of(work.workspaceCatalogueItems);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    for (final e in {'supplier-name':'Evaluation supplier', 'reference':'EVAL-MATCH-1',
+        'item-0':'Evaluation new rice', 'pack-0':'1 kg', 'quantity-0':'12', 'cost-0':'45.50'}.entries) {
+      final field = find.byKey(Key('work-purchase-${e.key}'));
+      await revealPurchaseInput(tester, field);
+      await tester.enterText(field, e.value);
+    }
+    for (final androidBack in [false, true]) {
+      final add = find.byKey(const Key('work-purchase-add-product-0'));
+      await revealPurchaseInput(tester, add, delta: -60);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-stock')), findsNothing);
+      expect(find.byKey(const Key('work-product-public')), findsNothing);
+      expect(find.text('Product & prices'), findsOneWidget);
+      expect(find.text('Product, price & stock'), findsNothing);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-title'))).controller!.text,
+        'Evaluation new rice');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-purchase-price'))).controller!.text,
+        isEmpty, reason: 'Decimal bill cost must not be rounded into the product model.');
+      if (androidBack) {
+        await tester.enterText(find.byKey(const Key('work-product-title')), 'Unsaved editor change');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+      } else {
+        await reveal(tester, find.byKey(const Key('work-product-cancel')));
+        await tester.tap(find.byKey(const Key('work-product-cancel')));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+      for (final e in {'reference':'EVAL-MATCH-1', 'item-0':'Evaluation new rice',
+          'quantity-0':'12', 'cost-0':'45.50'}.entries) {
+        expect(tester.widget<TextField>(find.byKey(Key('work-purchase-${e.key}'))).controller!.text, e.value);
+      }
+      expect(work.workspaceCatalogueItems, orderedEquals(products));
+      expect(entry.value, isNull);
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P05-MATCH editor saves zero-stock product and exact draft linkage', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final products = List.of(work.workspaceCatalogueItems);
+    final finance = work.workspaceFinance;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    for (final e in {'supplier-name':'Evaluation supplier', 'reference':'EVAL-MATCH-2',
+        'item-0':'Evaluation new rice', 'pack-0':'1 kg', 'quantity-0':'12', 'cost-0':'45.50'}.entries) {
+      final field = find.byKey(Key('work-purchase-${e.key}'));
+      await revealPurchaseInput(tester, field);
+      await tester.enterText(field, e.value);
+    }
+    final add = find.byKey(const Key('work-purchase-add-product-0'));
+    await revealPurchaseInput(tester, add, delta: -60);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    await reveal(tester, find.byKey(const Key('work-product-details-section')));
+    await tester.tap(find.byKey(const Key('work-product-details-section')));
+    await tester.pumpAndSettle();
+    for (final e in {'brand':'Evaluation maker', 'sku':'EVAL-MATCH-RICE',
+        'purchase-price':'45', 'selling-price':'55'}.entries) {
+      final field = find.byKey(Key('work-product-${e.key}'));
+      await reveal(tester, field);
+      await tester.enterText(field, e.value);
+    }
+    await reveal(tester, find.byKey(const Key('work-product-save')));
+    expect(find.text('Save product & return'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-product-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+    final product = work.workspaceCatalogueItems.singleWhere((p) => p.sku == 'EVAL-MATCH-RICE');
+    expect(product.stock, 0);
+    expect(product.available, isFalse);
+    expect(product.publicListing, isFalse);
+    expect(work.workspaceCatalogueItems.where((p) => p.id != product.id), orderedEquals(products));
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-quantity-0'))).controller!.text, '12');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-cost-0'))).controller!.text, '45.50');
+    expect(find.byKey(const Key('work-purchase-add-product-0')), findsNothing);
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    final draft = entry.value!.draft!;
+    expect(draft.goods.single['productId'], product.id);
+    expect(draft.goods.single['quantity'], '12');
+    expect(draft.goods.single['cost'], '45.50');
+    expect(work.workspaceFinance, same(finance));
+    expect(work.workspacePurchases, isEmpty);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(work.workspacePurchaseEntryDraft!.id, draft.id);
+    expect(find.byKey(const Key('work-purchase-add-product-0')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final display in [(320.0, 568.0, 2.0, 240.0), (800.0, 360.0, 1.5, 180.0)]) {
+    testWidgets('P05-MATCH Add product fits large text and keyboard $display', (tester) async {
+      final work = manualPurchaseFixture(_PurchaseEntryFixtureStore());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+      await openPurchaseList(tester);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      final item = find.byKey(const Key('work-purchase-item-0'));
+      await revealPurchaseInput(tester, item);
+      await tester.enterText(item, 'Evaluation unmatched item');
+      final add = find.byKey(const Key('work-purchase-add-product-0'));
+      await revealPurchaseInput(tester, add);
+      expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-title')), findsOneWidget);
+      expect(find.byKey(const Key('work-product-stock')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P05 OCR fixture fills empty fields only and preserves entered product identity', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);

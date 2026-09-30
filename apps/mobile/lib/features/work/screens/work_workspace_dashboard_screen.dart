@@ -11436,6 +11436,52 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   Future<void> _back() async {
     if (await confirmLeave() && mounted) widget.onBack();
   }
+  Future<void> _addGoodsProduct(_PurchaseGoodsInput line) async {
+    if (_busy || !_current || _scope == null || line.name.text.trim().isEmpty) return;
+    FocusScope.of(context).unfocus();
+    final id = 'custom-${DateTime.now().microsecondsSinceEpoch}';
+    final defaults = widget.session.workspaceProductDefaults;
+    final product = WorkspaceCatalogueItem(
+      id: id, canonicalId: id, categoryId: 'other', brand: '',
+      title: line.name.text.trim(), variant: '', pack: line.pack.text.trim(),
+      sku: 'SKU-${id.substring(7)}', barcode: '',
+      // The bill can use decimal prices; the product editor accepts whole rupees.
+      // Never round or replace the original bill price to make it fit.
+      purchasePrice: int.tryParse(line.cost.text.trim()) ?? 0,
+      sellingPrice: int.tryParse(line.extra['sellingPrice']!.text.trim()) ?? 0,
+      mrp: int.tryParse(line.extra['mrp']!.text.trim()),
+      unitPrice: '', stock: 0, available: false, publicListing: false,
+      deliveryPromise: 'Store pickup or local delivery', origin: '',
+      visualLabel: 'Product image pending', visualKind: 'catalogue-packshot',
+      stockMode: defaults.stockMode, lowStockThreshold: defaults.lowStockThreshold,
+    );
+    setState(() => _busy = true);
+    try {
+      final savedId = await Navigator.of(context).push<String>(MaterialPageRoute(
+        builder: (pageContext) => Scaffold(
+          appBar: AppBar(title: const Text('Add product')),
+          body: SafeArea(child: _CatalogueProductEditor(
+            session: widget.session, product: product, embeddedPage: true,
+            purchaseScope: _scope,
+            onSaved: () => Navigator.of(pageContext).pop(product.id),
+          )),
+        ),
+      ));
+      if (!mounted || savedId == null) return;
+      if (!_current) {
+        setState(() => _error = 'Your Store changed. Return to this bill’s Store before matching goods.');
+        return;
+      }
+      final saved = widget.session.workspaceCatalogueItems.where((p) => p.id == savedId).firstOrNull;
+      if (saved == null || !_goods.contains(line)) {
+        setState(() => _error = 'The saved product is unavailable. Match this item to Stock again.');
+        return;
+      }
+      setState(() { line.productId = saved.id; line.name.text = saved.title; line.pack.text = saved.pack; });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
   Future<void> _save() async {
     if (_busy || !_current || _scope == null) return;
     final now = DateTime.now();
@@ -11738,9 +11784,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           setState(() => _goods.removeAt(index)); line.dispose();
         }, icon: const Icon(Icons.close_rounded, size: 18, color: MoolColors.navy))]),
       if (line.name.text.trim().isNotEmpty && line.productId.isEmpty)
-        const Text('Not matched to Stock · complete product details before receipt',
-          key: Key('work-purchase-unmatched-item'),
-          style: TextStyle(fontSize: 11, color: MoolColors.ink)),
+        Row(children: [
+          const Expanded(child: Text('Not matched to Stock · complete product details before receipt',
+            key: Key('work-purchase-unmatched-item'),
+            style: TextStyle(fontSize: 11, color: MoolColors.ink))),
+          TextButton(key: Key('work-purchase-add-product-$index'),
+            style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            onPressed: () => _addGoodsProduct(line), child: const Text('Add product')),
+        ]),
       if (line.focus.hasFocus && line.productId.isEmpty && query.isNotEmpty)
         for (final p in matches) TextButton(onPressed: () {
           setState(() { line.productId = p.id; line.name.text = p.title; line.pack.text = p.pack;
@@ -17540,6 +17592,7 @@ class _CatalogueProductEditor extends StatefulWidget {
     this.importRow,
     this.validateImport,
     this.onImportReviewed,
+    this.purchaseScope,
   });
 
   final WorkSession session;
@@ -17553,6 +17606,8 @@ class _CatalogueProductEditor extends StatefulWidget {
   final WorkspaceProductImportRow? importRow;
   final WorkspaceProductImportRow Function(Map<String, String>)? validateImport;
   final ValueChanged<WorkspaceProductImportRow>? onImportReviewed;
+  // Only new-product setup launched by a purchase. All other editors are unchanged.
+  final (String, String, bool)? purchaseScope;
 
   @override
   State<_CatalogueProductEditor> createState() =>
@@ -18263,7 +18318,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         return;
       }
       if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
-          _storeId) {
+          _storeId || (widget.purchaseScope != null &&
+              widget.purchaseScope != widget.session.workspaceSupplierScope)) {
         setState(
           () => _error =
               'Your store changed. Close this product and open it in the correct store.',
@@ -18277,7 +18333,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         if (!ready ||
             (widget.session.activeWorkspace?.id ??
                     widget.session.workspaceId) !=
-                _storeId) {
+                _storeId || (widget.purchaseScope != null &&
+                    widget.purchaseScope != widget.session.workspaceSupplierScope)) {
           setState(
             () => _error =
                 widget.session.workspaceInventoryError ??
@@ -18317,7 +18374,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       final purchase = int.tryParse(_purchase.text.trim());
       final selling = int.tryParse(_selling.text.trim());
       final mrp = int.tryParse(_mrp.text.trim());
-      final stock = _stockMode == WorkspaceStockMode.availabilityOnly
+      final stock = widget.purchaseScope != null ? 0 : _stockMode == WorkspaceStockMode.availabilityOnly
           ? widget.product.stock.clamp(0, 1 << 31).toInt()
           : int.tryParse(_stock.text.trim());
       final lowStockThreshold = int.tryParse(_lowStockThreshold.text.trim());
@@ -18430,12 +18487,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         regulatoryNote: _regulatory.text.trim(),
         compliance: _packInformation,
         catalogueFactsRequireReview: _factsNeedReview || measureChanged,
-        available: _stockMode == WorkspaceStockMode.availabilityOnly ||
+        available: widget.purchaseScope != null ? false : _stockMode == WorkspaceStockMode.availabilityOnly ||
                 (_wasOwned && !widget.product.available)
             ? _available
             : stock! > 0,
         publicListing:
-            _public &&
+            widget.purchaseScope == null && _public &&
             _catalogueMatched &&
             !_factsNeedReview &&
             !measureChanged &&
@@ -18461,7 +18518,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         if (!persisted ||
             (widget.session.activeWorkspace?.id ??
                     widget.session.workspaceId) !=
-                _storeId) {
+                _storeId || (widget.purchaseScope != null &&
+                    widget.purchaseScope != widget.session.workspaceSupplierScope)) {
           _pendingInventorySave = true;
           setState(
             () => _error =
@@ -18474,7 +18532,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       _saved = true;
       if (widget.onSaved != null) {
         FocusManager.instance.primaryFocus?.unfocus();
-        widget.session.showNotice('Saved to Store stock.');
+        widget.session.showNotice(widget.purchaseScope == null ? 'Saved to Store stock.'
+            : 'Product saved. Goods stay in your purchase draft until receipt.');
         _finish(afterExit: widget.onSaved);
       } else {
         _finish();
@@ -18887,7 +18946,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                         _section(
                           'summary',
                           'work-product-fast-editor',
-                          'Product, price & stock',
+                          widget.purchaseScope == null ? 'Product, price & stock' : 'Product & prices',
                           [
                             if (widget.session.catalogueManagesProductPhoto(
                               product,
@@ -18982,9 +19041,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 numeric: true,
                                 money: true,
                               ),
-                              if (widget.importRow != null ||
+                              if (widget.purchaseScope == null && (widget.importRow != null ||
                                   _stockMode ==
-                                      WorkspaceStockMode.exactQuantity)
+                                      WorkspaceStockMode.exactQuantity))
                                 _field(
                                   'stock',
                                   'work-product-stock',
@@ -19007,7 +19066,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 numeric: true,
                               ),
                             ]),
-                            if (widget.importRow == null &&
+                            if (widget.purchaseScope == null && widget.importRow == null &&
                                 _stockMode ==
                                     WorkspaceStockMode.availabilityOnly)
                               SwitchListTile.adaptive(
@@ -19026,7 +19085,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               'Purchase price helps you track stock costs and profit. Only your Store can see it.',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            if (widget.onDraftReviewed != null ||
+                            if (widget.purchaseScope != null)
+                              Padding(padding: const EdgeInsets.only(top: 8),
+                                child: Text('Product setup only · quantity stays in your purchase bill until receipt.',
+                                  key: const Key('work-purchase-product-only'),
+                                  style: Theme.of(context).textTheme.bodySmall))
+                            else if (widget.onDraftReviewed != null ||
                                 widget.importRow != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
@@ -19405,7 +19469,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 ),
                                 onPressed: _save,
                                 child: Text(
-                                  widget.onDraftReviewed != null ||
+                                  widget.purchaseScope != null ? 'Save product & return' : widget.onDraftReviewed != null ||
                                           widget.importRow != null
                                       ? 'Apply to import'
                                       : _wasOwned
