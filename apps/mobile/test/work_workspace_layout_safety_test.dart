@@ -16300,7 +16300,9 @@ void main() {
       );
       await captureStoreView(tester, 'sales-register-$scale');
       expect(horizontal, findsNothing, reason: 'Invoice amounts no longer require sideways scrolling');
-      final vertical = find.descendant(of: find.byKey(const Key('work-store-statement')),
+      final invoiceList = find.descendant(
+        of: find.byKey(const Key('work-store-statement')), matching: find.byType(ListView));
+      final vertical = find.descendant(of: invoiceList,
         matching: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down));
       await tester.scrollUntilVisible(find.byKey(const ValueKey('work-sales-invoice-INV-9')), 250,
         scrollable: vertical, maxScrolls: 40);
@@ -23375,6 +23377,98 @@ void main() {
     createdAt: createdAt,
   );
 
+  // Automated provenance fixtures only, never injected device acceptance data.
+  for (final display in [(412.0, 915.0, 1.0), (320.0, 568.0, 2.0),
+      (915.0, 412.0, 2.0)]) {
+    testWidgets('O04 Counter Sales separated from customer Orders $display', (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      final counter = work.workspaceOrders.singleWhere((order) => order.source == 'Counter');
+      final invoice = WorkspaceCustomerInvoice(id: 'POS-ORIGINAL-INVOICE',
+          orderId: counter.id, customer: counter.customer, items: counter.items,
+          amount: counter.amount, payment: counter.payment, issuedAt: DateTime.now());
+      work.workspaceInvoices.add(invoice);
+      work.workspaceOrders.addAll([
+        customerOrder(id: 'COUNTER-ACTIVE', customer: 'Counter customer', createdAt: DateTime.now())
+            .copyWith(source: 'Counter', stage: 'Confirmed'),
+        customerOrder(id: 'PUBLIC-ORIGINAL', customer: 'Public customer', createdAt: DateTime.now()),
+        customerOrder(id: 'PHONE-ORIGINAL', customer: 'Phone customer', createdAt: DateTime.now())
+            .copyWith(source: 'Phone'),
+        customerOrder(id: 'LEGACY-ORIGINAL', customer: 'Legacy customer', createdAt: DateTime.now())
+            .copyWith(source: ''),
+      ]);
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      final stock = work.workspaceCatalogueItems.map((item) => item.stock).toList();
+      final active = work.currentWorkspaceOrderId;
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
+          work: work, viewport: Size(display.$1, display.$2), textScale: display.$3);
+      expect(find.text('History · 3'), findsOneWidget);
+      expect(find.byKey(Key('work-order-history-open-${counter.id}')), findsNothing);
+      final all = find.byKey(const Key('work-orders-filter-live'));
+      await tester.ensureVisible(all);
+      await tester.tap(all);
+      await tester.pumpAndSettle();
+      expect(find.text('All · 1 active'), findsOneWidget);
+      expect(find.byKey(const Key('work-order-ticket-COUNTER-ACTIVE')), findsNothing);
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      await tester.enterText(field, counter.id);
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('work-search-order-${counter.id}')), findsNothing);
+      for (final id in ['PUBLIC-ORIGINAL', 'PHONE-ORIGINAL', 'LEGACY-ORIGINAL']) {
+        await tester.enterText(field, id);
+        await tester.pumpAndSettle();
+        expect(find.byKey(Key('work-search-order-$id')), findsOneWidget);
+      }
+      await tester.tap(find.byKey(const Key('work-dashboard-search-close')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      final salesRow = find.byKey(ValueKey('work-sales-invoice-${invoice.id}'));
+      expect(salesRow, findsOneWidget);
+      await tester.ensureVisible(salesRow);
+      await tester.tap(salesRow);
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey(invoice.id)), findsOneWidget);
+      expect(find.byKey(const Key('work-sales-search')), findsNothing);
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.workspaceInvoices.single, same(invoice));
+      expect(work.currentWorkspaceOrderId, active);
+      expect(work.workspaceCatalogueItems.map((item) => item.stock), orderedEquals(stock));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final invoiceCount in [0, 1, 2]) {
+    testWidgets('O04 old Counter order entry preserves exact invoice $invoiceCount', (tester) async {
+      final work = storeViewFixture();
+      final counter = work.workspaceOrders.singleWhere((order) => order.source == 'Counter');
+      final invoice = WorkspaceCustomerInvoice(id: 'POS-RECOVERY-INVOICE',
+          orderId: counter.id, customer: counter.customer, items: counter.items,
+          amount: counter.amount, payment: counter.payment, issuedAt: DateTime.now());
+      work.workspaceInvoices.addAll(List.filled(invoiceCount, invoice));
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('work-dashboard-search-field')), counter.id);
+      await tester.pumpAndSettle();
+      final result = find.byKey(Key('work-search-order-${counter.id}'));
+      await tester.ensureVisible(result);
+      await tester.tap(result);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-focused-order-id')), findsNothing);
+      if (invoiceCount == 1) {
+        expect(find.text(invoice.id), findsWidgets);
+      } else {
+        expect(work.noticeMessage, 'This Counter Sale has no unique saved invoice. Check the Sales register.');
+      }
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.workspaceInvoices, hasLength(invoiceCount));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   // Automated layout fixtures only; not phone/user-flow acceptance evidence.
   for (final display in [
     (412.0, 915.0, 1.0),
@@ -23546,6 +23640,7 @@ void main() {
     'O03 History rejects an unavailable original order without writes',
     (tester) async {
       final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      work.workspaceOrders[1] = work.workspaceOrders[1].copyWith(source: 'App');
       await mount(
         tester,
         route: '/app/work/workspace/dashboard?section=orders',
@@ -23605,6 +23700,8 @@ void main() {
       tester,
     ) async {
       final work = storeViewFixture()..setWorkspaceOrderFilter('Packing');
+      // This lookup test concerns public orders; Counter provenance is tested in O04.
+      work.workspaceOrders[1] = work.workspaceOrders[1].copyWith(source: 'App');
       final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
       work.workspaceRecentSearches('store').add('unrelated product');
       work.workspaceRecentSearches('orders').add('SALE-1042');
@@ -23726,6 +23823,7 @@ void main() {
     tester,
   ) async {
     final work = storeViewFixture()..setWorkspaceOrderFilter('Ready');
+    work.workspaceOrders[1] = work.workspaceOrders[1].copyWith(source: 'App');
     await mount(
       tester,
       route: '/app/work/workspace/dashboard?section=orders',
@@ -23890,8 +23988,8 @@ void main() {
       final order = WorkspaceOrderRecord(id: 'ADJUST-$kind', customer: 'Test customer',
           items: 'Sunflower oil', quantities: const {'oil':1}, amount: net ~/ 100,
           remainderPaise: net % 100, discount: discount,
-          discountMinor: kind == 'unknown' ? 0 : reduced, source: 'Counter',
-          fulfilment: 'At the shop', payment: 'Refunded', address: '',
+          discountMinor: kind == 'unknown' ? 0 : reduced, source: 'App',
+          fulfilment: 'Pickup', payment: 'Refunded', address: '',
           stage: 'Completed', needsDelivery: false, createdAt: DateTime(2026,9,30),
           itemSnapshots: [WorkspaceOrderItemSnapshot(productId: 'oil',
               name: 'Sunflower oil', pack: '1 L', quantity:1,
@@ -23925,6 +24023,7 @@ void main() {
   }
   testWidgets('O03 details invoice link requires unique current saved record', (tester) async {
     final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+    work.workspaceOrders[1] = work.workspaceOrders[1].copyWith(source: 'App');
     final order = work.workspaceOrders.singleWhere((o) => o.id == 'SALE-1042');
     final invoice = WorkspaceCustomerInvoice(id:'INV-SALE-1042', orderId:order.id,
         customer:order.customer, items:order.items, amount:order.amount,
@@ -24008,7 +24107,7 @@ void main() {
               : const WorkspaceBillingDetails(),
           items: 'Sunflower oil', quantities: const {'oil': 1}, amount: amount ~/ 100,
           discount: const WorkspaceBillDiscount.fixed(1000), discountMinor: 1000,
-          source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: '',
+          source: 'App', fulfilment: 'Pickup', payment: 'Cash', address: '',
           stage: 'Completed', needsDelivery: false, createdAt: seed.finance.asOf,
           itemSnapshots: [WorkspaceOrderItemSnapshot(productId: 'oil',
               name: 'Sunflower oil', pack: '1 L', quantity: 1,
@@ -24126,7 +24225,7 @@ void main() {
           billingDetails: const WorkspaceBillingDetails(name: 'Saved order buyer'),
           items: 'Thirty original products',
           quantities: {for (var i = 0; i < 30; i++) 'INLINE-$i': 1}, amount: 3000,
-          source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: '',
+          source: 'App', fulfilment: 'Pickup', payment: 'Cash', address: '',
           stage: 'Completed', needsDelivery: false, createdAt: DateTime(2026, 9, 30),
           itemSnapshots: [for (var i = 0; i < 30; i++) WorkspaceOrderItemSnapshot(
               productId: 'INLINE-$i', name: 'Long original invoice product $i',

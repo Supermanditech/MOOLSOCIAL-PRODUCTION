@@ -978,6 +978,7 @@ class _WorkWorkspaceDashboardScreenState
             session.showNotice('This order is no longer available.');
             return;
           }
+          if (orderId != null && _openCounterSaleInvoice(orderId)) return;
           final fromAlerts = _view == _WorkspaceControlView.alerts;
           if (fromAlerts) {
             _alertsReturnOffset = _alertsScroll.hasClients
@@ -1884,6 +1885,7 @@ class _WorkWorkspaceDashboardScreenState
           session.showError('This order is no longer available. Search again.');
           return;
         }
+        if (_openCounterSaleInvoice(record.entityId)) return;
         _showOperation(
           _WorkspaceOperation.orders,
           focusedOrderId: record.entityId,
@@ -2041,6 +2043,25 @@ class _WorkWorkspaceDashboardScreenState
   void _showAlerts() {
     _searchFocus.unfocus();
     setState(() => _view = _WorkspaceControlView.alerts);
+  }
+
+  // Old order links remain useful without putting POS sales back in Orders.
+  // Only a unique saved invoice may be opened; never manufacture a link.
+  bool _openCounterSaleInvoice(String orderId) {
+    final order = session.visibleWorkspaceOrders
+        .where((record) => record.id == orderId).firstOrNull;
+    if (order == null || !_isCounterSaleOrder(order)) return false;
+    final invoices = session.workspaceInvoices
+        .where((invoice) => invoice.orderId == order.id).toList();
+    if (invoices.length != 1) {
+      session.showNotice(
+        'This Counter Sale has no unique saved invoice. Check the Sales register.',
+      );
+      return true;
+    }
+    _showOperation(_WorkspaceOperation.sales);
+    unawaited(_showWorkspaceInvoiceSheet(context, session, invoices.single));
+    return true;
   }
 
   void _showOperation(
@@ -20483,7 +20504,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final allOrders = session.visibleWorkspaceOrders;
+    final allOrders = session.visibleWorkspaceOrders
+        .where((order) => !_isCounterSaleOrder(order));
     bool matches(WorkspaceOrderRecord order, String filter) => switch (filter) {
       'Live' => !order.isClosed,
       'Done' => order.isClosed,
@@ -20720,8 +20742,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                             widget.orderId != null
                                 ? 'Return to the order list and search again.'
                                 : _filter == 'Done'
-                                ? 'Completed and cancelled orders are saved here.'
-                                : 'Saved orders appear here when they reach this stage.',
+                                ? 'Completed and cancelled customer orders are saved here. Counter sales are in Sales.'
+                                : 'Customer orders appear here when they reach this stage. Counter sales are in Sales.',
                             style: const TextStyle(
                               color: Color(0xFF4C5268), fontSize: 12,
                             ),
@@ -32681,6 +32703,11 @@ String _savedOrderCustomerName(WorkSession session, WorkspaceOrderRecord order) 
       ? payments.single.customerName.trim() : order.customer;
 }
 
+// Filter presentation only. Legacy/phone sources keep their recorded identity;
+// neither fulfilment labels nor payment status prove a public-order origin.
+bool _isCounterSaleOrder(WorkspaceOrderRecord order) =>
+    order.source.trim().toLowerCase() == 'counter';
+
 List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   WorkSession session,
   String normalized, {
@@ -32710,7 +32737,8 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       icon: Icons.inventory_2_outlined,
     ));
   }
-  final orders = session.visibleWorkspaceOrders.toList();
+  final orders = session.visibleWorkspaceOrders
+      .where((order) => !ordersOnly || !_isCounterSaleOrder(order)).toList();
   if (ordersOnly) orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   for (final order in orders) {
     final stage = session.workspaceOrderStageLabel(order);
