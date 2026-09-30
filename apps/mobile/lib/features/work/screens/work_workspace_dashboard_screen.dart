@@ -610,9 +610,7 @@ class _WorkWorkspaceDashboardScreenState
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
   _WorkspaceFinanceFocus? _focusedFinance;
   _WorkspaceOperation? _operationReturnOperation;
-  ({String? workspaceId, String? orderId})? _counterOrderOrigin;
   Timer? _procurementRevealTimer;
-  bool _ordersPurchases = false;
   bool _procurementReady = false;
   bool _procurementSearchOpen = false;
   _WorkspaceOperation? _procurementReturnOperation;
@@ -1701,10 +1699,6 @@ class _WorkWorkspaceDashboardScreenState
             _StoreFinanceSurface(session: session, focus: _focusedFinance),
           _WorkspaceControlView.operation => _WorkspaceOperationSurface(
             operation: _operation,
-            ordersPurchases: _ordersPurchases,
-            onOrdersTabChanged: (value) => setState(() {
-              _ordersPurchases = value;
-            }),
             focusedOrderId: _focusedOrderId,
             focusedCustomerId: _focusedCustomerId,
             session: session,
@@ -1748,7 +1742,6 @@ class _WorkWorkspaceDashboardScreenState
     _searchFocus.unfocus();
     _releaseDirectFilter();
     setState(() {
-      _counterOrderOrigin = null;
       _reviewedOrder = null;
       _focusedOrderId = null;
       _focusedCustomerId = null;
@@ -2020,24 +2013,6 @@ class _WorkWorkspaceDashboardScreenState
       // entries stay disabled; local visibility must not invent a public URL.
       return;
     }
-    final createBillFromOrders =
-        _view == _WorkspaceControlView.operation &&
-        _operation == _WorkspaceOperation.orders &&
-        operation == _WorkspaceOperation.counterOrder;
-    if (createBillFromOrders) {
-      final origin = (
-        workspaceId: session.activeWorkspace?.id,
-        orderId: session.currentWorkspaceOrderId,
-      );
-      if (!session.prepareWorkspaceOrder(
-        source: 'Counter',
-        fulfilment: 'At the shop',
-      )) {
-        return;
-      }
-      _counterOrderOrigin = origin;
-      _saleSearchController.clear();
-    }
     if (operation == _WorkspaceOperation.paidWork) {
       final workspaceId = session.activeWorkspace?.id;
       if (workspaceId == null) return;
@@ -2062,9 +2037,6 @@ class _WorkWorkspaceDashboardScreenState
       _releaseDirectFilter();
     }
     setState(() {
-      if (operation == _WorkspaceOperation.orders && focusedOrderId != null) {
-        _ordersPurchases = false;
-      }
       _focusedOrderId = focusedOrderId;
       _focusedCustomerId = focusedCustomerId;
       _focusedFinance = focusedFinance;
@@ -2078,8 +2050,7 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnView = _WorkspaceControlView.status;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
-          (createBillFromOrders ||
-              (_operation == _WorkspaceOperation.sales &&
+          ((_operation == _WorkspaceOperation.sales &&
                   (operation == _WorkspaceOperation.counterOrder ||
                       operation == _WorkspaceOperation.dues)) ||
               (_operation == _WorkspaceOperation.catalogue &&
@@ -2442,7 +2413,6 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     if ((_operation == _WorkspaceOperation.sourcing ||
-            (_operation == _WorkspaceOperation.orders && _ordersPurchases) ||
             _operation == _WorkspaceOperation.statement) &&
         session.focusedWorkspacePurchaseId != null) {
       session.clearWorkspacePurchaseSelection();
@@ -2502,19 +2472,6 @@ class _WorkWorkspaceDashboardScreenState
     final parent = _operationReturnOperation;
     if (_operationReturnView == _WorkspaceControlView.operation &&
         parent != null) {
-      if (_operation == _WorkspaceOperation.counterOrder &&
-          parent == _WorkspaceOperation.orders) {
-        final origin = _counterOrderOrigin;
-        _counterOrderOrigin = null;
-        if (origin != null &&
-            origin.workspaceId == session.activeWorkspace?.id &&
-            origin.orderId != null &&
-            session.currentWorkspaceOrderId == null &&
-            session.workspaceOrderCustomer.isEmpty &&
-            session.workspaceOrderQuantities.isEmpty) {
-          session.selectWorkspaceOrder(origin.orderId!);
-        }
-      }
       setState(() {
         _operation = parent;
         _operationReturnView = _WorkspaceControlView.dashboard;
@@ -12868,8 +12825,6 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.saleQuery,
     required this.requirementDraft,
     required this.stockStatementBookmark,
-    required this.ordersPurchases,
-    required this.onOrdersTabChanged,
     required this.onOpenStore,
     required this.onBuyStock,
     required this.onOpenOperation,
@@ -12890,8 +12845,6 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final String saleQuery;
   final Map<String, String> requirementDraft;
   final _StockStatementBookmark stockStatementBookmark;
-  final bool ordersPurchases;
-  final ValueChanged<bool> onOrdersTabChanged;
   final VoidCallback onOpenStore;
   final VoidCallback onBuyStock;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
@@ -13242,52 +13195,11 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       );
     }
     if (operation == _WorkspaceOperation.orders) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<bool>(
-                key: const Key('work-orders-tabs'),
-                style: SegmentedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Sales')),
-                  ButtonSegment(value: true, label: Text('Purchases')),
-                ],
-                selected: {ordersPurchases},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) =>
-                    onOrdersTabChanged(selection.single),
-              ),
-            ),
-          ),
-          Expanded(
-            child: ordersPurchases
-                ? _StorePurchasesSurface(
-                    session: session,
-                    onTrackPurchase: onTrackPurchase,
-                  )
-                : _OrdersDestinationSurface(
-                    session: session,
-                    orderId: focusedOrderId,
-                    onOpenCollection: onOpenStore,
-                    onCreateOrder: () =>
-                        onOpenOperation(_WorkspaceOperation.counterOrder),
-                    onOpenDelivery: () =>
-                        onOpenOperation(_WorkspaceOperation.delivery),
-                  ),
-          ),
-        ],
+      return _OrdersDestinationSurface(
+        session: session,
+        orderId: focusedOrderId,
+        onOpenCollection: onOpenStore,
+        onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
       );
     }
     if (operation == _WorkspaceOperation.counterOrder) {
@@ -20262,14 +20174,12 @@ class _OrdersDestinationSurface extends StatefulWidget {
   const _OrdersDestinationSurface({
     required this.session,
     required this.onOpenCollection,
-    required this.onCreateOrder,
     required this.onOpenDelivery,
     this.orderId,
   });
 
   final WorkSession session;
   final VoidCallback onOpenCollection;
-  final VoidCallback onCreateOrder;
   final VoidCallback onOpenDelivery;
   final String? orderId;
 
@@ -20370,17 +20280,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                 ),
                 if (widget.orderId != null)
                   const SizedBox.shrink()
-                else if (compactText)
-                  IconButton.filled(
-                    key: const Key('work-orders-create'),
-                    tooltip: 'Create bill',
-                    onPressed: widget.onCreateOrder,
-                    constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
-                    ),
-                    icon: const Icon(Icons.add_rounded),
-                  )
                 else
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -20453,7 +20352,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                       _filter,
                       widget.orderId,
                     )),
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                     itemCount: visibleOrders.length,
                     addAutomaticKeepAlives: false,
                     findChildIndexCallback: (key) {
@@ -20527,19 +20426,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                     ),
                   ),
           ),
-          if (!compactText && widget.orderId == null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  key: const Key('work-orders-create'),
-                  onPressed: widget.onCreateOrder,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Create bill'),
-                ),
-              ),
-            ),
         ],
       ),
     );

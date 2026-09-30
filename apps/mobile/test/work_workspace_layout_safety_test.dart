@@ -23174,10 +23174,9 @@ void main() {
           expect(work.workspaceInvoices, isEmpty);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(
-            find.byKey(const Key('work-store-activity-deck')),
-            findsOneWidget,
-          );
+          // Home now uses the approved analytics overview, not the old deck.
+          expect(find.text('Store overview'), findsOneWidget);
+          expect(find.byKey(const Key('work-orders-destination')), findsNothing);
           expect(work.workspaceOrders.first, same(original));
           expect(work.workspaceOrders.last, same(otherOrder));
           expect(tester.takeException(), isNull);
@@ -23191,7 +23190,7 @@ void main() {
     (320.0, 568.0, 1.4),
     (320.0, 568.0, 2.0),
   ]) {
-    testWidgets('S09 order totals compact create action $display', (
+    testWidgets('O01 Orders queue and Sales entry preserve order $display', (
       tester,
     ) async {
       final work = storeViewFixture();
@@ -23207,10 +23206,10 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('work-store-orders')));
       await tester.pumpAndSettle();
-      final create = find.byKey(const Key('work-orders-create'));
-      expect(create.hitTestable(), findsOneWidget);
-      expect(tester.getSize(create).width, greaterThanOrEqualTo(48));
-      expect(tester.getSize(create).height, greaterThanOrEqualTo(48));
+      expect(find.byKey(const Key('work-orders-tabs')), findsNothing);
+      expect(find.byKey(const Key('work-orders-create')), findsNothing);
+      expect(find.text('Create bill'), findsNothing);
+      expect(find.byKey(const Key('work-orders-filter-strip')), findsOneWidget);
       final heading = tester.renderObject<RenderParagraph>(
         find.text('Customer orders'),
       );
@@ -23235,8 +23234,7 @@ void main() {
         tester,
         'r665-order-first-view-${display.$1}-${display.$3}',
       );
-      await tester.tap(create);
-      await tester.pumpAndSettle();
+      await openCounterSaleFromSales(tester);
       expect(find.byKey(const Key('work-sale-customer-sheet')), findsOneWidget);
       expect(work.currentWorkspaceOrderId, isNull);
       expect(work.workspaceOrderCustomer, isEmpty);
@@ -23246,19 +23244,20 @@ void main() {
       expect(work.workspaceOrders, orderedEquals(originalOrders));
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-sales-search')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
-      expect(work.currentWorkspaceOrderId, 'APP-1043');
-      expect(work.workspaceOrderCustomer, originalOrders.first.customer);
-      expect(work.workspaceOrderStage, originalOrders.first.stage);
-      expect(work.workspaceOrderPayment, originalOrders.first.payment);
-      expect(work.workspaceOrderAmount, '${originalOrders.first.amount}');
+      // Sales releases the transient POS editor on exit. The customer order
+      // remains in the queue with its identity, amount, stage and payment intact.
+      expect(work.currentWorkspaceOrderId, isNull);
       expect(work.workspaceOrders, orderedEquals(originalOrders));
       expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('S09 order totals Create bill saved draft preserves order', (
+  testWidgets('O01 Sales saved draft preserves Orders and Stock purchases', (
     tester,
   ) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore())
@@ -23280,23 +23279,39 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-orders-create')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-orders-tabs')), findsNothing);
+    await openCounterSaleFromSales(tester);
     await enterSaleCustomer(tester, '9876543210');
     await tester.tap(find.byKey(const Key('work-counter-close')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
-    expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-search')), findsOneWidget);
     expect(work.retainedCounterDraft!.customer, '9876543210');
-    expect(work.currentWorkspaceOrderId, 'APP-1043');
-    expect(work.workspaceOrderCustomer, originalOrders.first.customer);
-    expect(work.workspaceOrderPayment, originalOrders.first.payment);
-    expect(work.workspacePackedProductIds, unorderedEquals(packed));
+    expect(work.currentWorkspaceOrderId, isNull);
+    expect(work.workspaceOrders.first.customer, originalOrders.first.customer);
+    expect(work.workspaceOrders.first.payment, originalOrders.first.payment);
     expect(work.workspaceOrders, orderedEquals(originalOrders));
     expect(work.workspaceSettlementBalance, balance);
     expect(work.workspaceInvoices, isEmpty);
-    await tester.tap(find.byKey(const Key('work-orders-create')));
+    await tester.tap(find.byKey(const Key('work-store-stock')));
     await tester.pumpAndSettle();
+    final purchases = find.byKey(const Key('work-incoming-purchases'));
+    await reveal(tester, purchases);
+    await tester.tap(purchases);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-catalogue-screen')),
+      findsOneWidget,
+    );
+    expect(work.retainedCounterDraft!.customer, '9876543210');
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    expect(find.byKey(const Key('work-orders-tabs')), findsNothing);
+    await openCounterSaleFromSales(tester);
     expect(work.workspaceOrderCustomer, '9876543210');
     expect(work.currentWorkspaceOrderId, isNull);
     expect(work.workspaceOrders, orderedEquals(originalOrders));
@@ -27032,7 +27047,8 @@ void main() {
     expect(find.text('1 active'), findsOneWidget);
     expect(find.text('All 1'), findsOneWidget);
     expect(find.text('New 1'), findsOneWidget);
-    expect(find.text('Create bill'), findsOneWidget);
+    expect(find.text('Create bill'), findsNothing);
+    expect(find.byKey(const Key('work-orders-tabs')), findsNothing);
     final order = find.byKey(const Key('work-live-order-ticket'));
     expect(order, findsOneWidget);
     expect(tester.getRect(order).height, lessThan(220));
