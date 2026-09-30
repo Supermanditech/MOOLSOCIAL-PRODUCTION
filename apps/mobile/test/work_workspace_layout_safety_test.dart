@@ -23340,6 +23340,121 @@ void main() {
     createdAt: createdAt,
   );
 
+  // Automated layout fixtures only; not phone/user-flow acceptance evidence.
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 2.0),
+    (915.0, 412.0, 2.0),
+  ]) {
+    testWidgets('O02 compact empty Orders retains useful viewport $display', (
+      tester,
+    ) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=orders',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      expect(find.text('Search order or customer'), findsOneWidget);
+      expect(find.text('Open'), findsOneWidget);
+      final status = tester.widget<Material>(
+        find.byKey(const Key('work-dashboard-settings')),
+      );
+      expect(status.color, Colors.transparent);
+      final strip = find.byKey(const Key('work-orders-filter-strip'));
+      final empty = find.byKey(const Key('work-orders-empty-state'));
+      final viewport = find.ancestor(of: empty, matching: find.byType(Align)).first;
+      expect(tester.getSize(viewport).height, greaterThanOrEqualTo(100));
+      expect(tester.getTopLeft(find.text('No active orders')).dy -
+          tester.getBottomLeft(strip).dy, lessThanOrEqualTo(16));
+      expect(find.byKey(const Key('work-orders-empty-history')), findsNothing);
+      expect(find.text('All · 0 active'), findsOneWidget);
+      final chip = find.byKey(const Key('work-orders-filter-live'));
+      expect(tester.getSize(chip).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(chip).height, lessThanOrEqualTo(64));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('O02 Orders-only search preserves filter and exact-order return $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Packing');
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      work.workspaceRecentSearches('store').add('unrelated product');
+      work.workspaceRecentSearches('orders').add('SALE-1042');
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=orders',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      expect(find.text('unrelated product'), findsNothing);
+      expect(find.text('SALE-1042'), findsOneWidget);
+      expect(find.byKey(const Key('work-search-order-SALE-1042')), findsOneWidget);
+      expect(find.byKey(const Key('work-search-product-oil-fortune-1l')), findsNothing);
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      final decoration = tester.widget<TextField>(field).decoration!;
+      expect(decoration.filled, isFalse);
+      expect(decoration.focusedBorder, InputBorder.none);
+      await tester.enterText(field, '98765');
+      await tester.pumpAndSettle();
+      final result = find.byKey(const Key('work-search-order-SALE-1042'));
+      expect(result, findsOneWidget);
+      expect(find.byKey(const Key('work-search-order-APP-1043')), findsNothing);
+      await tester.tap(result);
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+      expect(find.byKey(const Key('work-focused-order-id')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(result, findsOneWidget);
+      expect(work.workspaceSearchQuery, '98765');
+      await tester.tap(find.byKey(const Key('work-dashboard-search-close')));
+      await tester.pumpAndSettle();
+      expect(find.text('Customer orders'), findsOneWidget);
+      expect(work.workspaceOrderFilter, 'Packing');
+      expect(work.workspaceSearchQuery, isEmpty);
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceRecentSearches('orders'), contains('98765'));
+      expect(work.workspaceRecentSearches('store'), ['unrelated product']);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('O02 scrolled queue keeps scope visible and opens real history', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..setWorkspaceOrderFilter('Ready');
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard?section=orders',
+      work: work,
+      viewport: const Size(320, 640),
+      textScale: 2,
+    );
+    final strip = find.byKey(const Key('work-orders-filter-strip'));
+    await tester.drag(strip, const Offset(-900, 0));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderFilter, 'Ready');
+    expect(find.text('Ready · 0').hitTestable(), findsOneWidget);
+    expect(find.byKey(const Key('work-orders-filter-more')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-orders-empty-history')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderFilter, 'Done');
+    expect(find.text('History · 1'), findsOneWidget);
+    expect(find.byKey(const Key('work-order-stage-label-SALE-1042')), findsOneWidget);
+    expect(find.byKey(const Key('work-orders-empty-history')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('Store search exact historical order preserves packing $scale', (
       tester,
@@ -27044,7 +27159,7 @@ void main() {
     await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
     expect(find.text('Customer orders'), findsOneWidget);
-    expect(find.text('1 active'), findsOneWidget);
+    expect(find.text('All · 1 active'), findsOneWidget);
     expect(find.text('All 1'), findsOneWidget);
     expect(find.text('New 1'), findsOneWidget);
     expect(find.text('Create bill'), findsNothing);

@@ -579,6 +579,7 @@ class _WorkWorkspaceDashboardScreenState
   final FocusNode _searchFocus = FocusNode(debugLabel: 'workspace-search');
   final ScrollController _searchScroll = ScrollController();
   double _searchReturnOffset = 0;
+  String? _ordersSearchStoreId, _ordersSearchReturnOrderId;
   final ScrollController _alertsScroll = ScrollController();
   final ScrollController _settingsScroll = ScrollController();
   final ScrollController _homeContentScroll = ScrollController();
@@ -1146,6 +1147,11 @@ class _WorkWorkspaceDashboardScreenState
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.sales;
     final procurementOpen = _view == _WorkspaceControlView.procurement;
+    final ordersContext =
+        (_view == _WorkspaceControlView.operation &&
+            _operation == _WorkspaceOperation.orders) ||
+        (_view == _WorkspaceControlView.search &&
+            _ordersSearchStoreId == workspace.id);
     final compactOperation =
         _view == _WorkspaceControlView.operation &&
         const {
@@ -1172,7 +1178,7 @@ class _WorkWorkspaceDashboardScreenState
         _view == _WorkspaceControlView.alerts ||
         _reviewedOrder != null;
     final shortHomeHeader =
-        _view == _WorkspaceControlView.dashboard &&
+        (_view == _WorkspaceControlView.dashboard || ordersContext) &&
         MediaQuery.sizeOf(context).width >= 700 &&
         MediaQuery.sizeOf(context).height <= 450;
     final namePainter =
@@ -1290,7 +1296,8 @@ class _WorkWorkspaceDashboardScreenState
       session: session,
       title: title,
       subtitle: subtitle,
-      contentMaxWidth: salesOpen && MediaQuery.sizeOf(context).width >= 700 &&
+      contentMaxWidth: (salesOpen || ordersContext) &&
+          MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450
           ? double.infinity : MoolMetrics.maximumContentWidth,
       headerHeight: compactSettings
@@ -1322,7 +1329,8 @@ class _WorkWorkspaceDashboardScreenState
             )
           : storeRootSurface
           ? _WorkspaceDashboardHeader(
-              showStatusLabel: _view == _WorkspaceControlView.dashboard,
+              showStatusLabel:
+                  _view == _WorkspaceControlView.dashboard || ordersContext,
               compact: compactOperation,
               singleLine: shortHomeHeader,
               session: session,
@@ -1349,7 +1357,12 @@ class _WorkWorkspaceDashboardScreenState
                   ? (_activeProcurement.query.isEmpty
                         ? 'Search wholesale or bulk'
                         : _activeProcurement.query)
+                  : ordersContext
+                  ? 'Search order or customer'
                   : 'Search your store',
+              searchSemanticsLabel: ordersContext
+                  ? 'Search saved orders by order number or customer details'
+                  : null,
               searchController: _searchController,
               searchFocusNode: _searchFocus,
               onSwitchWorkspace: () => _showWorkspaceSwitcher(context),
@@ -1568,12 +1581,15 @@ class _WorkWorkspaceDashboardScreenState
           _WorkspaceControlView.search => StoreRecentSearches(
             controller: _searchController,
             focusNode: _searchFocus,
-            history: session.workspaceRecentSearches('store'),
+            history: session.workspaceRecentSearches(
+              ordersContext ? 'orders' : 'store',
+            ),
             onChanged: session.updateWorkspaceSearch,
             expandChild: true,
             child: _WorkspaceSearchSurface(
               session: session,
               query: session.workspaceSearchQuery,
+              ordersOnly: ordersContext,
               scrollController: _searchScroll,
               onClear: _clearSearch,
               onOpenRecord: (record) =>
@@ -1818,7 +1834,17 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   void _showSearch() {
-    setState(() => _view = _WorkspaceControlView.search);
+    setState(() {
+      _ordersSearchStoreId =
+          _view == _WorkspaceControlView.operation &&
+              _operation == _WorkspaceOperation.orders
+          ? session.activeWorkspace?.id
+          : null;
+      _ordersSearchReturnOrderId = _ordersSearchStoreId != null
+          ? _focusedOrderId
+          : null;
+      _view = _WorkspaceControlView.search;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _searchFocus.requestFocus();
     });
@@ -2668,9 +2694,20 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   void _finishSearch() {
+    final returnToOrders =
+        _ordersSearchStoreId != null &&
+        _ordersSearchStoreId == session.activeWorkspace?.id;
+    final orderId = _ordersSearchReturnOrderId;
+    _searchFocus.unfocus();
     _searchController.clear();
     session.updateWorkspaceSearch('');
-    _showDashboard();
+    _ordersSearchStoreId = null;
+    _ordersSearchReturnOrderId = null;
+    if (returnToOrders) {
+      _showOperation(_WorkspaceOperation.orders, focusedOrderId: orderId);
+    } else {
+      _showDashboard();
+    }
   }
 
   void _saveAvailability() {
@@ -3095,6 +3132,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     required this.profile,
     required this.searchOpen,
     this.searchHint = 'Search your store',
+    this.searchSemanticsLabel,
     this.nameTextScaler,
     this.nameTextStyle,
     this.backKey = const Key('work-operation-back'),
@@ -3121,6 +3159,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final WorkProfileOption profile;
   final bool searchOpen;
   final String searchHint;
+  final String? searchSemanticsLabel;
   final TextScaler? nameTextScaler;
   final TextStyle? nameTextStyle;
   final Key backKey;
@@ -3359,7 +3398,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                 : Semantics(
                                     key: const Key('work-dashboard-search'),
                                     button: true,
-                                    label:
+                                    label: searchSemanticsLabel ??
                                         'Search orders, products, customers or invoices',
                                     child: InkWell(
                                       onTap: onSearch,
@@ -10634,6 +10673,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   const _WorkspaceSearchSurface({
     required this.session,
     required this.query,
+    this.ordersOnly = false,
     required this.scrollController,
     required this.onClear,
     required this.onOpenRecord,
@@ -10641,6 +10681,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
 
   final WorkSession session;
   final String query;
+  final bool ordersOnly;
   final ScrollController scrollController;
   final VoidCallback onClear;
   final ValueChanged<_WorkspaceSearchRecord> onOpenRecord;
@@ -10648,7 +10689,10 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = query.trim().toLowerCase();
-    final results = _workspaceSearchRecords(session, normalized);
+    final results = _workspaceSearchRecords(session, normalized)
+        .where((record) =>
+            !ordersOnly || record.kind == _WorkspaceSearchKind.order)
+        .toList();
     return AnimatedSwitcher(
       key: const Key('work-dashboard-search-screen'),
       // Repeated empty/results states can overlap outgoing fades. Let the
@@ -10676,7 +10720,11 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                       ),
                       const SizedBox(height: MoolSpacing.sm),
                       Text(
-                        normalized.isEmpty
+                        ordersOnly
+                            ? (normalized.isEmpty
+                                ? 'No saved orders yet'
+                                : 'No matching order')
+                            : normalized.isEmpty
                             ? 'Search products, orders, customers or records'
                             : 'No matching store record',
                         textAlign: TextAlign.center,
@@ -20191,12 +20239,56 @@ class _OrdersDestinationSurface extends StatefulWidget {
 class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   late String _filter;
   final _selectedFilterKey = GlobalKey();
+  final _filterScroll = ScrollController();
+  bool _filterOverflow = false, _atFilterEnd = false;
+  bool _filterMetricsScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _filter = widget.session.workspaceOrderFilter;
+    _filterScroll.addListener(_scheduleFilterMetrics);
     _revealSelectedFilter();
+  }
+
+  @override
+  void dispose() {
+    _filterScroll.dispose();
+    super.dispose();
+  }
+
+  void _scheduleFilterMetrics() {
+    if (_filterMetricsScheduled) return;
+    _filterMetricsScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _filterMetricsScheduled = false;
+      if (!mounted || !_filterScroll.hasClients) return;
+      final position = _filterScroll.position;
+      final overflow = position.maxScrollExtent > 1;
+      final atEnd = position.extentAfter <= 1;
+      if (overflow != _filterOverflow || atEnd != _atFilterEnd) {
+        setState(() {
+          _filterOverflow = overflow;
+          _atFilterEnd = atEnd;
+        });
+      }
+    });
+  }
+
+  void _scrollFilters() {
+    if (!_filterScroll.hasClients) return;
+    final position = _filterScroll.position;
+    unawaited(
+      _filterScroll.animateTo(
+        (position.pixels +
+                position.viewportDimension * (_atFilterEnd ? -.8 : .8))
+            .clamp(0.0, position.maxScrollExtent),
+        duration: MediaQuery.of(context).disableAnimations
+            ? Duration.zero
+            : const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   @override
@@ -20254,48 +20346,43 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     }
     int countFor(String filter) => counts[filter] ?? 0;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
-    final compactText =
-        MediaQuery.sizeOf(context).width < 360 &&
-        MediaQuery.textScalerOf(context).scale(1) >= 1.4;
+    _scheduleFilterMetrics();
     return Container(
       key: const Key('work-orders-destination'),
       color: Colors.white,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
             child: Row(
               children: [
                 Expanded(
+                  flex: 3,
                   child: Text(
                     widget.orderId == null
                         ? 'Customer orders'
                         : 'Order details',
                     style: TextStyle(
                       color: MoolColors.ink,
-                      fontSize: compactText ? 16 : 20,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 if (widget.orderId != null)
                   const SizedBox.shrink()
                 else
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F3FF),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+                  Flexible(
+                    flex: 2,
                     child: Text(
-                      '${countFor('Live')} active',
+                      '${filterLabels[_filter]} · ${countFor(_filter)}'
+                          '${_filter == 'Live' ? ' active' : ''}',
+                      key: const Key('work-orders-current-scope'),
+                      textAlign: TextAlign.end,
                       style: const TextStyle(
                         color: MoolColors.navy,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -20311,37 +20398,82 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
               ),
             ),
           if (widget.orderId == null)
-            SingleChildScrollView(
-              key: const Key('work-orders-filter-strip'),
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              child: Row(
-                children: [
-                  for (final filter in filterLabels.keys.where(
-                    (value) =>
-                        value != 'Attention' ||
-                        countFor(value) > 0 ||
-                        _filter == value,
-                  )) ...[
-                    KeyedSubtree(
-                      key: _filter == filter ? _selectedFilterKey : null,
-                      child: ChoiceChip(
-                        key: Key('work-orders-filter-${filter.toLowerCase()}'),
-                        label: Text(
-                          '${filterLabels[filter]} ${countFor(filter)}',
-                        ),
-                        selected: _filter == filter,
-                        onSelected: (_) {
-                          widget.session.setWorkspaceOrderFilter(filter);
-                          setState(() => _filter = filter);
-                          _revealSelectedFilter();
-                        },
+            Row(
+              children: [
+                Expanded(
+                  child: NotificationListener<ScrollMetricsNotification>(
+                    onNotification: (_) {
+                      _scheduleFilterMetrics();
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      key: const Key('work-orders-filter-strip'),
+                      controller: _filterScroll,
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Row(
+                        children: [
+                          for (final filter in filterLabels.keys.where(
+                            (value) => value != 'Attention' ||
+                                countFor(value) > 0 || _filter == value,
+                          )) ...[
+                            KeyedSubtree(
+                              key: _filter == filter ? _selectedFilterKey : null,
+                              child: ChoiceChip(
+                                key: Key('work-orders-filter-${filter.toLowerCase()}'),
+                                showCheckmark: false,
+                                backgroundColor: Colors.white,
+                                selectedColor: const Color(0xFFF4F5FA),
+                                surfaceTintColor: Colors.transparent,
+                                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                materialTapTargetSize: MaterialTapTargetSize.padded,
+                                visualDensity: VisualDensity.standard,
+                                side: BorderSide(
+                                  color: _filter == filter
+                                      ? MoolColors.navy : const Color(0xFFE3E6EE),
+                                  width: .7,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
+                                labelStyle: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: _filter == filter
+                                      ? FontWeight.w700 : FontWeight.w500,
+                                  color: MoolColors.navy,
+                                ),
+                                label: Text('${filterLabels[filter]} ${countFor(filter)}'),
+                                selected: _filter == filter,
+                                onSelected: (_) {
+                                  widget.session.setWorkspaceOrderFilter(filter);
+                                  setState(() => _filter = filter);
+                                  _revealSelectedFilter();
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 7),
-                  ],
-                ],
-              ),
+                  ),
+                ),
+                if (_filterOverflow)
+                  IconButton(
+                    key: const Key('work-orders-filter-more'),
+                    tooltip: _atFilterEnd
+                        ? 'Earlier order stages' : 'More order stages',
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    onPressed: _scrollFilters,
+                    icon: Icon(
+                      _atFilterEnd
+                          ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                      size: 20,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+              ],
             ),
           Expanded(
             child: visibleOrders.isNotEmpty
@@ -20381,46 +20513,58 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                       );
                     },
                   )
-                : Center(
+                : Align(
+                    alignment: Alignment.topLeft,
                     child: SingleChildScrollView(
                       key: const Key('work-orders-empty-state'),
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const CircleAvatar(
-                            radius: 26,
-                            backgroundColor: Color(0xFFE5EAFF),
-                            child: Icon(
-                              Icons.receipt_long_outlined,
-                              color: MoolColors.navy,
-                              size: 25,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
                           Text(
-                            switch (_filter) {
-                              'Done' => 'No completed orders yet',
+                            widget.orderId != null ? 'Order unavailable' : switch (_filter) {
+                              'Done' => 'No past orders yet',
                               'New' => 'No new orders',
                               'Packing' => 'No orders awaiting packing',
                               'Ready' => 'No orders ready for pickup',
+                              'Delivery' => 'No orders awaiting delivery',
+                              'Attention' => 'No orders need review',
                               _ => 'No active orders',
                             },
-                            textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: MoolColors.ink,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
-                            _filter == 'Done'
+                            widget.orderId != null
+                                ? 'Return to the order list and search again.'
+                                : _filter == 'Done'
                                 ? 'Completed and cancelled orders are saved here.'
-                                : 'A new order will appear here when it needs this action.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: MoolColors.muted),
+                                : 'Saved orders appear here when they reach this stage.',
+                            style: const TextStyle(
+                              color: Color(0xFF4C5268), fontSize: 12,
+                            ),
                           ),
+                          if (widget.orderId == null && _filter != 'Done' && countFor('Done') > 0)
+                            TextButton.icon(
+                              key: const Key('work-orders-empty-history'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: MoolColors.navy,
+                                minimumSize: const Size(48, 48),
+                                padding: EdgeInsets.zero,
+                              ),
+                              onPressed: () {
+                                session.setWorkspaceOrderFilter('Done');
+                                setState(() => _filter = 'Done');
+                                _revealSelectedFilter();
+                              },
+                              icon: const Icon(Icons.history_rounded, size: 16),
+                              label: Text('View past orders · ${countFor('Done')}'),
+                            ),
                         ],
                       ),
                     ),
