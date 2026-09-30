@@ -136,6 +136,7 @@ class BuyV2CustomerStateSnapshot {
     this.shoppingGooglePlaceId,
     this.shoppingAreaScope,
     this.cartQuantities = const {},
+    this.excludedCartProductIds = const {},
     this.productIdentityKeys = const {},
     this.reviewDrafts = const {},
     this.procurementDraft,
@@ -167,6 +168,7 @@ class BuyV2CustomerStateSnapshot {
   });
 
   final Map<String, int> cartQuantities;
+  final Set<String> excludedCartProductIds;
 
   /// Retained identity constraints only, never listing or purchase authority.
   final Map<String, String> productIdentityKeys;
@@ -269,6 +271,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'shoppingGooglePlaceId': snapshot.shoppingGooglePlaceId,
     'shoppingAreaScope': snapshot.shoppingAreaScope,
     'cartQuantities': snapshot.cartQuantities,
+    'excludedCartProductIds': snapshot.excludedCartProductIds.toList(
+      growable: false,
+    ),
     'productIdentityKeys': snapshot.productIdentityKeys,
     'reviewDrafts': {
       for (final entry in snapshot.reviewDrafts.entries)
@@ -339,6 +344,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
         shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
         shoppingAreaScope: _string(source['shoppingAreaScope']),
         cartQuantities: _stringIntMap(source['cartQuantities']),
+        excludedCartProductIds: _stringList(
+          source['excludedCartProductIds'],
+        ).toSet(),
         productIdentityKeys: _stringMap(source['productIdentityKeys']),
         reviewDrafts: _decodeReviewDrafts(source['reviewDrafts']),
         procurementDraft: _decodeProcurementDraft(source['procurementDraft']),

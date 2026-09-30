@@ -1405,23 +1405,16 @@ void main() {
           await tester.pump(const Duration(seconds: 3));
           await tester.pumpAndSettle();
           expect(session.notice, isNull);
-          final scope = find.byKey(const ValueKey('buy-cart-scope-all'));
+          final scope = find.byKey(const ValueKey('buy-cart-filter-all'));
           expect(
-            find.descendant(of: scope, matching: find.text('All baskets')),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(
-              of: scope,
-              matching: find.text(buyV2Money(subtotal)),
-            ),
+            find.descendant(of: scope, matching: find.text('All')),
             findsOneWidget,
           );
           expect(find.text('₹ Total'), findsNothing);
           final header = tester.widget<BuyV2FiniteValueTransition>(
             find.byKey(const ValueKey('buy-cart-header-value-motion')),
           );
-          expect(header.text, contains('Items subtotal ${buyV2Money(subtotal)}'));
+          expect(header.text, contains('${session.cartLines.length} products'));
           final dock = find.byKey(const ValueKey('buy-cart-action-bar'));
           if (size.width > size.height) {
             await captureR66Visual(
@@ -2060,6 +2053,14 @@ void main() {
     final session = mixedSession(gstInvoiceProfileStore: gstStore);
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.shop);
+    // The display filter preserves the mixed purchase selection. This test
+    // exercises one invoice destination, selected explicitly by the buyer.
+    for (final line in session.cartLines.toList()) {
+      session.selectCartProduct(
+        line.product.id,
+        line.product.destination == BuyV2Destination.shop,
+      );
+    }
     expect(session.openCheckout(), isTrue);
     advanceCheckoutToConfirm(session);
 
@@ -2821,6 +2822,14 @@ void main() {
       final gstStore = _MemoryGstInvoiceProfileStore();
       final session = mixedSession(gstInvoiceProfileStore: gstStore);
       session.openCart(scope: BuyV2CartScope.wholesale);
+      // The display filter preserves the mixed purchase selection. This test
+      // exercises one invoice destination, selected explicitly by the buyer.
+      for (final line in session.cartLines.toList()) {
+        session.selectCartProduct(
+          line.product.id,
+          line.product.destination == BuyV2Destination.wholesale,
+        );
+      }
       expect(session.openCheckout(), isTrue, reason: viewport.label);
       advanceCheckoutToConfirm(session);
 
@@ -2906,6 +2915,14 @@ void main() {
     final session = mixedSession();
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.wholesale);
+    // The display filter preserves the mixed purchase selection. This test
+    // exercises one invoice destination, selected explicitly by the buyer.
+    for (final line in session.cartLines.toList()) {
+      session.selectCartProduct(
+        line.product.id,
+        line.product.destination == BuyV2Destination.wholesale,
+      );
+    }
     expect(session.openCheckout(), isTrue);
     advanceCheckoutToConfirm(session);
 
@@ -3071,6 +3088,11 @@ void main() {
         expect(session.activeDeliveryOrders, hasLength(2));
         addTearDown(session.dispose);
         session.openCart(scope: BuyV2CartScope.shop);
+        for (final line in session.cartLines.toList()) {
+          if (line.product.destination != BuyV2Destination.shop) {
+            session.selectCartProduct(line.product.id, false);
+          }
+        }
         expect(session.openCheckout(), isTrue);
 
         await tester.pumpWidget(

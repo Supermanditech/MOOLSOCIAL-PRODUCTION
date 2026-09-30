@@ -4468,7 +4468,20 @@ void main() {
         final cartProduct = find.byKey(
           ValueKey('buy-cart-product-details-$id'),
         );
-        await tester.ensureVisible(cartProduct);
+        await tester.scrollUntilVisible(
+          cartProduct,
+          150,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-cart-scroll')),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         expect(cartProduct.hitTestable(), findsOneWidget);
         await tester.tap(cartProduct);

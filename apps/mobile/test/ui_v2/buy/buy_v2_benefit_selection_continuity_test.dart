@@ -12,6 +12,40 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+/// Payment-method tests need an active offer, independent of the dated
+/// device-review campaigns. Production and expired-offer rules stay unchanged.
+class _ActivePaymentBenefits extends BuyV2SeededCartBenefitsAdapter {
+  const _ActivePaymentBenefits();
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => [
+    for (final benefit in super.benefitsFor(
+      kind: kind,
+      destinations: destinations,
+      itemTotal: itemTotal,
+    ))
+      BuyV2CartBenefit(
+        id: benefit.id,
+        kind: benefit.kind,
+        destination: benefit.destination,
+        title: benefit.title,
+        detail: benefit.detail,
+        sourceId: benefit.sourceId,
+        strategy: benefit.strategy,
+        sponsor: benefit.sponsor,
+        sponsorName: benefit.sponsorName,
+        savingAmount: benefit.savingAmount,
+        validUntil: DateTime.now().add(const Duration(days: 1)),
+        minimumSpend: benefit.minimumSpend,
+        eligiblePaymentMethods: benefit.eligiblePaymentMethods,
+      ),
+  ];
+}
+
 class _ScopedBenefitCommerce implements BuyV2CommerceAdapter {
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
@@ -370,7 +404,13 @@ void main() {
                     matching: find.byType(Scrollable),
                   )
                   .first
-            : find.byType(Scrollable).first,
+            : find
+                  .byWidgetPredicate(
+                    (widget) =>
+                        widget is Scrollable &&
+                        widget.axisDirection == AxisDirection.down,
+                  )
+                  .first,
       );
       expect(label, findsOneWidget);
       expect(tester.widget<Text>(label).data, contains('Fresh tomatoes'));
@@ -410,7 +450,13 @@ void main() {
       await tester.scrollUntilVisible(
         coupons,
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
         maxScrolls: 30,
       );
       await tester.pumpAndSettle();
@@ -446,7 +492,7 @@ void main() {
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
-        cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+        cartBenefitsAdapter: const _ActivePaymentBenefits(),
       );
       addTearDown(session.dispose);
       addTearDown(core.dispose);
@@ -471,7 +517,13 @@ void main() {
       await tester.scrollUntilVisible(
         entry,
         420,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
         maxScrolls: 30,
       );
       await Scrollable.ensureVisible(tester.element(entry), alignment: .3);
@@ -494,7 +546,13 @@ void main() {
       await tester.scrollUntilVisible(
         select,
         180,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
         maxScrolls: 30,
       );
       await tester.ensureVisible(select);
@@ -676,7 +734,13 @@ void main() {
       await tester.scrollUntilVisible(
         collapse,
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
       );
       await tester.pumpAndSettle();
       await tester.tap(collapse);
@@ -687,7 +751,13 @@ void main() {
       await tester.scrollUntilVisible(
         status,
         420,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
         maxScrolls: 30,
       );
       await tester.pumpAndSettle();
@@ -716,7 +786,13 @@ void main() {
     await tester.scrollUntilVisible(
       coupons,
       420,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first,
       maxScrolls: 30,
     );
     await tester.pumpAndSettle();
@@ -761,12 +837,26 @@ void main() {
       await tester.scrollUntilVisible(
         coupons,
         420,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
         maxScrolls: 30,
       );
       await tester.pumpAndSettle();
       final beforeScroll = tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
+          .state<ScrollableState>(
+            find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          )
           .position
           .pixels;
       expect(
@@ -829,7 +919,15 @@ void main() {
         hasLength(2),
       );
       final afterScroll = tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
+          .state<ScrollableState>(
+            find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          )
           .position
           .pixels;
       expect(afterScroll, greaterThanOrEqualTo(0));
@@ -926,6 +1024,7 @@ void main() {
     final total = session.cartTotal;
     session.chooseCartScope(BuyV2CartScope.wholesale);
     await tester.pumpAndSettle();
+    await openBenefitsPage(tester, session);
     expect(
       find.byKey(const ValueKey('buy-cart-benefits-inline')),
       findsOneWidget,

@@ -339,22 +339,18 @@ void main() {
             BuyV2CartScope.all,
           ]) {
             final selector = find.byKey(
-              ValueKey('buy-cart-scope-${scope.name}'),
+              ValueKey('buy-cart-filter-${scope.name}'),
             );
             await tester.ensureVisible(selector);
             await tester.tap(selector);
             await tester.pumpAndSettle();
-            expect(session.cartScope, scope);
+            expect(session.cartDisplayFilter, scope.name);
             expect(session.itemCount, 1);
             expect(tester.takeException(), isNull);
-            final scopeFace = tester.widget<Container>(
-              find
-                  .descendant(of: selector, matching: find.byType(Container))
-                  .first,
-            );
-            final decoration = scopeFace.decoration! as BoxDecoration;
-            expect(decoration.color, const Color(0xFFFFFFFF));
-            expect(decoration.gradient, isNull);
+            final chip = tester.widget<ChoiceChip>(selector);
+            expect(chip.backgroundColor, const Color(0xFFFFFFFF));
+            expect(chip.selectedColor, BuyV2ActionStyle.pressedFill);
+            expect(chip.labelStyle?.color, BuyV2ActionStyle.primaryForeground);
           }
         }
         final buttons = find.byType(FilledButton);
@@ -4370,6 +4366,11 @@ void main() {
         session.openDestination(BuyV2Destination.medicine);
         session.openCart(scope: BuyV2CartScope.shop);
         if (viewport.checkout) {
+          for (final line in session.cartLines.toList()) {
+            if (line.product.destination != BuyV2Destination.shop) {
+              session.selectCartProduct(line.product.id, false);
+            }
+          }
           expect(session.openCheckout(), isTrue);
         }
 
@@ -4386,8 +4387,19 @@ void main() {
         await settleVisibleImages(tester);
         expectConnectedOwner(tester, session, BuyV2Destination.shop);
         if (!viewport.checkout) {
-          // Offers now start open. Preserve the existing collapsed-state
-          // reference by explicitly exercising the customer's collapse action.
+          // The mixed basket can place coupons below the lazy viewport.
+          final scroll = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-cart-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('buy-cart-coupons')),
+            160,
+            scrollable: scroll,
+          );
+          await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('buy-cart-benefits-inline')),
             findsOneWidget,
@@ -4398,6 +4410,8 @@ void main() {
             find.byKey(const ValueKey('buy-cart-benefits-inline')),
             findsNothing,
           );
+          tester.state<ScrollableState>(scroll).position.jumpTo(0);
+          await tester.pumpAndSettle();
         }
         // These checkout captures render the same approved checkout as the
         // Cart-return suite. Share its successor reference, retaining originals.
@@ -4405,7 +4419,7 @@ void main() {
             ? 'cursor-pure-white-20260927/'
                   'buy-v2-r58-8-6-c24f-checkout-cart-return-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
-            : 'cursor-pure-white-20260927/'
+            : 'cursor-cart-t01-20260930/'
                   'buy-v2-r58-8-7-c24f-${viewport.label}.png';
         await expectLater(
           find.byType(BuyV2Screen),

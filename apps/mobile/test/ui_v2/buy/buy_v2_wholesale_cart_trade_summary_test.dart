@@ -140,7 +140,9 @@ void main() {
           expect(
             find.descendant(
               of: find.byKey(const ValueKey('buy-cart-action-bar')),
-              matching: find.text('Cart total'),
+              matching: find.text(
+                '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'item' : 'items'} selected · total',
+              ),
             ),
             findsOneWidget,
           );
@@ -170,6 +172,7 @@ void main() {
     addTearDown(session.dispose);
     final product = session.product('w-onion');
     final expectedTotal = product.price * product.minimumOrder;
+    expect(session.scopedPayableTotal, expectedTotal);
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
@@ -179,10 +182,7 @@ void main() {
       'buy-wholesale-cart-trade-summary-v1',
     );
     expect(
-      find.text(
-        '1 product · ${product.minimumOrder} packs · Wholesale · Items subtotal '
-        '${buyV2Money(expectedTotal)}',
-      ),
+      find.text('1 product · ${product.minimumOrder} packs'),
       findsOneWidget,
     );
     expect(find.text('${product.minimumOrder} products'), findsNothing);
@@ -201,7 +201,9 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('buy-cart-action-bar')),
-        matching: find.text('Cart total'),
+        matching: find.text(
+          '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'item' : 'items'} selected · total',
+        ),
       ),
       findsOneWidget,
     );
@@ -237,6 +239,7 @@ void main() {
     expect(session.addProduct('s-tomato'), isTrue);
     expect(session.addProduct('w-onion'), isTrue);
     session.openCart(scope: BuyV2CartScope.wholesale);
+    session.chooseCartDisplayFilter('wholesale');
     final wholesale = session.product('w-onion');
     final shop = session.product('s-tomato');
     final wholesaleTotal = wholesale.price * wholesale.minimumOrder;
@@ -246,10 +249,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        '1 product · ${wholesale.minimumOrder} packs · Wholesale · Items subtotal '
-        '${buyV2Money(wholesaleTotal)}',
-      ),
+      find.text('Wholesale · 1 product · ${wholesale.minimumOrder} packs'),
       findsOneWidget,
     );
     expect(
@@ -259,6 +259,7 @@ void main() {
       ),
       findsNothing,
     );
+    expect(session.scopedPayableTotal, globalTotal);
     expect(find.byKey(const ValueKey('buy-cart-line-s-tomato')), findsNothing);
     expect(find.byKey(const ValueKey('buy-cart-line-w-onion')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -282,10 +283,7 @@ void main() {
     await tester.tap(find.byTooltip('Add one trade pack'));
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), product.minimumOrder + 1);
-    expect(
-      find.text('1 product · 3 packs · Wholesale · Items subtotal ₹2,325'),
-      findsOneWidget,
-    );
+    expect(find.text('1 product · 3 packs'), findsOneWidget);
     expect(find.byTooltip('Remove one trade pack'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Remove one trade pack'));

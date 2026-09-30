@@ -1514,6 +1514,7 @@ void main() {
           tester.view.devicePixelRatio = 1;
           tester.view.physicalSize = size;
           addTearDown(tester.view.reset);
+          final semantics = tester.ensureSemantics();
           final core = BuySession();
           final session = BuyV2Session(
             core: core,
@@ -1533,6 +1534,7 @@ void main() {
           session.addProduct('s-milk');
           session.addProduct('w-rice-50kg');
           session.openCart(scope: BuyV2CartScope.wholesale);
+          session.selectCartProduct('s-milk', false);
           await tester.pumpAndSettle();
           expect(session.scopedPayableTotal, 3200);
           for (final kind in BuyV2CartBenefitKind.values) {
@@ -1620,12 +1622,14 @@ void main() {
               ValueKey('buy-cart-benefit-remove-${benefit.id}'),
             );
             await revealPurchaseTarget(tester, remove);
-            expectReadable(
-              tester,
-              find.descendant(of: remove, matching: find.text('Remove')),
-              action: remove,
-              wholeWords: true,
-            );
+            final removeSemantics = tester
+                .getSemantics(remove)
+                .getSemanticsData();
+            expect(removeSemantics.label, 'Remove ${benefit.title}');
+            expect(removeSemantics.flagsCollection.isSelected, Tristate.isTrue);
+            expect(removeSemantics.hasAction(SemanticsAction.tap), isTrue);
+            expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
+            expect(remove.hitTestable(), findsOneWidget);
             final status = find.byKey(
               ValueKey('buy-cart-benefit-status-motion-${benefit.id}'),
             );
@@ -1691,6 +1695,7 @@ void main() {
           expect(session.totalForDestination(BuyV2Destination.shop), 66);
           expect(session.confirmedOrders, isEmpty);
           expect(tester.takeException(), isNull);
+          semantics.dispose();
         },
       );
 

@@ -134,34 +134,40 @@ String _checkoutDockCountLabel(BuyV2Session session) =>
     : _itemCountLabel(session.checkoutItemCount);
 
 String _cartHeaderSummary(BuyV2Session session) {
-  final lines = session.cartLines;
-  final destinations = lines.map((line) => line.product.destination).toSet();
-  final quantityLabel =
-      session.cartScope == BuyV2CartScope.wholesale ||
-          _containsOnlyWholesaleLines(lines)
-      ? _packCountLabel(session.scopedItemCount)
-      : '${session.scopedItemCount} '
-            '${session.scopedItemCount == 1 ? 'item' : 'items'}';
-  return [
-    _productCountLabel(lines.length),
-    quantityLabel,
-    if (destinations.isNotEmpty) _destinationSummary(destinations),
-    session.scopedProcurementPricesUnavailable
-        ? 'Price pending'
-        : 'Items subtotal ${buyV2Money(session.scopedCartTotal)}',
-  ].join(' · ');
+  final lines = session.visibleCartLines;
+  final quantity = lines.fold<int>(0, (sum, line) => sum + line.quantity);
+  final quantityLabel = _containsOnlyWholesaleLines(lines)
+      ? _packCountLabel(quantity)
+      : _itemCountLabel(quantity);
+  final context =
+      session.usesMixedCartSelection && session.cartDisplayFilter != 'all'
+      ? '${_cartFilterLabel(session.cartDisplayFilter)} · '
+      : '';
+  return '$context${_productCountLabel(lines.length)} · $quantityLabel';
 }
 
-String _destinationSummary(Set<BuyV2Destination> destinations) {
-  const order = [
-    BuyV2Destination.shop,
-    BuyV2Destination.wholesale,
-    BuyV2Destination.medicine,
-  ];
-  return order
-      .where(destinations.contains)
-      .map((destination) => destination.label)
-      .join(' + ');
+String _cartFilterLabel(String filter) => switch (filter) {
+  'shop' => 'Shop',
+  'wholesale' => 'Wholesale',
+  'bulk' => 'Bulk',
+  _ => 'All',
+};
+
+String _cartDestinationLabel(
+  BuyV2Session session,
+  BuyV2Destination destination,
+) {
+  if (destination != BuyV2Destination.wholesale) return destination.label;
+  final lines = session.cartLines.where(
+    (line) => line.product.destination == destination,
+  );
+  final hasBulk = lines.any(
+    (line) => line.product.offerClass == BuyV2OfferClass.bulk,
+  );
+  final hasWholesale = lines.any(
+    (line) => line.product.offerClass != BuyV2OfferClass.bulk,
+  );
+  return hasBulk ? (hasWholesale ? 'Wholesale & Bulk' : 'Bulk') : 'Wholesale';
 }
 
 @immutable
@@ -8807,6 +8813,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
 
   bool _benefitsExpanded = true;
   late BuyV2CartScope _scope;
+  late String _displayFilter;
   late ScrollController _scrollController;
 
   BuyV2Session get session => widget.session;
@@ -8815,6 +8822,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   void initState() {
     super.initState();
     _scope = session.cartScope;
+    _displayFilter = session.cartDisplayFilter;
     _scrollController = _controllerFor(_scope);
   }
 
@@ -8833,6 +8841,14 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   void didUpdateWidget(covariant BuyV2CartView oldWidget) {
     super.didUpdateWidget(oldWidget);
     final nextScope = session.cartScope;
+    if (_displayFilter != session.cartDisplayFilter) {
+      _displayFilter = session.cartDisplayFilter;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      });
+    }
     if (_scope == nextScope && oldWidget.session == session) return;
     if (_scrollController.hasClients) {
       oldWidget.session.rememberCartScrollOffset(
@@ -8857,6 +8873,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   @override
   Widget build(BuildContext context) {
     final lines = session.cartLines;
+    final visibleLines = session.visibleCartLines;
     final destinations =
         const [
           BuyV2Destination.shop,
@@ -8868,9 +8885,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         );
     final header = <Widget>[
       Padding(
-        padding: const EdgeInsets.fromLTRB(10, 7, 10, 5),
+        padding: const EdgeInsets.fromLTRB(10, 3, 10, 2),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
           decoration: buyV2CardDecoration(radius: 16),
           child: Row(
             children: [
@@ -8898,7 +8915,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final summary = _cartHeaderSummary(session);
-                        final style = context.buyMeta.copyWith(fontSize: 8);
+                        final style = context.buyMeta.copyWith(fontSize: 11);
                         final size = buyV2ValueTextSize(
                           context,
                           summary,
@@ -8922,8 +8939,10 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
               ),
               IconButton(
                 key: const ValueKey('buy-cart-empty'),
-                tooltip: 'Empty cart',
-                onPressed: lines.isEmpty
+                tooltip: session.usesMixedCartSelection
+                    ? 'Empty entire cart'
+                    : 'Empty cart',
+                onPressed: session.itemCount == 0
                     ? null
                     : () => unawaited(_confirmBuyV2CartClear(context, session)),
                 icon: const Icon(
@@ -8951,7 +8970,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             ),
             const SizedBox(height: 8),
             Text(
-              session.cartScope == BuyV2CartScope.all
+              session.usesMixedCartSelection && session.itemCount > 0
+                  ? 'No products in this filter'
+                  : session.cartScope == BuyV2CartScope.all
                   ? 'Your cart is empty'
                   : 'Your ${session.cartScope.label} cart is empty',
               textAlign: TextAlign.center,
@@ -8959,7 +8980,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             ),
             const SizedBox(height: 4),
             Text(
-              session.cartScope == BuyV2CartScope.all
+              session.usesMixedCartSelection && session.itemCount > 0
+                  ? 'Choose All to see your Cart products.'
+                  : session.cartScope == BuyV2CartScope.all
                   ? 'Browse products to start your order.'
                   : 'Browse ${session.cartScope.label} products to start your order.',
               textAlign: TextAlign.center,
@@ -9028,8 +9051,37 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         ),
       ),
     );
+    final visibleIds = visibleLines.map((line) => line.product.id).toSet();
+    final hiddenSelected = lines
+        .where((line) => !visibleIds.contains(line.product.id))
+        .length;
     final contents = <Widget>[
-      for (final line in lines)
+      if (session.usesMixedCartSelection && hiddenSelected > 0)
+        TextButton(
+          key: const ValueKey('buy-cart-view-hidden-selection'),
+          onPressed: () => session.chooseCartDisplayFilter('all'),
+          style: TextButton.styleFrom(
+            foregroundColor: BuyV2ActionStyle.primaryForeground,
+            alignment: Alignment.centerLeft,
+            minimumSize: const Size(44, 44),
+          ),
+          child: Text(
+            '$hiddenSelected other ${hiddenSelected == 1 ? 'product' : 'products'} selected · View all',
+            style: context.buyMeta.copyWith(
+              fontSize: 11,
+              color: BuyV2ActionStyle.primaryForeground,
+            ),
+          ),
+        ),
+      if (visibleLines.isEmpty && session.itemCount > 0)
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            'No ${_cartFilterLabel(session.cartDisplayFilter)} products in Cart.',
+            style: context.buyMeta,
+          ),
+        ),
+      for (final line in visibleLines)
         Padding(
           padding: const EdgeInsets.only(bottom: 7),
           child: _CartLine(session: session, line: line),
@@ -9080,18 +9132,21 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         onExpandedChanged: (value) => setState(() => _benefitsExpanded = value),
       ),
       const SizedBox(height: 10),
-      _CartDiscoverySections(
-        session: session,
-        destinations: destinations.toList(growable: false),
-      ),
       _CartDeliveryInstructionSections(
         session: session,
         destinations: destinations.toList(growable: false),
       ),
       _CartTipSections(session: session),
       _CartBillSummary(session: session),
+      if (session.scopedCartSavings > 0) ...[
+        const SizedBox(height: 8),
+        _CartSavingsSummary(session: session),
+      ],
       const SizedBox(height: 8),
-      _CartSavingsSummary(session: session),
+      _CartDiscoverySections(
+        session: session,
+        destinations: destinations.toList(growable: false),
+      ),
       BuyV2SponsoredSlot(
         content: session.sponsoredContentFor(
           BuyV2SponsoredPlacement.cartBeforeSummary,
@@ -9107,6 +9162,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          if (lines.isEmpty && session.itemCount > 0) {
+            return Text('Select products to checkout', style: context.buyBody);
+          }
           if (lines.isEmpty) {
             return SizedBox(
               width: double.infinity,
@@ -9171,8 +9229,8 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           final baseTotalLabel = priceUnavailable
               ? 'Price confirmation required'
               : session.scopedTipTotal > 0
-              ? 'Cart total (incl. tip)'
-              : 'Cart total';
+              ? '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'item' : 'items'} selected · total (incl. tip)'
+              : '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'item' : 'items'} selected · total';
           final totalLabel = currencyInLabel
               ? '$baseTotalLabel (₹)'
               : baseTotalLabel;
@@ -9291,7 +9349,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         padding: const EdgeInsets.only(bottom: 72),
         children: [
           ...header,
-          if (lines.isEmpty)
+          if (lines.isEmpty && visibleLines.isEmpty)
             empty
           else
             for (final content in contents)
@@ -9307,7 +9365,8 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       children: [
         ...header,
         Expanded(
-          child: lines.isEmpty
+          key: const ValueKey('buy-cart-scroll'),
+          child: lines.isEmpty && visibleLines.isEmpty
               ? empty
               : ListView(
                   controller: _scrollController,
@@ -9330,8 +9389,12 @@ Future<void> _confirmBuyV2CartClear(
     session.clearCart();
     return;
   }
-  final scope = session.cartScope;
-  final removeCount = session.scopedItemCount;
+  final scope = session.usesMixedCartSelection
+      ? BuyV2CartScope.all
+      : session.cartScope;
+  final removeCount = scope == BuyV2CartScope.all
+      ? session.itemCount
+      : session.countForDestination(_destinationForCartScope(scope)!);
   if (removeCount == 0) return;
   final remainingCount = session.itemCount - removeCount;
   final clearEverything = scope == BuyV2CartScope.all;
@@ -9349,7 +9412,7 @@ Future<void> _confirmBuyV2CartClear(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    showDragHandle: true,
+    showDragHandle: false,
     backgroundColor: Colors.white,
     constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
     shape: const RoundedRectangleBorder(
@@ -9357,6 +9420,7 @@ Future<void> _confirmBuyV2CartClear(
     ),
     builder: (sheetContext) => SafeArea(
       top: false,
+      bottom: false,
       child: Semantics(
         container: true,
         scopesRoute: true,
@@ -9367,9 +9431,9 @@ Future<void> _confirmBuyV2CartClear(
           key: const ValueKey('buy-cart-clear-sheet'),
           padding: EdgeInsets.fromLTRB(
             16,
-            0,
             16,
-            16 +
+            16,
+            8 +
                 MediaQuery.viewInsetsOf(sheetContext).bottom +
                 BuyV2AddressSheetMotion.resolveModalActionBottomInset(
                   sheetContext,
@@ -9382,35 +9446,34 @@ Future<void> _confirmBuyV2CartClear(
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEBEA),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1),
+                    child: Icon(
                       Icons.delete_outline_rounded,
+                      size: 20,
                       color: Color(0xFFB42318),
                     ),
                   ),
-                  const SizedBox(width: 11),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           title,
-                          style: sheetContext.buyTitle.copyWith(fontSize: 18),
+                          style: sheetContext.buyTitle.copyWith(fontSize: 15),
                         ),
                         const SizedBox(height: 3),
-                        Text(detail, style: sheetContext.buyMeta),
+                        Text(
+                          detail,
+                          style: sheetContext.buyMeta.copyWith(fontSize: 12),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final keepCart = Align(
@@ -9422,6 +9485,11 @@ Future<void> _confirmBuyV2CartClear(
                       style: BuyV2ActionStyle.button(
                         OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       child: const Text('Keep Cart'),
@@ -9436,7 +9504,12 @@ Future<void> _confirmBuyV2CartClear(
                       style: BuyV2ActionStyle.button(
                         FilledButton.styleFrom(
                           minimumSize: const Size(0, 48),
-                          backgroundColor: const Color(0xFFB42318),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          foregroundColor: const Color(0xFFB42318),
                         ),
                       ),
                       child: Text(
@@ -9460,11 +9533,8 @@ Future<void> _confirmBuyV2CartClear(
                     );
                   }
                   return Row(
-                    children: [
-                      Expanded(child: keepCart),
-                      const SizedBox(width: 10),
-                      Expanded(child: removeItems),
-                    ],
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [keepCart, const SizedBox(width: 8), removeItems],
                   );
                 },
               ),
@@ -12176,7 +12246,7 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                     key: const ValueKey('buy-po-edit-basket'),
                     onPressed: busy
                         ? null
-                        : () => session.openCart(scope: session.checkoutScope),
+                        : () => session.openCart(scope: session.cartScope),
                     child: const Text('Review basket'),
                   ),
               ],
@@ -12247,11 +12317,8 @@ class _CheckoutConfirmStage extends StatelessWidget {
                     TextButton(
                       key: const ValueKey('buy-delivery-unavailable-cart'),
                       onPressed: () {
-                        session.rememberCartScrollOffset(
-                          session.checkoutScope,
-                          0,
-                        );
-                        session.openCart(scope: session.checkoutScope);
+                        session.rememberCartScrollOffset(session.cartScope, 0);
+                        session.openCart(scope: session.cartScope);
                       },
                       child: const Text('Edit basket'),
                     ),
@@ -20695,6 +20762,43 @@ class _CartScopeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (session.usesMixedCartSelection) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          children: [
+            for (final entry in const {
+              'all': 'All',
+              'shop': 'Shop',
+              'wholesale': 'Wholesale',
+              'bulk': 'Bulk',
+            }.entries)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(
+                  key: ValueKey('buy-cart-filter-${entry.key}'),
+                  label: Text(entry.value),
+                  labelStyle: TextStyle(
+                    color: BuyV2ActionStyle.primaryForeground,
+                    fontSize: 12,
+                    fontWeight: session.cartDisplayFilter == entry.key
+                        ? FontWeight.w800
+                        : FontWeight.w500,
+                  ),
+                  selected: session.cartDisplayFilter == entry.key,
+                  elevation: session.cartDisplayFilter == entry.key ? 2 : 0,
+                  side: BorderSide.none,
+                  showCheckmark: false,
+                  backgroundColor: BuyV2ActionStyle.primaryFill,
+                  selectedColor: BuyV2ActionStyle.pressedFill,
+                  onSelected: (_) => session.chooseCartDisplayFilter(entry.key),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     final scopes = session.isStoreProcurement
         ? const [BuyV2CartScope.wholesale]
         : session.cartScope == BuyV2CartScope.medicine
@@ -20920,27 +21024,6 @@ String _cartItemFamilyLabel(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Products',
     };
 
-String _cartRelatedTitle(BuyV2Destination destination) => switch (destination) {
-  BuyV2Destination.shop => 'Complete your Shop basket',
-  BuyV2Destination.wholesale => 'Complete this trade order',
-  BuyV2Destination.medicine => 'More from this care category',
-  BuyV2Destination.orders => 'More products',
-};
-
-String _cartSpecialTitle(BuyV2Destination destination) => switch (destination) {
-  BuyV2Destination.shop => 'Special Shop offers',
-  BuyV2Destination.wholesale => 'Trade offers for this order',
-  BuyV2Destination.medicine => 'Medicine savings available',
-  BuyV2Destination.orders => 'Special offers',
-};
-
-String _cartMoreTitle(BuyV2Destination destination) => switch (destination) {
-  BuyV2Destination.shop => 'You may also like in Shop',
-  BuyV2Destination.wholesale => 'More for business restocking',
-  BuyV2Destination.medicine => 'More Medicine essentials',
-  BuyV2Destination.orders => 'You may also like',
-};
-
 String _deliveryInstructionOwner(BuyV2Destination destination) =>
     switch (destination) {
       BuyV2Destination.shop => 'Shop delivery',
@@ -21116,14 +21199,6 @@ class _InlineCartBenefitPanelState extends State<_InlineCartBenefitPanel>
   }
 }
 
-String _cartBenefitContextLabel(BuyV2Destination destination) =>
-    switch (destination) {
-      BuyV2Destination.shop => 'Shop',
-      BuyV2Destination.wholesale => 'Wholesale',
-      BuyV2Destination.medicine => 'Medicine',
-      BuyV2Destination.orders => 'Orders',
-    };
-
 String _cartBenefitStrategyLabel(BuyV2CartBenefitStrategy strategy) =>
     switch (strategy) {
       BuyV2CartBenefitStrategy.timedSale => 'Time-bound sale',
@@ -21190,11 +21265,13 @@ class _CartBenefitsInline extends StatefulWidget {
 
 class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
   late BuyV2Destination _destination = widget.initialDestination;
+  late String _filter = widget.session.cartDisplayFilter;
   BuyV2CartBenefitKind _kind = BuyV2CartBenefitKind.coupon;
 
   @override
   void initState() {
     super.initState();
+    _followCartFilter();
     widget.session.addListener(_sessionChanged);
     if (widget.session.liveCartBenefitsEnabled &&
         widget.session.cartBenefitsLoadState !=
@@ -21205,6 +21282,15 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
     }
   }
 
+  void _followCartFilter() {
+    final destination = switch (_filter) {
+      'shop' => BuyV2Destination.shop,
+      'wholesale' || 'bulk' => BuyV2Destination.wholesale,
+      _ => _destination,
+    };
+    if (widget.destinations.contains(destination)) _destination = destination;
+  }
+
   void _sessionChanged() {
     if (mounted) setState(() {});
   }
@@ -21212,6 +21298,10 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
   @override
   void didUpdateWidget(covariant _CartBenefitsInline oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_filter != widget.session.cartDisplayFilter) {
+      _filter = widget.session.cartDisplayFilter;
+      _followCartFilter();
+    }
     if (!widget.destinations.contains(_destination)) {
       _destination = widget.initialDestination;
     }
@@ -21369,10 +21459,10 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
             button: true,
             selected: selected == destination,
             label:
-                '${_cartBenefitContextLabel(destination)} offers, '
-                '${_productCountLabel(session.productCountForDestination(destination))}, '
-                '${session.countForDestination(destination)} ${destination == BuyV2Destination.wholesale ? 'packs' : 'items'}, '
-                '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.totalForDestination(destination))}',
+                '${_cartDestinationLabel(session, destination)} offers, '
+                '${_productCountLabel(session.cartLines.where((line) => line.product.destination == destination).length)}, '
+                '${session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.quantity)} ${destination == BuyV2Destination.wholesale ? 'packs' : 'items'}, '
+                '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.total))}',
             child: Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(12),
@@ -21407,8 +21497,8 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      '${_cartBenefitContextLabel(destination)} · '
-                      '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.totalForDestination(destination))}',
+                      '${_cartDestinationLabel(session, destination)} · '
+                      '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.total))}',
                       maxLines: 1,
                       style: TextStyle(
                         color: selected == destination
@@ -21605,27 +21695,18 @@ class _CartBenefitEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spec = BuyV2ThemeScope.of(context);
     return Container(
       key: ValueKey('buy-cart-${kind.name}-empty-${destination.name}'),
-      padding: const EdgeInsets.all(11),
-      decoration: buyV2CardDecoration(radius: 14),
+      color: Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: spec.softAccent,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(
-              kind == BuyV2CartBenefitKind.coupon
-                  ? Icons.local_offer_outlined
-                  : Icons.account_balance_wallet_outlined,
-              color: BuyV2Colors.navy,
-              size: 20,
-            ),
+          Icon(
+            kind == BuyV2CartBenefitKind.coupon
+                ? Icons.local_offer_outlined
+                : Icons.account_balance_wallet_outlined,
+            color: BuyV2ActionStyle.primaryForeground,
+            size: 18,
           ),
           const SizedBox(width: 9),
           Expanded(
@@ -21635,12 +21716,15 @@ class _CartBenefitEmptyState extends StatelessWidget {
               children: [
                 Text(
                   _cartBenefitEmptyTitle(destination, kind),
-                  style: context.buyTitle.copyWith(fontSize: 13),
+                  style: context.buyBody.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _cartBenefitEmptyDetail(destination, kind),
-                  style: context.buyMeta.copyWith(fontSize: 9),
+                  style: context.buyMeta.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -21688,17 +21772,6 @@ class _CartBenefitCard extends StatelessWidget {
         benefit.eligiblePaymentMethods.isNotEmpty;
     void activate() => selected ? onRemove() : onSelect();
 
-    final actionLabel = selected ? 'Remove' : 'Select';
-    final actionStyle = TextStyle(
-      color: selected ? cardMuted : BuyV2ActionStyle.primaryForeground,
-      fontSize: 9,
-      fontWeight: FontWeight.w900,
-    );
-    final actionSize = buyV2ValueTextSize(context, actionLabel, actionStyle);
-    final actionWidth = (actionSize.width + 24)
-        .clamp(72.0, double.infinity)
-        .toDouble();
-
     const bandColours = [
       Color(0xFFE8D9F5),
       Color(0xFFD8EAF7),
@@ -21709,11 +21782,7 @@ class _CartBenefitCard extends StatelessWidget {
     final bandColour = bandColours[colourIndex % bandColours.length];
 
     final action = ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: (actionSize.height + 16)
-            .clamp(44.0, double.infinity)
-            .toDouble(),
-      ),
+      constraints: const BoxConstraints(minHeight: 44),
       child: Semantics(
         key: ValueKey(
           'buy-cart-benefit-'
@@ -21721,6 +21790,7 @@ class _CartBenefitCard extends StatelessWidget {
         ),
         label: '${selected ? 'Remove' : 'Select'} ${benefit.title}',
         button: true,
+        selected: selected,
         container: true,
         excludeSemantics: true,
         onTap: activate,
@@ -21735,21 +21805,17 @@ class _CartBenefitCard extends StatelessWidget {
               duration: BuyV2Motion.resolved(context, BuyV2Motion.selection),
               curve: Curves.easeOutCubic,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: selected
-                      ? Colors.transparent
-                      : BuyV2ActionStyle.primaryForeground.withValues(
-                          alpha: .38,
-                        ),
-                ),
-              ),
               child: BuyV2FiniteIncomingTransition(
                 key: ValueKey('buy-cart-benefit-action-visual-${benefit.id}'),
                 stateKey: selected,
                 duration: BuyV2Motion.stateChange,
-                child: Text(actionLabel, style: actionStyle),
+                child: Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 22,
+                  color: selected ? cardGreen : cardMuted,
+                ),
               ),
             ),
           ),
@@ -21817,22 +21883,23 @@ class _CartBenefitCard extends StatelessWidget {
                           benefit.title,
                           style: context.buyBody.copyWith(
                             fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      SizedBox(width: actionWidth, child: action),
+                      SizedBox(width: 44, child: action),
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    benefit.detail,
-                    style: context.buyMeta.copyWith(
-                      fontSize: 8.5,
-                      color: cardMuted,
+                  if (!hasCampaignDetails)
+                    Text(
+                      benefit.detail,
+                      style: context.buyMeta.copyWith(
+                        fontSize: 11,
+                        color: cardMuted,
+                      ),
                     ),
-                  ),
                   if (scopeLabel case final label?) ...[
                     const SizedBox(height: 2),
                     SingleChildScrollView(
@@ -21841,21 +21908,9 @@ class _CartBenefitCard extends StatelessWidget {
                         'For: $label',
                         key: ValueKey('buy-benefit-products-${benefit.id}'),
                         style: context.buyMeta.copyWith(
-                          fontSize: 9,
+                          fontSize: 11,
                           color: BuyV2ActionStyle.primaryForeground,
                         ),
-                      ),
-                    ),
-                  ],
-                  if (hasCampaignDetails) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      '${_cartBenefitStrategyLabel(benefit.strategy)} · '
-                      '${_cartBenefitSponsorLabel(benefit)}',
-                      style: context.buyMeta.copyWith(
-                        color: BuyV2ActionStyle.primaryForeground,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
@@ -21881,12 +21936,42 @@ class _CartBenefitCard extends StatelessWidget {
                       ].join(' · '),
                       style: context.buyMeta.copyWith(
                         color: cardGreen,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
 
+                  if (hasCampaignDetails)
+                    ExpansionTile(
+                      key: PageStorageKey(
+                        'buy-cart-benefit-details-${benefit.id}',
+                      ),
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(bottom: 6),
+                      minTileHeight: 44,
+                      shape: const Border(),
+                      collapsedShape: const Border(),
+                      title: Text(
+                        'Offer details',
+                        style: context.buyMeta.copyWith(
+                          fontSize: 11,
+                          color: cardMuted,
+                        ),
+                      ),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${benefit.detail}\n${_cartBenefitStrategyLabel(benefit.strategy)} · ${_cartBenefitSponsorLabel(benefit)}',
+                            style: context.buyMeta.copyWith(
+                              fontSize: 11,
+                              color: cardMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   if (selected && paymentStatus != null) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -21911,14 +21996,14 @@ class _CartBenefitCard extends StatelessWidget {
                             : 'Selected for Checkout review';
                         final statusStyle = context.buyMeta.copyWith(
                           color: cardGreen,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         );
                         final statusHeight = buyV2ValueTextSize(
                           context,
                           statusLabel,
                           statusStyle,
-                          maxWidth: (constraints.maxWidth - 66)
+                          maxWidth: (constraints.maxWidth - 19)
                               .clamp(1.0, double.infinity)
                               .toDouble(),
                           maxLines: null,
@@ -21934,7 +22019,7 @@ class _CartBenefitCard extends StatelessWidget {
                           child: ExcludeSemantics(
                             child: selected
                                 ? Padding(
-                                    padding: const EdgeInsets.only(left: 47),
+                                    padding: EdgeInsets.zero,
                                     child: Row(
                                       children: [
                                         const Icon(
@@ -21984,70 +22069,35 @@ class _CartDiscoverySections extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sections = <Widget>[];
+    final products = <BuyV2Product>[];
+    final seen = <String>{};
     for (final destination in destinations) {
-      final special = session.cartRecommendationsFor(
-        destination,
-        specialOffersOnly: true,
-      );
-      final specialIds = special.map((product) => product.id).toSet();
-      final related = session.cartRecommendationsFor(
-        destination,
-        excludedProductIds: specialIds,
-      );
-      final usedIds = {...specialIds, ...related.map((product) => product.id)};
-      final more = session.cartRecommendationsFor(
-        destination,
-        excludedProductIds: usedIds,
-      );
-      if (related.isNotEmpty) {
-        sections.add(
-          _CartProductLane(
-            session: session,
-            destination: destination,
-            laneId: 'related',
-            title: _cartRelatedTitle(destination),
-            detail:
-                'Deals from ${buyV2Money(related.map((product) => product.price).reduce((left, right) => left < right ? left : right))}',
-            products: related,
-          ),
-        );
-      }
-      if (special.isNotEmpty) {
-        sections.add(
-          _CartProductLane(
-            session: session,
-            destination: destination,
-            laneId: 'special',
-            title: _cartSpecialTitle(destination),
-            detail:
-                'Available offers for this ${_cartFamilyLabel(destination).toLowerCase()}',
-            products: special,
-          ),
-        );
-      }
-      if (more.isNotEmpty) {
-        sections.add(
-          _CartProductLane(
-            session: session,
-            destination: destination,
-            laneId: 'more',
-            title: _cartMoreTitle(destination),
-            detail: destination == BuyV2Destination.medicine
-                ? 'From the Medicine catalogue · not medical advice'
-                : 'More from the ${destination.label} catalogue',
-            products: more,
-          ),
-        );
+      for (final product in session.cartRecommendationsFor(destination)) {
+        if (seen.add(product.id)) products.add(product);
       }
     }
-    if (sections.isEmpty) return const SizedBox.shrink();
-    return Column(
+    if (products.isEmpty) return const SizedBox.shrink();
+    return ExpansionTile(
+      key: const PageStorageKey('buy-cart-discovery'),
+      iconColor: BuyV2ActionStyle.primaryForeground,
+      collapsedIconColor: BuyV2ActionStyle.primaryForeground,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+      childrenPadding: EdgeInsets.zero,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      title: Text(
+        'More products & offers',
+        style: context.buyBody.copyWith(fontSize: 12),
+      ),
       children: [
-        for (final section in sections) ...[
-          section,
-          const SizedBox(height: 10),
-        ],
+        _CartProductLane(
+          session: session,
+          destination: destinations.first,
+          laneId: 'recommendations',
+          title: 'Browse products',
+          detail: 'Check the pack and price before adding',
+          products: products,
+        ),
       ],
     );
   }
@@ -22084,6 +22134,7 @@ class _CartProductLane extends StatelessWidget {
           Text(detail, style: context.buyMeta.copyWith(fontSize: 8)),
           const SizedBox(height: 7),
           SingleChildScrollView(
+            key: PageStorageKey('buy-cart-$laneId-scroll-${destination.name}'),
             scrollDirection: Axis.horizontal,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -22176,7 +22227,7 @@ class _CartRecommendationCard extends StatelessWidget {
                           Text(
                             buyV2Money(product.price),
                             style: const TextStyle(
-                              color: BuyV2Colors.navy,
+                              color: BuyV2Colors.ink,
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
                             ),
@@ -22185,7 +22236,7 @@ class _CartRecommendationCard extends StatelessWidget {
                             Text(
                               buyV2Money(product.mrp!),
                               style: context.buyMeta.copyWith(
-                                fontSize: 7,
+                                fontSize: 11,
                                 decoration: TextDecoration.lineThrough,
                               ),
                             ),
@@ -22195,7 +22246,7 @@ class _CartRecommendationCard extends StatelessWidget {
                     SizedBox(
                       width: 44,
                       height: 44,
-                      child: IconButton.outlined(
+                      child: IconButton(
                         key: ValueKey('buy-cart-add-${product.id}'),
                         tooltip: 'Add ${product.customerTitle}',
                         onPressed: () {
@@ -22207,7 +22258,7 @@ class _CartRecommendationCard extends StatelessWidget {
                           }
                         },
                         padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.add_rounded, size: 20),
+                        icon: const BuyV2AddFace(),
                       ),
                     ),
                   ],
@@ -22221,44 +22272,123 @@ class _CartRecommendationCard extends StatelessWidget {
   }
 }
 
-class _CartDeliveryInstructionSections extends StatelessWidget {
+class _CartDeliveryInstructionSections extends StatefulWidget {
   const _CartDeliveryInstructionSections({
     required this.session,
     required this.destinations,
   });
-
   final BuyV2Session session;
   final List<BuyV2Destination> destinations;
+  @override
+  State<_CartDeliveryInstructionSections> createState() =>
+      _CartDeliveryInstructionSectionsState();
+}
+
+class _CartDeliveryInstructionSectionsState
+    extends State<_CartDeliveryInstructionSections> {
+  BuyV2Destination? _selected;
+  late String _filter;
+  @override
+  void initState() {
+    super.initState();
+    _filter = widget.session.cartDisplayFilter;
+    _followFilter();
+  }
+
+  void _followFilter() {
+    _selected = switch (_filter) {
+      'shop' => BuyV2Destination.shop,
+      'wholesale' || 'bulk' => BuyV2Destination.wholesale,
+      _ => _selected,
+    };
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartDeliveryInstructionSections oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_filter != widget.session.cartDisplayFilter) {
+      _filter = widget.session.cartDisplayFilter;
+      _followFilter();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final eligible = destinations
+    final session = widget.session;
+    final eligible = widget.destinations
         .where(
           (destination) =>
               session.deliveryInstructionsFor(destination).isNotEmpty,
         )
         .toList(growable: false);
     if (eligible.isEmpty) return const SizedBox.shrink();
+    final selected = eligible.contains(_selected) ? _selected! : eligible.first;
     return Container(
+      key: const ValueKey('buy-cart-instruction-panel'),
       padding: const EdgeInsets.fromLTRB(9, 7, 9, 3),
       decoration: buyV2CardDecoration(radius: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Delivery instructions',
+            'Delivery instructions · optional',
             style: context.buyBody.copyWith(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: BuyV2ActionStyle.primaryForeground,
             ),
           ),
+          if (eligible.length > 1)
+            SingleChildScrollView(
+              key: const PageStorageKey('buy-cart-instruction-contexts'),
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final destination in eligible)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        key: ValueKey(
+                          'buy-instruction-context-${destination.name}',
+                        ),
+                        label: Text(
+                          _cartDestinationLabel(session, destination),
+                        ),
+                        selected: selected == destination,
+                        showCheckmark: false,
+                        side: BorderSide.none,
+                        backgroundColor: BuyV2ActionStyle.primaryFill,
+                        selectedColor: BuyV2ActionStyle.pressedFill,
+                        elevation: selected == destination ? 2 : 0,
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected == destination
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: BuyV2ActionStyle.primaryForeground,
+                        ),
+                        onSelected: (_) {
+                          FocusScope.of(context).unfocus();
+                          HapticFeedback.selectionClick();
+                          setState(() => _selected = destination);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
           for (final destination in eligible)
-            _CartDeliveryInstructionCard(
-              key: ValueKey('buy-delivery-note-owner-${destination.name}'),
-              session: session,
-              destination: destination,
-              showDestination: eligible.length > 1,
+            Offstage(
+              offstage: destination != selected,
+              child: TickerMode(
+                enabled: destination == selected,
+                child: _CartDeliveryInstructionCard(
+                  key: ValueKey('buy-delivery-note-owner-${destination.name}'),
+                  session: session,
+                  destination: destination,
+                  showDestination: false,
+                ),
+              ),
             ),
         ],
       ),
@@ -22301,7 +22431,7 @@ class _CartDeliveryInstructionCardState
   Widget build(BuildContext context) {
     final noteActionStyle = TextButton.styleFrom(
       foregroundColor: BuyV2ActionStyle.primaryForeground,
-      minimumSize: const Size(44, 44),
+      minimumSize: const Size(48, 48),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
     );
@@ -22314,7 +22444,7 @@ class _CartDeliveryInstructionCardState
       children: [
         if (showDestination)
           Padding(
-            padding: const EdgeInsets.only(top: 5),
+            padding: const EdgeInsets.only(top: 3),
             child: Text(
               _deliveryInstructionOwner(destination),
               style: context.buyMeta.copyWith(
@@ -22650,13 +22780,16 @@ class _CartBillSummary extends StatelessWidget {
             children: [
               const Icon(
                 Icons.receipt_long_outlined,
-                color: BuyV2Colors.navy,
+                color: BuyV2Colors.ink,
                 size: 20,
               ),
               const SizedBox(width: 7),
               Text(
                 'Bill summary',
-                style: context.buyTitle.copyWith(fontSize: 15),
+                style: context.buyTitle.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -22664,7 +22797,7 @@ class _CartBillSummary extends StatelessWidget {
           for (final entry in familyTotals.entries)
             _CartAmountRow(
               label:
-                  '${entry.key.label} ${_cartItemFamilyLabel(entry.key).toLowerCase()}',
+                  '${_cartDestinationLabel(session, entry.key)} ${_cartItemFamilyLabel(entry.key).toLowerCase()}',
               value: buyV2Money(entry.value),
             ),
           if (session.scopedCartSavings > 0)
@@ -22692,8 +22825,8 @@ class _CartBillSummary extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            'Delivery charges, if any, are confirmed separately at order review.',
-            style: context.buyMeta.copyWith(fontSize: 8),
+            'Delivery charges, if any, are confirmed at checkout.',
+            style: context.buyMeta.copyWith(fontSize: 10),
           ),
         ],
       ),
@@ -22729,9 +22862,9 @@ class _CartAmountRow extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? BuyV2Colors.navy,
-              fontSize: strong ? 13 : 10,
-              fontWeight: strong ? FontWeight.w900 : FontWeight.w800,
+              color: valueColor ?? BuyV2Colors.ink,
+              fontSize: strong ? 13 : 11,
+              fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
         ],
@@ -22864,11 +22997,7 @@ class _CartLine extends StatelessWidget {
                       text: automaticFulfilment
                           ? '$buyerPromise · ${product.customerSeller(facts.partner)}'
                           : '${product.deliveryPromise} · ${product.customerSeller(product.seller)}',
-                      style: const TextStyle(
-                        color: BuyV2Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: context.buyMeta.copyWith(fontSize: 11),
                     ),
                   ];
                   final titleWidth =
@@ -22909,7 +23038,7 @@ class _CartLine extends StatelessWidget {
                     child: Icon(
                       Icons.chevron_right_rounded,
                       size: 18,
-                      color: BuyV2Colors.navy,
+                      color: BuyV2Colors.ink,
                     ),
                   );
                   if (stackMedia) {
@@ -22955,7 +23084,7 @@ class _CartLine extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
               decoration: BoxDecoration(
-                color: BuyV2Colors.softBlue,
+                color: BuyV2Colors.canvas,
                 borderRadius: BorderRadius.circular(9),
               ),
               child: Column(
@@ -22967,9 +23096,9 @@ class _CartLine extends StatelessWidget {
                         : 'Minimum order ${_packCountLabel(product.minimumOrder)} · '
                               '${buyV2Money(product.price)} per pack',
                     style: context.buyMeta.copyWith(
-                      color: BuyV2Colors.navy,
+                      color: BuyV2Colors.ink,
                       fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -22995,7 +23124,7 @@ class _CartLine extends StatelessWidget {
     const lineTotalStyle = TextStyle(
       color: BuyV2Colors.ink,
       fontSize: 14,
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.w700,
     );
     final lineTotalText = priceUnavailable
         ? 'Price pending'
@@ -23006,9 +23135,9 @@ class _CartLine extends StatelessWidget {
       lineTotalStyle,
     );
     const quantityStyle = TextStyle(
-      color: BuyV2Colors.navy,
+      color: BuyV2Colors.ink,
       fontSize: 13,
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.w700,
     );
     final quantitySize = buyV2ValueTextSize(
       context,
@@ -23134,7 +23263,29 @@ class _CartLine extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          BuyV2ProductEdgeControls(session: session, product: product),
+          Row(
+            children: [
+              if (session.usesMixedCartSelection)
+                Checkbox(
+                  key: ValueKey('buy-cart-select-${product.id}'),
+                  value: session.cartProductSelected(product.id),
+                  activeColor: BuyV2ActionStyle.primaryForeground,
+                  semanticLabel: 'Include ${product.customerTitle} in checkout',
+                  onChanged: session.checkoutRequiresResolution
+                      ? null
+                      : (value) => session.selectCartProduct(
+                          product.id,
+                          value == true,
+                        ),
+                ),
+              Expanded(
+                child: BuyV2ProductEdgeControls(
+                  session: session,
+                  product: product,
+                ),
+              ),
+            ],
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 0, 9, 9),
             child: LayoutBuilder(
@@ -23201,21 +23352,13 @@ class _CartLine extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       productBody,
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.only(top: 8),
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            top: BorderSide(color: BuyV2Colors.line),
-                          ),
-                        ),
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [price, quantityControl],
-                        ),
+                      const SizedBox(height: 2),
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [price, quantityControl],
                       ),
                     ],
                   );

@@ -36,6 +36,135 @@ void main() {
     );
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'T01 mixed Cart filters and deselection remain usable at $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(720, 1600);
+        tester.view.devicePixelRatio = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.addProduct('s-tomato');
+        session.addProduct('w-notebook');
+        session.openCart();
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final selectedFilter = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('buy-cart-filter-all')),
+        );
+        expect(
+          selectedFilter.labelStyle?.color,
+          BuyV2ActionStyle.primaryForeground,
+        );
+        expect(
+          selectedFilter.labelStyle?.color,
+          isNot(selectedFilter.selectedColor),
+        );
+        final cardRect = tester.getRect(
+          find.byKey(const ValueKey('buy-cart-line-s-tomato')),
+        );
+        final selectionRect = tester.getRect(
+          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
+        );
+        expect(
+          cardRect.contains(selectionRect.center),
+          isTrue,
+          reason: 'Selection shares card width instead of a separate gutter',
+        );
+        expect(cardRect.width, greaterThan(320));
+        final total = session.scopedPayableTotal;
+        await tester.tap(find.byKey(const ValueKey('buy-cart-filter-shop')));
+        await tester.pumpAndSettle();
+        expect(session.visibleCartLines.single.product.id, 's-tomato');
+        expect(session.scopedPayableTotal, total);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.cartLines.single.product.id, 'w-notebook');
+        expect(
+          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('buy-cart-select-s-tomato')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.scopedPayableTotal, total);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        for (var mask = 1; mask < 8; mask++) {
+          final combinationCore = BuySession();
+          final combination = BuyV2Session(core: combinationCore);
+          const ids = ['s-tomato', 'w-notebook', 'w-rice'];
+          for (var i = 0; i < ids.length; i++) {
+            if ((mask & (1 << i)) != 0) {
+              expect(combination.addProduct(ids[i]), isTrue);
+            }
+          }
+          combination.openCart();
+          await tester.pumpWidget(app(combination, textScale: scale));
+          await tester.pumpAndSettle();
+          final payable = combination.scopedPayableTotal;
+          for (final filter in ['shop', 'wholesale', 'bulk', 'all']) {
+            final chip = find.byKey(ValueKey('buy-cart-filter-$filter'));
+            await tester.ensureVisible(chip);
+            await tester.tap(chip);
+            await tester.pumpAndSettle();
+            final visible = combination.visibleCartLines;
+            final quantity = visible.fold<int>(
+              0,
+              (sum, line) => sum + line.quantity,
+            );
+            final trade =
+                visible.isNotEmpty &&
+                visible.every(
+                  (line) =>
+                      line.product.destination == BuyV2Destination.wholesale,
+                );
+            final contextLabel = switch (filter) {
+              'shop' => 'Shop · ',
+              'wholesale' => 'Wholesale · ',
+              'bulk' => 'Bulk · ',
+              _ => '',
+            };
+            final quantityLabel = trade
+                ? '$quantity ${quantity == 1 ? 'pack' : 'packs'}'
+                : '$quantity ${quantity == 1 ? 'item' : 'items'}';
+            final header = tester.widget<BuyV2FiniteValueTransition>(
+              find.byKey(const ValueKey('buy-cart-header-value-motion')),
+            );
+            expect(
+              header.text,
+              '$contextLabel${visible.length} ${visible.length == 1 ? 'product' : 'products'} · $quantityLabel',
+              reason: 'Combination $mask / $filter',
+            );
+            expect(combination.scopedPayableTotal, payable);
+            final hidden = combination.cartLines.length - visible.length;
+            expect(
+              find.byKey(const ValueKey('buy-cart-view-hidden-selection')),
+              hidden > 0 ? findsOneWidget : findsNothing,
+            );
+            expect(tester.takeException(), isNull);
+          }
+          for (final line in combination.cartLines.toList()) {
+            combination.selectCartProduct(line.product.id, false);
+          }
+          await tester.pumpAndSettle();
+          expect(find.text('Select products to checkout'), findsOneWidget);
+          expect(combination.visibleCartLines, isNotEmpty);
+          await tester.pumpWidget(const SizedBox());
+          combination.dispose();
+          combinationCore.dispose();
+        }
+      },
+    );
+  }
+
   BuyV2Product productFor(BuyV2Destination destination) =>
       BuyV2Catalogue.products.firstWhere(
         (candidate) =>
@@ -106,7 +235,7 @@ void main() {
             find.byKey(const ValueKey('buy-cart-navigation-button')),
           );
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('buy-cart-scope-all')));
+          await tester.tap(find.byKey(const ValueKey('buy-cart-filter-all')));
           await tester.pumpAndSettle();
           await tapAction('buy-cart-compare-prices');
           if (multiple) {
@@ -164,7 +293,15 @@ void main() {
           }
           session.openCart(scope: scope);
           final totalBefore = session.itemCount;
-          final removedCount = session.scopedItemCount;
+          final removedCount =
+              session.usesMixedCartSelection || scope == BuyV2CartScope.all
+              ? session.itemCount
+              : session.countForDestination(switch (scope) {
+                  BuyV2CartScope.shop => BuyV2Destination.shop,
+                  BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
+                  BuyV2CartScope.medicine => BuyV2Destination.medicine,
+                  BuyV2CartScope.all => throw StateError('handled above'),
+                });
           expect(removedCount, greaterThan(0));
           await tester.pumpWidget(app(session, textScale: 2));
           await tester.pumpAndSettle();
@@ -259,7 +396,6 @@ void main() {
               await tester.pump(Duration(milliseconds: elapsed));
               for (final key in [
                 'buy-cart-payable-total-motion',
-                'buy-cart-scope-value-motion-all',
                 'buy-cart-line-total-motion-w-notebook',
                 'buy-cart-line-quantity-motion-w-notebook',
               ]) {
@@ -382,30 +518,11 @@ void main() {
               greaterThanOrEqualTo(tester.getSize(label).height),
             );
             expect(tester.getBottomRight(review).dy, lessThanOrEqualTo(800));
-            final allScope = find.byKey(
-              const ValueKey('buy-cart-scope-value-motion-all'),
-            );
-            final allValue = tester.widget<BuyV2FiniteValueTransition>(
-              allScope,
-            );
-            expect(allValue.text, buyV2Money(total));
-            final allSize = buyV2ValueTextSize(
-              tester.element(allScope),
-              allValue.text,
-              allValue.style,
-            );
-            expect(
-              tester.getSize(allScope).width,
-              greaterThanOrEqualTo(allSize.width),
-            );
-            expect(
-              tester.getSize(allScope).height,
-              greaterThanOrEqualTo(allSize.height),
-            );
-            for (final scope in ['all', 'shop', 'wholesale']) {
-              final control = find.byKey(ValueKey('buy-cart-scope-$scope'));
-              expect(tester.getRect(control).left, greaterThanOrEqualTo(0));
-              expect(tester.getRect(control).right, lessThanOrEqualTo(width));
+            for (final scope in ['all', 'shop', 'wholesale', 'bulk']) {
+              final control = find.byKey(ValueKey('buy-cart-filter-$scope'));
+              await tester.ensureVisible(control);
+              await tester.pumpAndSettle();
+              expect(control.hitTestable(), findsOneWidget);
               expect(tester.getSize(control).height, greaterThanOrEqualTo(44));
             }
             await _captureR66MainCart(
@@ -491,9 +608,9 @@ void main() {
       );
       for (final key in [
         'buy-cart-header-value-motion',
-        'buy-cart-scope-value-motion-all',
-        'buy-cart-scope-value-motion-shop',
-        'buy-cart-scope-value-motion-wholesale',
+        'buy-cart-filter-all',
+        'buy-cart-filter-shop',
+        'buy-cart-filter-wholesale',
         'buy-cart-coupons',
       ]) {
         final finder = find.byKey(ValueKey(key));
@@ -755,8 +872,16 @@ void main() {
         final owner = find.byKey(
           ValueKey('buy-cart-delivery-instructions-${destination.name}'),
         );
+        final contextChoice = find.byKey(
+          ValueKey('buy-instruction-context-${destination.name}'),
+        );
+        await showInMainCartList(tester, contextChoice);
+        await tester.ensureVisible(contextChoice);
+        await tester.tap(contextChoice);
+        await tester.pumpAndSettle();
         await showInMainCartList(tester, owner);
-        expect(find.text('Delivery instructions'), findsOneWidget);
+        expect(find.text('Add instructions'), findsOneWidget);
+        expect(find.text('Delivery instructions · optional'), findsOneWidget);
         final option = session.deliveryInstructionsFor(destination).first;
         final action = find.byKey(
           ValueKey('buy-cart-instruction-${destination.name}-${option.id}'),
@@ -792,6 +917,12 @@ void main() {
       final shop = find.byKey(
         const ValueKey('buy-cart-delivery-instructions-shop'),
       );
+      final shopContext = find.byKey(
+        const ValueKey('buy-instruction-context-shop'),
+      );
+      await showInMainCartList(tester, shopContext);
+      await tester.tap(shopContext);
+      await tester.pumpAndSettle();
       await showInMainCartList(tester, shop);
       final clear = find.byKey(
         const ValueKey('buy-cart-instruction-shop-none'),
@@ -958,7 +1089,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
-    expect(find.byTooltip('Empty cart'), findsOneWidget);
+    expect(find.byTooltip('Empty entire cart'), findsOneWidget);
     expect(find.text('Clear'), findsNothing);
 
     for (final product in products) {
@@ -1001,7 +1132,15 @@ void main() {
     expect(find.text('Medicine order'), findsNothing);
 
     tester
-        .state<ScrollableState>(find.byType(Scrollable).first)
+        .state<ScrollableState>(
+          find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
+        )
         .position
         .jumpTo(0);
     await tester.pumpAndSettle();
@@ -1101,7 +1240,13 @@ void main() {
         await tester.scrollUntilVisible(
           target,
           -180,
-          scrollable: find.byType(Scrollable).first,
+          scrollable: find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
           maxScrolls: 30,
         );
         await tester.ensureVisible(target);
@@ -1190,7 +1335,13 @@ void main() {
           await tester.ensureVisible(card);
           await tester.pumpAndSettle();
           expect(tester.getTopLeft(card).dy, lessThan(220));
-          final list = find.byType(Scrollable).first;
+          final list = find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first;
           expect(
             tester.getSize(card).height,
             lessThan(tester.getSize(list).height),
@@ -1260,7 +1411,7 @@ void main() {
     );
     await showInMainCartList(tester, instructions);
 
-    expect(find.text('Delivery instructions'), findsOneWidget);
+    expect(find.text('Delivery instructions · optional'), findsOneWidget);
     expect(find.text('Shop delivery'), findsNothing);
     expect(find.byKey(const ValueKey('buy-cart-tip-wholesale')), findsNothing);
 
@@ -1269,6 +1420,30 @@ void main() {
     expect(bill, findsOneWidget);
     expect(find.text('Wholesale packs'), findsOneWidget);
     expect(find.text('Bill summary'), findsOneWidget);
+    final discovery = find.byKey(const PageStorageKey('buy-cart-discovery'));
+    await showInMainCartList(tester, discovery);
+    expect(
+      tester.getTopLeft(discovery).dy,
+      greaterThan(tester.getTopLeft(bill).dy),
+    );
+    expect(
+      find.byKey(const ValueKey('buy-cart-recommendations-wholesale')),
+      findsNothing,
+    );
+    final total = session.scopedPayableTotal;
+    await tester.tap(discovery);
+    await tester.pumpAndSettle();
+    final recommendations = find.byKey(
+      const ValueKey('buy-cart-recommendations-wholesale'),
+    );
+    await showInMainCartList(tester, recommendations);
+    expect(recommendations, findsOneWidget);
+    expect(
+      find.descendant(of: recommendations, matching: find.byType(BuyV2AddFace)),
+      findsWidgets,
+    );
+    expect(session.scopedPayableTotal, total);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Saved shelf adds productwise and clears only after confirmation', (
@@ -1446,7 +1621,8 @@ void main() {
             ValueKey('buy-cart-delivery-instructions-${destination.name}'),
           ),
           find.byKey(const ValueKey('buy-cart-bill-summary')),
-          find.byKey(const ValueKey('buy-cart-savings-summary')),
+          if (session.scopedCartSavings > 0)
+            find.byKey(const ValueKey('buy-cart-savings-summary')),
         ]) {
           await showInMainCartList(tester, target);
           expect(target, findsOneWidget);
@@ -1617,7 +1793,13 @@ void main() {
     await tester.scrollUntilVisible(
       coupons,
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first,
     );
     await tester.pump();
     expect(
@@ -1654,8 +1836,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const PageStorageKey('buy-cart-benefit-details-live-retailer-sale'),
+      ),
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.text('Time-bound sale · Retailer · Shree Balaji Fresh'),
+      find.textContaining('Time-bound sale · Retailer · Shree Balaji Fresh'),
       findsOneWidget,
     );
     expect(find.textContaining('Save ₹10 now'), findsOneWidget);

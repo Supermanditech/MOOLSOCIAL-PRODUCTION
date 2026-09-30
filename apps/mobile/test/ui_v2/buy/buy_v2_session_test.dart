@@ -1916,6 +1916,54 @@ void r669SharedProductTests() {
 
 void main() {
   test(
+    'T01 filters preserve mixed purchase and explicit exclusion survives codec',
+    () async {
+      final preferences = _R669StringPreferences();
+      BuyV2Session make(String owner) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: owner,
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        return session;
+      }
+
+      final session = make('t01-buyer');
+      await session.restoreCustomerState();
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.addProduct('w-notebook'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      final initialTotal = session.scopedPayableTotal;
+      expect(session.cartLines.length, 2);
+      for (final filter in ['shop', 'wholesale', 'bulk', 'all']) {
+        session.chooseCartDisplayFilter(filter);
+        expect(session.cartLines.length, 2);
+        expect(session.scopedPayableTotal, initialTotal);
+      }
+      session.selectCartProduct('w-notebook', false);
+      expect(session.cartLines.single.product.id, 's-tomato');
+      expect(session.visibleCartLines.length, 2);
+      expect(session.openCheckout(), isTrue);
+      expect(session.checkoutLines.single.product.id, 's-tomato');
+      await Future<void>.delayed(Duration.zero);
+      final restored = make('t01-buyer');
+      await restored.restoreCustomerState();
+      expect(restored.cartProductSelected('w-notebook'), isFalse);
+      expect(restored.quantityFor('w-notebook'), greaterThan(0));
+      restored.selectCartProduct('w-notebook', true);
+      expect(restored.cartLines.length, 2);
+      final other = make('t01-other');
+      await other.restoreCustomerState();
+      expect(other.cartLines, isEmpty);
+    },
+  );
+
+  test(
     'custom delivery note codec restores only its customer and basket',
     () async {
       final preferences = _R669StringPreferences();
@@ -5937,10 +5985,14 @@ void main() {
         expect(session.quantityFor('sku-b'), 1);
         expect(session.quantityFor('wholesale-sku'), 2);
         expect(harness.placements, 0);
+        session.selectCartProduct('sku-a', false);
+        session.selectCartProduct('sku-b', false);
         session.openCart(scope: BuyV2CartScope.wholesale);
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isFalse);
         expect(session.checkoutLines.single.product.id, 'wholesale-sku');
+        session.selectCartProduct('sku-a', true);
+        session.selectCartProduct('sku-b', true);
         session.openCart();
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isTrue);
@@ -5975,6 +6027,8 @@ void main() {
       () async {
         final session = await checkoutSession(openCheckout: false);
         expect(session.beginStoreCollection('sku-a'), isTrue);
+        session.selectCartProduct('sku-a', false);
+        session.selectCartProduct('sku-b', false);
         session.openCart(scope: BuyV2CartScope.wholesale);
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isFalse);
@@ -9148,7 +9202,7 @@ void main() {
     });
 
     test(
-      'scope checkout confirms only that family and preserves other cart lines',
+      'explicit Cart selection confirms only selected lines and preserves others',
       () {
         final session = _r669OrderReadySession();
         final shop = BuyV2Catalogue.products.firstWhere(
@@ -9161,6 +9215,7 @@ void main() {
         session.addProduct(wholesale.id);
 
         session.openCart(scope: BuyV2CartScope.wholesale);
+        session.selectCartProduct(shop.id, false);
         session.openCheckout();
         session.confirmOrder();
 

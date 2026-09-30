@@ -5233,6 +5233,52 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2View view = BuyV2View.catalogue;
   BuyV2CheckoutStep checkoutStep = BuyV2CheckoutStep.address;
   BuyV2CartScope cartScope = BuyV2CartScope.all;
+  String cartDisplayFilter = 'all';
+  final Set<String> _excludedCartProductIds = {};
+  bool get usesMixedCartSelection =>
+      !isStoreProcurement && cartScope != BuyV2CartScope.medicine;
+  bool cartProductSelected(String id) => !_excludedCartProductIds.contains(id);
+  void chooseCartDisplayFilter(String value) {
+    if (!const {'all', 'shop', 'wholesale', 'bulk'}.contains(value)) return;
+    cartDisplayFilter = value;
+    notifyListeners();
+  }
+
+  List<BuyV2CartLine> get visibleCartLines {
+    if (!usesMixedCartSelection) return cartLines;
+    return List.unmodifiable(
+      _linesForScope(BuyV2CartScope.all).where((line) {
+        final product = line.product;
+        return switch (cartDisplayFilter) {
+          'shop' => product.destination == BuyV2Destination.shop,
+          'wholesale' =>
+            product.destination == BuyV2Destination.wholesale &&
+                product.offerClass != BuyV2OfferClass.bulk,
+          'bulk' =>
+            product.destination == BuyV2Destination.wholesale &&
+                product.offerClass == BuyV2OfferClass.bulk,
+          _ => true,
+        };
+      }),
+    );
+  }
+
+  void selectCartProduct(String id, bool selected) {
+    if (!usesMixedCartSelection ||
+        !_cart.containsKey(id) ||
+        _holdCartForPaymentResolution()) {
+      return;
+    }
+    if (selected) {
+      _excludedCartProductIds.remove(id);
+    } else {
+      _excludedCartProductIds.add(id);
+    }
+    _invalidateAndRefreshCheckoutPricingContracts();
+    _persistCustomerState();
+    notifyListeners();
+  }
+
   BuyV2CartScope checkoutScope = BuyV2CartScope.all;
   BuyV2OrdersTab ordersTab = BuyV2OrdersTab.active;
   String shopCategoryId = 'all';
@@ -5336,7 +5382,9 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2Destination get activeDockDestination => switch (view) {
     BuyV2View.cart => _dockDestinationForScope(cartScope),
-    BuyV2View.checkout => _dockDestinationForScope(checkoutScope),
+    BuyV2View.checkout => _dockDestinationForScope(
+      usesMixedCartSelection ? cartScope : checkoutScope,
+    ),
     _ => destination,
   };
 
@@ -7280,6 +7328,13 @@ class BuyV2Session extends ChangeNotifier {
             : null;
       }
     }
+    _excludedCartProductIds
+      ..clear()
+      ..addAll(
+        snapshot.excludedCartProductIds.where(
+          snapshot.cartQuantities.containsKey,
+        ),
+      );
     final retainedDraft = snapshot.procurementDraft;
     _cart.clear();
     for (final entry in snapshot.cartQuantities.entries) {
@@ -7572,6 +7627,12 @@ class BuyV2Session extends ChangeNotifier {
         if (customerStateRecoveryPending) ..._unresolvedCustomerCart,
         for (final line in _cart.values) line.product.id: line.quantity,
       }),
+      excludedCartProductIds: Set.unmodifiable(
+        _excludedCartProductIds.where(
+          (id) =>
+              _cart.containsKey(id) || _unresolvedCustomerCart.containsKey(id),
+        ),
+      ),
       productIdentityKeys: isStoreProcurement
           ? const {}
           : Map.unmodifiable({
@@ -7701,8 +7762,15 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   List<BuyV2CartLine> get cartLines {
-    final lines = _linesForScope(cartScope);
-    return List.unmodifiable(lines);
+    final lines = _linesForScope(
+      usesMixedCartSelection ? BuyV2CartScope.all : cartScope,
+    );
+    return List.unmodifiable(
+      lines.where(
+        (line) =>
+            !usesMixedCartSelection || cartProductSelected(line.product.id),
+      ),
+    );
   }
 
   double cartScrollOffsetFor(BuyV2CartScope scope) =>
@@ -7723,8 +7791,11 @@ class BuyV2Session extends ChangeNotifier {
     return List.unmodifiable(
       _linesForScope(checkoutScope).where(
         (line) =>
-            !collectionCheckoutSelected ||
-            line.product.storeId == _collectionCheckoutStoreId,
+            (isStoreProcurement ||
+                checkoutScope == BuyV2CartScope.medicine ||
+                cartProductSelected(line.product.id)) &&
+            (!collectionCheckoutSelected ||
+                line.product.storeId == _collectionCheckoutStoreId),
       ),
     );
   }
@@ -10909,15 +10980,17 @@ class BuyV2Session extends ChangeNotifier {
       );
       return false;
     }
-    checkoutScope = cartScope;
+    if (!checkoutRequiresResolution) {
+      checkoutScope = usesMixedCartSelection ? BuyV2CartScope.all : cartScope;
+    }
     if (!retainingCheckout &&
         !checkoutRequiresResolution &&
         _collectionBrowseStoreId != null) {
       // Revalidate capability at checkout; never silently turn a customer's
       // collection choice into delivery when availability has expired.
-      _collectionCheckoutSelected = _linesForScope(
-        checkoutScope,
-      ).any((line) => line.product.storeId == _collectionBrowseStoreId);
+      _collectionCheckoutSelected = cartLines.any(
+        (line) => line.product.storeId == _collectionBrowseStoreId,
+      );
       _collectionCheckoutStoreId = _collectionCheckoutSelected
           ? _collectionBrowseStoreId
           : null;
@@ -11875,7 +11948,7 @@ class BuyV2Session extends ChangeNotifier {
               notice = null;
               notifyListeners();
             case BuyV2CheckoutStep.address:
-              openCart(scope: checkoutScope);
+              openCart(scope: cartScope);
           }
         case BuyV2View.confirmation:
           _openOrdersRoot();
@@ -12883,6 +12956,7 @@ class BuyV2Session extends ChangeNotifier {
             : destination,
     };
     _cart.clear();
+    _excludedCartProductIds.clear();
     _deliveryInstructionIds.clear();
     _customDeliveryInstructions.clear();
     _selectedCartBenefitRefs.clear();
@@ -14243,6 +14317,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void _pruneCartSelections() {
+    _excludedCartProductIds.removeWhere((id) => !_cart.containsKey(id));
     final destinations = _cart.values
         .map((line) => line.product.destination)
         .toSet();

@@ -1087,6 +1087,11 @@ $cursorStorefrontOwners = @(
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  # Versioned T01 Cart references; prior approved images remain immutable.
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-t01-20260930/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-t01-20260930/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'docs/quality/CURSOR-BUY-CART-T01-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-T01-20260930-SELECTED-2.jsonl',
   # Founder-selected public button colour inventory: exact additional owners.
   'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart',
   'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
