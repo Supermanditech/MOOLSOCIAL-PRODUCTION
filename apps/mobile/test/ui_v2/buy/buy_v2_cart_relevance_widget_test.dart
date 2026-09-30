@@ -815,6 +815,9 @@ void main() {
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(320, 800));
         addTearDown(() => tester.binding.setSurfaceSize(null));
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
         final core = BuySession();
         final session = BuyV2Session(core: core);
         addTearDown(session.dispose);
@@ -822,6 +825,7 @@ void main() {
         session.addProduct('s-tomato');
         session.addProduct('w-notebook');
         session.openCart(scope: BuyV2CartScope.all);
+        final originalTotal = session.cartTotal;
         await tester.pumpWidget(app(session, textScale: scale));
         await tester.pumpAndSettle();
         final edit = find.byKey(
@@ -855,11 +859,69 @@ void main() {
         final save = find.byKey(
           const ValueKey('buy-cart-instruction-save-shop'),
         );
-        await tester.ensureVisible(save);
-        await tester.pumpAndSettle();
         final composer = find.byKey(
           const ValueKey('buy-cart-instruction-composer-shop'),
         );
+        void expectEditorVisible() {
+          final viewport = tester.getRect(
+            find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          expect(
+            tester.getRect(field).top,
+            greaterThanOrEqualTo(viewport.top),
+            reason:
+                'Viewport $viewport; composer ${tester.getRect(composer)}; '
+                'field ${tester.getRect(field)}; Save ${tester.getRect(save)}',
+          );
+          expect(
+            tester.getRect(save).bottom,
+            lessThanOrEqualTo(viewport.bottom),
+          );
+          expect(
+            tester.getRect(composer).bottom,
+            lessThanOrEqualTo(viewport.bottom),
+          );
+          expect(save.hitTestable(), findsOneWidget);
+          expect(
+            find
+                .descendant(of: composer, matching: find.text('Cancel'))
+                .hitTestable(),
+            findsOneWidget,
+          );
+          expect(session.cartTotal, originalTotal);
+        }
+
+        // Focus occurs before the IME reaches its final size. No manual
+        // ensureVisible call may repair the editor under test.
+        for (final inset in [170.0, 300.0]) {
+          tester.view.viewInsets = FakeViewPadding(bottom: inset);
+          await tester.pumpAndSettle();
+          expectEditorVisible();
+        }
+        await tester.enterText(
+          field,
+          'Use the side entrance\nCall when you arrive\nHand to the recipient',
+        );
+        await tester.pumpAndSettle();
+        expectEditorVisible();
+        tester.view.viewInsets = FakeViewPadding.zero;
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          contains('Hand to the recipient'),
+        );
+        await tester.tap(field);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpAndSettle();
+        expectEditorVisible();
+        await tester.enterText(field, 'Use the side entrance');
+        await tester.pumpAndSettle();
         final composerRect = tester.getRect(composer);
         final fieldRect = tester.getRect(field);
         final saveRect = tester.getRect(save);
@@ -874,6 +936,7 @@ void main() {
           findsOneWidget,
         );
         await tester.tap(save);
+        tester.view.viewInsets = FakeViewPadding.zero;
         await tester.pumpAndSettle();
         expect(
           session.customDeliveryInstructionFor(BuyV2Destination.shop),
@@ -903,11 +966,12 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(edit);
         await tester.pumpAndSettle();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpAndSettle();
+        expectEditorVisible();
         final clearDraft = find.byKey(
           const ValueKey('buy-cart-instruction-clear-draft-shop'),
         );
-        await tester.ensureVisible(clearDraft);
-        await tester.pumpAndSettle();
         await tester.tap(clearDraft);
         await tester.pumpAndSettle();
         expect(tester.widget<TextField>(field).controller!.text, isEmpty);
@@ -915,9 +979,28 @@ void main() {
           session.customDeliveryInstructionFor(BuyV2Destination.shop),
           'Use the side entrance',
         );
-        await tester.ensureVisible(save);
+        await tester.tap(
+          find.descendant(of: composer, matching: find.text('Cancel')),
+        );
+        tester.view.viewInsets = FakeViewPadding.zero;
+        await tester.pumpAndSettle();
+        expect(
+          session.customDeliveryInstructionFor(BuyV2Destination.shop),
+          'Use the side entrance',
+        );
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          'Use the side entrance',
+        );
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpAndSettle();
+        expectEditorVisible();
+        await tester.tap(clearDraft);
         await tester.pumpAndSettle();
         await tester.tap(save);
+        tester.view.viewInsets = FakeViewPadding.zero;
         await tester.pumpAndSettle();
         expect(
           session.deliveryInstructionTextFor(BuyV2Destination.shop),
@@ -927,6 +1010,14 @@ void main() {
           find.byKey(const ValueKey('buy-cart-instruction-saved-shop')),
           findsNothing,
         );
+        expect(tester.takeException(), isNull);
+        expect(session.cartTotal, originalTotal);
+        // A queued keyboard callback cannot act on a disposed Cart editor.
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
     );

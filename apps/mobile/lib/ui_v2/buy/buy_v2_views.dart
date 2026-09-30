@@ -8812,6 +8812,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   }
 
   bool _benefitsExpanded = true;
+  bool _instructionsFocused = false;
   late BuyV2CartScope _scope;
   late String _displayFilter;
   late ScrollController _scrollController;
@@ -9132,9 +9133,14 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         onExpandedChanged: (value) => setState(() => _benefitsExpanded = value),
       ),
       const SizedBox(height: 10),
-      _CartDeliveryInstructionSections(
-        session: session,
-        destinations: destinations.toList(growable: false),
+      Focus(
+        onFocusChange: (focused) {
+          if (mounted) setState(() => _instructionsFocused = focused);
+        },
+        child: _CartDeliveryInstructionSections(
+          session: session,
+          destinations: destinations.toList(growable: false),
+        ),
       ),
       _CartTipSections(session: session),
       _CartBillSummary(session: session),
@@ -9361,22 +9367,30 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         ],
       );
     }
-    return Column(
-      children: [
-        ...header,
-        Expanded(
-          key: const ValueKey('buy-cart-scroll'),
-          child: lines.isEmpty && visibleLines.isEmpty
-              ? empty
-              : ListView(
-                  controller: _scrollController,
-                  key: PageStorageKey('buy-cart-${session.cartScope.name}'),
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
-                  children: contents,
-                ),
-        ),
-        footer,
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Scaffold consumes its body's MediaQuery insets. Read the actual view
+        // when its resized constraints change, preserving the same keyed list.
+        final keyboardVisible =
+            _instructionsFocused && View.of(context).viewInsets.bottom > 0;
+        return Column(
+          children: [
+            if (!keyboardVisible) ...header,
+            Expanded(
+              key: const ValueKey('buy-cart-scroll'),
+              child: lines.isEmpty && visibleLines.isEmpty
+                  ? empty
+                  : ListView(
+                      controller: _scrollController,
+                      key: PageStorageKey('buy-cart-${session.cartScope.name}'),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
+                      children: contents,
+                    ),
+            ),
+            if (!keyboardVisible) footer,
+          ],
+        );
+      },
     );
   }
 }
@@ -23001,13 +23015,45 @@ class _CartDeliveryInstructionCard extends StatefulWidget {
 }
 
 class _CartDeliveryInstructionCardState
-    extends State<_CartDeliveryInstructionCard> {
+    extends State<_CartDeliveryInstructionCard>
+    with WidgetsBindingObserver {
   final _noteController = TextEditingController();
+  final _noteFocus = FocusNode();
+  final _composerKey = GlobalKey();
   final _choiceScrollController = ScrollController();
+  bool _revealPending = false;
   bool _editing = false;
   BuyV2Session get session => widget.session;
   BuyV2Destination get destination => widget.destination;
   bool get showDestination => widget.showDestination;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _noteFocus.addListener(_revealEditor);
+  }
+
+  @override
+  void didChangeMetrics() => _revealEditor();
+
+  void _revealEditor() {
+    if (!_editing || !_noteFocus.hasFocus || _revealPending) return;
+    _revealPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _revealPending = false;
+      if (!mounted || !_editing || !_noteFocus.hasFocus) return;
+      final editorContext = _composerKey.currentContext;
+      if (editorContext == null) return;
+      // Keyboard insets settle after focus. Reveal the attached actions too,
+      // rather than only the caret, in the resized Cart viewport.
+      Scrollable.ensureVisible(
+        editorContext,
+        alignment: 1,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    });
+  }
 
   void _closeEditor() {
     setState(() => _editing = false);
@@ -23023,6 +23069,9 @@ class _CartDeliveryInstructionCardState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _noteFocus.removeListener(_revealEditor);
+    _noteFocus.dispose();
     _noteController.dispose();
     _choiceScrollController.dispose();
     super.dispose();
@@ -23175,80 +23224,87 @@ class _CartDeliveryInstructionCardState
           ),
         ),
         if (_editing)
-          Container(
-            key: ValueKey('buy-cart-instruction-composer-${destination.name}'),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDADDE5)),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  key: ValueKey(
-                    'buy-cart-instruction-note-${destination.name}',
-                  ),
-                  controller: _noteController,
-                  autofocus: true,
-                  minLines: 1,
-                  maxLines: 3,
-                  maxLength: 200,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Delivery instructions (optional)',
-                    hintText: 'For example, use the side entrance',
-                    isDense: true,
-                    filled: false,
-                    contentPadding: EdgeInsets.fromLTRB(8, 12, 8, 4),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    counterText: '',
-                    labelStyle: TextStyle(
-                      color: BuyV2ActionStyle.primaryForeground,
+          KeyedSubtree(
+            key: _composerKey,
+            child: Container(
+              key: ValueKey(
+                'buy-cart-instruction-composer-${destination.name}',
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFDADDE5)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    key: ValueKey(
+                      'buy-cart-instruction-note-${destination.name}',
+                    ),
+                    controller: _noteController,
+                    focusNode: _noteFocus,
+                    onChanged: (_) => _revealEditor(),
+                    autofocus: true,
+                    minLines: 1,
+                    maxLines: 3,
+                    maxLength: 200,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Delivery instructions (optional)',
+                      hintText: 'For example, use the side entrance',
+                      isDense: true,
+                      filled: false,
+                      contentPadding: EdgeInsets.fromLTRB(8, 12, 8, 4),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterText: '',
+                      labelStyle: TextStyle(
+                        color: BuyV2ActionStyle.primaryForeground,
+                      ),
                     ),
                   ),
-                ),
-                Wrap(
-                  spacing: 4,
-                  children: [
-                    TextButton(
-                      style: noteActionStyle,
-                      key: ValueKey(
-                        'buy-cart-instruction-clear-draft-${destination.name}',
+                  Wrap(
+                    spacing: 4,
+                    children: [
+                      TextButton(
+                        style: noteActionStyle,
+                        key: ValueKey(
+                          'buy-cart-instruction-clear-draft-${destination.name}',
+                        ),
+                        onPressed: _noteController.clear,
+                        child: const Text('Clear'),
                       ),
-                      onPressed: _noteController.clear,
-                      child: const Text('Clear'),
-                    ),
-                    TextButton(
-                      style: noteActionStyle,
-                      key: ValueKey(
-                        'buy-cart-instruction-save-${destination.name}',
+                      TextButton(
+                        style: noteActionStyle,
+                        key: ValueKey(
+                          'buy-cart-instruction-save-${destination.name}',
+                        ),
+                        onPressed: () {
+                          if (session.setCustomDeliveryInstruction(
+                            destination: destination,
+                            text: _noteController.text,
+                          )) {
+                            FocusScope.of(context).unfocus();
+                            _closeEditor();
+                          }
+                        },
+                        child: const Text('Save'),
                       ),
-                      onPressed: () {
-                        if (session.setCustomDeliveryInstruction(
-                          destination: destination,
-                          text: _noteController.text,
-                        )) {
+                      TextButton(
+                        style: noteActionStyle,
+                        onPressed: () {
                           FocusScope.of(context).unfocus();
                           _closeEditor();
-                        }
-                      },
-                      child: const Text('Save'),
-                    ),
-                    TextButton(
-                      style: noteActionStyle,
-                      onPressed: () {
-                        FocusScope.of(context).unfocus();
-                        _closeEditor();
-                      },
-                      child: const Text('Cancel'),
-                    ),
-                  ],
-                ),
-              ],
+                        },
+                        child: const Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           )
         else if (customNote != null)
