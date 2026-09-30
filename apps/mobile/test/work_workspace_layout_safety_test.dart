@@ -23853,26 +23853,28 @@ void main() {
   });
 
   // Separately labelled automated payment/layout fixtures, not device records.
-  for (final variant in ['paid', 'part-paid', 'refunded', 'stale', 'name-missing']) {
-    testWidgets('O03 details inline payment evidence $variant', (tester) async {
+  for (final variant in ['paid', 'part-paid', 'refunded', 'stale', 'name-missing', 'large-value']) {
+    for (final display in [(412.0, 915.0, 1.0), (320.0, 568.0, 2.0), (915.0, 412.0, 2.0)]) {
+    testWidgets('O03 details inline payment evidence $variant $display', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final seed = StoreReviewSeed(accountScope: 'review-draft-account',
           orderCount: 12, now: DateTime.now().subtract(const Duration(minutes: 1)));
       work.activeWorkspace = seed.workspace;
-      final paid = variant == 'part-paid' ? 15000 : 25000;
-      final due = 25000 - paid;
+      final amount = variant == 'large-value' ? 1000000000 : 25000;
+      final paid = variant == 'part-paid' ? 15000 : amount;
+      final due = amount - paid;
       final refunded = variant == 'refunded' ? 25000 : 0;
       final payment = WorkspacePaymentRecord(orderId: 'INLINE-ORDER',
           invoiceId: 'INLINE-INVOICE', customerId: '9001234567',
           customerName: variant == 'name-missing' ? '9001234567' : 'Recorded customer',
           revision: 1, updatedAt: seed.finance.asOf,
-          amountMinor: 25000, paidMinor: paid, dueMinor: due, refundedMinor: refunded,
+          amountMinor: amount, paidMinor: paid, dueMinor: due, refundedMinor: refunded,
           state: variant == 'refunded' ? WorkspacePaymentState.refunded
               : due > 0 ? WorkspacePaymentState.partPaid : WorkspacePaymentState.paid,
           channel: WorkspacePaymentChannel.cash);
       final finance = WorkspaceFinanceSnapshot(accountScope: seed.accountScope,
           workspaceId: seed.storeId, revision: 1, asOf: seed.finance.asOf,
-          salesTodayMinor: 25000, duesMinor: due, availableMinor: 0,
+          salesTodayMinor: amount, duesMinor: due, availableMinor: 0,
           heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
           deliveryAdjustmentsMinor: 0, refundsMinor: refunded, taxWithheldMinor: 0,
           payments: [payment], payouts: const []);
@@ -23881,13 +23883,13 @@ void main() {
           billingDetails: variant == 'part-paid'
               ? const WorkspaceBillingDetails(name: 'Original order customer')
               : const WorkspaceBillingDetails(),
-          items: 'Sunflower oil', quantities: const {'oil': 1}, amount: 250,
+          items: 'Sunflower oil', quantities: const {'oil': 1}, amount: amount ~/ 100,
           discount: const WorkspaceBillDiscount.fixed(1000), discountMinor: 1000,
           source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: '',
           stage: 'Completed', needsDelivery: false, createdAt: seed.finance.asOf,
-          itemSnapshots: const [WorkspaceOrderItemSnapshot(productId: 'oil',
+          itemSnapshots: [WorkspaceOrderItemSnapshot(productId: 'oil',
               name: 'Sunflower oil', pack: '1 L', quantity: 1,
-              unitPricePaise: 26000, lineTotalPaise: 25000)]);
+              unitPricePaise: amount + 1000, lineTotalPaise: amount)]);
       work.workspaceOrders.clear();
       work.workspaceOrders.add(order);
       work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: payment.invoiceId!,
@@ -23895,7 +23897,7 @@ void main() {
           billingDetails: variant == 'paid'
               ? const WorkspaceBillingDetails(name: 'Recorded customer')
               : const WorkspaceBillingDetails(),
-          items: order.items, amount: 250,
+          items: order.items, amount: amount ~/ 100,
           discount: order.discount, discountMinor: 1000,
           payment: 'Cash', issuedAt: order.createdAt));
       if (variant == 'stale') {
@@ -23904,17 +23906,21 @@ void main() {
       }
       work.setWorkspaceOrderFilter('Done');
       await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
-          work: work, viewport: const Size(915, 412), textScale: 2);
+          work: work, viewport: Size(display.$1, display.$2), textScale: display.$3);
       final entry = find.byKey(Key('work-order-history-open-${order.id}'));
       await tester.ensureVisible(entry);
-      await tester.tap(entry);
+      await tester.tapAt(tester.getTopLeft(entry) + const Offset(12, 12));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-order-inline-invoice')), findsOneWidget);
       expect(find.text(variant == 'part-paid' ? 'Original order customer'
           : variant == 'name-missing' ? 'Customer name not recorded'
           : 'Recorded customer'), findsOneWidget);
       expect(find.text(payment.customerId), findsOneWidget);
-      expect(find.text('Received ₹${paid ~/ 100} · Due ₹${due ~/ 100}'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('work-order-received-amount'))).data,
+          variant == 'large-value' ? '₹1,00,00,000' : '₹${paid ~/ 100}');
+      expect(tester.widget<Text>(find.byKey(const Key('work-order-due-amount'))).data,
+          '₹${due ~/ 100}');
+      expect(find.byKey(const Key('work-dashboard-search')), findsNothing);
       expect(find.byKey(const Key('work-order-refunded-amount')),
           refunded > 0 ? findsOneWidget : findsNothing);
       expect(find.byKey(const Key('work-order-payment-stale')),
@@ -23923,12 +23929,23 @@ void main() {
       expect(find.text('Open invoice'), findsNothing);
       expect(find.byType(BottomSheet), findsNothing);
       expect(tester.takeException(), isNull);
+      if (display.$3 == 1) {
+        expect(tester.getTopLeft(find.text('Sunflower oil')).dy, lessThan(500));
+        expect(tester.getTopLeft(find.byKey(const Key('work-order-received-amount'))).dy,
+            closeTo(tester.getTopLeft(find.byKey(const Key('work-order-due-amount'))).dy, 1));
+      }
       await tester.ensureVisible(find.text('Sunflower oil'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(work.workspaceInvoices.single.id, payment.invoiceId);
       expect(work.workspaceFinance!.payments.single, same(payment));
+      await tester.tap(find.byKey(const Key('work-operation-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-search')), findsOneWidget);
+      expect(find.text('Customer orders'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
+    }
   }
 
   for (final display in [(320.0, 568.0), (915.0, 412.0)]) {
@@ -23962,6 +23979,20 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(work.workspaceInvoices.single.id, 'ORIGINAL-THIRTY-INVOICE');
       expect(find.byType(BottomSheet), findsNothing);
+      // Scroll offsets and disclosure booleans must not share PageStorage.
+      await tester.tap(find.byKey(const Key('work-operation-back')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(entry);
+      await tester.tapAt(tester.getTopLeft(entry) + const Offset(12, 12));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.byKey(const Key('work-invoice-details')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-invoice-details')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Sold by:'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(work.workspaceInvoices.single.id, 'ORIGINAL-THIRTY-INVOICE');
     });
   }
 
