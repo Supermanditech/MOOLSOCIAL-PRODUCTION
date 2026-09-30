@@ -20424,14 +20424,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
               ],
             ),
           ),
-          if (widget.orderId != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Text(
-                widget.orderId!,
-                key: const Key('work-focused-order-id'),
-              ),
-            ),
           if (widget.orderId == null)
             Row(
               children: [
@@ -20624,12 +20616,16 @@ class _ExactOrderInformation extends StatelessWidget {
     this.paymentLabel,
     this.showPayment = true,
     this.showFacts = true,
+    this.invoiceStyle = false,
+    this.stageLabel,
   });
   final WorkspaceOrderRecord order;
   final bool showItems;
   final String? paymentLabel;
   final bool showPayment;
   final bool showFacts;
+  final bool invoiceStyle;
+  final String? stageLabel;
 
   static String _price(int paise) {
     final fraction = paise % 100;
@@ -20639,6 +20635,7 @@ class _ExactOrderInformation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (invoiceStyle) return _invoiceInformation(context);
     final localizations = MaterialLocalizations.of(context);
     final placed = order.createdAt.toLocal();
     final facts = <(String, String)>[
@@ -20792,6 +20789,139 @@ class _ExactOrderInformation extends StatelessWidget {
             ),
           ],
         ],
+      ],
+    );
+  }
+
+  // Opt-in Orders details only; approved invoice/collection callers stay intact.
+  Widget _invoiceInformation(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    String date(DateTime value) {
+      final local = value.toLocal();
+      return '${localizations.formatShortDate(local)} · '
+          '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+    }
+    final lines = order.itemSnapshots;
+    final reconciled = order.hasCompleteItemSnapshot &&
+        order.validBillAmounts &&
+        lines.fold<int>(0, (sum, line) => sum + line.lineTotalPaise) ==
+            order.payableMinor &&
+        lines.fold<int>(0, (sum, line) =>
+            sum + line.quantity * line.unitPricePaise) == order.subtotalMinor;
+    final facts = <(String, String)>[
+      ('Placed', date(order.createdAt)),
+      ('Order status', order.stage == 'Confirmed'
+          ? 'Awaiting acceptance' : stageLabel ?? order.stage),
+      ('Payment', (paymentLabel ?? order.payment).trim().isEmpty
+          ? 'Payment details unavailable' : paymentLabel ?? order.payment),
+      ('Ordered via', order.source == 'App' ? 'MoolSocial app' : order.source),
+      ('Fulfilment', order.isCustomerCollection ? 'Collect at store'
+          : order.fulfilment.isEmpty ? 'Awaiting confirmation' : order.fulfilment),
+      if (order.fulfilmentDeadline case final deadline?)
+        ('Fulfil by', date(deadline)),
+      if (!order.isClosed)
+        if (order.actionDeadline case final deadline?)
+          ('Accept by', date(deadline)),
+      if (order.needsDelivery || order.address.trim().isNotEmpty)
+        ('Deliver to', order.address.trim().isEmpty
+            ? 'Address not yet available' : order.address),
+      if (order.rejectionReason?.trim().isNotEmpty == true)
+        ('Cancellation reason', order.rejectionReason!),
+    ];
+    return Column(
+      key: Key('work-exact-order-information-${order.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final fact in facts)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: _StoreScaledPair(
+              first: Text(fact.$1, style: const TextStyle(
+                  color: MoolColors.muted, fontSize: 12)),
+              second: Text(fact.$2,
+                  key: fact.$1 == 'Order status'
+                      ? Key('work-order-stage-label-${order.id}') : null,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(color: MoolColors.ink,
+                      fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        if (showItems) ...[
+          const Divider(height: 16, color: Color(0xFFE5E8F1)),
+          const Text('Ordered items', style: TextStyle(
+            color: MoolColors.navy, fontSize: 13, fontWeight: FontWeight.w600)),
+          if (order.hasCompleteItemSnapshot) ...[
+            const Padding(
+              padding: EdgeInsets.only(top: 6, bottom: 2),
+              child: Row(children: [
+                Expanded(child: Text('Quantity × price', style: TextStyle(
+                    color: MoolColors.muted, fontSize: 11))),
+                Text('Amount', style: TextStyle(
+                    color: MoolColors.muted, fontSize: 11)),
+              ]),
+            ),
+            if (reconciled && order.discountMinor > 0)
+              const Text('Line amounts after bill discount', style: TextStyle(
+                  color: MoolColors.muted, fontSize: 11)),
+            for (final line in lines)
+              Container(
+                key: Key('work-exact-order-item-${line.productId}'),
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                decoration: const BoxDecoration(border: Border(
+                    bottom: BorderSide(color: Color(0xFFE8EAF0), width: .6))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  Text(line.name, style: const TextStyle(color: MoolColors.ink,
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+                  if (line.pack.trim().isNotEmpty)
+                    Text(line.pack, style: const TextStyle(
+                        color: MoolColors.muted, fontSize: 11)),
+                  _StoreMoneyLine(
+                    alignAmountToEnd: true,
+                    leading: Text('${line.quantity} × ${_price(line.unitPricePaise)}',
+                        style: const TextStyle(color: MoolColors.ink, fontSize: 12)),
+                    value: _price(line.lineTotalPaise),
+                    style: const TextStyle(color: MoolColors.ink,
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ]),
+              ),
+          ] else ...[
+            Text(order.items, style: const TextStyle(
+                color: MoolColors.ink, fontSize: 13)),
+            const Text('Item prices are not available on this order.',
+                key: Key('work-exact-order-prices-unavailable'),
+                style: TextStyle(color: MoolColors.muted, fontSize: 12)),
+          ],
+        ],
+        const SizedBox(height: 8),
+        if (reconciled && order.discountMinor > 0) ...[
+          _StoreMoneyLine(alignAmountToEnd: true,
+              leading: const Text('Subtotal', style: TextStyle(
+                  color: MoolColors.muted, fontSize: 12)),
+              value: _price(order.subtotalMinor),
+              style: const TextStyle(color: MoolColors.ink,
+                  fontSize: 13, fontWeight: FontWeight.w600)),
+          _StoreMoneyLine(alignAmountToEnd: true,
+              leading: Text(order.discount.kind == 'percentage'
+                  ? 'Bill discount (${order.discount.value / 100}%)' : 'Bill discount',
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 12)),
+              value: '−${_price(order.discountMinor)}',
+              style: const TextStyle(color: MoolColors.ink,
+                  fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+        if (!reconciled)
+          const Text('Price breakdown unavailable · saved total shown',
+              key: Key('work-order-breakdown-unavailable'),
+              style: TextStyle(color: MoolColors.muted, fontSize: 11)),
+        _StoreMoneyLine(
+          alignAmountToEnd: true,
+          leading: const Text('Order total', style: TextStyle(
+              color: MoolColors.navy, fontSize: 14, fontWeight: FontWeight.w700)),
+          value: _price(order.payableMinor),
+          style: const TextStyle(color: MoolColors.navy,
+              fontSize: 14, fontWeight: FontWeight.w700),
+        ),
       ],
     );
   }
@@ -20964,6 +21094,9 @@ class _LiveOrderTicket extends StatelessWidget {
   Widget build(BuildContext context) {
     final stage = order.stage;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    final invoiceAccount = session.workspaceFinance?.accountScope;
+    final linkedInvoices = detailed ? session.workspaceInvoices.where(
+        (invoice) => invoice.orderId == order.id).toList() : <WorkspaceCustomerInvoice>[];
     bool sameStore() =>
         context.mounted &&
         storeId == (session.activeWorkspace?.id ?? session.workspaceId);
@@ -21036,7 +21169,13 @@ class _LiveOrderTicket extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (order.isCustomerCollection)
+              if (detailed) ...[
+                Text(order.customer, style: const TextStyle(
+                    color: MoolColors.ink, fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(order.id, key: const Key('work-focused-order-id'),
+                    style: const TextStyle(color: MoolColors.muted, fontSize: 11)),
+                const SizedBox(height: 6),
+              ] else if (order.isCustomerCollection)
                 Text(
                   '${order.id} · ${session.workspaceOrderStageLabel(order)}',
                   key: Key('work-order-stage-label-${order.id}'),
@@ -21087,8 +21226,8 @@ class _LiveOrderTicket extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-              const SizedBox(height: 8),
-              Text(
+              if (!detailed) const SizedBox(height: 8),
+              if (!detailed) Text(
                 order.customer,
                 style: const TextStyle(
                   color: MoolColors.ink,
@@ -21108,12 +21247,42 @@ class _LiveOrderTicket extends StatelessWidget {
                     fontSize: 10.5,
                   ),
                 ),
-              const SizedBox(height: 7),
+              if (!detailed) const SizedBox(height: 7),
               if (detailed)
                 _ExactOrderInformation(
                   order: order,
                   showItems: packingLines.isEmpty,
                   paymentLabel: session.workspaceOrderPaymentLabel(order),
+                  invoiceStyle: true,
+                  stageLabel: session.workspaceOrderStageLabel(order),
+                ),
+              if (detailed && !session.workspaceFinanceStale && linkedInvoices.length == 1)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    key: Key('work-order-invoice-open-${order.id}'),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                    label: const Text('Open invoice'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: MoolColors.navy,
+                      minimumSize: const Size(48, 48),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    onPressed: () {
+                      final candidates = session.workspaceInvoices.where(
+                          (invoice) => invoice.orderId == order.id).toList();
+                      if (!sameStore() || session.workspaceFinanceStale ||
+                          session.workspaceFinance?.accountScope != invoiceAccount ||
+                          candidates.length != 1 ||
+                          candidates.single.id != linkedInvoices.single.id ||
+                          !session.visibleWorkspaceOrders.any(
+                              (current) => current.id == order.id)) {
+                        session.showNotice('The linked invoice is unavailable. Reopen the order.');
+                        return;
+                      }
+                      _showWorkspaceInvoiceSheet(context, session, candidates.single);
+                    },
+                  ),
                 ),
               _StoreIssueReviews(
                 session: session,

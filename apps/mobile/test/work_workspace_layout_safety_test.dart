@@ -23714,6 +23714,136 @@ void main() {
     });
   }
 
+  // O03-V05/V06 automated fixtures; never runtime/user-flow acceptance data.
+  for (final display in [(412.0, 915.0, 1.0), (320.0, 568.0, 2.0),
+      (915.0, 412.0, 2.0)]) {
+    testWidgets('O03 details discounted full items and statuses $display', (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      final lines = List.generate(30, (index) => WorkspaceOrderItemSnapshot(
+        productId: 'DETAIL-$index', name: 'Original long product $index',
+        pack: '1 kg pack', quantity: 1, unitPricePaise: 10000,
+        lineTotalPaise: index == 0 ? 9000 : 10000));
+      final order = WorkspaceOrderRecord(id: 'DETAIL-LONG-REFERENCE-20260930',
+        customer: 'Long customer name · 9001234567', items: 'Original 30 products',
+        quantities: {for (final line in lines) line.productId: 1}, amount: 2990,
+        discount: const WorkspaceBillDiscount.fixed(1000), discountMinor: 1000,
+        source: 'App', fulfilment: 'MoolSocial delivery', payment: 'Refunded',
+        address: 'Long delivery address, original building, Market Road',
+        stage: 'Completed', needsDelivery: true, createdAt: DateTime(2026,9,30,9,45),
+        fulfilmentDeadline: DateTime(2026,9,30,12), itemSnapshots: lines);
+      // This responsive fixture isolates one History record; active queue stays.
+      work.workspaceOrders.removeWhere((record) => record.isClosed);
+      work.workspaceOrders.add(order);
+      final originals = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+      final active = work.currentWorkspaceOrderId;
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders', work: work,
+          viewport: Size(display.$1, display.$2), textScale: display.$3);
+      final entry = find.byKey(Key('work-order-history-open-${order.id}'));
+      await tester.ensureVisible(entry);
+      await tester.tapAt(tester.getTopLeft(entry) + const Offset(12, 12));
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+      expect(find.text(order.id), findsOneWidget);
+      expect(find.text(order.customer), findsOneWidget);
+      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('Refunded'), findsOneWidget);
+      expect(find.text('Fulfilment'), findsOneWidget);
+      expect(find.text('Fulfil by'), findsOneWidget);
+      expect(find.text('Receive by'), findsNothing);
+      expect(find.text('Subtotal'), findsOneWidget);
+      expect(find.text('₹3,000'), findsOneWidget);
+      expect(find.text('−₹10'), findsOneWidget);
+      expect(find.text('₹2,990'), findsOneWidget);
+      expect(find.text('Line amounts after bill discount'), findsOneWidget);
+      expect(find.byKey(const Key('work-order-breakdown-unavailable')), findsNothing);
+      expect(find.text('Accept'), findsNothing);
+      expect(find.text('Mark ready'), findsNothing);
+      expect(find.text('Open invoice'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.byKey(const Key('work-exact-order-item-DETAIL-29')));
+      await tester.pumpAndSettle();
+      expect(find.text('Original long product 29').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('Order total'));
+      await tester.pumpAndSettle();
+      expect(find.text('₹2,990').hitTestable(), findsOneWidget);
+      expect(work.workspaceOrders, orderedEquals(originals));
+      expect(work.currentWorkspaceOrderId, active);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final kind in ['none', 'fixed', 'percentage', 'unknown']) {
+    testWidgets('O03 details saved adjustment $kind', (tester) async {
+      final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+      final discount = kind == 'fixed' ? const WorkspaceBillDiscount.fixed(1000)
+          : kind == 'percentage' ? const WorkspaceBillDiscount.percentage(1000)
+          : const WorkspaceBillDiscount.none();
+      final reduced = kind == 'none' ? 0 : kind == 'percentage' ? 2600 : 1000;
+      final net = 26000 - reduced;
+      final order = WorkspaceOrderRecord(id: 'ADJUST-$kind', customer: 'Test customer',
+          items: 'Sunflower oil', quantities: const {'oil':1}, amount: net ~/ 100,
+          remainderPaise: net % 100, discount: discount,
+          discountMinor: kind == 'unknown' ? 0 : reduced, source: 'Counter',
+          fulfilment: 'At the shop', payment: 'Refunded', address: '',
+          stage: 'Completed', needsDelivery: false, createdAt: DateTime(2026,9,30),
+          itemSnapshots: [WorkspaceOrderItemSnapshot(productId: 'oil',
+              name: 'Sunflower oil', pack: '1 L', quantity:1,
+              unitPricePaise:26000, lineTotalPaise:net)]);
+      work.workspaceOrders.add(order);
+      await mount(tester, route:'/app/work/workspace/dashboard?section=orders', work:work);
+      final entry = find.byKey(Key('work-order-history-open-${order.id}'));
+      await tester.ensureVisible(entry);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(find.text('1 × ₹260'), findsOneWidget);
+      expect(find.text('Order total'), findsOneWidget);
+      expect(find.byKey(const Key('work-order-breakdown-unavailable')),
+          kind == 'unknown' ? findsOneWidget : findsNothing);
+      expect(find.text('Subtotal'), reduced > 0 && kind != 'unknown'
+          ? findsOneWidget : findsNothing);
+      if (kind == 'percentage') expect(find.text('Bill discount (10.0%)'), findsOneWidget);
+      if (kind == 'unknown') expect(find.text('−₹10'), findsNothing);
+      expect(work.workspaceOrders.last, same(order));
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      if (kind == 'fixed') {
+        final subtotalRight = tester.getRect(find.text('₹260')).right;
+        final discountRight = tester.getRect(find.text('−₹10')).right;
+        final totalRight = tester.getRect(find.text('₹250').last).right;
+        expect(subtotalRight, closeTo(totalRight, 1));
+        expect(discountRight, closeTo(totalRight, 1));
+        await captureStoreView(tester, 'orders-v05-fixed-discount');
+      }
+    });
+  }
+  testWidgets('O03 details invoice link requires unique current saved record', (tester) async {
+    final work = storeViewFixture()..setWorkspaceOrderFilter('Done');
+    final order = work.workspaceOrders.singleWhere((o) => o.id == 'SALE-1042');
+    final invoice = WorkspaceCustomerInvoice(id:'INV-SALE-1042', orderId:order.id,
+        customer:order.customer, items:order.items, amount:order.amount,
+        payment:order.payment, issuedAt:order.createdAt);
+    work.workspaceInvoices.add(invoice);
+    await mount(tester,route:'/app/work/workspace/dashboard?section=orders',work:work);
+    final entry = find.byKey(Key('work-order-history-open-${order.id}'));
+    await tester.ensureVisible(entry);
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+    final button = find.byKey(Key('work-order-invoice-open-${order.id}'));
+    expect(button, findsOneWidget);
+    final open = tester.widget<TextButton>(button).onPressed!;
+    work.workspaceInvoices.clear();
+    open();
+    await tester.pumpAndSettle();
+    expect(work.noticeMessage,'The linked invoice is unavailable. Reopen the order.');
+    expect(work.workspaceInvoices,isEmpty);
+    work.workspaceInvoices.addAll([invoice,invoice]);
+    work.notifyListeners();
+    await tester.pumpAndSettle();
+    expect(button,findsNothing);
+    expect(tester.takeException(),isNull);
+  });
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('Exact order purchased facts have no repeated summary $scale', (
       tester,
