@@ -5973,10 +5973,35 @@ class WorkspacePurchaseEntryDraft {
     'buyerGstin', 'priceBasis', 'taxTreatment', 'reverseCharge', 'billDiscount',
     'freight', 'otherCharges', 'roundOff', 'taxableValue', 'cgst', 'sgst', 'igst',
     'cess', 'invoiceTotal', 'receiptStatus', 'receivedDate', 'paymentStatus',
-    'paidAmount', 'paymentMethod', 'paymentReference', 'paymentDate', 'dueDate', 'notes'};
+    'paidAmount', 'paymentMethod', 'paymentReference', 'paymentDate', 'dueDate', 'notes',
+    'placeOfSupplyCode', 'buyerUin', 'buyerState', 'buyerStateCode', 'deliveryAddress',
+    'deliveryState', 'deliveryStateCode', 'supplyValue', 'sgstAmount', 'utgst',
+    'eInvoiceStatus', 'irn', 'ackNumber', 'ackDate', 'qrStatus', 'signatureStatus',
+    'eInvoiceDeclaration'};
   static const goodsExtraKeys = {'hsn', 'barcode', 'freeQuantity', 'batch', 'expiry',
     'mrp', 'sellingPrice', 'discount', 'gstRate', 'cess', 'lineTotal',
-    'receivedQuantity', 'damagedQuantity', 'shortQuantity'};
+    'receivedQuantity', 'damagedQuantity', 'shortQuantity', 'unitCode', 'taxableValue',
+    'cgstRate', 'cgst', 'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate'};
+  // Review an external document without truncating it or blocking a partial draft.
+  // These two format hints are not GST/IRN validation or ITC eligibility.
+  List<String> get invoiceFormatWarnings => reviewInvoiceFormat(
+    invoiceReference, invoiceDate, details['documentType']);
+  static List<String> reviewInvoiceFormat(String reference, String issuedOn, String? documentType) {
+    if (documentType != 'GST invoice') return const [];
+    final warnings = <String>[];
+    if (!RegExp(r'^[A-Za-z0-9/-]{1,16}$').hasMatch(reference)) {
+      warnings.add('Check invoice number: up to 16 letters, digits, / or -.');
+    }
+    final match = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(issuedOn);
+    bool dateValid = false;
+    if (match != null) {
+      final day = int.parse(match[1]!), month = int.parse(match[2]!), year = int.parse(match[3]!);
+      final date = DateTime(year, month, day);
+      dateValid = date.day == day && date.month == month && date.year == year && year > 0;
+    }
+    if (!dateValid) warnings.add('Check invoice date: use a valid DD/MM/YYYY date.');
+    return List.unmodifiable(warnings);
+  }
   bool get valid => id.isNotEmpty && supplierId.isNotEmpty &&
       invoiceReference.length <= 120 && invoiceDate.length <= 10 &&
       !updatedAt.isBefore(createdAt) && goods.length <= 200 &&

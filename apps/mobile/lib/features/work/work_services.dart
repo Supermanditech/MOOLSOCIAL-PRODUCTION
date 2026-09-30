@@ -1481,11 +1481,19 @@ class WorkPurchaseInvoiceSuggestions {
   final List<Map<String, String>> goods;
   static WorkPurchaseInvoiceSuggestions parse(String text) {
     const labels = {'supplier': 'supplierName', 'sold by': 'supplierName',
+      'supplier address':'supplierAddress', 'supplier phone':'supplierPhone',
       'supplier gstin': 'supplierGstin', 'buyer gstin': 'buyerGstin',
+      'buyer uin':'buyerUin', 'buyer name':'buyerName', 'buyer address':'buyerAddress',
+      'buyer state':'buyerState', 'buyer state code':'buyerStateCode',
+      'delivery address':'deliveryAddress', 'delivery state':'deliveryState',
+      'delivery state code':'deliveryStateCode', 'place of supply code':'placeOfSupplyCode',
       'invoice no': 'invoiceReference', 'invoice number': 'invoiceReference',
       'bill no': 'invoiceReference', 'invoice date': 'invoiceDate', 'bill date': 'invoiceDate',
       'place of supply': 'placeOfSupply', 'taxable value': 'taxableValue',
-      'cgst': 'cgst', 'sgst': 'sgst', 'igst': 'igst', 'cess': 'cess',
+      'goods value':'supplyValue', 'cgst': 'cgst', 'sgst': 'sgstAmount', 'utgst':'utgst',
+      'sgst / utgst':'sgst', 'igst': 'igst', 'cess': 'cess',
+      'irn':'irn', 'ack no':'ackNumber', 'acknowledgement number':'ackNumber',
+      'ack date':'ackDate', 'acknowledgement date':'ackDate',
       'grand total': 'invoiceTotal', 'invoice total': 'invoiceTotal'};
     final candidates = <String, Set<String>>{};
     final rows = text.split(RegExp(r'\r?\n'));
@@ -1494,9 +1502,15 @@ class WorkPurchaseInvoiceSuggestions {
       if (match == null) continue;
       final key = labels[match[1]!.trim().toLowerCase().replaceAll('.', '')];
       final value = match[2]!.trim();
-      if (key == null || value.length > 120) continue;
+      if (key == null || value.length > (key.endsWith('Address') ? 500 : 120)) continue;
       if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) continue;
-      if (key == 'invoiceDate') {
+      if (key == 'irn' && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) continue;
+      if (const {'supplyValue', 'taxableValue', 'cgst', 'sgstAmount', 'sgst', 'utgst',
+          'igst', 'cess', 'invoiceTotal'}.contains(key)) {
+        final amount = double.tryParse(value);
+        if (amount == null || !amount.isFinite || amount < 0) continue;
+      }
+      if (key == 'invoiceDate' || key == 'ackDate') {
         if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value)) continue;
         final parts = value.split('/').map(int.parse).toList();
         final date = DateTime(parts[2], parts[1], parts[0]);
@@ -1509,7 +1523,14 @@ class WorkPurchaseInvoiceSuggestions {
     final goods = <Map<String, String>>[];
     List<String>? headers;
     const columns = {'description':'name', 'item':'name', 'product':'name', 'qty':'quantity',
-      'quantity':'quantity', 'rate':'cost', 'cost':'cost', 'unit':'pack', 'hsn':'hsn'};
+      'quantity':'quantity', 'rate':'cost', 'cost':'cost', 'unit':'pack', 'hsn':'hsn',
+      'uqc':'unitCode', 'unit code':'unitCode', 'discount':'discount',
+      'taxable value':'taxableValue', 'gst %':'gstRate', 'gst rate':'gstRate',
+      'cgst %':'cgstRate', 'cgst rate':'cgstRate', 'cgst':'cgst', 'cgst amount':'cgst',
+      'sgst %':'sgstRate', 'sgst rate':'sgstRate', 'sgst':'sgst', 'sgst amount':'sgst',
+      'utgst %':'utgstRate', 'utgst rate':'utgstRate', 'utgst':'utgst', 'utgst amount':'utgst',
+      'igst %':'igstRate', 'igst rate':'igstRate', 'igst':'igst', 'igst amount':'igst',
+      'cess %':'cessRate', 'cess rate':'cessRate', 'cess':'cess', 'amount':'lineTotal'};
     for (final row in rows) {
       if (!row.contains('|') && !row.contains('\t')) { headers = null; continue; }
       final cells = row.split(RegExp(r'\||\t')).map((c) => c.trim()).toList();
@@ -1522,6 +1543,16 @@ class WorkPurchaseInvoiceSuggestions {
       if (headers == null || cells.length != headers.length || cells.any((c) => c.length > 200)) continue;
       final line = <String, String>{'productId':'', 'name':'', 'pack':'', 'quantity':'', 'cost':''};
       for (var i=0; i<headers.length; i++) { if (headers[i].isNotEmpty) line[headers[i]] = cells[i]; }
+      // Retain proven columns; uncertain optional numeric cells need manual review.
+      for (final key in const ['discount', 'taxableValue', 'gstRate', 'cgstRate', 'cgst',
+          'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate', 'cess', 'lineTotal']) {
+        final value = line[key];
+        if (value == null || value.isEmpty) continue;
+        final number = double.tryParse(value);
+        if (number == null || !number.isFinite || number < 0) {
+          line.remove(key);
+        }
+      }
       final quantity = double.tryParse(line['quantity']!);
       final cost = double.tryParse(line['cost']!);
       if (line['name']!.isNotEmpty && quantity != null && quantity.isFinite && quantity > 0 &&

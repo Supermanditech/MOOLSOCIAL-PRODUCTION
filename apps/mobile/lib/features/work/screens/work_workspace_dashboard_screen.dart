@@ -11596,7 +11596,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
     decoration: InputDecoration(labelText: label, filled: false, isDense: true,
       labelStyle: const TextStyle(fontSize: 12, color: MoolColors.muted),
+      border: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
       enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
+      focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
       contentPadding: const EdgeInsets.symmetric(vertical: 10)),
     items: [const DropdownMenuItem(value: '', child: Text('Not recorded')),
       for (final value in choices) DropdownMenuItem(value: value, child: Text(value))],
@@ -11645,6 +11647,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   void _applySuggestions(WorkspacePurchaseInvoiceAttachment a) {
     final suggestions = WorkPurchaseInvoiceSuggestions.parse(a.detectedText);
     final targets = {'supplierName': _name, 'supplierGstin': _gstin,
+      'supplierAddress': _address, 'supplierPhone': _phone,
       'invoiceReference': _reference, 'invoiceDate': _date, ..._details};
     setState(() {
       for (final e in suggestions.fields.entries) {
@@ -11764,20 +11767,54 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               _optionalDetails([
                 (title: 'Bill & tax', key: 'work-purchase-tax-details', fields: [
                 _choice('Bill type', 'documentType', ['GST invoice', 'Bill of supply', 'Other bill']),
-                _detail('Place of supply — State', 'placeOfSupply'),
+                for (final warning in WorkspacePurchaseEntryDraft.reviewInvoiceFormat(
+                    _reference.text, _date.text, _details['documentType']!.text))
+                  Text(warning, key: ValueKey('purchase-format-$warning'),
+                    style: const TextStyle(fontSize: 11, color: Color(0xff8b3b13))),
+                _compactFields([_detail('Place of supply', 'placeOfSupply'),
+                  _detail('State code', 'placeOfSupplyCode')]),
                 _choice('Item prices', 'priceBasis', ['Before tax', 'Including tax']),
-                _choice('Tax shown on bill', 'taxTreatment', ['CGST + SGST / UTGST', 'IGST', 'No tax']),
+                _choice('Tax shown on bill', 'taxTreatment', ['CGST + SGST', 'CGST + UTGST', 'IGST', 'No tax',
+                  if (_details['taxTreatment']!.text == 'CGST + SGST / UTGST') 'CGST + SGST / UTGST']),
                 _choice('Reverse charge shown?', 'reverseCharge', ['Yes', 'No']),
-                _compactFields([_detail('Value before tax ₹', 'taxableValue', number: true),
-                  _detail('CGST ₹', 'cgst', number: true), _detail('SGST / UTGST ₹', 'sgst', number: true),
+                _compactFields([_detail('Taxable value ₹', 'taxableValue', number: true),
+                  _detail('Goods value ₹', 'supplyValue', number: true),
+                  _detail('CGST ₹', 'cgst', number: true), _detail('SGST ₹', 'sgstAmount', number: true),
+                  _detail('UTGST ₹', 'utgst', number: true),
                   _detail('IGST ₹', 'igst', number: true), _detail('Cess ₹', 'cess', number: true),
                   _detail('Bill discount ₹', 'billDiscount', number: true), _detail('Freight ₹', 'freight', number: true),
                   _detail('Other charges ₹', 'otherCharges', number: true), _detail('Round off ₹', 'roundOff', number: true)]),
-                const Text('Enter the amounts printed on the bill. Tax treatment is not inferred from GSTIN.',
-                  style: TextStyle(fontSize: 11, color: MoolColors.ink))]),
+                if (_details['sgst']!.text.isNotEmpty) ...[
+                  _compactFields([_detail('Earlier SGST / UTGST ₹', 'sgst', number: true)]),
+                  const Text('Earlier combined tax entry kept. Check the original before separating it.',
+                    style: TextStyle(fontSize: 11, color: MoolColors.muted))],
+                const Text('Copy printed amounts. Taxable value is the taxed amount after discount, before GST.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                _section('Original invoice evidence', 'work-purchase-original-evidence', [
+                  _choice('E-invoice details on bill', 'eInvoiceStatus',
+                    ['IRN / QR shown', 'Supplier declaration shown', 'Not shown']),
+                  if (_details['eInvoiceStatus']!.text == 'IRN / QR shown' || _details['irn']!.text.isNotEmpty) ...[
+                    _field('IRN on invoice', _details['irn']!, 'work-purchase-irn', limit: 64),
+                    _compactFields([_detail('Acknowledgement', 'ackNumber'),
+                      _detail('Acknowledged on', 'ackDate', date: true)]),
+                    _choice('QR code on invoice', 'qrStatus', ['Shown on invoice', 'Not shown'])],
+                  if (_details['eInvoiceStatus']!.text == 'Supplier declaration shown' ||
+                      _details['eInvoiceDeclaration']!.text.isNotEmpty)
+                    _detail('Supplier declaration on bill', 'eInvoiceDeclaration'),
+                  _choice('Supplier signature on bill', 'signatureStatus',
+                    ['Signed on invoice', 'Electronic document', 'Not shown']),
+                  const Text('Keep the original copy. Entering these details does not verify the invoice or claim tax credit.',
+                    style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                ])]),
                 (title: 'Buyer details', key: 'work-purchase-buyer-details', fields: [
                 _detail('Business name on bill', 'buyerName'), _detail('Business address on bill', 'buyerAddress'),
-                _field('Your GSTIN on bill (optional)', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15)]),
+                _field('Your GSTIN on bill (optional)', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15),
+                _field('UIN, only if printed', _details['buyerUin']!, 'work-purchase-buyerUin', limit: 15),
+                _compactFields([_detail('Buyer State', 'buyerState'), _detail('State code', 'buyerStateCode')]),
+                _section('Delivery address on invoice', 'work-purchase-delivery-details', [
+                  _detail('Delivery address, if different', 'deliveryAddress'),
+                  _compactFields([_detail('Delivery State', 'deliveryState'), _detail('State code', 'deliveryStateCode')]),
+                ])]),
                 (title: 'Goods received', key: 'work-purchase-receipt-details', fields: [
                 _choice('Goods status', 'receiptStatus', ['Received at Store', 'Awaiting delivery', 'Already added to Stock']),
                 _compactFields([_detail('Received on', 'receivedDate', date: true)]),
@@ -11860,15 +11897,25 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _section('More item details', 'work-purchase-item-details-$index', [
         const Text('HSN is the item code printed on the bill. Leave unavailable details blank.',
           style: TextStyle(fontSize: 11, color: MoolColors.ink)),
-        _compactFields([for (final e in const {'hsn':'HSN code', 'barcode':'Barcode / supplier code',
+        _compactFields([for (final e in const {'hsn':'HSN code', 'barcode':'Barcode / code',
+          'unitCode':'Unit code on bill', 'taxableValue':'Taxable value ₹',
           'freeQuantity':'Free qty', 'batch':'Batch', 'expiry':'Expiry on', 'mrp':'MRP ₹',
           'sellingPrice':'Selling price ₹', 'discount':'Discount ₹', 'gstRate':'GST %', 'cess':'Cess ₹',
           'lineTotal':'Item amount ₹', 'receivedQuantity':'Received qty', 'damagedQuantity':'Damaged qty',
           'shortQuantity':'Short qty'}.entries)
           _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 200,
-            hint: e.key == 'expiry' ? 'DD/MM/YYYY' : null,
-            keyboard: const ['hsn','barcode','batch','expiry'].contains(e.key) ? null :
-              const TextInputType.numberWithOptions(decimal: true))])]),
+            hint: e.key == 'expiry' ? 'DD/MM/YYYY' : e.key == 'barcode' ? 'Barcode / supplier code' : null,
+            keyboard: const ['hsn','barcode','batch','expiry','unitCode'].contains(e.key) ? null :
+              const TextInputType.numberWithOptions(decimal: true))]),
+        _section('GST split on invoice', 'work-purchase-gst-split-$index', [
+          const Text('Copy each tax rate and amount shown. Leave components not shown blank.',
+            style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+          _compactFields([for (final e in const {'cgstRate':'CGST %', 'cgst':'CGST ₹',
+            'sgstRate':'SGST %', 'sgst':'SGST ₹', 'utgstRate':'UTGST %', 'utgst':'UTGST ₹',
+            'igstRate':'IGST %', 'igst':'IGST ₹', 'cessRate':'Cess %'}.entries)
+            _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 200,
+              keyboard: const TextInputType.numberWithOptions(decimal: true))]),
+        ])]),
       const SizedBox(height: 4),
     ]);
   }

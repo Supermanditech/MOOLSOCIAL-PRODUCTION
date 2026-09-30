@@ -3504,6 +3504,155 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('P05-GST same compact form saves explicit tax and buyer details', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
+    await tester.enterText(find.byKey(const Key('work-purchase-reference')), 'LONG-EXTERNAL-INVOICE-REF');
+    await tester.enterText(find.byKey(const Key('work-purchase-date')), '31/02/2026');
+    final section = find.byKey(const Key('work-purchase-tax-details'));
+    await revealPurchaseInput(tester, section);
+    await tester.tap(section);
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-documentType')));
+    await tester.tap(find.byKey(const Key('work-purchase-documentType')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('GST invoice').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Check invoice number: up to 16 letters, digits, / or -.'), findsOneWidget);
+    expect(find.text('Check invoice date: use a valid DD/MM/YYYY date.'), findsOneWidget);
+    for (final value in {'sgstAmount':'24.57', 'utgst':'0', 'placeOfSupplyCode':'27'}.entries) {
+      final field = find.byKey(Key('work-purchase-${value.key}'));
+      await revealPurchaseInput(tester, field);
+      await tester.enterText(field, value.value);
+    }
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-original-evidence')));
+    await tester.tap(find.byKey(const Key('work-purchase-original-evidence')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-irn')), findsNothing);
+    final status = find.byKey(const Key('work-purchase-eInvoiceStatus'));
+    await revealPurchaseInput(tester, status);
+    await tester.tap(status);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('IRN / QR shown').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<DropdownButtonFormField<String>>(status).decoration.focusedBorder,
+      isA<UnderlineInputBorder>(), reason: 'Purchase choices stay inline when focused.');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-placeOfSupply')))
+      .decoration!.labelText, 'Place of supply');
+    final irn = find.byKey(const Key('work-purchase-irn'));
+    await revealPurchaseInput(tester, irn);
+    await tester.enterText(irn, 'a'*64);
+    final buyer = find.byKey(const Key('work-purchase-buyer-details'));
+    await revealPurchaseInput(tester, buyer, delta: -60);
+    await tester.tap(buyer);
+    await tester.pumpAndSettle();
+    for (final value in {'buyerUin':'AS-PRINTED', 'buyerState':'Maharashtra', 'buyerStateCode':'27'}.entries) {
+      final field = find.byKey(Key('work-purchase-${value.key}'));
+      await revealPurchaseInput(tester, field);
+      await tester.enterText(field, value.value);
+    }
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-delivery-details')));
+    await tester.tap(find.byKey(const Key('work-purchase-delivery-details')));
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-deliveryAddress')));
+    await tester.enterText(find.byKey(const Key('work-purchase-deliveryAddress')), 'Evaluation delivery');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    final saved = entry.value!.draft!;
+    expect(saved.invoiceReference, 'LONG-EXTERNAL-INVOICE-REF');
+    expect(saved.invoiceFormatWarnings, hasLength(2));
+    expect(saved.details['sgstAmount'], '24.57');
+    expect(saved.details.containsKey('sgst'), isFalse);
+    expect(saved.details['irn'], 'a'*64);
+    expect(saved.details['buyerUin'], 'AS-PRINTED');
+    expect(saved.details['deliveryAddress'], 'Evaluation delivery');
+    expect(work.workspacePurchases, isEmpty);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(work.workspacePurchaseEntryDraft!.id, saved.id);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    // Automated legacy fixture only: never migrate a combined tax without evidence.
+    final legacy = entry.value!.toJson();
+    (legacy['draft'] as Map)['details'] = {'sgst':'24.57'};
+    entry.value = WorkspacePurchaseEntryBook.fromJson(legacy);
+    await mount(tester, route: '/app/work/workspace/dashboard',
+      work: manualPurchaseFixture(entry), textScale: 1);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, section);
+    await tester.tap(section);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-sgst'))).controller!.text, '24.57');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-sgstAmount'))).controller!.text, isEmpty);
+    expect(find.text('Earlier combined tax entry kept. Check the original before separating it.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final display in [(320.0, 568.0, 2.0, 240.0), (800.0, 360.0, 2.0, 180.0)]) {
+    testWidgets('P05-GST nested invoice fields remain reachable with keyboard $display', (tester) async {
+      await mount(tester, route: '/app/work/workspace/dashboard',
+        work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+      await openPurchaseList(tester);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      for (final key in ['work-purchase-item-details-0', 'work-purchase-gst-split-0']) {
+        final control = find.byKey(Key(key));
+        await revealPurchaseInput(tester, control);
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: key);
+      }
+      for (final key in ['work-purchase-sgstRate-0', 'work-purchase-sgst-0']) {
+        final field = find.byKey(Key(key));
+        await revealPurchaseInput(tester, field);
+        await tester.enterText(field, '4.5');
+        expect(tester.takeException(), isNull, reason: key);
+      }
+      for (final key in ['work-purchase-tax-details', 'work-purchase-original-evidence']) {
+        final control = find.byKey(Key(key));
+        await revealPurchaseInput(tester, control);
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+      }
+      final status = find.byKey(const Key('work-purchase-eInvoiceStatus'));
+      await revealPurchaseInput(tester, status);
+      await tester.tap(status);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('IRN / QR shown').last);
+      await tester.pumpAndSettle();
+      final irn = find.byKey(const Key('work-purchase-irn'));
+      await revealPurchaseInput(tester, irn);
+      await tester.enterText(irn, 'a'*64);
+      expect(tester.takeException(), isNull);
+      final buyer = find.byKey(const Key('work-purchase-buyer-details'));
+      await revealPurchaseInput(tester, buyer, delta: -60);
+      await tester.tap(buyer);
+      await tester.pumpAndSettle();
+      final delivery = find.byKey(const Key('work-purchase-delivery-details'));
+      await revealPurchaseInput(tester, delivery);
+      await tester.tap(delivery);
+      await tester.pumpAndSettle();
+      final address = find.byKey(const Key('work-purchase-deliveryAddress'));
+      await revealPurchaseInput(tester, address);
+      await tester.enterText(address, 'Long evaluation delivery address '*8);
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P05 expanded purchase details save and resume without posting', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -3532,7 +3681,7 @@ void main() {
       await tester.tap(find.byKey(Key(key)));
       await tester.pumpAndSettle();
       final values = switch (section) {
-        'tax' => {'work-purchase-cgst': '30.30', 'work-purchase-sgst': '30.30'},
+        'tax' => {'work-purchase-cgst': '30.30', 'work-purchase-sgstAmount': '30.30'},
         'item' => {'work-purchase-hsn-0': '1006', 'work-purchase-batch-0': 'EVAL-BATCH-1'},
         'receipt' => {'work-purchase-receivedDate': '30/09/2026'},
         _ => {'work-purchase-paidAmount': '100', 'work-purchase-dueDate': '15/10/2026'},

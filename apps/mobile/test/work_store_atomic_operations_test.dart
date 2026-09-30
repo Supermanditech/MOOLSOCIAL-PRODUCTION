@@ -660,6 +660,91 @@ void main() {
       expect(() => WorkspacePurchaseEntryBook.fromJson(wrong), throwsFormatException);
     }
   });
+  test('P05-GST domestic particulars retain legacy fields and secure restart', () async {
+    final raw = jsonDecode(jsonEncode(entryFixture().toJson())) as Map<String, dynamic>;
+    final draft = raw['draft'] as Map<String, dynamic>;
+    draft['details'] = {'placeOfSupplyCode':'27', 'buyerUin':'UIN-AS-PRINTED',
+      'buyerState':'Maharashtra', 'buyerStateCode':'27', 'deliveryAddress':'Evaluation delivery address',
+      'deliveryState':'Maharashtra', 'deliveryStateCode':'27', 'supplyValue':'546',
+      'sgst':'24.57', 'sgstAmount':'', 'utgst':'', 'eInvoiceStatus':'IRN / QR shown',
+      'irn':List.filled(64, 'a').join(), 'ackNumber':'123456789012345',
+      'ackDate':'30/09/2026', 'qrStatus':'Shown on invoice',
+      'signatureStatus':'Electronic document', 'eInvoiceDeclaration':'As printed'};
+    (draft['goods'] as List).single.addAll({'unitCode':'KGS', 'taxableValue':'546',
+      'cgstRate':'4.5', 'cgst':'24.57', 'sgstRate':'4.5', 'sgst':'24.57',
+      'utgstRate':'', 'utgst':'', 'igstRate':'', 'igst':'', 'cessRate':''});
+    final book = WorkspacePurchaseEntryBook.fromJson(raw);
+    final storage = _OrderJournalStorage();
+    await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .save(book, expectedRevision: null);
+    final restored = await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .read('account-A', 'store-A', qa: true);
+    expect(restored!.toJson(), book.toJson());
+    expect(restored.draft!.details['sgst'], '24.57', reason: 'Legacy combined tax is not silently migrated.');
+    expect(restored.draft!.details['sgstAmount'], isEmpty);
+    expect(restored.draft!.goods.single['productId'], 'saved-product-A');
+    for (final unknown in ['unknownDetail', 'unknownGoods']) {
+      final bad = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+      if (unknown == 'unknownDetail') {
+        (bad['draft']['details'] as Map)['issuedByApp'] = 'true';
+      } else {
+        (bad['draft']['goods'] as List).single['taxVerified'] = 'true';
+      }
+      expect(() => WorkspacePurchaseEntryBook.fromJson(bad), throwsFormatException);
+    }
+  });
+
+  test('P05-GST invoice format review keeps nonconforming supplier originals', () {
+    final raw = entryFixture(reference: 'EXTERNAL-NUMBER-TOO-LONG').draft!.toJson();
+    raw['invoiceDate'] = '31/02/2026';
+    raw['details'] = {'documentType':'GST invoice'};
+    final draft = WorkspacePurchaseEntryDraft.fromJson(raw);
+    expect(draft.valid, isTrue, reason: 'A partial external document can still be saved as a draft.');
+    expect(draft.invoiceFormatWarnings, hasLength(2));
+    expect(draft.toJson()['invoiceReference'], 'EXTERNAL-NUMBER-TOO-LONG');
+    expect(draft.toJson()['invoiceDate'], '31/02/2026');
+    expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('AB-123/2026', '29/02/2024', 'GST invoice'), isEmpty);
+    expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('A B', '29/02/2026', 'GST invoice'), hasLength(2));
+    expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('A'*16, '30/09/2026', 'GST invoice'), isEmpty);
+    expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('A'*17, '30/09/2026', 'GST invoice'), hasLength(1));
+    expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('', '', 'Other bill'), isEmpty);
+  });
+
+  test('P05-GST OCR maps explicit identities and tax columns without verification', () {
+    final irn = List.filled(64, 'a').join();
+    final result = WorkPurchaseInvoiceSuggestions.parse('Supplier address: Source address\n'
+      'Buyer name: Buyer only\nBuyer UIN: AS-PRINTED\nBuyer State: Maharashtra\n'
+      'Buyer State code: 27\nDelivery address: Another address\n'
+      'Place of supply code: 27\nSGST: 24.57\nUTGST: 0\nIRN: $irn\n'
+      'Acknowledgement date: 30/09/2026\n'
+      'Item | Qty | Rate | UQC | Taxable value | CGST % | CGST | SGST % | SGST | Amount\n'
+      'Rice | 12 | 45.50 | KGS | 546 | 4.5 | 24.57 | 4.5 | 24.57 | 595.14');
+    expect(result.fields['supplierAddress'], 'Source address');
+    expect(result.fields['buyerName'], 'Buyer only');
+    expect(result.fields['buyerUin'], 'AS-PRINTED');
+    expect(result.fields.containsKey('buyerGstin'), isFalse);
+    expect(result.fields['sgstAmount'], '24.57');
+    expect(result.fields.containsKey('sgst'), isFalse, reason: 'Explicit SGST is not legacy combined tax.');
+    expect(result.fields['irn'], irn);
+    expect(result.fields.containsKey('qrStatus'), isFalse);
+    expect(result.fields.containsKey('eInvoiceStatus'), isFalse);
+    expect(result.goods.single['productId'], isEmpty);
+    expect(result.goods.single['unitCode'], 'KGS');
+    expect(result.goods.single['taxableValue'], '546');
+    expect(result.goods.single['sgstRate'], '4.5');
+    expect(result.goods.single['sgst'], '24.57');
+    expect(WorkPurchaseInvoiceSuggestions.parse('IRN: invalid\nAck date: 31/02/2026').fields, isEmpty);
+    expect(WorkPurchaseInvoiceSuggestions.parse('Buyer name: A\nBuyer name: B').fields, isEmpty);
+    expect(WorkPurchaseInvoiceSuggestions.parse('SGST: NaN\nCGST: -2\nUTGST: Infinity').fields, isEmpty);
+    final address = 'Evaluation address '*15;
+    expect(WorkPurchaseInvoiceSuggestions.parse('Delivery address: $address').fields['deliveryAddress'], address.trim());
+    final uncertain = WorkPurchaseInvoiceSuggestions.parse(
+      'Item | Qty | Rate | SGST % | SGST | Amount\nRice | 2 | 40 | unknown | NaN | 80');
+    expect(uncertain.goods.single.containsKey('sgstRate'), isFalse);
+    expect(uncertain.goods.single.containsKey('sgst'), isFalse);
+    expect(uncertain.goods.single['lineTotal'], '80');
+  });
+
   test('P05 OCR labelled suggestions reject ambiguity invalid dates and unsafe rows', () {
     final parsed = WorkPurchaseInvoiceSuggestions.parse('Supplier: A\nSold by: B\n'
       'GSTIN: 27AAAAA0000A1Z5\nSupplier GSTIN: 27AAAAA0000A1Z5\n'
