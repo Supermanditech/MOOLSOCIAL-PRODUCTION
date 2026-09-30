@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4603,
-    "sha256": "1A4FA8655E1F9D53492D2F3D7AEA0678FBC283A0817383D6533208BAFF5D93C7"
+    "sha256": "DE035BFEACBD38C33A6C58A4BCAB269FD2F9C1A81D57052502D5CB29838D9C50"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -89,6 +89,7 @@
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt",
         "apps/mobile/pubspec.yaml",
+        "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
         "apps/mobile/assets/store_evaluation_v1/oil-1l.png",
         "apps/mobile/assets/store_evaluation_v1/atta-1kg.png",
         "apps/mobile/assets/store_evaluation_v1/salt-1kg.png",

@@ -470,6 +470,24 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "google_mlkit_commons",
+      "rootUri": "file:///C:/Users/jisal/AppData/Local/Pub/Cache/hosted/pub.dev/google_mlkit_commons-0.13.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.12"
+    },
+    {
+      "name": "google_mlkit_text_recognition",
+      "rootUri": "file:///C:/Users/jisal/AppData/Local/Pub/Cache/hosted/pub.dev/google_mlkit_text_recognition-0.17.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.12"
+    },
+    {
+      "name": "google_mlkit_translation",
+      "rootUri": "file:///C:/Users/jisal/AppData/Local/Pub/Cache/hosted/pub.dev/google_mlkit_translation-0.15.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.12"
+    },
+    {
       "name": "google_sign_in",
       "rootUri": "file:///C:/Users/jisal/AppData/Local/Pub/Cache/hosted/pub.dev/google_sign_in-7.2.0",
       "packageUri": "lib/",

@@ -2912,7 +2912,8 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
         )
       )
-      # Founder approved one XLSX dependency for the current-stock export only.
+      # Founder-approved Store export/OCR dependencies; one generated registration
+      # owner only (2026-09-30), not general native configuration authority.
       $addProductExportDependencyOwner = (
         $hasContinuationBinding -and
         $selectedContinuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
@@ -2923,7 +2924,8 @@ if ($ProductionLane -ceq 'baseline') {
         $effectiveOwner -cin @(
           'apps/mobile/pubspec.yaml', 'apps/mobile/pubspec.lock',
           'apps/mobile/.dart_tool/package_config.json', 'apps/mobile/.dart_tool/package_graph.json',
-          'apps/mobile/.flutter-plugins-dependencies'
+          'apps/mobile/.flutter-plugins-dependencies',
+          'apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java'
         )
       )
       # Founder authorized the remaining Store-to-Buy photo frontend wiring on

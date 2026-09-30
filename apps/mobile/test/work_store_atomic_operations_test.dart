@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -14,6 +15,18 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_downloads.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+
+// Automated invoice fixture only; never supplies OPPO runtime acceptance records.
+class _PurchaseInvoicePickerFixture implements WorkProofPicker {
+  _PurchaseInvoicePickerFixture(this.value);
+  WorkPickedProof? value;
+  void Function()? afterPick;
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) async {
+    afterPick?.call();
+    return value;
+  }
+}
 
 class _LostCollectionGateway extends StoreReviewCustomerCollectionGateway {
   _LostCollectionGateway(super.finance);
@@ -611,6 +624,115 @@ void main() {
     final oversized = entryFixture().toJson();
     (oversized['draft'] as Map)['goods'] = List.filled(201, entryFixture().draft!.goods.single);
     expect(() => WorkspacePurchaseEntryBook.fromJson(oversized), throwsFormatException);
+  });
+  test('P05 detailed draft legacy compatibility scope and secure restart', () async {
+    final legacy = entryFixture();
+    expect(WorkspacePurchaseEntryBook.fromJson(legacy.toJson()).toJson(), legacy.toJson());
+    final raw = jsonDecode(jsonEncode(legacy.toJson())) as Map<String, dynamic>;
+    final draft = raw['draft'] as Map<String, dynamic>;
+    draft['details'] = {'invoiceTotal': '600.60', 'paymentStatus': 'On credit',
+      'dueDate': '15/10/2026', 'cgst': '30.30', 'sgst': '30.30'};
+    (draft['goods'] as List).single['hsn'] = '1006';
+    draft['attachments'] = [WorkspacePurchaseInvoiceAttachment(
+      owner: jsonEncode(['account-A', 'store-A', true, 'manual-draft-A']),
+      digest: List.filled(64, 'a').join(), fileName: 'Invoice.png', contentType: 'image/png',
+      byteLength: 12, source: 'camera', detectedText: 'Invoice no: EVAL-P-001').toJson()];
+    final detailed = WorkspacePurchaseEntryBook.fromJson(raw);
+    final storage = _OrderJournalStorage();
+    await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .save(detailed, expectedRevision: null);
+    final restored = await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .read('account-A', 'store-A', qa: true);
+    expect(restored!.toJson(), detailed.toJson());
+    expect(restored.draft!.id, legacy.draft!.id);
+    expect(restored.draft!.goods.single['productId'], 'saved-product-A');
+    for (final changed in ['account', 'store', 'qa']) {
+      final wrong = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+      wrong[changed] = changed == 'qa' ? false : 'other';
+      expect(() => WorkspacePurchaseEntryBook.fromJson(wrong), throwsFormatException);
+    }
+    for (final changed in ['unknown', 'duplicates', 'oversized-text']) {
+      final wrong = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+      final d = wrong['draft'] as Map<String, dynamic>;
+      if (changed == 'unknown') (d['details'] as Map)['postedPayment'] = 'true';
+      if (changed == 'duplicates') (d['attachments'] as List).add((d['attachments'] as List).single);
+      if (changed == 'oversized-text') (d['attachments'] as List).single['detectedText'] = List.filled(60001, 'a').join();
+      expect(() => WorkspacePurchaseEntryBook.fromJson(wrong), throwsFormatException);
+    }
+  });
+  test('P05 OCR labelled suggestions reject ambiguity invalid dates and unsafe rows', () {
+    final parsed = WorkPurchaseInvoiceSuggestions.parse('Supplier: A\nSold by: B\n'
+      'GSTIN: 27AAAAA0000A1Z5\nSupplier GSTIN: 27AAAAA0000A1Z5\n'
+      'Invoice no: EVAL-123\nInvoice date: 31/02/2026\n'
+      'Item | Qty | Rate | Unit | HSN\nRice | 2.5 | 40 | kg | 1006\n'
+      'Unsafe | NaN | 40 | kg | 1006\nUnsafe | 1 | -40 | kg | 1006\n'
+      'Unsafe | -1 | 40 | kg | 1006\nUnsafe | 1 | Infinity | kg | 1006\n'
+      'Item | Qty | Quantity | Rate\nUnsafe | 1 | 5 | 40');
+    expect(parsed.fields.containsKey('supplierName'), isFalse);
+    expect(parsed.fields.containsKey('buyerGstin'), isFalse);
+    expect(parsed.fields.containsKey('invoiceDate'), isFalse);
+    expect(parsed.fields['supplierGstin'], '27AAAAA0000A1Z5');
+    expect(parsed.fields['invoiceReference'], 'EVAL-123');
+    expect(parsed.goods, hasLength(1));
+    expect(parsed.goods.single['productId'], isEmpty);
+    expect(parsed.goods.single['quantity'], '2.5');
+    expect(WorkPurchaseInvoiceSuggestions.parse('Invoice date: 29/02/2024').fields['invoiceDate'], '29/02/2024');
+  });
+  test('P05 private image original roundtrip cancellation scope and native fallback', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final directory = await Directory.systemTemp.createTemp('mool-purchase-fixture-');
+    addTearDown(() => directory.delete(recursive: true));
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder).drawPaint(ui.Paint()..color = const ui.Color(0xffffffff));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(2, 2);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+    image.dispose(); picture.dispose();
+    final picker = _PurchaseInvoicePickerFixture(WorkPickedProof(fileName: '../invoice.png',
+      contentType: 'wrong/extension', bytes: bytes));
+    (String, String, bool) scope = ('account-A', 'store-A', true);
+    final capture = WorkPurchaseInvoiceCapture(currentScope: () => scope, picker: picker,
+      supportDirectory: () async => directory,
+      recognize: (_) async => throw MissingPluginException('old APK fixture'));
+    final a = (await capture.capture(scope, 'draft-A', WorkProofSource.camera))!;
+    expect(a.contentType, 'image/png');
+    expect(a.fileName.contains('/'), isFalse);
+    expect(await capture.read(scope, 'draft-A', a), orderedEquals(bytes));
+    final reopened = WorkPurchaseInvoiceCapture(currentScope: () => scope,
+      supportDirectory: () async => directory);
+    expect(await reopened.read(scope, 'draft-A', a), orderedEquals(bytes));
+    expect((await directory.list(recursive: true).toList()).whereType<File>()
+      .any((f) => f.path.endsWith('.pending')), isFalse);
+    await expectLater(capture.read(scope, 'other-draft', a), throwsA(isA<WorkGatewayException>()));
+    await expectLater(capture.read(('account-A', 'store-A', false), 'draft-A', a), throwsA(isA<WorkGatewayException>()));
+    await expectLater(capture.scan(scope, 'draft-A', a), throwsA(isA<WorkGatewayException>()
+      .having((e) => e.message, 'manual fallback', contains('next app update'))));
+    picker.value = null;
+    expect(await capture.capture(scope, 'draft-A', WorkProofSource.camera), isNull);
+    picker.value = WorkPickedProof(fileName: 'invoice.png', contentType: 'image/png', bytes: bytes);
+    picker.afterPick = () => scope = ('account-A', 'other-store', true);
+    await expectLater(capture.capture(('account-A', 'store-A', true), 'draft-A', WorkProofSource.camera),
+      throwsA(isA<WorkGatewayException>()));
+    scope = ('account-A', 'store-A', true);
+    final file = (await directory.list(recursive: true).toList()).whereType<File>().single;
+    await file.writeAsBytes(List.filled(bytes.length, 0));
+    await expectLater(capture.read(scope, 'draft-A', a), throwsA(isA<WorkGatewayException>()));
+  });
+  test('P05 PDF manual fallback unsupported media and size limits', () async {
+    final directory = await Directory.systemTemp.createTemp('mool-purchase-pdf-fixture-');
+    addTearDown(() => directory.delete(recursive: true));
+    const scope = ('account-A', 'store-A', true);
+    final picker = _PurchaseInvoicePickerFixture(WorkPickedProof(fileName: 'invoice.pdf',
+      contentType: 'application/pdf', bytes: Uint8List.fromList(utf8.encode('%PDF-fixture-only'))));
+    final capture = WorkPurchaseInvoiceCapture(currentScope: () => scope, picker: picker,
+      supportDirectory: () async => directory);
+    final a = (await capture.capture(scope, 'draft-A', WorkProofSource.upload))!;
+    await expectLater(capture.scan(scope, 'draft-A', a), throwsA(isA<WorkGatewayException>()
+      .having((e) => e.message, 'PDF fallback', contains('manually'))));
+    for (final bytes in [Uint8List(0), Uint8List(10 * 1024 * 1024 + 1), Uint8List.fromList([1,2,3])]) {
+      picker.value = WorkPickedProof(fileName: 'bad.jpg', contentType: 'image/jpeg', bytes: bytes);
+      await expectLater(capture.capture(scope, 'draft-A', WorkProofSource.upload), throwsA(isA<WorkGatewayException>()));
+    }
   });
   WorkspaceCustomerLedger creditLedger() => WorkspaceCustomerLedger(
     accountScope: 'account-A', workspaceId: 'credit-store', customerId: '9000091941',

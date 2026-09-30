@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart' as invoice_ocr;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -1338,6 +1339,198 @@ class SecureWorkUpiDestinationStore implements WorkUpiDestinationStore {
 abstract interface class WorkPurchaseEntryStore {
   Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa});
   Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision});
+}
+
+/// App-private originals. No public upload, product-photo identity or accounting effect.
+class WorkPurchaseInvoiceCapture {
+  WorkPurchaseInvoiceCapture({required this.currentScope, WorkProofPicker? picker,
+    Future<Directory> Function()? supportDirectory,
+    Future<String> Function(String)? recognize})
+    : picker = picker ?? NativeWorkProofPicker(),
+      _supportDirectory = supportDirectory ?? getApplicationSupportDirectory,
+      _recognize = recognize ?? _nativeRecognize;
+  final (String, String, bool)? Function() currentScope;
+  final WorkProofPicker picker;
+  final Future<Directory> Function() _supportDirectory;
+  final Future<String> Function(String) _recognize;
+  void _check((String, String, bool) scope) {
+    if (scope != currentScope()) {
+      throw const WorkGatewayException('Return to the same Store to continue with this invoice.');
+    }
+  }
+  String owner((String, String, bool) scope, String draftId) =>
+    jsonEncode([scope.$1, scope.$2, scope.$3, draftId]);
+  Future<Directory> _directory(String owner) async {
+    final support = await _supportDirectory();
+    var directory = support;
+    for (final part in ['purchase-invoices-v1', crypto.sha256.convert(utf8.encode(owner)).toString()]) {
+      directory = Directory('${directory.path}${Platform.pathSeparator}$part');
+      if (await FileSystemEntity.type(directory.path, followLinks: false) == FileSystemEntityType.link) {
+        throw const WorkGatewayException('Invoice storage needs recovery. Your draft has been kept.');
+      }
+      await directory.create(recursive: true);
+    }
+    return directory;
+  }
+  Future<File> _file(WorkspacePurchaseInvoiceAttachment a) async {
+    if (!a.valid) throw const WorkGatewayException('Invoice attachment needs recovery.');
+    final directory = await _directory(a.owner);
+    final file = File('${directory.path}${Platform.pathSeparator}${a.digest}.invoice');
+    if (await FileSystemEntity.type(file.path, followLinks: false) == FileSystemEntityType.link) {
+      throw const WorkGatewayException('Invoice attachment needs recovery.');
+    }
+    return file;
+  }
+  Future<WorkspacePurchaseInvoiceAttachment?> capture((String, String, bool) scope,
+      String draftId, WorkProofSource source) async {
+    _check(scope);
+    final picked = await picker.pick(source);
+    _check(scope);
+    if (picked == null) return null;
+    final bytes = picked.bytes;
+    if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
+      throw const WorkGatewayException('Choose an invoice photo or PDF up to 10 MB.');
+    }
+    final mime = bytes.length >= 5 && ascii.decode(bytes.take(5).toList(), allowInvalid: true) == '%PDF-'
+      ? 'application/pdf' : bytes.length >= 3 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255
+      ? 'image/jpeg' : bytes.length >= 8 && listEquals(bytes.take(8).toList(), [137,80,78,71,13,10,26,10])
+      ? 'image/png' : bytes.length >= 12 && ascii.decode(bytes.take(4).toList(), allowInvalid: true) == 'RIFF' &&
+        ascii.decode(bytes.sublist(8,12), allowInvalid: true) == 'WEBP' ? 'image/webp' : null;
+    if (mime == null) throw const WorkGatewayException('Choose a readable JPEG, PNG, WebP or PDF invoice.');
+    if (mime != 'application/pdf') {
+      final codec = await ui.instantiateImageCodec(bytes);
+      try { final frame = await codec.getNextFrame(); frame.image.dispose(); }
+      finally { codec.dispose(); }
+    }
+    _check(scope);
+    final name = picked.fileName.replaceAll(RegExp(r'[\\/\r\n]'), '_');
+    final a = WorkspacePurchaseInvoiceAttachment(owner: owner(scope, draftId),
+      digest: crypto.sha256.convert(bytes).toString(),
+      fileName: name.isEmpty ? 'Invoice' : name.substring(0, min(200, name.length)),
+      contentType: mime, byteLength: bytes.length, source: source.name);
+    final file = await _file(a);
+    _check(scope);
+    if (await file.exists()) {
+      await read(scope, draftId, a);
+    } else {
+      final temporary = File('${file.path}.${DateTime.now().microsecondsSinceEpoch}.${Random.secure().nextInt(1 << 32)}.pending');
+      try {
+        await temporary.writeAsBytes(bytes, flush: true);
+        _check(scope);
+        if (await file.exists()) {
+          await read(scope, draftId, a);
+        } else {
+          await temporary.rename(file.path);
+          await read(scope, draftId, a);
+        }
+      } finally {
+        // Only this call's unpublished temporary copy; never remove a saved original.
+        if (await temporary.exists()) await temporary.delete();
+      }
+    }
+    return a;
+  }
+  Future<Uint8List> read((String, String, bool) scope, String draftId,
+      WorkspacePurchaseInvoiceAttachment a) async {
+    _check(scope);
+    if (a.owner != owner(scope, draftId)) {
+      throw const WorkGatewayException('This invoice belongs to another purchase draft.');
+    }
+    final file = await _file(a);
+    _check(scope);
+    if (!await file.exists() || await file.length() != a.byteLength) {
+      throw const WorkGatewayException('Invoice attachment is unavailable. Attach the original again.');
+    }
+    final bytes = await file.readAsBytes();
+    _check(scope);
+    if (crypto.sha256.convert(bytes).toString() != a.digest) {
+      throw const WorkGatewayException('Invoice attachment changed. Attach the original again.');
+    }
+    return bytes;
+  }
+  Future<WorkspacePurchaseInvoiceAttachment> scan((String, String, bool) scope,
+      String draftId, WorkspacePurchaseInvoiceAttachment a) async {
+    if (a.contentType == 'application/pdf') {
+      throw const WorkGatewayException('PDF attached. Enter its details manually, or photograph a page to read its text.');
+    }
+    await read(scope, draftId, a);
+    try {
+      final text = await _recognize((await _file(a)).path);
+      _check(scope);
+      if (text.trim().isEmpty || text.length > 60000) {
+        throw const WorkGatewayException('The invoice text could not be read. Retake a clear photo or enter the details.');
+      }
+      return a.withText(text);
+    } on MissingPluginException {
+      throw const WorkGatewayException('Text reading needs the next app update. Your invoice is kept; enter its details manually.');
+    } on PlatformException {
+      throw const WorkGatewayException('Text reading is unavailable. Your invoice is kept; retry or enter its details manually.');
+    }
+  }
+  static Future<String> _nativeRecognize(String path) async {
+    final recognizer = invoice_ocr.TextRecognizer(script: invoice_ocr.TextRecognitionScript.latin);
+    try { return (await recognizer.processImage(invoice_ocr.InputImage.fromFilePath(path))).text; }
+    finally { await recognizer.close(); }
+  }
+}
+
+/// Conservative labelled suggestions only. Unlabelled/ambiguous values remain for review.
+class WorkPurchaseInvoiceSuggestions {
+  WorkPurchaseInvoiceSuggestions(this.fields, this.goods);
+  final Map<String, String> fields;
+  final List<Map<String, String>> goods;
+  static WorkPurchaseInvoiceSuggestions parse(String text) {
+    const labels = {'supplier': 'supplierName', 'sold by': 'supplierName',
+      'supplier gstin': 'supplierGstin', 'buyer gstin': 'buyerGstin',
+      'invoice no': 'invoiceReference', 'invoice number': 'invoiceReference',
+      'bill no': 'invoiceReference', 'invoice date': 'invoiceDate', 'bill date': 'invoiceDate',
+      'place of supply': 'placeOfSupply', 'taxable value': 'taxableValue',
+      'cgst': 'cgst', 'sgst': 'sgst', 'igst': 'igst', 'cess': 'cess',
+      'grand total': 'invoiceTotal', 'invoice total': 'invoiceTotal'};
+    final candidates = <String, Set<String>>{};
+    final rows = text.split(RegExp(r'\r?\n'));
+    for (final row in rows) {
+      final match = RegExp(r'^\s*([^:]{1,40})\s*:\s*(.+?)\s*$').firstMatch(row);
+      if (match == null) continue;
+      final key = labels[match[1]!.trim().toLowerCase().replaceAll('.', '')];
+      final value = match[2]!.trim();
+      if (key == null || value.length > 120) continue;
+      if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) continue;
+      if (key == 'invoiceDate') {
+        if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value)) continue;
+        final parts = value.split('/').map(int.parse).toList();
+        final date = DateTime(parts[2], parts[1], parts[0]);
+        if (date.year != parts[2] || date.month != parts[1] || date.day != parts[0]) continue;
+      }
+      (candidates[key] ??= {}).add(value);
+    }
+    final fields = {for (final e in candidates.entries) if (e.value.length == 1) e.key: e.value.single};
+    // Only explicit tab/pipe tables: guessing whitespace columns risks price/quantity swaps.
+    final goods = <Map<String, String>>[];
+    List<String>? headers;
+    const columns = {'description':'name', 'item':'name', 'product':'name', 'qty':'quantity',
+      'quantity':'quantity', 'rate':'cost', 'cost':'cost', 'unit':'pack', 'hsn':'hsn'};
+    for (final row in rows) {
+      if (!row.contains('|') && !row.contains('\t')) { headers = null; continue; }
+      final cells = row.split(RegExp(r'\||\t')).map((c) => c.trim()).toList();
+      final mapped = cells.map((c) => columns[c.toLowerCase()] ?? '').toList();
+      if (mapped.contains('name') && mapped.contains('quantity') && mapped.contains('cost')) {
+        final known = mapped.where((key) => key.isNotEmpty).toList();
+        headers = known.toSet().length == known.length ? mapped : null;
+        continue;
+      }
+      if (headers == null || cells.length != headers.length || cells.any((c) => c.length > 200)) continue;
+      final line = <String, String>{'productId':'', 'name':'', 'pack':'', 'quantity':'', 'cost':''};
+      for (var i=0; i<headers.length; i++) { if (headers[i].isNotEmpty) line[headers[i]] = cells[i]; }
+      final quantity = double.tryParse(line['quantity']!);
+      final cost = double.tryParse(line['cost']!);
+      if (line['name']!.isNotEmpty && quantity != null && quantity.isFinite && quantity > 0 &&
+          cost != null && cost.isFinite && cost >= 0 && goods.length < 200) {
+        goods.add(line);
+      }
+    }
+    return WorkPurchaseInvoiceSuggestions(Map.unmodifiable(fields), List.unmodifiable(goods));
+  }
 }
 
 /// Uses the existing encrypted, serialized, revision-checked checkpoint pattern.

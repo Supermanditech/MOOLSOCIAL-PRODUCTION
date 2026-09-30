@@ -5922,31 +5922,85 @@ class WorkspaceSupplierProfile {
   }
 }
 
-/// Manual bill input only: saving cannot post stock, dues or payments.
+/// Original private invoice evidence, not product media or publication approval.
+class WorkspacePurchaseInvoiceAttachment {
+  const WorkspacePurchaseInvoiceAttachment({required this.owner, required this.digest,
+    required this.fileName, required this.contentType, required this.byteLength,
+    required this.source, this.detectedText = ''});
+  final String owner, digest, fileName, contentType, source, detectedText;
+  final int byteLength;
+  bool get valid => owner.isNotEmpty && owner.length <= 1000 &&
+    RegExp(r'^[a-f0-9]{64}$').hasMatch(digest) && fileName.isNotEmpty &&
+    fileName.length <= 200 && byteLength > 0 && byteLength <= 10 * 1024 * 1024 &&
+    const ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].contains(contentType) &&
+    const ['camera', 'gallery', 'upload'].contains(source) && detectedText.length <= 60000;
+  Map<String, Object?> toJson() => {'owner': owner, 'digest': digest,
+    'fileName': fileName, 'contentType': contentType, 'byteLength': byteLength,
+    'source': source, 'detectedText': detectedText};
+  WorkspacePurchaseInvoiceAttachment withText(String text) =>
+    WorkspacePurchaseInvoiceAttachment(owner: owner, digest: digest,
+      fileName: fileName, contentType: contentType, byteLength: byteLength,
+      source: source, detectedText: text);
+  static WorkspacePurchaseInvoiceAttachment fromJson(Object? raw) {
+    const keys = {'owner', 'digest', 'fileName', 'contentType', 'byteLength', 'source', 'detectedText'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invoice attachment needs recovery');
+    }
+    final value = WorkspacePurchaseInvoiceAttachment(owner: raw['owner'] as String,
+      digest: raw['digest'] as String, fileName: raw['fileName'] as String,
+      contentType: raw['contentType'] as String, byteLength: raw['byteLength'] as int,
+      source: raw['source'] as String, detectedText: raw['detectedText'] as String);
+    if (!value.valid) throw const FormatException('Invalid invoice attachment');
+    return value;
+  }
+}
+
+/// Manual/reviewed input only: saving cannot post stock, dues or payments.
 class WorkspacePurchaseEntryDraft {
   WorkspacePurchaseEntryDraft({required this.id, required this.supplierId,
     required this.invoiceReference, required this.invoiceDate,
     required this.createdAt, required this.updatedAt,
-    required List<Map<String, String>> goods})
-      : goods = List.unmodifiable(goods.map((line) => Map<String, String>.unmodifiable(line)));
+    required List<Map<String, String>> goods, Map<String, String> details = const {},
+    List<WorkspacePurchaseInvoiceAttachment> attachments = const []})
+      : goods = List.unmodifiable(goods.map((line) => Map<String, String>.unmodifiable(line))),
+        details = Map.unmodifiable(details), attachments = List.unmodifiable(attachments);
   final String id, supplierId, invoiceReference, invoiceDate;
   final DateTime createdAt, updatedAt;
   final List<Map<String, String>> goods;
+  final Map<String, String> details;
+  final List<WorkspacePurchaseInvoiceAttachment> attachments;
+  static const detailKeys = {'documentType', 'placeOfSupply', 'buyerName', 'buyerAddress',
+    'buyerGstin', 'priceBasis', 'taxTreatment', 'reverseCharge', 'billDiscount',
+    'freight', 'otherCharges', 'roundOff', 'taxableValue', 'cgst', 'sgst', 'igst',
+    'cess', 'invoiceTotal', 'receiptStatus', 'receivedDate', 'paymentStatus',
+    'paidAmount', 'paymentMethod', 'paymentReference', 'paymentDate', 'dueDate', 'notes'};
+  static const goodsExtraKeys = {'hsn', 'barcode', 'freeQuantity', 'batch', 'expiry',
+    'mrp', 'sellingPrice', 'discount', 'gstRate', 'cess', 'lineTotal',
+    'receivedQuantity', 'damagedQuantity', 'shortQuantity'};
   bool get valid => id.isNotEmpty && supplierId.isNotEmpty &&
       invoiceReference.length <= 120 && invoiceDate.length <= 10 &&
       !updatedAt.isBefore(createdAt) && goods.length <= 200 &&
-      goods.every((line) => line.length == 5 &&
+      details.keys.every(detailKeys.contains) && details.values.every((v) => v.length <= 500) &&
+      attachments.length <= 3 && attachments.every((a) => a.valid) &&
+      attachments.fold<int>(0, (sum, a) => sum + a.byteLength) <= 20 * 1024 * 1024 &&
+      attachments.map((a) => a.digest).toSet().length == attachments.length &&
+      goods.every((line) =>
         const ['productId', 'name', 'pack', 'quantity', 'cost'].every(line.containsKey) &&
+        line.keys.every((k) => const ['productId', 'name', 'pack', 'quantity', 'cost'].contains(k) ||
+          goodsExtraKeys.contains(k)) &&
         line.values.every((value) => value.length <= 200));
   Map<String, Object?> toJson() => {'id': id, 'supplierId': supplierId,
     'invoiceReference': invoiceReference, 'invoiceDate': invoiceDate,
     'createdAt': createdAt.toUtc().toIso8601String(),
     'updatedAt': updatedAt.toUtc().toIso8601String(),
-    'source': 'manual', 'stage': 'draft', 'goods': goods};
+    'source': 'manual', 'stage': 'draft', 'goods': goods,
+    if (details.isNotEmpty) 'details': details,
+    if (attachments.isNotEmpty) 'attachments': attachments.map((a) => a.toJson()).toList()};
   static WorkspacePurchaseEntryDraft fromJson(Object? raw) {
     const keys = {'id', 'supplierId', 'invoiceReference', 'invoiceDate',
       'createdAt', 'updatedAt', 'source', 'stage', 'goods'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+    if (raw is! Map || !keys.every(raw.containsKey) ||
+        !raw.keys.every((k) => keys.contains(k) || k == 'details' || k == 'attachments') ||
         raw['source'] != 'manual' || raw['stage'] != 'draft' || raw['goods'] is! List) {
       throw const FormatException('Invalid purchase draft');
     }
@@ -5956,7 +6010,10 @@ class WorkspacePurchaseEntryDraft {
       invoiceDate: raw['invoiceDate'] as String,
       createdAt: DateTime.parse(raw['createdAt'] as String),
       updatedAt: DateTime.parse(raw['updatedAt'] as String),
-      goods: [for (final line in raw['goods'] as List) (line as Map).cast<String, String>()]);
+      goods: [for (final line in raw['goods'] as List) (line as Map).cast<String, String>()],
+      details: raw['details'] == null ? const {} : (raw['details'] as Map).cast<String, String>(),
+      attachments: raw['attachments'] == null ? const [] :
+        [for (final a in raw['attachments'] as List) WorkspacePurchaseInvoiceAttachment.fromJson(a)]);
     if (!draft.valid) throw const FormatException('Invalid purchase draft');
     return draft;
   }
@@ -5992,7 +6049,9 @@ class WorkspacePurchaseEntryBook {
       final ids = <String>{};
       if (result.account.trim().isEmpty || result.store.trim().isEmpty || result.revision < 1 ||
           result.profiles.any((p) => !ids.add(p.id)) ||
-          (result.draft != null && !ids.contains(result.draft!.supplierId))) {
+          (result.draft != null && (!ids.contains(result.draft!.supplierId) ||
+            result.draft!.attachments.any((a) => a.owner !=
+              jsonEncode([result.account, result.store, result.qa, result.draft!.id]))))) {
         throw const FormatException('Invalid supplier scope');
       }
       return result;

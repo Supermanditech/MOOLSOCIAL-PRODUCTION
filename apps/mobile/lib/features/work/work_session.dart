@@ -555,6 +555,7 @@ class WorkSession extends ChangeNotifier {
     this.reviewStoreSelectionStore,
     this.inventoryStore,
     this.purchaseEntryStore,
+    this.purchaseInvoiceCapture,
     this.catalogueReference,
     this.productPhotoSupportDirectory,
   }) : _productionSession = false,
@@ -598,6 +599,7 @@ class WorkSession extends ChangeNotifier {
     this.reviewStoreSelectionStore,
     this.inventoryStore,
     this.purchaseEntryStore,
+    this.purchaseInvoiceCapture,
     this.catalogueReference,
     this.productPhotoSupportDirectory,
   }) : _productionSession = true,
@@ -630,6 +632,9 @@ class WorkSession extends ChangeNotifier {
   final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
   final WorkInventoryStore? inventoryStore;
   final WorkPurchaseEntryStore? purchaseEntryStore;
+  final WorkPurchaseInvoiceCapture? purchaseInvoiceCapture;
+  late final WorkPurchaseInvoiceCapture workspacePurchaseInvoiceCapture =
+      purchaseInvoiceCapture ?? WorkPurchaseInvoiceCapture(currentScope: () => workspaceSupplierScope);
   final List<WorkspaceCatalogueItem>? catalogueReference;
 
   /// Optional filesystem location injection; the real scoped media store is

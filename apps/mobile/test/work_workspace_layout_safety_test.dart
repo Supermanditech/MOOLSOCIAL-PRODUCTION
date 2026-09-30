@@ -3262,9 +3262,10 @@ void main() {
     storeViewFixture(null, _ContactDraftFixtureStore(), null, null, null, null, null, null, null, entry);
 
   Future<void> revealPurchaseInput(WidgetTester tester, Finder target, {double delta = 60}) async {
+    // The outer purchase ListView comes first; detected SelectableText may also scroll.
     final scroll = find.descendant(of: find.byKey(const Key('work-record-purchase')),
       matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
-        widget.axisDirection == AxisDirection.down));
+        widget.axisDirection == AxisDirection.down)).first;
     await tester.scrollUntilVisible(target, delta, scrollable: scroll);
     await tester.pumpAndSettle();
     await Scrollable.ensureVisible(tester.element(target), alignment: .5);
@@ -3406,6 +3407,125 @@ void main() {
       await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
       await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
       expect(find.byKey(const Key('work-purchase-draft-save')).hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('P05 expanded purchase details save and resume without posting', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final products = List.of(work.workspaceCatalogueItems);
+    final finance = work.workspaceFinance;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byKey(const Key('work-purchase-item-0'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const Key('work-purchase-tax-details'))).dy));
+    expect(tester.getSize(find.byKey(const Key('work-purchase-invoiceTotal'))).width, lessThanOrEqualTo(190));
+    expect(find.byTooltip('Remove item 1'), findsNothing);
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
+    await tester.enterText(find.byKey(const Key('work-purchase-reference')), 'EVAL-DETAILED-01');
+    await tester.enterText(find.byKey(const Key('work-purchase-date')), '30/09/2026');
+    await tester.enterText(find.byKey(const Key('work-purchase-invoiceTotal')), '600.60');
+    await tester.enterText(find.byKey(const Key('work-purchase-item-0')), 'Evaluation rice');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-unmatched-item')), findsOneWidget);
+    expect(find.text('Not yet linked to Stock — matching is required before receipt.'), findsNothing);
+    for (final section in ['item', 'tax', 'receipt', 'payment']) {
+      final key = section == 'item' ? 'work-purchase-item-details-0'
+        : 'work-purchase-$section-details';
+      await revealPurchaseInput(tester, find.byKey(Key(key)));
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      final values = switch (section) {
+        'tax' => {'work-purchase-cgst': '30.30', 'work-purchase-sgst': '30.30'},
+        'item' => {'work-purchase-hsn-0': '1006', 'work-purchase-batch-0': 'EVAL-BATCH-1'},
+        'receipt' => {'work-purchase-receivedDate': '30/09/2026'},
+        _ => {'work-purchase-paidAmount': '100', 'work-purchase-dueDate': '15/10/2026'},
+      };
+      for (final value in values.entries) {
+        await revealPurchaseInput(tester, find.byKey(Key(value.key)));
+        await tester.enterText(find.byKey(Key(value.key)), value.value);
+      }
+    }
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    final saved = entry.value!.draft!;
+    expect(saved.details['invoiceTotal'], '600.60');
+    expect(saved.details['cgst'], '30.30');
+    expect(saved.details['dueDate'], '15/10/2026');
+    expect(saved.goods.single['hsn'], '1006');
+    expect(work.workspaceCatalogueItems, orderedEquals(products));
+    expect(work.workspaceFinance, same(finance));
+    expect(work.workspacePurchases, isEmpty);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(work.workspacePurchaseEntryDraft!.id, saved.id);
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-invoiceTotal'))).controller!.text, '600.60');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('P05 OCR fixture fills empty fields only and preserves entered product identity', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 9, 30);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [WorkspaceSupplierProfile(id: 'supplier-fixture', name: 'Entered supplier', createdAt: at, updatedAt: at)],
+      draft: WorkspacePurchaseEntryDraft(id: 'draft-fixture', supplierId: 'supplier-fixture',
+        invoiceReference: 'MANUAL-KEPT', invoiceDate: '', createdAt: at, updatedAt: at,
+        goods: [const {'productId': 'entered-product', 'name': 'Entered product', 'pack': '1 kg', 'quantity': '12', 'cost': '45'}],
+        attachments: [WorkspacePurchaseInvoiceAttachment(owner: jsonEncode([scope.$1, scope.$2, scope.$3, 'draft-fixture']),
+          digest: List.filled(64, 'b').join(), fileName: 'Automated OCR fixture.pdf', contentType: 'application/pdf',
+          byteLength: 12, source: 'upload', detectedText: 'Supplier: OCR supplier\nInvoice no: OCR-123\nInvoice date: 30/09/2026\n'
+            'Grand total: 600.60\nItem | Qty | Rate\nOCR item | 2 | 40') ]));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    final attachment = find.byKey(Key('work-purchase-document-${List.filled(64, 'b').join()}'));
+    await revealPurchaseInput(tester, attachment);
+    await tester.tap(attachment);
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.text('Use detected details'));
+    await tester.tap(find.text('Use detected details'));
+    await tester.pumpAndSettle();
+    for (final expected in {'work-purchase-supplier-name': 'Entered supplier',
+      'work-purchase-reference': 'MANUAL-KEPT', 'work-purchase-date': '30/09/2026',
+      'work-purchase-invoiceTotal': '600.60', 'work-purchase-item-0': 'Entered product'}.entries) {
+      expect(tester.widget<TextField>(find.byKey(Key(expected.key))).controller!.text, expected.value);
+    }
+    expect(find.byKey(const Key('work-purchase-entry-error')), findsNothing);
+    expect(find.byKey(const Key('work-purchase-entry-notice')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final display in [(360.0, 800.0, 1.0, 280.0), (800.0, 360.0, 1.5, 180.0),
+      (320.0, 568.0, 2.0, 240.0)]) {
+    testWidgets('P05 expanded sections keyboard and large text fit $display', (tester) async {
+      await mount(tester, route: '/app/work/workspace/dashboard',
+        work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+      await openPurchaseList(tester);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      for (final key in ['work-purchase-item-details-0', 'work-purchase-tax-details',
+        'work-purchase-buyer-details', 'work-purchase-receipt-details', 'work-purchase-payment-details']) {
+        await revealPurchaseInput(tester, find.byKey(Key(key)));
+        await tester.tap(find.byKey(Key(key)));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: key);
+        if (key == 'work-purchase-tax-details') {
+          expect(tester.getTopLeft(find.byKey(const Key('work-purchase-taxableValue'))).dx,
+            tester.getTopLeft(find.byKey(const Key('work-purchase-reference'))).dx);
+        }
+      }
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });

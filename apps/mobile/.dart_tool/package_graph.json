@@ -23,6 +23,8 @@
         "flutter_secure_storage",
         "flutter_svg",
         "go_router",
+        "google_mlkit_text_recognition",
+        "google_mlkit_translation",
         "google_sign_in",
         "image_picker",
         "intl",
@@ -361,6 +363,22 @@
       ]
     },
     {
+      "name": "google_mlkit_translation",
+      "version": "0.15.1",
+      "dependencies": [
+        "flutter",
+        "google_mlkit_commons"
+      ]
+    },
+    {
+      "name": "google_mlkit_text_recognition",
+      "version": "0.17.1",
+      "dependencies": [
+        "flutter",
+        "google_mlkit_commons"
+      ]
+    },
+    {
       "name": "image_picker",
       "version": "1.2.3",
       "dependencies": [
@@ -589,6 +607,14 @@
       ]
     },
     {
+      "name": "equatable",
+      "version": "2.1.0",
+      "dependencies": [
+        "collection",
+        "meta"
+      ]
+    },
+    {
       "name": "xml",
       "version": "7.0.1",
       "dependencies": [
@@ -598,17 +624,17 @@
       ]
     },
     {
-      "name": "web",
-      "version": "1.1.1",
-      "dependencies": []
-    },
-    {
       "name": "archive",
       "version": "4.0.9",
       "dependencies": [
         "path",
         "posix"
       ]
+    },
+    {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
     },
     {
       "name": "path_parsing",
@@ -1273,6 +1299,13 @@
         "flutter",
         "path",
         "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "google_mlkit_commons",
+      "version": "0.13.0",
+      "dependencies": [
+        "flutter"
       ]
     },
     {
@@ -2166,14 +2199,6 @@
       "dependencies": [
         "meta",
         "source_span"
-      ]
-    },
-    {
-      "name": "equatable",
-      "version": "2.1.0",
-      "dependencies": [
-        "collection",
-        "meta"
       ]
     }
   ],
