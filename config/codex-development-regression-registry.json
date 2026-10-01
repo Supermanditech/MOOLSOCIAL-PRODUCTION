@@ -105098,7 +105098,7 @@
           "scope": "Qualified shared-instruction implementation checkpoint; not founder visual acceptance, ticket_close, APK or integrated provider acceptance"
         },
         "supplierPolicySourceAssessment20261002": {
-          "state": "next_sweep_awaits_authoritative_store_published_policy_contract",
+          "state": "frontend_policy_contract_and_popup_authorized_live_store_mapping_deferred",
           "actualContractsReviewed": [
             "apps/mobile/lib/features/buy/buy_v2_models.dart:579 BuyV2Product has Store identity and returnPolicy, but no versioned published acceptance policy",
             "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart:1197 BuyV2ProductContentSnapshot has no policy publication/version/acceptance-required fields",
@@ -105112,10 +105112,37 @@
             "Displayable actual policy and explicit acceptance-required decision",
             "Buyer-scoped acceptance receipt bound to exact policy and intended add quantity; persistence and revalidation contract"
           ],
-          "architectAssessment": "Published policies must be separate from order-dependent financial terms; all increasing quantity paths share one guarded add intent. Ticking an initially unchecked acceptance adds once, cancellation adds nothing, and changed policy/offer requires revalidation",
-          "admissionAssessment": "Existing root claim includes Buy models/content/session/views and focused tests, but it does not supply authoritative Store publication data or establish permission to mutate the Store/backend producer. No successor runtime sweep or shared producer mutation started",
+          "architectAssessment": "Architect corrected its initial overly broad blocker: define minimal scoped/versioned policy and acceptance receipt contracts using existing content states, distinguish confirmed no-required-policy from unresolved/unavailable data, guard all relevant quantity increases, and cover duplicate/stale/failed/cancelled intent behavior with isolated fixtures. Live supplier-consent acceptance remains deferred.",
+          "admissionAssessment": "Current root claim includes Buy models/content/session/persistence/views and focused tests. The authoritative handoff expressly authorizes frontend contracts/states now and future Store/backend mapping later. Missing live policy data is not a blocker for minimal fixture-backed frontend completion. No Store/backend producer mutation is authorized or started.",
           "uiDecision": "Keep supplier policy on the product sheet; show the add-time popup only when the supplier policy requires consent. No blanket Cart gate or extra completion tap. Preserve separate final financial agreement review",
           "implementationStatus": "queued, not implemented or represented as supplier consent authority"
+        },
+        "supplierFrontendScopeClarification20261002": {
+          "incident": "The initial readiness wording incorrectly made missing future Store publication sound like a prerequisite for frontend runtime completion",
+          "rootCause": "Read current policy input contracts before reconciling the authoritative frontend-only T11-T13 execution clarification",
+          "authoritativeInstruction": "T11-T13 define frontend interfaces, states and handoffs in this phase; unavailable future services must not block frontend completion",
+          "recovery": "Read exact execution/reporting and current executable frontend scope sections with bounded line/character windows; obtain a corrected architect review; update readiness/handoff language before claiming a blocker",
+          "remainingBoundary": "Production publication lookup, Store mapping, receipt consumption and real integrated acceptance remain separately deferred; no backend/workspace or real supplier terms fabricated"
+        },
+        "autonomousCartReviewRequest20261002": {
+          "founderRequest": "List pending Cart user-journey tickets for an autonomous Redmi hot-reload, screenshot, visual/technical audit, fix, technical verification and repeated Redmi screenshot cycle; close or register linked children, then stop workflow",
+          "nextFrontendFollowup": "T03 published supplier policy and conditional add-time acceptance, supported by T11 frontend contract mapping",
+          "nextSeparatePublicTicket": "T04 one-tap offers and total continuity",
+          "remainingPublicTickets": [
+            "T05 payment methods and limits",
+            "T06 payment groups and final commitment",
+            "T07 resume and safe recovery",
+            "T08 order status, balances and feedback",
+            "T09 alternative Store and refund presentation",
+            "T10 compact visual sweep"
+          ],
+          "contractAndQualificationTickets": [
+            "T11-T13 frontend interfaces/states/handoffs; backend/workspaces deferred",
+            "T14 cumulative frontend qualification and Git handoff"
+          ],
+          "boundedCycle": "Use existing authorized Redmi/package and registered ticket ownership; baseline hot reload/screenshots -> audit -> smallest fixes -> required behavior/impact tests -> hot reload/screenshots -> local qualification or actual linked child/dependency -> stop the selected workflow",
+          "closureTruth": "Local frontend qualification is separate from founder visual approval, ticket_close and live provider acceptance",
+          "executionState": "Pending-ticket list and workflow scope recorded; no new runtime sweep, APK, installation or live payment started"
         }
       },
       "storeCategoryResumeQualification20260925": {
