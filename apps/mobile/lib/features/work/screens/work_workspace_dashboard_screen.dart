@@ -11809,7 +11809,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         _purchaseSection(sections[i].title, sections[i].key, sections[i].fields, number: i + 5,
           summary: switch (sections[i].key) {
             'work-purchase-tax-details' => _details['invoiceTotal']!.text.isEmpty
-              ? 'Copy taxes, discounts and the final total' : 'Bill total ${_invoiceMoney(_details['invoiceTotal']!.text, currency: true)}',
+              ? 'Copy taxes, discounts and the final total' : 'Invoice total ${_invoiceMoney(_details['invoiceTotal']!.text, currency: true)}',
             'work-purchase-receipt-details' => _details['receiptStatus']!.text.isEmpty
               ? 'Check received, short or damaged goods' : _details['receiptStatus']!.text,
             'work-purchase-payment-details' => _details['paymentStatus']!.text.isEmpty
@@ -11840,12 +11840,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
       contentPadding: const EdgeInsets.symmetric(vertical: 8)),
     items: [DropdownMenuItem(value: '', child: Text(switch (key) {
-      'documentType' => 'Choose bill type', 'priceBasis' => 'Check printed rates',
+      'documentType' => 'Choose supplier document type', 'priceBasis' => 'Check printed rates',
       'taxTreatment' => 'Choose GST type', 'receiptStatus' => 'Choose goods status',
       'paymentStatus' => 'Choose payment status', 'paymentMethod' => 'Choose, if paid',
       _ => 'As shown on bill',
     })),
-      for (final value in choices) DropdownMenuItem(value: value, child: Text(value))],
+      for (final value in choices) DropdownMenuItem(value: value,
+        child: Text(key == 'documentType' ? storePurchaseDocumentTypeLabel(value) : value))],
     onChanged: (value) => setState(() {
       _details[key]!.text = value ?? '';
     }));
@@ -12178,7 +12179,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     Widget detail(String key, {bool cell = false, bool amount = false}) {
       used.add(key);
       final text = _details[key]!.text;
-      return value(_fieldLabels['work-purchase-$key']!, moneyKeys.contains(key) ? _invoiceMoney(text) : text,
+      return value(_fieldLabels['work-purchase-$key']!, moneyKeys.contains(key) ? _invoiceMoney(text)
+        : key == 'documentType' ? storePurchaseDocumentTypeLabel(text) : text,
         key, cell: cell, amount: amount);
     }
     List<Widget> selected(Iterable<String> keys) => [for (final key in keys)
@@ -12217,7 +12219,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: const BoxDecoration(border: Border(bottom: rule)), child: Row(children: [
           Expanded(child: Padding(key: title.isEmpty ? null : const ValueKey('purchase-review-documentTitle'),
-            padding: EdgeInsets.zero, child: Text(title.isEmpty ? 'PURCHASE INVOICE' : title,
+            padding: EdgeInsets.zero, child: Text(storePurchaseSupplierDocumentHeading(
+              title: title, type: _details['documentType']!.text),
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 1.8,
                 color: Color(0xff17395c))))),
           if (copy.isNotEmpty) Flexible(child: value('', copy, 'documentCopy', cell: true, amount: true)),
@@ -12232,7 +12235,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         ...details('supplier'), ...extras('supplier'),
       ], [
         heading('Invoice details'),
-        if (_reference.text.isNotEmpty) value('Invoice No.',_reference.text,'reference'),
+        if (_reference.text.isNotEmpty) value('Supplier invoice No.',_reference.text,'reference'),
         if (_date.text.isNotEmpty) value('Invoice date',_date.text,'date'),
         ...selected(['originalInvoiceDate','dueDate','poReference','placeOfSupply','placeOfSupplyCode']),
         ...details('invoice'), ...extras('invoice'),
@@ -12343,6 +12346,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         style:TextStyle(fontSize:10,color:Color(0xff424b55)))),
     ]);
     final pos = <Widget>[
+      value('Purchase voucher No.', storePurchaseUnpostedVoucherNumber, 'voucher-reference'),
       ...selected(recordedPaymentKeys),
       ...details('payment'),
       ...details('receipt'),
@@ -12356,7 +12360,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     return [
       _reviewCopies(),
       Wrap(alignment:WrapAlignment.spaceBetween,crossAxisAlignment:WrapCrossAlignment.center,children:[
-        const Text('Recorded purchase · Draft', key:Key('work-purchase-review-title'),
+        const Text('Purchase entry · Draft', key:Key('work-purchase-review-title'),
           style:TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
         _invoiceTools(original: false),
       ]),
@@ -12595,7 +12599,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         padding: EdgeInsets.fromLTRB(12, 0, 12, pinned ? 12 : 24 + MediaQuery.viewInsetsOf(context).bottom),
         children: [
           Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [
-            const Expanded(child: Text('Record purchase', style: TextStyle(fontSize: 16,
+            const Expanded(child: Text('Purchase entry', style: TextStyle(fontSize: 16,
               fontWeight: FontWeight.w700, color: MoolColors.navy))),
             const Text('Draft', style: TextStyle(fontSize: 12, color: MoolColors.muted))])),
           if (_loading) const Padding(padding: EdgeInsets.all(12), child: Text('Opening purchase draft…'))
@@ -12651,7 +12655,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               ], number: 1, summary: _name.text.isEmpty ? 'Name, contact and GSTIN' : _name.text),
               _purchaseSection('Enter invoice details', 'work-purchase-invoice-section', [
                 LayoutBuilder(builder: (context, constraints) {
-                final fields = [_field('Invoice No.', _reference, 'work-purchase-reference', limit: 120),
+                final fields = [_field('Supplier invoice No.', _reference, 'work-purchase-reference', limit: 120),
                   _field('Invoice date', _date, 'work-purchase-date', limit: 10, hint: 'DD/MM/YYYY',
                     keyboard: TextInputType.datetime)];
                 if (constraints.maxWidth < 300 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
@@ -12660,7 +12664,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 return Row(children: [Expanded(child: fields[0]), const SizedBox(width: 12),
                   SizedBox(width: 100, child: fields[1])]);
               }),
-              _choice('Bill type', 'documentType', ['GST invoice', 'Bill of supply', 'Other bill']),
+              const Wrap(key: Key('work-purchase-voucher-reference'), spacing: 6, children: [
+                Text('Purchase voucher No.', style: TextStyle(fontSize: 12, color: _paperMuted)),
+                Text(storePurchaseUnpostedVoucherNumber, style: TextStyle(fontSize: 12, color: _paperInk)),
+              ]),
+              _choice('Supplier document type', 'documentType', ['GST invoice', 'Bill of supply', 'Other bill']),
               for (final warning in WorkspacePurchaseEntryDraft.reviewInvoiceFormat(
                   _reference.text, _date.text, _details['documentType']!.text))
                 Text(warning, key: ValueKey('purchase-format-$warning'),
@@ -12732,7 +12740,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 ]),
                 const SizedBox(height: 8),
                 _compactFields([_detail('Total GST / tax ₹', 'totalTax', number: true),
-                  _detail('Bill total ₹', 'invoiceTotal', number: true),
+                  _detail('Invoice total ₹', 'invoiceTotal', number: true),
                   _detail('Amount payable ₹', 'amountPayable', number: true)]),
                 _compactFields([_detail('Total items', 'printedTotalItems'),
                   _detail('Total quantity', 'printedTotalQuantity')]),

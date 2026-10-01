@@ -3717,7 +3717,7 @@ void main() {
     await tester.pumpAndSettle();
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-documentType')));
     expect(find.text('Select, if applicable'), findsNothing);
-    expect(find.text('Choose bill type'), findsOneWidget);
+    expect(find.text('Choose supplier document type'), findsOneWidget);
     final save = find.byKey(const Key('work-purchase-draft-save'));
     expect(save, findsOneWidget);
     expect(save.hitTestable(), findsOneWidget, reason: 'Saving must not require scrolling past all expanded sections.');
@@ -4219,7 +4219,7 @@ void main() {
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-documentType')));
     await tester.tap(find.byKey(const Key('work-purchase-documentType')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('GST invoice').last);
+    await tester.tap(find.text('Tax invoice').last);
     await tester.pumpAndSettle();
     expect(find.text('Check invoice number: up to 16 letters, digits, / or -.'), findsOneWidget);
     expect(find.text('Check invoice date: use a valid DD/MM/YYYY date.'), findsOneWidget);
@@ -4807,6 +4807,87 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+  test('P05-R11-C02 supplier headings preserve source titles and do not infer tax status', () {
+    expect(storePurchaseDocumentTypeLabel('GST invoice'), 'Tax invoice');
+    expect(storePurchaseDocumentTypeLabel('Other bill'), 'Other supplier bill');
+    expect(storePurchaseDocumentTypeLabel('Source-specific document'), 'Source-specific document');
+    for (final (type, expected) in [('GST invoice', 'TAX INVOICE'), ('Tax invoice', 'TAX INVOICE'),
+        ('Bill of supply', 'BILL OF SUPPLY'), ('Other bill', 'SUPPLIER INVOICE'), ('', 'SUPPLIER INVOICE')]) {
+      expect(storePurchaseSupplierDocumentHeading(title: '', type: type), expected);
+    }
+    expect(storePurchaseSupplierDocumentHeading(title: 'Consulting Invoice', type: 'GST invoice'),
+      'Consulting Invoice');
+  });
+
+  testWidgets('P05-R11-C02 Record purchase opens Purchase entry with a read-only draft voucher', (tester) async {
+    await mount(tester, route: '/app/work/workspace/dashboard',
+      work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
+      viewport: const Size(320, 568), textScale: 2, bottomInset: 240);
+    await openPurchaseList(tester);
+    expect(find.text('Record purchase'), findsOneWidget);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    expect(find.text('Purchase entry'), findsOneWidget);
+    await usePurchaseControl(tester, 'work-purchase-invoice-section');
+    final voucher = find.byKey(const Key('work-purchase-voucher-reference'));
+    await revealPurchaseInput(tester, voucher);
+    expect(find.descendant(of: voucher, matching: find.text('Purchase voucher No.')), findsOneWidget);
+    expect(find.descendant(of: voucher, matching: find.text('Not assigned (draft)')), findsOneWidget);
+    expect(find.descendant(of: voucher, matching: find.byType(TextField)), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final (type, title, heading) in [('GST invoice', '', 'TAX INVOICE'),
+      ('Bill of supply', '', 'BILL OF SUPPLY'), ('Other bill', 'Consulting Invoice', 'Consulting Invoice'),
+      ('', '', 'SUPPLIER INVOICE')]) {
+    testWidgets('P05-R11-C02 purchase entry wording keeps saved source values $type $title', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 9, 30);
+      // Automated legacy-draft fixture, not runtime or OCR acceptance evidence.
+      final draft = WorkspacePurchaseEntryDraft(id: 'host-wording-draft', supplierId: 'host-wording-supplier',
+        invoiceReference: 'SOURCE-REF-KEPT', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: [{'name': 'Host-only item', 'pack': '1 kg', 'quantity': '1', 'cost': '40', 'productId': ''}],
+        details: {'documentType': type, 'documentTitle': title});
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
+        profiles: [WorkspaceSupplierProfile(id: draft.supplierId, name: 'Host-only supplier',
+          createdAt: at, updatedAt: at)], draft: draft);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      expect(find.text('Resume purchase'), findsOneWidget);
+      await usePurchaseControl(tester, 'work-purchase-record');
+      expect(find.text('Purchase entry'), findsOneWidget);
+      await usePurchaseControl(tester, 'work-purchase-invoice-section');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).decoration!.labelText,
+        'Supplier invoice No.');
+      final choice = tester.widget<DropdownButtonFormField<String>>(
+        find.byKey(const Key('work-purchase-documentType')));
+      expect(choice.initialValue, type);
+      expect(choice.decoration.labelText, 'Supplier document type');
+      if (type == 'GST invoice') {
+        expect(find.descendant(of: find.byKey(const Key('work-purchase-documentType')),
+          matching: find.text('Tax invoice')), findsWidgets);
+      }
+      await usePurchaseControl(tester, 'work-purchase-preview');
+      expect(find.text('Purchase entry · Draft'), findsOneWidget);
+      final paper = find.byKey(const Key('purchase-review-paper'));
+      expect(find.descendant(of: paper, matching: find.text(heading)), findsOneWidget);
+      expect(find.descendant(of: paper, matching: find.text('Supplier invoice No.')), findsOneWidget);
+      expect(find.descendant(of: paper, matching: find.text('SOURCE-REF-KEPT')), findsOneWidget);
+      expect(find.descendant(of: paper, matching: find.text('Purchase voucher No.')), findsNothing,
+        reason: 'Internal accounting reference is not part of the supplier invoice.');
+      final voucher = find.byKey(const Key('purchase-review-voucher-reference'));
+      expect(find.descendant(of: voucher, matching: find.text('Not assigned (draft)')), findsOneWidget);
+      expect(work.workspacePurchaseEntryDraft, same(draft));
+      expect(entry.value!.draft!.details['documentType'], type);
+      expect(entry.value!.draft!.details['documentTitle'], title);
+      expect(work.workspacePurchases, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P05-R11-C02 download saved copy cancels retries and rejects dirty or stale records', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -4957,7 +5038,7 @@ void main() {
       expect(decoration.labelText,label,reason:key);
     }
     final details={
-      'documentType':'Bill type','placeOfSupply':'Place of supply','placeOfSupplyCode':'State code',
+      'documentType':'Supplier document type','placeOfSupply':'Place of supply','placeOfSupplyCode':'State code',
       'buyerName':'Billed to / business name','buyerAddress':'Billing address','buyerGstin':'Your GSTIN',
       'buyerUin':'UIN, only if printed','buyerPhone':'Mobile / phone','buyerEmail':'Email',
       'buyerState':'Billing State','buyerStateCode':'State code','deliveryAddress':'Address, if different from billing',
@@ -4965,7 +5046,7 @@ void main() {
       'taxTreatment':'GST type','reverseCharge':'Reverse charge shown?','billDiscount':'Bill discount ₹',
       'freight':'Transport charges ₹','otherCharges':'Other charges ₹','roundOff':'Round off ₹',
       'taxableValue':'Taxable value ₹','supplyValue':'Subtotal ₹','cgst':'CGST ₹','sgst':'Earlier SGST / UTGST ₹',
-      'sgstAmount':'SGST ₹','utgst':'UTGST ₹','igst':'IGST ₹','cess':'Cess ₹','invoiceTotal':'Bill total ₹',
+      'sgstAmount':'SGST ₹','utgst':'UTGST ₹','igst':'IGST ₹','cess':'Cess ₹','invoiceTotal':'Invoice total ₹',
       'receiptStatus':'Goods status','receivedDate':'Received date','expectedDeliveryDate':'Expected delivery date',
       'shippingTerms':'Delivery / shipping terms','paymentStatus':'Payment status','paidAmount':'Amount paid ₹',
       'paymentMethod':'Payment mode','paymentReference':'Payment reference','paymentDate':'Payment date',
@@ -4985,7 +5066,7 @@ void main() {
     expect(details.keys.toSet(),WorkspacePurchaseEntryDraft.detailKeys);
     for(final field in details.entries) { expectLabel('work-purchase-${field.key}',field.value); }
     for(final field in {'supplier-name':'Supplier name or phone','supplier-phone':'Mobile / phone',
-      'supplier-address':'Supplier address','supplier-gstin':'Supplier GSTIN','reference':'Invoice No.',
+      'supplier-address':'Supplier address','supplier-gstin':'Supplier GSTIN','reference':'Supplier invoice No.',
       'date':'Invoice date','item-0':'Item / description','pack-0':'Pack / unit','quantity-0':'Qty',
       'cost-0':'Rate ₹','stock-search-0':'Find saved product'}.entries) {
       expectLabel('work-purchase-${field.key}',field.value);

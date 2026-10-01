@@ -1233,6 +1233,26 @@ Future<Uint8List> _generateStockLedgerFile(
   );
 }
 
+/// Display aliases only: legacy saved document types are not rewritten.
+String storePurchaseDocumentTypeLabel(String raw) => switch (raw.trim().toLowerCase()) {
+  'gst invoice' || 'tax invoice' => 'Tax invoice',
+  'bill of supply' => 'Bill of supply',
+  'other bill' => 'Other supplier bill',
+  _ => raw,
+};
+
+/// Keep a printed title verbatim; never classify an unknown bill as a tax invoice.
+String storePurchaseSupplierDocumentHeading({required String title, required String type}) {
+  if (title.trim().isNotEmpty) return title;
+  return switch (storePurchaseDocumentTypeLabel(type)) {
+    'Tax invoice' => 'TAX INVOICE',
+    'Bill of supply' => 'BILL OF SUPPLY',
+    _ => 'SUPPLIER INVOICE',
+  };
+}
+
+const storePurchaseUnpostedVoucherNumber = 'Not assigned (draft)';
+
 /// A copy of saved, unposted retailer entries, never a reissued supplier bill.
 /// Original attachments and their visual evidence remain separate documents.
 Future<Uint8List> generateStorePurchaseRecordedCopy({
@@ -1326,7 +1346,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     'sellingPrice', 'mrp', 'barcode', 'alreadyInStock'};
   const posKeys = {'receiptStatus', 'receivedDate', 'expectedDeliveryDate', 'shippingTerms',
     'paymentStatus', 'paidAmount', 'paymentMethod', 'paymentReference', 'paymentDate', 'paymentTerms'};
-  final used = <String>{'documentTitle', 'documentCopy', 'supplierEmail', 'originalInvoiceDate',
+  final used = <String>{'documentTitle', 'documentType', 'documentCopy', 'supplierEmail', 'originalInvoiceDate',
     'dueDate', 'poReference', 'placeOfSupply', 'placeOfSupplyCode', 'buyerName', 'buyerAddress',
     'buyerPhone', 'buyerEmail', 'buyerGstin', 'buyerUin', 'buyerState', 'buyerStateCode',
     'deliveryAddress', 'deliveryState', 'deliveryStateCode'};
@@ -1350,17 +1370,19 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     ]),
   ]);
   final widgets = <pw.Widget>[
-    text('Recorded purchase copy - Unposted draft', size: 11, bold: true),
+    text('Purchase entry - Recorded copy (Draft)', size: 11, bold: true),
     pw.SizedBox(height: 5),
     text('Saved retailer entries, not the original supplier invoice. No stock, dues or payment posting.', size: 8),
     pw.SizedBox(height: 10),
     pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(9),
       decoration: pw.BoxDecoration(border: border),
-      child: pw.Text(d['documentTitle']?.isNotEmpty == true ? d['documentTitle']! : 'PURCHASE INVOICE',
+      child: pw.Text(storePurchaseSupplierDocumentHeading(
+        title: d['documentTitle'] ?? '', type: d['documentType'] ?? ''),
         style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: navy))),
     pair(block('Supplier', [('Name', supplier.name), ('GSTIN', supplier.gstin),
       ('Address', supplier.address), ('Phone', supplier.phone), ('Email', d['supplierEmail'] ?? '')]),
-      block('Invoice details', [('Invoice No.', draft.invoiceReference), ('Invoice date', draft.invoiceDate),
+      block('Invoice details', [('Supplier invoice No.', draft.invoiceReference), ('Invoice date', draft.invoiceDate),
+        ('Supplier document type', storePurchaseDocumentTypeLabel(d['documentType'] ?? '')),
         for (final key in ['originalInvoiceDate', 'dueDate', 'poReference', 'placeOfSupply', 'placeOfSupplyCode', 'documentCopy'])
           (key == 'documentCopy' ? 'Copy marking on supplier bill' : label(key), d[key] ?? '')])),
     pair(block('Billed to', [for (final key in ['buyerName', 'buyerAddress', 'buyerPhone', 'buyerEmail',
@@ -1452,6 +1474,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     pw.SizedBox(height: 8),
     pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [text('Record reference', bold: true), table(const ['Detail', 'Saved value'], [
+      ['Purchase voucher No.', storePurchaseUnpostedVoucherNumber],
       ['Store', storeName], ['Store ID', storeId], ['Draft ID', draft.id], ['Supplier ID', supplier.id],
       ['Saved revision', '$revision'], ['Saved on', draft.updatedAt.toIso8601String()],
       for (final a in draft.attachments) ['Original attachment SHA-256', a.digest],
