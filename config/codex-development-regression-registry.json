@@ -104944,6 +104944,136 @@
     },
     {
       "id": "REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES",
+      "sharedDeliveryInstructionCorrection20261002": {
+        "finding": "Founder identified an escaped T03 product regression: public delivery instructions were scoped to Shop and Wholesale despite one receiving address, leaving Bulk unclear. Previous green isolation tests encoded the wrong product rule. Reconstruction also repeated oversized central-instruction and registry projections; truncated results are rejected as complete evidence. Initial full status was empty but did not follow the independent digest protocol; handoff heading discovery emitted titles instead of line numbers.",
+        "rootCause": "Basket destination identity was incorrectly reused as the public delivery-instruction scope. Founder intent requires one receiving-address instruction shared by selected delivery orders. Read-only reconstruction failed to bound exact fields before emission.",
+        "prevention": "Replace public destination tabs with one existing composer, trace persistence and each outgoing order request, cover mixed Shop/Wholesale/Bulk selections and saved-state continuity. Keep Store procurement and historical orders intact. Read exact named registry fields only, reuse unchanged completed mandatory reads and retain independent scalar Git identity plus a non-emitting status digest.",
+        "authority": "Founder explicitly authorized deciding and fixing the one-address public instruction model under the open T03 parent. No new APK, backend, payment, supplier contact or production release authority.",
+        "readRecovery": "The handoff instruction search also truncated; exclude it and read the exact T03 section separately. A source read passed the word ninety instead of integer 90 to Select-Object and returned zero content. Use literal numeric bounds and verify source results before patches. No runtime correction or test preceded recovery.",
+        "state": "local_qualified_pending_founder_visual_and_provider_integration",
+        "fixturePatchRecovery": "Three context-only patches selected an insertion anchor but added no test. They are zero mutation and not implementation progress. Before every further test patch, assert at least one added semantic line exists in the prepared patch string. The next fixture patch must contain complete positive/negative blocks; verify actual test names and counts afterward.",
+        "encodingReadRecovery": "The registry readback used the Windows default cp1252 decoder and failed before returning any hash. Use explicit UTF-8 for every JSON read; no runtime/test retry or generation pin used that failed output.",
+        "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+        "fixtureMigrationPreparation": {
+          "failure": "Preparation assertion matched legitimate destination references and stopped before editing.",
+          "recovery": "Constrain assertion to removed variable declaration and required semantic patch lines; preserve unchanged files and qualify before retry.",
+          "sourceMutation": false
+        },
+        "analysisAttempt1": {
+          "result": "Three lint infos, no compile errors; correction required before tests.",
+          "log": "apps/mobile/build/shared-instructions-20261002/analysis-1.log",
+          "sha256": "7a27f761ac5ff04c2e3fbeecb82f726c32d3cbaebbe56016e7b8f4c1559f2b4b",
+          "issues": [
+            "null-aware snapshot encoding",
+            "legacy-note block braces",
+            "null-aware Checkout summary"
+          ]
+        },
+        "preparationIncidents": {
+          "isolateSyntax": "An unapplied JavaScript template contained Dart interpolation; parse failed before tool execution. Recovered with a literal shell argument.",
+          "ledgerProjection": "Inspection assumed selected was an object; its actual schema is a list. No data changed."
+        },
+        "focusedAttempt1": {
+          "exitCode": 1,
+          "passed": 32,
+          "failed": 16,
+          "warnings": 0,
+          "terminalSuccess": false,
+          "sourceSha256": "4c98254ef4b2b0ce889bbc21dca490eb8a059f86d6815e5a96e541d555975e74",
+          "unchangedSource": true,
+          "sha256": "c6a3817d1e25b523c2617a4e31976c4f215aed4bb159a539368aaf956b3043e6",
+          "classification": [
+            "Conflict CTA fixture had no saved address and no eligible selected payment.",
+            "Four restart fixtures had no saved address.",
+            "Filter test showed lazy viewport relocation and unkeyed instruction section lifetime.",
+            "Generic preset lane at 200 percent exceeds old fixed 2000px drag."
+          ],
+          "recovery": "Retain public instruction section identity and editing state in existing unconditional list delegate; restore viewport before draft assertions; supply real saved address/payment fixtures; scroll by measured extent."
+        },
+        "metadataPreparation": {
+          "failure": "Rename admission asserted a unit test was already in selected ledger; it is not. No changes applied.",
+          "recovery": "Only rename existing selected names; add genuine new behavior cases."
+        },
+        "readIncident": {
+          "rejected": "One focused JSONL raw context query exceeded output budget; use parsed bounded error projections. One guessed catalogue file did not exist; use known model or explicit fixture.",
+          "gateBeforeRetry": true
+        },
+        "focusedAttempt2": {
+          "exitCode": 0,
+          "passed": 40,
+          "failed": 0,
+          "warnings": 0,
+          "terminalSuccess": true,
+          "sourceSha256": "b944362466aed2a3d904de913703615a8aab0747e4adce49bf31ff7b76ef61d1",
+          "unchangedSource": true,
+          "sha256": "c25f1da1122ee26e5f2e1c43a9590eb3fe4ecdcbfe4b115c22b512802f17022a"
+        },
+        "submissionGuardReview": {
+          "finding": "Shared note setters reject submitting, but existing cart mutation guard only rejects unresolved states, not submitting. Clear/remove during an awaited new placement could erase reconstruction inputs.",
+          "requiredCorrection": "Include checkoutBusy in the existing shared mutation hold; exercise clear/remove while placement is delayed. No new persisted request map or order contract.",
+          "selectedAttempt1": "Stopped before qualification to correct this concrete async consistency risk; partial log retained and not accepted.",
+          "architectReview": "Read-only Astra review required before closing; smallest guard correction and real delayed gateway test."
+        },
+        "selectedAttempt2": {
+          "status": "stopped_failed_unqualified",
+          "failure": "Wholesale Cart keeps trade vocabulary and truthful summary retained one literal wholesale instruction owner key after public shared-composer migration.",
+          "log": "apps/mobile/build/checkout-review-20261001/shared-instructions-20261002-selected-2/selected-1.jsonl",
+          "recovery": "Exact inventory across Buy test owners found just this remaining old public key. Update to shared delivery key; preserve vocabulary/totals assertions. Runtime unchanged. Repeat final matrix with disjoint batches in parallel, retaining source boundaries and per-batch closed machine logs."
+        },
+        "inspectionRecovery": {
+          "failure": "A live-event summary did not skip a non-object JSON line; no evidence accepted. One guessed handoff filename was absent.",
+          "recovery": "Use dict-only event parser and exact owner path from recorded claim, not guessed filename."
+        },
+        "finalQualification": {
+          "sourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da",
+          "selected": 888,
+          "references": 947,
+          "focused": 41,
+          "legacyOrigin": 2,
+          "evidence": [
+            {
+              "path": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-SELECTED-1.jsonl",
+              "sha256": "6e26f67c37dab28cbcce1c9e58666aec0f6513e6898045c7cf6a3d477022a2a8",
+              "sourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-SELECTED-2.jsonl",
+              "sha256": "ad9d423d7d5ebf44c4296d0be9d3e1aac4791f643a96d02ff2df710cfaf07cd6",
+              "sourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da"
+            }
+          ],
+          "terminalSuccess": true,
+          "nativeRuntimeUnchanged": true
+        },
+        "nativeReview": {
+          "path": "apps/mobile/build/shared-instructions-20261002/device-review.json",
+          "captures": 10,
+          "runtimeOwnersByteMatch": true,
+          "restoredBasket": "3 items INR837; original Call on arrival",
+          "restoredFontScale": "1.0",
+          "apkBuilt": false,
+          "apkInstalled": false
+        },
+        "nextSweep": "Supplier-specific policy disclosure and conditional +/unchecked tick/add flow authorized and queued in supplierTermsNextSweep20261002; no policy UI implementation claimed.",
+        "architectCompletion": "No architectural blocker; two sole-legacy-origin removal/restart checks pass.",
+        "gitQualification": "Pre-commit and normal feature-branch preservation pending; no clean/push claim yet.",
+        "finalGatePhaseInvocation20261002": {
+          "classification": "invalid_gate_phase_argument_before_script_execution",
+          "command": "check-cross-agent-incremental-ticket-gate.ps1 -Phase pre_commit",
+          "result": "PowerShell ValidateSet rejected pre_commit before the gate body ran; no source, evidence or machine-state mutation occurred",
+          "cause": "The coordinator supports pre_commit, but the incremental ticket gate supports ticket_start, implementation, pre_build and handoff",
+          "recovery": "Read the exact parameter declarations, record this incident before retry, then run the incremental ticket gate with handoff and rerun registry-bound pre_commit checks",
+          "checksAlreadyPassed": [
+            "development regression memory implementation gate",
+            "founder regression pre_commit gate",
+            "subagent coordination pre_commit gate",
+            "approved UI locks gate",
+            "MVP scope execution authorization gate"
+          ],
+          "productQualificationUnchanged": true,
+          "sourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da"
+        }
+      },
       "storeCategoryResumeQualification20260925": {
         "tickets": [
           "BUY-PDP-REF-20260924-02-A05",

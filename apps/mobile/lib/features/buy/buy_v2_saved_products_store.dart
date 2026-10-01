@@ -145,6 +145,7 @@ class BuyV2CustomerStateSnapshot {
     this.savedProductKeys = const {},
     this.deliveryInstructionIds = const {},
     this.customDeliveryInstructions = const {},
+    this.publicDeliveryInstruction,
     this.selectedPayment,
     this.purchaseOrderReference,
     this.pendingPurchaseOrderAccountId,
@@ -183,6 +184,8 @@ class BuyV2CustomerStateSnapshot {
   final Set<String> savedProductKeys;
   final Map<BuyV2Destination, String> deliveryInstructionIds;
   final Map<BuyV2Destination, String> customDeliveryInstructions;
+  // Empty explicitly clears a public note; null permits retained-note migration.
+  final String? publicDeliveryInstruction;
   final String? selectedPayment;
   final String? purchaseOrderReference;
   final String? pendingPurchaseOrderAccountId;
@@ -290,6 +293,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ],
     'selectedAddressId': snapshot.selectedAddressId,
     'savedProductKeys': snapshot.savedProductKeys.toList(growable: false),
+    'publicDeliveryInstruction': ?snapshot.publicDeliveryInstruction,
     'customDeliveryInstructions': {
       for (final entry in snapshot.customDeliveryInstructions.entries)
         entry.key.name: entry.value,
@@ -355,6 +359,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
         ).map(_decodeAddress).whereType<BuyV2Address>().toList(growable: false),
         selectedAddressId: _string(source['selectedAddressId']),
         savedProductKeys: _stringList(source['savedProductKeys']).toSet(),
+        publicDeliveryInstruction: source['publicDeliveryInstruction'] is String
+            ? source['publicDeliveryInstruction'] as String
+            : null,
         customDeliveryInstructions: _destinationStringMap(
           source['customDeliveryInstructions'],
         ),

@@ -227,6 +227,18 @@ BuyV2CommerceAdapter prepaidCommerceFixture() {
     );
 }
 
+const _instructionAddress = BuyV2Address(
+  id: 'instruction-home',
+  kind: BuyV2AddressKind.home,
+  label: 'Home',
+  recipient: 'Aarav Sharma',
+  phone: '9000000000',
+  line: '12, Central Avenue',
+  area: 'Sardarpura, Jodhpur',
+  pinCode: '342003',
+  landmark: 'Near the market',
+);
+
 final class _ShopCommerceAdapter
     implements BuyV2CommerceAdapter, BuyV2VerifiedRatingAdapter {
   _ShopCommerceAdapter({required this.snapshot, required this.placement});
@@ -241,6 +253,7 @@ final class _ShopCommerceAdapter
   int orderRefreshCalls = 0;
   Completer<BuyV2OrderRefreshResult>? orderRefreshGate;
   final requests = <BuyV2OrderPlacementRequest>[];
+  Completer<BuyV2OrderPlacementResult>? placementGate;
   BuyV2MutationResult reviewResult = const BuyV2MutationResult(
     accepted: true,
     customerMessage: 'Review added.',
@@ -268,7 +281,7 @@ final class _ShopCommerceAdapter
   ) async {
     placementCalls += 1;
     requests.add(request);
-    return placement;
+    return placementGate == null ? placement : await placementGate!.future;
   }
 
   @override
@@ -2247,7 +2260,7 @@ void main() {
       await restored.restoreCustomerState();
       expect(
         restored.customDeliveryInstructionFor(BuyV2Destination.shop),
-        'Use side entrance',
+        'Warehouse gate 2',
       );
       expect(
         restored.customDeliveryInstructionFor(BuyV2Destination.wholesale),
@@ -2269,7 +2282,7 @@ void main() {
       expect(cleared.deliveryInstructionTextFor(BuyV2Destination.shop), isNull);
       expect(
         cleared.deliveryInstructionTextFor(BuyV2Destination.wholesale),
-        'Warehouse gate 2',
+        isNull,
       );
     },
   );
@@ -2293,16 +2306,365 @@ void main() {
       expect(request.deliveryInstructionsByProductId, isNotEmpty);
       expect(
         request.deliveryInstructionsByProductId.keys.toSet(),
-        request.lines
-            .where((line) => line.product.destination == destination)
-            .map((line) => line.product.id)
-            .toSet(),
+        request.lines.map((line) => line.product.id).toSet(),
       );
       expect(request.deliveryInstructionsByProductId.values.toSet(), {
         'Use side entrance',
       });
     },
   );
+
+  test(
+    'T03 shared instruction reaches Shop Wholesale and Bulk orders',
+    () async {
+      final core = BuySession();
+      final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: adapter,
+        productFactsAdapter: _T01CDeliveryFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Use the side entrance',
+        ),
+        isTrue,
+      );
+      expect(session.addProduct('w-notebook'), isTrue);
+      expect(session.addProduct('w-rice'), isTrue);
+      expect(session.product('w-rice').offerClass, BuyV2OfferClass.bulk);
+      expect(
+        session.product('w-notebook').offerClass,
+        BuyV2OfferClass.wholesale,
+      );
+      expect(
+        session.deliveryInstructionTextFor(BuyV2Destination.wholesale),
+        'Use the side entrance',
+      );
+      session.openCart(scope: BuyV2CartScope.all);
+      expect(session.openCheckout(), isTrue);
+      expect(session.continueCheckoutFromAddress(), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      adapter.placementGate = Completer<BuyV2OrderPlacementResult>();
+      final submission = session.submitOrder();
+      await Future<void>.delayed(Duration.zero);
+      expect(session.checkoutBusy, isTrue);
+      session.clearCart();
+      session.remove('s-tomato');
+      expect(session.cartLines.map((line) => line.product.id).toSet(), {
+        's-tomato',
+        'w-notebook',
+        'w-rice',
+      });
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'During submission',
+        ),
+        isFalse,
+      );
+      expect(session.publicDeliveryInstruction, 'Use the side entrance');
+      adapter.placementGate!.complete(adapter.placement);
+      expect(await submission, isFalse);
+      final request = adapter.requests.single;
+      expect(request.lines.map((line) => line.product.id).toSet(), {
+        's-tomato',
+        'w-notebook',
+        'w-rice',
+      });
+      expect(
+        request.deliveryInstructionsByProductId.keys.toSet(),
+        request.lines.map((line) => line.product.id).toSet(),
+      );
+      expect(request.deliveryInstructionsByProductId.values.toSet(), {
+        'Use the side entrance',
+      });
+      expect(request.address.id, session.selectedAddressId);
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.wholesale,
+          text: 'Changed during payment',
+        ),
+        isFalse,
+      );
+      expect(
+        session.chooseDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          instructionId: 'shop-call-arrival',
+        ),
+        isFalse,
+      );
+      expect(session.publicDeliveryInstruction, 'Use the side entrance');
+      expect(await session.continuePayment((_) async => true), isTrue);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.confirmedOrders, isNotEmpty);
+      expect(
+        session.confirmedOrders.expand((order) => order.productIds).toSet(),
+        {'s-tomato', 'w-notebook', 'w-rice'},
+      );
+      expect(
+        session.confirmedOrders
+            .map((order) => order.deliveryInstruction)
+            .toSet(),
+        {'Use the side entrance'},
+      );
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Next purchase instruction',
+        ),
+        isTrue,
+      );
+      expect(
+        session.confirmedOrders
+            .map((order) => order.deliveryInstruction)
+            .toSet(),
+        {'Use the side entrance'},
+      );
+    },
+  );
+
+  for (final conflicting in [false, true]) {
+    test(
+      'T03 shared instruction recovers legacy notes conflict $conflicting',
+      () async {
+        final store = _MemoryCustomerStateStore('legacy-delivery-$conflicting')
+          ..snapshot = BuyV2CustomerStateSnapshot(
+            cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+            customDeliveryInstructions: {
+              BuyV2Destination.shop: 'Use side entrance',
+              BuyV2Destination.wholesale: conflicting
+                  ? 'Call at the gate'
+                  : 'Use side entrance',
+            },
+          );
+        final core = BuySession();
+        final session = BuyV2Session(core: core, customerStateStore: store);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await session.restoreCustomerState();
+        expect(session.publicDeliveryInstructionReviewRequired, conflicting);
+        expect(
+          session.publicDeliveryInstruction,
+          conflicting ? null : 'Use side entrance',
+        );
+        if (conflicting) {
+          expect(session.previousPublicDeliveryInstructions, [
+            'Use side entrance',
+            'Call at the gate',
+          ]);
+          expect(session.confirmOrder(), isFalse);
+          expect(
+            session.notice,
+            'Review and save one delivery instruction for this address.',
+          );
+          expect(
+            session.setCustomDeliveryInstruction(
+              destination: BuyV2Destination.shop,
+              text: 'x' * 201,
+            ),
+            isFalse,
+          );
+          expect(session.previousPublicDeliveryInstructions, [
+            'Use side entrance',
+            'Call at the gate',
+          ]);
+        }
+        if (!conflicting) {
+          session.remove('s-tomato');
+          expect(session.publicDeliveryInstruction, 'Use side entrance');
+          session.addAddress(_instructionAddress);
+          expect(session.publicDeliveryInstruction, 'Use side entrance');
+        }
+        expect(
+          session.setCustomDeliveryInstruction(
+            destination: BuyV2Destination.wholesale,
+            text: 'Use side entrance; call at the gate',
+          ),
+          isTrue,
+        );
+        expect(session.publicDeliveryInstructionReviewRequired, isFalse);
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Use side entrance; call at the gate',
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          store.snapshot!.publicDeliveryInstruction,
+          'Use side entrance; call at the gate',
+        );
+        expect(store.snapshot!.customDeliveryInstructions, isEmpty);
+        expect(
+          session.setCustomDeliveryInstruction(
+            destination: BuyV2Destination.shop,
+            text: '',
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+        final restoredCore = BuySession();
+        final restored = BuyV2Session(
+          core: restoredCore,
+          customerStateStore: store,
+        );
+        addTearDown(restoredCore.dispose);
+        addTearDown(restored.dispose);
+        await restored.restoreCustomerState();
+        expect(restored.publicDeliveryInstruction, isNull);
+        expect(restored.publicDeliveryInstructionReviewRequired, isFalse);
+        expect(restored.previousPublicDeliveryInstructions, isEmpty);
+      },
+    );
+  }
+
+  testWidgets('T03 conflicting instruction review opens lossless composer', (
+    tester,
+  ) async {
+    final first = 'a' * 150;
+    final second = 'b' * 150;
+    final store = _MemoryCustomerStateStore('instruction-review')
+      ..snapshot = BuyV2CustomerStateSnapshot(
+        addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id,
+        selectedPayment: 'Card',
+        cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+        customDeliveryInstructions: {
+          BuyV2Destination.shop: first,
+          BuyV2Destination.wholesale: second,
+        },
+      );
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      customerStateStore: store,
+      productFactsAdapter: _T01CDeliveryFactsAdapter(),
+    );
+    final gst = BuyV2GstInvoiceController();
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    addTearDown(gst.dispose);
+    await session.restoreCustomerState();
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: BuyV2CheckoutView(session: session, gstInvoiceController: gst),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review delivery instructions'));
+    await tester.pumpAndSettle();
+    final field = find.byKey(
+      const ValueKey('buy-cart-instruction-note-delivery'),
+    );
+    final save = find.byKey(
+      const ValueKey('buy-cart-instruction-save-delivery'),
+    );
+    expect(tester.widget<TextField>(field).controller!.text, '$first\n$second');
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(session.publicDeliveryInstructionReviewRequired, isTrue);
+    expect(tester.widget<TextField>(field).controller!.text, '$first\n$second');
+    final composer = find.byKey(
+      const ValueKey('buy-cart-instruction-composer-delivery'),
+    );
+    await tester.tap(
+      find.descendant(of: composer, matching: find.text('Cancel')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.previousPublicDeliveryInstructions, [first, second]);
+    expect(session.confirmOrder(), isFalse);
+    await tester.ensureVisible(find.text('Review delivery instructions'));
+    await tester.tap(find.text('Review delivery instructions'));
+    await tester.pumpAndSettle();
+    await tester.enterText(field, 'Use one shared entrance');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(session.publicDeliveryInstruction, 'Use one shared entrance');
+    expect(session.publicDeliveryInstructionReviewRequired, isFalse);
+    expect(
+      find.byKey(const ValueKey('buy-instruction-context-shop')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final shared in [false, true]) {
+    for (final secondNote in [false, true]) {
+      test(
+        'T03 pending instructions survive restart shared $shared second note $secondNote',
+        () async {
+          final store = _MemoryCustomerStateStore('pending-instructions')
+            ..snapshot = BuyV2CustomerStateSnapshot(
+              addresses: const [_instructionAddress],
+              selectedAddressId: _instructionAddress.id,
+              cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+              customDeliveryInstructions: {
+                BuyV2Destination.shop: 'Side entrance',
+                if (secondNote) BuyV2Destination.wholesale: 'Warehouse gate',
+              },
+              publicDeliveryInstruction: shared ? 'Shared gate' : null,
+              selectedPayment: 'Card',
+              checkoutIdempotencyKey: 'pending-instructions-1',
+              paymentReference: 'payment-instructions-1',
+              checkoutSubmissionState: 'paymentPending',
+            );
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            customerStateStore: store,
+            commerceAdapter: prepaidCommerceFixture(),
+            productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCustomerState();
+          expect(session.checkoutRequiresResolution, isTrue);
+          expect(
+            session.setCustomDeliveryInstruction(
+              destination: BuyV2Destination.shop,
+              text: '',
+            ),
+            isFalse,
+          );
+          expect(await session.reconcilePayment(), isTrue);
+          final shop = session.confirmedOrders.singleWhere(
+            (o) => o.destination == BuyV2Destination.shop,
+          );
+          final wholesale = session.confirmedOrders.singleWhere(
+            (o) => o.destination == BuyV2Destination.wholesale,
+          );
+          expect(
+            shop.deliveryInstruction,
+            shared ? 'Shared gate' : 'Side entrance',
+          );
+          expect(
+            wholesale.deliveryInstruction,
+            shared
+                ? 'Shared gate'
+                : secondNote
+                ? 'Warehouse gate'
+                : null,
+          );
+          expect(session.cartLines, isEmpty);
+        },
+      );
+    }
+  }
 
   test(
     'review comparison cart restores through exact catalogue resolver',

@@ -1673,9 +1673,9 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Checkout retains each unchanged accepted supplier agreement, requires a fresh choice when its financial or eligibility conditions change, presents compact terms with Change, keeps Retail prepaid, reuses saved receiving/GST details and permits optional instructions without blocking payment.",
-      "manifestPath": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json",
-      "manifestSha256": "82493398296CAA9D023554725F4D141D16776C23449B087424BEBCCC4AE14AFC",
+      "customerOutcome": "One optional instruction composer in Cart and Checkout applies the same saved instruction to every selected delivery order at the receiving address, including Bulk. Different older notes are shown for review without losing them or silently sending category-specific instructions.",
+      "manifestPath": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json",
+      "manifestSha256": "128BDF2C305BC0C9B13E6BB54F1D031FA6CF64BFAD893C8A22AD2000F6B7BBBB",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -1686,45 +1686,49 @@
       ],
       "sharedImplementationOwners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "The existing Buy session owns supplier agreements and the current Checkout owns display, payment and recovery. Full agreement comparison and reuse of the existing note composer correct the observed gaps without new screens, routes, state owners or provider contracts.",
+      "necessityProof": "Reuse the current Buy session, customer snapshot, composer and per-product order request. One public note replaces category scoping; Store procurement and existing historical orders remain separate. Bulk already uses Wholesale offer capabilities, so no destination, screen or route is added.",
       "robustnessCoverage": [
-        "Changed amount, balance, due date or eligibility under the same ID needs new consent; equivalent unchanged agreements retain consent",
-        "Stale term objects cannot silently consent to refreshed conditions; supplier/group identities remain isolated",
-        "Retail prepaid and mixed-basket totals remain correct; legacy pending-payment recovery is preserved",
-        "Compact terms support Change, Retry, small screens, enlarged text and reduced motion",
-        "Empty instructions are optional, saved instructions survive Cart/Checkout interruption, and invalid receiving facts identify affected items",
-        "Focused behavioral checks, existing selected Buy matrix, analysis and actual installed review-app screens"
+        "Mixed Shop, Wholesale and Bulk receive the same instruction in actual placement requests and confirmed orders",
+        "Category filters and adding/removing another category never switch the public draft or saved instruction",
+        "Customer-specific codec round trip, legacy same/differing notes, empty Save and invalid length preserve correct recovery",
+        "One public composer, no category contexts, one attached Clear, saved preset editing, Cancel and Cart/Checkout return",
+        "Normal/200-percent keyboard and compact/reduced-motion fitment; existing selected Buy regressions and changed-owner analysis",
+        "Current local native review screens and truthful remaining provider/founder acceptance boundaries"
       ],
       "adjustments": [
-        "Compare accepted agreement contents rather than only its ID; reject stale agreement objects and exclude unselected groups from placement terms",
-        "Keep unaffected supplier choices and require a new choice only for a changed or unavailable agreement",
-        "Show compact accepted public terms with an accessible Change action; Retail has no business-term chooser",
-        "Reject new public Retail COD selections and retain truthful prepaid payment/recovery behavior",
-        "Expose optional Checkout instruction review/edit through the existing composer and preserve address/GST validation"
+        "Remove public Shop/Wholesale instruction contexts; keep one stable composer independent of display filters and selected categories",
+        "Retain one public instruction in the existing customer snapshot and apply it to all submitted delivery products and resulting orders",
+        "Reuse existing choices without duplicate labels; typed notes and empty notes retain the 200-character bound",
+        "Migrate an unambiguous older note; show differing older notes in the same composer for explicit review before ordering",
+        "Keep Clear only inside the composer; Clear edits draft, Cancel preserves saved text, empty Save removes the shared instruction",
+        "Keep instructions frozen during unresolved/submitting payments and preserve Store procurement and historical order notes"
       ],
       "explicitExclusions": [
-        "No new screen, route, state owner, dependency, backend, Store or delivery implementation",
-        "No invented supplier terms, credit eligibility, provider quote, payment success or cross-Store credit transfer",
-        "No new APK, install, data clear, real payment, cloud deployment, secret access or external messaging",
-        "No screenbook HTML mutation or unrelated product expansion"
+        "No new screen, route, state service, dependency, backend, Store procurement or Bulk delivery workspace implementation",
+        "No change to supplier agreement consent, GST, pricing, payment/provider authority or historical orders",
+        "No APK build/install, data clear, live payment, cloud deployment or supplier messaging",
+        "No screenbook mutation or unrelated worktree edits"
       ],
       "dependenciesAndApprovals": [
-        "Technically qualified and founder-approved GST checkpoint a0067a63",
-        "Existing T02 unified Checkout and exclusive registered Buy source/test ownership",
-        "T11 authoritative supplier/customer eligibility and provider terms remain required for integrated acceptance",
-        "Founder visual approval of the new T03 screens remains separate from technical acceptance"
+        "Existing open T03 parent and qualified checkpoint 1c625420",
+        "Exclusive Buy source/test ownership and current instruction correction authorization",
+        "Founder visual review remains distinct from local tests; T11 provider integration remains deferred"
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "assessed_before_T03_runtime_execution",
-      "evidencePath": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json"
+      "implementationState": "assessed_before_shared_instruction_correction",
+      "evidencePath": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5188,35 +5192,35 @@
   "ticket": {
     "id": "BUY-ACTION-POLISH-20260926-01",
     "parentTicketId": "UAW-CURSOR-BUY-READY-20260921",
-    "customerOutcome": "Checkout retains each unchanged accepted supplier agreement, requires a fresh choice when its financial or eligibility conditions change, presents compact terms with Change, keeps Retail prepaid, reuses saved receiving/GST details and permits optional instructions without blocking payment.",
+    "customerOutcome": "One optional instruction composer in Cart and Checkout applies the same saved instruction to every selected delivery order at the receiving address, including Bulk. Different older notes are shown for review without losing them or silently sending category-specific instructions.",
     "classification": "mvp_required",
-    "classificationReason": "Correct consent, payment eligibility and recoverable Checkout are required for the founder-selected commerce launch journey.",
+    "classificationReason": "Correct delivery instructions and retained-state recovery are required for the selected public commerce journey.",
     "minimumCompleteScope": [
-      "Compare accepted agreement contents rather than only its ID; reject stale agreement objects and exclude unselected groups from placement terms",
-      "Keep unaffected supplier choices and require a new choice only for a changed or unavailable agreement",
-      "Show compact accepted public terms with an accessible Change action; Retail has no business-term chooser",
-      "Reject new public Retail COD selections and retain truthful prepaid payment/recovery behavior",
-      "Expose optional Checkout instruction review/edit through the existing composer and preserve address/GST validation"
+      "Remove public Shop/Wholesale instruction contexts; keep one stable composer independent of display filters and selected categories",
+      "Retain one public instruction in the existing customer snapshot and apply it to all submitted delivery products and resulting orders",
+      "Reuse existing choices without duplicate labels; typed notes and empty notes retain the 200-character bound",
+      "Migrate an unambiguous older note; show differing older notes in the same composer for explicit review before ordering",
+      "Keep Clear only inside the composer; Clear edits draft, Cancel preserves saved text, empty Save removes the shared instruction",
+      "Keep instructions frozen during unresolved/submitting payments and preserve Store procurement and historical order notes"
     ],
     "explicitExclusions": [
-      "No new screen, route, state owner, dependency, backend, Store or delivery implementation",
-      "No invented supplier terms, credit eligibility, provider quote, payment success or cross-Store credit transfer",
-      "No new APK, install, data clear, real payment, cloud deployment, secret access or external messaging",
-      "No screenbook HTML mutation or unrelated product expansion"
+      "No new screen, route, state service, dependency, backend, Store procurement or Bulk delivery workspace implementation",
+      "No change to supplier agreement consent, GST, pricing, payment/provider authority or historical orders",
+      "No APK build/install, data clear, live payment, cloud deployment or supplier messaging",
+      "No screenbook mutation or unrelated worktree edits"
     ],
     "dependenciesAndApprovals": [
-      "Technically qualified and founder-approved GST checkpoint a0067a63",
-      "Existing T02 unified Checkout and exclusive registered Buy source/test ownership",
-      "T11 authoritative supplier/customer eligibility and provider terms remain required for integrated acceptance",
-      "Founder visual approval of the new T03 screens remains separate from technical acceptance"
+      "Existing open T03 parent and qualified checkpoint 1c625420",
+      "Exclusive Buy source/test ownership and current instruction correction authorization",
+      "Founder visual review remains distinct from local tests; T11 provider integration remains deferred"
     ],
     "testAndEvidencePlan": [
-      "Changed amount, balance, due date or eligibility under the same ID needs new consent; equivalent unchanged agreements retain consent",
-      "Stale term objects cannot silently consent to refreshed conditions; supplier/group identities remain isolated",
-      "Retail prepaid and mixed-basket totals remain correct; legacy pending-payment recovery is preserved",
-      "Compact terms support Change, Retry, small screens, enlarged text and reduced motion",
-      "Empty instructions are optional, saved instructions survive Cart/Checkout interruption, and invalid receiving facts identify affected items",
-      "Focused behavioral checks, existing selected Buy matrix, analysis and actual installed review-app screens"
+      "Mixed Shop, Wholesale and Bulk receive the same instruction in actual placement requests and confirmed orders",
+      "Category filters and adding/removing another category never switch the public draft or saved instruction",
+      "Customer-specific codec round trip, legacy same/differing notes, empty Save and invalid length preserve correct recovery",
+      "One public composer, no category contexts, one attached Clear, saved preset editing, Cancel and Cart/Checkout return",
+      "Normal/200-percent keyboard and compact/reduced-motion fitment; existing selected Buy regressions and changed-owner analysis",
+      "Current local native review screens and truthful remaining provider/founder acceptance boundaries"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5476,13 +5480,13 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json"
+    "evidence": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json"
   },
   "authorization": {
     "state": "existing_ticket_authority_confirmed",
-    "evidence": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json",
+    "evidence": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder approved the GST amendment subject to technical testing and instructed the next cart ticket, then explicitly requested do needful as needed for T03 including the annotated changed-agreement consent risk."
+    "founderAcceptance": "Founder identified the category-scoping regression and explicitly instructed the agent to decide and fix it. Use one standard composer for the one receiving address."
   },
   "execution": {
     "referenceWriteAuthorized": false,

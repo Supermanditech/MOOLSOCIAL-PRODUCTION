@@ -84,7 +84,7 @@ void main() {
         session.confirmedOrders
             .singleWhere((o) => o.destination == BuyV2Destination.shop)
             .deliveryInstruction,
-        'Use the side entrance',
+        'Call at the warehouse gate',
       );
       expect(
         session.confirmedOrders
@@ -746,7 +746,7 @@ void main() {
       },
     );
 
-    test('delivery instructions stay vertical-owned through confirmation', () {
+    test('delivery instructions share one address through confirmation', () {
       final session = BuyV2Session(
         core: BuySession(),
         productFactsAdapter: const QualificationDeliveryFacts(),
@@ -772,7 +772,7 @@ void main() {
           destination: BuyV2Destination.wholesale,
           instructionId: 'shop-call-arrival',
         ),
-        isFalse,
+        isTrue,
       );
       expect(
         session.chooseDeliveryInstruction(
@@ -790,7 +790,7 @@ void main() {
       final wholesaleOrder = session.confirmedOrders.singleWhere(
         (order) => order.destination == BuyV2Destination.wholesale,
       );
-      expect(shopOrder.deliveryInstruction, 'Call on arrival');
+      expect(shopOrder.deliveryInstruction, 'Deliver to the receiving desk');
       expect(
         wholesaleOrder.deliveryInstruction,
         'Deliver to the receiving desk',

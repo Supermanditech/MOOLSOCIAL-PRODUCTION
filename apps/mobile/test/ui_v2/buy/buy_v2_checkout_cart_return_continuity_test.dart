@@ -2820,7 +2820,7 @@ void main() {
         );
         await tester.pump();
         final add = find.byKey(
-          const ValueKey('buy-cart-instruction-custom-shop'),
+          const ValueKey('buy-cart-instruction-custom-delivery'),
         );
         expect(add.hitTestable(), findsOneWidget);
         expect(find.text('Clear'), findsNothing);
@@ -2830,17 +2830,17 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Clear'), findsOneWidget);
         expect(
-          find.byKey(const ValueKey('buy-cart-instruction-shop-none')),
+          find.byKey(const ValueKey('buy-cart-instruction-delivery-none')),
           findsNothing,
         );
         final field = find.byKey(
-          const ValueKey('buy-cart-instruction-note-shop'),
+          const ValueKey('buy-cart-instruction-note-delivery'),
         );
         await tester.ensureVisible(field);
         await tester.pumpAndSettle();
         await tester.enterText(field, 'Ring once at the front gate.');
         final save = find.byKey(
-          const ValueKey('buy-cart-instruction-save-shop'),
+          const ValueKey('buy-cart-instruction-save-delivery'),
         );
         await tester.ensureVisible(save);
         await tester.pumpAndSettle();
@@ -2876,7 +2876,7 @@ void main() {
           const PageStorageKey('buy-checkout-instructions'),
         );
         final reopenedAdd = find.byKey(
-          const ValueKey('buy-cart-instruction-custom-shop'),
+          const ValueKey('buy-cart-instruction-custom-delivery'),
         );
         if (reopenedAdd.hitTestable().evaluate().isEmpty) {
           await tester.tap(
@@ -2893,7 +2893,7 @@ void main() {
         await tester.tap(reopenedAdd);
         await tester.pumpAndSettle();
         final clear = find.byKey(
-          const ValueKey('buy-cart-instruction-clear-draft-shop'),
+          const ValueKey('buy-cart-instruction-clear-draft-delivery'),
         );
         expect(find.text('Clear'), findsOneWidget);
         await tester.ensureVisible(clear);

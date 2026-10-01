@@ -5605,6 +5605,9 @@ class BuyV2Session extends ChangeNotifier {
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
   final Map<BuyV2Destination, String> _customDeliveryInstructions = {};
+  // Public Checkout has one receiving address, shared by every delivery group.
+  // Null retains legacy notes until migration; an empty string is an explicit clear.
+  String? _publicDeliveryInstruction;
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
       {};
   List<BuyV2CartBenefit> _liveCartBenefits = [];
@@ -7421,6 +7424,11 @@ class BuyV2Session extends ChangeNotifier {
     _deliveryInstructionIds
       ..clear()
       ..addAll(snapshot.deliveryInstructionIds);
+    final publicNote = snapshot.publicDeliveryInstruction;
+    _publicDeliveryInstruction =
+        publicNote != null && publicNote.trim().characters.length <= 200
+        ? publicNote.trim()
+        : null;
     _customDeliveryInstructions
       ..clear()
       ..addEntries(
@@ -7680,6 +7688,7 @@ class BuyV2Session extends ChangeNotifier {
       savedProductKeys: Set.unmodifiable(_savedKeys),
       deliveryInstructionIds: Map.unmodifiable(_deliveryInstructionIds),
       customDeliveryInstructions: Map.unmodifiable(_customDeliveryInstructions),
+      publicDeliveryInstruction: _publicDeliveryInstruction,
       selectedPayment: selectedPayment.isEmpty ? null : selectedPayment,
       purchaseOrderReference: purchaseOrderReference.trim().isEmpty
           ? null
@@ -8432,11 +8441,62 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2DeliveryInstructionOption> deliveryInstructionsFor(
     BuyV2Destination destination,
-  ) => buyV2DeliveryInstructionsFor(destination);
+  ) {
+    if (isStoreProcurement) return buyV2DeliveryInstructionsFor(destination);
+    final labels = <String>{};
+    return List.unmodifiable([
+      for (final option in buyV2DeliveryInstructionOptions)
+        if (labels.add(option.label)) option,
+    ]);
+  }
+
+  List<String> get previousPublicDeliveryInstructions {
+    if (isStoreProcurement || _publicDeliveryInstruction != null) {
+      return const [];
+    }
+    final notes = <String>{};
+    for (final destination in BuyV2Destination.values) {
+      final custom = _customDeliveryInstructions[destination];
+      final id = _deliveryInstructionIds[destination];
+      final preset = buyV2DeliveryInstructionOptions
+          .where(
+            (option) => option.id == id && option.destination == destination,
+          )
+          .firstOrNull;
+      final note = custom ?? preset?.label;
+      if (note != null && note.isNotEmpty) notes.add(note);
+    }
+    return List.unmodifiable(notes);
+  }
+
+  bool get publicDeliveryInstructionReviewRequired =>
+      previousPublicDeliveryInstructions.length > 1;
+
+  String? get publicDeliveryInstruction {
+    final note =
+        _publicDeliveryInstruction ??
+        previousPublicDeliveryInstructions.singleOrNull;
+    return note == null || note.isEmpty ? null : note;
+  }
+
+  bool _savePublicDeliveryInstruction(String note) {
+    _publicDeliveryInstruction = note;
+    _deliveryInstructionIds.clear();
+    _customDeliveryInstructions.clear();
+    notice = null;
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
 
   BuyV2DeliveryInstructionOption? selectedDeliveryInstructionFor(
     BuyV2Destination destination,
   ) {
+    if (!isStoreProcurement) {
+      return deliveryInstructionsFor(destination)
+          .where((option) => option.label == publicDeliveryInstruction)
+          .firstOrNull;
+    }
     final id = _deliveryInstructionIds[destination];
     if (id == null) return null;
     return buyV2DeliveryInstructionOptions
@@ -8445,23 +8505,35 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String? customDeliveryInstructionFor(BuyV2Destination destination) =>
-      _customDeliveryInstructions[destination];
+      isStoreProcurement
+      ? _customDeliveryInstructions[destination]
+      : selectedDeliveryInstructionFor(destination) == null
+      ? publicDeliveryInstruction
+      : null;
 
   String? deliveryInstructionTextFor(BuyV2Destination destination) =>
-      customDeliveryInstructionFor(destination) ??
-      selectedDeliveryInstructionFor(destination)?.label;
+      !isStoreProcurement
+      ? publicDeliveryInstruction
+      : customDeliveryInstructionFor(destination) ??
+            selectedDeliveryInstructionFor(destination)?.label;
 
   bool setCustomDeliveryInstruction({
     required BuyV2Destination destination,
     required String text,
   }) {
+    if (checkoutBusy || _holdCartForPaymentResolution()) return false;
     final note = text.trim();
     if (note.characters.length > 200 ||
-        !_cart.values.any((line) => line.product.destination == destination)) {
+        _cart.isEmpty ||
+        (isStoreProcurement &&
+            !_cart.values.any(
+              (line) => line.product.destination == destination,
+            ))) {
       notice = 'Use up to 200 characters for delivery instructions.';
       notifyListeners();
       return false;
     }
+    if (!isStoreProcurement) return _savePublicDeliveryInstruction(note);
     _deliveryInstructionIds.remove(destination);
     if (note.isEmpty) {
       _customDeliveryInstructions.remove(destination);
@@ -8478,7 +8550,9 @@ class BuyV2Session extends ChangeNotifier {
     required BuyV2Destination destination,
     required String? instructionId,
   }) {
+    if (checkoutBusy || _holdCartForPaymentResolution()) return false;
     if (instructionId == null) {
+      if (!isStoreProcurement) return _savePublicDeliveryInstruction('');
       _deliveryInstructionIds.remove(destination);
       _customDeliveryInstructions.remove(destination);
       notice = null;
@@ -8488,13 +8562,24 @@ class BuyV2Session extends ChangeNotifier {
     }
     final valid = buyV2DeliveryInstructionOptions.any(
       (option) =>
-          option.id == instructionId && option.destination == destination,
+          option.id == instructionId &&
+          (!isStoreProcurement || option.destination == destination),
     );
     if (!valid ||
-        !_cart.values.any((line) => line.product.destination == destination)) {
+        _cart.isEmpty ||
+        (isStoreProcurement &&
+            !_cart.values.any(
+              (line) => line.product.destination == destination,
+            ))) {
       notice = 'This delivery instruction is not available.';
       notifyListeners();
       return false;
+    }
+    if (!isStoreProcurement) {
+      final option = buyV2DeliveryInstructionOptions.firstWhere(
+        (option) => option.id == instructionId,
+      );
+      return _savePublicDeliveryInstruction(option.label);
     }
     _customDeliveryInstructions.remove(destination);
     _deliveryInstructionIds[destination] = instructionId;
@@ -12806,7 +12891,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     }
-    if (!checkoutRequiresResolution) return false;
+    if (!checkoutRequiresResolution && !checkoutBusy) return false;
     notice =
         'Check the current payment before changing your Cart or payment method.';
     notifyListeners();
@@ -13206,6 +13291,7 @@ class BuyV2Session extends ChangeNotifier {
     _excludedCartProductIds.clear();
     _deliveryInstructionIds.clear();
     _customDeliveryInstructions.clear();
+    _publicDeliveryInstruction = null;
     _selectedCartBenefitRefs.clear();
     _tipsByFulfilmentKey.clear();
     destination = fallback;
@@ -13425,7 +13511,14 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool _checkoutEligibilityCurrent() {
+  bool _checkoutEligibilityCurrent({bool placingOrder = false}) {
+    if (placingOrder &&
+        !collectionCheckoutSelected &&
+        publicDeliveryInstructionReviewRequired) {
+      notice = 'Review and save one delivery instruction for this address.';
+      notifyListeners();
+      return false;
+    }
     for (final line in checkoutLines) {
       if (!_availableForDiscovery(line.product)) {
         notice =
@@ -13438,7 +13531,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool confirmOrder() {
-    if (!_checkoutEligibilityCurrent()) return false;
+    if (!_checkoutEligibilityCurrent(placingOrder: true)) return false;
     if (isStoreProcurement && checkoutPaymentTermsReviewRequired) {
       notice = 'Supplier payment terms must be confirmed before ordering.';
       notifyListeners();
@@ -13802,7 +13895,7 @@ class BuyV2Session extends ChangeNotifier {
             !_allowProcurementLines(lines))) {
       return false;
     }
-    if (!_checkoutEligibilityCurrent()) return false;
+    if (!_checkoutEligibilityCurrent(placingOrder: true)) return false;
     if (purchaseOrderReviewRequired) {
       notice = 'Supplier terms changed. Check them before payment.';
       notifyListeners();
@@ -13819,6 +13912,15 @@ class BuyV2Session extends ChangeNotifier {
         'shop-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-'
         '${_checkoutAttemptSequence++}';
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
+    // A non-null shared field distinguishes new attempts from legacy payments
+    // whose instructions were frozen separately for each destination.
+    if (!isStoreProcurement) {
+      _publicDeliveryInstruction = publicDeliveryInstruction ?? '';
+    }
+    final submittedInstructions = Map<String, String>.unmodifiable({
+      for (final line in lines)
+        line.product.id: ?deliveryInstructionTextFor(line.product.destination),
+    });
     notice = null;
     final paymentOwner = collectionIdentity?.value;
     final persistenceOwner = customerStateStore?.ownerScope;
@@ -13859,12 +13961,7 @@ class BuyV2Session extends ChangeNotifier {
     final placement = await commerceAdapter.placeOrder(
       BuyV2OrderPlacementRequest(
         lines: List.unmodifiable(lines),
-        deliveryInstructionsByProductId: Map.unmodifiable({
-          for (final line in lines)
-            line.product.id: ?deliveryInstructionTextFor(
-              line.product.destination,
-            ),
-        }),
+        deliveryInstructionsByProductId: submittedInstructions,
         address: address,
         paymentMethod: selectedPayment,
         total: checkoutPayableTotal,
@@ -14456,6 +14553,11 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Address address,
     String purchaseId,
   ) {
+    final legacyPayment =
+        !isStoreProcurement &&
+        _publicDeliveryInstruction == null &&
+        checkoutBusy &&
+        _checkoutIdempotencyKey != null;
     final discountByKey = _checkoutGroupCouponSavings();
     final quoteLineByKey = {
       for (final line
@@ -14477,6 +14579,18 @@ class BuyV2Session extends ChangeNotifier {
             deliveryFee: quoteLine?.deliveryFee ?? 0,
             paymentCharge: quoteLine?.paymentCharge ?? 0,
             totalOverride: quoteLine?.total,
+            deliveryInstruction: legacyPayment
+                ? _customDeliveryInstructions[group.destination] ??
+                      buyV2DeliveryInstructionOptions
+                          .where(
+                            (option) =>
+                                option.destination == group.destination &&
+                                option.id ==
+                                    _deliveryInstructionIds[group.destination],
+                          )
+                          .firstOrNull
+                          ?.label
+                : deliveryInstructionTextFor(group.destination),
           );
         }(),
     ]);
@@ -14511,6 +14625,7 @@ class BuyV2Session extends ChangeNotifier {
     int deliveryFee = 0,
     int paymentCharge = 0,
     int? totalOverride,
+    String? deliveryInstruction,
   }) {
     final prefix = switch (group.destination) {
       BuyV2Destination.shop => 'MS',
@@ -14559,7 +14674,7 @@ class BuyV2Session extends ChangeNotifier {
           : null,
       recipient: address.recipient,
       addressLine: '${address.line}, ${address.area} ${address.pinCode}',
-      deliveryInstruction: deliveryInstructionTextFor(group.destination),
+      deliveryInstruction: deliveryInstruction,
       tip: tipForGroup(group),
       discount: discount,
       paymentTermLabel: paymentTerm == null
@@ -14608,12 +14723,15 @@ class BuyV2Session extends ChangeNotifier {
     final destinations = _cart.values
         .map((line) => line.product.destination)
         .toSet();
-    _deliveryInstructionIds.removeWhere(
-      (destination, _) => !destinations.contains(destination),
-    );
-    _customDeliveryInstructions.removeWhere(
-      (destination, _) => !destinations.contains(destination),
-    );
+    if (isStoreProcurement || _cart.isEmpty) {
+      _deliveryInstructionIds.removeWhere(
+        (destination, _) => !destinations.contains(destination),
+      );
+      _customDeliveryInstructions.removeWhere(
+        (destination, _) => !destinations.contains(destination),
+      );
+    }
+    if (_cart.isEmpty) _publicDeliveryInstruction = null;
     _selectedCartBenefitRefs.removeWhere((key, _) {
       final destinationName = key.split('|').firstOrNull;
       return !destinations.any(

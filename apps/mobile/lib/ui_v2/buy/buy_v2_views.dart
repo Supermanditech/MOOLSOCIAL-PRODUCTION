@@ -9135,6 +9135,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       ),
       const SizedBox(height: 10),
       Focus(
+        key: const ValueKey('buy-cart-instructions-focus-owner'),
         onFocusChange: (focused) {
           if (mounted) setState(() => _instructionsFocused = focused);
         },
@@ -10975,7 +10976,7 @@ class _CommercialPaymentTermGroupState
   }
 }
 
-class BuyV2CheckoutView extends StatelessWidget {
+class BuyV2CheckoutView extends StatefulWidget {
   const BuyV2CheckoutView({
     super.key,
     required this.session,
@@ -10988,6 +10989,18 @@ class BuyV2CheckoutView extends StatelessWidget {
   final BuyV2GstInvoiceController gstInvoiceController;
   final bool keyboardVisible;
   final BuyV2PaymentHandoff? paymentHandoff;
+
+  @override
+  State<BuyV2CheckoutView> createState() => _BuyV2CheckoutViewState();
+}
+
+class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
+  final _instructionsKey = GlobalKey<_CheckoutDeliveryInstructionsState>();
+  BuyV2Session get session => widget.session;
+  BuyV2GstInvoiceController get gstInvoiceController =>
+      widget.gstInvoiceController;
+  bool get keyboardVisible => widget.keyboardVisible;
+  BuyV2PaymentHandoff? get paymentHandoff => widget.paymentHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -11022,6 +11035,7 @@ class BuyV2CheckoutView extends StatelessWidget {
           missingDetails: missingDetails,
           gstInvoiceController: gstInvoiceController,
           paymentHandoff: paymentHandoff,
+          reviewInstructions: () => _instructionsKey.currentState?.openEditor(),
         );
         final returnAction = _ReturnAffordance(
           label: 'Cart',
@@ -11083,6 +11097,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       session: session,
                       gstInvoiceController: gstInvoiceController,
                       invoiceDestinations: invoiceDestinations,
+                      instructionsKey: _instructionsKey,
                     ),
                     const SizedBox(height: 8),
                     _CheckoutPaymentStage(
@@ -11114,6 +11129,7 @@ class BuyV2CheckoutView extends StatelessWidget {
   required List<BuyV2Destination> missingDetails,
   required BuyV2GstInvoiceController gstInvoiceController,
   required BuyV2PaymentHandoff? paymentHandoff,
+  required VoidCallback reviewInstructions,
 }) {
   if (session.checkoutBusy) return ('Checking payment…', null);
   if (session.collectionCheckoutSelected) {
@@ -11187,6 +11203,9 @@ class BuyV2CheckoutView extends StatelessWidget {
         );
       }
       if (!selectedPaymentAvailable) return ('Choose payment method', null);
+      if (session.publicDeliveryInstructionReviewRequired) {
+        return ('Review delivery instructions', reviewInstructions);
+      }
       if (session.checkoutDeliveryEstimateReviewRequired) {
         return ('Check delivery', session.refreshCheckoutDeliveryEstimates);
       }
@@ -12301,11 +12320,13 @@ class _CheckoutOrderDetails extends StatelessWidget {
     required this.session,
     required this.gstInvoiceController,
     required this.invoiceDestinations,
+    required this.instructionsKey,
   });
 
   final BuyV2Session session;
   final BuyV2GstInvoiceController gstInvoiceController;
   final List<BuyV2Destination> invoiceDestinations;
+  final GlobalKey<_CheckoutDeliveryInstructionsState> instructionsKey;
 
   @override
   Widget build(BuildContext context) {
@@ -12369,7 +12390,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
           _CheckoutCommercialPaymentTerms(session: session),
           const SizedBox(height: 8),
         ],
-        _CheckoutDeliveryInstructions(session: session),
+        _CheckoutDeliveryInstructions(key: instructionsKey, session: session),
         const SizedBox(height: 8),
         if (session.checkoutBenefitReviewRequired) ...[
           _CartBenefitEligibilityState(session: session),
@@ -12429,7 +12450,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
 }
 
 class _CheckoutDeliveryInstructions extends StatefulWidget {
-  const _CheckoutDeliveryInstructions({required this.session});
+  const _CheckoutDeliveryInstructions({super.key, required this.session});
 
   final BuyV2Session session;
 
@@ -12441,29 +12462,51 @@ class _CheckoutDeliveryInstructions extends StatefulWidget {
 class _CheckoutDeliveryInstructionsState
     extends State<_CheckoutDeliveryInstructions> {
   final _instructionStorage = PageStorageBucket();
+  final _expansion = ExpansibleController();
+  final _editorKey = GlobalKey<_CartDeliveryInstructionCardState>();
   BuyV2Session get session => widget.session;
+
+  void openEditor() {
+    if (session.checkoutBusy || session.checkoutRequiresResolution) return;
+    _expansion.expand();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _editorKey.currentState?.openEditor(focus: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _expansion.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final destinations = session.checkoutDestinations;
     final saved = [
-      for (final destination in destinations)
-        if (session.deliveryInstructionTextFor(destination) case final note?)
-          '${_cartDestinationLabel(session, destination)} · $note',
+      if (!session.isStoreProcurement) ?session.publicDeliveryInstruction,
+      if (session.isStoreProcurement)
+        for (final destination in destinations)
+          if (session.deliveryInstructionTextFor(destination) case final note?)
+            '${_cartDestinationLabel(session, destination)} · $note',
     ];
     final locked = session.checkoutBusy || session.checkoutRequiresResolution;
     return Material(
       color: Colors.transparent,
       child: ExpansionTile(
         key: const PageStorageKey('buy-checkout-instructions'),
+        controller: _expansion,
         maintainState: true,
+        initiallyExpanded: session.publicDeliveryInstructionReviewRequired,
         enabled: !locked,
         expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
             ? AnimationStyle.noAnimation
             : null,
         tilePadding: EdgeInsets.zero,
         title: Text('Delivery instructions · optional', style: context.buyBody),
-        subtitle: saved.isEmpty
+        subtitle: session.publicDeliveryInstructionReviewRequired
+            ? Text('Review your previous instructions', style: context.buyMeta)
+            : saved.isEmpty
             ? null
             : Text(saved.join('\n'), style: context.buyMeta),
         children: [
@@ -12475,6 +12518,7 @@ class _CheckoutDeliveryInstructionsState
                 session: session,
                 destinations: destinations.toList(growable: false),
                 showHeading: false,
+                publicEditorKey: _editorKey,
               ),
             ),
           ),
@@ -22945,10 +22989,12 @@ class _CartDeliveryInstructionSections extends StatefulWidget {
     required this.session,
     required this.destinations,
     this.showHeading = true,
+    this.publicEditorKey,
   });
   final BuyV2Session session;
   final List<BuyV2Destination> destinations;
   final bool showHeading;
+  final GlobalKey<_CartDeliveryInstructionCardState>? publicEditorKey;
   @override
   State<_CartDeliveryInstructionSections> createState() =>
       _CartDeliveryInstructionSectionsState();
@@ -22985,7 +23031,10 @@ class _CartDeliveryInstructionSectionsState
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final eligible = widget.destinations
+    final destinations = session.isStoreProcurement
+        ? widget.destinations
+        : widget.destinations.take(1);
+    final eligible = destinations
         .where(
           (destination) =>
               session.deliveryInstructionsFor(destination).isNotEmpty,
@@ -23009,7 +23058,7 @@ class _CartDeliveryInstructionSectionsState
                 color: BuyV2ActionStyle.primaryForeground,
               ),
             ),
-          if (eligible.length > 1)
+          if (session.isStoreProcurement && eligible.length > 1)
             SingleChildScrollView(
               key: const PageStorageKey('buy-cart-instruction-contexts'),
               scrollDirection: Axis.horizontal,
@@ -23054,7 +23103,13 @@ class _CartDeliveryInstructionSectionsState
               child: TickerMode(
                 enabled: destination == selected,
                 child: _CartDeliveryInstructionCard(
-                  key: ValueKey('buy-delivery-note-owner-${destination.name}'),
+                  key:
+                      (!session.isStoreProcurement
+                          ? widget.publicEditorKey
+                          : null) ??
+                      ValueKey(
+                        'buy-delivery-note-owner-${session.isStoreProcurement ? destination.name : 'delivery'}',
+                      ),
                   session: session,
                   destination: destination,
                   showDestination: false,
@@ -23086,16 +23141,23 @@ class _CartDeliveryInstructionCard extends StatefulWidget {
 
 class _CartDeliveryInstructionCardState
     extends State<_CartDeliveryInstructionCard>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final _noteController = TextEditingController();
   final _noteFocus = FocusNode();
   final _composerKey = GlobalKey();
   final _choiceScrollController = ScrollController();
   bool _revealPending = false;
   bool _editing = false;
+  @override
+  bool get wantKeepAlive => _editing;
   BuyV2Session get session => widget.session;
   BuyV2Destination get destination => widget.destination;
   bool get showDestination => widget.showDestination;
+  String get instructionScope =>
+      session.isStoreProcurement ? destination.name : 'delivery';
+  String get instructionOwner => session.isStoreProcurement
+      ? _deliveryInstructionOwner(destination)
+      : 'Delivery instructions';
 
   @override
   void initState() {
@@ -23127,6 +23189,7 @@ class _CartDeliveryInstructionCardState
 
   void _closeEditor() {
     setState(() => _editing = false);
+    updateKeepAlive();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         Scrollable.ensureVisible(
@@ -23135,6 +23198,24 @@ class _CartDeliveryInstructionCardState
         );
       }
     });
+  }
+
+  void openEditor({bool focus = false}) {
+    if (session.checkoutBusy || session.checkoutRequiresResolution) return;
+    if (!_editing) {
+      setState(() {
+        _noteController.text = session.isStoreProcurement
+            ? session.customDeliveryInstructionFor(destination) ?? ''
+            : session.publicDeliveryInstruction ??
+                  session.previousPublicDeliveryInstructions.join('\n');
+        _editing = true;
+      });
+      updateKeepAlive();
+    }
+    if (focus) {
+      _noteFocus.requestFocus();
+      _revealEditor();
+    }
   }
 
   @override
@@ -23150,23 +23231,25 @@ class _CartDeliveryInstructionCardState
   @override
   Widget build(BuildContext context) {
     final noteActionStyle = TextButton.styleFrom(
+      // The shared editor remains alive when filtering moves its list row.
       foregroundColor: BuyV2ActionStyle.primaryForeground,
       minimumSize: const Size(48, 48),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
     );
+    super.build(context);
     final options = session.deliveryInstructionsFor(destination);
     final selected = session.selectedDeliveryInstructionFor(destination);
     final customNote = session.customDeliveryInstructionFor(destination);
     return Column(
-      key: ValueKey('buy-cart-delivery-instructions-${destination.name}'),
+      key: ValueKey('buy-cart-delivery-instructions-$instructionScope'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showDestination)
           Padding(
             padding: const EdgeInsets.only(top: 3),
             child: Text(
-              _deliveryInstructionOwner(destination),
+              instructionOwner,
               style: context.buyMeta.copyWith(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -23174,8 +23257,16 @@ class _CartDeliveryInstructionCardState
               ),
             ),
           ),
+        if (session.publicDeliveryInstructionReviewRequired) ...[
+          Text(
+            'Your previous instructions differ. Review and save one instruction for this address.',
+            style: context.buyBody,
+          ),
+          for (final note in session.previousPublicDeliveryInstructions)
+            Text(note, style: context.buyMeta),
+        ],
         RawScrollbar(
-          key: ValueKey('buy-instruction-scroll-cue-${destination.name}'),
+          key: ValueKey('buy-instruction-scroll-cue-$instructionScope'),
           controller: _choiceScrollController,
           thumbColor: BuyV2Colors.muted,
           thumbVisibility: true,
@@ -23186,7 +23277,7 @@ class _CartDeliveryInstructionCardState
               notification.depth == 0 &&
               notification.metrics.axis == Axis.horizontal,
           child: SingleChildScrollView(
-            key: PageStorageKey('buy-instruction-lane-${destination.name}'),
+            key: PageStorageKey('buy-instruction-lane-$instructionScope'),
             controller: _choiceScrollController,
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -23194,7 +23285,7 @@ class _CartDeliveryInstructionCardState
                 if (session.isStoreProcurement && selected != null)
                   TextButton(
                     key: ValueKey(
-                      'buy-cart-instruction-${destination.name}-none',
+                      'buy-cart-instruction-$instructionScope-none',
                     ),
                     style: TextButton.styleFrom(
                       foregroundColor: BuyV2ActionStyle.primaryForeground,
@@ -23217,12 +23308,9 @@ class _CartDeliveryInstructionCardState
                 TextButton.icon(
                   style: noteActionStyle,
                   key: ValueKey(
-                    'buy-cart-instruction-custom-${destination.name}',
+                    'buy-cart-instruction-custom-$instructionScope',
                   ),
-                  onPressed: () => setState(() {
-                    _noteController.text = customNote ?? '';
-                    _editing = true;
-                  }),
+                  onPressed: openEditor,
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: const Text('Add instructions'),
                 ),
@@ -23235,13 +23323,12 @@ class _CartDeliveryInstructionCardState
                       return Semantics(
                         checked: isSelected,
                         inMutuallyExclusiveGroup: true,
-                        label:
-                            '${_deliveryInstructionOwner(destination)}: $label',
+                        label: '$instructionOwner: $label',
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
                             key: ValueKey(
-                              'buy-cart-instruction-${destination.name}-${option.id}',
+                              'buy-cart-instruction-$instructionScope-${option.id}',
                             ),
                             borderRadius: BorderRadius.circular(8),
                             onTap: () {
@@ -23297,9 +23384,7 @@ class _CartDeliveryInstructionCardState
           KeyedSubtree(
             key: _composerKey,
             child: Container(
-              key: ValueKey(
-                'buy-cart-instruction-composer-${destination.name}',
-              ),
+              key: ValueKey('buy-cart-instruction-composer-$instructionScope'),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -23311,7 +23396,7 @@ class _CartDeliveryInstructionCardState
                 children: [
                   TextField(
                     key: ValueKey(
-                      'buy-cart-instruction-note-${destination.name}',
+                      'buy-cart-instruction-note-$instructionScope',
                     ),
                     controller: _noteController,
                     focusNode: _noteFocus,
@@ -23342,7 +23427,7 @@ class _CartDeliveryInstructionCardState
                       TextButton(
                         style: noteActionStyle,
                         key: ValueKey(
-                          'buy-cart-instruction-clear-draft-${destination.name}',
+                          'buy-cart-instruction-clear-draft-$instructionScope',
                         ),
                         onPressed: _noteController.clear,
                         child: const Text('Clear'),
@@ -23350,7 +23435,7 @@ class _CartDeliveryInstructionCardState
                       TextButton(
                         style: noteActionStyle,
                         key: ValueKey(
-                          'buy-cart-instruction-save-${destination.name}',
+                          'buy-cart-instruction-save-$instructionScope',
                         ),
                         onPressed: () {
                           if (session.setCustomDeliveryInstruction(
@@ -23380,7 +23465,7 @@ class _CartDeliveryInstructionCardState
         else if (customNote != null)
           Text(
             customNote,
-            key: ValueKey('buy-cart-instruction-saved-${destination.name}'),
+            key: ValueKey('buy-cart-instruction-saved-$instructionScope'),
             style: context.buyBody,
           ),
       ],
