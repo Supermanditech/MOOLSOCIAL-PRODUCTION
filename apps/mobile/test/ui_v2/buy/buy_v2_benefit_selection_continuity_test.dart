@@ -41,7 +41,16 @@ class _ActivePaymentBenefits extends BuyV2SeededCartBenefitsAdapter {
         savingAmount: benefit.savingAmount,
         validUntil: DateTime.now().add(const Duration(days: 1)),
         minimumSpend: benefit.minimumSpend,
-        eligiblePaymentMethods: benefit.eligiblePaymentMethods,
+        // Adapt these expired, local-only legacy fixtures to canonical methods.
+        // This does not advertise or migrate a live provider capability.
+        eligiblePaymentMethods: {
+          for (final method in benefit.eligiblePaymentMethods)
+            switch (method) {
+              'PhonePe' => 'UPI',
+              'Paytm' || 'Pine Labs' => 'Card',
+              _ => method,
+            },
+        },
       ),
   ];
 }
@@ -561,7 +570,7 @@ void main() {
       await tester.tap(select);
       await tester.pumpAndSettle();
       expect(find.textContaining('Potential saving ₹300'), findsOneWidget);
-      expect(find.textContaining('Not eligible with PhonePe'), findsOneWidget);
+      expect(find.textContaining('Not eligible with UPI'), findsOneWidget);
       final collapse = find.byKey(const ValueKey('buy-cart-coupons'));
       await tester.ensureVisible(collapse);
       await tester.pumpAndSettle();
@@ -574,7 +583,7 @@ void main() {
       );
       await tester.ensureVisible(status);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Not eligible with PhonePe'), findsOneWidget);
+      expect(find.textContaining('Not eligible with UPI'), findsOneWidget);
       expect(
         find.textContaining('Payment savings are not included in this total.'),
         findsOneWidget,
@@ -612,14 +621,14 @@ void main() {
       expect(paymentChoice.hitTestable(), findsOneWidget);
       await tester.tap(paymentChoice);
       await tester.pumpAndSettle();
-      final pine = find.byKey(const ValueKey('buy-payment-Pine Labs'));
+      final pine = find.byKey(const ValueKey('buy-payment-Card'));
       await tester.scrollUntilVisible(pine, 150, maxScrolls: 50);
       await Scrollable.ensureVisible(tester.element(pine), alignment: .2);
       await tester.pumpAndSettle();
       expect(pine.hitTestable(), findsOneWidget);
       await tester.tap(pine);
       await tester.pumpAndSettle();
-      expect(session.selectedPayment, 'Pine Labs');
+      expect(session.selectedPayment, 'Card');
       expect(session.checkoutAmountDueNow, 3180);
       final summary = find.byKey(
         const ValueKey('buy-checkout-confirm-benefits'),

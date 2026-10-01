@@ -4416,7 +4416,7 @@ void main() {
         // These checkout captures render the same draft T02 Checkout as the
         // Cart-return suite. Retain every historical reference unchanged.
         final reference = viewport.checkout
-            ? 'cursor-checkout-review-20261001/'
+            ? 'cursor-upi-checkout-20261001/'
                   'buy-v2-t02-checkout-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
             : 'cursor-cart-child-20260930/'

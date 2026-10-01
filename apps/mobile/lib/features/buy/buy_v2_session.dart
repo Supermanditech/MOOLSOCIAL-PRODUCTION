@@ -460,11 +460,7 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   ) async {
     final reference =
         'BT-${DateTime.now().microsecondsSinceEpoch.toString().substring(8)}';
-    if (const {
-      'PhonePe',
-      'Paytm',
-      'Pine Labs',
-    }.contains(request.paymentMethod)) {
+    if (const {'UPI', 'Card'}.contains(request.paymentMethod)) {
       final provider = request.paymentMethod.toLowerCase().replaceAll(' ', '-');
       final paymentReference = reference.replaceFirst('BT-', 'PAY-');
       return BuyV2OrderPlacementResult(
@@ -473,7 +469,7 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
             'Continue securely with ${request.paymentMethod}. MoolSocial will collect this payment.',
         paymentReference: paymentReference,
         paymentActionUri: Uri.https('payments.moolsocial.app', '/checkout', {
-          'provider': provider,
+          'method': provider,
           'reference': paymentReference,
         }),
       );
@@ -498,9 +494,9 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
           paymentReference: paymentReference,
         )
       : BuyV2OrderPlacementResult(
-          outcome: BuyV2OrderPlacementOutcome.confirmed,
-          customerMessage: 'Payment confirmed. Your order is placed.',
-          purchaseReference: paymentReference.replaceFirst('PAY-', 'MS-'),
+          outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          customerMessage:
+              'Payment confirmation requires the payment connector. Do not pay again.',
           paymentReference: paymentReference,
         );
 
@@ -5061,12 +5057,7 @@ class BuyV2Session extends ChangeNotifier {
   static const BuyV2CatalogueMarketplaceTrustAdapter _catalogueTrustFallback =
       BuyV2CatalogueMarketplaceTrustAdapter();
 
-  static const Set<String> paymentMethods = {
-    'PhonePe',
-    'Paytm',
-    'Pine Labs',
-    'Cash on Delivery',
-  };
+  static const Set<String> paymentMethods = {'UPI', 'Card', 'Cash on Delivery'};
 
   static const Set<String> storePaymentMethods = {
     'UPI',
@@ -5092,6 +5083,38 @@ class BuyV2Session extends ChangeNotifier {
   String? _checkoutIdempotencyKey;
   String? _paymentReference;
   Uri? _paymentActionUri;
+  bool upiQrAvailable = false;
+  bool useUpiQr = false;
+  BuyV2UpiQrAction? _upiQrAction;
+  bool get canChooseUpiQr =>
+      !isStoreProcurement &&
+      !collectionCheckoutSelected &&
+      upiQrAvailable &&
+      checkoutAmountDueNow > 0 &&
+      selectedPayment == 'UPI';
+  BuyV2UpiQrAction? get upiQrAction {
+    final qr = _upiQrAction;
+    return checkoutSubmissionState ==
+                BuyV2CheckoutSubmissionState.paymentPending &&
+            qr != null &&
+            qr.validFor(
+              reference: _paymentReference,
+              amountMinor: checkoutAmountDueNow * 100,
+              now: catalogueNow(),
+            )
+        ? qr
+        : null;
+  }
+
+  bool chooseUpiQr(bool value) {
+    if (checkoutBusy || checkoutRequiresResolution || !canChooseUpiQr) {
+      return false;
+    }
+    useUpiQr = value;
+    notifyListeners();
+    return true;
+  }
+
   BuyV2BankTransferInstructions? _bankTransferInstructions;
   int _checkoutAttemptSequence = 0;
 
@@ -5340,7 +5363,7 @@ class BuyV2Session extends ChangeNotifier {
   bool trackingAlertsEnabled = true;
   bool trackingAlertsAvailable = true;
   bool trackingAlertsBusy = false;
-  String selectedPayment = 'PhonePe';
+  String selectedPayment = 'UPI';
   String purchaseOrderReference = '';
 
   bool get purchaseOrderEligibleForCheckout {
@@ -6508,16 +6531,20 @@ class BuyV2Session extends ChangeNotifier {
         }
       }
       availablePaymentMethods = Set.unmodifiable(
-        isStoreProcurement
-            ? snapshot.paymentMethods.where(supportedPaymentMethods.contains)
-            : snapshot.paymentMethods,
+        snapshot.paymentMethods.where(supportedPaymentMethods.contains),
       );
+      upiQrAvailable =
+          !isStoreProcurement &&
+          snapshot.upiQrAvailable &&
+          availablePaymentMethods.contains('UPI');
+      if (!upiQrAvailable) useUpiQr = false;
       _selectedAddressId = snapshot.selectedAddressId;
       if (_selectedAddressId != null &&
           !_addresses.any((address) => address.id == _selectedAddressId)) {
         _selectedAddressId = null;
       }
-      if (!availablePaymentMethods.contains(selectedPayment)) {
+      if (!checkoutRequiresResolution &&
+          !availablePaymentMethods.contains(selectedPayment)) {
         selectedPayment = availablePaymentMethods.firstOrNull ?? '';
       }
       commerceLoadState = snapshot.state;
@@ -7480,7 +7507,14 @@ class BuyV2Session extends ChangeNotifier {
     if (checkoutRequiresResolution) {
       // Retired choices cannot start a new payment, but an unresolved
       // persisted attempt must keep its original provider identity.
-      if (const {'Bank transfer', 'UPI'}.contains(storedPayment)) {
+      if (const {
+        'Bank transfer',
+        'UPI',
+        'Card',
+        'PhonePe',
+        'Paytm',
+        'Pine Labs',
+      }.contains(storedPayment)) {
         selectedPayment = storedPayment!;
       }
       checkoutStep = BuyV2CheckoutStep.payment;
@@ -13466,8 +13500,7 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> submitOrder() {
     if (purchaseOrderReviewRequired) {
-      notice =
-          'Check the supplier terms and response before payment.';
+      notice = 'Check the supplier terms and response before payment.';
       notifyListeners();
       return Future<bool>.value(false);
     }
@@ -13505,8 +13538,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return Future<bool>.value(false);
     }
-    if (reviewDataEnabled &&
-        const {'PhonePe', 'Paytm', 'Pine Labs'}.contains(selectedPayment)) {
+    if (reviewDataEnabled && const {'UPI', 'Card'}.contains(selectedPayment)) {
       return _submitOrderAsync();
     }
     if (reviewDataEnabled) {
@@ -13793,6 +13825,7 @@ class BuyV2Session extends ChangeNotifier {
         total: checkoutPayableTotal,
         amountDueNow: checkoutAmountDueNow,
         idempotencyKey: _checkoutIdempotencyKey!,
+        useUpiQr: canChooseUpiQr && useUpiQr,
         commercialPaymentTermIds: Map.unmodifiable(
           _selectedCommercialPaymentTermIds,
         ),
@@ -13912,6 +13945,21 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     _paymentReference = placement.paymentReference ?? _paymentReference;
     _paymentActionUri = placement.paymentActionUri;
+    _upiQrAction = null;
+    final qrRequested =
+        canChooseUpiQr &&
+        useUpiQr &&
+        placement.outcome == BuyV2OrderPlacementOutcome.paymentActionRequired;
+    final qr = placement.upiQrAction;
+    final validQr =
+        qrRequested &&
+        qr != null &&
+        qr.validFor(
+          reference: _paymentReference,
+          amountMinor: checkoutAmountDueNow * 100,
+          now: catalogueNow(),
+        );
+    if (validQr) _upiQrAction = qr;
     _bankTransferInstructions =
         placement.bankTransferInstructions ?? _bankTransferInstructions;
     if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed &&
@@ -13921,6 +13969,12 @@ class BuyV2Session extends ChangeNotifier {
     if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed) {
       checkoutStep = BuyV2CheckoutStep.payment;
       checkoutSubmissionState = switch (placement.outcome) {
+        // An issued QR may already have been scanned. Persist pending before
+        // displaying it; cold restart must reconcile, never offer a fresh pay.
+        BuyV2OrderPlacementOutcome.paymentActionRequired when validQr =>
+          BuyV2CheckoutSubmissionState.paymentPending,
+        BuyV2OrderPlacementOutcome.paymentActionRequired when qrRequested =>
+          BuyV2CheckoutSubmissionState.paymentUnknown,
         BuyV2OrderPlacementOutcome.paymentActionRequired
             when _validPaymentAction(placement) ||
                 _validBankTransferAction(placement) =>
@@ -14023,6 +14077,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutIdempotencyKey = null;
     _paymentReference = null;
     _paymentActionUri = null;
+    _upiQrAction = null;
     _bankTransferInstructions = null;
     _persistCustomerState();
   }
@@ -14181,6 +14236,7 @@ class BuyV2Session extends ChangeNotifier {
       return reconcileCollectionPurchase();
     }
     if (checkoutBusy) return false;
+    _upiQrAction = null;
     final idempotencyKey = _checkoutIdempotencyKey;
     final paymentReference = _paymentReference;
     final address = selectedAddressOrNull;
@@ -14255,6 +14311,16 @@ class BuyV2Session extends ChangeNotifier {
         outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
         customerMessage: 'Payment status is unavailable. Do not pay again.',
       );
+    }
+    if (paymentReference != null &&
+        placement.paymentReference != null &&
+        placement.paymentReference != paymentReference) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'Payment could not be matched to this order. Do not pay again. Get order help.';
+      _persistCustomerState();
+      notifyListeners();
+      return false;
     }
     if (isStoreProcurement &&
         (!procurementScopeCurrent || procurementEpoch != _procurementEpoch)) {

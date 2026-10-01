@@ -1381,7 +1381,7 @@ void main() {
     session.openCart();
     expect(session.openCheckout(), isTrue);
     expect(session.continueCheckoutFromAddress(), isTrue);
-    expect(session.choosePayment('PhonePe'), isTrue);
+    expect(session.choosePayment('UPI'), isTrue);
     expect(session.continueCheckoutFromPayment(), isTrue);
     final quantities = {
       for (final line in session.cartLines) line.product.id: line.quantity,
@@ -1423,7 +1423,7 @@ void main() {
     expect(session.continueCheckoutFromPayment(), isTrue);
     await tester.pumpAndSettle();
     await reveal();
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
     expect({
       for (final line in session.cartLines) line.product.id: line.quantity,
     }, quantities);

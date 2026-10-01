@@ -167,7 +167,7 @@ void main() {
         session.openCart();
         expect(session.openCheckout(), isTrue);
         session.checkoutSubmissionState = state;
-        expect(session.choosePayment('Paytm'), isTrue);
+        expect(session.choosePayment('Card'), isTrue);
         expect(
           session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.idle,
@@ -189,7 +189,7 @@ void main() {
         addTearDown(core.dispose);
         session.addProduct('s-tomato');
         session.checkoutSubmissionState = state;
-        expect(session.choosePayment('Paytm'), isFalse);
+        expect(session.choosePayment('Card'), isFalse);
         expect(session.addProduct('w-notebook'), isFalse);
         expect(session.quantityFor('s-tomato'), 1);
         expect(session.quantityFor('w-notebook'), 0);

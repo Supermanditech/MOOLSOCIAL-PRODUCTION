@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pdf/widgets.dart' as buy_qr;
 import 'package:share_plus/share_plus.dart';
 
 import '../../features/buy/buy_v2_cart_contracts.dart';
@@ -9943,6 +9944,9 @@ class _GstInvoiceCard extends StatelessWidget {
                       'buy-gst-${details == null ? 'add' : 'edit'}-'
                       '${destination.name}',
                     ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: BuyV2Colors.navy,
+                    ),
                     onPressed: () async {
                       await showBuyV2GstInvoiceSheet(
                         context,
@@ -11122,6 +11126,8 @@ class BuyV2CheckoutView extends StatelessWidget {
           session.selectedPayment == 'Cash on Delivery' ||
               session.checkoutAmountDueNow == 0
           ? 'Place order'
+          : session.canChooseUpiQr && session.useUpiQr
+          ? 'Show QR · ${buyV2Money(session.checkoutAmountDueNow)}'
           : 'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place order';
       return (
         label,
@@ -11584,21 +11590,8 @@ List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
                 ),
               ]
             : [
-                (
-                  'PhonePe',
-                  Icons.phone_android_rounded,
-                  'Secure payment collected by MoolSocial',
-                ),
-                (
-                  'Paytm',
-                  Icons.account_balance_wallet_rounded,
-                  'Secure payment collected by MoolSocial',
-                ),
-                (
-                  'Pine Labs',
-                  Icons.credit_card_rounded,
-                  'Secure card or UPI collection by MoolSocial',
-                ),
+                ('UPI', Icons.phone_android_rounded, 'Pay with any UPI app'),
+                ('Card', Icons.credit_card_rounded, 'Debit or credit card'),
                 if (!session.collectionCheckoutSelected &&
                     session.cashOnDeliveryEligibleForCheckout)
                   (
@@ -11688,6 +11681,32 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
               child: const Text('Cancel'),
             ),
         ],
+        if (session.canChooseUpiQr && !locked)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final qr in [false, true])
+                  Semantics(
+                    checked: session.useUpiQr == qr,
+                    inMutuallyExclusiveGroup: true,
+                    child: TextButton.icon(
+                      key: ValueKey(qr ? 'buy-upi-use-qr' : 'buy-upi-use-app'),
+                      onPressed: () => session.chooseUpiQr(qr),
+                      icon: Icon(
+                        session.useUpiQr == qr
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        size: 18,
+                      ),
+                      label: Text(qr ? 'Scan QR' : 'UPI app'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (session.upiQrAction case final qr?)
+          _CheckoutUpiQr(session: session, action: qr),
         if (session.checkoutQuotedPaymentCharge > 0)
           _CheckoutPaymentFact(
             label: 'Payment charge',
@@ -11701,6 +11720,128 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
       ],
     );
   }
+}
+
+class _CheckoutUpiQr extends StatefulWidget {
+  const _CheckoutUpiQr({required this.session, required this.action});
+  final BuyV2Session session;
+  final BuyV2UpiQrAction action;
+  @override
+  State<_CheckoutUpiQr> createState() => _CheckoutUpiQrState();
+}
+
+class _CheckoutUpiQrState extends State<_CheckoutUpiQr> {
+  Timer? _expiry;
+  @override
+  void initState() {
+    super.initState();
+    _watchExpiry();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CheckoutUpiQr oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _watchExpiry();
+  }
+
+  void _watchExpiry() {
+    _expiry?.cancel();
+    final remaining = widget.action.expiresAt.difference(
+      widget.session.catalogueNow(),
+    );
+    _expiry = Timer(remaining.isNegative ? Duration.zero : remaining, () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _expiry?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.session.upiQrAction == null) {
+      return Text(
+        'QR expired. Check payment before trying again.',
+        key: const ValueKey('buy-upi-qr-expired'),
+        style: context.buyMeta,
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Scan with another phone’s UPI app', style: context.buyBody),
+        Text(
+          '${buyV2Money(widget.session.checkoutAmountDueNow)} · MoolSocial',
+          style: context.buyBody,
+        ),
+        Text(
+          'Payee: ${widget.action.uri.queryParameters['pn']}',
+          textAlign: TextAlign.center,
+          style: context.buyMeta,
+        ),
+        Semantics(
+          label:
+              'Order payment QR. Scan using another phone. Payment is confirmed only after verification.',
+          image: true,
+          child: SizedBox.square(
+            dimension: 220,
+            child: CustomPaint(
+              key: const ValueKey('buy-upi-order-qr'),
+              painter: _CheckoutUpiQrPainter(widget.action.uri.toString()),
+            ),
+          ),
+        ),
+        Text(
+          'Authorise in your UPI app, then tap Check payment. Do not pay twice.',
+          textAlign: TextAlign.center,
+          style: context.buyMeta,
+        ),
+        Text(
+          'Check the payee in your UPI app. Never share your PIN or OTP.',
+          textAlign: TextAlign.center,
+          style: context.buyMeta,
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckoutUpiQrPainter extends CustomPainter {
+  _CheckoutUpiQrPainter(this.data);
+  final String data;
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    final side = size.shortestSide - 40;
+    final origin = Offset((size.width - side) / 2, (size.height - side) / 2);
+    final ink = Paint()
+      ..color = Colors.black
+      ..isAntiAlias = false;
+    for (final element in buy_qr.Barcode.qrCode().make(
+      data,
+      width: side,
+      height: side,
+    )) {
+      if (element is buy_qr.BarcodeBar && element.black) {
+        canvas.drawRect(
+          Rect.fromLTWH(
+            origin.dx + element.left,
+            origin.dy + element.top,
+            element.width,
+            element.height,
+          ),
+          ink,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CheckoutUpiQrPainter oldDelegate) =>
+      oldDelegate.data != data;
 }
 
 class _CheckoutPaymentFact extends StatelessWidget {
@@ -12302,25 +12443,37 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
                   key: ValueKey(
                     'buy-checkout-primary-${session.checkoutStep.name}',
                   ),
-                  style: BuyV2ActionStyle.button(
-                    FilledButton.styleFrom(
-                      textStyle: actionStyle,
-                      minimumSize: const Size(0, BuyV2Metrics.minimumTap),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                  style:
+                      BuyV2ActionStyle.button(
+                        FilledButton.styleFrom(
+                          textStyle: actionStyle,
+                          minimumSize: const Size(0, BuyV2Metrics.minimumTap),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ).copyWith(
+                        foregroundColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.disabled)
+                              ? BuyV2Colors.muted
+                              : BuyV2Colors.navy,
+                        ),
+                        iconColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.disabled)
+                              ? BuyV2Colors.muted
+                              : BuyV2Colors.navy,
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
                   onPressed: onPressed,
                   child: busy
                       ? const SizedBox.square(
                           dimension: 18,
                           child: CircularProgressIndicator(
-                            color: BuyV2ActionStyle.primaryForeground,
+                            color: BuyV2Colors.navy,
                             strokeWidth: 2.2,
                           ),
                         )

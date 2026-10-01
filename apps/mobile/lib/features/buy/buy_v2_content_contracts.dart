@@ -1727,6 +1727,7 @@ class BuyV2CommerceSnapshot {
     this.addresses = const [],
     this.orders = const [],
     this.paymentMethods = const {},
+    this.upiQrAvailable = false,
     this.selectedAddressId,
     this.businessVerified = false,
     this.businessVerificationState = BuyV2BusinessVerificationState.unavailable,
@@ -1742,6 +1743,9 @@ class BuyV2CommerceSnapshot {
   final List<BuyV2Address> addresses;
   final List<BuyV2Order> orders;
   final Set<String> paymentMethods;
+
+  /// True only when the authenticated merchant connector supports order QR.
+  final bool upiQrAvailable;
   final String? selectedAddressId;
   final bool businessVerified;
   final BuyV2BusinessVerificationState businessVerificationState;
@@ -1872,6 +1876,7 @@ class BuyV2OrderPlacementRequest {
     required this.total,
     required this.amountDueNow,
     required this.idempotencyKey,
+    this.useUpiQr = false,
     this.commercialPaymentTermIds = const {},
     this.deliveryInstructionsByProductId = const {},
     this.checkoutQuoteId,
@@ -1892,6 +1897,9 @@ class BuyV2OrderPlacementRequest {
   final int total;
   final int amountDueNow;
   final String idempotencyKey;
+
+  /// Same UPI method and idempotent order; QR is a transport, not another charge.
+  final bool useUpiQr;
   final Map<String, String> commercialPaymentTermIds;
   final String? checkoutQuoteId;
   final String? purchaseOrderRequestId;
@@ -1907,6 +1915,7 @@ class BuyV2OrderPlacementResult {
     this.purchaseReference,
     this.paymentReference,
     this.paymentActionUri,
+    this.upiQrAction,
     this.bankTransferInstructions,
     this.orders = const [],
     this.failureKind,
@@ -1918,10 +1927,67 @@ class BuyV2OrderPlacementResult {
   final String? purchaseReference;
   final String? paymentReference;
   final Uri? paymentActionUri;
+  final BuyV2UpiQrAction? upiQrAction;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
   final List<BuyV2Order> orders;
   final BuyV2OrderPlacementFailureKind? failureKind;
   final String? affectedProductId;
+}
+
+/// Supplied by the authenticated MoolSocial merchant payment connector only.
+/// The gateway reference and UPI transaction reference can differ. The backend
+/// binds both to this exact attempt, amount and verified merchant beneficiary.
+@immutable
+class BuyV2UpiQrAction {
+  const BuyV2UpiQrAction({
+    required this.uri,
+    required this.paymentReference,
+    required this.transactionReference,
+    required this.expiresAt,
+  });
+
+  final Uri uri;
+  final String paymentReference, transactionReference;
+  final DateTime expiresAt;
+
+  bool validFor({
+    required String? reference,
+    required int amountMinor,
+    required DateTime now,
+  }) {
+    if (reference == null ||
+        reference.isEmpty ||
+        paymentReference != reference ||
+        transactionReference.isEmpty ||
+        amountMinor <= 0 ||
+        !now.isBefore(expiresAt) ||
+        uri.toString().length > 2048 ||
+        uri.scheme != 'upi' ||
+        uri.host != 'pay' ||
+        uri.path.isNotEmpty ||
+        uri.hasPort ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasFragment) {
+      return false;
+    }
+    final fields = uri.queryParametersAll;
+    if (fields.values.any((values) => values.length != 1)) return false;
+    final q = uri.queryParameters;
+    final amount = q['am'];
+    if (q['cu'] != 'INR' ||
+        q['tr'] != transactionReference ||
+        (q['pn']?.trim().isEmpty ?? true) ||
+        !RegExp(r'^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$').hasMatch(q['pa'] ?? '') ||
+        amount == null ||
+        !RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(amount)) {
+      return false;
+    }
+    final parts = amount.split('.');
+    final minor =
+        int.parse(parts[0]) * 100 +
+        int.parse(parts.length == 1 ? '00' : parts[1].padRight(2, '0'));
+    return minor == amountMinor;
+  }
 }
 
 @immutable

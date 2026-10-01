@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "40EC8B3EFAE7782F81BC6AA1AED3D6914425DC7B46845A16875D2DC8B65DEC96"
+    "sha256": "33AFD8F976C93EBA533DF8ACF998F27D0EA82DF4A55096221B6D3F05F8E85636"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -235,7 +235,20 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-checkout-review-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png",
         "docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-FOCUSED.jsonl",
         "docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-1.jsonl",
-        "docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-2.jsonl"
+        "docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-2.jsonl",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png",
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-2.jsonl",
+        "apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart",
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-2.jsonl"
       ]
     },
     {
@@ -284,7 +297,6 @@
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
         "apps/mobile/test/app/ui_review_language_store_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",

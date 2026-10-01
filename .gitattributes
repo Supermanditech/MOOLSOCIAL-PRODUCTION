@@ -56,3 +56,11 @@ docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-SELECTED-2.jsonl text eol=lf
 docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-FOCUSED.jsonl text eol=lf
 docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-1.jsonl text eol=lf
 docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-2.jsonl text eol=lf

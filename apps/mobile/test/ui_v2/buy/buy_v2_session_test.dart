@@ -14,6 +14,7 @@ import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show showBuyV2CatalogueArea;
@@ -845,7 +846,7 @@ class _CollectionPurchaseHarness
     int quantity = 1,
     String storeId = 'store-a',
     String? sku,
-    String payment = 'PhonePe',
+    String payment = 'UPI',
   }) {
     final product = BuyV2Catalogue.allProducts
         .firstWhere((p) => p.destination == BuyV2Destination.shop)
@@ -1915,6 +1916,226 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  final qrClock = DateTime.utc(2026, 10, 1, 10);
+  final validQrUri = Uri.parse(
+    'upi://pay?pa=test-merchant%40bank&pn=Test%20merchant&cu=INR&am=37.00&tr=txn-1',
+  );
+  for (final invalid in <String, Uri>{
+    'amount': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '38.00'),
+    ),
+    'reference': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('txn-1', 'other'),
+    ),
+    'currency': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('INR', 'USD'),
+    ),
+    'duplicate amount': Uri.parse('$validQrUri&am=37.00'),
+    'missing payee': validQrUri.replace(
+      query: 'pn=Merchant&am=37&tr=txn-1&cu=INR',
+    ),
+    'missing name': validQrUri.replace(
+      query: 'pa=test%40bank&am=37&tr=txn-1&cu=INR',
+    ),
+    'fraction': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '37.001'),
+    ),
+    'negative': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '-37'),
+    ),
+    'exponent': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '3.7e1'),
+    ),
+    'https': validQrUri.replace(scheme: 'https'),
+    'host': validQrUri.replace(host: 'other'),
+    'fragment': validQrUri.replace(fragment: 'redirect'),
+  }.entries) {
+    test('UPI QR rejects ${invalid.key}', () {
+      final qr = BuyV2UpiQrAction(
+        uri: invalid.value,
+        paymentReference: 'gateway-1',
+        transactionReference: 'txn-1',
+        expiresAt: qrClock.add(const Duration(minutes: 5)),
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3700, now: qrClock),
+        isFalse,
+      );
+    });
+  }
+  test(
+    'UPI QR accepts exact minor amount and distinct gateway reference only before expiry',
+    () {
+      final expires = qrClock.add(const Duration(minutes: 5));
+      final qr = BuyV2UpiQrAction(
+        uri: validQrUri,
+        paymentReference: 'gateway-1',
+        transactionReference: 'txn-1',
+        expiresAt: expires,
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3700, now: qrClock),
+        isTrue,
+      );
+      expect(
+        qr.validFor(reference: 'other', amountMinor: 3700, now: qrClock),
+        isFalse,
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3701, now: qrClock),
+        isFalse,
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3700, now: expires),
+        isFalse,
+      );
+    },
+  );
+  for (final invalid in [false, true]) {
+    testWidgets(
+      'UPI QR ${invalid ? 'invalid' : 'issued'} attempt retains Cart and reconciles without a second order',
+      (tester) async {
+        final seed = BuyV2Session(core: BuySession());
+        addTearDown(seed.dispose);
+        var now = qrClock;
+        final store = _MemoryCustomerStateStore('upi-qr-tests');
+        final commerce = _ShopCommerceAdapter(
+          snapshot: BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [
+              BuyV2Catalogue.products
+                  .firstWhere((p) => p.id == 's-tomato')
+                  .copyWith(storeId: 'upi-test-store'),
+            ],
+            addresses: seed.addresses,
+            selectedAddressId: seed.selectedAddressId,
+            paymentMethods: const {'UPI', 'Card'},
+            upiQrAvailable: true,
+          ),
+          placement: const BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.unavailable,
+            customerMessage: 'Test setup',
+          ),
+        );
+        final session = BuyV2Session(
+          core: BuySession(),
+          commerceAdapter: commerce,
+          customerStateStore: store,
+          catalogueNow: () => now,
+          reviewDataEnabled: false,
+          productFactsAdapter: BuyTestEligibilityFacts(now: () => now),
+        );
+        addTearDown(session.dispose);
+        await session.restoreCommerce();
+        await session.restoreCustomerState();
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        expect(session.chooseUpiQr(true), isTrue);
+        final qr = BuyV2UpiQrAction(
+          uri: validQrUri.replace(
+            queryParameters: {
+              ...validQrUri.queryParameters,
+              'am': '${session.checkoutAmountDueNow + (invalid ? 1 : 0)}.00',
+            },
+          ),
+          paymentReference: 'gateway-1',
+          transactionReference: 'txn-1',
+          expiresAt: now.add(const Duration(minutes: 5)),
+        );
+        commerce.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+          customerMessage: 'Scan to pay',
+          paymentReference: 'gateway-1',
+          upiQrAction: qr,
+        );
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests.single.useUpiQr, isTrue);
+        expect(commerce.requests.single.paymentMethod, 'UPI');
+        expect(
+          session.checkoutSubmissionState,
+          invalid
+              ? BuyV2CheckoutSubmissionState.paymentUnknown
+              : BuyV2CheckoutSubmissionState.paymentPending,
+        );
+        expect(session.upiQrAction, invalid ? isNull : same(qr));
+        final gst = BuyV2GstInvoiceController();
+        addTearDown(gst.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: AnimatedBuilder(
+              animation: session,
+              builder: (context, _) => Scaffold(
+                body: BuyV2CheckoutView(
+                  session: session,
+                  gstInvoiceController: gst,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-upi-order-qr')),
+          invalid ? findsNothing : findsOne,
+        );
+        final key = session.checkoutIdempotencyKey;
+        expect(session.cancelPaymentAttempt(), isFalse);
+        expect(session.choosePayment('Card'), isFalse);
+        expect(session.chooseUpiQr(false), isFalse);
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.placementCalls, 1);
+        now = qr.expiresAt;
+        expect(session.upiQrAction, isNull);
+        await tester.pump(const Duration(minutes: 5));
+        expect(find.byKey(const ValueKey('buy-upi-order-qr')), findsNothing);
+        expect(session.checkoutRequiresResolution, isTrue);
+        commerce.reconciliation = const BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          customerMessage: 'Checking same payment',
+          paymentReference: 'gateway-1',
+        );
+        expect(await session.reconcilePayment(), isFalse);
+        expect(session.checkoutIdempotencyKey, key);
+        expect(commerce.reconciliationCalls, 1);
+        expect(session.upiQrAction, isNull);
+        expect(session.cartLines, hasLength(1));
+        expect(session.confirmedOrders, isEmpty);
+        commerce.reconciliation = const BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Forged different payment',
+          paymentReference: 'other-payment',
+        );
+        expect(await session.reconcilePayment(), isFalse);
+        expect(session.paymentReference, 'gateway-1');
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
+        );
+        expect(session.confirmedOrders, isEmpty);
+        await tester.pump();
+        final restored = BuyV2Session(
+          core: BuySession(),
+          commerceAdapter: commerce,
+          customerStateStore: store,
+          catalogueNow: () => now,
+          reviewDataEnabled: false,
+          productFactsAdapter: BuyTestEligibilityFacts(now: () => now),
+        );
+        addTearDown(restored.dispose);
+        await restored.restoreCommerce();
+        await restored.restoreCustomerState();
+        expect(restored.paymentReference, 'gateway-1');
+        expect(restored.checkoutIdempotencyKey, key);
+        expect(restored.checkoutRequiresResolution, isTrue);
+        expect(restored.upiQrAction, isNull);
+        expect(restored.retryCheckoutPayment(), isFalse);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
   test(
     'T01 filters preserve mixed purchase and explicit exclusion survives codec',
     () async {
@@ -3013,7 +3234,7 @@ void main() {
       orders: orders,
       businessVerified: true,
       businessVerificationState: BuyV2BusinessVerificationState.verified,
-      paymentMethods: const {'Cash on Delivery', 'PhonePe', 'UPI'},
+      paymentMethods: const {'Cash on Delivery', 'UPI'},
       addresses: const [
         BuyV2Address(
           id: 'receiving-store',
@@ -5382,7 +5603,7 @@ void main() {
               selectedAddressId: address.id,
               businessVerificationState:
                   BuyV2BusinessVerificationState.verified,
-              paymentMethods: const {'PhonePe'},
+              paymentMethods: const {'UPI'},
             ),
           );
           final deliveryFacts = _T01CDeliveryFactsAdapter();
@@ -5421,7 +5642,7 @@ void main() {
           session.openCart(scope: BuyV2CartScope.wholesale);
           expect(session.openCheckout(), isTrue);
           session.continueCheckoutFromAddress();
-          expect(session.choosePayment('PhonePe'), isTrue);
+          expect(session.choosePayment('UPI'), isTrue);
           session.continueCheckoutFromPayment();
           expect(await session.reviewPurchaseOrder(), isTrue);
           expect(session.purchaseOrder!.review!.documents, hasLength(2));
@@ -5516,7 +5737,7 @@ void main() {
           final request = commerce.placements.single;
           expect(request.purchaseOrderRequestId, 'collection-po-request');
           expect(request.purchaseOrderRevision, 'po-revision-1');
-          expect(request.paymentMethod, 'PhonePe');
+          expect(request.paymentMethod, 'UPI');
           expect(request.lines.map((line) => line.product.storeId).toSet(), {
             'store-c',
             'store-d',
@@ -5557,7 +5778,7 @@ void main() {
                         )
                       : line,
                 ],
-                paymentMethod: 'PhonePe',
+                paymentMethod: 'UPI',
                 paymentStatusLabel: 'Paid',
                 purchaseOrderReference: resultCase == 'wrong-po'
                     ? 'UNRELATED-PO'
@@ -6293,8 +6514,8 @@ void main() {
           expect(session.collectionCheckoutStore!.id, 'store-a');
           await capture('store-choice');
           await tap(find.byKey(const ValueKey('buy-checkout-confirm-payment')));
-          await tap(find.byKey(const ValueKey('buy-payment-Paytm')));
-          expect(session.selectedPayment, 'Paytm');
+          await tap(find.byKey(const ValueKey('buy-payment-Card')));
+          expect(session.selectedPayment, 'Card');
           await capture('payment-choice');
           expect(find.text('Cash on Delivery'), findsNothing);
           expect(find.text('Purchase order'), findsNothing);
@@ -6333,15 +6554,9 @@ void main() {
           expect(session.quantityFor('sku-a'), 1);
           expect(session.checkoutStep, BuyV2CheckoutStep.payment);
           await capture('payment-pending');
-          expect(
-            find.byKey(const ValueKey('buy-payment-PhonePe')),
-            findsNothing,
-          );
-          expect(find.byKey(const ValueKey('buy-payment-Paytm')), findsNothing);
-          expect(
-            find.byKey(const ValueKey('buy-payment-Pine Labs')),
-            findsNothing,
-          );
+          expect(find.byKey(const ValueKey('buy-payment-UPI')), findsNothing);
+          expect(find.byKey(const ValueKey('buy-payment-Card')), findsNothing);
+          expect(find.byKey(const ValueKey('buy-payment-Card')), findsNothing);
           final recoveryText = find.descendant(
             of: find.byKey(const ValueKey('buy-checkout-collection-notice')),
             matching: find.byType(Text),
@@ -6366,7 +6581,7 @@ void main() {
           expect(session.quantityFor('sku-b'), 1);
           expect(session.quantityFor('wholesale-sku'), 2);
           expect(harness.placements, 1);
-          expect(harness.lastRequest!.basket.paymentMethod, 'Paytm');
+          expect(harness.lastRequest!.basket.paymentMethod, 'Card');
           await capture('same-paid-order');
           await tester.ensureVisible(find.text('Paid ₹100.25'));
           await tester.pumpAndSettle();
@@ -6417,7 +6632,7 @@ void main() {
           session.chooseCheckoutCollection(true, storeId: 'store-b'),
           isFalse,
         );
-        expect(session.choosePayment('Paytm'), isFalse);
+        expect(session.choosePayment('Card'), isFalse);
         expect(session.addProduct('sku-b'), isFalse);
         expect(session.confirmOrder(), isFalse);
         expect(session.quantityFor('sku-a'), 1);
@@ -6574,7 +6789,7 @@ void main() {
           harness.basket(quantity: 2),
           harness.basket(storeId: 'b'),
           harness.basket(sku: 'sku-b'),
-          harness.basket(payment: 'Paytm'),
+          harness.basket(payment: 'Card'),
         ]) {
           expect(changed.fingerprint, isNot(first.fingerprint));
         }
@@ -8702,7 +8917,7 @@ void main() {
         final store = _MemoryCustomerStateStore('old-refinement-account')
           ..snapshot = const BuyV2CustomerStateSnapshot(
             cartQuantities: {'s-milk': 1},
-            selectedPayment: 'Paytm',
+            selectedPayment: 'Card',
             selectedBrands: {'UNAVAILABLE OLD BRAND'},
             maximumPrice: 1,
             packFilter: 'bulk',
@@ -8719,7 +8934,7 @@ void main() {
         expect(restored.activeDiscoveryRefinementCount, 0);
         expect(restored.catalogueSaleTypeProducts, isNotEmpty);
         expect(restored.quantityFor('s-milk'), 1);
-        expect(restored.selectedPayment, 'Paytm');
+        expect(restored.selectedPayment, 'Card');
         expect(
           restored
               .recentlyViewedProductsFor(BuyV2Destination.shop)
@@ -9356,7 +9571,7 @@ void main() {
           );
           expect(order.total, group.total);
           expect(order.partnerType, group.partnerType);
-          expect(order.paymentMethod, 'PhonePe');
+          expect(order.paymentMethod, 'UPI');
           expect(order.recipient, session.selectedAddress.recipient);
           expect(order.addressLine, contains(session.selectedAddress.pinCode));
         }
@@ -9973,15 +10188,15 @@ void main() {
     test('saved address and payment selections change independently', () {
       session.chooseAddress('work');
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'PhonePe');
+      expect(session.selectedPayment, 'UPI');
 
-      expect(session.choosePayment('Paytm'), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Paytm');
+      expect(session.selectedPayment, 'Card');
 
       session.chooseAddress('home');
       expect(session.selectedAddressId, 'home');
-      expect(session.selectedPayment, 'Paytm');
+      expect(session.selectedPayment, 'Card');
     });
 
     test('Checkout Back returns directly to Cart from every legacy step', () {
@@ -10061,22 +10276,17 @@ void main() {
 
     test('unsupported payment identifiers fail closed', () {
       session.chooseAddress('work');
-      expect(session.choosePayment('Paytm'), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
 
       expect(session.choosePayment('Purchase order'), isFalse);
       expect(session.choosePayment('Card<script>'), isFalse);
-      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.choosePayment('PhonePe'), isFalse);
       expect(session.choosePayment('Bank transfer'), isFalse);
 
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Paytm');
+      expect(session.selectedPayment, 'Card');
       expect(session.notice, 'This payment method is not available.');
-      expect(BuyV2Session.paymentMethods, {
-        'PhonePe',
-        'Paytm',
-        'Pine Labs',
-        'Cash on Delivery',
-      });
+      expect(BuyV2Session.paymentMethods, {'UPI', 'Card', 'Cash on Delivery'});
     });
 
     test('Orders search filters only the current order tab', () {
@@ -10272,7 +10482,7 @@ void main() {
             landmark: 'Near the park',
           ),
         );
-        first.choosePayment('Paytm');
+        first.choosePayment('Card');
         expect(first.deliveryOptionsFor(product), isEmpty);
         expect(first.quantityFor(product.id), product.minimumOrder);
         first.toggleDiscoveryBrand(brand);
@@ -10296,7 +10506,7 @@ void main() {
         expect(restored.quantityFor(product.id), product.minimumOrder);
         expect(restored.isSaved(product.id), isTrue);
         expect(restored.selectedAddressId, 'family');
-        expect(restored.selectedPayment, 'Paytm');
+        expect(restored.selectedPayment, 'Card');
         expect(restored.selectedBrands, isEmpty);
         expect(restored.maximumProductPrice, isNull);
         expect(restored.selectedPackFilter, isNull);
@@ -10381,7 +10591,7 @@ void main() {
             expect(session.openCheckout(), isTrue);
             expect(session.continueCheckoutFromAddress(), isTrue);
             expect(
-              session.choosePayment(wholesale ? 'Paytm' : 'Cash on Delivery'),
+              session.choosePayment(wholesale ? 'Card' : 'Cash on Delivery'),
               isTrue,
             );
             expect(session.continueCheckoutFromPayment(), isTrue);

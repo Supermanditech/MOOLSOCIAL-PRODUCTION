@@ -466,7 +466,7 @@ class _ChangingCheckoutCommitFixture extends BuyV2Session {
   Future<bool> submitOrder() async {
     await Future<void>.delayed(Duration.zero);
     if (change == 'amount') updatedAmount = checkoutAmountDueNow + 1;
-    if (change == 'method') selectedPayment = 'Paytm';
+    if (change == 'method') selectedPayment = 'Card';
     if (change == 'surface') view = BuyV2View.cart;
     checkoutSubmissionState =
         BuyV2CheckoutSubmissionState.paymentActionRequired;
@@ -1710,7 +1710,7 @@ void main() {
             expect(session.addProduct('w-notebook'), isTrue);
             session.openCart(scope: BuyV2CartScope.wholesale);
             expect(session.openCheckout(), isTrue);
-            expect(session.choosePayment('PhonePe'), isTrue);
+            expect(session.choosePayment('UPI'), isTrue);
             await tester.pumpWidget(
               app(
                 session,
@@ -1835,7 +1835,7 @@ void main() {
       expect(session.addProduct('w-notebook'), isTrue);
       session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue);
-      expect(session.choosePayment('PhonePe'), isTrue);
+      expect(session.choosePayment('UPI'), isTrue);
       for (final step in [
         BuyV2CheckoutStep.address,
         BuyV2CheckoutStep.payment,
@@ -1860,7 +1860,7 @@ void main() {
           );
           expect(session.checkoutStep, step);
           expect(session.cartScope, BuyV2CartScope.wholesale);
-          expect(session.selectedPayment, 'PhonePe');
+          expect(session.selectedPayment, 'UPI');
           expect(session.quantityFor('w-notebook'), 1);
           expect(tester.takeException(), isNull);
         }
@@ -1901,7 +1901,7 @@ void main() {
     return session;
   }
 
-  for (final provider in ['PhonePe', 'Paytm', 'Pine Labs']) {
+  for (final provider in ['UPI', 'Card']) {
     testWidgets('R66 missing $provider handoff cannot simulate payment', (
       tester,
     ) async {
@@ -1954,7 +1954,7 @@ void main() {
     final opened = <Uri>[];
     final session = await mountPaymentAction(
       tester,
-      'PhonePe',
+      'UPI',
       handoff: (uri) async {
         opened.add(uri);
         return true;
@@ -3284,7 +3284,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-checkout-review-20261001/'
+            'candidate_captures/cursor-upi-checkout-20261001/'
             'buy-v2-t02-checkout-${viewport.label}.png',
           ),
         );

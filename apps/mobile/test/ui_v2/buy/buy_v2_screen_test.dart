@@ -1410,7 +1410,7 @@ void main() {
           find.byKey(const ValueKey('buy-checkout-primary-address')),
         );
         await tester.pumpAndSettle();
-        final phonePe = find.byKey(const ValueKey('buy-payment-PhonePe'));
+        final phonePe = find.byKey(const ValueKey('buy-payment-UPI'));
         await revealPurchaseTarget(tester, phonePe);
         await tester.tap(phonePe);
         await tester.pumpAndSettle();
@@ -5733,9 +5733,9 @@ void main() {
       find.byKey(const ValueKey('buy-checkout-address-edit-home')),
       findsOneWidget,
     );
-    expect(find.text('Payment · PhonePe'), findsNothing);
+    expect(find.text('Payment · UPI'), findsNothing);
     await advanceCheckoutToPayment(tester, session);
-    expect(find.byKey(const ValueKey('buy-payment-PhonePe')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-payment-UPI')), findsOneWidget);
     expect(find.text('Amount to MoolSocial'), findsOneWidget);
     expect(find.textContaining('Delivery & payment'), findsNothing);
     expect(find.textContaining('delivery and payment'), findsNothing);
@@ -6695,7 +6695,7 @@ void main() {
     expect((ineligibleAction.child! as Text).data, 'Choose payment method');
     expect(ineligibleAction.onPressed, isNull);
 
-    expect(session.choosePayment('PhonePe'), isTrue);
+    expect(session.choosePayment('UPI'), isTrue);
     await tester.pumpAndSettle();
     final enabledAction = tester.widget<FilledButton>(action);
     expect(enabledAction.child, isA<Text>());

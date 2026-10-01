@@ -73,7 +73,7 @@ class R669BrandCommerce implements BuyV2CommerceAdapter {
               ),
     ],
     orders: const [],
-    paymentMethods: const {'PhonePe', 'Paytm', 'Pine Labs', 'Cash on Delivery'},
+    paymentMethods: const {'UPI', 'Card', 'Cash on Delivery'},
     businessVerified: true,
     businessVerificationState: BuyV2BusinessVerificationState.verified,
   );

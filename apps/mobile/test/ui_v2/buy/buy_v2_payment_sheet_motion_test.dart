@@ -7,6 +7,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_payment_sheet_motion.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
@@ -60,6 +61,67 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-payment-sheet')));
     await tester.pump();
     if (settle) await tester.pumpAndSettle();
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('UPI QR transport and navy GST fit at $scale text', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      session.addProduct('s-tomato');
+      session.openCart();
+      session.openCheckout();
+      final gstController = BuyV2GstInvoiceController()
+        ..setRequested(BuyV2Destination.shop, true);
+      addTearDown(gstController.dispose);
+      await tester.pumpWidget(
+        app(
+          session,
+          textScale: scale,
+          home: Scaffold(
+            body: BuyV2CheckoutView(
+              session: session,
+              gstInvoiceController: gstController,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final gst = find.widgetWithText(FilledButton, 'Add GST details');
+      expect(gst, findsOne);
+      final button = tester.widget<FilledButton>(gst);
+      expect(button.style!.foregroundColor!.resolve({}), BuyV2Colors.navy);
+      expect(find.byKey(const ValueKey('buy-upi-use-qr')), findsNothing);
+      session.upiQrAvailable = true;
+      session.chooseUpiQr(false);
+      await tester.pumpAndSettle();
+      final qr = find.byKey(const ValueKey('buy-upi-use-qr'));
+      await tester.scrollUntilVisible(
+        qr,
+        180,
+        maxScrolls: 50,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.ensureVisible(qr);
+      await tester.pumpAndSettle();
+      await tester.tap(qr);
+      await tester.pumpAndSettle();
+      expect(session.useUpiQr, isTrue);
+      expect(session.cartLines, hasLength(1));
+      expect(find.byKey(const ValueKey('buy-upi-order-qr')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-payment-PhonePe')), findsNothing);
+      expect(tester.getSize(qr).height, greaterThanOrEqualTo(44));
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('R56.7 route policy is finite and reduced motion is static', (
@@ -135,7 +197,7 @@ void main() {
     await tester.tap(paymentSummary);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-checkout-payment-stage')), findsOne);
-    expect(find.byKey(const ValueKey('buy-payment-PhonePe')), findsOne);
+    expect(find.byKey(const ValueKey('buy-payment-UPI')), findsOne);
     expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsNothing);
 
     await tester.pumpWidget(
@@ -157,14 +219,14 @@ void main() {
     addTearDown(session.dispose);
     await openSheet(tester, session);
 
-    await tester.tap(find.byKey(const ValueKey('buy-payment-Paytm')));
+    await tester.tap(find.byKey(const ValueKey('buy-payment-Card')));
     await tester.pump();
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
     await tester.pump(const Duration(milliseconds: 219));
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
     await tester.pump(const Duration(milliseconds: 1));
     await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'Paytm');
+    expect(session.selectedPayment, 'Card');
     expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsNothing);
   });
 
@@ -191,7 +253,7 @@ void main() {
     expect(find.textContaining('Purchase order'), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
 
     // A stale or restored client selection cannot bypass the visible guard.
     session.selectedPayment = 'Purchase order';
@@ -219,7 +281,7 @@ void main() {
       findsNothing,
     );
     expect(session.choosePayment('Purchase order'), isFalse);
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
     expect(
       find.byKey(const ValueKey('buy-purchase-order-reference')),
       findsNothing,
@@ -241,7 +303,7 @@ void main() {
     addTearDown(session.dispose);
 
     await openSheet(tester, session);
-    for (final name in const ['PhonePe', 'Paytm', 'Pine Labs']) {
+    for (final name in const ['UPI', 'Card']) {
       final action = find.byKey(ValueKey('buy-payment-$name'));
       await tester.ensureVisible(action);
       await tester.pumpAndSettle();
@@ -255,7 +317,7 @@ void main() {
   testWidgets('Back, Close and lifecycle preserve the existing choice', (
     tester,
   ) async {
-    final session = BuyV2Session(core: BuySession())..choosePayment('Paytm');
+    final session = BuyV2Session(core: BuySession())..choosePayment('Card');
     addTearDown(session.dispose);
     await openSheet(tester, session);
 
@@ -263,17 +325,17 @@ void main() {
     await tester.pump();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
-    expect(session.selectedPayment, 'Paytm');
+    expect(session.selectedPayment, 'Card');
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'Paytm');
+    expect(session.selectedPayment, 'Card');
 
     await tester.tap(find.byKey(const ValueKey('open-payment-sheet')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-payment-close')));
     await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'Paytm');
+    expect(session.selectedPayment, 'Card');
   });
 
   testWidgets('stale destination or view cannot receive a payment choice', (
@@ -285,34 +347,34 @@ void main() {
 
     session.openDestination(BuyV2Destination.medicine);
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('buy-payment-Paytm')));
+    await tester.tap(find.byKey(const ValueKey('buy-payment-Card')));
     await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
 
     session.openDestination(BuyV2Destination.shop);
     await tester.tap(find.byKey(const ValueKey('open-payment-sheet')));
     await tester.pumpAndSettle();
     session.openAccount();
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('buy-payment-Pine Labs')));
+    await tester.tap(find.byKey(const ValueKey('buy-payment-Card')));
     await tester.pumpAndSettle();
-    expect(session.selectedPayment, 'PhonePe');
+    expect(session.selectedPayment, 'UPI');
   });
 
   testWidgets('named route and selected option expose one semantic owner', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
-    final session = BuyV2Session(core: BuySession())..choosePayment('Paytm');
+    final session = BuyV2Session(core: BuySession())..choosePayment('Card');
     addTearDown(session.dispose);
     await openSheet(tester, session);
 
     final route = find.byKey(const ValueKey('buy-payment-sheet-route'));
     expect(tester.getSemantics(route).label, 'Payment methods');
     final selected = tester.getSemantics(
-      find.byKey(const ValueKey('buy-payment-semantics-Paytm')),
+      find.byKey(const ValueKey('buy-payment-semantics-Card')),
     );
-    expect(selected.label, contains('Paytm, selected'));
+    expect(selected.label, contains('Card, selected'));
     expect(selected.flagsCollection.isButton, isTrue);
     expect(selected.flagsCollection.isSelected, Tristate.isTrue);
     expect(selected.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
@@ -332,7 +394,7 @@ void main() {
     addTearDown(session.dispose);
     await openSheet(tester, session, textScale: 1.4);
 
-    final target = find.byKey(const ValueKey('buy-payment-Pine Labs'));
+    final target = find.byKey(const ValueKey('buy-payment-Card'));
     await tester.scrollUntilVisible(
       target,
       120,
@@ -355,10 +417,10 @@ void main() {
     await openSheet(tester, session, disableAnimations: true, settle: false);
     expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsOne);
 
-    await tester.tap(find.byKey(const ValueKey('buy-payment-Paytm')));
+    await tester.tap(find.byKey(const ValueKey('buy-payment-Card')));
     await tester.pump();
     await tester.pump();
-    expect(session.selectedPayment, 'Paytm');
+    expect(session.selectedPayment, 'Card');
     expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsNothing);
   });
 
@@ -403,7 +465,7 @@ void main() {
   });
 
   testWidgets(
-    'PhonePe collection moves action required to pending and confirmation',
+    'UPI collection preserves pending until payment connector confirms',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -416,7 +478,7 @@ void main() {
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.shop);
       expect(session.openCheckout(), isTrue);
-      expect(session.selectedPayment, 'PhonePe');
+      expect(session.selectedPayment, 'UPI');
       final handedOff = <Uri>[];
 
       await tester.pumpWidget(
@@ -454,9 +516,14 @@ void main() {
         find.byKey(const ValueKey('buy-checkout-primary-payment')),
       );
       await tester.pumpAndSettle();
-      expect(session.view, BuyV2View.confirmation);
-      expect(find.text('Order placed'), findsOneWidget);
-      expect(session.confirmedOrders, isNotEmpty);
+      expect(session.view, BuyV2View.checkout);
+      expect(find.text('Order placed'), findsNothing);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.cartLines, hasLength(1));
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentPending,
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -475,7 +542,7 @@ void main() {
       await tester.pump();
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = capture.$1;
-      final session = BuyV2Session(core: BuySession())..choosePayment('Paytm');
+      final session = BuyV2Session(core: BuySession())..choosePayment('Card');
       await openSheet(
         tester,
         session,
