@@ -1489,11 +1489,6 @@ void main() {
           session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.idle,
         );
-        final back = find.byKey(const ValueKey('buy-checkout-back'));
-        await revealPurchaseTarget(tester, back, towardStart: true);
-        await tester.tap(back);
-        await tester.pumpAndSettle();
-        expect(session.checkoutStep, BuyV2CheckoutStep.address);
         final cart = find.byKey(const ValueKey('buy-checkout-return-cart'));
         await revealPurchaseTarget(tester, cart, towardStart: true);
         await tester.tap(cart);
@@ -6704,7 +6699,10 @@ void main() {
     await tester.pumpAndSettle();
     final enabledAction = tester.widget<FilledButton>(action);
     expect(enabledAction.child, isA<Text>());
-    expect((enabledAction.child! as Text).data, 'Review order');
+    expect(
+      (enabledAction.child! as Text).data,
+      'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place order',
+    );
     expect(enabledAction.onPressed, isNotNull);
     expect(
       tester

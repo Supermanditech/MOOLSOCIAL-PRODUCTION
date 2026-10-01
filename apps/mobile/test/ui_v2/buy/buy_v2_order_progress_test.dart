@@ -1319,7 +1319,7 @@ void main() {
               scrollable: find
                   .descendant(
                     of: find.byKey(
-                      const PageStorageKey('buy-checkout-confirm'),
+                      const PageStorageKey('buy-checkout-unified'),
                     ),
                     matching: find.byType(Scrollable),
                   )

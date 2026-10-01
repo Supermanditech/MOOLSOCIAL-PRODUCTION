@@ -452,6 +452,35 @@ class _R66CheckoutAmountFixture extends BuyV2Session {
   int get checkoutAmountDueNow => displayAmount;
 }
 
+// Isolated UI orchestration double: no payment/provider or order is created.
+class _ChangingCheckoutCommitFixture extends BuyV2Session {
+  _ChangingCheckoutCommitFixture(this.change) : super(core: BuySession());
+  final String change;
+  int? updatedAmount;
+  int handoffs = 0;
+
+  @override
+  int get checkoutAmountDueNow => updatedAmount ?? super.checkoutAmountDueNow;
+
+  @override
+  Future<bool> submitOrder() async {
+    await Future<void>.delayed(Duration.zero);
+    if (change == 'amount') updatedAmount = checkoutAmountDueNow + 1;
+    if (change == 'method') selectedPayment = 'Paytm';
+    if (change == 'surface') view = BuyV2View.cart;
+    checkoutSubmissionState =
+        BuyV2CheckoutSubmissionState.paymentActionRequired;
+    notifyListeners();
+    return false;
+  }
+
+  @override
+  Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
+    handoffs++;
+    return false;
+  }
+}
+
 void main() {
   _purchaseOrderControllerCases();
   _purchaseOrderPanelCases();
@@ -630,6 +659,142 @@ void main() {
     );
   }
 
+  for (final change in ['amount', 'method', 'surface']) {
+    testWidgets('T02 changed $change never automatically opens payment', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = _ChangingCheckoutCommitFixture(change);
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpWidget(app(session, paymentHandoff: (_) async => true));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-address')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.handoffs, 0);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.confirmedOrders, isEmpty);
+      if (change != 'surface') {
+        expect(
+          find.text('Pay ${buyV2Money(session.checkoutAmountDueNow)}'),
+          findsOne,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-primary-address')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.handoffs, 1);
+      } else {
+        expect(session.view, BuyV2View.cart);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final restoredStep in BuyV2CheckoutStep.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'T02 unified Checkout restores ${restoredStep.name} at $scale',
+        (tester) async {
+          const size = Size(320, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final session = BuyV2Session(core: BuySession());
+          addTearDown(session.dispose);
+          expect(session.addProduct('s-milk'), isTrue);
+          expect(session.addProduct('w-notebook'), isTrue);
+          session.openCart(scope: BuyV2CartScope.all);
+          expect(session.openCheckout(), isTrue);
+          expect(session.showCheckoutStep(restoredStep), isTrue);
+          final originalAddress = session.selectedAddressId;
+          final originalPayment = session.selectedPayment;
+          final originalLines = {
+            for (final line in session.checkoutLines)
+              line.product.id: line.quantity,
+          };
+          final originalOrders = session.orders.length;
+          await tester.pumpWidget(app(session, size: size, textScale: scale));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-checkout-heading')), findsOne);
+          expect(find.text('Continue to payment'), findsNothing);
+          expect(find.text('Review order'), findsNothing);
+
+          Future<void> reveal(Finder target, double delta) async {
+            await tester.scrollUntilVisible(
+              target,
+              delta,
+              maxScrolls: 50,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      const PageStorageKey('buy-checkout-unified'),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.ensureVisible(target);
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOne);
+          }
+
+          final address = find.byKey(
+            const ValueKey('buy-checkout-confirm-address'),
+          );
+          await reveal(address, -150);
+          await tester.tap(address);
+          await tester.pumpAndSettle();
+          final addressCancel = find.byKey(
+            const ValueKey('buy-checkout-address-cancel'),
+          );
+          await reveal(addressCancel, 150);
+          await tester.tap(addressCancel);
+          await tester.pumpAndSettle();
+          expect(session.selectedAddressId, originalAddress);
+
+          final payment = find.byKey(
+            const ValueKey('buy-checkout-confirm-payment'),
+          );
+          await reveal(payment, 150);
+          await tester.tap(payment);
+          await tester.pumpAndSettle();
+          final paymentCancel = find.byKey(
+            const ValueKey('buy-checkout-payment-cancel'),
+          );
+          await reveal(paymentCancel, 150);
+          await tester.tap(paymentCancel);
+          await tester.pumpAndSettle();
+          expect(session.selectedPayment, originalPayment);
+          expect(session.orders.length, originalOrders);
+          expect(session.checkoutStep, restoredStep);
+          final back = find.byKey(const ValueKey('buy-checkout-return-cart'));
+          await reveal(back, -150);
+          await tester.tap(back);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect({
+            for (final line in session.cartLines)
+              line.product.id: line.quantity,
+          }, originalLines);
+          expect(session.selectedAddressId, originalAddress);
+          expect(session.selectedPayment, originalPayment);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (var route = 0; route < 6; route++) {
     if (route == 4) {
       continue;
@@ -730,13 +895,9 @@ void main() {
           await reveal(checkout);
           await tester.tap(checkout);
           await tester.pumpAndSettle();
-          for (final step in ['address', 'payment']) {
-            final next = find.byKey(ValueKey('buy-checkout-primary-$step'));
-            await reveal(next);
-            await tester.tap(next);
-            await tester.pumpAndSettle();
-          }
-          expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+          expect(find.byKey(const ValueKey('buy-checkout-heading')), findsOne);
+          expect(find.text('Continue to payment'), findsNothing);
+          expect(find.text('Review order'), findsNothing);
           expect(session.checkoutItemCount, count);
           final edit = find.text('Edit basket');
           await reveal(edit);
@@ -1272,7 +1433,7 @@ void main() {
           maxScrolls: 50,
           scrollable: find
               .descendant(
-                of: find.byKey(const PageStorageKey('buy-checkout-confirm')),
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
                 matching: find.byType(Scrollable),
               )
               .first,
@@ -1300,7 +1461,12 @@ void main() {
         await tester.pumpAndSettle();
         expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
         expect(
-          find.descendant(of: dock, matching: find.text('Place order')),
+          find.descendant(
+            of: dock,
+            matching: find.text(
+              'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place order',
+            ),
+          ),
           findsOneWidget,
         );
         expect(
@@ -1455,11 +1621,7 @@ void main() {
               maxScrolls: 50,
               scrollable: find
                   .descendant(
-                    of: find.byKey(
-                      PageStorageKey(
-                        'buy-checkout-${session.checkoutStep.name}',
-                      ),
-                    ),
+                    of: find.byKey(PageStorageKey('buy-checkout-unified')),
                     matching: find.byType(Scrollable),
                   )
                   .first,
@@ -1509,17 +1671,6 @@ void main() {
           await tester.tap(toggle);
           await tester.pumpAndSettle();
           expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsNothing);
-          for (final step in [
-            BuyV2CheckoutStep.confirm,
-            BuyV2CheckoutStep.payment,
-          ]) {
-            expect(session.checkoutStep, step);
-            final back = find.byKey(const ValueKey('buy-checkout-back'));
-            await reveal(back, delta: -140);
-            await tester.tap(back);
-            await tester.pumpAndSettle();
-          }
-          expect(session.checkoutStep, BuyV2CheckoutStep.address);
           final returnCart = find.byKey(
             const ValueKey('buy-checkout-return-cart'),
           );
@@ -1570,17 +1721,7 @@ void main() {
             await tester.pumpAndSettle();
 
             void expectCompleteFooter(String label) {
-              final progress = find.byKey(
-                ValueKey('buy-checkout-progress-${session.checkoutStep.name}'),
-              );
-              final index = BuyV2CheckoutStep.values.indexOf(
-                session.checkoutStep,
-              );
-              final stepLabel = ['Address', 'Payment', 'Confirm order'][index];
-              final text = find.descendant(
-                of: progress,
-                matching: find.text('$stepLabel · ${index + 1}/3'),
-              );
+              final text = find.byKey(const ValueKey('buy-checkout-heading'));
               expect(text, findsOneWidget);
               final paragraph = tester.renderObject<RenderParagraph>(text);
               expect(paragraph.didExceedMaxLines, isFalse);
@@ -1649,22 +1790,20 @@ void main() {
               expect(tester.takeException(), isNull);
             }
 
-            expectCompleteFooter('Continue to payment');
-            await _captureR66Checkout(tester, amount, width, scale, 'address');
-            await tester.tap(
-              find.byKey(const ValueKey('buy-checkout-primary-address')),
-            );
-            await tester.pumpAndSettle();
-            expect(session.checkoutStep, BuyV2CheckoutStep.payment);
-            expectCompleteFooter('Review order');
-            await _captureR66Checkout(tester, amount, width, scale, 'payment');
-            await tester.tap(
-              find.byKey(const ValueKey('buy-checkout-primary-payment')),
-            );
-            await tester.pumpAndSettle();
-            expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
-            expectCompleteFooter('Place order');
-            await _captureR66Checkout(tester, amount, width, scale, 'confirm');
+            for (final step in BuyV2CheckoutStep.values) {
+              expect(session.showCheckoutStep(step), isTrue);
+              await tester.pumpAndSettle();
+              expectCompleteFooter('Pay ${buyV2Money(amount)} & place order');
+              expect(find.text('Continue to payment'), findsNothing);
+              expect(find.text('Review order'), findsNothing);
+              await _captureR66Checkout(
+                tester,
+                amount,
+                width,
+                scale,
+                step.name,
+              );
+            }
             expect(await session.submitOrder(), isFalse);
             await tester.pumpAndSettle();
             expect(
@@ -1724,9 +1863,6 @@ void main() {
           expect(tester.takeException(), isNull);
         }
       }
-      await tester.tap(find.byKey(const ValueKey('buy-checkout-back')));
-      await tester.pumpAndSettle();
-      expect(session.checkoutStep, BuyV2CheckoutStep.address);
       await tester.tap(find.byKey(const ValueKey('buy-checkout-return-cart')));
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.cart);
@@ -3023,7 +3159,7 @@ void main() {
     expect(semanticNode.rect.height, greaterThanOrEqualTo(44));
     advanceCheckoutToConfirm(session);
     await tester.pump();
-    expect(find.text('Deliveries'), findsOneWidget);
+    expect(find.text('Your orders'), findsOneWidget);
     expect(session.checkoutFulfilmentGroups, hasLength(1));
     expect(
       session.checkoutFulfilmentGroups.single.destination,
@@ -3113,11 +3249,14 @@ void main() {
           reason: viewport.label,
         );
         expect(tester.takeException(), isNull, reason: viewport.label);
+        expect(owner.hitTestable(), findsOneWidget, reason: viewport.label);
+        expect(find.text('Checkout'), findsOneWidget, reason: viewport.label);
+        expect(find.text('Review order'), findsNothing, reason: viewport.label);
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-pure-white-20260927/'
-            'buy-v2-r58-8-6-c24f-checkout-cart-return-${viewport.label}.png',
+            'candidate_captures/cursor-unified-checkout-20261001/'
+            'buy-v2-t02-checkout-${viewport.label}.png',
           ),
         );
       },

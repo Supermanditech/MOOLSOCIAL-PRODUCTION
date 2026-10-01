@@ -128,9 +128,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('buy-checkout-primary-address')),
+    final paymentSummary = find.byKey(
+      const ValueKey('buy-checkout-confirm-payment'),
     );
+    await tester.scrollUntilVisible(paymentSummary, 150);
+    await tester.tap(paymentSummary);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-checkout-payment-stage')), findsOne);
     expect(find.byKey(const ValueKey('buy-payment-PhonePe')), findsOne);
@@ -435,30 +437,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('buy-checkout-primary-address')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('buy-checkout-primary-payment')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('buy-checkout-primary-confirm')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        session.checkoutSubmissionState,
-        BuyV2CheckoutSubmissionState.paymentActionRequired,
-      );
-      expect(
-        find.byKey(
-          const ValueKey('buy-checkout-payment-state-paymentActionRequired'),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Ready for secure payment'), findsOneWidget);
-      await tester.tap(
-        find.byKey(const ValueKey('buy-checkout-primary-payment')),
       );
       await tester.pumpAndSettle();
       expect(handedOff, hasLength(1));

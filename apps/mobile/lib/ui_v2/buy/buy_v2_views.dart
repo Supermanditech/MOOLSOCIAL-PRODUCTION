@@ -10930,97 +10930,65 @@ class BuyV2CheckoutView extends StatelessWidget {
                   gstInvoiceController.detailsFor(destination) == null,
             )
             .toList(growable: false);
-        final step = session.checkoutStep;
         final keyboardObscured =
             keyboardVisible || MediaQuery.viewInsetsOf(context).bottom > 0;
         final action = _checkoutPrimaryAction(
           context,
           session: session,
-          step: step,
           missingDetails: missingDetails,
           gstInvoiceController: gstInvoiceController,
           paymentHandoff: paymentHandoff,
         );
-        const compactHeader = true;
         final returnAction = _ReturnAffordance(
-          label: switch (step) {
-            BuyV2CheckoutStep.address => 'Cart',
-            BuyV2CheckoutStep.payment =>
-              session.collectionCheckoutSelected ? 'Collection' : 'Address',
-            BuyV2CheckoutStep.confirm => 'Payment',
-          },
+          label: 'Cart',
           onTap: session.checkoutBusy
               ? () => session.showNotice(
                   'Please wait while your payment status is checked.',
                 )
               : session.goBack,
           tightHitOwner: true,
-          hitOwnerKey: ValueKey(
-            step == BuyV2CheckoutStep.address
-                ? 'buy-checkout-return-cart'
-                : 'buy-checkout-back',
-          ),
+          hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
           minimumHeight: 44,
-        );
-        final progress = _CheckoutProgressHeader(
-          activeStep: step,
-          collection: session.collectionCheckoutSelected,
-          compact: compactHeader,
         );
         return Column(
           children: [
             Expanded(
               child: ListView(
-                key: PageStorageKey(
-                  'buy-checkout-${step.name}'
-                  '${session.collectionCheckoutSelected && session.checkoutRequiresResolution ? '-recovery' : ''}',
-                ),
+                key: const PageStorageKey('buy-checkout-unified'),
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
                 children: [
                   Row(
                     children: [
                       Flexible(child: returnAction),
                       const SizedBox(width: 12),
-                      Expanded(child: progress),
+                      Expanded(
+                        child: Text(
+                          'Checkout',
+                          key: const ValueKey('buy-checkout-heading'),
+                          textAlign: TextAlign.end,
+                          style: context.buyBody,
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  AnimatedSwitcher(
-                    duration: BuyV2Motion.resolved(
-                      context,
-                      BuyV2Motion.contentChange,
-                    ),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(.035, 0),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
-                      ),
-                    ),
-                    child: switch (step) {
-                      BuyV2CheckoutStep.address => _CheckoutAddressStage(
-                        key: const ValueKey('buy-checkout-address-stage'),
-                        session: session,
-                        wholesaleReceiving: wholesaleReceiving,
-                      ),
-                      BuyV2CheckoutStep.payment => _CheckoutPaymentStage(
-                        key: const ValueKey('buy-checkout-payment-stage'),
-                        session: session,
-                        hasPaymentHandoff: paymentHandoff != null,
-                      ),
-                      BuyV2CheckoutStep.confirm => _CheckoutConfirmStage(
-                        key: const ValueKey('buy-checkout-confirm-stage'),
-                        session: session,
-                        gstInvoiceController: gstInvoiceController,
-                        invoiceDestinations: invoiceDestinations,
-                        wholesaleReceiving: wholesaleReceiving,
-                      ),
-                    },
+                  const SizedBox(height: 8),
+                  _CheckoutAddressStage(
+                    key: const ValueKey('buy-checkout-address-stage'),
+                    session: session,
+                    wholesaleReceiving: wholesaleReceiving,
+                  ),
+                  const SizedBox(height: 8),
+                  _CheckoutOrderDetails(
+                    key: const ValueKey('buy-checkout-order-details'),
+                    session: session,
+                    gstInvoiceController: gstInvoiceController,
+                    invoiceDestinations: invoiceDestinations,
+                  ),
+                  const SizedBox(height: 8),
+                  _CheckoutPaymentStage(
+                    key: const ValueKey('buy-checkout-payment-stage'),
+                    session: session,
+                    hasPaymentHandoff: paymentHandoff != null,
                   ),
                 ],
               ),
@@ -11042,7 +11010,6 @@ class BuyV2CheckoutView extends StatelessWidget {
 (String, VoidCallback?) _checkoutPrimaryAction(
   BuildContext context, {
   required BuyV2Session session,
-  required BuyV2CheckoutStep step,
   required List<BuyV2Destination> missingDetails,
   required BuyV2GstInvoiceController gstInvoiceController,
   required BuyV2PaymentHandoff? paymentHandoff,
@@ -11050,14 +11017,6 @@ class BuyV2CheckoutView extends StatelessWidget {
   if (session.checkoutBusy) return ('Checking payment…', null);
   if (session.collectionCheckoutSelected) {
     final controller = session.collectionCheckout;
-    if (step == BuyV2CheckoutStep.address) {
-      return (
-        'Continue to payment',
-        session.collectionCheckoutStore == null
-            ? null
-            : session.continueCheckoutFromAddress,
-      );
-    }
     if (controller?.unresolved == true) {
       if (controller?.paymentActionUri != null && paymentHandoff != null) {
         return (
@@ -11067,68 +11026,66 @@ class BuyV2CheckoutView extends StatelessWidget {
       }
       return ('Check payment', session.reconcileCollectionPurchase);
     }
-    if (step == BuyV2CheckoutStep.payment) {
-      return (
-        'Review order',
-        controller?.available == true && session.currentCollectionBasket != null
-            ? session.prepareCollectionCheckout
-            : null,
-      );
-    }
     if (session.purchaseOrderReviewRequired) {
       return ('Review purchase order', null);
     }
     final basket = session.currentCollectionBasket;
     if (basket != null && controller?.canPlace(basket) == true) {
-      return ('Place order', session.submitCollectionPurchase);
+      return (
+        'Pay ${_collectionCheckoutAmount(session)} & place order',
+        () async {
+          final committedTotal = session.collectionCheckoutQuote?.totalMinor;
+          final committedMethod = session.selectedPayment;
+          if (!session.showCheckoutStep(BuyV2CheckoutStep.confirm)) return;
+          await session.submitCollectionPurchase();
+          if (session.view == BuyV2View.checkout &&
+              session.collectionCheckoutQuote?.totalMinor == committedTotal &&
+              session.selectedPayment == committedMethod &&
+              controller?.paymentActionUri != null &&
+              paymentHandoff != null) {
+            await session.continueCollectionPayment(paymentHandoff);
+          }
+        },
+      );
     }
     return (
-      'Update total',
+      'Check total',
       controller?.available == true ? session.prepareCollectionCheckout : null,
     );
   }
   final selectedPaymentAvailable = _buyV2CustomerPaymentChoices(
     session,
   ).any((choice) => choice.$1 == session.selectedPayment);
-  switch (step) {
-    case BuyV2CheckoutStep.address:
-      return ('Continue to payment', session.continueCheckoutFromAddress);
-    case BuyV2CheckoutStep.payment:
-      return switch (session.checkoutSubmissionState) {
-        BuyV2CheckoutSubmissionState.idle when !selectedPaymentAvailable => (
-          'Choose payment method',
-          null,
-        ),
-        BuyV2CheckoutSubmissionState.idle => (
-          'Review order',
-          session.continueCheckoutFromPayment,
-        ),
-        BuyV2CheckoutSubmissionState.paymentActionRequired => (
-          paymentHandoff == null
-              ? 'Unavailable'
-              : 'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
-          paymentHandoff == null
-              ? null
-              : () => session.continuePayment(paymentHandoff),
-        ),
-        BuyV2CheckoutSubmissionState.paymentPending ||
-        BuyV2CheckoutSubmissionState.paymentUnknown => (
-          'Check payment',
-          session.reconcilePayment,
-        ),
-        BuyV2CheckoutSubmissionState.cancelled => (
-          'Choose again',
-          session.retryCheckoutPayment,
-        ),
-        BuyV2CheckoutSubmissionState.failed ||
-        BuyV2CheckoutSubmissionState.unavailable => (
-          'Try payment again',
-          session.retryCheckoutPayment,
-        ),
-        BuyV2CheckoutSubmissionState.submitting => ('Checking payment…', null),
-        BuyV2CheckoutSubmissionState.confirmed => ('Order confirmed', null),
-      };
-    case BuyV2CheckoutStep.confirm:
+  switch (session.checkoutSubmissionState) {
+    case BuyV2CheckoutSubmissionState.paymentActionRequired:
+      return (
+        paymentHandoff == null
+            ? 'Unavailable'
+            : 'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
+        paymentHandoff == null
+            ? null
+            : () => session.continuePayment(paymentHandoff),
+      );
+    case BuyV2CheckoutSubmissionState.paymentPending:
+    case BuyV2CheckoutSubmissionState.paymentUnknown:
+      return ('Check payment', session.reconcilePayment);
+    case BuyV2CheckoutSubmissionState.cancelled:
+      return ('Choose again', session.retryCheckoutPayment);
+    case BuyV2CheckoutSubmissionState.failed:
+    case BuyV2CheckoutSubmissionState.unavailable:
+      return ('Try payment again', session.retryCheckoutPayment);
+    case BuyV2CheckoutSubmissionState.submitting:
+      return ('Checking payment…', null);
+    case BuyV2CheckoutSubmissionState.confirmed:
+      return ('Order confirmed', null);
+    case BuyV2CheckoutSubmissionState.idle:
+      if (session.selectedAddressOrNull == null) {
+        return (
+          'Add delivery address',
+          () => _showAddAddressSheet(context, session),
+        );
+      }
+      if (!selectedPaymentAvailable) return ('Choose payment method', null);
       if (session.checkoutDeliveryEstimateReviewRequired) {
         return ('Check delivery', session.refreshCheckoutDeliveryEstimates);
       }
@@ -11149,138 +11106,29 @@ class BuyV2CheckoutView extends StatelessWidget {
           session.checkoutBenefitReviewRequired ||
           session.checkoutPriceReviewRequired ||
           session.checkoutPromiseReviewRequired;
-      return ('Place order', reviewBlocked ? null : session.submitOrder);
-  }
-}
-
-class _CheckoutProgressHeader extends StatelessWidget {
-  const _CheckoutProgressHeader({
-    required this.activeStep,
-    this.collection = false,
-    this.compact = false,
-  });
-
-  final BuyV2CheckoutStep activeStep;
-  final bool collection;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeIndex = BuyV2CheckoutStep.values.indexOf(activeStep);
-    final labels = [
-      collection ? 'Store' : 'Address',
-      'Payment',
-      'Confirm order',
-    ];
-    return Semantics(
-      key: ValueKey('buy-checkout-progress-${activeStep.name}'),
-      container: true,
-      label: '${labels[activeIndex]}, step ${activeIndex + 1} of 3',
-      child: ExcludeSemantics(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            const labelStyle = TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-            );
-            if (compact) {
-              return Text(
-                '${labels[activeIndex]} · ${activeIndex + 1}/3',
-                textAlign: TextAlign.end,
-                style: labelStyle.copyWith(color: BuyV2Colors.navy),
-              );
-            }
-            final cellWidth = (constraints.maxWidth - 10) / 3;
-            final contentWidth = cellWidth - 14;
-            final iconsAbove = labels.any(
-              (label) =>
-                  buyV2ValueTextSize(context, label, labelStyle).width + 19 >
-                  contentWidth,
-            );
-            final widestWord = labels
-                .expand((label) => label.split(' '))
-                .map(
-                  (word) => buyV2ValueTextSize(context, word, labelStyle).width,
-                )
-                .fold(0.0, (widest, width) => width > widest ? width : widest);
-            final horizontalPadding = iconsAbove
-                ? ((cellWidth - 2 - widestWord) / 2).floorToDouble().clamp(
-                    2.0,
-                    6.0,
-                  )
-                : 6.0;
-
-            Widget cellContent(int index) {
-              const color = BuyV2ActionStyle.foreground;
-              final icon = Icon(
-                index < activeIndex
-                    ? Icons.check_rounded
-                    : switch (index) {
-                        0 => Icons.location_on_outlined,
-                        1 => Icons.account_balance_wallet_outlined,
-                        _ => Icons.verified_outlined,
-                      },
-                size: 15,
-                color: color,
-              );
-              final text = Text(
-                labels[index],
-                textAlign: TextAlign.center,
-                style: labelStyle.copyWith(color: color),
-              );
-              return iconsAbove
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [icon, const SizedBox(height: 4), text],
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        icon,
-                        const SizedBox(width: 4),
-                        Flexible(child: text),
-                      ],
-                    );
-            }
-
-            return IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var index = 0; index < labels.length; index++) ...[
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: BuyV2Motion.resolved(
-                          context,
-                          BuyV2Motion.stateChange,
-                        ),
-                        curve: Curves.easeOutCubic,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: BuyV2ActionStyle.primaryFill,
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(
-                            color: index <= activeIndex
-                                ? BuyV2Colors.navy
-                                : BuyV2Colors.line,
-                          ),
-                        ),
-                        child: cellContent(index),
-                      ),
-                    ),
-                    if (index != labels.length - 1) const SizedBox(width: 5),
-                  ],
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
+      final label =
+          session.selectedPayment == 'Cash on Delivery' ||
+              session.checkoutAmountDueNow == 0
+          ? 'Place order'
+          : 'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place order';
+      return (
+        label,
+        reviewBlocked
+            ? null
+            : () async {
+                final committedAmount = session.checkoutAmountDueNow;
+                final committedMethod = session.selectedPayment;
+                await session.submitOrder();
+                if (session.view == BuyV2View.checkout &&
+                    session.checkoutAmountDueNow == committedAmount &&
+                    session.selectedPayment == committedMethod &&
+                    session.checkoutSubmissionState ==
+                        BuyV2CheckoutSubmissionState.paymentActionRequired &&
+                    paymentHandoff != null) {
+                  await session.continuePayment(paymentHandoff);
+                }
+              },
+      );
   }
 }
 
@@ -11333,12 +11181,8 @@ class _CheckoutCollectionDetails extends StatelessWidget {
       children: [
         if (!resolving || MediaQuery.sizeOf(context).height >= 500)
           Text(
-            resolving
-                ? 'Payment status'
-                : reviewing
-                ? 'Review collection'
-                : 'Collect at store',
-            style: context.buyTitle.copyWith(fontSize: 21),
+            resolving ? 'Payment status' : 'Collect at store',
+            style: context.buyBody,
           ),
         if (!resolving) ...[
           const SizedBox(height: 3),
@@ -11382,8 +11226,11 @@ class _CheckoutCollectionDetails extends StatelessWidget {
             title:
                 '${buyV2CustomerStoreName(store.name, store.id)} · ${store.area}',
             detail: store.address,
-            action: reviewing ? 'Change' : null,
-            onTap: reviewing && !session.checkoutRequiresResolution
+            action: reviewing && !choosingStore ? 'Change' : null,
+            onTap:
+                reviewing &&
+                    !choosingStore &&
+                    !session.checkoutRequiresResolution
                 ? () => session.showCheckoutStep(BuyV2CheckoutStep.address)
                 : null,
           ),
@@ -11439,23 +11286,13 @@ class _CheckoutCollectionDetails extends StatelessWidget {
               value: _collectionMoney(quote.totalMinor),
             ),
           ],
-          const SizedBox(height: 8),
-          _CheckoutCard(
-            icon: Icons.account_balance_wallet_outlined,
-            title: 'Payment · ${session.selectedPayment}',
-            detail: 'Your order is placed after payment is confirmed.',
-            action: 'Change',
-            onTap: session.checkoutRequiresResolution
-                ? null
-                : () => session.showCheckoutStep(BuyV2CheckoutStep.payment),
-          ),
         ],
       ],
     );
   }
 }
 
-class _CheckoutAddressStage extends StatelessWidget {
+class _CheckoutAddressStage extends StatefulWidget {
   const _CheckoutAddressStage({
     super.key,
     required this.session,
@@ -11466,20 +11303,25 @@ class _CheckoutAddressStage extends StatelessWidget {
   final bool wholesaleReceiving;
 
   @override
+  State<_CheckoutAddressStage> createState() => _CheckoutAddressStageState();
+}
+
+class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
+  bool _choosingAddress = false;
+  BuyV2Session get session => widget.session;
+  bool get wholesaleReceiving => widget.wholesaleReceiving;
+
+  @override
   Widget build(BuildContext context) {
     final addresses = session.addresses;
     final selectedId = session.selectedAddressId;
+    final address = session.selectedAddressOrNull;
+    final locked = session.checkoutBusy || session.checkoutRequiresResolution;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (session.checkoutLines.any(
-              (line) =>
-                  line.product.destination == BuyV2Destination.shop ||
-                  line.product.destination == BuyV2Destination.wholesale,
-            ) ||
+        if (session.collectionCheckoutStores.isNotEmpty ||
             session.collectionCheckoutSelected) ...[
-          Text('How would you like your order?', style: context.buyTitle),
-          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 6,
@@ -11518,23 +11360,33 @@ class _CheckoutAddressStage extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
         ],
         if (session.collectionCheckoutSelected)
-          _CheckoutCollectionDetails(session: session, choosingStore: true)
+          _CheckoutCollectionDetails(
+            session: session,
+            choosingStore: true,
+            reviewing: true,
+          )
+        else if (address != null && (!_choosingAddress || locked))
+          _CheckoutCard(
+            key: const ValueKey('buy-checkout-confirm-address'),
+            icon: Icons.location_on_outlined,
+            title: wholesaleReceiving ? 'Receive at' : 'Deliver to',
+            detail:
+                '${address.recipient} · ${address.phone}\n'
+                '${address.line}, ${address.shortLine}',
+            action: locked ? null : 'Change',
+            onTap: locked
+                ? null
+                : () => setState(() => _choosingAddress = true),
+          )
         else ...[
           Text(
             wholesaleReceiving ? 'Receiving address' : 'Delivery address',
-            style: context.buyTitle.copyWith(fontSize: 21),
+            style: context.buyBody,
           ),
-          const SizedBox(height: 3),
-          Text(
-            wholesaleReceiving
-                ? 'Choose where this Wholesale or Bulk purchase will be received.'
-                : 'Choose where this order should be delivered.',
-            style: context.buyMeta,
-          ),
-          const SizedBox(height: 11),
+          const SizedBox(height: 6),
           if (addresses.isEmpty)
             Container(
               key: const ValueKey('buy-checkout-address-empty'),
@@ -11554,7 +11406,11 @@ class _CheckoutAddressStage extends StatelessWidget {
               _CheckoutAddressChoice(
                 address: address,
                 selected: selectedId == address.id,
-                onSelect: () => session.chooseAddress(address.id),
+                onSelect: () {
+                  if (locked) return;
+                  session.chooseAddress(address.id);
+                  setState(() => _choosingAddress = false);
+                },
                 onEdit: () => _showAddAddressSheet(
                   context,
                   session,
@@ -11573,10 +11429,18 @@ class _CheckoutAddressStage extends StatelessWidget {
                 key: const ValueKey('buy-checkout-add-address'),
                 onPressed: () => _showAddAddressSheet(context, session),
                 icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                label: const Text('Add another address'),
+                label: Text(
+                  addresses.isEmpty ? 'Add address' : 'Add another address',
+                ),
               ),
             ),
           ),
+          if (address != null)
+            TextButton(
+              key: const ValueKey('buy-checkout-address-cancel'),
+              onPressed: () => setState(() => _choosingAddress = false),
+              child: const Text('Cancel'),
+            ),
         ],
       ],
     );
@@ -11734,7 +11598,7 @@ List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
         .where((choice) => session.availablePaymentMethods.contains(choice.$1))
         .toList(growable: false);
 
-class _CheckoutPaymentStage extends StatelessWidget {
+class _CheckoutPaymentStage extends StatefulWidget {
   const _CheckoutPaymentStage({
     super.key,
     required this.session,
@@ -11745,27 +11609,49 @@ class _CheckoutPaymentStage extends StatelessWidget {
   final bool hasPaymentHandoff;
 
   @override
+  State<_CheckoutPaymentStage> createState() => _CheckoutPaymentStageState();
+}
+
+class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
+  bool _choosingPayment = false;
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
     final choices = _buyV2CustomerPaymentChoices(session);
-    if (session.collectionCheckoutSelected) {
-      final locked = session.checkoutBusy || session.checkoutRequiresResolution;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _CheckoutCollectionDetails(session: session),
-          const SizedBox(height: 12),
+    final selected = choices
+        .where((choice) => choice.$1 == session.selectedPayment)
+        .firstOrNull;
+    final locked = session.checkoutBusy || session.checkoutRequiresResolution;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!session.collectionCheckoutSelected &&
+            session.checkoutSubmissionState !=
+                BuyV2CheckoutSubmissionState.idle)
+          _CheckoutPaymentStateRow(
+            session: session,
+            hasPaymentHandoff: widget.hasPaymentHandoff,
+          ),
+        if (selected != null && (!_choosingPayment || locked))
+          _CheckoutCard(
+            key: const ValueKey('buy-checkout-confirm-payment'),
+            icon: selected.$2,
+            title: 'Payment · ${selected.$1}',
+            detail: selected.$1 == 'Cash on Delivery'
+                ? '${buyV2Money(session.checkoutAmountDueNow)} payable on delivery'
+                : selected.$3,
+            action: locked ? null : 'Change',
+            onTap: locked
+                ? null
+                : () => setState(() => _choosingPayment = true),
+          )
+        else ...[
           Text('Payment method', style: context.buyBody),
-          const SizedBox(height: 7),
-          if (locked)
-            _CheckoutCard(
-              key: const ValueKey('buy-checkout-collection-payment-locked'),
-              icon: Icons.account_balance_wallet_outlined,
-              title: session.selectedPayment,
-              detail: 'Check this payment before starting another.',
-            )
-          else if (choices.isEmpty)
+          const SizedBox(height: 6),
+          if (choices.isEmpty)
             Text(
-              'Payment methods are unavailable right now.',
+              'Payment methods are unavailable right now. Your Cart is retained.',
               style: context.buyMeta,
             )
           else
@@ -11773,114 +11659,33 @@ class _CheckoutPaymentStage extends StatelessWidget {
               _BuyV2PaymentChoice(
                 choice: choice,
                 selected: session.selectedPayment == choice.$1,
-                onTap: () => session.choosePayment(choice.$1),
+                onTap: locked
+                    ? null
+                    : () {
+                        HapticFeedback.selectionClick();
+                        session.choosePayment(choice.$1);
+                        setState(() => _choosingPayment = false);
+                      },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
             ],
+          if (selected != null)
+            TextButton(
+              key: const ValueKey('buy-checkout-payment-cancel'),
+              onPressed: () => setState(() => _choosingPayment = false),
+              child: const Text('Cancel'),
+            ),
         ],
-      );
-    }
-    final state = session.checkoutSubmissionState;
-    final selecting =
-        state == BuyV2CheckoutSubmissionState.idle ||
-        state == BuyV2CheckoutSubmissionState.cancelled ||
-        state == BuyV2CheckoutSubmissionState.failed ||
-        state == BuyV2CheckoutSubmissionState.unavailable;
-    final paymentOffer = session
-        .selectedCartBenefitsFor(session.checkoutDestinations)
-        .where((benefit) => benefit.kind == BuyV2CartBenefitKind.paymentOffer)
-        .firstOrNull;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Payment', style: context.buyTitle.copyWith(fontSize: 21)),
-        const SizedBox(height: 3),
-        Text(
-          session.isStoreProcurement
-              ? 'Choose a method accepted by your supplier.'
-              : 'Choose how you want to pay MoolSocial.',
-          style: context.buyMeta,
-        ),
-        const SizedBox(height: 10),
-        Container(
-          key: const ValueKey('buy-checkout-payment-summary'),
-          padding: const EdgeInsets.all(12),
-          decoration: buyV2CardDecoration(
-            color: BuyV2Colors.softBlue,
-            border: BuyV2Colors.navy,
-            radius: 16,
+        if (session.checkoutQuotedPaymentCharge > 0)
+          _CheckoutPaymentFact(
+            label: 'Payment charge',
+            value: buyV2Money(session.checkoutQuotedPaymentCharge),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                session.isStoreProcurement
-                    ? (session.checkoutPaymentTermsReviewRequired
-                          ? 'Order total · select supplier terms at review'
-                          : 'Amount due now')
-                    : 'Amount to MoolSocial',
-                style: context.buyMeta,
-              ),
-              const SizedBox(height: 1),
-              Text(
-                buyV2Money(session.checkoutAmountDueNow),
-                style: context.buyTitle.copyWith(fontSize: 25),
-              ),
-              const SizedBox(height: 7),
-              if (!session.isStoreProcurement)
-                _CheckoutPaymentFact(
-                  label: 'Provider charge',
-                  value: session.checkoutQuotedPaymentCharge > 0
-                      ? buyV2Money(session.checkoutQuotedPaymentCharge)
-                      : 'No extra provider charge',
-                ),
-              if (!session.isStoreProcurement)
-                _CheckoutPaymentFact(
-                  label: 'Payment offer',
-                  value: paymentOffer == null
-                      ? 'No offer selected'
-                      : '${paymentOffer.title} · ${_cartBenefitSponsorLabel(paymentOffer)}\n'
-                            '${_paymentOfferStatus(session, paymentOffer)}',
-                ),
-            ],
+        if (session.checkoutBalanceDue > 0)
+          _CheckoutPaymentFact(
+            label: 'Balance due',
+            value: buyV2Money(session.checkoutBalanceDue),
           ),
-        ),
-        if (state != BuyV2CheckoutSubmissionState.idle) ...[
-          const SizedBox(height: 9),
-          _CheckoutPaymentStateRow(
-            session: session,
-            hasPaymentHandoff: hasPaymentHandoff,
-          ),
-        ],
-        const SizedBox(height: 12),
-        Text('Payment method', style: context.buyBody),
-        const SizedBox(height: 7),
-        if (choices.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: buyV2CardDecoration(
-              color: BuyV2Colors.softOrange,
-              radius: 14,
-            ),
-            child: Text(
-              'Payment methods are unavailable right now. Try again shortly.',
-              style: context.buyMeta,
-            ),
-          )
-        else
-          for (final choice in choices) ...[
-            _BuyV2PaymentChoice(
-              choice: choice,
-              selected: session.selectedPayment == choice.$1,
-              onTap: selecting
-                  ? () {
-                      HapticFeedback.selectionClick();
-                      session.choosePayment(choice.$1);
-                    }
-                  : null,
-            ),
-            const SizedBox(height: 8),
-          ],
       ],
     );
   }
@@ -12268,26 +12073,21 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
   );
 }
 
-class _CheckoutConfirmStage extends StatelessWidget {
-  const _CheckoutConfirmStage({
+class _CheckoutOrderDetails extends StatelessWidget {
+  const _CheckoutOrderDetails({
     super.key,
     required this.session,
     required this.gstInvoiceController,
     required this.invoiceDestinations,
-    required this.wholesaleReceiving,
   });
 
   final BuyV2Session session;
   final BuyV2GstInvoiceController gstInvoiceController;
   final List<BuyV2Destination> invoiceDestinations;
-  final bool wholesaleReceiving;
 
   @override
   Widget build(BuildContext context) {
-    if (session.collectionCheckoutSelected) {
-      return _CheckoutCollectionDetails(session: session, reviewing: true);
-    }
-    final address = session.selectedAddressOrNull;
+    if (session.collectionCheckoutSelected) return const SizedBox.shrink();
     final groups = session.checkoutFulfilmentGroups;
     final selectedBenefits = session.selectedCartBenefitsFor(
       session.checkoutDestinations,
@@ -12299,12 +12099,6 @@ class _CheckoutConfirmStage extends StatelessWidget {
           BuyV2PurchaseOrderPanel(session: session),
           const SizedBox(height: 8),
         ],
-        Text('Confirm order', style: context.buyTitle.copyWith(fontSize: 21)),
-        const SizedBox(height: 3),
-        Text(
-          'Check the address, deliveries and payment before placing the order.',
-          style: context.buyMeta,
-        ),
         if (session.checkoutDeliveryEstimateReviewRequired)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -12320,8 +12114,11 @@ class _CheckoutConfirmStage extends StatelessWidget {
                   children: [
                     TextButton(
                       key: const ValueKey('buy-delivery-unavailable-address'),
-                      onPressed: () =>
-                          session.showCheckoutStep(BuyV2CheckoutStep.address),
+                      onPressed: () => _showAddAddressSheet(
+                        context,
+                        session,
+                        existingAddress: session.selectedAddressOrNull,
+                      ),
                       child: const Text('Change address or collection'),
                     ),
                     TextButton(
@@ -12337,18 +12134,6 @@ class _CheckoutConfirmStage extends StatelessWidget {
               ],
             ),
           ),
-        const SizedBox(height: 10),
-        _CheckoutCard(
-          key: const ValueKey('buy-checkout-confirm-address'),
-          icon: Icons.location_on_outlined,
-          title: wholesaleReceiving ? 'Receiving address' : 'Delivery address',
-          detail: address == null
-              ? 'Choose an address to continue.'
-              : '${address.recipient} · ${address.phone}\n${address.line}, ${address.shortLine}',
-          action: 'Change',
-          onTap: () => session.showCheckoutStep(BuyV2CheckoutStep.address),
-        ),
-        const SizedBox(height: 8),
         BuyV2CheckoutGstDetails(
           destinations: invoiceDestinations,
           controller: gstInvoiceController,
@@ -12374,7 +12159,7 @@ class _CheckoutConfirmStage extends StatelessWidget {
           _CheckoutPromiseChangeReview(session: session),
           const SizedBox(height: 8),
         ],
-        Text('Deliveries', style: context.buyBody),
+        Text('Your orders', style: context.buyBody),
         const SizedBox(height: 7),
         for (var index = 0; index < groups.length; index++) ...[
           _CheckoutDeliverySummaryCard(
@@ -12388,23 +12173,6 @@ class _CheckoutConfirmStage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        _CheckoutCard(
-          key: const ValueKey('buy-checkout-confirm-payment'),
-          icon: Icons.account_balance_wallet_outlined,
-          title: 'Payment · ${session.selectedPayment}',
-          detail: session.isStoreProcurement
-              ? 'Due now · ${buyV2Money(session.checkoutAmountDueNow)}\nBalance · ${buyV2Money(session.checkoutBalanceDue)}\nSupplier acceptance and payment confirmation remain separate.'
-              : switch (session.selectedPayment) {
-                  'Purchase order' =>
-                    'Amount · ${buyV2Money(session.checkoutAmountDueNow)}\nPurchase order · ${session.purchaseOrderReference.trim()}',
-                  'Cash on Delivery' =>
-                    'Amount due on delivery · ${buyV2Money(session.checkoutAmountDueNow)}',
-                  _ =>
-                    'Amount to MoolSocial · ${buyV2Money(session.checkoutAmountDueNow)}\nYour order is placed after payment is confirmed.',
-                },
-          action: 'Change',
-          onTap: () => session.showCheckoutStep(BuyV2CheckoutStep.payment),
-        ),
         if (selectedBenefits.isNotEmpty) ...[
           const SizedBox(height: 8),
           Container(

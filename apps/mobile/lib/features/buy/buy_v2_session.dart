@@ -12123,18 +12123,7 @@ class BuyV2Session extends ChangeNotifier {
             returnToCatalogue();
           }
         case BuyV2View.checkout:
-          switch (checkoutStep) {
-            case BuyV2CheckoutStep.confirm:
-              checkoutStep = BuyV2CheckoutStep.payment;
-              notice = null;
-              notifyListeners();
-            case BuyV2CheckoutStep.payment:
-              checkoutStep = BuyV2CheckoutStep.address;
-              notice = null;
-              notifyListeners();
-            case BuyV2CheckoutStep.address:
-              openCart(scope: cartScope);
-          }
+          openCart(scope: cartScope);
         case BuyV2View.confirmation:
           _openOrdersRoot();
         case BuyV2View.tracking:

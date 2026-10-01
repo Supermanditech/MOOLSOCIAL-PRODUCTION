@@ -6097,14 +6097,14 @@ void main() {
         expect(harness.pending, isNull);
         expect(session.orders.length, orderCount);
         await captureR66Visual(tester, 'r5-collection-checkout-failure-$fault');
-        final back = find.byKey(const ValueKey('buy-checkout-back'));
+        final back = find.byKey(const ValueKey('buy-checkout-return-cart'));
         if (back.evaluate().isEmpty) {
           await tester.scrollUntilVisible(
             back,
             -180,
             scrollable: find
                 .descendant(
-                  of: find.byKey(const PageStorageKey('buy-checkout-payment')),
+                  of: find.byKey(const PageStorageKey('buy-checkout-unified')),
                   matching: find.byType(Scrollable),
                 )
                 .first,
@@ -6115,13 +6115,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(back.hitTestable(), findsOneWidget);
         await tester.tap(back);
-        await tester.pumpAndSettle();
-        expect(session.checkoutStep, BuyV2CheckoutStep.address);
-        final cart = find.byKey(const ValueKey('buy-checkout-return-cart'));
-        await tester.ensureVisible(cart);
-        await tester.pumpAndSettle();
-        expect(cart.hitTestable(), findsOneWidget);
-        await tester.tap(cart);
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         expect(session.quantityFor('sku-a'), 1);
@@ -6220,8 +6213,27 @@ void main() {
           final session = await checkoutSession(openCheckout: false);
           await mountCheckout(tester, session, size: size, scale: scale);
           Future<void> tap(Finder target) async {
+            if (target.evaluate().isEmpty) {
+              await tester.scrollUntilVisible(
+                target,
+                160,
+                scrollable: find
+                    .descendant(
+                      of: find.byKey(
+                        const PageStorageKey('buy-checkout-unified'),
+                      ),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+                maxScrolls: 40,
+              );
+              await tester.pumpAndSettle();
+            }
             expect(target, findsOneWidget);
-            await tester.ensureVisible(target);
+            await Scrollable.ensureVisible(
+              tester.element(target),
+              alignment: .2,
+            );
             await tester.pumpAndSettle();
             expect(target.hitTestable(), findsOneWidget);
             await tester.tap(target);
@@ -6280,13 +6292,13 @@ void main() {
           );
           expect(session.collectionCheckoutStore!.id, 'store-a');
           await capture('store-choice');
-          await tap(find.byKey(const ValueKey('buy-checkout-primary-address')));
+          await tap(find.byKey(const ValueKey('buy-checkout-confirm-payment')));
           await tap(find.byKey(const ValueKey('buy-payment-Paytm')));
           expect(session.selectedPayment, 'Paytm');
           await capture('payment-choice');
           expect(find.text('Cash on Delivery'), findsNothing);
           expect(find.text('Purchase order'), findsNothing);
-          await tap(find.byKey(const ValueKey('buy-checkout-primary-payment')));
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-address')));
           expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
           expect(find.text('₹100.25'), findsWidgets);
           await capture('review');
@@ -6305,7 +6317,7 @@ void main() {
           expect(harness.placements, 0);
           expect(harness.pending, isNull);
           expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
-          expect(find.text('Update total'), findsOneWidget);
+          expect(find.text('Check total'), findsOneWidget);
           final expiredNotice = find.text(
             'Your total needs updating. Review it before paying.',
           );
@@ -6314,7 +6326,7 @@ void main() {
           expect(expiredNotice.hitTestable(), findsOneWidget);
           await capture('expired-total');
           await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
-          expect(find.text('Place order'), findsOneWidget);
+          expect(find.text('Pay ₹100.25 & place order'), findsOneWidget);
           expect(harness.quotes, 2);
           harness.outcome = BuyV2CollectionPurchaseState.unknown;
           await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
@@ -6334,8 +6346,10 @@ void main() {
             of: find.byKey(const ValueKey('buy-checkout-collection-notice')),
             matching: find.byType(Text),
           );
+          await tester.ensureVisible(recoveryText);
+          await tester.pumpAndSettle();
           final recoveryViewport = tester.getRect(
-            find.byKey(const PageStorageKey('buy-checkout-payment-recovery')),
+            find.byKey(const PageStorageKey('buy-checkout-unified')),
           );
           final recoveryRect = tester.getRect(recoveryText);
           expect(recoveryRect.top, greaterThanOrEqualTo(recoveryViewport.top));
@@ -9970,29 +9984,20 @@ void main() {
       expect(session.selectedPayment, 'Paytm');
     });
 
-    test('staged Checkout Back returns Confirm Payment Address then Cart', () {
+    test('Checkout Back returns directly to Cart from every legacy step', () {
       final product = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.shop,
       );
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.shop);
-      expect(session.openCheckout(), isTrue);
-      expect(session.checkoutStep, BuyV2CheckoutStep.address);
-
-      expect(session.continueCheckoutFromAddress(), isTrue);
-      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
-      expect(session.continueCheckoutFromPayment(), isTrue);
-      expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
-
-      session.goBack();
-      expect(session.view, BuyV2View.checkout);
-      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
-      session.goBack();
-      expect(session.view, BuyV2View.checkout);
-      expect(session.checkoutStep, BuyV2CheckoutStep.address);
-      session.goBack();
-      expect(session.view, BuyV2View.cart);
-      expect(session.cartScope, BuyV2CartScope.shop);
+      for (final step in BuyV2CheckoutStep.values) {
+        expect(session.openCheckout(), isTrue);
+        expect(session.showCheckoutStep(step), isTrue);
+        session.goBack();
+        expect(session.view, BuyV2View.cart);
+        expect(session.cartScope, BuyV2CartScope.shop);
+        expect(session.quantityFor(product.id), 1);
+      }
     });
 
     test('saved address update preserves identity count and selection', () {

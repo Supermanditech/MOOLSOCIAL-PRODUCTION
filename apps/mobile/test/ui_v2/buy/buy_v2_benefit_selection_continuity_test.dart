@@ -600,13 +600,21 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.checkout);
-      await tester.tap(
-        find.byKey(const ValueKey('buy-checkout-primary-address')),
+      final paymentChoice = find.byKey(
+        const ValueKey('buy-checkout-confirm-payment'),
+      );
+      await tester.scrollUntilVisible(paymentChoice, 150, maxScrolls: 50);
+      await Scrollable.ensureVisible(
+        tester.element(paymentChoice),
+        alignment: .2,
       );
       await tester.pumpAndSettle();
-      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      expect(paymentChoice.hitTestable(), findsOneWidget);
+      await tester.tap(paymentChoice);
+      await tester.pumpAndSettle();
       final pine = find.byKey(const ValueKey('buy-payment-Pine Labs'));
-      await Scrollable.ensureVisible(tester.element(pine), alignment: .3);
+      await tester.scrollUntilVisible(pine, 150, maxScrolls: 50);
+      await Scrollable.ensureVisible(tester.element(pine), alignment: .2);
       await tester.pumpAndSettle();
       expect(pine.hitTestable(), findsOneWidget);
       await tester.tap(pine);
@@ -614,7 +622,7 @@ void main() {
       expect(session.selectedPayment, 'Pine Labs');
       expect(session.checkoutAmountDueNow, 3180);
       final summary = find.byKey(
-        const ValueKey('buy-checkout-payment-summary'),
+        const ValueKey('buy-checkout-confirm-benefits'),
       );
       await tester.ensureVisible(summary);
       await tester.pumpAndSettle();
@@ -624,7 +632,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: summary, matching: find.text('₹3,180')),
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-checkout-action-bar')),
+          matching: find.text('₹3,180'),
+        ),
         findsOneWidget,
       );
       for (final element
@@ -644,10 +655,6 @@ void main() {
         );
         natural.dispose();
       }
-      await tester.tap(
-        find.byKey(const ValueKey('buy-checkout-primary-payment')),
-      );
-      await tester.pumpAndSettle();
       final confirmation = find.byKey(
         const ValueKey('buy-checkout-confirm-benefits'),
       );

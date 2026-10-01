@@ -182,7 +182,7 @@ void main() {
       160,
       scrollable: find
           .descendant(
-            of: find.byKey(const PageStorageKey('buy-checkout-confirm')),
+            of: find.byKey(const PageStorageKey('buy-checkout-unified')),
             matching: find.byType(Scrollable),
           )
           .first,
