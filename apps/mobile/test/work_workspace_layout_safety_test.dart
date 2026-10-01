@@ -3523,10 +3523,16 @@ void main() {
       final fit=find.byKey(const Key('purchase-review-fit'));
       await revealPurchaseInput(tester,fit); await tester.tap(fit); await tester.pumpAndSettle();
       expect(transform.value.getMaxScaleOnAxis(),lessThanOrEqualTo(1));
-      expect(tester.getBottomLeft(find.byKey(const Key('purchase-review-paper-notes-terms'))).dy,
-        greaterThan(tester.getTopLeft(paper).dy+tester.getRect(paper).height*.75),
-        reason:'Spare page height belongs to the ruled item area, not below the footer.');
-      expect(find.text('Pinch to zoom · drag to read'), findsOneWidget);
+      if (tester.getSize(paper).width >= 600) {
+        expect(tester.getBottomLeft(find.byKey(const Key('purchase-review-paper-notes-terms'))).dy,
+          greaterThan(tester.getTopLeft(paper).dy+tester.getRect(paper).height*.75),
+          reason:'Wide paper preserves the ruled item area and physical invoice composition.');
+      } else {
+        expect(tester.getSize(paper).width,lessThanOrEqualTo(view.$1));
+        expect(find.byKey(const Key('purchase-review-item-space')),findsNothing,
+          reason:'Compact phone reading does not reserve a blank A4-height area.');
+      }
+      expect(find.text('Pinch to zoom · drag to read'), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
       await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
       expect(find.byKey(const Key('work-purchase-draft-save')).hitTestable(), findsOneWidget);
@@ -4943,7 +4949,7 @@ void main() {
     expect(find.text('Could not download the recorded copy. Your saved draft is kept; retry.'), findsOneWidget);
     picker.bytes = null; picker.fail = false; picker.result = Uri.file('/host-only/export.pdf');
     await download();
-    expect(find.text('Recorded copy saved. Purchase draft remains unposted.'), findsOneWidget);
+    expect(find.text('Recorded copy saved.'), findsOneWidget);
     await usePurchaseControl(tester, 'work-purchase-invoice-section');
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-reference')));
     await tester.enterText(find.byKey(const Key('work-purchase-reference')), 'UNSAVED-CHANGE');
@@ -5000,11 +5006,35 @@ void main() {
       expect(find.text('Invoice total'),findsOneWidget);
       expect(find.text('₹1,23,456.78'),findsOneWidget);
       expect(find.text('Not entered'),findsNothing);
-      expect(tester.getSize(find.byKey(const Key('purchase-review-paper'))).width,greaterThanOrEqualTo(760),
-        reason:'Default paper is readable and pans; it is not shrunk to phone width.');
+      final paperRect = tester.getRect(find.byKey(const Key('purchase-review-paper')));
+      expect(paperRect.width,lessThanOrEqualTo(config.$1.width),
+        reason:'The recorded phone copy must not start half offscreen. Only its item columns scroll sideways.');
+      final headerRect = tester.getRect(find.byKey(const Key('purchase-review-paper-header')));
+      if(config.$2==1) {
+        expect(headerRect.height,lessThan(190),
+          reason:'Sparse supplier details must not stretch beside taller invoice metadata.');
+      }
+      for(final id in ['supplier-Supplier name','reference','date']) {
+        final fact = tester.getRect(find.byKey(ValueKey('purchase-review-$id')));
+        expect(fact.left,greaterThanOrEqualTo(paperRect.left));
+        expect(fact.right,lessThanOrEqualTo(paperRect.right));
+      }
+      expect(find.byKey(const Key('purchase-review-item-space')),findsNothing,
+        reason:'Phone reading must not reserve blank A4-height filler.');
+      expect(find.byKey(const Key('purchase-review-item-scroll')),findsOneWidget);
+      expect(find.text('Pinch to zoom · drag to read'),findsNothing);
+      expect(find.text('Item amounts not entered'),findsNothing);
+      expect(find.text('Enter item amounts'),findsOneWidget);
       if(config.$2==1) {
         expect(tester.getSize(find.byKey(const Key('purchase-review-toolbar'))).height,48,
           reason:'The recorded-copy controls use one compact accessible lane.');
+        final supplierBefore = tester.getRect(find.byKey(const ValueKey('purchase-review-supplier-Supplier name')));
+        await tester.drag(find.byKey(const Key('purchase-review-item-scroll')),const Offset(-500,0));
+        await tester.pumpAndSettle();
+        final itemScroll = tester.widget<SingleChildScrollView>(find.byKey(const Key('purchase-review-item-scroll')));
+        expect(itemScroll.controller!.offset,greaterThan(0));
+        expect(tester.getRect(find.byKey(const ValueKey('purchase-review-supplier-Supplier name'))),supplierBefore,
+          reason:'Sideways item-table reading must not move or clip the supplier header.');
       }
       await revealPurchaseInput(tester,find.byKey(const Key('work-purchase-draft-save')));
       expect(find.byKey(const Key('work-purchase-draft-save')).hitTestable(),findsOneWidget);

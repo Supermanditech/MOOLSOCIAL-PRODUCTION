@@ -11395,6 +11395,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   final _sourceViewport = GlobalKey();
   final _documentPage = GlobalKey();
   final _previewZoom = TransformationController();
+  final _recordedItemScroll = ScrollController(keepScrollOffset: false);
+  final _recordedTaxScroll = ScrollController(keepScrollOffset: false);
   final _readingPointers = <int>{};
   bool _reviewFocused = false;
   WorkspacePurchaseInvoiceAttachment? _lastOriginal;
@@ -11599,6 +11601,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     for (final c in _details.values) { c.dispose(); }
     _supplierFocus.dispose();
     _previewZoom.dispose();
+    _recordedItemScroll.dispose();
+    _recordedTaxScroll.dispose();
     _sourceEpoch++;
     _sourcePdf.dispose();
     for (final line in _goods) { line.dispose(); }
@@ -11980,7 +11984,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         type: FileType.custom, allowedExtensions: ['pdf'], bytes: bytes);
       if (_recordedCurrent(draft, supplier, revision)) {
         setState(() => _recordedNotice = result == null
-          ? 'Download cancelled. Your saved draft is kept.' : 'Recorded copy saved. Purchase draft remains unposted.');
+          ? 'Download cancelled. Your saved draft is kept.' : 'Recorded copy saved.');
       }
     } on FormatException catch (error) {
       if (mounted && _current) setState(() => _recordedNotice = error.message);
@@ -12064,8 +12068,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         child: ClipRect(child: ColoredBox(color: const Color(0xffe8ebef),
           child: InteractiveViewer(key: Key(key), transformationController: _previewZoom,
             constrained: false, alignment: Alignment.topLeft, minScale: .05, maxScale: 8,
-            child: SizedBox(key: _documentPage, width: constraints.maxWidth < 760 ? 760 : constraints.maxWidth,
-              child: page(constraints.maxWidth < 760 ? 760 : constraints.maxWidth))))))));
+            child: SizedBox(key: _documentPage,
+              width: key == 'purchase-review-zoom' ? constraints.maxWidth
+                : constraints.maxWidth < 760 ? 760 : constraints.maxWidth,
+              child: page(key == 'purchase-review-zoom' ? constraints.maxWidth
+                : constraints.maxWidth < 760 ? 760 : constraints.maxWidth))))))));
   Widget _invoiceTools({required bool original}) => Wrap(
     crossAxisAlignment: WrapCrossAlignment.center, children: [
       if (original && _sourcePage != null) Row(mainAxisSize: MainAxisSize.min, children: [
@@ -12121,6 +12128,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   void _previewPurchase({bool recorded = true}) {
     FocusScope.of(context).unfocus();
     _previewZoom.value = Matrix4.identity();
+    for (final controller in [_recordedItemScroll, _recordedTaxScroll]) {
+      if (controller.hasClients) controller.jumpTo(0);
+    }
     setState(() {
       _reviewFocused = true;
       _readingPointers.clear();
@@ -12163,7 +12173,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       }
     });
   }
-  List<Widget> _reviewPurchase(double viewportHeight) {
+  List<Widget> _reviewPurchase(double viewportHeight) => [
+    LayoutBuilder(builder: (context, constraints) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: _reviewPurchaseAtWidth(viewportHeight, constraints.maxWidth))),
+  ];
+  List<Widget> _reviewPurchaseAtWidth(double viewportHeight, double readingWidth) {
+    final paperWidth = readingWidth - 1.4;
     const quantityKeys = {'receivedQuantity', 'damagedQuantity', 'shortQuantity'};
     const rule = BorderSide(color: Color(0xff89929c), width: .7);
     const printedStyle = TextStyle(fontSize: 12, color: Color(0xff171b20), height: 1.25);
@@ -12207,10 +12223,35 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (!hasLeft && !hasRight) return const SizedBox.shrink();
       return DecoratedBox(key: Key('purchase-review-paper-$key'),
         decoration: const BoxDecoration(border: Border(bottom: rule)),
-        child: hasLeft && hasRight ? Table(border: const TableBorder(verticalInside: rule), children: [
-          TableRow(children: [column(left), column(right)]),
-        ]) : column(hasLeft ? left : right));
+        child: Builder(builder: (context) {
+          if (readingWidth < 600 && hasLeft && hasRight) {
+            if (key == 'header') {
+              final fullWidth = paperWidth - 24;
+              final fieldWidth = readingWidth < 320 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.3 ? fullWidth : (fullWidth - 12) / 2;
+              return column([
+                ...left,
+                const SizedBox(height: 8),
+                right.first,
+                Wrap(spacing: 12, runSpacing: 2, children: [
+                  for (final field in right.skip(1)) SizedBox(width: fieldWidth, child: field),
+                ]),
+              ]);
+            }
+            return column([...left, const SizedBox(height: 8), ...right]);
+          }
+          return hasLeft && hasRight ? Table(border: const TableBorder(verticalInside: rule), children: [
+            TableRow(children: [column(left), column(right)]),
+          ]) : column(hasLeft ? left : right);
+        }));
     }
+    Widget readingTable(Widget table, String key, ScrollController controller) =>
+      readingWidth >= 760 ? table
+        : Scrollbar(controller: controller, thumbVisibility: true, thickness: 2,
+          radius: const Radius.circular(2),
+          child: SingleChildScrollView(key: Key(key), controller: controller,
+            scrollDirection: Axis.horizontal, padding: const EdgeInsets.only(bottom: 5),
+            child: SizedBox(width: 760, child: table)));
     Widget itemCell(String text, String id, {bool amount = false}) => value('', text, id, cell: true, amount: amount);
     Widget itemExtra(_PurchaseGoodsInput line, int index, String key, {bool amount = false}) =>
       line.extra[key]!.text.isEmpty ? const Text('—', style: printedStyle)
@@ -12260,7 +12301,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       ]),
       DecoratedBox(key: const Key('purchase-review-paper-items'),
         decoration: const BoxDecoration(border: Border(bottom: rule)),
-        child: Table(key: const Key('purchase-review-item-table'),
+        child: readingTable(Table(key: const Key('purchase-review-item-table'),
           columnWidths: const {0:FlexColumnWidth(.4),1:FlexColumnWidth(3),2:FlexColumnWidth(.85),
             3:FlexColumnWidth(.65),4:FlexColumnWidth(.8),5:FlexColumnWidth(.6),
             6:FlexColumnWidth(1),7:FlexColumnWidth(1),8:FlexColumnWidth(1)},
@@ -12292,7 +12333,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'taxAmount',amount:true)),
               Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'lineTotal',amount:true)),
             ]),
-          ])),
+          ]), 'purchase-review-item-scroll', _recordedItemScroll)),
       if (extras('items').isNotEmpty) column(extras('items')),
       Expanded(child: Row(key:const Key('purchase-review-item-space'),
         crossAxisAlignment:CrossAxisAlignment.stretch,children:[
@@ -12323,7 +12364,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (amountWords.isNotEmpty) column(amountWords),
       if (_taxRows.isNotEmpty) column([
         heading('HSN / tax summary as on invoice'),
-        Table(key:const Key('purchase-review-printed-tax-table'),border:const TableBorder(
+        readingTable(Table(key:const Key('purchase-review-printed-tax-table'),border:const TableBorder(
           top:rule,bottom:rule,left:rule,right:rule,horizontalInside:rule,verticalInside:rule),children:[
           TableRow(children:[for(final key in WorkspacePurchaseEntryDraft.printedTaxKeys)
             Padding(padding:const EdgeInsets.all(4),child:Text(key=='label'?'Row':key=='hsn'?'HSN / SAC'
@@ -12335,7 +12376,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 :itemCell(moneyKeys.contains(key) ? _invoiceMoney(row[key]!.text) : row[key]!.text,
                   'tax-$index-$key',amount:key!='label'&&key!='hsn')),
           ]),
-        ]),
+        ]), 'purchase-review-tax-scroll', _recordedTaxScroll),
         for(final (index,_) in _taxRows.indexed) ...extras('tax',row:index),
       ]),
       if (remainingTax.isNotEmpty) column(remainingTax),
@@ -12365,25 +12406,28 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     ];
     return [
       _reviewCopies(),
-      const Text('Purchase entry · Draft', key:Key('work-purchase-review-title'),
-        style:TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
+      Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+        const Text('Purchase entry · Draft', key:Key('work-purchase-review-title'),
+          style:TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
+        if (_goods.any((line) => line.name.text.trim().isNotEmpty && line.extra['lineTotal']!.text.trim().isEmpty))
+          TextButton(key: const Key('purchase-review-edit-amounts'), onPressed: _reviewItemAmounts,
+            style: TextButton.styleFrom(foregroundColor: const Color(0xff8b3b13),
+              minimumSize: const Size(48,48), padding: const EdgeInsets.symmetric(horizontal: 4),
+              textStyle: const TextStyle(fontSize: 12)),
+            child: const Text('Enter item amounts')),
+      ]),
       if (_name.text.trim().isEmpty || _reference.text.trim().isEmpty || _date.text.trim().isEmpty ||
           !_goods.any((line) => line.name.text.trim().isNotEmpty))
         const Text('Still to enter: check supplier, invoice number/date and items before saving.',
           style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-      if (_goods.any((line) => line.name.text.trim().isNotEmpty && line.extra['lineTotal']!.text.trim().isEmpty))
-        Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
-          const Text('Item amounts not entered', style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-          TextButton(key: const Key('purchase-review-edit-amounts'), onPressed: _reviewItemAmounts,
-            child: const Text('Review items')),
-        ]),
-      const Text('Pinch to zoom · drag to read',style:TextStyle(fontSize:11,color:_paperMuted)),
       _invoiceViewer('purchase-review-zoom', viewportHeight, (width) {
+        final content = Column(crossAxisAlignment:CrossAxisAlignment.stretch,
+          children: [for (final part in paperParts) if (width >= 600 || part is! Expanded) part]);
         final paper = SizedBox(width:width,child:DecoratedBox(key:const Key('purchase-review-paper'),
           decoration:const BoxDecoration(color:Colors.white,border:Border.fromBorderSide(rule),
             boxShadow:[BoxShadow(color:Color(0x22000000),blurRadius:8,offset:Offset(0,3))]),
-          child:ConstrainedBox(constraints:const BoxConstraints(minHeight:1075),
-            child:IntrinsicHeight(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:paperParts)))));
+          child: width < 600 ? content : ConstrainedBox(constraints:const BoxConstraints(minHeight:1075),
+            child:IntrinsicHeight(child:content))));
         return paper;
       }),
       if (_recordedNotice != null) Padding(padding: const EdgeInsets.only(top: 6),
