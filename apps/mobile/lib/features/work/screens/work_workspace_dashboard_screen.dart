@@ -12486,9 +12486,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         if (suggestions.fields.isEmpty && suggestions.goods.isEmpty && suggestions.additionalFields.isEmpty) {
           _notice = 'No clear bill details found. Your entries are kept; enter details manually.';
         } else {
-          _notice = retained
-            ? 'Extra details are ready for review. Fill blank fields, then check the bill. Your entries are kept.'
-            : 'Check the text read from the bill. Enter missing details or match the items; the original is kept.';
+          _notice = 'Check the bill details, then tap Fill blank fields. '
+            '${suggestions.goods.isEmpty ? 'Items were not identified; enter them from your bill.'
+              : 'Match the items to Stock before saving.'}'
+            '${retained ? '' : ' Extra details need checking against the supplier copy.'}';
+          if (suggestions.goods.isEmpty) _expandedSections.add('work-purchase-items-section');
         }
       }); }
     } on Object catch (e) {
@@ -12537,9 +12539,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       'supplierAddress': _address, 'supplierPhone': _phone,
       'invoiceReference': _reference, 'invoiceDate': _date, ..._details};
     setState(() {
+      var filled = 0;
       for (final e in suggestions.fields.entries) {
         final target = targets[e.key];
-        if (target != null && target.text.trim().isEmpty) target.text = e.value;
+        if (target != null && target.text.trim().isEmpty) {
+          target.text = e.value;
+          filled++;
+        }
       }
       // Goods are never merged into entered lines or automatically linked to an inventory ID.
       final useGoods = _goods.length == 1 && _goods.single.fields.values.every((v) => v.isEmpty) &&
@@ -12551,9 +12557,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final keptAll = _retainDetectedExtras(a, suggestions, useGoods: useGoods);
       _error = null;
       _openSuggestedSections(suggestions);
-      _notice = keptAll
-        ? 'Check the filled details against your bill, correct anything needed, then save. Your earlier entries were kept.'
-        : 'Enter any missing details or match the items. The text read from the bill and the original are kept; check them before saving.';
+      _notice = '${filled > 0 ? 'Blank fields filled.' : 'Scanned details are ready for review.'} '
+        'Earlier entries kept. '
+        '${suggestions.goods.isEmpty ? 'Items were not identified; enter them from your bill.'
+          : useGoods ? 'Match scanned items to Stock before saving.'
+          : 'Your item rows were kept; enter any missing items from the bill.'}'
+        '${keptAll ? '' : ' Extra details need checking against the supplier copy.'}';
+      if (suggestions.goods.isEmpty) _expandedSections.add('work-purchase-items-section');
     });
   }
   void _openSuggestedSections(WorkPurchaseInvoiceSuggestions suggestions) {

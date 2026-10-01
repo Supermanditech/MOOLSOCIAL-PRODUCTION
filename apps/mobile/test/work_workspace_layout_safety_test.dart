@@ -273,8 +273,11 @@ class _PurchaseOriginalSaveFixture extends FilePickerPlatform {
   }
 }
 class _PurchaseScanReviewFixture extends WorkPurchaseInvoiceCapture {
-  _PurchaseScanReviewFixture(this.bytes) : super(currentScope: () => null);
+  _PurchaseScanReviewFixture(this.bytes, {this.text = 'Invoice no: OCR-123\nWarranty: Two years\n'
+      'Item | Qty | Rate | Supplier code\nDetected item | 1 | 40 | SUP-01'})
+      : super(currentScope: () => null);
   final Uint8List bytes;
+  final String text;
   bool fail = false;
   @override
   Future<Uint8List> read((String, String, bool) scope, String draftId,
@@ -283,8 +286,7 @@ class _PurchaseScanReviewFixture extends WorkPurchaseInvoiceCapture {
   Future<WorkspacePurchaseInvoiceAttachment> scan((String, String, bool) scope,
       String draftId, WorkspacePurchaseInvoiceAttachment attachment) async {
     if (fail) throw const WorkGatewayException('Could not read this photo. Your entries are kept.');
-    return attachment.withText('Invoice no: OCR-123\nWarranty: Two years\n'
-      'Item | Qty | Rate | Supplier code\nDetected item | 1 | 40 | SUP-01');
+    return attachment.withText(text);
   }
 }
 
@@ -5207,7 +5209,7 @@ void main() {
       await tap('work-purchase-read-$digest');
       final extra=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Details on bill');
       expect(extra,findsNWidgets(2),reason:'Invoice and unassigned item extras appear immediately, before acceptance.');
-      expect(find.text('Check the text read from the bill. Enter missing details or match the items; the original is kept.'), findsOneWidget);
+      expect(find.textContaining('Check the bill details, then tap Fill blank fields.'), findsOneWidget);
       expect(tester.widget<TextField>(extra.first).controller!.text,'Two years');
       expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text,'MANUAL-KEPT');
       await revealPurchaseInput(tester,extra.first); await tester.enterText(extra.first,'Retailer correction');
@@ -5215,6 +5217,7 @@ void main() {
       expect(extra,findsNWidgets(2),reason:'Repeated reading must not create duplicate extras.');
       expect(tester.widget<TextField>(extra.first).controller!.text,'Retailer correction');
       await tap('work-purchase-use-$digest');
+      expect(find.textContaining(enteredItems ? 'Your item rows were kept' : 'Match scanned items to Stock'), findsOneWidget);
       expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-item-0'))).controller!.text,
         enteredItems ? 'Entered item' : 'Detected item');
       expect(extra,findsNWidgets(2),reason:'All captured extras stay editable regardless of matching.');
@@ -5238,6 +5241,43 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('P05-R07-C02 host-only scan explains missing items without overwriting or posting', (tester) async {
+    final bytes=(await tester.runAsync(_catalogueTestPhoto))!;
+    final capture=_PurchaseScanReviewFixture(bytes,text:'Invoice no: OCR-123\n'
+      'Invoice date: 17 Jun 2023\nTotal: Rs. 1,180.00\nWarranty: Two years');
+    final entry=_PurchaseEntryFixtureStore();
+    final work=storeViewFixture(null,_ContactDraftFixtureStore(),null,null,null,null,null,null,null,entry,capture);
+    final scope=work.workspaceSupplierScope!;
+    final at=DateTime.utc(2026,9,30), digest='d'*64;
+    entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,
+      profiles:[WorkspaceSupplierProfile(id:'supplier-fixture',name:'Entered supplier',createdAt:at,updatedAt:at)],
+      draft:WorkspacePurchaseEntryDraft(id:'draft-fixture',supplierId:'supplier-fixture',
+        invoiceReference:'MANUAL-KEPT',invoiceDate:'',createdAt:at,updatedAt:at,
+        goods:[{'productId':'','name':'','pack':'','quantity':'','cost':''}],
+        attachments:[WorkspacePurchaseInvoiceAttachment(owner:jsonEncode([scope.$1,scope.$2,scope.$3,'draft-fixture']),
+          digest:digest,fileName:'Host-only no-item scan.png',contentType:'image/png',
+          byteLength:bytes.length,source:'upload')]));
+    await mount(tester,route:'/app/work/workspace/dashboard',work:work);
+    await openPurchaseList(tester); await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await usePurchaseControl(tester,'work-purchase-document-$digest');
+    await usePurchaseControl(tester,'work-purchase-read-$digest');
+    expect(find.textContaining('Items were not identified; enter them from your bill.'),findsOneWidget);
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-date'))).controller!.text,isEmpty,
+      reason:'Reading does not silently replace the explicit review and acceptance action.');
+    await usePurchaseControl(tester,'work-purchase-use-$digest');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-date'))).controller!.text,'17/06/2023');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-invoiceTotal'))).controller!.text,'1180.00');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text,'MANUAL-KEPT');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-item-0'))).controller!.text,isEmpty);
+    expect(find.textContaining('Items were not identified; enter them from your bill.'),findsOneWidget);
+    expect(entry.value!.revision,1);
+    expect(entry.value!.draft!.invoiceDate,isEmpty,reason:'Review is not a saved purchase, stock receipt or payment.');
+    expect(entry.value!.draft!.additionalFields,isEmpty);
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('P05 OCR fixture fills empty fields only and preserves entered product identity', (tester) async {
     final entry = _PurchaseEntryFixtureStore();

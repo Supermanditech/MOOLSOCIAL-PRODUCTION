@@ -1482,8 +1482,76 @@ class WorkPurchaseInvoiceSuggestions {
   final List<Map<String, String>> goods;
   final List<WorkspacePurchaseAdditionalField> additionalFields;
   final bool additionalOverflow;
+  static String _label(String value) => value.trim().toLowerCase()
+    .replaceAll(RegExp(r'\.(?!\d)'), '').replaceAll(RegExp(r'\s*/\s*'), '/')
+    .replaceAll(RegExp(r'\s*₹\s*$'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  // Normalize explicit printed tokens only; never infer totals or round source amounts.
+  static String? _number(String input, {bool negative = false,
+      bool quantity = false, bool rate = false}) {
+    var value = input.trim();
+    if (!quantity && !rate) {
+      value = value.replaceFirst(RegExp(r'^(?:₹\s*|INR\s+|Rs\.?\s*)',
+        caseSensitive: false), '').trim();
+      if (value.endsWith('/-')) value = value.substring(0, value.length - 2).trim();
+    }
+    if (rate && value.endsWith('%')) value = value.substring(0, value.length - 1).trim();
+    if (value.contains(',')) {
+      if (value.split('.').skip(1).any((fraction) => fraction.contains(','))) return null;
+      final whole = value.replaceFirst(RegExp(r'^-'), '').split('.').first;
+      if (!RegExp(r'^[1-9]\d{0,2}(,\d{3})+$').hasMatch(whole) &&
+          !RegExp(r'^[1-9]\d?(,\d{2})*,\d{3}$').hasMatch(whole)) {
+        return null;
+      }
+      value = value.replaceAll(',', '');
+    }
+    final pattern = quantity ? RegExp(r'^-?\d+(?:\.\d{1,6})?$')
+      : rate ? RegExp(r'^-?\d+(?:\.\d{1,4})?$') : RegExp(r'^-?\d+(?:\.\d{1,2})?$');
+    final number = double.tryParse(value);
+    if (!pattern.hasMatch(value) || number == null || !number.isFinite ||
+        number.abs() > 999999999999 || (!negative && number < 0) ||
+        (rate && number > 100)) {
+      return null;
+    }
+    return value;
+  }
+  static String? _date(String input) {
+    final numeric = RegExp(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$').firstMatch(input);
+    final iso = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(input);
+    final named = RegExp(r'^(\d{1,2})[\s-]+([a-z]+)[,\s-]+(\d{4})$',
+      caseSensitive: false).firstMatch(input);
+    const months = {'jan':1,'january':1,'feb':2,'february':2,'mar':3,'march':3,
+      'apr':4,'april':4,'may':5,'jun':6,'june':6,'jul':7,'july':7,'aug':8,'august':8,
+      'sep':9,'sept':9,'september':9,'oct':10,'october':10,'nov':11,'november':11,
+      'dec':12,'december':12};
+    final day = numeric != null ? int.parse(numeric[1]!) : iso != null
+      ? int.parse(iso[3]!) : named != null ? int.parse(named[1]!) : null;
+    final month = numeric != null ? int.parse(numeric[2]!) : iso != null
+      ? int.parse(iso[2]!) : named != null ? months[named[2]!.toLowerCase()] : null;
+    final year = numeric != null ? int.parse(numeric[3]!) : iso != null
+      ? int.parse(iso[1]!) : named != null ? int.parse(named[3]!) : null;
+    if (day == null || month == null || year == null || year < 1) return null;
+    final date = DateTime(year, month, day);
+    if (date.day != day || date.month != month || date.year != year) return null;
+    return [day.toString().padLeft(2, '0'), month.toString().padLeft(2, '0'),
+      year.toString().padLeft(4, '0')].join('/');
+  }
   static WorkPurchaseInvoiceSuggestions parse(String text) {
     const labels = {'supplier': 'supplierName', 'sold by': 'supplierName',
+      'supplier name':'supplierName', 'billed by':'supplierName', 'seller':'supplierName',
+      'seller name':'supplierName', 'seller address':'supplierAddress',
+      'billed to':'buyerName', 'bill to':'buyerName', 'customer details':'buyerName',
+      'customer name':'buyerName', 'billing address':'buyerAddress',
+      'shipping address':'deliveryAddress', 'customer phone':'buyerPhone',
+      'customer email':'buyerEmail', 'customer gstin':'buyerGstin', 'seller gstin':'supplierGstin',
+      'supplier invoice no':'invoiceReference', 'supplier invoice number':'invoiceReference',
+      'invoice no#':'invoiceReference', 'bill number':'invoiceReference',
+      'due date':'dueDate', 'pay by date':'dueDate', 'taxable amount':'taxableValue',
+      'sub total':'supplyValue', 'subtotal':'supplyValue', 'gst':'totalTax',
+      'total':'invoiceTotal', 'round off':'roundOff', 'roundoff':'roundOff',
+      'discount':'billDiscount', 'freight':'freight', 'other charges':'otherCharges',
+      'bank':'bankName', 'account #':'bankAccount', 'account no':'bankAccount',
+      'branch':'bankBranch', 'upi number':'upiId', 'terms and conditions':'terms',
+      'terms & conditions':'terms', 'notes':'notes', 'amount paid':'printedPaymentMark',
       'supplier address':'supplierAddress', 'supplier phone':'supplierPhone',
       'supplier email':'supplierEmail', 'buyer phone':'buyerPhone', 'buyer email':'buyerEmail',
       'purchase order no':'poReference', 'po number':'poReference', 'copy label':'documentCopy',
@@ -1504,7 +1572,7 @@ class WorkPurchaseInvoiceSuggestions {
       'bill no': 'invoiceReference', 'invoice date': 'invoiceDate', 'bill date': 'invoiceDate',
       'place of supply': 'placeOfSupply', 'taxable value': 'taxableValue',
       'goods value':'supplyValue', 'cgst': 'cgst', 'sgst': 'sgstAmount', 'utgst':'utgst',
-      'sgst / utgst':'sgst', 'igst': 'igst', 'cess': 'cess',
+      'sgst/utgst':'sgst', 'igst': 'igst', 'cess': 'cess',
       'irn':'irn', 'ack no':'ackNumber', 'acknowledgement number':'ackNumber',
       'ack date':'ackDate', 'acknowledgement date':'ackDate',
       'grand total': 'invoiceTotal', 'invoice total': 'invoiceTotal'};
@@ -1525,39 +1593,77 @@ class WorkPurchaseInvoiceSuggestions {
         label: label, value: value, section: section, itemIndex: itemIndex));
     }
     final rows = text.split(RegExp(r'\r?\n'));
+    String? party;
+    void candidate(String key, String value, String label, String rawValue) {
+      (candidates[key] ??= {}).add(value);
+      (originalCandidates[key] ??= []).add((label, rawValue));
+    }
     for (final row in rows) {
+      final heading = _label(row).replaceFirst(RegExp(r':$'), '');
+      final partyHeading = const ['supplier details','seller details','billed by'].contains(heading)
+        ? 'supplier' : const ['buyer details','customer details','billed to','bill to'].contains(heading)
+        ? 'buyer' : null;
+      if (partyHeading != null) party = partyHeading;
+      if (const ['tax invoice','bill of supply'].contains(heading)) {
+        candidate('documentTitle', row.trim(), 'Document title', row.trim());
+      }
       final match = RegExp(r'^\s*([^:]+?)\s*:\s*(.+?)\s*$').firstMatch(row);
-      if (match == null) continue;
-      final key = labels[match[1]!.trim().toLowerCase().replaceAll('.', '')];
-      final value = match[2]!.trim();
+      if (match == null) {
+        if (heading.isNotEmpty && partyHeading == null) party = null;
+        continue;
+      }
+      final originalLabel = match[1]!.trim(), originalValue = match[2]!.trim();
+      final normalizedLabel = _label(originalLabel);
+      final rateLabel = RegExp(r'^(cgst|sgst|utgst|igst|gst|cess)\s*(?:@|at)\s*(\d+(?:\.\d+)?)\s*%$')
+        .firstMatch(normalizedLabel);
+      var key = labels[rateLabel?[1] ?? normalizedLabel];
+      if (key == null && party != null) {
+        key = switch (normalizedLabel) {
+          'gstin' => party == 'supplier' ? 'supplierGstin' : 'buyerGstin',
+          'mobile' || 'mobile / phone' || 'mobile/phone' || 'phone' || 'ph' =>
+            party == 'supplier' ? 'supplierPhone' : 'buyerPhone',
+          'email' => party == 'supplier' ? 'supplierEmail' : 'buyerEmail',
+          'address' => party == 'supplier' ? 'supplierAddress' : 'buyerAddress',
+          _ => null,
+        };
+      }
+      var value = originalValue;
       if (key == null || value.length > (key == 'terms' ? 4000 :
           const ['shippingTerms', 'paymentTerms', 'amountInWords'].contains(key) ||
-          key.endsWith('Address') ? 500 : 120)) { keepRaw(match[1]!.trim(), value); continue; }
+          key.endsWith('Address') ? 500 : 120)) { party = null; keepRaw(match[1]!.trim(), value); continue; }
       if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) {
-        keepRaw(match[1]!.trim(), value); continue;
+        party = null; keepRaw(match[1]!.trim(), value); continue;
       }
+      party = key.startsWith('supplier') ? 'supplier' : key.startsWith('buyer') ? 'buyer' : null;
       if (key == 'irn' && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) {
         keepRaw(match[1]!.trim(), value); continue;
       }
       if (const {'supplyValue', 'taxableValue', 'cgst', 'sgstAmount', 'sgst', 'utgst',
-          'igst', 'cess', 'invoiceTotal', 'totalTax', 'amountPayable'}.contains(key)) {
-        final amount = double.tryParse(value);
-        if (amount == null || !amount.isFinite || amount < 0) {
+          'igst', 'cess', 'invoiceTotal', 'totalTax', 'amountPayable', 'roundOff',
+          'billDiscount', 'freight', 'otherCharges'}.contains(key)) {
+        final amount = _number(value, negative: key == 'roundOff');
+        if (amount == null) {
           keepRaw(match[1]!.trim(), value); continue;
+        }
+        value = amount;
+        const printedRates = {'cgst':'printedCgstRate','sgst':'printedSgstRate',
+          'utgst':'printedUtgstRate','igst':'printedIgstRate','gst':'printedTaxRate'};
+        if (rateLabel != null && printedRates.containsKey(rateLabel[1])) {
+          final rate = _number(rateLabel[2]!, rate: true);
+          if (rate != null) candidate(printedRates[rateLabel[1]]!, rate, originalLabel, originalValue);
         }
       }
-      if (key == 'invoiceDate' || key == 'ackDate' || key == 'expectedDeliveryDate') {
-        if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value)) {
+      if (const ['invoiceDate','ackDate','expectedDeliveryDate','dueDate'].contains(key)) {
+        final date = _date(value);
+        if (date == null) {
           keepRaw(match[1]!.trim(), value); continue;
         }
-        final parts = value.split('/').map(int.parse).toList();
-        final date = DateTime(parts[2], parts[1], parts[0]);
-        if (date.year != parts[2] || date.month != parts[1] || date.day != parts[0]) {
-          keepRaw(match[1]!.trim(), value); continue;
+        if (key == 'invoiceDate' && date != value) {
+          candidate('originalInvoiceDate', value, 'Original invoice date', value);
         }
+        value = date;
       }
-      (candidates[key] ??= {}).add(value);
-      (originalCandidates[key] ??= []).add((match[1]!.trim(), value));
+      candidate(key, value, originalLabel, originalValue);
     }
     final fields = {for (final e in candidates.entries) if (e.value.length == 1) e.key: e.value.single};
     for (final e in candidates.entries.where((e) => e.value.length > 1)) {
@@ -1566,7 +1672,8 @@ class WorkPurchaseInvoiceSuggestions {
     // Only explicit tab/pipe tables: guessing whitespace columns risks price/quantity swaps.
     final goods = <Map<String, String>>[];
     List<String>? headers, originalHeaders;
-    const columns = {'description':'name', 'item':'name', 'product':'name', 'services':'name', 'qty':'quantity',
+    const columns = {'description':'name', 'item/description':'name', 'description of goods':'name',
+      'item':'name', 'product':'name', 'services':'name', 'qty':'quantity',
       'quantity':'quantity', 'rate':'cost', 'cost':'cost', 'unit':'pack', 'hsn':'hsn',
       'units':'pack', 'hsn/sac':'hsn', 'specifications':'specifications', 'model':'specifications',
       'tax amount':'taxAmount', 'rate/item':'cost', 's no':'printedSerial', '#':'printedSerial',
@@ -1580,7 +1687,7 @@ class WorkPurchaseInvoiceSuggestions {
     for (final row in rows) {
       if (!row.contains('|') && !row.contains('\t')) { headers = null; originalHeaders = null; continue; }
       final cells = row.split(RegExp(r'\||\t')).map((c) => c.trim()).toList();
-      final mapped = cells.map((c) => columns[c.toLowerCase()] ?? '').toList();
+      final mapped = cells.map((c) => columns[_label(c)] ?? '').toList();
       if (mapped.contains('name') && mapped.contains('quantity') && mapped.contains('cost')) {
         final known = mapped.where((key) => key.isNotEmpty).toList();
         headers = known.toSet().length == known.length ? mapped : null;
@@ -1601,17 +1708,21 @@ class WorkPurchaseInvoiceSuggestions {
           'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate', 'cess', 'lineTotal', 'taxAmount']) {
         final value = line[key];
         if (value == null || value.isEmpty) continue;
-        final number = double.tryParse(value);
-        if (number == null || !number.isFinite || number < 0) {
+        final number = _number(value, rate: key.endsWith('Rate'));
+        if (number == null) {
           final columnIndex = rowHeaders.indexOf(key);
           extraCells.add((originalHeaders![columnIndex], value));
           line.remove(key);
-        }
+        } else { line[key] = number; }
       }
+      final quantityText = _number(line['quantity']!, quantity: true);
+      final costText = _number(line['cost']!);
+      if (quantityText != null) line['quantity'] = quantityText;
+      if (costText != null) line['cost'] = costText;
       final quantity = double.tryParse(line['quantity']!);
       final cost = double.tryParse(line['cost']!);
-      if (line['name']!.isNotEmpty && quantity != null && quantity.isFinite && quantity > 0 &&
-          cost != null && cost.isFinite && cost >= 0 && goods.length < 200) {
+      if (line['name']!.isNotEmpty && quantityText != null && costText != null &&
+          quantity != null && quantity > 0 && cost != null && cost >= 0 && goods.length < 200) {
         for (final cell in extraCells) {
           keepRaw(cell.$1, cell.$2, section: 'items', itemIndex: goods.length);
         }

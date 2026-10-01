@@ -804,11 +804,11 @@ void main() {
     final parsed = WorkPurchaseInvoiceSuggestions.parse('Warranty: Two years\n'
       'Invoice date: 17 Jun 2023\nInvoice total: ₹ 9,52,399.00\n'
       'Item | Qty | Rate | Serial / IMEI | Tax amount\nPhone | 1 | 40 | 00123 | 7.20 (18%)');
-    expect(parsed.fields.containsKey('invoiceDate'), false);
-    expect(parsed.fields.containsKey('invoiceTotal'), false);
+    expect(parsed.fields['invoiceDate'], '17/06/2023');
+    expect(parsed.fields['originalInvoiceDate'], '17 Jun 2023');
+    expect(parsed.fields['invoiceTotal'], '952399.00');
     expect(parsed.additionalFields.map((f) => (f.label, f.value, f.itemIndex)), containsAll([
-      ('Warranty', 'Two years', null), ('Invoice date', '17 Jun 2023', null),
-      ('Invoice total', '₹ 9,52,399.00', null), ('Serial / IMEI', '00123', 0),
+      ('Warranty', 'Two years', null), ('Serial / IMEI', '00123', 0),
       ('Tax amount', '7.20 (18%)', 0)]));
     expect(parsed.additionalFields.every((f) => !f.reviewed), true);
     expect(parsed.goods.single['productId'], isEmpty);
@@ -929,6 +929,105 @@ void main() {
     expect(uncertain.goods.single.containsKey('sgstRate'), isFalse);
     expect(uncertain.goods.single.containsKey('sgst'), isFalse);
     expect(uncertain.goods.single['lineTotal'], '80');
+  });
+
+  test('P05-R07-C02 host-only invoice labels Indian amounts and printed dates', () {
+    final parsed = WorkPurchaseInvoiceSuggestions.parse('TAX INVOICE\n'
+      'Billed by: Evaluation supplier\nMobile: 9999999999\nEmail: supplier@example.test\n'
+      'GSTIN: 27AAAAA0000A1Z5\nInvoice #: EVAL-123\nInvoice Date: 17 Jun 2023\n'
+      'Due Date: 17 July 2023\nCustomer Details: Evaluation buyer\nPh: 8888888888\n'
+      'Billing address: Printed billing address\nShipping address: Printed shipping address\n'
+      'Taxable Amount: ₹8,07,117.80\nIGST @ 18.0%: INR 1,45,281.20\n'
+      'Total: ₹9,52,399.00\nRound Off: -0.50\nBank: Evaluation bank\n'
+      'Account #: 0012345\nUPI Number: evaluation@upi\nAmount Paid: Yes');
+    expect(parsed.fields['supplierName'], 'Evaluation supplier');
+    expect(parsed.fields['supplierPhone'], '9999999999');
+    expect(parsed.fields['supplierEmail'], 'supplier@example.test');
+    expect(parsed.fields['supplierGstin'], '27AAAAA0000A1Z5');
+    expect(parsed.fields['invoiceReference'], 'EVAL-123');
+    expect(parsed.fields['invoiceDate'], '17/06/2023');
+    expect(parsed.fields['originalInvoiceDate'], '17 Jun 2023');
+    expect(parsed.fields['dueDate'], '17/07/2023');
+    expect(parsed.fields['buyerName'], 'Evaluation buyer');
+    expect(parsed.fields['buyerPhone'], '8888888888');
+    expect(parsed.fields['buyerAddress'], 'Printed billing address');
+    expect(parsed.fields['deliveryAddress'], 'Printed shipping address');
+    expect(parsed.fields['taxableValue'], '807117.80');
+    expect(parsed.fields['igst'], '145281.20');
+    expect(parsed.fields['printedIgstRate'], '18.0');
+    expect(parsed.fields['invoiceTotal'], '952399.00');
+    expect(parsed.fields['roundOff'], '-0.50');
+    expect(parsed.fields['bankAccount'], '0012345');
+    expect(parsed.fields['upiId'], 'evaluation@upi');
+    expect(parsed.fields['printedPaymentMark'], 'Yes');
+    for (final key in ['paidAmount','paymentStatus','paymentMethod','receiptStatus']) {
+      expect(parsed.fields.containsKey(key), false, reason: 'Printed bill is not a POS confirmation.');
+    }
+  });
+  test('P05-R07-C02 host-only row amounts rate percentages and exact identity', () {
+    final parsed = WorkPurchaseInvoiceSuggestions.parse('Billed To: Evaluation buyer\n'
+      'CGST @ 0.125 %: Rs. 81.25\nSGST @ 0.125%: 81.25\nGST @ 0.25%: 162.50\n'
+      'Invoice date: 2026-05-13\n'
+      'S No. | Item / description | Qty | Rate / Item ₹ | Units | HSN / SAC | GST % | Taxable Value ₹ | Amount ₹\n'
+      '001 | Evaluation item | 2.5 | ₹1,250.00 | kg | 001143 | 0.25% | Rs. 3,125.00 | INR 3,132.81');
+    expect(parsed.fields['printedCgstRate'], '0.125');
+    expect(parsed.fields['printedSgstRate'], '0.125');
+    expect(parsed.fields['printedTaxRate'], '0.25');
+    expect(parsed.fields['totalTax'], '162.50');
+    expect(parsed.fields['invoiceDate'], '13/05/2026');
+    expect(parsed.goods.single, containsPair('printedSerial', '001'));
+    expect(parsed.goods.single, containsPair('hsn', '001143'));
+    expect(parsed.goods.single, containsPair('cost', '1250.00'));
+    expect(parsed.goods.single, containsPair('quantity', '2.5'));
+    expect(parsed.goods.single, containsPair('gstRate', '0.25'));
+    expect(parsed.goods.single, containsPair('lineTotal', '3132.81'));
+    expect(parsed.goods.single['productId'], isEmpty);
+  });
+  test('P05-R07-C02 host-only malformed numbers and unlabelled geometry stay uncertain', () {
+    for (final value in ['1,2,3.00','₹NaN','INR 1e4','1.234','-12','100 + 18%','12%','Infinity']) {
+      final parsed = WorkPurchaseInvoiceSuggestions.parse('Invoice total: $value');
+      expect(parsed.fields.containsKey('invoiceTotal'), false, reason: value);
+      expect(parsed.additionalFields.map((field) => field.value), contains(value));
+    }
+    for (final value in ['31 Feb 2026','2026-02-29','17 Unknown 2026']) {
+      final parsed = WorkPurchaseInvoiceSuggestions.parse('Invoice date: $value');
+      expect(parsed.fields.containsKey('invoiceDate'), false, reason: value);
+      expect(parsed.additionalFields.map((field) => field.value), contains(value));
+    }
+    expect(WorkPurchaseInvoiceSuggestions.parse('Invoice date: 29 February 2024').fields['invoiceDate'], '29/02/2024');
+    final parsed = WorkPurchaseInvoiceSuggestions.parse('Warranty: Two years\n'
+      'Invoice total: 100\nTotal: 200\nItem Qty Rate\nRice 2 40');
+    expect(parsed.fields.containsKey('invoiceTotal'), false);
+    expect(parsed.goods, isEmpty, reason: 'No invented column assignments from flattened words.');
+    expect(parsed.additionalFields.map((field) => (field.label, field.value)), containsAll([
+      ('Warranty','Two years'),('Invoice total','100'),('Total','200')]));
+  });
+  test('P05-R07-C03 host-only fractional commas never change amounts', () {
+    for (final value in ['1,234.5,6', '1,234.56,', '1,234.,56']) {
+      final parsed=WorkPurchaseInvoiceSuggestions.parse('Total: $value');
+      expect(parsed.fields.containsKey('invoiceTotal'),false,reason:value);
+      expect(parsed.additionalFields.single.value,value);
+      final goods=WorkPurchaseInvoiceSuggestions.parse('Item | Qty | Rate\nRice | $value | 40');
+      expect(goods.goods,isEmpty,reason:'Malformed quantity is not a candidate item.');
+    }
+    expect(WorkPurchaseInvoiceSuggestions.parse('Total: 1,234.56').fields['invoiceTotal'],'1234.56');
+    expect(WorkPurchaseInvoiceSuggestions.parse('Total: 1,23,456.78').fields['invoiceTotal'],'123456.78');
+  });
+  test('P05-R07-C04 host-only party context ends at unrelated or invalid details', () {
+    for(final text in ['Supplier: Acme\nBank details\nAddress: 10 Bank Road\nEmail: bank@example.test',
+        'Billed to: Buyer\nShipping address: Delivery road\nPhone: 9999999999',
+        'Supplier GSTIN: invalid\nMobile: 8888888888']) {
+      final parsed=WorkPurchaseInvoiceSuggestions.parse(text);
+      for(final key in ['supplierAddress','supplierEmail','buyerPhone','supplierPhone']) {
+        expect(parsed.fields.containsKey(key),false,reason:text);
+      }
+      expect(parsed.additionalFields,isNotEmpty,reason:'Ambiguous contacts remain source extras.');
+    }
+    final accepted=WorkPurchaseInvoiceSuggestions.parse('Supplier details\nAddress: Warehouse road\n\nPhone: 8888888888\n'
+      'Customer details\nPhone: 9999999999');
+    expect(accepted.fields['supplierAddress'],'Warehouse road');
+    expect(accepted.fields['supplierPhone'],'8888888888');
+    expect(accepted.fields['buyerPhone'],'9999999999');
   });
 
   test('P05 OCR labelled suggestions reject ambiguity invalid dates and unsafe rows', () {
