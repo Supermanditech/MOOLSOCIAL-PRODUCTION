@@ -29,6 +29,7 @@ import '../widgets/store_product_thumbnail.dart';
 import '../widgets/store_catalogue_categories.dart';
 import '../work_models.dart';
 import '../work_invoice_pdf.dart';
+import '../work_document_preview.dart';
 import '../work_stock_export.dart';
 import 'work_invoice_pdf_screen.dart';
 import 'store_add_product_sheet.dart';
@@ -11390,7 +11391,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   static const _taxComponentLabels = {'cgst': 'CGST ₹', 'sgstAmount': 'SGST ₹',
     'utgst': 'UTGST ₹', 'igst': 'IGST ₹', 'cess': 'Cess ₹'};
   final _reviewAnchor = GlobalKey();
+  final _sourceViewport = GlobalKey();
   final _previewZoom = TransformationController();
+  WorkspacePurchaseInvoiceAttachment? _sourceAttachment;
+  Uint8List? _sourceBytes;
+  WorkPdfPage? _sourcePage;
+  WorkPdfPreview _sourcePdf = WorkPdfPreview();
+  int _sourceEpoch = 0;
+  bool _sourceLoading = false, _sourceSaving = false;
+  String? _sourceError, _sourceNotice;
   final _name = TextEditingController(), _phone = TextEditingController(),
       _address = TextEditingController(), _gstin = TextEditingController(),
       _reference = TextEditingController(), _date = TextEditingController();
@@ -11584,6 +11593,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     for (final c in _details.values) { c.dispose(); }
     _supplierFocus.dispose();
     _previewZoom.dispose();
+    _sourceEpoch++;
+    _sourcePdf.dispose();
     for (final line in _goods) { line.dispose(); }
     for (final field in _additional) { field.dispose(); }
     for (final row in _taxRows) { for (final c in row.values) { c.dispose(); } }
@@ -11832,10 +11843,158 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   Widget _taxComponents() => _section('GST amounts on invoice', 'work-purchase-other-tax-amounts', [
     _compactFields([for (final e in _taxComponentLabels.entries) _detail(e.value, e.key, number: true)]),
   ]);
-  void _previewPurchase() {
+  void _closeSource() {
+    _sourceEpoch++;
+    _sourcePdf.dispose();
+    _sourcePdf = WorkPdfPreview();
+    _sourceAttachment = null;
+    _sourceBytes = null;
+    _sourcePage = null;
+    _sourceLoading = false;
+    _sourceError = _sourceNotice = null;
+  }
+  bool _sourceCurrent(int epoch) => mounted && _current && epoch == _sourceEpoch &&
+    _attachments.any((a) => a.digest == _sourceAttachment?.digest);
+  Future<void> _openSource(WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (_busy || _sourceSaving || !_current || _scope == null) return;
+    _closeSource();
+    final epoch = _sourceEpoch;
+    setState(() { _sourceAttachment = attachment; _sourceLoading = true; });
+    _previewPurchase(recorded: false);
+    try {
+      final bytes = await widget.session.workspacePurchaseInvoiceCapture.read(_scope!, _draftId, attachment);
+      if (!_sourceCurrent(epoch)) return;
+      _sourceBytes = bytes;
+      if (attachment.contentType == 'application/pdf') {
+        final page = await _sourcePdf.render(bytes, page: 0);
+        if (!_sourceCurrent(epoch)) return;
+        _sourcePage = page;
+      }
+    } on WorkGatewayException catch (error) {
+      if (_sourceCurrent(epoch)) _sourceError = error.message;
+    } on WorkPdfPreviewException catch (error) {
+      if (_sourceCurrent(epoch)) { _sourceError = error.message; }
+    } on Object {
+      if (_sourceCurrent(epoch)) _sourceError = 'Cannot open the original invoice. Retry, or attach the original again.';
+    } finally {
+      if (_sourceCurrent(epoch)) {
+        setState(() => _sourceLoading = false);
+        _positionReview();
+      }
+    }
+  }
+  Future<void> _sourceTurnPage(int index) async {
+    if (_sourceLoading || _sourceBytes == null || _sourcePage == null ||
+        index < 0 || index >= _sourcePage!.pageCount) { return; }
+    final epoch = _sourceEpoch;
+    if (!_sourceCurrent(epoch)) return;
+    setState(() { _sourceLoading = true; _sourceError = null; });
+    try {
+      final page = await _sourcePdf.render(_sourceBytes!, page: index);
+      if (_sourceCurrent(epoch)) {
+        _previewZoom.value = Matrix4.identity();
+        _sourcePage = page;
+      }
+    } on WorkPdfPreviewException catch (error) {
+      if (_sourceCurrent(epoch)) { _sourceError = error.message; }
+    } finally {
+      if (_sourceCurrent(epoch)) setState(() => _sourceLoading = false);
+    }
+  }
+  Future<void> _downloadSource() async {
+    final attachment = _sourceAttachment;
+    final epoch = _sourceEpoch;
+    if (_sourceSaving || attachment == null || !_sourceCurrent(epoch) || _scope == null) return;
+    setState(() { _sourceSaving = true; _sourceNotice = _sourceError = null; });
+    try {
+      // Recheck the saved source's ownership, length and hash before handing its
+      // unchanged bytes to the existing system save picker, never a page image.
+      final bytes = await widget.session.workspacePurchaseInvoiceCapture.read(_scope!, _draftId, attachment);
+      if (!_sourceCurrent(epoch)) return;
+      final extension = switch (attachment.contentType) {
+        'application/pdf' => 'pdf', 'image/png' => 'png',
+        'image/jpeg' => 'jpg', 'image/webp' => 'webp', _ => throw StateError('Unsupported original'),
+      };
+      final result = await FilePicker.saveFile(dialogTitle: 'Save original supplier invoice',
+        fileName: 'purchase-original-${attachment.digest.substring(0, 16)}.$extension',
+        mimeType: attachment.contentType, type: FileType.custom, allowedExtensions: [extension], bytes: bytes);
+      if (_sourceCurrent(epoch)) {
+        _sourceNotice = result == null
+          ? 'Download cancelled. Your original is kept.' : 'Original invoice saved.';
+      }
+    } on WorkGatewayException catch (error) {
+      if (_sourceCurrent(epoch)) { _sourceError = error.message; }
+    } on Object {
+      if (_sourceCurrent(epoch)) _sourceError = 'Could not save the original. Your copy is kept; retry.';
+    } finally {
+      if (mounted) setState(() => _sourceSaving = false);
+    }
+  }
+  List<Widget> _reviewOriginal(double viewportHeight) {
+    final attachment = _sourceAttachment!;
+    final image = attachment.contentType == 'application/pdf' ? _sourcePage?.bytes : _sourceBytes;
+    return [Column(key: const Key('purchase-original-view'),
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Original supplier invoice', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _paperInk)),
+        Text(attachment.fileName, style: const TextStyle(fontSize: 12, color: _paperInk)),
+        const Text('Your entries do not change this original attachment.', style: TextStyle(fontSize: 11, color: _paperMuted)),
+        Wrap(spacing: 8, children: [
+          TextButton.icon(key: const Key('purchase-original-download'),
+            onPressed: _sourceSaving ? null : _downloadSource,
+            icon: const Icon(Icons.download_outlined, size: 18),
+            label: Text(_sourceSaving ? 'Saving original…' : 'Download original')),
+          TextButton(key: const Key('purchase-original-recorded'), onPressed: _sourceSaving ? null : _previewPurchase,
+            child: const Text('Recorded copy')),
+        ]),
+        if (_sourceLoading) Row(children: [const Expanded(child: Text('Opening original invoice…')),
+          TextButton(key: const Key('purchase-original-cancel'), onPressed: _previewPurchase, child: const Text('Cancel'))]),
+        if (_sourceError != null) ...[
+          Text(_sourceError!, style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
+          TextButton(key: const Key('purchase-original-retry'), onPressed: _sourceSaving ? null : () => _openSource(attachment),
+            child: const Text('Retry original')),
+        ],
+        if (_sourceNotice != null) Text(_sourceNotice!, style: const TextStyle(fontSize: 12, color: _paperInk)),
+        if (_sourcePage != null) Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+          TextButton(key: const Key('purchase-original-prev'),
+            onPressed: _sourceLoading || _sourcePage!.index == 0 ? null : () => _sourceTurnPage(_sourcePage!.index - 1),
+            child: const Text('Previous')),
+          Text('Page ${_sourcePage!.index + 1} of ${_sourcePage!.pageCount}', style: const TextStyle(fontSize: 12, color: _paperInk)),
+          TextButton(key: const Key('purchase-original-next'),
+            onPressed: _sourceLoading || _sourcePage!.index + 1 == _sourcePage!.pageCount ? null : () => _sourceTurnPage(_sourcePage!.index + 1),
+            child: const Text('Next')),
+        ]),
+        if (image != null) ...[
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+            const Text('Pinch to zoom · drag to read', style: TextStyle(fontSize: 11, color: _paperMuted)),
+            TextButton(key: const Key('purchase-original-zoom-in'), onPressed: () {
+              final box = _sourceViewport.currentContext?.findRenderObject();
+              if (box is! RenderBox) return;
+              final scale = (_previewZoom.value.getMaxScaleOnAxis() * 2).clamp(1.0, 8.0);
+              _previewZoom.value = Matrix4.diagonal3Values(scale, scale, 1)
+                ..setTranslationRaw(-box.size.width * (scale - 1) / 2,
+                  -box.size.height * (scale - 1) / 2, 0);
+            }, child: const Text('Zoom in')),
+            TextButton(key: const Key('purchase-original-fit'), onPressed: () => _previewZoom.value = Matrix4.identity(),
+              child: const Text('Fit')),
+          ]),
+          SizedBox(key: _sourceViewport, height: (viewportHeight * .4).clamp(100.0, 500.0),
+            child: ClipRect(child: InteractiveViewer(key: const Key('purchase-original-zoom'),
+              transformationController: _previewZoom, minScale: 1, maxScale: 8,
+              child: ColoredBox(color: Colors.white, child: Center(child: Image.memory(image,
+                fit: BoxFit.contain, gaplessPlayback: true, semanticLabel: 'Original supplier invoice')))))),
+        ],
+      ])];
+  }
+  void _previewPurchase({bool recorded = true}) {
     FocusScope.of(context).unfocus();
     _previewZoom.value = Matrix4.identity();
-    setState(() => _expandedSections.add('work-purchase-review-section'));
+    setState(() {
+      if (recorded) _closeSource();
+      _expandedSections.add('work-purchase-review-section');
+    });
+    _positionReview();
+  }
+  void _positionReview() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final target = _reviewAnchor.currentContext;
       if (mounted && target != null) {
@@ -12231,11 +12390,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           widget.session.workspacePurchaseInvoiceCapture.read(_scope!, _draftId, a)), builder: (context, snapshot) =>
           snapshot.hasData ? Image.memory(snapshot.data!, height: 220, fit: BoxFit.contain)
             : Text(snapshot.hasError ? 'Cannot open the invoice copy. Attach it again.' : 'Opening invoice…')),
-      Wrap(spacing: 8, children: [TextButton.icon(onPressed: () => _scan(a), icon: const Icon(Icons.document_scanner_outlined, size: 18),
+      Wrap(spacing: 8, children: [TextButton.icon(key: Key('work-purchase-view-${a.digest}'),
+        onPressed: _sourceSaving ? null : () => _openSource(a), icon: const Icon(Icons.visibility_outlined, size: 18),
+        label: const Text('View original')), TextButton.icon(onPressed: () => _scan(a), icon: const Icon(Icons.document_scanner_outlined, size: 18),
         key: Key('work-purchase-read-${a.digest}'), label: const Text('Read photo details')), TextButton(onPressed: () {
           if (_additional.any((f) => f.record.sourceDigest == a.digest)) {
             setState(() => _error = 'Extra details were read from this copy. Keep it attached, or remove those details before removing this copy.');
-          } else { setState(() => _attachments.remove(a)); }
+          } else { setState(() {
+            if (_sourceAttachment?.digest == a.digest) _closeSource();
+            _attachments.remove(a);
+          }); }
         },
         child: const Text('Remove attachment'))]),
       if (a.detectedText.isNotEmpty) ...[
@@ -12495,7 +12659,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 ]),
                 _extraFields('payment')]),
               ]),
-              _purchaseSection('Preview & review purchase', 'work-purchase-review-section', _reviewPurchase(),
+              _purchaseSection('Preview & review purchase', 'work-purchase-review-section',
+                _sourceAttachment == null ? _reviewPurchase() : _reviewOriginal(constraints.maxHeight),
                 number: 8, summary: 'Review entered details, then save draft'),
               if (_notice != null) Text(_notice!, key: const Key('work-purchase-entry-notice'),
                 style: const TextStyle(fontSize: 12, color: MoolColors.ink)),

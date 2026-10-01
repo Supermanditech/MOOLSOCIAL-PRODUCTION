@@ -104719,6 +104719,17 @@
       "prevention": "Before successor integration/build, exercise every recorded historical and current candidate evidence owner against the exact successor identity with absent optional records; require ordinary missing owners, changed identities and unknown candidate paths to fail. Admit only explicitly enumerated inherited paths. Preserve historical source/version pins and one-build controls; never copy old execution authorization, create placeholder evidence, broaden wildcard admission, rewrite failed integration history or mark device gates passed. Qualify a fresh replacement checkout and preserve the failed v4 merge.",
       "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-apk-regression-gate-state.ps1"],
       "evidence": ["artifacts/quality/counter-sale-r66-36-review-20260920/prebuild-validation.md", "artifacts/quality/counter-sale-r66-36-review-20260920/local-validation.md"]
+    },
+    {
+      "id": "REG-20261001-4633-PURCHASE-ORIGINAL-PREVIEW-LIFECYCLE",
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "implementation", "testing", "device", "evidence"],
+      "mistake": "R11 original-file Preview initially scrolled against the short loading layout; the original remained below the phone viewport. Full-screen sizing still placed its centre behind the pinned footer on a host portrait PDF. Zooming about the scene origin also shifted a centred document away. Read-only cwd errors, bounded-output truncation, two brace diagnostics and a rejected task JSON context were retained locally but not initially reconciled to this canonical register.",
+      "rootCause": "Asynchronous content height and usable form viewport differ from loading/full-screen bounds. A plain scale matrix ignores the document viewport centre. Local incident receipts are evidence, not a replacement for mandatory canonical registration. Reconnected installed runtime remained legacy until debug restart; transient UI dumps are not successful screen evidence.",
+      "prevention": "Preserve task logs and failed candidates. Reposition the existing review anchor after a current scoped load; size the original viewer from actual form constraints; zoom about its centre and expose Fit. Keep strict original-image hit testing, landscape/large-text, protected-PDF recovery, late-read cancellation, byte-preserving downloads and unmodified draft/Stock assertions. Check exact numbered lint sites and literal cwd/owners independently; never count truncated output, stale installed UI, failed dumps or host fixtures as device acceptance. Register each incident canonically before retries, refresh only the verified coordination registry binding, rerun unchanged gates and leave founder acceptance pending.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"],
+      "retainedTaskEvidence": "C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/purchase-match-preflight-incidents-20261001.json; original-before-v1, original-after-v1-v4, analysis-v1-v5 and OPPO original-page1-v1/ready-v2/zoom-v1 remain immutable diagnostic evidence. Canonical entry does not retroactively convert a failed attempt into a pass."
     }
   ],
   "storeOneTimeSettingsIncident20260922": {

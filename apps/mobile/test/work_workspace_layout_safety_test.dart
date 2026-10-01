@@ -238,6 +238,37 @@ class _EntryFilePicker extends FilePickerPlatform {
 }
 
 // Labelled widget fixture: callback/review behaviour only, not physical OCR.
+// R11 host-only source/picker transport; never injected into the device Store.
+class _PurchaseOriginalFixture extends WorkPurchaseInvoiceCapture {
+  _PurchaseOriginalFixture(this.bytes) : super(currentScope: () => null);
+  final Uint8List bytes;
+  int reads=0;
+  bool unavailable=false;
+  Completer<void>? holdRead;
+  @override
+  Future<Uint8List> read((String,String,bool) scope,String draftId,
+      WorkspacePurchaseInvoiceAttachment attachment) async {
+    reads++;
+    await holdRead?.future;
+    if(unavailable) throw const WorkGatewayException('Invoice attachment is unavailable. Attach the original again.');
+    return bytes;
+  }
+}
+class _PurchaseOriginalSaveFixture extends FilePickerPlatform {
+  Uint8List? bytes;
+  String? name,mime;
+  bool fail=false;
+  Uri? result;
+  @override
+  Future<Uri?> saveFile({required String fileName,required Uint8List bytes,required String mimeType,
+    String? dialogTitle,String? initialDirectory,Function(FilePickerStatus)? onFileSaving,
+    WindowsOptions windowsOptions=const WindowsOptions(),LinuxOptions linuxOptions=const LinuxOptions(),
+    WebOptions webOptions=const WebOptions()}) async {
+    this.bytes=Uint8List.fromList(bytes);name=fileName;mime=mimeType;
+    if(fail) throw PlatformException(code:'host_fixture_unavailable');
+    return result;
+  }
+}
 class _PurchaseScanReviewFixture extends WorkPurchaseInvoiceCapture {
   _PurchaseScanReviewFixture(this.bytes) : super(currentScope: () => null);
   final Uint8List bytes;
@@ -3494,6 +3525,113 @@ void main() {
       expect(find.byKey(const Key('work-purchase-draft-save')).hitTestable(), findsOneWidget);
       expect(entry.value, same(original)); expect(work.workspacePurchases,isEmpty);
       expect(tester.takeException(),isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for(final config in [(false,const Size(360,800),1.0),(true,const Size(360,800),1.0),
+      (true,const Size(800,360),1.5)]) {
+    final (pdf,viewport,scale)=config;
+    testWidgets('P05-R11-C01 original view download and recovery pdf=$pdf viewport=$viewport scale=$scale', (tester) async {
+      final png=(await tester.runAsync(() async {
+        final recorder=ui.PictureRecorder();Canvas(recorder).drawColor(Colors.white,BlendMode.src);
+        final picture=recorder.endRecording();final image=await picture.toImage(2,2);
+        final bytes=(await image.toByteData(format:ui.ImageByteFormat.png))!.buffer.asUint8List();
+        image.dispose();picture.dispose();return bytes;
+      }))!;
+      final bytes=pdf?Uint8List.fromList(utf8.encode('%PDF-host-original-only')):png;
+      final capture=_PurchaseOriginalFixture(bytes);
+      final entry=_PurchaseEntryFixtureStore();
+      final work=storeViewFixture(null,_ContactDraftFixtureStore(),null,null,null,null,null,null,null,entry,capture);
+      final scope=work.workspaceSupplierScope!;final at=DateTime.utc(2026,9,30);
+      final attachment=WorkspacePurchaseInvoiceAttachment(owner:jsonEncode([scope.$1,scope.$2,scope.$3,'r11-draft']),
+        digest:'a'*64,fileName:pdf?'Supplier original.pdf':'Supplier original.png',
+        contentType:pdf?'application/pdf':'image/png',byteLength:bytes.length,source:'upload');
+      entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,
+        profiles:[WorkspaceSupplierProfile(id:'r11-supplier',name:'Host-only R11 supplier',createdAt:at,updatedAt:at)],
+        draft:WorkspacePurchaseEntryDraft(id:'r11-draft',supplierId:'r11-supplier',invoiceReference:'R11-BILL',
+          invoiceDate:'30/09/2026',createdAt:at,updatedAt:at,attachments:[attachment],
+          goods:[{'productId':'','name':'Host item','pack':'1 kg','quantity':'2','cost':'25'}],details:{'invoiceTotal':'50'}));
+      final original=entry.value;
+      final picker=_PurchaseOriginalSaveFixture();final previous=FilePickerPlatform.instance;
+      FilePickerPlatform.instance=picker;addTearDown(()=>FilePickerPlatform.instance=previous);
+      const channel=MethodChannel('com.moolsocial.app/work_document_preview');
+      final messenger=TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final pages=<int>[];
+      var protected=false;
+      messenger.setMockMethodCallHandler(channel,(call) async {
+        if(call.method=='cancel') return null;
+        if(protected) throw PlatformException(code:'protected_pdf');
+        final args=call.arguments as Map;expect(args['bytes'],orderedEquals(bytes));
+        final page=args['page'] as int;pages.add(page);
+        return {'bytes':png,'page':page,'pages':2,'width':2,'height':2};
+      });addTearDown(()=>messenger.setMockMethodCallHandler(channel,null));
+      await mount(tester,route:'/app/work/workspace/dashboard',work:work,textScale:scale,viewport:viewport);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-record')));await tester.pumpAndSettle();
+      await usePurchaseControl(tester,'work-purchase-invoice-section');
+      final view=find.byKey(Key('work-purchase-view-${attachment.digest}'));
+      await revealPurchaseInput(tester,view);expect(view.hitTestable(),findsOneWidget);
+      await tester.tap(view);await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-original-view')),findsOneWidget);
+      expect(find.byKey(const Key('purchase-review-paper')),findsNothing);
+      expect(find.text('Original supplier invoice'),findsOneWidget);
+      if(viewport.height>500) {
+        expect(find.byKey(const Key('purchase-original-zoom')).hitTestable(),findsOneWidget,
+          reason:'The loaded original must be brought into view without another manual scroll.');
+      }
+      final transform=tester.widget<InteractiveViewer>(find.byKey(const Key('purchase-original-zoom')))
+        .transformationController!;
+      final zoom=find.byKey(const Key('purchase-original-zoom-in'));
+      await revealPurchaseInput(tester,zoom);await tester.tap(zoom);await tester.pumpAndSettle();
+      expect(transform.value.getMaxScaleOnAxis(),2);
+      expect(transform.value.storage[12],lessThan(0));expect(transform.value.storage[13],lessThan(0),
+        reason:'Zoom must keep the document centred instead of moving it towards the corner.');
+      final fit=find.byKey(const Key('purchase-original-fit'));
+      await revealPurchaseInput(tester,fit);await tester.tap(fit);await tester.pumpAndSettle();
+      expect(transform.value,Matrix4.identity());
+      if(pdf) {
+        expect(find.text('Page 1 of 2'),findsOneWidget);
+        final next=find.byKey(const Key('purchase-original-next'));
+        await revealPurchaseInput(tester,next);await tester.tap(next);await tester.pumpAndSettle();
+        expect(find.text('Page 2 of 2'),findsOneWidget);expect(pages,[0,1]);
+        protected=true;
+        final previousPage=find.byKey(const Key('purchase-original-prev'));
+        await revealPurchaseInput(tester,previousPage);await tester.tap(previousPage);await tester.pumpAndSettle();
+        expect(find.text('This PDF is password-protected. Choose an unlocked copy.'),findsOneWidget);
+        protected=false;
+        final retry=find.byKey(const Key('purchase-original-retry'));
+        await revealPurchaseInput(tester,retry);await tester.tap(retry);await tester.pumpAndSettle();
+        expect(find.text('Page 1 of 2'),findsOneWidget);
+      }
+      final download=find.byKey(const Key('purchase-original-download'));
+      await revealPurchaseInput(tester,download);await tester.tap(download);await tester.pumpAndSettle();
+      expect(find.text('Download cancelled. Your original is kept.'),findsOneWidget);
+      expect(picker.bytes,orderedEquals(bytes));expect(picker.mime,attachment.contentType);
+      expect(picker.name,endsWith(pdf?'.pdf':'.png'));
+      picker.fail=true;await tester.tap(download);await tester.pumpAndSettle();
+      expect(find.text('Could not save the original. Your copy is kept; retry.'),findsOneWidget);
+      picker.fail=false;picker.result=Uri.parse('content://host-only/saved');
+      await tester.tap(download);await tester.pumpAndSettle();
+      expect(find.text('Original invoice saved.'),findsOneWidget);expect(capture.reads,greaterThanOrEqualTo(4));
+      capture.unavailable=true;await tester.tap(download);await tester.pumpAndSettle();
+      expect(find.text('Invoice attachment is unavailable. Attach the original again.'),findsOneWidget);
+      final recorded=find.byKey(const Key('purchase-original-recorded'));
+      await revealPurchaseInput(tester,recorded);await tester.tap(recorded);await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-review-paper')),findsOneWidget);
+      expect(entry.value,same(original));expect(work.workspacePurchases,isEmpty);
+      expect(find.byType(AlertDialog),findsNothing);expect(tester.takeException(),isNull);
+      capture.unavailable=false;capture.holdRead=Completer<void>();
+      await usePurchaseControl(tester,'work-purchase-invoice-section');
+      await revealPurchaseInput(tester,view);await tester.tap(view);await tester.pump();
+      expect(find.text('Opening original invoice…'),findsOneWidget);
+      final cancel=find.byKey(const Key('purchase-original-cancel'));
+      await revealPurchaseInput(tester,cancel);await tester.tap(cancel);await tester.pumpAndSettle();
+      capture.holdRead!.complete();await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-original-view')),findsNothing,
+        reason:'A late original read must not reopen Preview after cancellation.');
+      expect(find.byKey(const Key('purchase-review-paper')),findsOneWidget);
+      expect(entry.value,same(original));expect(tester.takeException(),isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
