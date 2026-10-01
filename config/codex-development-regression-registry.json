@@ -104945,7 +104945,7 @@
     {
       "id": "REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES",
       "t04OffersAutonomous20261002": {
-        "status": "partially_verified_pending_safe_git_checkpoint",
+        "status": "partially_verified_checkpoint_preserved_handoff_blocked",
         "contract": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
         "contractSha256": "21CC943EF7FEA471AF57F746C6CDE76CB484B39125364F778EE1520EE318D71D",
         "baseline": "7a6e141f0731a643757127db4a6ea81c9b6264c0",
@@ -105192,7 +105192,49 @@
         "preCommitAtomicStageAdmission": {
           "firstAttempt": "Coordinator pre_commit rejected the intentionally unstaged review set: production pre-commit requires one fully staged atomic change set. Memory, MVP, incremental implementation and diff checks passed. No commit was attempted.",
           "nextStep": "Stage only the exact 16 owned task files and rerun coordinator pre_commit against the staged atomic set; never weaken the gate."
-        }
+        },
+        "safeGitCheckpoint": {
+          "branch": "work/cursor-ui/buy-ready-20260921",
+          "head": "0e90a6ca74b81e212f118995f7c4fab0d3b78620",
+          "remoteReadback": "0e90a6ca74b81e212f118995f7c4fab0d3b78620",
+          "porcelainBytes": 0,
+          "porcelainRecords": 0,
+          "porcelainExitCode": 0,
+          "porcelainSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "sourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9",
+          "normalPush": true,
+          "preCommitGates": [
+            "memory implementation",
+            "coordinator staged pre_commit",
+            "MVP authorized",
+            "incremental implementation",
+            "founder pre_commit",
+            "git diff check"
+          ],
+          "status": "implementation_checkpoint_verified_pending_handoff"
+        },
+        "handoffGateFailure": {
+          "phase": "handoff",
+          "gate": "scripts/check-codex-subagent-coordination-policy.ps1",
+          "toolSession": 91046,
+          "exitCode": 1,
+          "message": "Codex subagent coordination gate rejected: production feature commit subject is not atomic: 0e90a6ca74b81e212f118995f7c4fab0d3b78620",
+          "commit": "0e90a6ca74b81e212f118995f7c4fab0d3b78620",
+          "actualSubject": "Fix Buy offer expiry and checkout preflight holds",
+          "requiredPrefix": "ui(buy-ready-20260921): ",
+          "rangeRule": "All feature commits in the authorized baseCommit..HEAD must satisfy the required subject or an existing exact historical admission.",
+          "status": "open_governance_handoff_blocker",
+          "incrementalHandoff": "passed",
+          "runtimeSourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9",
+          "recoveryBoundary": "Published commit retained. No amend, force push, baseline advance, gate weakening or new historical exception. A proper forward evidence commit cannot remove the offending ancestor. Current branch formal handoff remains blocked pending separately authorized governance recovery.",
+          "architectReview": "Read-only architect confirmed no compliant repair inside the assigned branch with unchanged gate; a replacement branch would require explicit scope/ownership authorization and is outside this bounded stop.",
+          "evidence": {
+            "path": "apps/mobile/build/t04-offers-20261002/handoff-subject-failure.json",
+            "sha256": "39c707476d1bc2947e137882176692d2914cf11e853ebb2b29cc6d183dd59b84"
+          }
+        },
+        "futureCommitSubjectGuard": "Before every commit, read selected lane commitPrefix and current workId, validate the proposed complete subject against the exact gate pattern, and reject before mutation. A successful pre_commit gate does not prove the proposed commit title.",
+        "finalStopBoundary": "T04 local A06/A07 and native scoped verification preserved; A08/A09 open. Stop after evidence-only normal feature-branch checkpoint. Do not claim coordinator handoff pass, ticket_close, full continuity or integrated acceptance."
       },
       "sharedDeliveryInstructionCorrection20261002": {
         "finding": "Founder identified an escaped T03 product regression: public delivery instructions were scoped to Shop and Wholesale despite one receiving address, leaving Bulk unclear. Previous green isolation tests encoded the wrong product rule. Reconstruction also repeated oversized central-instruction and registry projections; truncated results are rejected as complete evidence. Initial full status was empty but did not follow the independent digest protocol; handoff heading discovery emitted titles instead of line numbers.",
