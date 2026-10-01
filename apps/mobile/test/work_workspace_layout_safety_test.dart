@@ -3955,6 +3955,104 @@ void main() {
     });
   }
 
+  testWidgets('P05-R02-R09 differential editing saves the same draft without posting', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final products = List.of(work.workspaceCatalogueItems);
+    final finance = work.workspaceFinance;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await expandPurchasePrimarySections(tester);
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
+    Future<void> open(String key) async {
+      await revealPurchaseInput(tester, find.byKey(Key('work-purchase-$key')));
+      await tester.tap(find.byKey(Key('work-purchase-$key')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: key);
+    }
+    Future<void> fill(String key, String value) async {
+      final field = find.byKey(Key('work-purchase-$key'));
+      await revealPurchaseInput(tester, field);
+      await tester.enterText(field, value);
+      await tester.pumpAndSettle();
+    }
+    await open('supplier-more');
+    await fill('supplierEmail', 'supplier@example.test');
+    await open('document-references');
+    await fill('poReference', 'EXISTING-PO-123');
+    await fill('documentCopy', 'Original for recipient');
+    await fill('taxAmount-0', '18.25');
+    await open('item-details-0');
+    await fill('specifications-0', 'Model A, retail pack');
+    await open('tax-details');
+    await fill('totalTax', '18.25');
+    await fill('amountPayable', '2840');
+    await fill('amountInWords', 'As printed in the original');
+    await open('original-evidence');
+    await fill('signatory', 'Printed name only');
+    await open('buyer-details');
+    await fill('buyerPhone', '9999999999');
+    await fill('buyerEmail', 'buyer@example.test');
+    await open('receipt-details');
+    await open('delivery-plan');
+    await fill('expectedDeliveryDate', '03/10/2026');
+    await fill('shippingTerms', 'Deliver at Store');
+    await open('payment-details');
+    await fill('paymentTerms', 'Within fifteen days');
+    await open('supplier-instructions');
+    for (final pair in {'bankName':'Evaluation bank', 'bankAccount':'0012345',
+        'bankIfsc':'ASPRINTED', 'bankBranch':'Evaluation branch', 'upiType':'As printed',
+        'upiId':'evaluation@upi', 'terms':'Only the supplier’s printed terms'}.entries) {
+      await fill(pair.key, pair.value);
+    }
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    final saved = entry.value!.draft!;
+    expect(saved.details['bankAccount'], '0012345');
+    expect(saved.details['supplierEmail'], 'supplier@example.test');
+    expect(saved.details['buyerEmail'], 'buyer@example.test');
+    expect(saved.details['paymentStatus'], isNull);
+    expect(saved.details['signatureStatus'], isNull);
+    expect(saved.goods.single['specifications'], 'Model A, retail pack');
+    expect(work.workspaceCatalogueItems, orderedEquals(products));
+    expect(work.workspaceFinance, same(finance));
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    expect(work.workspacePurchaseEntryDraft!.id, saved.id);
+    expect(find.byKey(const Key('work-purchase-bankAccount')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final display in [(320.0, 568.0, 2.0, 240.0), (800.0, 360.0, 2.0, 180.0)]) {
+    testWidgets('P05-R09 new optional fields remain reachable with keyboard $display', (tester) async {
+      await mount(tester, route: '/app/work/workspace/dashboard',
+        work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+      await openPurchaseList(tester);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      for (final key in ['payment-details', 'supplier-instructions']) {
+        await revealPurchaseInput(tester, find.byKey(Key('work-purchase-$key')));
+        await tester.tap(find.byKey(Key('work-purchase-$key')));
+        await tester.pumpAndSettle();
+      }
+      for (final key in ['bankAccount', 'upiId', 'terms']) {
+        final target = find.byKey(Key('work-purchase-$key'));
+        await revealPurchaseInput(tester, target);
+        await tester.enterText(target, 'Long retained evaluation detail, not a real payment');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: key);
+      }
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
   testWidgets('P05 OCR fixture fills empty fields only and preserves entered product identity', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -3973,7 +4071,8 @@ void main() {
     await openPurchaseList(tester);
     await tester.tap(find.byKey(const Key('work-purchase-record')));
     await tester.pumpAndSettle();
-    await expandPurchasePrimarySections(tester);
+    expect(find.byKey(const Key('work-purchase-reference')), findsNothing);
+    expect(find.byKey(const Key('work-purchase-item-0')), findsNothing);
     final attachment = find.byKey(Key('work-purchase-document-${List.filled(64, 'b').join()}'));
     await revealPurchaseInput(tester, attachment);
     await tester.tap(attachment);
@@ -3988,6 +4087,8 @@ void main() {
     }
     expect(find.byKey(const Key('work-purchase-entry-error')), findsNothing);
     expect(find.byKey(const Key('work-purchase-entry-notice')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-paidAmount')), findsNothing,
+      reason: 'OCR must not open or infer payment recording from bill totals.');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

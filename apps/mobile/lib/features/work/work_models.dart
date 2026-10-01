@@ -5977,11 +5977,69 @@ class WorkspacePurchaseEntryDraft {
     'placeOfSupplyCode', 'buyerUin', 'buyerState', 'buyerStateCode', 'deliveryAddress',
     'deliveryState', 'deliveryStateCode', 'supplyValue', 'sgstAmount', 'utgst',
     'eInvoiceStatus', 'irn', 'ackNumber', 'ackDate', 'qrStatus', 'signatureStatus',
-    'eInvoiceDeclaration'};
+    'eInvoiceDeclaration', 'supplierEmail', 'buyerPhone', 'buyerEmail', 'poReference',
+    'documentCopy', 'totalTax', 'amountPayable', 'amountInWords', 'bankName',
+    'bankAccount', 'bankIfsc', 'bankBranch', 'upiType', 'upiId', 'paymentQrStatus',
+    'terms', 'signatory', 'expectedDeliveryDate', 'shippingTerms', 'paymentTerms'};
   static const goodsExtraKeys = {'hsn', 'barcode', 'freeQuantity', 'batch', 'expiry',
     'mrp', 'sellingPrice', 'discount', 'gstRate', 'cess', 'lineTotal',
     'receivedQuantity', 'damagedQuantity', 'shortQuantity', 'unitCode', 'taxableValue',
-    'cgstRate', 'cgst', 'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate'};
+    'cgstRate', 'cgst', 'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate',
+    'specifications', 'taxAmount'};
+  /// Printed rupee amounts only; never rounds input or invents missing zeroes.
+  static int? printedPaise(String? input) {
+    if (input == null) return null;
+    final value = input.trim();
+    if (!RegExp(r'^-?\d+(\.\d{1,2})?$').hasMatch(value)) return null;
+    final parts = value.replaceFirst('-', '').split('.');
+    final paise = int.tryParse(parts[0]);
+    if (paise == null || paise > 999999999999) return null;
+    final result = paise * 100 + (parts.length == 2 ? int.parse(parts[1].padRight(2, '0')) : 0);
+    return value.startsWith('-') ? -result : result;
+  }
+  static List<String> reviewAmounts(Map<String, String> values) {
+    final warnings = <String>[];
+    for (final key in const ['invoiceTotal', 'totalTax', 'amountPayable', 'paidAmount',
+        'taxableValue', 'supplyValue', 'cgst', 'sgstAmount', 'utgst', 'igst', 'cess',
+        'billDiscount', 'freight', 'otherCharges', 'roundOff']) {
+      final value = values[key];
+      if (value != null && value.trim().isNotEmpty && printedPaise(value) == null) {
+        warnings.add('Check the amount format: use rupees with up to two decimal places.');
+        break;
+      }
+    }
+    final components = switch (values['taxTreatment']) {
+      'CGST + SGST' => ['cgst', 'sgstAmount', 'cess'],
+      'CGST + UTGST' => ['cgst', 'utgst', 'cess'],
+      'IGST' => ['igst', 'cess'],
+      _ => <String>[],
+    };
+    final total = printedPaise(values['totalTax']);
+    // A missing component remains unknown; compare only a fully entered split.
+    if (total != null && components.isNotEmpty &&
+        components.every((key) => printedPaise(values[key]) != null) &&
+        components.fold<int>(0, (sum, key) => sum + printedPaise(values[key])!) != total) {
+      warnings.add('Printed tax and the entered tax split differ. Check the original bill.');
+    }
+    return List.unmodifiable(warnings);
+  }
+  /// No incomplete HSN summary or rate/quantity inference from invoice totals.
+  static List<({String hsn, String rate, int taxable, int tax})> printedHsnSummary(
+      List<Map<String, String>> lines) {
+    if (lines.isEmpty || lines.any((line) => (line['hsn'] ?? '').trim().isEmpty ||
+        printedPaise(line['taxableValue']) == null || printedPaise(line['taxAmount']) == null)) {
+      return const [];
+    }
+    final totals = <(String, String), ({int taxable, int tax})>{};
+    for (final line in lines) {
+      final key = (line['hsn']!.trim(), line['gstRate'] ?? '');
+      final before = totals[key];
+      totals[key] = (taxable: (before?.taxable ?? 0) + printedPaise(line['taxableValue'])!,
+        tax: (before?.tax ?? 0) + printedPaise(line['taxAmount'])!);
+    }
+    return List.unmodifiable([for (final entry in totals.entries)
+      (hsn: entry.key.$1, rate: entry.key.$2, taxable: entry.value.taxable, tax: entry.value.tax)]);
+  }
   // Review an external document without truncating it or blocking a partial draft.
   // These two format hints are not GST/IRN validation or ITC eligibility.
   List<String> get invoiceFormatWarnings => reviewInvoiceFormat(
@@ -6005,7 +6063,8 @@ class WorkspacePurchaseEntryDraft {
   bool get valid => id.isNotEmpty && supplierId.isNotEmpty &&
       invoiceReference.length <= 120 && invoiceDate.length <= 10 &&
       !updatedAt.isBefore(createdAt) && goods.length <= 200 &&
-      details.keys.every(detailKeys.contains) && details.values.every((v) => v.length <= 500) &&
+      details.keys.every(detailKeys.contains) &&
+      details.entries.every((entry) => entry.value.length <= (entry.key == 'terms' ? 4000 : 500)) &&
       attachments.length <= 3 && attachments.every((a) => a.valid) &&
       attachments.fold<int>(0, (sum, a) => sum + a.byteLength) <= 20 * 1024 * 1024 &&
       attachments.map((a) => a.digest).toSet().length == attachments.length &&
@@ -6013,7 +6072,7 @@ class WorkspacePurchaseEntryDraft {
         const ['productId', 'name', 'pack', 'quantity', 'cost'].every(line.containsKey) &&
         line.keys.every((k) => const ['productId', 'name', 'pack', 'quantity', 'cost'].contains(k) ||
           goodsExtraKeys.contains(k)) &&
-        line.values.every((value) => value.length <= 200));
+        line.entries.every((entry) => entry.value.length <= (entry.key == 'specifications' ? 1000 : 200)));
   Map<String, Object?> toJson() => {'id': id, 'supplierId': supplierId,
     'invoiceReference': invoiceReference, 'invoiceDate': invoiceDate,
     'createdAt': createdAt.toUtc().toIso8601String(),

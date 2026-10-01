@@ -1482,6 +1482,13 @@ class WorkPurchaseInvoiceSuggestions {
   static WorkPurchaseInvoiceSuggestions parse(String text) {
     const labels = {'supplier': 'supplierName', 'sold by': 'supplierName',
       'supplier address':'supplierAddress', 'supplier phone':'supplierPhone',
+      'supplier email':'supplierEmail', 'buyer phone':'buyerPhone', 'buyer email':'buyerEmail',
+      'purchase order no':'poReference', 'po number':'poReference', 'copy label':'documentCopy',
+      'total tax':'totalTax', 'amount payable':'amountPayable', 'amount in words':'amountInWords',
+      'bank name':'bankName', 'bank account':'bankAccount', 'account number':'bankAccount',
+      'ifsc':'bankIfsc', 'bank branch':'bankBranch', 'upi type':'upiType', 'upi id':'upiId',
+      'supplier terms':'terms', 'signatory name':'signatory', 'payment terms':'paymentTerms',
+      'expected delivery date':'expectedDeliveryDate', 'shipping terms':'shippingTerms',
       'supplier gstin': 'supplierGstin', 'buyer gstin': 'buyerGstin',
       'buyer uin':'buyerUin', 'buyer name':'buyerName', 'buyer address':'buyerAddress',
       'buyer state':'buyerState', 'buyer state code':'buyerStateCode',
@@ -1502,15 +1509,17 @@ class WorkPurchaseInvoiceSuggestions {
       if (match == null) continue;
       final key = labels[match[1]!.trim().toLowerCase().replaceAll('.', '')];
       final value = match[2]!.trim();
-      if (key == null || value.length > (key.endsWith('Address') ? 500 : 120)) continue;
+      if (key == null || value.length > (key == 'terms' ? 4000 :
+          const ['shippingTerms', 'paymentTerms', 'amountInWords'].contains(key) ||
+          key.endsWith('Address') ? 500 : 120)) { continue; }
       if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) continue;
       if (key == 'irn' && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) continue;
       if (const {'supplyValue', 'taxableValue', 'cgst', 'sgstAmount', 'sgst', 'utgst',
-          'igst', 'cess', 'invoiceTotal'}.contains(key)) {
+          'igst', 'cess', 'invoiceTotal', 'totalTax', 'amountPayable'}.contains(key)) {
         final amount = double.tryParse(value);
         if (amount == null || !amount.isFinite || amount < 0) continue;
       }
-      if (key == 'invoiceDate' || key == 'ackDate') {
+      if (key == 'invoiceDate' || key == 'ackDate' || key == 'expectedDeliveryDate') {
         if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value)) continue;
         final parts = value.split('/').map(int.parse).toList();
         final date = DateTime(parts[2], parts[1], parts[0]);
@@ -1524,6 +1533,8 @@ class WorkPurchaseInvoiceSuggestions {
     List<String>? headers;
     const columns = {'description':'name', 'item':'name', 'product':'name', 'qty':'quantity',
       'quantity':'quantity', 'rate':'cost', 'cost':'cost', 'unit':'pack', 'hsn':'hsn',
+      'units':'pack', 'hsn/sac':'hsn', 'specifications':'specifications', 'model':'specifications',
+      'tax amount':'taxAmount', 'rate/item':'cost',
       'uqc':'unitCode', 'unit code':'unitCode', 'discount':'discount',
       'taxable value':'taxableValue', 'gst %':'gstRate', 'gst rate':'gstRate',
       'cgst %':'cgstRate', 'cgst rate':'cgstRate', 'cgst':'cgst', 'cgst amount':'cgst',
@@ -1540,12 +1551,14 @@ class WorkPurchaseInvoiceSuggestions {
         headers = known.toSet().length == known.length ? mapped : null;
         continue;
       }
-      if (headers == null || cells.length != headers.length || cells.any((c) => c.length > 200)) continue;
+      final rowHeaders = headers;
+      if (rowHeaders == null || cells.length != rowHeaders.length ||
+          cells.indexed.any((cell) => cell.$2.length > (rowHeaders[cell.$1] == 'specifications' ? 1000 : 200))) { continue; }
       final line = <String, String>{'productId':'', 'name':'', 'pack':'', 'quantity':'', 'cost':''};
-      for (var i=0; i<headers.length; i++) { if (headers[i].isNotEmpty) line[headers[i]] = cells[i]; }
+      for (var i=0; i<rowHeaders.length; i++) { if (rowHeaders[i].isNotEmpty) line[rowHeaders[i]] = cells[i]; }
       // Retain proven columns; uncertain optional numeric cells need manual review.
       for (final key in const ['discount', 'taxableValue', 'gstRate', 'cgstRate', 'cgst',
-          'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate', 'cess', 'lineTotal']) {
+          'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate', 'cess', 'lineTotal', 'taxAmount']) {
         final value = line[key];
         if (value == null || value.isEmpty) continue;
         final number = double.tryParse(value);

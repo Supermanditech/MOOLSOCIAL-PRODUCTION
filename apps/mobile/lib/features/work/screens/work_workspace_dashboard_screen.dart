@@ -11423,9 +11423,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     setState(() { _loading = false; _error = null; });
   }
   void _chooseSupplier(WorkspaceSupplierProfile p) {
+    if (_supplierId != p.id) { _clearSupplierInstructions(); }
     setState(() { _supplier = p; _supplierId = p.id; _name.text = p.name;
       _phone.text = p.phone; _address.text = p.address; _gstin.text = p.gstin; });
     _supplierFocus.unfocus();
+  }
+  void _clearSupplierInstructions() {
+    for (final key in const ['supplierEmail', 'bankName', 'bankAccount', 'bankIfsc',
+        'bankBranch', 'upiType', 'upiId', 'paymentQrStatus', 'terms', 'signatory', 'paymentTerms']) {
+      _details[key]!.clear();
+    }
   }
   Future<bool> confirmLeave() async {
     if (_busy || _leaving) return false;
@@ -11544,8 +11551,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Widget _field(String label, TextEditingController controller, String key, {
       int limit = 200, TextInputType? keyboard, FocusNode? focus,
-      ValueChanged<String>? changed, String? hint, bool lookup = false}) => TextField(key: Key(key), controller: controller,
+      ValueChanged<String>? changed, String? hint, bool lookup = false, bool multiline = false}) => TextField(key: Key(key), controller: controller,
     focusNode: focus, maxLength: limit, keyboardType: keyboard,
+    minLines: 1, maxLines: multiline ? null : 1,
+    textAlign: keyboard?.index == TextInputType.number.index ? TextAlign.right : TextAlign.left,
     textInputAction: TextInputAction.next, onChanged: changed ?? (_) => setState(() {}),
     style: const TextStyle(fontSize: 13, color: MoolColors.ink),
     decoration: InputDecoration(labelText: label, hintText: hint, counterText: '', filled: false,
@@ -11613,9 +11622,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     ]);
   }
   Widget _detail(String label, String key, {bool number = false, bool date = false}) =>
-    _field(label, _details[key]!, 'work-purchase-$key', limit: number ? 14 : date ? 10 : 500,
-      hint: date ? 'DD/MM/YYYY' : null, keyboard: number ? const TextInputType.numberWithOptions(decimal: true)
-        : date ? TextInputType.datetime : null);
+    _field(label, _details[key]!, 'work-purchase-$key', limit: number ? 14 : date ? 10 : key == 'terms' ? 4000 : 500,
+      hint: date ? 'DD/MM/YYYY' : null,
+      multiline: const ['buyerAddress', 'deliveryAddress', 'terms', 'notes', 'shippingTerms', 'paymentTerms', 'amountInWords'].contains(key),
+      keyboard: number ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+        : date ? TextInputType.datetime : key.endsWith('Email') ? TextInputType.emailAddress
+        : key == 'buyerPhone' ? TextInputType.phone : null);
   Widget _choice(String label, String key, List<String> choices) => DropdownButtonFormField<String>(
     key: Key('work-purchase-$key'), initialValue: choices.contains(_details[key]!.text) ? _details[key]!.text : '',
     isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
@@ -11631,8 +11643,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   Widget _compactFields(List<Widget> fields, {double width = 138}) => LayoutBuilder(
     builder: (context, constraints) {
       final preferred = MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 190.0 : width;
+      final columns = ((constraints.maxWidth + 12) / (preferred + 12)).floor().clamp(1, 3);
+      final fitted = (constraints.maxWidth - 12 * (columns - 1)) / columns;
       return Wrap(spacing: 12, runSpacing: 6, children: [for (final field in fields)
-        SizedBox(width: preferred.clamp(0, constraints.maxWidth).toDouble(), child: field)]);
+        SizedBox(width: field is TextField &&
+            (field.keyboardType.index == TextInputType.number.index || field.keyboardType == TextInputType.datetime)
+          ? fitted.clamp(0, 190).toDouble() : fitted, child: field)]);
     });
   Future<void> _capture(WorkProofSource source) async {
     if (_busy || !_current || _scope == null) return;
@@ -11661,7 +11677,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final read = await widget.session.workspacePurchaseInvoiceCapture.scan(_scope!, _draftId, a);
       if (!mounted || !_current) return;
       final index = _attachments.indexOf(a);
-      if (index >= 0) setState(() => _attachments[index] = read);
+      if (index >= 0) { setState(() {
+        _attachments[index] = read;
+        final suggestions = WorkPurchaseInvoiceSuggestions.parse(read.detectedText);
+        _openSuggestedSections(suggestions);
+        if (suggestions.fields.isEmpty && suggestions.goods.isEmpty) {
+          _notice = 'No clear bill details found. Your entries are kept; enter details manually.';
+        }
+      }); }
     } on Object catch (e) {
       if (mounted) {
         setState(() => _error = e is WorkGatewayException ? e.message :
@@ -11671,6 +11694,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   void _applySuggestions(WorkspacePurchaseInvoiceAttachment a) {
     final suggestions = WorkPurchaseInvoiceSuggestions.parse(a.detectedText);
+    if (suggestions.fields.isEmpty && suggestions.goods.isEmpty) {
+      setState(() => _notice = 'No clear bill details found. Your entries are kept; enter details manually.');
+      return;
+    }
     final targets = {'supplierName': _name, 'supplierGstin': _gstin,
       'supplierAddress': _address, 'supplierPhone': _phone,
       'invoiceReference': _reference, 'invoiceDate': _date, ..._details};
@@ -11685,8 +11712,22 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         _goods..clear()..addAll(suggestions.goods.map(_PurchaseGoodsInput.new));
       }
       _error = null;
+      _openSuggestedSections(suggestions);
       _notice = 'Check detected details against your bill. Entered values were kept; match items to Stock before receipt.';
     });
+  }
+  void _openSuggestedSections(WorkPurchaseInvoiceSuggestions suggestions) {
+    for (final key in suggestions.fields.keys) {
+      _expandedSections.add(key.startsWith('supplier') ? 'work-purchase-supplier-section'
+        : key.startsWith('buyer') || key.startsWith('delivery') ? 'work-purchase-buyer-details'
+        : const ['invoiceReference', 'invoiceDate', 'poReference', 'documentCopy', 'invoiceTotal'].contains(key)
+          ? 'work-purchase-invoice-section'
+        : key.startsWith('bank') || key.startsWith('upi') || const ['paymentTerms', 'terms', 'paymentQrStatus'].contains(key)
+          ? 'work-purchase-payment-details'
+        : const ['expectedDeliveryDate', 'shippingTerms'].contains(key) ? 'work-purchase-receipt-details'
+        : 'work-purchase-tax-details');
+    }
+    if (suggestions.goods.isNotEmpty) _expandedSections.add('work-purchase-items-section');
   }
   Widget _attachment(WorkspacePurchaseInvoiceAttachment a) => _section(
     a.fileName, 'work-purchase-document-${a.digest}', [
@@ -11712,6 +11753,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (_details['invoiceTotal']!.text.isNotEmpty) '₹${_details['invoiceTotal']!.text}'].join(' · ');
     final itemCount = _goods.where((line) => line.name.text.trim().isNotEmpty).length;
     final linkedCount = _goods.where((line) => line.productId.isNotEmpty).length;
+    final hsnSummary = WorkspacePurchaseEntryDraft.printedHsnSummary(_goods.map((line) => line.fields).toList());
     return ListView(key: const Key('work-record-purchase'), primary: false,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(12, 0, 12, 24 + MediaQuery.viewInsetsOf(context).bottom),
@@ -11751,6 +11793,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                     if (_supplier != null && _name.text != _supplier!.name) {
                       _supplier = null; _supplierId = widget.session.newWorkspaceSupplierId();
                       _phone.clear(); _address.clear(); _gstin.clear();
+                      _clearSupplierInstructions();
                     }
                   }));
                 final details = Tooltip(message: 'Supplier phone, address & GSTIN', child: TextButton(
@@ -11774,7 +11817,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               if (_moreSupplier) ...[
                 _field('Phone (optional)', _phone, 'work-purchase-supplier-phone',
                   limit: 20, keyboard: TextInputType.phone),
-                _field('Address (optional)', _address, 'work-purchase-supplier-address', limit: 500),
+                _detail('Email (optional)', 'supplierEmail'),
+                _field('Address (optional)', _address, 'work-purchase-supplier-address', limit: 500, multiline: true),
                 _field('GSTIN from invoice (optional)', _gstin, 'work-purchase-supplier-gstin', limit: 15)],
               ], number: 1, summary: _name.text.isEmpty ? 'Name, contact and GSTIN' : _name.text),
               _purchaseSection('Invoice details', 'work-purchase-invoice-section', [
@@ -11789,6 +11833,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   SizedBox(width: 88, child: fields[1]), const SizedBox(width: 12),
                   SizedBox(width: 100, child: fields[2])]);
               }),
+              _section('Other invoice references', 'work-purchase-document-references', [
+                _detail('Purchase order no., if printed', 'poReference'),
+                _detail('Copy label on bill (optional)', 'documentCopy'),
+              ]),
               _detail('Notes (optional)', 'notes'),
               ], number: 2, summary: invoiceSummary.isEmpty ? 'Bill number, date and total' : invoiceSummary),
               _purchaseSection('Items on invoice', 'work-purchase-items-section', [
@@ -11821,6 +11869,25 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   _detail('IGST ₹', 'igst', number: true), _detail('Cess ₹', 'cess', number: true),
                   _detail('Bill discount ₹', 'billDiscount', number: true), _detail('Freight ₹', 'freight', number: true),
                   _detail('Other charges ₹', 'otherCharges', number: true), _detail('Round off ₹', 'roundOff', number: true)]),
+                const SizedBox(height: 8),
+                _compactFields([_detail('Printed total tax ₹', 'totalTax', number: true),
+                  _detail('Printed payable ₹', 'amountPayable', number: true)]),
+                _detail('Amount in words on bill', 'amountInWords'),
+                for (final warning in WorkspacePurchaseEntryDraft.reviewAmounts(
+                    {for (final e in _details.entries) e.key: e.value.text}))
+                  Text(warning, style: const TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
+                _section('HSN tax summary', 'work-purchase-hsn-summary', [
+                  if (hsnSummary.isEmpty)
+                    const Text('Enter each item’s HSN, taxable value and printed tax to see a complete summary.',
+                      style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+                  for (final row in hsnSummary)
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
+                      Expanded(child: Text('HSN ${row.hsn}${row.rate.isEmpty ? '' : ' · ${row.rate}%'}',
+                        style: const TextStyle(fontSize: 12, color: MoolColors.ink))),
+                      Expanded(child: Text('Taxable ₹${(row.taxable / 100).toStringAsFixed(2)}\nTax ₹${(row.tax / 100).toStringAsFixed(2)}',
+                        textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, color: MoolColors.ink))),
+                    ])),
+                ]),
                 if (_details['sgst']!.text.isNotEmpty) ...[
                   _compactFields([_detail('Earlier SGST / UTGST ₹', 'sgst', number: true)]),
                   const Text('Earlier combined tax entry kept. Check the original before separating it.',
@@ -11840,11 +11907,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                     _detail('Supplier declaration on bill', 'eInvoiceDeclaration'),
                   _choice('Supplier signature on bill', 'signatureStatus',
                     ['Signed on invoice', 'Electronic document', 'Not shown']),
+                  _detail('Signatory name on bill', 'signatory'),
                   const Text('Keep the original copy. Entering these details does not verify the invoice or claim tax credit.',
                     style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 ])]),
                 (title: 'Buyer details', key: 'work-purchase-buyer-details', fields: [
                 _detail('Business name on bill', 'buyerName'), _detail('Business address on bill', 'buyerAddress'),
+                _compactFields([_detail('Buyer phone', 'buyerPhone'), _detail('Buyer email', 'buyerEmail')]),
                 _field('Your GSTIN on bill (optional)', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15),
                 _field('UIN, only if printed', _details['buyerUin']!, 'work-purchase-buyerUin', limit: 15),
                 _compactFields([_detail('Buyer State', 'buyerState'), _detail('State code', 'buyerStateCode')]),
@@ -11855,6 +11924,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 (title: 'Goods received', key: 'work-purchase-receipt-details', fields: [
                 _choice('Goods status', 'receiptStatus', ['Received at Store', 'Awaiting delivery', 'Already added to Stock']),
                 _compactFields([_detail('Received on', 'receivedDate', date: true)]),
+                _section('Delivery plan & terms', 'work-purchase-delivery-plan', [
+                  _compactFields([_detail('Expected on', 'expectedDeliveryDate', date: true)]),
+                  _detail('Shipping terms on bill', 'shippingTerms'),
+                ]),
                 const Text('Already in Stock? Keep that status to prevent adding the same goods twice when receipt is confirmed.',
                   style: TextStyle(fontSize: 11, color: MoolColors.ink))]),
                 (title: 'Payment', key: 'work-purchase-payment-details', fields: [
@@ -11863,6 +11936,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 _choice('Paid by', 'paymentMethod', ['Cash', 'UPI', 'Bank transfer', 'Card', 'Other']),
                 _compactFields([_detail('Payment reference', 'paymentReference'),
                   _detail('Paid on', 'paymentDate', date: true)]),
+                _detail('Agreed payment terms', 'paymentTerms'),
+                _section('Supplier payment instructions', 'work-purchase-supplier-instructions', [
+                  const Text('Printed instructions only—not verified bank details or a payment receipt.',
+                    style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+                  _detail('Bank name', 'bankName'), _detail('Account number', 'bankAccount'),
+                  _compactFields([_detail('IFSC', 'bankIfsc'), _detail('Branch', 'bankBranch')]),
+                  _compactFields([_detail('UPI app / type', 'upiType'), _detail('UPI ID', 'upiId')]),
+                  _choice('Payment QR on bill', 'paymentQrStatus', ['Shown on invoice', 'Not shown']),
+                  _detail('Supplier terms on bill', 'terms'),
+                ]),
                 const Text('This records your bill details. It does not send money or update supplier balances yet.',
                   style: TextStyle(fontSize: 11, color: MoolColors.ink))]),
               ]),
@@ -11889,6 +11972,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final matches = widget.session.workspaceCatalogueItems.where((p) =>
       '${p.title} ${p.sku} ${p.barcode}'.toLowerCase().contains(query)).take(5);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(padding: const EdgeInsets.only(top: 8), child: Text('Item ${index + 1}',
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy))),
       Row(children: [Expanded(child: _field('Product name / SKU', line.name, 'work-purchase-item-$index',
         focus: line.focus, lookup: true, changed: (_) => setState(() => line.productId = ''))),
         if (_goods.length > 1) IconButton(tooltip: 'Remove item ${index + 1}', onPressed: () {
@@ -11925,14 +12010,23 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         SizedBox(width: priceWidth, child: _field('Unit price ₹', line.cost, 'work-purchase-cost-$index',
           limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
       ]); }),
+      _compactFields([_field('HSN / SAC', line.extra['hsn']!, 'work-purchase-hsn-$index'),
+        _field('Taxable value ₹', line.extra['taxableValue']!, 'work-purchase-taxableValue-$index',
+          keyboard: const TextInputType.numberWithOptions(decimal: true)),
+        _field('Printed tax ₹', line.extra['taxAmount']!, 'work-purchase-taxAmount-$index',
+          keyboard: const TextInputType.numberWithOptions(decimal: true)),
+        _field('Item amount ₹', line.extra['lineTotal']!, 'work-purchase-lineTotal-$index',
+          keyboard: const TextInputType.numberWithOptions(decimal: true))]),
       _section('More item details', 'work-purchase-item-details-$index', [
+        _field('Model / specifications on bill', line.extra['specifications']!,
+          'work-purchase-specifications-$index', limit: 1000, multiline: true),
         const Text('HSN is the item code printed on the bill. Leave unavailable details blank.',
           style: TextStyle(fontSize: 11, color: MoolColors.ink)),
-        _compactFields([for (final e in const {'hsn':'HSN code', 'barcode':'Barcode / code',
-          'unitCode':'Unit code on bill', 'taxableValue':'Taxable value ₹',
+        _compactFields([for (final e in const {'barcode':'Barcode / code',
+          'unitCode':'Unit code on bill',
           'freeQuantity':'Free qty', 'batch':'Batch', 'expiry':'Expiry on', 'mrp':'MRP ₹',
           'sellingPrice':'Selling price ₹', 'discount':'Discount ₹', 'gstRate':'GST %', 'cess':'Cess ₹',
-          'lineTotal':'Item amount ₹', 'receivedQuantity':'Received qty', 'damagedQuantity':'Damaged qty',
+          'receivedQuantity':'Received qty', 'damagedQuantity':'Damaged qty',
           'shortQuantity':'Short qty'}.entries)
           _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 200,
             hint: e.key == 'expiry' ? 'DD/MM/YYYY' : e.key == 'barcode' ? 'Barcode / supplier code' : null,

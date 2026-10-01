@@ -694,6 +694,102 @@ void main() {
     }
   });
 
+  test('P05-R02-R08 differential fields retain private identities through secure restart', () async {
+    final raw = jsonDecode(jsonEncode(entryFixture().toJson())) as Map<String, dynamic>;
+    final draft = raw['draft'] as Map<String, dynamic>;
+    const additions = {'supplierEmail':'supplier@example.test', 'buyerPhone':'9999999999',
+      'buyerEmail':'buyer@example.test', 'poReference':'EXISTING-PO-01', 'documentCopy':'Original for recipient',
+      'totalTax':'18.25', 'amountPayable':'2840.00', 'amountInWords':'As printed, not regenerated',
+      'bankName':'Evaluation bank', 'bankAccount':'001234500', 'bankIfsc':'ASPRINTED01',
+      'bankBranch':'Evaluation branch', 'upiType':'As printed', 'upiId':'evaluation@upi',
+      'paymentQrStatus':'Shown on invoice', 'terms':'Only terms printed on this bill',
+      'signatory':'Printed name, not authenticated', 'expectedDeliveryDate':'03/10/2026',
+      'shippingTerms':'Delivered at Store', 'paymentTerms':'Pay within fifteen days'};
+    draft['details'] = additions;
+    (draft['goods'] as List).single.addAll({'specifications':'Model A, 1 kg pack', 'taxAmount':'18.25'});
+    final book = WorkspacePurchaseEntryBook.fromJson(raw);
+    final storage = _OrderJournalStorage();
+    await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .save(book, expectedRevision: null);
+    final restored = await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .read('account-A', 'store-A', qa: true);
+    expect(restored!.toJson(), book.toJson());
+    expect(restored.draft!.id, 'manual-draft-A');
+    expect(restored.draft!.supplierId, 'private-supplier-A');
+    expect(restored.draft!.goods.single['productId'], 'saved-product-A');
+    expect(restored.draft!.details.containsKey('paymentStatus'), isFalse);
+    expect(restored.draft!.details.containsKey('signatureStatus'), isFalse);
+    expect(await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .read('account-A', 'store-A', qa: false), isNull);
+    final bad = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+    bad['draft']['details']['postedPayable'] = '2840';
+    expect(() => WorkspacePurchaseEntryBook.fromJson(bad), throwsFormatException);
+  });
+  test('P05-R05-C01 longer supplier terms and specifications retain bounded originals', () {
+    final terms = 'Evaluation supplier terms. ' * 120;
+    final specs = 'Evaluation model. ' * 40;
+    final raw = jsonDecode(jsonEncode(entryFixture().draft!.toJson())) as Map<String, dynamic>;
+    raw['details'] = {'terms':terms};
+    (raw['goods'] as List).single['specifications'] = specs;
+    final restored = WorkspacePurchaseEntryDraft.fromJson(raw);
+    expect(restored.details['terms'], terms);
+    expect(restored.goods.single['specifications'], specs);
+    final parsed = WorkPurchaseInvoiceSuggestions.parse('Supplier terms: $terms\n'
+      'Item | Qty | Rate | Specifications\nEvaluation item | 2 | 40 | $specs');
+    expect(parsed.fields['terms'], terms.trim());
+    expect(parsed.goods.single['specifications'], specs.trim());
+    raw['details']['terms'] = 'a' * 4001;
+    expect(() => WorkspacePurchaseEntryDraft.fromJson(raw), throwsFormatException);
+    raw['details']['terms'] = terms;
+    (raw['goods'] as List).single['specifications'] = 'a' * 1001;
+    expect(() => WorkspacePurchaseEntryDraft.fromJson(raw), throwsFormatException);
+  });
+  test('P05-R04-R08 printed paise and incomplete tax never invent zeroes', () {
+    expect(WorkspacePurchaseEntryDraft.printedPaise('807117.80'), 80711780);
+    expect(WorkspacePurchaseEntryDraft.printedPaise('-0.50'), -50);
+    for (final value in ['', 'NaN', 'Infinity', '1.234', '1e4', '1,23']) {
+      expect(WorkspacePurchaseEntryDraft.printedPaise(value), isNull);
+    }
+    expect(WorkspacePurchaseEntryDraft.reviewAmounts({'taxTreatment':'IGST', 'totalTax':'18.25', 'igst':'18.25'}), isEmpty);
+    expect(WorkspacePurchaseEntryDraft.reviewAmounts({'taxTreatment':'IGST', 'totalTax':'18.25', 'igst':'18.25', 'cess':'0'}), isEmpty);
+    expect(WorkspacePurchaseEntryDraft.reviewAmounts({'taxTreatment':'IGST', 'totalTax':'18.25', 'igst':'18.24', 'cess':'0'}), hasLength(1));
+    expect(WorkspacePurchaseEntryDraft.reviewAmounts({'roundOff':'-0.50'}), isEmpty);
+    expect(WorkspacePurchaseEntryDraft.reviewAmounts({'paidAmount':'not known'}), hasLength(1));
+  });
+  test('P05-R04 HSN summary needs all explicit line facts and keeps rates separate', () {
+    final rows = [
+      {'hsn':'1006', 'gstRate':'5', 'taxableValue':'1.01', 'taxAmount':'0.05', 'quantity':'2', 'pack':'kg'},
+      {'hsn':'1006', 'gstRate':'5', 'taxableValue':'2.02', 'taxAmount':'0.10', 'quantity':'3', 'pack':'bags'},
+      {'hsn':'1006', 'gstRate':'12', 'taxableValue':'3', 'taxAmount':'0.36'},
+    ];
+    final summary = WorkspacePurchaseEntryDraft.printedHsnSummary(rows);
+    expect(summary, hasLength(2));
+    expect(summary.first.taxable, 303);
+    expect(summary.first.tax, 15);
+    expect(summary.last.rate, '12');
+    expect(WorkspacePurchaseEntryDraft.printedHsnSummary([...rows, {'hsn':'1006', 'taxableValue':'5'}]), isEmpty);
+  });
+  test('P05-R07 explicit differential OCR suggestions do not invent payment identity', () {
+    final result = WorkPurchaseInvoiceSuggestions.parse('Supplier email: supplier@example.test\n'
+      'Buyer phone: 9999999999\nBuyer email: buyer@example.test\nPO number: EXISTING-1\n'
+      'Copy label: Original for recipient\nTotal tax: 18.25\nAmount payable: 2840\n'
+      'Amount in words: As printed\nBank name: Evaluation bank\nBank account: 0012345\n'
+      'IFSC: ASPRINTED\nUPI ID: evaluation@upi\nSupplier terms: As printed\n'
+      'Expected delivery date: 03/10/2026\nPayment terms: Fifteen days\nPaid: Yes\n'
+      'Item | Qty | Rate/Item | Units | HSN/SAC | Model | Tax amount | Amount\n'
+      'Evaluation item | 2 | 40 | pcs | 1006 | Model A | 4 | 84');
+    expect(result.fields['supplierEmail'], 'supplier@example.test');
+    expect(result.fields['bankAccount'], '0012345');
+    expect(result.fields['poReference'], 'EXISTING-1');
+    expect(result.fields.containsKey('paymentStatus'), isFalse);
+    expect(result.goods.single['productId'], isEmpty);
+    expect(result.goods.single['specifications'], 'Model A');
+    expect(result.goods.single['taxAmount'], '4');
+    expect(WorkPurchaseInvoiceSuggestions.parse('Buyer phone: A\nBuyer phone: B\n'
+      'Total tax: NaN\nExpected delivery date: 31/02/2026').fields, isEmpty);
+    expect(WorkPurchaseInvoiceSuggestions.parse('').fields, isEmpty);
+    expect(WorkPurchaseInvoiceSuggestions.parse('unclear words').goods, isEmpty);
+  });
   test('P05-GST invoice format review keeps nonconforming supplier originals', () {
     final raw = entryFixture(reference: 'EXTERNAL-NUMBER-TOO-LONG').draft!.toJson();
     raw['invoiceDate'] = '31/02/2026';
@@ -874,7 +970,8 @@ void main() {
       targetInvoiceId: 'target', amountMinor: 30000, expectedRevision: 1,
       operationId: 'report-credit');
     final statement = StoreSalesStatement(accountId: 'account-A', storeId: 'credit-store',
-      storeName: 'Evaluation credit Store', from: DateTime.utc(2026, 9), until: DateTime.utc(2026, 10),
+      storeName: 'Evaluation credit Store', from: DateTime.utc(2026, 9),
+      until: after.asOf.add(const Duration(days: 1)),
       generatedAt: after.asOf.add(const Duration(minutes: 1)), finance: after, reviewOnly: true,
       invoices: [for (final source in [true, false]) WorkspaceCustomerInvoice(
         id: source ? 'source' : 'target', orderId: source ? 'source-order' : 'target-order',
@@ -884,6 +981,12 @@ void main() {
     expect(statement.recorded(WorkspaceLedgerEntryKind.creditNote), 50000);
     expect(statement.recorded(WorkspaceLedgerEntryKind.refund), 0);
     expect(statement.recorded(WorkspaceLedgerEntryKind.creditReceived), 30000);
+    // A later adjustment must not leak into an earlier invoice/report period.
+    final beforeAllocation = StoreSalesStatement(accountId: statement.accountId,
+      storeId: statement.storeId, storeName: statement.storeName, from: statement.from,
+      until: after.asOf, generatedAt: statement.generatedAt, finance: after,
+      reviewOnly: true, invoices: statement.invoices);
+    expect(beforeAllocation.recorded(WorkspaceLedgerEntryKind.creditReceived), 0);
     final allocations = statement.report.rows.where((r) => r[12] is num).toList();
     expect(allocations, hasLength(2));
     expect(allocations.map((r) => r[1]), ['source', 'target']);
