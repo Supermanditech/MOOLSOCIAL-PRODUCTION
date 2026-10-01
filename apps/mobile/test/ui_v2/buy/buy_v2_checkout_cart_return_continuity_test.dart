@@ -642,7 +642,9 @@ void main() {
           textScaler: TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
         ),
-        child: const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE')
+        child:
+            (const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE') ||
+                const bool.fromEnvironment('BUY_CHECKOUT_REVIEW_DRAFT_CAPTURE'))
             ? RepaintBoundary(
                 key: const ValueKey('r66-checkout-review-capture'),
                 child: child!,
@@ -2506,7 +2508,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Dispatches'), findsOneWidget);
       expect(find.text('Dispatch within one business day'), findsOneWidget);
-      expect(find.text('Handled by'), findsOneWidget);
+      expect(find.text('Planned delivery'), findsOneWidget);
       expect(find.text('Rajasthan Freight Network'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
@@ -3159,7 +3161,7 @@ void main() {
     expect(semanticNode.rect.height, greaterThanOrEqualTo(44));
     advanceCheckoutToConfirm(session);
     await tester.pump();
-    expect(find.text('Your orders'), findsOneWidget);
+    expect(find.text('Order items'), findsOneWidget);
     expect(session.checkoutFulfilmentGroups, hasLength(1));
     expect(
       session.checkoutFulfilmentGroups.single.destination,
@@ -3252,10 +3254,37 @@ void main() {
         expect(owner.hitTestable(), findsOneWidget, reason: viewport.label);
         expect(find.text('Checkout'), findsOneWidget, reason: viewport.label);
         expect(find.text('Review order'), findsNothing, reason: viewport.label);
+        if (const bool.fromEnvironment('BUY_CHECKOUT_REVIEW_DRAFT_CAPTURE')) {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(const ValueKey('r66-checkout-review-capture')),
+          );
+          await tester.runAsync(() async {
+            final directory = Directory(
+              const String.fromEnvironment(
+                'BUY_CHECKOUT_REVIEW_DRAFT_DIRECTORY',
+                defaultValue: 'build/checkout-review-20261001/drafts',
+              ),
+            );
+            await directory.create(recursive: true);
+            final file = File(
+              '${directory.path}/buy-v2-t02-checkout-${viewport.label}.png',
+            );
+            if (await file.exists()) throw StateError('Draft already exists');
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              final bytes = await image.toByteData(format: ImageByteFormat.png);
+              if (bytes == null) throw StateError('Draft encoding failed');
+              await file.writeAsBytes(bytes.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+          return;
+        }
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-unified-checkout-20261001/'
+            'candidate_captures/cursor-checkout-review-20261001/'
             'buy-v2-t02-checkout-${viewport.label}.png',
           ),
         );
@@ -3670,7 +3699,7 @@ void _purchaseOrderPanelCases() {
         expect(find.text('Previous terms · review required'), findsNothing);
         expect(
           find.text(
-            'Purchase order status needs checking. Do not submit again.',
+            'Supplier terms status needs checking. Do not submit again.',
           ),
           findsOneWidget,
         );
@@ -3748,7 +3777,7 @@ void _purchaseOrderPanelCases() {
 
         Future<void> captureCollection(String state) async {
           if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
-          await tester.ensureVisible(find.text('Purchase order'));
+          await tester.ensureVisible(find.text('Supplier terms'));
           await tester.pumpAndSettle();
           await captureR66Visual(tester, 'po-collection-$state-text$scale');
         }
@@ -3763,7 +3792,7 @@ void _purchaseOrderPanelCases() {
         await tap('buy-po-refresh');
         await captureCollection('accepted');
         expect(session.purchaseOrderReviewRequired, isFalse);
-        expect(find.text('Update total'), findsOneWidget);
+        expect(find.text('Check total'), findsOneWidget);
         // No collection gateway is installed in this fixture: approval alone
         // must not fabricate a quote or enable payment.
         expect(tester.widget<FilledButton>(action).onPressed, isNull);
@@ -3810,13 +3839,13 @@ void _purchaseOrderPanelCases() {
         await tester.pumpAndSettle();
         expect(scroll.position.pixels, 0);
         expect(
-          tester.getTopLeft(find.text('Purchase order')).dy,
+          tester.getTopLeft(find.text('Supplier terms')).dy,
           greaterThanOrEqualTo(0),
         );
         await captureR66Visual(tester, 'po-$state-text$scale');
         expect(scroll.position.pixels, 0);
         expect(
-          tester.getTopLeft(find.text('Purchase order')).dy,
+          tester.getTopLeft(find.text('Supplier terms')).dy,
           greaterThanOrEqualTo(0),
         );
       }

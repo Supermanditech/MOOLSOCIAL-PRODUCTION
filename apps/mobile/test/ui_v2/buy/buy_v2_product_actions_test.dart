@@ -1428,24 +1428,39 @@ void main() {
 
         session.openCart();
         await tester.pumpAndSettle();
-        final cartEdit = find.byKey(ValueKey('buy-cart-edit-quantity-$id'));
-        await tester.ensureVisible(cartEdit);
+        final cartQuantity = find.byKey(ValueKey('buy-cart-quantity-$id'));
+        await tester.ensureVisible(cartQuantity);
         await tester.pumpAndSettle();
-        expect(cartEdit.hitTestable(), findsOneWidget);
-        await tester.tap(cartEdit);
+        expect(cartQuantity.hitTestable(), findsOneWidget);
+        await tester.tap(cartQuantity);
         await tester.pumpAndSettle();
-        await tester.enterText(input, '1000');
-        await tester.ensureVisible(find.text('Cancel'));
-        await tester.tap(find.text('Cancel'));
+        expect(input, findsNothing);
+        expect(
+          find.byKey(ValueKey('buy-cart-edit-quantity-$id')),
+          findsNothing,
+        );
+        expect(session.quantityFor(id), 28736);
+        final controls = find.descendant(
+          of: find.ancestor(of: cartQuantity, matching: find.byType(Row)).first,
+          matching: find.byType(IconButton),
+        );
+        expect(controls, findsNWidgets(2));
+        await tester.tap(controls.last);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(id), 28736 + product.quantityStep);
+        expect(session.cartLines.single.product.pack, product.pack);
+        expect(
+          session.cartLines.single.product.minimumOrder,
+          product.minimumOrder,
+        );
+        expect(
+          session.cartLines.single.product.quantityStep,
+          product.quantityStep,
+        );
+        await tester.tap(controls.first);
         await tester.pumpAndSettle();
         expect(session.quantityFor(id), 28736);
-        await tester.tap(cartEdit);
-        await tester.pumpAndSettle();
-        await tester.enterText(input, '1000');
-        await tester.ensureVisible(save);
-        await tester.tap(save);
-        await tester.pumpAndSettle();
-        expect(session.quantityFor(id), 1000);
+        expect(input, findsNothing);
         expect(session.view, BuyV2View.cart);
         session.goBack();
         await tester.pumpAndSettle();

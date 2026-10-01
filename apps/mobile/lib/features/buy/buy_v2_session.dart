@@ -2960,8 +2960,8 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
     } on Object {
       if (!_current(epoch, owner)) return false;
       message = needsReconciliation
-          ? 'Purchase order status needs checking. Do not submit again.'
-          : 'Purchase order could not be checked. Try again.';
+          ? 'Supplier terms status needs checking. Do not submit again.'
+          : 'Supplier terms could not be checked. Try again.';
       return false;
     } finally {
       if (_current(epoch, owner)) {
@@ -7969,7 +7969,7 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> submitCollectionPurchase() async {
     if (purchaseOrderReviewRequired) {
-      notice = 'Purchase order collection details need review before payment.';
+      notice = 'Supplier terms for collection need checking before payment.';
       notifyListeners();
       return false;
     }
@@ -13453,7 +13453,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (purchaseOrderReviewRequired) {
-      notice = 'Purchase order approval changed. Review it before payment.';
+      notice = 'Supplier terms changed. Check them before payment.';
       notifyListeners();
       return false;
     }
@@ -13467,7 +13467,7 @@ class BuyV2Session extends ChangeNotifier {
   Future<bool> submitOrder() {
     if (purchaseOrderReviewRequired) {
       notice =
-          'Review the purchase order and supplier response before payment.';
+          'Check the supplier terms and response before payment.';
       notifyListeners();
       return Future<bool>.value(false);
     }
@@ -13727,7 +13727,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (!_checkoutEligibilityCurrent()) return false;
     if (purchaseOrderReviewRequired) {
-      notice = 'Purchase order approval changed. Review it before payment.';
+      notice = 'Supplier terms changed. Check them before payment.';
       notifyListeners();
       return false;
     }
@@ -13772,7 +13772,7 @@ class BuyV2Session extends ChangeNotifier {
         _pendingPurchaseOrderRequestId = null;
         _pendingPurchaseOrderRevision = null;
         notice = retained
-            ? 'Purchase order approval changed. Review it before payment.'
+            ? 'Supplier terms changed. Check them before payment.'
             : 'Order recovery details could not be saved. Try again before payment.';
         _persistCustomerState();
         notifyListeners();
@@ -13958,7 +13958,7 @@ class BuyV2Session extends ChangeNotifier {
         !_purchaseOrderConfirmationMatches(placement, lines)) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
       notice =
-          'Order details could not be matched to your purchase order. '
+          'Order details could not be matched to your agreed supplier terms. '
           'Do not pay again. Check payment status or get order help.';
       _persistCustomerState();
       notifyListeners();
@@ -14206,7 +14206,7 @@ class BuyV2Session extends ChangeNotifier {
       if (!await _restorePendingPurchaseOrder(lines, address)) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
         notice =
-            'Purchase order details could not be restored. Do not pay again. '
+            'Supplier terms could not be restored. Do not pay again. '
             'Check payment status again or get order help.';
         _persistCustomerState();
         notifyListeners();
