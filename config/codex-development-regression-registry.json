@@ -104944,6 +104944,256 @@
     },
     {
       "id": "REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES",
+      "t04OffersAutonomous20261002": {
+        "status": "partially_verified_pending_safe_git_checkpoint",
+        "contract": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
+        "contractSha256": "21CC943EF7FEA471AF57F746C6CDE76CB484B39125364F778EE1520EE318D71D",
+        "baseline": "7a6e141f0731a643757127db4a6ea81c9b6264c0",
+        "baselineSourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da",
+        "baselineGit": {
+          "remoteExact": true,
+          "rawStatusBytes": 0,
+          "rawStatusRecords": 0,
+          "rawStatusExitCode": 0,
+          "rawStatusSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "authority": "Founder selected the next Cart T04 bounded cycle: scope/Git, existing Redmi hot reload, screenshots and actual journey, register defects, scoped fixes, tests, re-hot-reload/retest, verified status or unresolved child, safe Git checkpoint, then stop. Backend deferred; workspace/provider dependencies assigned to Codex after integration; Google dependencies kept listed.",
+        "owners": [
+          "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart"
+        ],
+        "newExactEvidenceOwners": [
+          "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
+          "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl",
+          "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl",
+          "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-2.jsonl"
+        ],
+        "architectPlanReview": "Existing read-only architect approved the bounded plan; freeze benefit choice/removal, reject stale actions/responses, use one applied-state source and retain truthful native versus fixture evidence boundaries.",
+        "preliminaryAudit": "chooseCartBenefit/removeCartBenefit omit the existing payment hold; reproduce before registering an actual child or runtime repair.",
+        "preAdmissionIncident": {
+          "classification": "read_only_preparation_assertion_before_any_tracked_mutation",
+          "cause": "A global selectedTicketAssessment property search found both current and historical objects at the same indentation; the helper correctly rejected the ambiguous match.",
+          "diagnosticRecovery": "Nested tool diagnostic was initially discarded by the wrapper. Recorded that orchestration error, inspected scalar preconditions and found selectedTicketAssessmentCount=2; branch/head/status/other markers were valid.",
+          "repair": "Update only the unique root preTicketSelectionCheckpoint object and its current selectedTicketAssessment, preserving every historical assessment. Retain every nested result before throwing.",
+          "runtimeChanged": false,
+          "secondRejectedPreparation": "Serializing the entire checkpoint container reformatted historical compact arrays and produced an oversized patch. The tool truncated it; that patch was rejected and never applied.",
+          "finalRecovery": "Isolate the unique root checkpoint raw character span, replace only its current selectedTicketAssessment value, preserve all surrounding historical text, enforce a patch-size limit and write the patch to an ignored artifact with scalar-only output. Architect reviewed this exact recovery.",
+          "artifactHashPreflight": "A later raw patch-file hash check rejected Windows write_text newline translation versus the prepared LF string hash. No patch applied. Replaced that ignored artifact writer with explicit UTF-8 bytes and bind the printed hash to actual artifact bytes before fetching/applying."
+        },
+        "deferred": [
+          "Workspace benefit/quote/payment provider mapping remains assigned to Codex after integration; backend execution deferred",
+          "Google-backed shopping-area/current-location and separately gated delivery Maps dependencies stay listed; no direct Google change in T04"
+        ],
+        "stopRule": "After the selected T04 workflow is locally verified or linked unresolved children are recorded and a safe checkpoint is preserved; do not silently start T05.",
+        "admissionEvidenceOwnerCorrection20261002": {
+          "phase": "coordination implementation before native baseline",
+          "failure": "Gate rejected recorded owner CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl because the closed receipt does not exist yet",
+          "cause": "The initial preparation claimed three planned proof files before the test run produced them",
+          "recovery": "Remove only those nonexistent proof claims; retain the actual immutable contract claim and all existing Buy owners. Produce and strictly validate actual closed receipts before registering their exact owners at qualification",
+          "checksPreserved": "No stub receipt, fabricated proof or weakened owner/file-existence check",
+          "notExecutedAfterFailure": [
+            "MVP execution gate",
+            "incremental implementation gate",
+            "device gate",
+            "native hot reload"
+          ],
+          "runtimeSourceUnchanged": true,
+          "reservedProofPathsAreNotCurrentClaims": true
+        },
+        "admissionPairedOwnerCorrection20261002": {
+          "failure": "Corrected root claim had239 actual owners, while the checker still expected242 including three future receipts; exact claim equality rejected it",
+          "cause": "The first missing-file recovery removed future receipts from the claim but not from the paired review-qualification array",
+          "recovery": "Keep both exact lists at239 existing owners now; retain the new contract only. Add each proof path to both lists only after its actual closed file is produced and strictly qualified",
+          "gatePreservation": "Keep all file-existence, equality, branch, baseline, regression binding and serialization checks unchanged",
+          "runtimeSourceUnchanged": true,
+          "nativeBaselineNotStarted": true,
+          "architectReview": "Repeated admission mismatch reviewed with the existing read-only architect before retry"
+        },
+        "admissionPassed": "Regression memory implementation/device, root239 exact paired owners, MVP scope and incremental implementation gates passed before native hot reload",
+        "baselineNative": {
+          "serial": "TG8HCYTGGQT885OF",
+          "package": "com.moolsocial.app.cursorreview",
+          "hotReload": "baseline-hot-reload-1: code0, detach true, Reloaded0libraries",
+          "cart": "All:2products/3items ₹837; unchanged shared Call on arrival note; expanded benefit panel and reachable Checkout",
+          "actualDeviceDate": "2026-10-02T03:03:18+0530",
+          "observedDefect": "Wholesale shows three selectable payment campaigns ending2026-09-30, despite actual device date2026-10-02",
+          "screenshots": "apps/mobile/build/t04-offers-20261002/baseline-*.png and matching closed XML; individual hashes retained",
+          "limits": "Shop/trade coupons unavailable for this basket. Active provider coupon/payment journey will use isolated local fixtures; integrated provider acceptance remains separately deferred"
+        },
+        "reproduction": {
+          "path": "apps/mobile/build/t04-offers-20261002/reproduction-1.jsonl",
+          "sha256": "50d55766d5a6cb8480a9cf6a88758409ba1000663dab6f144c0ce901df522f3b",
+          "sourceSha256": "6b88f08708fd2d47a5247d45297585ff321c6741a879158d7edab53c691ea8a8",
+          "confirmed": [
+            "Actual delayed placeOrder and unresolved payment permit coupon choice, replacing t04-coupon-5 with t04-coupon-7",
+            "Actual delayed placeOrder and unresolved payment permit removal, dropping the agreed coupon",
+            "Non-live payment offer can be selected before validFrom; native expired payment offers remain selectable"
+          ],
+          "fixtureCorrection": "New coupon boundary case incorrectly reused a payment-only fixture and could not select an active coupon. Generalize that test-only fixture to its supplied benefit.kind before the repair replay; no production source changed yet",
+          "rejectedPatch": "The initial narrow fixture patch omitted the existing newline between arrow and condition; apply_patch rejected it before any write. Use the actual observed condition line."
+        },
+        "auditReadRecovery": "Two targeted search/read results exceeded output budgets because of an oversized combined range and long JSON scalar lines. Retained the tool diagnostics; reread relevant code in bounded windows and use parsed JSON scalar summaries. A guessed commerce-contract filename did not exist; the actual request contract is buy_v2_content_contracts.dart, read through session imports. No runtime or gate change from these read-only incidents.",
+        "architectRepairReview": "Astra approved existing payment hold for choice/removal and consistent campaign clock/boundary validation across adapters; keep deliberate minimum-spend/method pending review and truthful integration boundaries",
+        "firstReplay": {
+          "path": "apps/mobile/build/t04-offers-20261002/focused-1.jsonl",
+          "sha256": "b3c80484714999e1536f6d2f20372a151b06b5c52d5c8378f0a2fd6f6634657f",
+          "sourceSha256": "0e6c8ae5c375b0d603c7ce6e8190855b13a4848d990bc0c805bc50d79cea92ee",
+          "passed": 532,
+          "distinctFailures": 6,
+          "positiveFixtureFailures": "Five benefit tests used expired device-review campaigns as active coupons; use the existing isolated active campaign fixture for those behavior tests, preserving current native dates and all boundary assertions",
+          "unrelatedFollowUp": "R5 collection purchase checkout failure recovery visual identity exposes an enabled prepareCollectionCheckout action when its test identity is removed; register a linked follow-up, retain its actual failed log, and do not silently refactor collection identity in this T04 pass",
+          "qualification": "Failed full-file replay retained as reproduction only; it will not be used as successful acceptance evidence"
+        },
+        "deviceGateCommandCorrection": "An invocation used a shortened nonexistent memory-check script name. No gate ran and no hot reload followed. Discover actual scripts/check-codex-development-regression-memory.ps1 and run it with the existing device/none/archive parameters before retest",
+        "preflightAudit": "checkoutBusy starts only after awaited benefit/quote/terms checks. Add an ephemeral preflight hold around actual asynchronous order submission, clearing it in finally and preserving existing submitting/unresolved holds. Astra reviewed the wrapper and internal eligibility path; actual delayed preflight will be reproduced before source repair.",
+        "expiryRecoveryBoundary": "Current Cart must revalidate campaign expiry. Already submitted request totals must remain immutable. Deferred live quote/recovery integration is distinct from local frontend correctness; any reproduced unresolved display drift will be linked explicitly, not reported as full T04 continuity acceptance.",
+        "preflightReproduction": {
+          "path": "apps/mobile/build/t04-offers-20261002/preflight-reproduction-1.jsonl",
+          "sha256": "81af2170f99dac98fcab927df602a80b8fa9fea908bf2e71ef807014c7094eb6",
+          "sourceSha256": "cb9e60bf80b8c46fb45520d8f0da2b4136581570b8b78b19d5a6e11f398731dc",
+          "passed": 5,
+          "distinctFailures": 1,
+          "confirmed": "An actual submitOrder awaiting controlled live benefit eligibility does not report checkoutBusy; removal and quantity change can run during that window. Captured results retained before assertions and both actual submission futures drained.",
+          "repair": "Wrap only actual asynchronous order placement with an ephemeral preflight busy flag and try/finally; preserve original validation, submission and payment recovery states. Include a failure/retry release assertion.",
+          "architectReview": "Existing Astra approved the wrapper, prompt notify, finally release and shared busy semantics; do not weaken internal eligibility or existing collection holds"
+        },
+        "fixtureCompileCorrection": {
+          "failedFocusedLog": "apps/mobile/build/t04-offers-20261002/focused-2.jsonl",
+          "failedFocusedSha256": "07bb9b7544dab7a5fc5828072dede3936a8aa7901d79059432415a64700b975b",
+          "failedAnalysisLog": "apps/mobile/build/t04-offers-20261002/analysis-2.log",
+          "failedAnalysisSha256": "76e9532f9d27c3c06669a0f107487e125ddd3d5c80a13c4abc4917e0c0a3b7aa",
+          "cause": "The new unavailable preflight test snapshot omitted its required evaluatedAt field; static analysis and test compilation rejected it",
+          "repair": "Supply the required fixture timestamp through the existing snapshot constructor. Preserve the unavailable outcome and hold/retry assertions. This is test-only; no new runtime mutation or relaxed gate",
+          "qualification": "Both failed logs retained; no successful qualification inferred"
+        },
+        "nativeRefreshDiscrepancy": {
+          "attempt": "final-hot-reload-1",
+          "controlResult": "app.restart fullRestart:false returned code0 Reloaded0libraries and detachtrue",
+          "actualObservation": "final-wholesale-payment.png still shows the three expired Sep30 campaigns after qualified source c62e3eca; this is failed native synchronization, not accepted fix evidence",
+          "captureSha256": "1a407ff7ae285019e1b0c662fa3ca721db638f5d89ccf0f26f156146e11c3511",
+          "recovery": "Compared the existing proven shared-instructions full-refresh helper in this assigned worktree: it uses fullRestart:true. Use that supported full Dart restart of the existing debug application; no APK build/install, process force-stop, data clear or other worktree edit",
+          "readOnlyCommandIncident": "A targeted rg expression beginning with --target was parsed as an option and rejected. Use an explicit pattern argument or -- terminator; no file read/mutation or qualification inferred from the failed search",
+          "architectReview": "Astra requires actual changed native behavior after source/device/entrypoint checks; record an unresolved native-retest child if debug synchronization cannot be proved"
+        },
+        "firstSelectedReplay": {
+          "sourceSha256": "c62e3ecaa8f5887c39a03382b4de5fd62a59031820c21f5d55de852a6e3494f6",
+          "batch1": {
+            "path": "apps/mobile/build/t04-offers-20261002/selected-1/selected-1.jsonl",
+            "sha256": "6d57f4fcb7ecd937ae89420bc2b20a5aebcb9fab5f7c74ff341815f1e79dd483",
+            "passed": 432,
+            "distinctFailures": 1
+          },
+          "batch2": {
+            "path": "apps/mobile/build/t04-offers-20261002/selected-1/selected-2.jsonl",
+            "sha256": "f923c820663c526ab2fe72f65fd03f42c7c34e189fc712566bf8a1f009748550",
+            "passed": 456,
+            "distinctFailures": 4
+          },
+          "unchangedSource": true,
+          "cause": "Two positive offer test owners reused dated review campaigns: four full-benefit size profiles and the six-state selection/removal scenario cannot select expired campaigns after correct runtime temporal validation",
+          "repair": "Move the already isolated active campaign fixture to the existing shared qualified-provider test owner; explicitly inject it only for positive offer scenarios. Preserve identities, Store/product scope, revisions and every field except isolated campaign dates/legacy method adaptation. Native/seeded dates, negative tests, totals, semantics and golden assertions remain unchanged",
+          "architectReview": "Astra approved shared fixture reuse and removal of the replaced private class. Closed failed logs are retained; final matrix must use the amended final source only",
+          "qualification": "Both failed matrix logs are reproduction only, never successful evidence"
+        },
+        "impactTestOwners": [
+          "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"
+        ],
+        "impactOwnership": "All three existing test files already belong to the exact239-file root claim; verified no missing owners. This is necessary regression-fixture impact of the existing T04 temporal correction, not runtime expansion",
+        "monitorReadCorrection": "A progress-only parser accepted a JSON array and called dict.get on it. The command failed before any qualification; restrict monitoring to actual dictionary machine events as the existing runners do. Repeated oversized read outputs are excluded as evidence; future inventory queries print counts/missing paths only, not whole coordination objects",
+        "nativeRetest": "Existing full Dart restart synchronized runtime successfully: actual Sep30 campaigns absent on Oct02, normal/200% Cart and Checkout preserve837. Eight inspected PNG/XML pairs and runtime hashes retained in device-review.json; original basket, shared note, font and rotation restored. No new APK or live payment",
+        "qualifiedFocused": {
+          "path": "apps/mobile/build/t04-offers-20261002/focused-4.jsonl",
+          "sha256": "9116811106004c09c7d198e303c7e4983f2e40f8966b9bf7a055a2ce40d98636",
+          "sourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9",
+          "passed": 31,
+          "failed": 0,
+          "skipped": 0,
+          "warnings": 0
+        },
+        "analysis": {
+          "owners": 7,
+          "result": "No issues found",
+          "path": "apps/mobile/build/t04-offers-20261002/analysis-4.log",
+          "sha256": "538ac453db9ba66652e363e6bea4c184f3e49444e4fc08d839cdec51b3647ff0"
+        },
+        "nativeDeviceRecord": {
+          "path": "apps/mobile/build/t04-offers-20261002/device-review.json",
+          "sha256": "2d4f37f72c6ea50aaee93a9caf407e84c070633e2d95aecee34f2bdbc860bfeb",
+          "acceptedCaptures": 8,
+          "note": "Only test fixtures changed after native review; all three reviewed runtime owner hashes remain exact. Full restart and actual expiry disappearance proved synchronization"
+        },
+        "reproducedUnresolvedChildren": [
+          {
+            "id": "BUY-ACTION-POLISH-20260926-01-A08",
+            "issue": "Collection preparation action remains enabled after test identity loss",
+            "scope": "Frontend payment eligibility/recovery follow-up; independent of selected T04 offers"
+          },
+          {
+            "id": "BUY-ACTION-POLISH-20260926-01-A09",
+            "issue": "Isolated review-only pending Checkout displays37 after campaign expiry while submitted request remains32",
+            "scope": "Frontend frozen pending-amount/recovery correction for T07; not a changed provider charge; integration is not a demonstrated technical prerequisite",
+            "reproduction": "apps/mobile/build/t04-offers-20261002/pending-expiry-reproduction-1.jsonl",
+            "sha256": "a22eec1364773348b32f52678b692924dd9f725be2311b20ba14ff24aee53060",
+            "testSha256": "86ab5e287fe991c3aad67cb10ff7b87e3e5ce721cced3926fd623016b6c809ec"
+          }
+        ],
+        "architectStopReview": "Founder explicitly permits bounded stop with linked unresolved children. Qualify A06/A07 and actual native scope only after final selected matrix finishes; T04 partially verified, no full total-continuity/ticket_close or integrated acceptance claim. No broad durable payment-snapshot implementation in this pass.",
+        "qualifiedSelected": {
+          "sourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9",
+          "distinctPassed": 893,
+          "references": 952,
+          "files": 53,
+          "failed": 0,
+          "skipped": 0,
+          "terminalSuccess": true,
+          "unchangedSource": true,
+          "evidence": [
+            {
+              "path": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl",
+              "sha256": "9116811106004c09c7d198e303c7e4983f2e40f8966b9bf7a055a2ce40d98636",
+              "sourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl",
+              "sha256": "5c4deb1b398f903a26d75b0feb630a747032087771de90b42e141fc96adcb9a4",
+              "sourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-2.jsonl",
+              "sha256": "0eab9fa77bef6595bb59660c6a34987c0b25f827d7ed5c59beda69572168cad5",
+              "sourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9"
+            }
+          ]
+        },
+        "caseStatus": {
+          "A06": "local_passed",
+          "A07": "local_passed",
+          "A08": "open_collection_identity_action",
+          "A09": "open_pending_payment_display_drift_request32_display37"
+        },
+        "acceptanceBoundary": "T04 is partially verified with A08 and A09 open; no total-continuity acceptance, founder visual approval, ticket_close or live provider acceptance is inferred. User authorized linked unresolved-child stop. No T05 implementation starts.",
+        "qualificationBindingRecovery": {
+          "firstAttempt": "Closed successful logs passed all behavior/source checks; helper rejected the 805058-character binding patch against its arbitrary 360000-character transport bound before generating any receipt or claim. No source or ledger mutation occurred.",
+          "correction": "Raised only the ignored helper transport ceiling to 1000000 and split at actual owner/hunk boundaries into 35 individually hash-verified patches below 26KB. Actual closed receipts existed before exact paired ownership registration.",
+          "qualifiedReceiptOwners": 3,
+          "rootOwnerCount": 242
+        },
+        "memoryOwnershipBoundary": "The general regression-memory Markdown file is unclaimed and was left unchanged. Durable T04 regression records are kept in the existing owned REG4647 registry subtree and Buy handoff.",
+        "qualificationOwnerSeparatorRecovery": {
+          "initialGates": "Memory and coordinator pre_commit rejected invalid JSON after the last-owner insertion omitted the original comma and left a trailing receipt comma. No commit or native action followed the rejection.",
+          "correction": "Precisely added the separator after CONTRACT.json and removed the final receipt comma. Strict Python parse then verified 242 unique owners, every claimed file exists and registry SHA matches. Both memory and coordinator gates must pass before checkpoint.",
+          "runtimeSourceUnchanged": true,
+          "failedGeneratedPatchRetained": "apps/mobile/build/t04-offers-20261002/qualification.patch"
+        },
+        "preCommitAtomicStageAdmission": {
+          "firstAttempt": "Coordinator pre_commit rejected the intentionally unstaged review set: production pre-commit requires one fully staged atomic change set. Memory, MVP, incremental implementation and diff checks passed. No commit was attempted.",
+          "nextStep": "Stage only the exact 16 owned task files and rerun coordinator pre_commit against the staged atomic set; never weaken the gate."
+        }
+      },
       "sharedDeliveryInstructionCorrection20261002": {
         "finding": "Founder identified an escaped T03 product regression: public delivery instructions were scoped to Shop and Wholesale despite one receiving address, leaving Bulk unclear. Previous green isolation tests encoded the wrong product rule. Reconstruction also repeated oversized central-instruction and registry projections; truncated results are rejected as complete evidence. Initial full status was empty but did not follow the independent digest protocol; handoff heading discovery emitted titles instead of line numbers.",
         "rootCause": "Basket destination identity was incorrectly reused as the public delivery-instruction scope. Founder intent requires one receiving-address instruction shared by selected delivery orders. Read-only reconstruction failed to bound exact fields before emission.",

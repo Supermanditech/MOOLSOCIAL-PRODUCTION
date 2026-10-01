@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "D1C511CC0E9296A3913D6E7F668A430976F6E73866CBEA904F6F84774DE1E447"
+    "sha256": "4FFFE2639589D477A2C737D3BE375CED134DC7D356D8119628A38EAC60C5E628"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -271,7 +271,11 @@
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-360x800-android.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-390x844-ios.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-430x932-ios.png",
-        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png"
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png",
+        "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-2.jsonl"
       ]
     },
     {

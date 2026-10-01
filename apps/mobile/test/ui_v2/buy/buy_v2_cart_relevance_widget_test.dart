@@ -1522,7 +1522,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final session = BuyV2Session(
         core: BuySession(),
-        cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+        cartBenefitsAdapter: const ActiveTestCartBenefits(),
       );
       for (final destination in const [
         BuyV2Destination.shop,

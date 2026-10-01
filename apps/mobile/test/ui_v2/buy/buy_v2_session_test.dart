@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
@@ -203,6 +204,52 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
           sourceId: 'b01-t01c-delivery-quote',
         );
   }
+}
+
+class _T04CartBenefits extends BuyV2SeededCartBenefitsAdapter {
+  const _T04CartBenefits();
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) =>
+      kind == BuyV2CartBenefitKind.coupon &&
+          destinations.contains(BuyV2Destination.shop)
+      ? [
+          for (final saving in [5, 7])
+            BuyV2CartBenefit(
+              id: 't04-coupon-$saving',
+              kind: kind,
+              destination: BuyV2Destination.shop,
+              title: 'Test coupon $saving',
+              detail: 'Isolated payment-hold fixture.',
+              sourceId: 't04-test-source',
+              savingAmount: saving,
+            ),
+        ]
+      : const [];
+}
+
+class _T04LiveBenefits extends _T04CartBenefits
+    implements BuyV2LiveCartBenefitsAdapter {
+  Completer<BuyV2CartBenefitsSnapshot>? gate;
+
+  BuyV2CartBenefitsSnapshot get snapshot => BuyV2CartBenefitsSnapshot(
+    state: BuyV2CartBenefitsLoadState.ready,
+    evaluatedAt: DateTime.now(),
+    benefits: benefitsFor(
+      kind: BuyV2CartBenefitKind.coupon,
+      destinations: {BuyV2Destination.shop},
+      itemTotal: 37,
+    ),
+  );
+
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  ) => gate?.future ?? Future.value(snapshot);
 }
 
 BuyV2CommerceAdapter prepaidCommerceFixture() {
@@ -2429,6 +2476,157 @@ void main() {
       );
     },
   );
+
+  for (final remove in [false, true]) {
+    test(
+      'T04 benefit ${remove ? 'removal' : 'choice'} holds actual payment',
+      () async {
+        final core = BuySession();
+        final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: adapter,
+          productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          cartBenefitsAdapter: const _T04CartBenefits(),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        final coupons = session.cartBenefits(kind: BuyV2CartBenefitKind.coupon);
+        expect(session.chooseCartBenefit(coupons.first), isTrue);
+        expect(session.chooseCartBenefit(coupons.first), isTrue);
+        expect(session.scopedCouponSaving, 5);
+        session.openCart(scope: BuyV2CartScope.all);
+        expect(session.openCheckout(), isTrue);
+        expect(session.continueCheckoutFromAddress(), isTrue);
+        expect(session.choosePayment('Card'), isTrue);
+        expect(session.continueCheckoutFromPayment(), isTrue);
+        final agreedTotal = session.checkoutAmountDueNow;
+        expect(agreedTotal, 32);
+        adapter.placementGate = Completer<BuyV2OrderPlacementResult>();
+        final submission = session.submitOrder();
+        await Future<void>.delayed(Duration.zero);
+        expect(session.checkoutBusy, isTrue);
+        void attemptEdit() {
+          if (remove) {
+            session.removeCartBenefit(
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+            );
+          } else {
+            session.chooseCartBenefit(coupons.last);
+          }
+        }
+
+        String? selectedId() => session
+            .selectedCartBenefit(
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+            )
+            ?.id;
+        attemptEdit();
+        final duringPlacement = selectedId();
+        final duringPlacementTotal = session.checkoutAmountDueNow;
+        adapter.placementGate!.complete(adapter.placement);
+        expect(await submission, isFalse);
+        expect(session.checkoutRequiresResolution, isTrue);
+        attemptEdit();
+        final duringResolution = selectedId();
+        final duringResolutionTotal = session.checkoutAmountDueNow;
+        expect(await session.continuePayment((_) async => true), isTrue);
+        expect(await session.reconcilePayment(), isTrue);
+        expect(adapter.placementCalls, 1);
+        expect(adapter.requests.single.total, agreedTotal);
+        expect(adapter.requests.single.amountDueNow, agreedTotal);
+        expect(duringPlacement, coupons.first.id);
+        expect(duringResolution, coupons.first.id);
+        expect(duringPlacementTotal, agreedTotal);
+        expect(duringResolutionTotal, agreedTotal);
+        expect(session.confirmedOrders.single.total, agreedTotal);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.chooseCartBenefit(coupons.last), isTrue);
+        session.removeCartBenefit(
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+        );
+        expect(selectedId(), isNull);
+      },
+    );
+  }
+
+  test('T04 delayed preflight holds edits and duplicate submission', () async {
+    final core = BuySession();
+    final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+    final benefits = _T04LiveBenefits();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      productFactsAdapter: _T01CDeliveryFactsAdapter(),
+      cartBenefitsAdapter: benefits,
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    session.addProduct('s-tomato');
+    await session.refreshCartBenefits();
+    final coupon = session
+        .cartBenefits(kind: BuyV2CartBenefitKind.coupon)
+        .first;
+    expect(session.chooseCartBenefit(coupon), isTrue);
+    session.openCart();
+    session.openCheckout();
+    session.continueCheckoutFromAddress();
+    session.choosePayment('Card');
+    await session.refreshCartBenefits();
+    expect(session.continueCheckoutFromPayment(), isTrue);
+    benefits.gate = Completer<BuyV2CartBenefitsSnapshot>();
+    final submission = session.submitOrder();
+    final heldDuringPreflight = session.checkoutBusy;
+    final choiceAccepted = session.chooseCartBenefit(coupon);
+    session.removeCartBenefit(
+      kind: coupon.kind,
+      destination: coupon.destination,
+    );
+    final quantityChanged = session.setCartQuantity('s-tomato', '2');
+    final duplicate = session.submitOrder();
+    benefits.gate!.complete(benefits.snapshot);
+    final firstResult = await submission;
+    final duplicateResult = await duplicate;
+    expect(heldDuringPreflight, isTrue);
+    expect(choiceAccepted, isFalse);
+    expect(quantityChanged, isFalse);
+    expect(firstResult, isFalse);
+    expect(duplicateResult, isFalse);
+    expect(adapter.placementCalls, 1);
+    expect(adapter.requests.single.total, 32);
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(await session.continuePayment((_) async => true), isTrue);
+    expect(await session.reconcilePayment(), isTrue);
+    session.addProduct('s-tomato');
+    benefits.gate = null;
+    await session.refreshCartBenefits();
+    expect(session.chooseCartBenefit(coupon), isTrue);
+    session.openCart();
+    session.openCheckout();
+    session.continueCheckoutFromAddress();
+    session.choosePayment('Card');
+    await session.refreshCartBenefits();
+    session.continueCheckoutFromPayment();
+    benefits.gate = Completer<BuyV2CartBenefitsSnapshot>();
+    final failedPreflight = session.submitOrder();
+    expect(session.checkoutBusy, isTrue);
+    benefits.gate!.complete(
+      BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.unavailable,
+        evaluatedAt: DateTime.now(),
+      ),
+    );
+    expect(await failedPreflight, isFalse);
+    expect(session.checkoutBusy, isFalse);
+    expect(adapter.placementCalls, 1);
+    benefits.gate = null;
+    await session.refreshCartBenefits();
+    expect(session.chooseCartBenefit(coupon), isTrue);
+  });
 
   for (final conflicting in [false, true]) {
     test(

@@ -1673,62 +1673,58 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "One optional instruction composer in Cart and Checkout applies the same saved instruction to every selected delivery order at the receiving address, including Bulk. Different older notes are shown for review without losing them or silently sending category-specific instructions.",
-      "manifestPath": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json",
-      "manifestSha256": "128BDF2C305BC0C9B13E6BB54F1D031FA6CF64BFAD893C8A22AD2000F6B7BBBB",
+      "customerOutcome": "One tap chooses a currently eligible coupon or payment offer in the expanded Cart; Checkout shows the applied summary and truthful final amount. Quantity or payment-method changes revalidate savings, and payment-in-progress or unresolved attempts keep their agreed basket immutable.",
+      "manifestPath": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
+      "manifestSha256": "21CC943EF7FEA471AF57F746C6CDE76CB484B39125364F778EE1520EE318D71D",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
         "reuse",
-        "thin_policy_adapter",
         "test_only_acceptance",
         "new_necessary_work"
       ],
       "sharedImplementationOwners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
-        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse the current Buy session, customer snapshot, composer and per-product order request. One public note replaces category scoping; Store procurement and existing historical orders remain separate. Bulk already uses Wholesale offer capabilities, so no destination, screen or route is added.",
+      "necessityProof": "Reuse existing Cart radio cards, benefit eligibility/allocation, Checkout summary, request fingerprints and payment hold. Fix only reproduced gaps; no duplicate screen, route, state owner or backend.",
       "robustnessCoverage": [
-        "Mixed Shop, Wholesale and Bulk receive the same instruction in actual placement requests and confirmed orders",
-        "Category filters and adding/removing another category never switch the public draft or saved instruction",
-        "Customer-specific codec round trip, legacy same/differing notes, empty Save and invalid length preserve correct recovery",
-        "One public composer, no category contexts, one attached Clear, saved preset editing, Cancel and Cart/Checkout return",
-        "Normal/200-percent keyboard and compact/reduced-motion fitment; existing selected Buy regressions and changed-owner analysis",
-        "Current local native review screens and truthful remaining provider/founder acceptance boundaries"
+        "Eligible coupon/payment offer applies through one radio tap with no separate Apply page; chosen allocation appears once in Checkout",
+        "Expired/ineligible/Store-mismatched/revised offers do not produce a fabricated saving; method and quantity changes show truthful revalidation",
+        "Choosing/removing benefits cannot change an in-progress or unresolved payment basket, captured amount or submitted benefit identity",
+        "Repeated/stale actions and out-of-order eligibility responses do not duplicate savings or resurrect removed selections",
+        "Existing selection/return/Store scope/keyboard/enlarged-text/Checkout tests and required selected Buy regressions pass on the final source",
+        "Baseline and final Redmi screenshots/journey are distinguished from active isolated-fixture checks and deferred integrated provider acceptance"
       ],
       "adjustments": [
-        "Remove public Shop/Wholesale instruction contexts; keep one stable composer independent of display filters and selected categories",
-        "Retain one public instruction in the existing customer snapshot and apply it to all submitted delivery products and resulting orders",
-        "Reuse existing choices without duplicate labels; typed notes and empty notes retain the 200-character bound",
-        "Migrate an unambiguous older note; show differing older notes in the same composer for explicit review before ordering",
-        "Keep Clear only inside the composer; Clear edits draft, Cancel preserves saved text, empty Save removes the shared instruction",
-        "Keep instructions frozen during unresolved/submitting payments and preserve Store procurement and historical order notes"
+        "Inspect current native Cart and Checkout offers before runtime fixes; preserve existing eligible/unavailable states truthfully",
+        "Keep one-tap choice/removal in Cart and applied-only Checkout summary, with current scope and eligibility checks",
+        "Repair actually confirmed visual/technical defects only; keep discount and payable truthful across quantity/payment changes",
+        "Reject benefit edits during preflight/submission/unresolved payment through the existing hold pattern where reproduction confirms the gap",
+        "Verify stale revision/expiry/scope and delayed-response handling without changing Store/backend producers or campaign dates",
+        "Re-hot-reload, inspect actual journey/screenshots, record local verification or linked unresolved children, preserve a safe feature checkpoint and stop"
       ],
       "explicitExclusions": [
-        "No new screen, route, state service, dependency, backend, Store procurement or Bulk delivery workspace implementation",
-        "No change to supplier agreement consent, GST, pricing, payment/provider authority or historical orders",
-        "No APK build/install, data clear, live payment, cloud deployment or supplier messaging",
-        "No screenbook mutation or unrelated worktree edits"
+        "No new screen, route, state service, dependency, broad visual refactor or altered stacking rules",
+        "No Store/backend/delivery workspace implementation, provider invention, cloud action or changed campaign expiry",
+        "No supplier-policy popup implementation in this T04 pass; retain the separately authorized T03/T11 frontend follow-up",
+        "No APK build/install, data clear, real payment, supplier contact, screenbook mutation or other worktree edit"
       ],
       "dependenciesAndApprovals": [
-        "Existing open T03 parent and qualified checkpoint 1c625420",
-        "Exclusive Buy source/test ownership and current instruction correction authorization",
-        "Founder visual review remains distinct from local tests; T11 provider integration remains deferred"
+        "Founder-approved frontend sequence and current root Buy ownership; baseline 7a6e141f is clean and remote-exact",
+        "Workspace benefit/quote/payment provider mapping remains assigned to Codex after integration; backend execution deferred",
+        "Google-backed shopping-area/current-location and separately gated delivery Maps dependencies stay listed; no direct Google change in T04",
+        "Existing Redmi TG8HCYTGGQT885OF / com.moolsocial.app.cursorreview hot reload only; founder visual and integrated acceptance remain distinct"
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "assessed_before_shared_instruction_correction",
-      "evidencePath": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json"
+      "implementationState": "assessed_before_T04_bounded_native_audit",
+      "evidencePath": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5192,35 +5188,36 @@
   "ticket": {
     "id": "BUY-ACTION-POLISH-20260926-01",
     "parentTicketId": "UAW-CURSOR-BUY-READY-20260921",
-    "customerOutcome": "One optional instruction composer in Cart and Checkout applies the same saved instruction to every selected delivery order at the receiving address, including Bulk. Different older notes are shown for review without losing them or silently sending category-specific instructions.",
+    "customerOutcome": "One tap chooses a currently eligible coupon or payment offer in the expanded Cart; Checkout shows the applied summary and truthful final amount. Quantity or payment-method changes revalidate savings, and payment-in-progress or unresolved attempts keep their agreed basket immutable.",
     "classification": "mvp_required",
-    "classificationReason": "Correct delivery instructions and retained-state recovery are required for the selected public commerce journey.",
+    "classificationReason": "Offer eligibility, agreed totals and safe payment recovery are necessary for the selected purchase journey.",
     "minimumCompleteScope": [
-      "Remove public Shop/Wholesale instruction contexts; keep one stable composer independent of display filters and selected categories",
-      "Retain one public instruction in the existing customer snapshot and apply it to all submitted delivery products and resulting orders",
-      "Reuse existing choices without duplicate labels; typed notes and empty notes retain the 200-character bound",
-      "Migrate an unambiguous older note; show differing older notes in the same composer for explicit review before ordering",
-      "Keep Clear only inside the composer; Clear edits draft, Cancel preserves saved text, empty Save removes the shared instruction",
-      "Keep instructions frozen during unresolved/submitting payments and preserve Store procurement and historical order notes"
+      "Inspect current native Cart and Checkout offers before runtime fixes; preserve existing eligible/unavailable states truthfully",
+      "Keep one-tap choice/removal in Cart and applied-only Checkout summary, with current scope and eligibility checks",
+      "Repair actually confirmed visual/technical defects only; keep discount and payable truthful across quantity/payment changes",
+      "Reject benefit edits during preflight/submission/unresolved payment through the existing hold pattern where reproduction confirms the gap",
+      "Verify stale revision/expiry/scope and delayed-response handling without changing Store/backend producers or campaign dates",
+      "Re-hot-reload, inspect actual journey/screenshots, record local verification or linked unresolved children, preserve a safe feature checkpoint and stop"
     ],
     "explicitExclusions": [
-      "No new screen, route, state service, dependency, backend, Store procurement or Bulk delivery workspace implementation",
-      "No change to supplier agreement consent, GST, pricing, payment/provider authority or historical orders",
-      "No APK build/install, data clear, live payment, cloud deployment or supplier messaging",
-      "No screenbook mutation or unrelated worktree edits"
+      "No new screen, route, state service, dependency, broad visual refactor or altered stacking rules",
+      "No Store/backend/delivery workspace implementation, provider invention, cloud action or changed campaign expiry",
+      "No supplier-policy popup implementation in this T04 pass; retain the separately authorized T03/T11 frontend follow-up",
+      "No APK build/install, data clear, real payment, supplier contact, screenbook mutation or other worktree edit"
     ],
     "dependenciesAndApprovals": [
-      "Existing open T03 parent and qualified checkpoint 1c625420",
-      "Exclusive Buy source/test ownership and current instruction correction authorization",
-      "Founder visual review remains distinct from local tests; T11 provider integration remains deferred"
+      "Founder-approved frontend sequence and current root Buy ownership; baseline 7a6e141f is clean and remote-exact",
+      "Workspace benefit/quote/payment provider mapping remains assigned to Codex after integration; backend execution deferred",
+      "Google-backed shopping-area/current-location and separately gated delivery Maps dependencies stay listed; no direct Google change in T04",
+      "Existing Redmi TG8HCYTGGQT885OF / com.moolsocial.app.cursorreview hot reload only; founder visual and integrated acceptance remain distinct"
     ],
     "testAndEvidencePlan": [
-      "Mixed Shop, Wholesale and Bulk receive the same instruction in actual placement requests and confirmed orders",
-      "Category filters and adding/removing another category never switch the public draft or saved instruction",
-      "Customer-specific codec round trip, legacy same/differing notes, empty Save and invalid length preserve correct recovery",
-      "One public composer, no category contexts, one attached Clear, saved preset editing, Cancel and Cart/Checkout return",
-      "Normal/200-percent keyboard and compact/reduced-motion fitment; existing selected Buy regressions and changed-owner analysis",
-      "Current local native review screens and truthful remaining provider/founder acceptance boundaries"
+      "Eligible coupon/payment offer applies through one radio tap with no separate Apply page; chosen allocation appears once in Checkout",
+      "Expired/ineligible/Store-mismatched/revised offers do not produce a fabricated saving; method and quantity changes show truthful revalidation",
+      "Choosing/removing benefits cannot change an in-progress or unresolved payment basket, captured amount or submitted benefit identity",
+      "Repeated/stale actions and out-of-order eligibility responses do not duplicate savings or resurrect removed selections",
+      "Existing selection/return/Store scope/keyboard/enlarged-text/Checkout tests and required selected Buy regressions pass on the final source",
+      "Baseline and final Redmi screenshots/journey are distinguished from active isolated-fixture checks and deferred integrated provider acceptance"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5480,13 +5477,13 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json"
+    "evidence": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json"
   },
   "authorization": {
     "state": "existing_ticket_authority_confirmed",
-    "evidence": "docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json",
+    "evidence": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder identified the category-scoping regression and explicitly instructed the agent to decide and fix it. Use one standard composer for the one receiving address."
+    "founderAcceptance": "Founder selected the next Cart T04 bounded cycle: scope/Git, existing Redmi hot reload, screenshots and actual journey, register defects, scoped fixes, tests, re-hot-reload/retest, verified status or unresolved child, safe Git checkpoint, then stop. Backend deferred; workspace/provider dependencies assigned to Codex after integration; Google dependencies kept listed."
   },
   "execution": {
     "referenceWriteAuthorized": false,
@@ -5495,7 +5492,7 @@
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "T03_source_and_tests_only_no_build_authority",
+    "buildAuthorizationScope": "T04_source_and_tests_only_no_build_authority",
     "deviceInstallAuthorizationScope": "No_install_uninstall_or_data_clear_existing_cursorreview_hot_refresh_only",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,

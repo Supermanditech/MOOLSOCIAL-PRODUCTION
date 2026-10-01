@@ -1513,7 +1513,7 @@ void main() {
           final core = BuySession();
           final session = BuyV2Session(
             core: core,
-            cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+            cartBenefitsAdapter: const ActiveTestCartBenefits(),
           );
           addTearDown(core.dispose);
           addTearDown(session.dispose);

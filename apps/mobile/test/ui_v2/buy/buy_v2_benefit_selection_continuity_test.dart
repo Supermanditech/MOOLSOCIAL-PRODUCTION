@@ -12,49 +12,6 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
-/// Payment-method tests need an active offer, independent of the dated
-/// device-review campaigns. Production and expired-offer rules stay unchanged.
-class _ActivePaymentBenefits extends BuyV2SeededCartBenefitsAdapter {
-  const _ActivePaymentBenefits();
-
-  @override
-  List<BuyV2CartBenefit> benefitsFor({
-    required BuyV2CartBenefitKind kind,
-    required Set<BuyV2Destination> destinations,
-    required int itemTotal,
-  }) => [
-    for (final benefit in super.benefitsFor(
-      kind: kind,
-      destinations: destinations,
-      itemTotal: itemTotal,
-    ))
-      BuyV2CartBenefit(
-        id: benefit.id,
-        kind: benefit.kind,
-        destination: benefit.destination,
-        title: benefit.title,
-        detail: benefit.detail,
-        sourceId: benefit.sourceId,
-        strategy: benefit.strategy,
-        sponsor: benefit.sponsor,
-        sponsorName: benefit.sponsorName,
-        savingAmount: benefit.savingAmount,
-        validUntil: DateTime.now().add(const Duration(days: 1)),
-        minimumSpend: benefit.minimumSpend,
-        // Adapt these expired, local-only legacy fixtures to canonical methods.
-        // This does not advertise or migrate a live provider capability.
-        eligiblePaymentMethods: {
-          for (final method in benefit.eligiblePaymentMethods)
-            switch (method) {
-              'PhonePe' => 'UPI',
-              'Paytm' || 'Pine Labs' => 'Card',
-              _ => method,
-            },
-        },
-      ),
-  ];
-}
-
 class _ScopedBenefitCommerce implements BuyV2CommerceAdapter {
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
@@ -110,11 +67,57 @@ class _BenefitTermsCapture implements BuyV2CommercialPaymentTermsAdapter {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final kind in BuyV2CartBenefitKind.values) {
+    test('T04 $kind campaign boundaries reject stale choices', () {
+      var now = DateTime.utc(2026, 10, 2, 10);
+      final starts = now.add(const Duration(minutes: 1));
+      final ends = starts.add(const Duration(minutes: 1));
+      final benefit = BuyV2CartBenefit(
+        id: 't04-boundary',
+        kind: kind,
+        destination: BuyV2Destination.wholesale,
+        title: 'Test campaign',
+        detail: 'Isolated deterministic campaign boundary fixture.',
+        sourceId: 't04-boundary-source',
+        savingAmount: 30,
+        validFrom: starts,
+        validUntil: ends,
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        catalogueNow: () => now,
+        cartBenefitsAdapter: _PaymentStatusAdapter(benefit),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('w-notebook');
+      expect(session.chooseCartBenefit(benefit), isFalse);
+      now = starts;
+      expect(session.chooseCartBenefit(benefit), isTrue);
+      expect(
+        session.scopedCouponSaving,
+        kind == BuyV2CartBenefitKind.coupon ? 30 : 0,
+      );
+      now = ends;
+      expect(session.cartBenefits(kind: kind), isEmpty);
+      expect(
+        session.selectedCartBenefit(
+          kind: kind,
+          destination: benefit.destination,
+        ),
+        isNull,
+      );
+      expect(session.scopedCouponSaving, 0);
+      expect(session.chooseCartBenefit(benefit), isFalse);
+    });
+  }
+
   test('R669 coupon minimum uses its own destination subtotal', () {
     final core = BuySession();
     final session = BuyV2Session(
       core: core,
-      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+      cartBenefitsAdapter: const ActiveTestCartBenefits(),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
@@ -143,7 +146,7 @@ void main() {
     final core = BuySession();
     final session = BuyV2Session(
       core: core,
-      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+      cartBenefitsAdapter: const ActiveTestCartBenefits(),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
@@ -444,7 +447,7 @@ void main() {
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
-        cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+        cartBenefitsAdapter: const ActiveTestCartBenefits(),
       );
       addTearDown(session.dispose);
       addTearDown(core.dispose);
@@ -501,7 +504,7 @@ void main() {
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
-        cartBenefitsAdapter: const _ActivePaymentBenefits(),
+        cartBenefitsAdapter: const ActiveTestCartBenefits(),
       );
       addTearDown(session.dispose);
       addTearDown(core.dispose);
@@ -742,6 +745,16 @@ void main() {
       addTearDown(session.dispose);
       addTearDown(core.dispose);
       session.addProduct('w-notebook');
+      if (terms.start != null || terms.end != null) {
+        expect(session.chooseCartBenefit(offer), isFalse);
+        expect(
+          session.cartBenefits(kind: BuyV2CartBenefitKind.paymentOffer),
+          isEmpty,
+        );
+        expect(session.scopedPayableTotal, 3480);
+        expect(session.scopedCouponSaving, 0);
+        return;
+      }
       expect(session.chooseCartBenefit(offer), isTrue);
       session.openCart(scope: BuyV2CartScope.wholesale);
       await tester.pumpWidget(app(session));
@@ -830,7 +843,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final session = BuyV2Session(
         core: BuySession(),
-        cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+        cartBenefitsAdapter: const ActiveTestCartBenefits(),
       );
       for (final destination in const [
         BuyV2Destination.shop,
@@ -963,7 +976,7 @@ void main() {
 
     final session = BuyV2Session(
       core: BuySession(),
-      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+      cartBenefitsAdapter: const ActiveTestCartBenefits(),
     );
     session.addProduct(productFor(BuyV2Destination.shop).id);
     session.addProduct(productFor(BuyV2Destination.wholesale).id);
@@ -998,7 +1011,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = BuyV2Session(
       core: BuySession(),
-      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+      cartBenefitsAdapter: const ActiveTestCartBenefits(),
     );
     session.addProduct(productFor(BuyV2Destination.medicine).id);
     session.openCart(scope: BuyV2CartScope.medicine);
@@ -1030,7 +1043,7 @@ void main() {
   ) async {
     final session = BuyV2Session(
       core: BuySession(),
-      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+      cartBenefitsAdapter: const ActiveTestCartBenefits(),
     );
     session.addProduct('s-tomato');
     session.addProduct('w-notebook');
@@ -1076,7 +1089,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final session = BuyV2Session(
         core: BuySession(),
-        cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+        cartBenefitsAdapter: const ActiveTestCartBenefits(),
       );
       session.addProduct('w-notebook');
       session.openCart();
@@ -1202,7 +1215,7 @@ class _PaymentStatusAdapter extends BuyV2SeededCartBenefitsAdapter {
     required Set<BuyV2Destination> destinations,
     required int itemTotal,
   }) =>
-      kind == BuyV2CartBenefitKind.paymentOffer &&
+      kind == offer.kind &&
           destinations.contains(offer.destination) &&
           itemTotal > 0
       ? [offer]

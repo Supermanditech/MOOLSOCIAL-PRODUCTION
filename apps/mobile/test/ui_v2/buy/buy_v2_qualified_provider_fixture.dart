@@ -1,4 +1,5 @@
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 
 /// Simulated provider grants for named test SKUs only. These are not live
@@ -31,6 +32,55 @@ class QualifiedTestProductFacts implements BuyV2ProductFactsAdapter {
       ),
     );
   }
+}
+
+/// Active campaigns for positive behavior tests only. Native review campaign
+/// dates and live provider eligibility are never changed by this fixture.
+class ActiveTestCartBenefits extends BuyV2SeededCartBenefitsAdapter {
+  const ActiveTestCartBenefits();
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => [
+    for (final benefit in super.benefitsFor(
+      kind: kind,
+      destinations: destinations,
+      itemTotal: itemTotal,
+    ))
+      BuyV2CartBenefit(
+        id: benefit.id,
+        kind: benefit.kind,
+        destination: benefit.destination,
+        title: benefit.title,
+        detail: benefit.detail,
+        sourceId: benefit.sourceId,
+        strategy: benefit.strategy,
+        sponsor: benefit.sponsor,
+        sponsorName: benefit.sponsorName,
+        savingAmount: benefit.savingAmount,
+        validFrom: benefit.validFrom,
+        validUntil: DateTime.now().add(const Duration(days: 1)),
+        freeDelivery: benefit.freeDelivery,
+        offerId: benefit.offerId,
+        minimumSpend: benefit.minimumSpend,
+        minimumQuantity: benefit.minimumQuantity,
+        eligiblePaymentMethods: {
+          for (final method in benefit.eligiblePaymentMethods)
+            switch (method) {
+              'PhonePe' => 'UPI',
+              'Paytm' || 'Pine Labs' => 'Card',
+              _ => method,
+            },
+        },
+        scope: benefit.scope,
+        storeId: benefit.storeId,
+        productIds: benefit.productIds,
+        revision: benefit.revision,
+      ),
+  ];
 }
 
 /// Deterministic substitute for the deferred Google location provider.

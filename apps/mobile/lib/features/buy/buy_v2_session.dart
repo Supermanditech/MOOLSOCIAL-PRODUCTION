@@ -5236,7 +5236,10 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get addressRequestsAvailable => reviewDataEnabled;
 
+  bool _checkoutPreflightBusy = false;
+
   bool get checkoutBusy =>
+      _checkoutPreflightBusy ||
       (collectionCheckout?.busy ?? false) ||
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting;
 
@@ -9513,17 +9516,22 @@ class BuyV2Session extends ChangeNotifier {
           );
     final valid = <BuyV2CartBenefit>[];
     final ids = <String>{};
+    final evaluatedAt = _benefitEvaluationTime(
+      _cartBenefitServerTime,
+      _cartBenefitReceivedTime,
+    );
     for (final benefit in raw) {
       if (!benefit.validScope ||
+          (benefit.validFrom != null &&
+              evaluatedAt.isBefore(benefit.validFrom!)) ||
+          (benefit.validUntil != null &&
+              !evaluatedAt.isBefore(benefit.validUntil!)) ||
           _benefitTotal(benefit, cartLines) <= 0 ||
           benefit.savingAmount > _benefitTotal(benefit, cartLines) ||
           (liveCartBenefitsEnabled &&
               !_liveBenefitMatchesStrategy(
                 benefit,
-                evaluatedAt: _benefitEvaluationTime(
-                  _cartBenefitServerTime,
-                  _cartBenefitReceivedTime,
-                ),
+                evaluatedAt: evaluatedAt,
                 destinationTotal: _benefitTotal(benefit, cartLines),
                 destinationQuantity: _benefitQuantity(benefit, cartLines),
               )) ||
@@ -9648,6 +9656,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool chooseCartBenefit(BuyV2CartBenefit benefit) {
+    if (_holdCartForPaymentResolution()) return false;
     if (liveCartBenefitsEnabled &&
         cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
       notice = 'Coupon eligibility is still being checked.';
@@ -9694,6 +9703,7 @@ class BuyV2Session extends ChangeNotifier {
     required BuyV2CartBenefitKind kind,
     required BuyV2Destination destination,
   }) {
+    if (_holdCartForPaymentResolution()) return;
     final removed = _selectedCartBenefitRefs.remove(
       _cartBenefitSelectionKey(destination, kind),
     );
@@ -13796,9 +13806,20 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> _submitOrderAsync() async {
+    if (checkoutBusy) return false;
+    _checkoutPreflightBusy = true;
+    notifyListeners();
+    try {
+      return await _placeOrderAfterPreflight();
+    } finally {
+      _checkoutPreflightBusy = false;
+      if (!_collectionDisposed) notifyListeners();
+    }
+  }
+
+  Future<bool> _placeOrderAfterPreflight() async {
     if (!_allowProcurementLines(checkoutLines)) return false;
     final procurementEpoch = _procurementEpoch;
-    if (checkoutBusy) return false;
     final previous = _navigationSurfaceIdentity;
     final lines = checkoutLines;
     if (lines.isEmpty) {
