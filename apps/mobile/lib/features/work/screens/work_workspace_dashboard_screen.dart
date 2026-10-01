@@ -11391,8 +11391,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   static const _taxComponentLabels = {'cgst': 'CGST ₹', 'sgstAmount': 'SGST ₹',
     'utgst': 'UTGST ₹', 'igst': 'IGST ₹', 'cess': 'Cess ₹'};
   final _reviewAnchor = GlobalKey();
+  final _itemsAnchor = GlobalKey();
   final _sourceViewport = GlobalKey();
+  final _documentPage = GlobalKey();
   final _previewZoom = TransformationController();
+  final _readingPointers = <int>{};
+  bool _reviewFocused = false;
+  WorkspacePurchaseInvoiceAttachment? _lastOriginal;
+  int _lastOriginalPage = 0;
   WorkspacePurchaseInvoiceAttachment? _sourceAttachment;
   Uint8List? _sourceBytes;
   WorkPdfPage? _sourcePage;
@@ -11407,7 +11413,6 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   final _goods = <_PurchaseGoodsInput>[];
   final _details = {for (final key in WorkspacePurchaseEntryDraft.detailKeys) key: TextEditingController()};
   final _attachments = <WorkspacePurchaseInvoiceAttachment>[];
-  final _images = <String, Future<Uint8List>>{};
   final _additional = <_PurchaseAdditionalInput>[];
   final _taxRows = <Map<String, TextEditingController>>[];
   final _fieldLabels = <String, String>{};
@@ -11452,7 +11457,6 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _date.text = _original?.invoiceDate ?? '';
     for (final e in _details.entries) { e.value.text = _original?.details[e.key] ?? ''; }
     _attachments..clear()..addAll(_original?.attachments ?? const []);
-    _images.clear();
     for (final field in _additional) { field.dispose(); }
     _additional..clear()..addAll((_original?.additionalFields ?? const []).map(_PurchaseAdditionalInput.new));
     for (final row in _taxRows) { for (final c in row.values) { c.dispose(); } }
@@ -11752,11 +11756,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       'work-purchase-payment-details' => 'Record actual payment separately from supplier payment instructions.',
       _ => 'Compare this entered record with the original, then save draft.',
     };
-    return Column(key: key == 'work-purchase-review-section' ? _reviewAnchor : null,
+    return Column(key: key == 'work-purchase-review-section' ? _reviewAnchor
+        : key == 'work-purchase-items-section' ? _itemsAnchor : null,
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Semantics(expanded: expanded, child: InkWell(key: Key(key), onTap: () {
         FocusScope.of(context).unfocus();
-        setState(() { if (expanded) { _expandedSections.remove(key); } else { _expandedSections.add(key); } });
+        setState(() {
+          _reviewFocused = key == 'work-purchase-review-section' && !expanded;
+          if (expanded) { _expandedSections.remove(key); } else { _expandedSections.add(key); }
+        });
       }, child: Container(constraints: const BoxConstraints(minHeight: 52),
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _paperRule, width: .7))),
@@ -11799,7 +11807,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         _purchaseSection(sections[i].title, sections[i].key, sections[i].fields, number: i + 5,
           summary: switch (sections[i].key) {
             'work-purchase-tax-details' => _details['invoiceTotal']!.text.isEmpty
-              ? 'Copy taxes, discounts and the final total' : 'Bill total ₹${_details['invoiceTotal']!.text}',
+              ? 'Copy taxes, discounts and the final total' : 'Bill total ${_invoiceMoney(_details['invoiceTotal']!.text, currency: true)}',
             'work-purchase-receipt-details' => _details['receiptStatus']!.text.isEmpty
               ? 'Check received, short or damaged goods' : _details['receiptStatus']!.text,
             'work-purchase-payment-details' => _details['paymentStatus']!.text.isEmpty
@@ -11855,9 +11863,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   bool _sourceCurrent(int epoch) => mounted && _current && epoch == _sourceEpoch &&
     _attachments.any((a) => a.digest == _sourceAttachment?.digest);
-  Future<void> _openSource(WorkspacePurchaseInvoiceAttachment attachment) async {
+  Future<void> _openSource(WorkspacePurchaseInvoiceAttachment attachment, {int page = 0}) async {
     if (_busy || _sourceSaving || !_current || _scope == null) return;
     _closeSource();
+    _lastOriginal = attachment;
+    _lastOriginalPage = page;
     final epoch = _sourceEpoch;
     setState(() { _sourceAttachment = attachment; _sourceLoading = true; });
     _previewPurchase(recorded: false);
@@ -11866,9 +11876,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (!_sourceCurrent(epoch)) return;
       _sourceBytes = bytes;
       if (attachment.contentType == 'application/pdf') {
-        final page = await _sourcePdf.render(bytes, page: 0);
+        final rendered = await _sourcePdf.render(bytes, page: page);
         if (!_sourceCurrent(epoch)) return;
-        _sourcePage = page;
+        _sourcePage = rendered;
       }
     } on WorkGatewayException catch (error) {
       if (_sourceCurrent(epoch)) _sourceError = error.message;
@@ -11894,6 +11904,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (_sourceCurrent(epoch)) {
         _previewZoom.value = Matrix4.identity();
         _sourcePage = page;
+        _lastOriginalPage = index;
       }
     } on WorkPdfPreviewException catch (error) {
       if (_sourceCurrent(epoch)) { _sourceError = error.message; }
@@ -11930,22 +11941,102 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (mounted) setState(() => _sourceSaving = false);
     }
   }
+  String _invoiceMoney(String text, {bool currency = false}) {
+    final minor = WorkspacePurchaseEntryDraft.printedPaise(text);
+    if (minor == null) return text;
+    final absolute = minor.abs();
+    return '${minor < 0 ? '−' : ''}${currency ? '₹' : ''}'
+      '${_formatStoreAmount(absolute ~/ 100)}.${(absolute % 100).toString().padLeft(2, '0')}';
+  }
+  Widget _reviewCopies() {
+    final original = _sourceAttachment != null;
+    final attachment = _attachments.where((a) => a.digest == _lastOriginal?.digest).firstOrNull
+        ?? _attachments.firstOrNull;
+    return Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+      if (attachment != null) Semantics(selected: original, child: TextButton(
+        key: const Key('purchase-review-original'),
+        style: TextButton.styleFrom(disabledForegroundColor: MoolColors.navy,
+          textStyle: TextStyle(fontSize: 12, fontWeight: original ? FontWeight.w700 : FontWeight.w500)),
+        onPressed: original || _sourceSaving ? null : () => _openSource(attachment,
+          page: attachment.digest == _lastOriginal?.digest ? _lastOriginalPage : 0),
+        child: const Text('Original invoice'))),
+      Semantics(selected: !original, child: TextButton(key: const Key('purchase-original-recorded'),
+        style: TextButton.styleFrom(disabledForegroundColor: MoolColors.navy,
+          textStyle: TextStyle(fontSize: 12, fontWeight: original ? FontWeight.w500 : FontWeight.w700)),
+        onPressed: !original || _sourceSaving ? null : _previewPurchase,
+        child: const Text('Recorded copy'))),
+      if (original) IconButton(key: const Key('purchase-original-download'),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        tooltip: _sourceSaving ? 'Saving original…' : 'Download original',
+        onPressed: _sourceSaving ? null : _downloadSource,
+        icon: const Icon(Icons.download_outlined, size: 20, color: MoolColors.navy)),
+    ]);
+  }
+  void _zoomInvoice() {
+    final box = _sourceViewport.currentContext?.findRenderObject();
+    if (box is! RenderBox) return;
+    final centre = box.size.center(Offset.zero);
+    final scene = _previewZoom.toScene(centre);
+    final scale = (_previewZoom.value.getMaxScaleOnAxis() * 2).clamp(.05, 8.0);
+    _previewZoom.value = Matrix4.diagonal3Values(scale, scale, 1)
+      ..setTranslationRaw(centre.dx - scene.dx * scale, centre.dy - scene.dy * scale, 0);
+  }
+  void _fitInvoice() {
+    final viewport = _sourceViewport.currentContext?.findRenderObject();
+    final page = _documentPage.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || page is! RenderBox || page.size.isEmpty) return;
+    final widthScale = viewport.size.width / page.size.width;
+    final heightScale = viewport.size.height / page.size.height;
+    final scale = (widthScale < heightScale ? widthScale : heightScale).clamp(.05, 1.0);
+    _previewZoom.value = Matrix4.diagonal3Values(scale, scale, 1)
+      ..setTranslationRaw((viewport.size.width - page.size.width * scale) / 2, 0, 0);
+  }
+  void _readingPointer(PointerEvent event, bool down) {
+    final changed = down ? _readingPointers.add(event.pointer) : _readingPointers.remove(event.pointer);
+    if (changed && mounted) setState(() {});
+  }
+  Widget _invoiceViewer(String key, double viewportHeight, Widget Function(double width) page) =>
+    LayoutBuilder(builder: (context, constraints) => SizedBox(key: _sourceViewport,
+      // Reserve space for comparison controls and the fixed draft actions.
+      // The page starts at readable width; its remaining height pans inside.
+      height: (viewportHeight * .55).clamp(160.0, 650.0),
+      child: Listener(onPointerDown: (e) => _readingPointer(e, true),
+        onPointerUp: (e) => _readingPointer(e, false), onPointerCancel: (e) => _readingPointer(e, false),
+        child: ClipRect(child: ColoredBox(color: const Color(0xffe8ebef),
+          child: InteractiveViewer(key: Key(key), transformationController: _previewZoom,
+            constrained: false, alignment: Alignment.topLeft, minScale: .05, maxScale: 8,
+            child: SizedBox(key: _documentPage, width: constraints.maxWidth,
+              child: page(constraints.maxWidth))))))));
+  Widget _invoiceTools({required bool original}) => Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+      if (original && _sourcePage != null) Row(mainAxisSize: MainAxisSize.min, children: [
+        IconButton(key: const Key('purchase-original-prev'), tooltip: 'Previous page',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: _sourceLoading || _sourcePage!.index == 0 ? null : () => _sourceTurnPage(_sourcePage!.index - 1),
+          icon: const Icon(Icons.chevron_left, size: 20)),
+        Text('Page ${_sourcePage!.index + 1} of ${_sourcePage!.pageCount}',
+          style: const TextStyle(fontSize: 12, color: _paperInk)),
+        IconButton(key: const Key('purchase-original-next'), tooltip: 'Next page',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: _sourceLoading || _sourcePage!.index + 1 == _sourcePage!.pageCount ? null : () => _sourceTurnPage(_sourcePage!.index + 1),
+          icon: const Icon(Icons.chevron_right, size: 20)),
+      ]),
+      IconButton(key: Key(original ? 'purchase-original-zoom-in' : 'purchase-review-zoom-in'),
+        tooltip: 'Zoom in', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        onPressed: _zoomInvoice, icon: const Icon(Icons.zoom_in, size: 20, color: MoolColors.navy)),
+      TextButton(key: Key(original ? 'purchase-original-fit' : 'purchase-review-fit'),
+        onPressed: _fitInvoice, child: const Text('Fit page')),
+    ]);
   List<Widget> _reviewOriginal(double viewportHeight) {
     final attachment = _sourceAttachment!;
     final image = attachment.contentType == 'application/pdf' ? _sourcePage?.bytes : _sourceBytes;
     return [Column(key: const Key('purchase-original-view'),
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Original supplier invoice', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _paperInk)),
-        Text(attachment.fileName, style: const TextStyle(fontSize: 12, color: _paperInk)),
-        const Text('Your entries do not change this original attachment.', style: TextStyle(fontSize: 11, color: _paperMuted)),
-        Wrap(spacing: 8, children: [
-          TextButton.icon(key: const Key('purchase-original-download'),
-            onPressed: _sourceSaving ? null : _downloadSource,
-            icon: const Icon(Icons.download_outlined, size: 18),
-            label: Text(_sourceSaving ? 'Saving original…' : 'Download original')),
-          TextButton(key: const Key('purchase-original-recorded'), onPressed: _sourceSaving ? null : _previewPurchase,
-            child: const Text('Recorded copy')),
-        ]),
+        _reviewCopies(),
+        Tooltip(message: attachment.fileName, child: Text(attachment.fileName, maxLines: 1,
+          overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: _paperMuted))),
+        const Text('Original supplier invoice · kept unchanged',
+          style: TextStyle(fontSize: 12, color: _paperInk)),
         if (_sourceLoading) Row(children: [const Expanded(child: Text('Opening original invoice…')),
           TextButton(key: const Key('purchase-original-cancel'), onPressed: _previewPurchase, child: const Text('Cancel'))]),
         if (_sourceError != null) ...[
@@ -11954,34 +12045,19 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             child: const Text('Retry original')),
         ],
         if (_sourceNotice != null) Text(_sourceNotice!, style: const TextStyle(fontSize: 12, color: _paperInk)),
-        if (_sourcePage != null) Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
-          TextButton(key: const Key('purchase-original-prev'),
-            onPressed: _sourceLoading || _sourcePage!.index == 0 ? null : () => _sourceTurnPage(_sourcePage!.index - 1),
-            child: const Text('Previous')),
-          Text('Page ${_sourcePage!.index + 1} of ${_sourcePage!.pageCount}', style: const TextStyle(fontSize: 12, color: _paperInk)),
-          TextButton(key: const Key('purchase-original-next'),
-            onPressed: _sourceLoading || _sourcePage!.index + 1 == _sourcePage!.pageCount ? null : () => _sourceTurnPage(_sourcePage!.index + 1),
-            child: const Text('Next')),
-        ]),
         if (image != null) ...[
-          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
-            const Text('Pinch to zoom · drag to read', style: TextStyle(fontSize: 11, color: _paperMuted)),
-            TextButton(key: const Key('purchase-original-zoom-in'), onPressed: () {
-              final box = _sourceViewport.currentContext?.findRenderObject();
-              if (box is! RenderBox) return;
-              final scale = (_previewZoom.value.getMaxScaleOnAxis() * 2).clamp(1.0, 8.0);
-              _previewZoom.value = Matrix4.diagonal3Values(scale, scale, 1)
-                ..setTranslationRaw(-box.size.width * (scale - 1) / 2,
-                  -box.size.height * (scale - 1) / 2, 0);
-            }, child: const Text('Zoom in')),
-            TextButton(key: const Key('purchase-original-fit'), onPressed: () => _previewZoom.value = Matrix4.identity(),
-              child: const Text('Fit')),
-          ]),
-          SizedBox(key: _sourceViewport, height: (viewportHeight * .4).clamp(100.0, 500.0),
-            child: ClipRect(child: InteractiveViewer(key: const Key('purchase-original-zoom'),
-              transformationController: _previewZoom, minScale: 1, maxScale: 8,
-              child: ColoredBox(color: Colors.white, child: Center(child: Image.memory(image,
-                fit: BoxFit.contain, gaplessPlayback: true, semanticLabel: 'Original supplier invoice')))))),
+          _invoiceTools(original: true),
+          _invoiceViewer('purchase-original-zoom', viewportHeight, (width) => Semantics(
+            image: true, label: 'Original supplier invoice', child: Image.memory(image,
+              width: width, fit: BoxFit.contain, gaplessPlayback: true, excludeFromSemantics: true,
+              frameBuilder: (context, child, frame, synchronous) {
+                final decoded = child is RawImage ? child.image : null;
+                // Keep a finite page before image decoding; use the actual source
+                // aspect ratio as soon as available, never stretch its pixels.
+                final ratio = decoded != null ? decoded.width / decoded.height
+                  : _sourcePage != null ? _sourcePage!.width / _sourcePage!.height : 1 / 1.414;
+                return AspectRatio(aspectRatio: ratio, child: child);
+              }))),
         ],
       ])];
   }
@@ -11989,6 +12065,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     FocusScope.of(context).unfocus();
     _previewZoom.value = Matrix4.identity();
     setState(() {
+      _reviewFocused = true;
+      _readingPointers.clear();
       if (recorded) _closeSource();
       _expandedSections.add('work-purchase-review-section');
     });
@@ -12015,11 +12093,27 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       : receiptKeys.contains(key) ? 'receipt'
       : key.startsWith('bank') || key.startsWith('upi') || paymentKeys.contains(key) ? 'payment' : 'tax';
   }
-  List<Widget> _reviewPurchase() {
+  void _reviewItemAmounts() {
+    setState(() {
+      _reviewFocused = false;
+      _expandedSections.remove('work-purchase-review-section');
+      _expandedSections.add('work-purchase-items-section');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _itemsAnchor.currentContext;
+      if (mounted && target != null) {
+        unawaited(Scrollable.ensureVisible(target, alignment: 0, duration: const Duration(milliseconds: 180)));
+      }
+    });
+  }
+  List<Widget> _reviewPurchase(double viewportHeight) {
     const quantityKeys = {'receivedQuantity', 'damagedQuantity', 'shortQuantity'};
     const rule = BorderSide(color: Color(0xff89929c), width: .7);
     const printedStyle = TextStyle(fontSize: 12, color: Color(0xff171b20), height: 1.25);
     final used = <String>{};
+    const moneyKeys = {'supplyValue', 'billDiscount', 'taxableValue', 'cgst', 'sgstAmount', 'sgst',
+      'utgst', 'igst', 'cess', 'freight', 'otherCharges', 'roundOff', 'totalTax', 'invoiceTotal',
+      'amountPayable', 'paidAmount', 'mrp', 'sellingPrice', 'lineTotal', 'taxAmount'};
     Widget value(String label, String text, String id, {bool cell = false, bool amount = false}) => Padding(
       key: ValueKey('purchase-review-$id'), padding: EdgeInsets.symmetric(vertical: cell ? 4 : 3),
       child: Column(crossAxisAlignment: amount ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
@@ -12029,7 +12123,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       ]));
     Widget detail(String key, {bool cell = false, bool amount = false}) {
       used.add(key);
-      return value(_fieldLabels['work-purchase-$key']!, _details[key]!.text, key, cell: cell, amount: amount);
+      final text = _details[key]!.text;
+      return value(_fieldLabels['work-purchase-$key']!, moneyKeys.contains(key) ? _invoiceMoney(text) : text,
+        key, cell: cell, amount: amount);
     }
     List<Widget> selected(Iterable<String> keys) => [for (final key in keys)
       if (!used.contains(key) && _details[key]!.text.isNotEmpty) detail(key)];
@@ -12053,7 +12149,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     Widget itemCell(String text, String id, {bool amount = false}) => value('', text, id, cell: true, amount: amount);
     Widget itemExtra(_PurchaseGoodsInput line, int index, String key, {bool amount = false}) =>
       line.extra[key]!.text.isEmpty ? const Text('—', style: printedStyle)
-        : itemCell(line.extra[key]!.text, 'item-$index-$key', amount: amount);
+        : itemCell(moneyKeys.contains(key) ? _invoiceMoney(line.extra[key]!.text) : line.extra[key]!.text,
+          'item-$index-$key', amount: amount);
     const primaryItemKeys = {'printedSerial', 'hsn', 'unitCode', 'taxableValue', 'taxAmount', 'lineTotal'};
     const recordedPaymentKeys = {'paymentStatus', 'paidAmount', 'paymentMethod',
       'paymentReference', 'paymentDate', 'paymentTerms'};
@@ -12115,13 +12212,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 if (line.pack.text.isNotEmpty) value('Pack / unit',line.pack.text,'item-$index-Pack / unit'),
                 for (final e in line.extra.entries)
                   if (!quantityKeys.contains(e.key) && !primaryItemKeys.contains(e.key) && e.value.text.isNotEmpty)
-                    value(_fieldLabels['work-purchase-${e.key}-$index']!,e.value.text,'item-$index-${e.key}'),
+                    value(_fieldLabels['work-purchase-${e.key}-$index']!,
+                      moneyKeys.contains(e.key) ? _invoiceMoney(e.value.text) : e.value.text,'item-$index-${e.key}'),
                 ...extras('items',item:index),
               ])),
               Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'hsn')),
               Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'unitCode')),
               Padding(padding:const EdgeInsets.all(6),child:line.cost.text.isEmpty ? const Text('—',style:printedStyle)
-                : itemCell(line.cost.text,'item-$index-Rate ₹',amount:true)),
+                : itemCell(_invoiceMoney(line.cost.text),'item-$index-Rate ₹',amount:true)),
               Padding(padding:const EdgeInsets.all(6),child:line.quantity.text.isEmpty ? const Text('—',style:printedStyle)
                 : itemCell(line.quantity.text,'item-$index-Qty',amount:true)),
               Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'taxableValue',amount:true)),
@@ -12145,7 +12243,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             padding: const EdgeInsets.symmetric(vertical: 3), child: Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Expanded(child:Text(_fieldLabels['work-purchase-$key']!,style:printedStyle)),
               const SizedBox(width:12),
-              Flexible(child:Text(_details[key]!.text,textAlign:TextAlign.right,
+              Flexible(child:Text(_invoiceMoney(_details[key]!.text),textAlign:TextAlign.right,
                 style:printedStyle.copyWith(fontSize:key=='invoiceTotal'?18:12,
                   fontWeight:key=='invoiceTotal'?FontWeight.w700:FontWeight.w500))),
             ])),
@@ -12168,7 +12266,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           for(final (index,row) in _taxRows.indexed) TableRow(children:[
             for(final key in WorkspacePurchaseEntryDraft.printedTaxKeys) Padding(padding:const EdgeInsets.all(4),
               child:row[key]!.text.isEmpty ? const Text('—',style:printedStyle)
-                :itemCell(row[key]!.text,'tax-$index-$key',amount:key!='label'&&key!='hsn')),
+                :itemCell(moneyKeys.contains(key) ? _invoiceMoney(row[key]!.text) : row[key]!.text,
+                  'tax-$index-$key',amount:key!='label'&&key!='hsn')),
           ]),
         ]),
         for(final (index,_) in _taxRows.indexed) ...extras('tax',row:index),
@@ -12201,44 +12300,35 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       ...extras('receipt'),
     ];
     return [
+      _reviewCopies(),
       Wrap(alignment:WrapAlignment.spaceBetween,crossAxisAlignment:WrapCrossAlignment.center,children:[
         const Text('Recorded purchase · Draft', key:Key('work-purchase-review-title'),
           style:TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
-        TextButton(key:const Key('purchase-review-zoom-in'),onPressed:(){
-          final scale=(_previewZoom.value.getMaxScaleOnAxis()*2).clamp(1.0,8.0).toDouble();
-          _previewZoom.value=Matrix4.diagonal3Values(scale,scale,1);
-        },child:const Text('Zoom in')),
-        TextButton(key:const Key('purchase-review-fit'),onPressed:()=>_previewZoom.value=Matrix4.identity(),
-          child:const Text('Fit page')),
+        _invoiceTools(original: false),
       ]),
       if (_name.text.trim().isEmpty || _reference.text.trim().isEmpty || _date.text.trim().isEmpty ||
           !_goods.any((line) => line.name.text.trim().isNotEmpty))
         const Text('Still to enter: check supplier, invoice number/date and items before saving.',
           style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-      const Text('Pinch to zoom · drag to read',style:TextStyle(fontSize:12,color:_paperMuted)),
-      LayoutBuilder(builder:(context,constraints) {
+      if (_goods.any((line) => line.name.text.trim().isNotEmpty && line.extra['lineTotal']!.text.trim().isEmpty))
+        Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+          const Text('Item amounts not entered', style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
+          TextButton(key: const Key('purchase-review-edit-amounts'), onPressed: _reviewItemAmounts,
+            child: const Text('Review items')),
+        ]),
+      const Text('Pinch to zoom · drag to read',style:TextStyle(fontSize:11,color:_paperMuted)),
+      _invoiceViewer('purchase-review-zoom', viewportHeight, (width) {
         final paper = SizedBox(width:760,child:DecoratedBox(key:const Key('purchase-review-paper'),
           decoration:const BoxDecoration(color:Colors.white,border:Border.fromBorderSide(rule),
             boxShadow:[BoxShadow(color:Color(0x22000000),blurRadius:8,offset:Offset(0,3))]),
           child:ConstrainedBox(constraints:const BoxConstraints(minHeight:1075),
             child:IntrinsicHeight(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:paperParts)))));
-        return SizedBox(
-          height:(constraints.maxWidth*1.414).clamp(0.0,MediaQuery.sizeOf(context).height*.44).toDouble(),
-          child:ColoredBox(color:const Color(0xffe8ebef),child:InteractiveViewer(
-            key:const Key('purchase-review-zoom'),transformationController:_previewZoom,minScale:1,maxScale:8,
-            child:SizedBox.expand(child:FittedBox(fit:BoxFit.contain,
-              alignment:Alignment.topCenter,child:paper)))));
+        return FittedBox(fit: BoxFit.fitWidth, alignment: Alignment.topLeft, child: paper);
       }),
-      const Padding(padding:EdgeInsets.only(top:8),child:Text(
-        'These are your entered details, not the original supplier invoice. Blank fields are not assumed to be zero.',
-        style:TextStyle(fontSize:12,color:_paperMuted))),
-      _section('Recorded goods & payment · not money transferred','purchase-review-pos-observations',pos),
-      if (_attachments.isNotEmpty) _section('Original invoice attachments', 'purchase-review-attachments', [
-        for (final attachment in _attachments) Text(attachment.fileName,
-          style: const TextStyle(fontSize: 12, color: _paperInk)),
-        const Text('Your original copies remain attached above; this record does not replace them.',
-          style: TextStyle(fontSize: 12, color: _paperMuted)),
-      ]),
+      const Padding(padding:EdgeInsets.only(top:6),child:Text(
+        'Entered bill details · blank amounts are not zero.',
+        style:TextStyle(fontSize:11,color:_paperMuted))),
+      _section('Goods & payment details','purchase-review-pos-observations',pos),
     ];
   }
   Widget _compactFields(List<Widget> fields, {double width = 138}) => LayoutBuilder(
@@ -12383,17 +12473,18 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       }
     }
   }
-  Widget _attachment(WorkspacePurchaseInvoiceAttachment a) => _section(
-    a.fileName, 'work-purchase-document-${a.digest}', [
-      if (a.contentType != 'application/pdf' && _scope != null)
-        FutureBuilder<Uint8List>(future: _images.putIfAbsent(a.digest, () =>
-          widget.session.workspacePurchaseInvoiceCapture.read(_scope!, _draftId, a)), builder: (context, snapshot) =>
-          snapshot.hasData ? Image.memory(snapshot.data!, height: 220, fit: BoxFit.contain)
-            : Text(snapshot.hasError ? 'Cannot open the invoice copy. Attach it again.' : 'Opening invoice…')),
+  Widget _attachment(WorkspacePurchaseInvoiceAttachment a) => Column(
+    key: Key('work-purchase-document-${a.digest}'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Tooltip(message: a.fileName, child: Text(a.fileName, maxLines: 1, overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 11, color: _paperMuted))),
       Wrap(spacing: 8, children: [TextButton.icon(key: Key('work-purchase-view-${a.digest}'),
         onPressed: _sourceSaving ? null : () => _openSource(a), icon: const Icon(Icons.visibility_outlined, size: 18),
-        label: const Text('View original')), TextButton.icon(onPressed: () => _scan(a), icon: const Icon(Icons.document_scanner_outlined, size: 18),
-        key: Key('work-purchase-read-${a.digest}'), label: const Text('Read photo details')), TextButton(onPressed: () {
+        label: const Text('View original')),
+        if (a.contentType != 'application/pdf') TextButton.icon(onPressed: () => _scan(a),
+          icon: const Icon(Icons.document_scanner_outlined, size: 18),
+          key: Key('work-purchase-read-${a.digest}'), label: const Text('Try reading photo')),
+        IconButton(tooltip: 'Remove attachment', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () {
           if (_additional.any((f) => f.record.sourceDigest == a.digest)) {
             setState(() => _error = 'Extra details were read from this copy. Keep it attached, or remove those details before removing this copy.');
           } else { setState(() {
@@ -12401,7 +12492,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             _attachments.remove(a);
           }); }
         },
-        child: const Text('Remove attachment'))]),
+        icon: const Icon(Icons.delete_outline, size: 18, color: MoolColors.navy))]),
       if (a.detectedText.isNotEmpty) ...[
         const Text('Compare with the original bill. Fill blank fields, then check and correct your entries.', style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         SelectableText(a.detectedText, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
@@ -12414,11 +12505,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     decoration: const BoxDecoration(color: Color(0xfffffefb),
       border: Border(top: BorderSide(color: _paperRule, width: .7))),
     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-      const Text('Check your entries, then save this draft. No stock, supplier dues or payment is updated.',
+      const Text('Draft only — stock, dues and payments stay unchanged.',
         style: TextStyle(fontSize: 11, color: _paperMuted)),
       Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4, children: [
         TextButton(onPressed: _back, child: const Text('Cancel')),
-        TextButton(key: const Key('work-purchase-preview'), onPressed: _previewPurchase,
+        if (!_reviewFocused) TextButton(key: const Key('work-purchase-preview'), onPressed: _previewPurchase,
           child: const Text('Preview')),
         FilledButton(key: const Key('work-purchase-draft-save'),
           style: FilledButton.styleFrom(minimumSize: const Size(48, 48),
@@ -12442,6 +12533,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final pinned = constraints.maxHeight >= 300 && MediaQuery.viewInsetsOf(context).bottom == 0;
       final ready = !_loading && widget.session.workspaceSuppliersLoaded && _current;
       final form = ListView(key: const Key('work-record-purchase'), primary: false,
+        physics: _readingPointers.isEmpty ? null : const NeverScrollableScrollPhysics(),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(12, 0, 12, pinned ? 12 : 24 + MediaQuery.viewInsetsOf(context).bottom),
         children: [
@@ -12472,7 +12564,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               Text(_attachments.any((a) => a.detectedText.isNotEmpty)
                 ? 'Check the original → correct the details → save draft.'
                 : _attachments.isNotEmpty
-                  ? 'Copy from the attachment, or Read photo details. Check before saving.'
+                  ? _attachments.every((a) => a.contentType == 'application/pdf')
+                    ? 'PDF attached. Enter its details below.'
+                    : 'Enter details below, or try reading the attached photo.'
                   : 'Enter from your supplier bill, or attach a copy to read and review.',
                 key: const Key('work-purchase-attachment-purpose'),
                 style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
@@ -12660,8 +12754,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 _extraFields('payment')]),
               ]),
               _purchaseSection('Preview & review purchase', 'work-purchase-review-section',
-                _sourceAttachment == null ? _reviewPurchase() : _reviewOriginal(constraints.maxHeight),
-                number: 8, summary: 'Review entered details, then save draft'),
+                _sourceAttachment == null ? _reviewPurchase(constraints.maxHeight) : _reviewOriginal(constraints.maxHeight),
+                number: 8, summary: _reviewFocused
+                  ? _sourceAttachment == null ? 'Entered bill details' : 'Original supplier bill'
+                  : 'Check bill details before saving'),
               if (_notice != null) Text(_notice!, key: const Key('work-purchase-entry-notice'),
                 style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
               if (_error != null) Text(_error!, key: const Key('work-purchase-entry-error'),

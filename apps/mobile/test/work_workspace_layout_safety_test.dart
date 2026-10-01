@@ -3425,11 +3425,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-purchase-review-title')), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing, reason: 'Review stays inside the existing form.');
-    expect(find.text('These are your entered details, not the original supplier invoice. Blank fields are not assumed to be zero.'), findsOneWidget);
+    expect(find.text('Entered bill details · blank amounts are not zero.'), findsOneWidget);
+    const displayedMoney = {'supplyValue', 'billDiscount', 'taxableValue', 'cgst', 'sgstAmount', 'sgst',
+      'utgst', 'igst', 'cess', 'freight', 'otherCharges', 'roundOff', 'totalTax', 'invoiceTotal',
+      'amountPayable', 'paidAmount'};
     for (final key in WorkspacePurchaseEntryDraft.detailKeys) {
       final row = find.byKey(ValueKey('purchase-review-$key'));
       expect(row, findsOneWidget, reason: 'Preview retains detail $key even with all edit sections collapsed.');
-      expect(find.descendant(of: row, matching: find.text('1')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text(displayedMoney.contains(key) ? '1.00' : '1')), findsOneWidget);
     }
     for (final key in WorkspacePurchaseEntryDraft.goodsExtraKeys) {
       final prefix = ['receivedQuantity', 'damagedQuantity', 'shortQuantity'].contains(key) ? 'receipt' : 'item';
@@ -3486,9 +3489,9 @@ void main() {
       expect(find.byKey(const ValueKey('purchase-instruction-work-purchase-review-section')),findsNothing,
         reason:'Preview already has a review summary; a repeated instruction must not push the paper down.');
       if (view.$1==360.0 && view.$2==800.0) {
-        expect(tester.getBottomLeft(paper).dy,
+        expect(tester.getBottomLeft(find.byKey(const Key('purchase-review-zoom'))).dy,
           lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('work-purchase-draft-save'))).dy),
-          reason:'The whole fitted paper must remain above the fixed actions on the normal portrait viewport.');
+          reason:'The reading viewport must stay above the fixed actions; page content pans inside it.');
       }
       final decoration = tester.widget<DecoratedBox>(paper).decoration as BoxDecoration;
       expect(decoration.color, Colors.white);
@@ -3515,7 +3518,7 @@ void main() {
       expect(transform.value.getMaxScaleOnAxis(),2);
       final fit=find.byKey(const Key('purchase-review-fit'));
       await revealPurchaseInput(tester,fit); await tester.tap(fit); await tester.pumpAndSettle();
-      expect(transform.value.getMaxScaleOnAxis(),1);
+      expect(transform.value.getMaxScaleOnAxis(),lessThanOrEqualTo(1));
       expect(tester.getBottomLeft(find.byKey(const Key('purchase-review-paper-notes-terms'))).dy,
         greaterThan(tester.getTopLeft(paper).dy+tester.getRect(paper).height*.75),
         reason:'Spare page height belongs to the ruled item area, not below the footer.');
@@ -3551,7 +3554,7 @@ void main() {
         profiles:[WorkspaceSupplierProfile(id:'r11-supplier',name:'Host-only R11 supplier',createdAt:at,updatedAt:at)],
         draft:WorkspacePurchaseEntryDraft(id:'r11-draft',supplierId:'r11-supplier',invoiceReference:'R11-BILL',
           invoiceDate:'30/09/2026',createdAt:at,updatedAt:at,attachments:[attachment],
-          goods:[{'productId':'','name':'Host item','pack':'1 kg','quantity':'2','cost':'25'}],details:{'invoiceTotal':'50'}));
+          goods:[{'productId':'','name':'Host item','pack':'1 kg','quantity':'2','cost':'12345.67'}],details:{'invoiceTotal':'123456.78'}));
       final original=entry.value;
       final picker=_PurchaseOriginalSaveFixture();final previous=FilePickerPlatform.instance;
       FilePickerPlatform.instance=picker;addTearDown(()=>FilePickerPlatform.instance=previous);
@@ -3575,7 +3578,12 @@ void main() {
       await tester.tap(view);await tester.pumpAndSettle();
       expect(find.byKey(const Key('purchase-original-view')),findsOneWidget);
       expect(find.byKey(const Key('purchase-review-paper')),findsNothing);
-      expect(find.text('Original supplier invoice'),findsOneWidget);
+      expect(find.text('Original supplier invoice · kept unchanged'),findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-preview')), findsNothing,
+        reason: 'Preview must not secretly switch documents when review is already open.');
+      expect(find.byKey(Key('work-purchase-read-${attachment.digest}')),
+        pdf ? findsNothing : findsOneWidget,
+        reason: 'An unsupported PDF must not offer photo extraction.');
       if(viewport.height>500) {
         expect(find.byKey(const Key('purchase-original-zoom')).hitTestable(),findsOneWidget,
           reason:'The loaded original must be brought into view without another manual scroll.');
@@ -3587,9 +3595,36 @@ void main() {
       expect(transform.value.getMaxScaleOnAxis(),2);
       expect(transform.value.storage[12],lessThan(0));expect(transform.value.storage[13],lessThan(0),
         reason:'Zoom must keep the document centred instead of moving it towards the corner.');
+      if (viewport.height > 500) {
+        final surface = find.byKey(const Key('purchase-original-zoom'));
+        final outer = tester.state<ScrollableState>(find.descendant(
+          of: find.byKey(const Key('work-record-purchase')), matching: find.byType(Scrollable)).first);
+        for (final delta in [const Offset(0, 40), const Offset(40, 0),
+            const Offset(0, -40), const Offset(-40, 0)]) {
+          final rect = tester.getRect(surface);
+          final scroll = outer.position.pixels;
+          final before = Matrix4.copy(transform.value);
+          final gesture = await tester.startGesture(rect.center);
+          await tester.pump();
+          await gesture.moveBy(delta / 2); await tester.pump();
+          await gesture.moveBy(delta / 2); await tester.pump();
+          await gesture.up(); await tester.pumpAndSettle();
+          expect(outer.position.pixels, closeTo(scroll, .1), reason: 'Document drag must not scroll the surrounding form.');
+          expect(tester.getRect(surface).top, closeTo(rect.top, .1));
+          expect(transform.value, isNot(before), reason: 'The page, not the form, must move in every direction.');
+        }
+        final outside = find.byKey(const Key('purchase-review-original'));
+        await revealPurchaseInput(tester, outside);
+        expect(outside.hitTestable(), findsOneWidget);
+        final scroll = outer.position.pixels;
+        await tester.dragFrom(tester.getCenter(outside), const Offset(0, 40));
+        await tester.pumpAndSettle();
+        expect(outer.position.pixels, isNot(closeTo(scroll, .1)), reason: 'Outside the document, normal form scrolling remains available.');
+      }
       final fit=find.byKey(const Key('purchase-original-fit'));
       await revealPurchaseInput(tester,fit);await tester.tap(fit);await tester.pumpAndSettle();
-      expect(transform.value,Matrix4.identity());
+      expect(transform.value.getMaxScaleOnAxis(), lessThanOrEqualTo(1),
+        reason: 'Fit must include the complete page, even on a short landscape screen.');
       if(pdf) {
         expect(find.text('Page 1 of 2'),findsOneWidget);
         final next=find.byKey(const Key('purchase-original-next'));
@@ -3603,6 +3638,8 @@ void main() {
         final retry=find.byKey(const Key('purchase-original-retry'));
         await revealPurchaseInput(tester,retry);await tester.tap(retry);await tester.pumpAndSettle();
         expect(find.text('Page 1 of 2'),findsOneWidget);
+        await revealPurchaseInput(tester,next);await tester.tap(next);await tester.pumpAndSettle();
+        expect(find.text('Page 2 of 2'),findsOneWidget);
       }
       final download=find.byKey(const Key('purchase-original-download'));
       await revealPurchaseInput(tester,download);await tester.tap(download);await tester.pumpAndSettle();
@@ -3619,6 +3656,29 @@ void main() {
       final recorded=find.byKey(const Key('purchase-original-recorded'));
       await revealPurchaseInput(tester,recorded);await tester.tap(recorded);await tester.pumpAndSettle();
       expect(find.byKey(const Key('purchase-review-paper')),findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-preview')), findsNothing);
+      expect(find.descendant(of: find.byKey(const ValueKey('purchase-review-invoiceTotal')),
+        matching: find.text('1,23,456.78')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('purchase-review-item-0-Rate ₹')),
+        matching: find.text('12,345.67')), findsOneWidget);
+      expect(find.byKey(const ValueKey('purchase-review-item-0-lineTotal')), findsNothing,
+        reason: 'Missing printed amounts stay unknown, not calculated or zero.');
+      final returnOriginal = find.byKey(const Key('purchase-review-original'));
+      capture.unavailable = false;
+      await revealPurchaseInput(tester, returnOriginal); await tester.tap(returnOriginal); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-original-view')), findsOneWidget);
+      expect(find.byKey(const Key('purchase-original-zoom')), findsOneWidget);
+      if (pdf) {
+        expect(find.text('Page 2 of 2'), findsOneWidget,
+          reason: 'Returning to the original must retain the last reviewed source page.');
+      }
+      expect(find.text(attachment.fileName), findsNWidgets(2));
+      await revealPurchaseInput(tester, recorded); await tester.tap(recorded); await tester.pumpAndSettle();
+      final editAmounts = find.byKey(const Key('purchase-review-edit-amounts'));
+      await revealPurchaseInput(tester, editAmounts); await tester.tap(editAmounts); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-lineTotal-0')), findsOneWidget);
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-preview')));
+      expect(find.byKey(const Key('work-purchase-preview')).hitTestable(), findsOneWidget);
       expect(entry.value,same(original));expect(work.workspacePurchases,isEmpty);
       expect(find.byType(AlertDialog),findsNothing);expect(tester.takeException(),isNull);
       capture.unavailable=false;capture.holdRead=Completer<void>();
@@ -4836,7 +4896,7 @@ void main() {
         'Paid / payable wording on bill','Photograph invoice','Choose photo / PDF']) {
       expect(find.text(old),findsNothing);
     }
-    expect(find.text('Check your entries, then save this draft. No stock, supplier dues or payment is updated.'), findsOneWidget);
+    expect(find.text('Draft only — stock, dues and payments stay unchanged.'), findsOneWidget);
     expect(find.text('This records your bill details. It does not send money or update supplier balances yet.'), findsNothing);
     expect(find.text('Preview invoice'), findsNothing, reason:'No pretend original-format preview destination.');
     expect(find.text('Submit purchase'), findsNothing, reason:'Saving a draft is not receipt or ledger posting.');
