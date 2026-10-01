@@ -64,7 +64,7 @@ final class _MediaCommerce extends Fake implements BuyV2CommerceAdapter {
     state: BuyV2CommerceLoadState.ready,
     products: [product, ...otherProducts],
     orders: const [],
-    paymentMethods: const {'Cash on Delivery'},
+    paymentMethods: const {'UPI'},
   );
   @override
   Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>

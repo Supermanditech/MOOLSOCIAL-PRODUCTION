@@ -19,6 +19,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_session_test.dart' show prepaidCommerceFixture;
 
 // These protected checkout images explicitly include two current deliveries.
 // Ordinary seed history remains inactive; provenance is tested independently.
@@ -72,6 +73,7 @@ class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
 class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
   BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
   String? customerMessage;
+  BuyV2CommercialPaymentTerm Function(BuyV2CommercialPaymentTerm)? amend;
 
   @override
   Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
@@ -177,14 +179,46 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               keyFactsUri: Uri.parse('https://bank.example/kfs/offer-1'),
             ),
           ],
-      ],
+      ].map((term) => amend?.call(term) ?? term).toList(),
     );
   }
 }
 
+BuyV2CommercialPaymentTerm _amendPaymentTerm(
+  BuyV2CommercialPaymentTerm term, {
+  int? amountDueNow,
+  String? balanceDueLabel,
+  int? netDays,
+  String? sourceId,
+  Set<String>? acceptedPaymentMethods,
+  double? annualPercentageRate,
+}) => BuyV2CommercialPaymentTerm(
+  id: term.id,
+  fulfilmentKey: term.fulfilmentKey,
+  destination: term.destination,
+  supplierName: term.supplierName,
+  kind: term.kind,
+  orderTotal: term.orderTotal,
+  amountDueNow: amountDueNow ?? term.amountDueNow,
+  balanceDue: term.orderTotal - (amountDueNow ?? term.amountDueNow),
+  balanceDueLabel: balanceDueLabel ?? term.balanceDueLabel,
+  sourceId: sourceId ?? term.sourceId,
+  supplierIsMicroOrSmall: term.supplierIsMicroOrSmall,
+  advancePercent: term.advancePercent,
+  upiTransactionLimit: term.upiTransactionLimit,
+  acceptedPaymentMethods: acceptedPaymentMethods ?? term.acceptedPaymentMethods,
+  netDays: netDays ?? term.netDays,
+  financierName: term.financierName,
+  annualPercentageRate: annualPercentageRate ?? term.annualPercentageRate,
+  keyFactsUri: term.keyFactsUri,
+);
+
 class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
   BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
   String? customerMessage;
+  String? changedGroup;
+  int extraDeliveryFee = 0;
+  BuyV2Address? lastAddress;
 
   @override
   Future<BuyV2CheckoutQuoteSnapshot> loadQuote({
@@ -194,6 +228,7 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
     required List<BuyV2CartBenefit> selectedBenefits,
     required Map<String, int> tipAmountsByFulfilmentKey,
   }) async {
+    lastAddress = address;
     if (state != BuyV2CommerceLoadState.ready) {
       return BuyV2CheckoutQuoteSnapshot(
         state: state,
@@ -214,7 +249,9 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
       couponByDestination[group.destination] = availableCoupon - coupon;
       final tax = group.total * 5 ~/ 100;
       final freight = group.destination == BuyV2Destination.wholesale ? 20 : 0;
-      final deliveryFee = group.destination == BuyV2Destination.shop ? 10 : 0;
+      final deliveryFee =
+          (group.destination == BuyV2Destination.shop ? 10 : 0) +
+          (changedGroup == group.key ? extraDeliveryFee : 0);
       final tip = tipAmountsByFulfilmentKey[group.key] ?? 0;
       lines.add(
         BuyV2CheckoutQuoteLine(
@@ -265,13 +302,19 @@ class _R669PendingEstimateFacts implements BuyV2ProductFactsAdapter {
 }
 
 class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
+  String? unavailableProductId;
   @override
   BuyV2ProductFactsSnapshot snapshotFor(
     BuyV2Product product,
   ) => const BuyV2CatalogueProductFactsAdapter()
       .snapshotFor(product)
       .copyWith(
-        promisedByLabel: 'by tomorrow 4:00 PM',
+        deliveryPromise: product.id == unavailableProductId
+            ? 'Delivery time confirmed at checkout'
+            : product.deliveryPromise,
+        promisedByLabel: product.id == unavailableProductId
+            ? ''
+            : 'by tomorrow 4:00 PM',
         dispatchPromise: product.destination == BuyV2Destination.wholesale
             ? 'Dispatch within one business day'
             : 'Dispatch after packing',
@@ -649,7 +692,7 @@ void main() {
                 key: const ValueKey('r66-checkout-review-capture'),
                 child: child!,
               )
-            : child!,
+            : r66VisualCaptureRoot(child!),
       ),
       home: BuyV2Screen(
         session: session,
@@ -1101,6 +1144,7 @@ void main() {
     final session = BuyV2Session(
       core: core,
       deliveryExceptionAdapter: adapter,
+      commerceAdapter: prepaidCommerceFixture(),
       productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
     addTearDown(core.dispose);
@@ -1109,9 +1153,9 @@ void main() {
     expect(session.addProduct('s-tomato'), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
-    expect(session.choosePayment('Cash on Delivery'), isTrue);
+    expect(session.choosePayment('Card'), isTrue);
     advanceCheckoutToConfirm(session);
-    expect(await session.submitOrder(), isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
     return session;
   }
 
@@ -1214,6 +1258,100 @@ void main() {
       );
     });
   }
+
+  test(
+    'T03 saved address refresh changes consent only for affected supplier fees',
+    () async {
+      final terms = _PaymentTermsAdapter();
+      final quotes = _CheckoutQuoteAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: terms,
+        checkoutQuoteAdapter: quotes,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      final first = productFor(BuyV2Destination.wholesale);
+      final second = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.wholesale &&
+            product.seller != first.seller,
+      );
+      for (final product in [first, second]) {
+        expect(session.addProduct(product.id), isTrue);
+      }
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCheckoutQuote();
+      await session.refreshCommercialPaymentTerms();
+      final groups = session.checkoutFulfilmentGroups;
+      expect(groups, hasLength(2));
+      for (final group in groups) {
+        expect(
+          session.chooseCommercialPaymentTerm(
+            session
+                .commercialPaymentTermsFor(group.key)
+                .firstWhere(
+                  (term) =>
+                      term.kind ==
+                      BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+                ),
+          ),
+          isTrue,
+        );
+      }
+      final unaffected = session.selectedCommercialPaymentTermFor(
+        groups.last.key,
+      )!;
+      quotes.changedGroup = groups.first.key;
+      quotes.extraDeliveryFee = 11;
+      expect(session.chooseAddress('work'), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isTrue);
+      await session.refreshCheckoutQuote();
+      await session.refreshCommercialPaymentTerms();
+      expect(quotes.lastAddress?.id, 'work');
+      expect(
+        session.selectedCommercialPaymentTermFor(groups.first.key),
+        isNull,
+      );
+      expect(
+        session.selectedCommercialPaymentTermFor(groups.last.key)?.id,
+        unaffected.id,
+      );
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    },
+  );
+
+  test(
+    'T03 empty instructions are optional and pending payment locks receiving details',
+    () async {
+      final session = BuyV2Session(
+        core: BuySession(),
+        commerceAdapter: prepaidCommerceFixture(),
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.deliveryInstructionTextFor(BuyV2Destination.shop), isNull);
+      expect(session.choosePayment('Card'), isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      final address = session.selectedAddress;
+      expect(session.chooseAddress('work'), isFalse);
+      expect(session.updateAddress(address), isFalse);
+      expect(session.removeAddress(address.id), isFalse);
+      session.addAddress(address);
+      expect(session.selectedAddress, address);
+      expect(await session.continuePayment((_) async => true), isTrue);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.confirmedOrders, hasLength(1));
+    },
+  );
 
   for (final scale in [1.0, 2.0]) {
     testWidgets('R6634 C05 itemised receipt native review $scale', (
@@ -1987,13 +2125,17 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final store = _R66OrderCustomerStore();
     final earlierCore = BuySession();
-    final earlier = BuyV2Session(core: earlierCore, customerStateStore: store);
+    final earlier = BuyV2Session(
+      core: earlierCore,
+      customerStateStore: store,
+      commerceAdapter: prepaidCommerceFixture(),
+    );
     expect(earlier.addProduct('s-tomato'), isTrue);
     earlier.openCart(scope: BuyV2CartScope.shop);
     expect(earlier.openCheckout(), isTrue);
-    expect(earlier.choosePayment('Cash on Delivery'), isTrue);
+    expect(earlier.choosePayment('Card'), isTrue);
     advanceCheckoutToConfirm(earlier);
-    expect(await earlier.submitOrder(), isTrue);
+    expect(await _submitAndCompleteReviewPayment(earlier), isTrue);
     final previousPurchase = earlier.confirmedPurchaseId!;
     final previousOrder = earlier.confirmedOrders.single;
     await tester.pump();
@@ -2005,6 +2147,7 @@ void main() {
       core: core,
       customerStateStore: store,
       productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      commerceAdapter: prepaidCommerceFixture(),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
@@ -2020,7 +2163,7 @@ void main() {
     expect(session.addProduct(anotherStore.id), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
-    expect(session.choosePayment('Cash on Delivery'), isTrue);
+    expect(session.choosePayment('Card'), isTrue);
     advanceCheckoutToConfirm(session);
     final total = session.checkoutPayableTotal;
     await tester.pumpWidget(app(session));
@@ -2028,6 +2171,9 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('buy-checkout-primary-confirm')),
     );
+    await tester.pumpAndSettle();
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.confirmation);
     expect(session.confirmedOrders, hasLength(2));
@@ -2253,6 +2399,7 @@ void main() {
         core: BuySession(),
         commercialPaymentTermsAdapter: adapter,
         productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+        commerceAdapter: prepaidCommerceFixture(),
       );
       addTearDown(session.dispose);
       final shop = productFor(BuyV2Destination.shop);
@@ -2293,10 +2440,59 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('buy-checkout-balance-due')),
+        findsNothing,
+      );
+      final wholesaleGroup = session.checkoutFulfilmentGroups.firstWhere(
+        (group) => group.destination == BuyV2Destination.wholesale,
+      );
+      expect(
+        find.byKey(ValueKey('buy-payment-term-summary-${wholesaleGroup.key}')),
         findsOneWidget,
       );
+      expect(booking, findsNothing);
+      await Scrollable.ensureVisible(
+        tester.element(
+          find.byKey(const ValueKey('buy-checkout-payment-terms')),
+        ),
+        alignment: 0.15,
+      );
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      await captureR66Visual(tester, 'buy-t03-selected-terms');
+      final change = find.byKey(
+        ValueKey('buy-payment-term-change-${wholesaleGroup.key}'),
+      );
+      final changeStyle = tester.widget<TextButton>(change).style!;
+      expect(changeStyle.textStyle!.resolve({})!.fontFamily, 'Inter');
+      expect(
+        changeStyle.foregroundColor!.resolve({}),
+        BuyV2ActionStyle.primaryForeground,
+      );
+      expect(tester.getSize(change).height, greaterThanOrEqualTo(44));
+      await tester.ensureVisible(change);
+      await tester.pumpAndSettle();
+      await tester.tap(change);
+      await tester.pumpAndSettle();
+      expect(booking, findsOneWidget);
+      await Scrollable.ensureVisible(
+        tester.element(
+          find.byKey(const ValueKey('buy-checkout-payment-terms')),
+        ),
+        alignment: 0.15,
+      );
+      await tester.pumpAndSettle();
+      await captureR66Visual(tester, 'buy-t03-change-terms');
+      await tester.ensureVisible(booking);
+      await tester.pumpAndSettle();
+      await tester.tap(booking);
+      await tester.pumpAndSettle();
 
-      expect(await _submitAndCompleteReviewPayment(session), isTrue);
+      expect(
+        await _submitAndCompleteReviewPayment(session),
+        isTrue,
+        reason:
+            'notice=${session.notice}; state=${session.checkoutSubmissionState}; terms=${session.checkoutPaymentTermsReviewRequired}',
+      );
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.confirmation);
       expect(
@@ -2312,6 +2508,416 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test(
+    'T03 equivalent payment methods retain consent and mutable changes revoke it',
+    () async {
+      final adapter = _PaymentTermsAdapter()
+        ..amend = (term) =>
+            _amendPaymentTerm(term, acceptedPaymentMethods: {'UPI', 'Card'});
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      expect(
+        session.addProduct(productFor(BuyV2Destination.wholesale).id),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final term = session.commercialPaymentTermsFor(group.key).first;
+      expect(session.chooseCommercialPaymentTerm(term), isTrue);
+      adapter.amend = (current) =>
+          _amendPaymentTerm(current, acceptedPaymentMethods: {'Card', 'UPI'});
+      expect(await session.refreshCommercialPaymentTerms(), isTrue);
+      final unchanged = session.selectedCommercialPaymentTermFor(group.key)!;
+      unchanged.acceptedPaymentMethods.remove('Card');
+      expect(session.selectedCommercialPaymentTermFor(group.key), isNull);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    },
+  );
+
+  testWidgets(
+    'T03 unavailable delivery facts identify only affected Store items',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final facts = _DeliveryPromiseFactsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: facts,
+      );
+      addTearDown(session.dispose);
+      final first = productFor(BuyV2Destination.shop);
+      final second = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            product.seller != first.seller,
+      );
+      for (final product in [first, second]) {
+        expect(session.addProduct(product.id), isTrue);
+      }
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.chooseAddress('work'), isTrue);
+      facts.unavailableProductId = first.id;
+      expect(session.refreshCheckoutDeliveryEstimates(), isFalse);
+      expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      final groups = session.checkoutFulfilmentGroups;
+      final affected = groups.firstWhere(
+        (group) => group.lines.any((line) => line.product.id == first.id),
+      );
+      final unaffected = groups.firstWhere(
+        (group) => group.lines.any((line) => line.product.id == second.id),
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            ValueKey('buy-checkout-confirm-delivery-${affected.key}'),
+          ),
+          matching: find.textContaining('Unavailable · Check delivery'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            ValueKey('buy-checkout-confirm-delivery-${unaffected.key}'),
+          ),
+          matching: find.textContaining('Unavailable · Check delivery'),
+        ),
+        findsNothing,
+      );
+      facts.unavailableProductId = null;
+      expect(session.refreshCheckoutDeliveryEstimates(), isTrue);
+      expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final change in [
+    'advance',
+    'due date',
+    'credit days',
+    'eligibility',
+    'source',
+    'financier disclosure',
+  ]) {
+    test(
+      'T03 changed $change requires consent only for its supplier',
+      () async {
+        final adapter = _PaymentTermsAdapter();
+        final session = BuyV2Session(
+          core: BuySession(),
+          commercialPaymentTermsAdapter: adapter,
+          productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+        );
+        addTearDown(session.dispose);
+        final first = productFor(BuyV2Destination.wholesale);
+        final second = BuyV2Catalogue.products.firstWhere(
+          (product) =>
+              product.destination == BuyV2Destination.wholesale &&
+              product.seller != first.seller,
+        );
+        for (final product in [
+          first,
+          second,
+          productFor(BuyV2Destination.shop),
+        ]) {
+          expect(session.addProduct(product.id), isTrue);
+        }
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        final groups = session.checkoutFulfilmentGroups;
+        expect(groups, hasLength(3));
+        final target = groups.firstWhere(
+          (group) => group.partner == first.seller,
+        );
+        final kind = change == 'credit days'
+            ? BuyV2CommercialPaymentTermKind.supplierCredit
+            : change == 'financier disclosure'
+            ? BuyV2CommercialPaymentTermKind.regulatedCredit
+            : BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery;
+        for (final group in groups.where(
+          (group) => group.destination == BuyV2Destination.wholesale,
+        )) {
+          expect(
+            session.chooseCommercialPaymentTerm(
+              session
+                  .commercialPaymentTermsFor(group.key)
+                  .firstWhere((term) => term.kind == kind),
+            ),
+            isTrue,
+          );
+        }
+        final accepted = session.selectedCommercialPaymentTermFor(target.key)!;
+        final unaffected = {
+          for (final group in groups.where((group) => group.key != target.key))
+            group.key: session.selectedCommercialPaymentTermFor(group.key)!.id,
+        };
+        adapter.amend = (term) {
+          if (term.fulfilmentKey != target.key || term.id != accepted.id) {
+            return term;
+          }
+          return switch (change) {
+            'advance' => _amendPaymentTerm(
+              term,
+              amountDueNow: term.amountDueNow + 1,
+            ),
+            'due date' => _amendPaymentTerm(
+              term,
+              balanceDueLabel: 'before dispatch',
+            ),
+            'credit days' => _amendPaymentTerm(
+              term,
+              netDays: 20,
+              balanceDueLabel: 'within 20 days of delivery',
+            ),
+            'eligibility' => _amendPaymentTerm(
+              term,
+              acceptedPaymentMethods: {'UPI'},
+            ),
+            'source' => _amendPaymentTerm(
+              term,
+              sourceId: 'revised-supplier-agreement',
+            ),
+            _ => _amendPaymentTerm(term, annualPercentageRate: 13.5),
+          };
+        };
+        expect(await session.refreshCommercialPaymentTerms(), isFalse);
+        expect(session.selectedCommercialPaymentTermFor(target.key), isNull);
+        for (final entry in unaffected.entries) {
+          expect(
+            session.selectedCommercialPaymentTermFor(entry.key)?.id,
+            entry.value,
+          );
+        }
+        expect(session.chooseCommercialPaymentTerm(accepted), isFalse);
+        expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+        final refreshed = session
+            .commercialPaymentTermsFor(target.key)
+            .firstWhere((term) => term.id == accepted.id);
+        expect(session.chooseCommercialPaymentTerm(refreshed), isTrue);
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+      },
+    );
+  }
+
+  test(
+    'T03 unavailable terms retry retains an unchanged accepted agreement',
+    () async {
+      final adapter = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      expect(
+        session.addProduct(productFor(BuyV2Destination.wholesale).id),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final term = session.commercialPaymentTermsFor(group.key).first;
+      expect(session.chooseCommercialPaymentTerm(term), isTrue);
+      adapter.state = BuyV2CommerceLoadState.offline;
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+      adapter.state = BuyV2CommerceLoadState.ready;
+      expect(await session.refreshCommercialPaymentTerms(), isTrue);
+      expect(session.selectedCommercialPaymentTermFor(group.key)?.id, term.id);
+    },
+  );
+
+  test(
+    'T03 supplier payment eligibility removes only the affected agreement',
+    () async {
+      final adapter = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      expect(
+        session.addProduct(productFor(BuyV2Destination.wholesale).id),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final term = session.commercialPaymentTermsFor(group.key).first;
+      expect(session.chooseCommercialPaymentTerm(term), isTrue);
+      adapter.amend = (current) => current.id == term.id
+          ? _amendPaymentTerm(current, acceptedPaymentMethods: {'Card'})
+          : current;
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(session.selectedCommercialPaymentTermFor(group.key), isNull);
+      expect(
+        session
+            .commercialPaymentTermsFor(group.key)
+            .any((current) => current.id == term.id),
+        isFalse,
+      );
+      expect(session.chooseCommercialPaymentTerm(term), isFalse);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'T03 Retail prepaid and optional instructions stay usable at $scale',
+      (tester) async {
+        const size = Size(320, 568);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final session = BuyV2Session(
+          core: BuySession(),
+          commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+          productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+        );
+        addTearDown(session.dispose);
+        expect(
+          session.addProduct(productFor(BuyV2Destination.shop).id),
+          isTrue,
+        );
+        session.openCart(scope: BuyV2CartScope.shop);
+        expect(session.openCheckout(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+        expect(session.choosePayment('Cash on Delivery'), isFalse);
+        expect(session.cashOnDeliveryEligibleForCheckout, isFalse);
+        expect(session.selectedPayment, 'UPI');
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          isNull,
+        );
+        await tester.pumpWidget(
+          app(session, size: size, textScale: scale, reducedMotion: true),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Cash on Delivery'), findsNothing);
+        expect(find.textContaining('Supplier credit'), findsNothing);
+        expect(find.text('Pay in full online'), findsOneWidget);
+        final instructions = find.byKey(
+          const PageStorageKey('buy-checkout-instructions'),
+        );
+        await tester.ensureVisible(instructions);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: instructions,
+            matching: find.text('Delivery instructions · optional'),
+          ),
+        );
+        await tester.pump();
+        final add = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-shop'),
+        );
+        expect(add.hitTestable(), findsOneWidget);
+        expect(find.text('Clear'), findsNothing);
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(find.text('Clear'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('buy-cart-instruction-shop-none')),
+          findsNothing,
+        );
+        final field = find.byKey(
+          const ValueKey('buy-cart-instruction-note-shop'),
+        );
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
+        await tester.enterText(field, 'Ring once at the front gate.');
+        final save = find.byKey(
+          const ValueKey('buy-cart-instruction-save-shop'),
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        session.openCart(scope: BuyV2CartScope.shop);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        expect(session.openCheckout(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+        await Scrollable.ensureVisible(
+          tester.element(
+            find.byKey(const PageStorageKey('buy-checkout-instructions')),
+          ),
+          alignment: 0.15,
+        );
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'buy-t03-instructions-$scale');
+        final reopenedInstructions = find.byKey(
+          const PageStorageKey('buy-checkout-instructions'),
+        );
+        final reopenedAdd = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-shop'),
+        );
+        if (reopenedAdd.hitTestable().evaluate().isEmpty) {
+          await tester.tap(
+            find.descendant(
+              of: reopenedInstructions,
+              matching: find.text('Delivery instructions · optional'),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        await tester.ensureVisible(reopenedAdd);
+        await tester.pumpAndSettle();
+        expect(find.text('Clear'), findsNothing);
+        await tester.tap(reopenedAdd);
+        await tester.pumpAndSettle();
+        final clear = find.byKey(
+          const ValueKey('buy-cart-instruction-clear-draft-shop'),
+        );
+        expect(find.text('Clear'), findsOneWidget);
+        await tester.ensureVisible(clear);
+        await tester.pumpAndSettle();
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          isNull,
+        );
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+        expect(find.text('Clear'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('payment terms offline state blocks Checkout and retries', (
     tester,
@@ -2378,6 +2984,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final quoteAdapter = _CheckoutQuoteAdapter();
     final session = BuyV2Session(
+      commerceAdapter: prepaidCommerceFixture(),
       core: BuySession(),
       checkoutQuoteAdapter: quoteAdapter,
       commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
@@ -2479,6 +3086,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final session = BuyV2Session(
+        commerceAdapter: prepaidCommerceFixture(),
         core: BuySession(),
         productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );
@@ -2533,6 +3141,7 @@ void main() {
     final balanceAdapter = _BalancePaymentAdapter();
     final core = BuySession();
     final session = BuyV2Session(
+      commerceAdapter: prepaidCommerceFixture(),
       core: core,
       commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
       balancePaymentAdapter: balanceAdapter,
@@ -2589,6 +3198,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final balanceAdapter = _BalancePaymentAdapter();
       final session = BuyV2Session(
+        commerceAdapter: prepaidCommerceFixture(),
         core: BuySession(),
         commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
         balancePaymentAdapter: balanceAdapter,
@@ -3284,7 +3894,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-gst-toggle-20261001/'
+            'candidate_captures/cursor-t03-20261001/'
             'buy-v2-t02-checkout-${viewport.label}.png',
           ),
         );

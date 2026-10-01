@@ -10679,7 +10679,11 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
           Text(
             session.isStoreProcurement
                 ? 'Available from this supplier for your Store.'
-                : 'Retail is paid in full. Wholesale terms are published by each supplier.',
+                : groups.any(
+                    (group) => group.destination == BuyV2Destination.wholesale,
+                  )
+                ? 'Wholesale terms are published by each supplier.'
+                : 'Retail orders are paid online before placement.',
             style: context.buyMeta.copyWith(fontSize: 8.5),
           ),
           const SizedBox(height: 8),
@@ -10689,36 +10693,41 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
             groupIndex++
           ) ...[
             _CommercialPaymentTermGroup(
+              key: ValueKey(
+                'buy-payment-terms-group-${groups[groupIndex].key}',
+              ),
               session: session,
               group: groups[groupIndex],
             ),
             if (groupIndex < groups.length - 1) const Divider(height: 18),
           ],
-          const Divider(height: 18),
-          Row(
-            children: [
-              Expanded(child: Text('Pay now', style: context.buyBody)),
-              Text(
-                buyV2Money(session.checkoutAmountDueNow),
-                key: const ValueKey('buy-checkout-amount-due-now'),
-                style: context.buyTitle.copyWith(fontSize: 15),
-              ),
-            ],
-          ),
-          if (session.checkoutBalanceDue > 0) ...[
-            const SizedBox(height: 3),
+          if (session.isStoreProcurement) ...[
+            const Divider(height: 18),
             Row(
               children: [
-                Expanded(
-                  child: Text('Balance due later', style: context.buyMeta),
-                ),
+                Expanded(child: Text('Pay now', style: context.buyBody)),
                 Text(
-                  buyV2Money(session.checkoutBalanceDue),
-                  key: const ValueKey('buy-checkout-balance-due'),
-                  style: context.buyBody,
+                  buyV2Money(session.checkoutAmountDueNow),
+                  key: const ValueKey('buy-checkout-amount-due-now'),
+                  style: context.buyTitle.copyWith(fontSize: 15),
                 ),
               ],
             ),
+            if (session.checkoutBalanceDue > 0) ...[
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Balance due later', style: context.buyMeta),
+                  ),
+                  Text(
+                    buyV2Money(session.checkoutBalanceDue),
+                    key: const ValueKey('buy-checkout-balance-due'),
+                    style: context.buyBody,
+                  ),
+                ],
+              ),
+            ],
           ],
           if ((!session.isStoreProcurement ||
                   session.checkoutPaymentTermsReviewRequired) &&
@@ -10753,14 +10762,26 @@ String _storePaymentChoiceLabel(BuyV2CommercialPaymentTerm term) {
       : '$deposit · balance within ${term.netDays} days of delivery';
 }
 
-class _CommercialPaymentTermGroup extends StatelessWidget {
+class _CommercialPaymentTermGroup extends StatefulWidget {
   const _CommercialPaymentTermGroup({
+    super.key,
     required this.session,
     required this.group,
   });
 
   final BuyV2Session session;
   final BuyV2FulfilmentGroup group;
+
+  @override
+  State<_CommercialPaymentTermGroup> createState() =>
+      _CommercialPaymentTermGroupState();
+}
+
+class _CommercialPaymentTermGroupState
+    extends State<_CommercialPaymentTermGroup> {
+  bool _changing = false;
+  BuyV2Session get session => widget.session;
+  BuyV2FulfilmentGroup get group => widget.group;
 
   @override
   Widget build(BuildContext context) {
@@ -10866,6 +10887,48 @@ class _CommercialPaymentTermGroup extends StatelessWidget {
               fontSize: 9,
             ),
           )
+        else if (selected != null && !_changing)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  key: ValueKey('buy-payment-term-summary-${group.key}'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.destination == BuyV2Destination.wholesale
+                          ? _commercialPaymentTermTitle(selected)
+                          : 'Pay in full online',
+                      style: context.buyBody,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _commercialPaymentTermDetail(selected),
+                      style: context.buyMeta,
+                    ),
+                  ],
+                ),
+              ),
+              if (group.destination == BuyV2Destination.wholesale)
+                TextButton(
+                  key: ValueKey('buy-payment-term-change-${group.key}'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: BuyV2ActionStyle.primaryForeground,
+                    minimumSize: const Size(64, 44),
+                    textStyle: context.buyBody.copyWith(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                    ),
+                  ),
+                  onPressed:
+                      session.checkoutBusy || session.checkoutRequiresResolution
+                      ? null
+                      : () => setState(() => _changing = true),
+                  child: const Text('Change'),
+                ),
+            ],
+          )
         else
           RadioGroup<String>(
             groupValue: selected?.id,
@@ -10873,7 +10936,9 @@ class _CommercialPaymentTermGroup extends StatelessWidget {
               final term = terms
                   .where((candidate) => candidate.id == termId)
                   .firstOrNull;
-              if (term != null) session.chooseCommercialPaymentTerm(term);
+              if (term != null && session.chooseCommercialPaymentTerm(term)) {
+                setState(() => _changing = false);
+              }
             },
             child: Column(
               children: [
@@ -11612,13 +11677,6 @@ List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
             : [
                 ('UPI', Icons.phone_android_rounded, 'Pay with any UPI app'),
                 ('Card', Icons.credit_card_rounded, 'Debit or credit card'),
-                if (!session.collectionCheckoutSelected &&
-                    session.cashOnDeliveryEligibleForCheckout)
-                  (
-                    'Cash on Delivery',
-                    Icons.payments_outlined,
-                    'Pay when this eligible Shop order arrives',
-                  ),
               ])
         .where((choice) => session.availablePaymentMethods.contains(choice.$1))
         .toList(growable: false);
@@ -12311,6 +12369,8 @@ class _CheckoutOrderDetails extends StatelessWidget {
           _CheckoutCommercialPaymentTerms(session: session),
           const SizedBox(height: 8),
         ],
+        _CheckoutDeliveryInstructions(session: session),
+        const SizedBox(height: 8),
         if (session.checkoutBenefitReviewRequired) ...[
           _CartBenefitEligibilityState(session: session),
           const SizedBox(height: 8),
@@ -12364,6 +12424,62 @@ class _CheckoutOrderDetails extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _CheckoutDeliveryInstructions extends StatefulWidget {
+  const _CheckoutDeliveryInstructions({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  State<_CheckoutDeliveryInstructions> createState() =>
+      _CheckoutDeliveryInstructionsState();
+}
+
+class _CheckoutDeliveryInstructionsState
+    extends State<_CheckoutDeliveryInstructions> {
+  final _instructionStorage = PageStorageBucket();
+  BuyV2Session get session => widget.session;
+
+  @override
+  Widget build(BuildContext context) {
+    final destinations = session.checkoutDestinations;
+    final saved = [
+      for (final destination in destinations)
+        if (session.deliveryInstructionTextFor(destination) case final note?)
+          '${_cartDestinationLabel(session, destination)} · $note',
+    ];
+    final locked = session.checkoutBusy || session.checkoutRequiresResolution;
+    return Material(
+      color: Colors.transparent,
+      child: ExpansionTile(
+        key: const PageStorageKey('buy-checkout-instructions'),
+        maintainState: true,
+        enabled: !locked,
+        expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
+            ? AnimationStyle.noAnimation
+            : null,
+        tilePadding: EdgeInsets.zero,
+        title: Text('Delivery instructions · optional', style: context.buyBody),
+        subtitle: saved.isEmpty
+            ? null
+            : Text(saved.join('\n'), style: context.buyMeta),
+        children: [
+          PageStorage(
+            bucket: _instructionStorage,
+            child: IgnorePointer(
+              ignoring: locked,
+              child: _CartDeliveryInstructionSections(
+                session: session,
+                destinations: destinations.toList(growable: false),
+                showHeading: false,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -12440,7 +12556,13 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
               final stacked =
                   summaryWidth + 10 + actionWidth > constraints.maxWidth;
               final count = Text(countText, style: countStyle);
-              final amount = Text(amountText, style: amountStyle);
+              final amount = Text(
+                amountText,
+                key: session.isStoreProcurement
+                    ? null
+                    : const ValueKey('buy-checkout-amount-due-now'),
+                style: amountStyle,
+              );
               final summary =
                   stacked &&
                       countWidth + 10 + amountWidth <= constraints.maxWidth
@@ -22822,9 +22944,11 @@ class _CartDeliveryInstructionSections extends StatefulWidget {
   const _CartDeliveryInstructionSections({
     required this.session,
     required this.destinations,
+    this.showHeading = true,
   });
   final BuyV2Session session;
   final List<BuyV2Destination> destinations;
+  final bool showHeading;
   @override
   State<_CartDeliveryInstructionSections> createState() =>
       _CartDeliveryInstructionSectionsState();
@@ -22876,14 +23000,15 @@ class _CartDeliveryInstructionSectionsState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Delivery instructions · optional',
-            style: context.buyBody.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: BuyV2ActionStyle.primaryForeground,
+          if (widget.showHeading)
+            Text(
+              'Delivery instructions · optional',
+              style: context.buyBody.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: BuyV2ActionStyle.primaryForeground,
+              ),
             ),
-          ),
           if (eligible.length > 1)
             SingleChildScrollView(
               key: const PageStorageKey('buy-cart-instruction-contexts'),
@@ -23066,7 +23191,7 @@ class _CartDeliveryInstructionCardState
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                if (selected != null)
+                if (session.isStoreProcurement && selected != null)
                   TextButton(
                     key: ValueKey(
                       'buy-cart-instruction-${destination.name}-none',

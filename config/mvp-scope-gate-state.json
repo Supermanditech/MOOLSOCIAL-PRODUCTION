@@ -13,7 +13,7 @@
     "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
-    "currentTicketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
+    "currentTicketId": "BUY-ACTION-POLISH-20260926-01",
     "priorC33LFix2SelectedTicketAssessment": {
       "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
       "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
@@ -1672,63 +1672,59 @@
       "evidencePath": "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md"
     },
     "selectedTicketAssessment": {
-      "ticketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
-      "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
-      "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-      "manifestSha256": "11E8F7D030DCF3319C889AE7B7ECADF006A325F998333FAE80BD00B2C7FD5B5B",
+      "ticketId": "BUY-ACTION-POLISH-20260926-01",
+      "customerOutcome": "Checkout retains each unchanged accepted supplier agreement, requires a fresh choice when its financial or eligibility conditions change, presents compact terms with Change, keeps Retail prepaid, reuses saved receiving/GST details and permits optional instructions without blocking payment.",
+      "manifestPath": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json",
+      "manifestSha256": "82493398296CAA9D023554725F4D141D16776C23449B087424BEBCCC4AE14AFC",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
-      "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+      "implementationDisposition": [
+        "reuse",
+        "thin_policy_adapter",
+        "test_only_acceptance",
+        "new_necessary_work"
+      ],
       "sharedImplementationOwners": [
-        "scripts/build-buy-device-review.ps1",
-        "scripts/check-apk-regression-gate-state.ps1",
-        "scripts/check-apk-production-plugin-integrity.ps1",
-        "scripts/test-public-auth-sideload-build-controls.ps1",
-        "scripts/test-release-production-plugin-integrity.ps1",
-        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-        "config/mvp-scope-gate-state.json"
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "The legacy generic APK state is an immutable consumed r58 candidate, the current wrapper cannot hydrate the newly locked share_plus dependency inside its guarded --no-pub build operation, and no consolidated Social-only deployment allowlist or preauthorization readiness state exists.",
+      "necessityProof": "The existing Buy session owns supplier agreements and the current Checkout owns display, payment and recovery. Full agreement comparison and reuse of the existing note composer correct the observed gaps without new screens, routes, state owners or provider contracts.",
       "robustnessCoverage": [
-        "strict_r60_91_to_r60_92_version_monotonicity",
-        "clean_remote_exact_final_integration_graph",
-        "preauthorization_ready_with_build_install_Play_and_deploy_closed",
-        "same_operation_locked_dependency_hydration_and_build",
-        "share_plus_source_and_postbuild_plugin_integrity",
-        "two_complete_source_regression_cycles",
-        "complete_prebuild_and_pending_postbuild_matrix",
-        "five_function_Social_source_live_revision_and_client_compatibility_map",
-        "end_to_end_qualified_deployment_allowlist_and_rollback"
+        "Changed amount, balance, due date or eligibility under the same ID needs new consent; equivalent unchanged agreements retain consent",
+        "Stale term objects cannot silently consent to refreshed conditions; supplier/group identities remain isolated",
+        "Retail prepaid and mixed-basket totals remain correct; legacy pending-payment recovery is preserved",
+        "Compact terms support Change, Retry, small screens, enlarged text and reduced motion",
+        "Empty instructions are optional, saved instructions survive Cart/Checkout interruption, and invalid receiving facts identify affected items",
+        "Focused behavioral checks, existing selected Buy matrix, analysis and actual installed review-app screens"
       ],
       "adjustments": [
-        "add_candidate_specific_pre_APK_readiness_state_and_gate",
-        "harden_supported_wrapper_for_new_locked_dependencies",
-        "extend_plugin_integrity_for_native_share",
-        "create_final_integration_and_source_seal",
-        "create_Social_only_backend_deployment_map_and_gate"
+        "Compare accepted agreement contents rather than only its ID; reject stale agreement objects and exclude unselected groups from placement terms",
+        "Keep unaffected supplier choices and require a new choice only for a changed or unavailable agreement",
+        "Show compact accepted public terms with an accessible Change action; Retail has no business-term chooser",
+        "Reject new public Retail COD selections and retain truthful prepaid payment/recovery behavior",
+        "Expose optional Checkout instruction review/edit through the existing composer and preserve address/GST validation"
       ],
       "explicitExclusions": [
-        "no_APK_AAB_build_or_one_build_authority_consumption",
-        "no_install_uninstall_data_clear_downgrade_Play_or_OPPO_mutation",
-        "no_cloud_backend_Hosting_provider_or_Firebase_write",
-        "no_secret_credential_token_OTP_cookie_or_account_output",
-        "no_Buy_Travel_Work_Care_or_unimplemented_backend_deployment"
+        "No new screen, route, state owner, dependency, backend, Store or delivery implementation",
+        "No invented supplier terms, credit eligibility, provider quote, payment success or cross-Store credit transfer",
+        "No new APK, install, data clear, real payment, cloud deployment, secret access or external messaging",
+        "No screenbook HTML mutation or unrelated product expansion"
       ],
       "dependenciesAndApprovals": [
-        "founder_requested_complete_version_incremented_pre_APK_gate_preparation_2026_08_26",
-        "founder_added_Social_only_backend_cloud_deployment_mapping_for_end_to_end_preflight_qualified_runtime_2026_08_26",
-        "closed_v4_integration_0a40f68dc7697ae226aef469604761fa8b3d1301",
-        "closed_remote_Social_share_tip_dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
-        "installed_predecessor_r60_91_versionCode_2026082591_preserved",
-        "actual_APK_build_and_cloud_deployment_require_later_exact_founder_authority"
+        "Technically qualified and founder-approved GST checkpoint a0067a63",
+        "Existing T02 unified Checkout and exclusive registered Buy source/test ownership",
+        "T11 authoritative supplier/customer eligibility and provider terms remain required for integrated acceptance",
+        "Founder visual approval of the new T03 screens remains separate from technical acceptance"
       ],
-      "timelineImpactDays": 2,
+      "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "REL_PREAPK_01_CHILD_09_selected_two_function_Social_backend_deployment_execution_and_rollback_gate_no_build_deploy_device_Play_secret_or_excluded_surface_action",
-      "evidencePath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+      "implementationState": "assessed_before_T03_runtime_execution",
+      "evidencePath": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5047,46 +5043,180 @@
       "whole_backend_and_mobile analysis_dual host gates_UI locks_and_two identical affected cycles"
     ]
   },
+  "priorPreApk20260826Scope": {
+    "ticket": {
+      "id": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
+      "parentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
+      "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
+      "classification": "mvp_required",
+      "classificationReason": "Installed r60.91 predates accepted source fixes, while launch safety requires a uniquely versioned successor with reproducible native dependencies, exact Social backend sequencing and a complete fail-closed gate matrix.",
+      "minimumCompleteScope": [
+        "reserve_unique_r60_92_version_and_candidate_identity",
+        "create_and_remote_close_final_integration_from_exact_approved_tips",
+        "separate_preauthorization_readiness_from_one_build_authority",
+        "hydrate_locked_dependencies_inside_the_same_guarded_future_build",
+        "require_share_plus_native_plugin_integrity",
+        "seal_source_and_pass_two_complete_regression_cycles",
+        "register_all_prebuild_passed_and_postbuild_device_gates_pending",
+        "map_and_gate_only_end_to_end_preflight_qualified_Social_backend_deployments"
+      ],
+      "explicitExclusions": [
+        "no_APK_AAB_build_or_one_build_authority_consumption",
+        "no_install_uninstall_data_clear_downgrade_Play_or_OPPO_mutation",
+        "no_cloud_backend_Hosting_provider_or_Firebase_write",
+        "no_secret_credential_token_OTP_cookie_or_account_output",
+        "no_Buy_Travel_Work_Care_or_unimplemented_backend_deployment"
+      ],
+      "dependenciesAndApprovals": [
+        "founder_requested_complete_version_incremented_pre_APK_gate_preparation_2026_08_26",
+        "founder_added_Social_only_backend_cloud_deployment_mapping_for_end_to_end_preflight_qualified_runtime_2026_08_26",
+        "closed_v4_integration_0a40f68dc7697ae226aef469604761fa8b3d1301",
+        "closed_remote_Social_share_tip_dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
+        "installed_predecessor_r60_91_versionCode_2026082591_preserved",
+        "later_exact_founder_authority_required_for_build_and_deployment"
+      ],
+      "testAndEvidencePlan": [
+        "candidate_version_and_retained_history_negative_tests",
+        "integration_graph_tree_remote_and_secret_verification",
+        "wrapper_dependency_hydration_fixture_without_APK",
+        "plugin_integrity_positive_and_negative fixtures",
+        "two_complete_mobile_backend_hosting_and_release_gate cycles",
+        "source_manifest_checksum_and_clean_remote_readback",
+        "five_function_Social_deployment_map_and_allowlist_negative tests",
+        "candidate_preauthorization_gate_with_build_deploy_install_Play_held"
+      ]
+    },
+    "founderDisclosure": {
+      "state": "presented_before_execution",
+      "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+    },
+    "authorization": {
+      "state": "founder_acknowledged_mvp_scope",
+      "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+      "beyondMvpExplicitlyAuthorized": false,
+      "founderAcceptance": "complete_version_incremented_pre_APK_mandatory_gate_preparation_plus_Social_only_end_to_end_preflight_qualified_backend_cloud_deployment_mapping_no_APK_or_deployment_yet_2026_08_26"
+    },
+    "execution": {
+      "referenceWriteAuthorized": false,
+      "runtimeWriteAuthorized": true,
+      "testOrGateWriteAuthorized": true,
+      "backendWriteAuthorized": false,
+      "buildAuthorized": false,
+      "deviceInstallAuthorized": false,
+      "buildAuthorizationScope": "pre_APK_preparation_only_one_build_authority_remains_closed_until_later_exact_founder_authorization",
+      "deviceInstallAuthorizationScope": "no_install_uninstall_downgrade_data_clear_or_other_device_mutation_authorized_during_pre_APK_preparation",
+      "oppoUninstallExistingAppDataAuthorizedOnce": false,
+      "oppoUninstallAuthorizationConsumed": true,
+      "playUploadAuthorized": false,
+      "externalServiceWriteAuthorized": false,
+      "firebaseEmailPasswordAndEmailLinkEnablementAuthorizedOnce": false,
+      "firebaseMoolSocialAuthorizedDomainAdditionAuthorizedOnce": false,
+      "hostingDeploymentAuthorized": false,
+      "liveEmailSendAuthorized": false,
+      "liveEmailSendAuthorizedCount": 0,
+      "exactFirebaseAndroidPlaySigningSha1AdditionAuthorizedOnce": false,
+      "exactFirebaseAndroidPlaySigningSha1AdditionConsumed": true,
+      "otherProviderWriteAuthorized": false,
+      "secretValueAccessAuthorized": false
+    },
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
+      "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
+      "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+      "manifestSha256": "11E8F7D030DCF3319C889AE7B7ECADF006A325F998333FAE80BD00B2C7FD5B5B",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": [
+        "reuse",
+        "configuration",
+        "thin_policy_adapter",
+        "test_only_acceptance",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "scripts/build-buy-device-review.ps1",
+        "scripts/check-apk-regression-gate-state.ps1",
+        "scripts/check-apk-production-plugin-integrity.ps1",
+        "scripts/test-public-auth-sideload-build-controls.ps1",
+        "scripts/test-release-production-plugin-integrity.ps1",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "config/mvp-scope-gate-state.json"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "necessityProof": "The legacy generic APK state is an immutable consumed r58 candidate, the current wrapper cannot hydrate the newly locked share_plus dependency inside its guarded --no-pub build operation, and no consolidated Social-only deployment allowlist or preauthorization readiness state exists.",
+      "robustnessCoverage": [
+        "strict_r60_91_to_r60_92_version_monotonicity",
+        "clean_remote_exact_final_integration_graph",
+        "preauthorization_ready_with_build_install_Play_and_deploy_closed",
+        "same_operation_locked_dependency_hydration_and_build",
+        "share_plus_source_and_postbuild_plugin_integrity",
+        "two_complete_source_regression_cycles",
+        "complete_prebuild_and_pending_postbuild_matrix",
+        "five_function_Social_source_live_revision_and_client_compatibility_map",
+        "end_to_end_qualified_deployment_allowlist_and_rollback"
+      ],
+      "adjustments": [
+        "add_candidate_specific_pre_APK_readiness_state_and_gate",
+        "harden_supported_wrapper_for_new_locked_dependencies",
+        "extend_plugin_integrity_for_native_share",
+        "create_final_integration_and_source_seal",
+        "create_Social_only_backend_deployment_map_and_gate"
+      ],
+      "explicitExclusions": [
+        "no_APK_AAB_build_or_one_build_authority_consumption",
+        "no_install_uninstall_data_clear_downgrade_Play_or_OPPO_mutation",
+        "no_cloud_backend_Hosting_provider_or_Firebase_write",
+        "no_secret_credential_token_OTP_cookie_or_account_output",
+        "no_Buy_Travel_Work_Care_or_unimplemented_backend_deployment"
+      ],
+      "dependenciesAndApprovals": [
+        "founder_requested_complete_version_incremented_pre_APK_gate_preparation_2026_08_26",
+        "founder_added_Social_only_backend_cloud_deployment_mapping_for_end_to_end_preflight_qualified_runtime_2026_08_26",
+        "closed_v4_integration_0a40f68dc7697ae226aef469604761fa8b3d1301",
+        "closed_remote_Social_share_tip_dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
+        "installed_predecessor_r60_91_versionCode_2026082591_preserved",
+        "actual_APK_build_and_cloud_deployment_require_later_exact_founder_authority"
+      ],
+      "timelineImpactDays": 2,
+      "within60To75DayLock": true,
+      "implementationState": "REL_PREAPK_01_CHILD_09_selected_two_function_Social_backend_deployment_execution_and_rollback_gate_no_build_deploy_device_Play_secret_or_excluded_surface_action",
+      "evidencePath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+    }
+  },
   "ticket": {
-    "id": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
-    "parentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
-    "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
+    "id": "BUY-ACTION-POLISH-20260926-01",
+    "parentTicketId": "UAW-CURSOR-BUY-READY-20260921",
+    "customerOutcome": "Checkout retains each unchanged accepted supplier agreement, requires a fresh choice when its financial or eligibility conditions change, presents compact terms with Change, keeps Retail prepaid, reuses saved receiving/GST details and permits optional instructions without blocking payment.",
     "classification": "mvp_required",
-    "classificationReason": "Installed r60.91 predates accepted source fixes, while launch safety requires a uniquely versioned successor with reproducible native dependencies, exact Social backend sequencing and a complete fail-closed gate matrix.",
+    "classificationReason": "Correct consent, payment eligibility and recoverable Checkout are required for the founder-selected commerce launch journey.",
     "minimumCompleteScope": [
-      "reserve_unique_r60_92_version_and_candidate_identity",
-      "create_and_remote_close_final_integration_from_exact_approved_tips",
-      "separate_preauthorization_readiness_from_one_build_authority",
-      "hydrate_locked_dependencies_inside_the_same_guarded_future_build",
-      "require_share_plus_native_plugin_integrity",
-      "seal_source_and_pass_two_complete_regression_cycles",
-      "register_all_prebuild_passed_and_postbuild_device_gates_pending",
-      "map_and_gate_only_end_to_end_preflight_qualified_Social_backend_deployments"
+      "Compare accepted agreement contents rather than only its ID; reject stale agreement objects and exclude unselected groups from placement terms",
+      "Keep unaffected supplier choices and require a new choice only for a changed or unavailable agreement",
+      "Show compact accepted public terms with an accessible Change action; Retail has no business-term chooser",
+      "Reject new public Retail COD selections and retain truthful prepaid payment/recovery behavior",
+      "Expose optional Checkout instruction review/edit through the existing composer and preserve address/GST validation"
     ],
     "explicitExclusions": [
-      "no_APK_AAB_build_or_one_build_authority_consumption",
-      "no_install_uninstall_data_clear_downgrade_Play_or_OPPO_mutation",
-      "no_cloud_backend_Hosting_provider_or_Firebase_write",
-      "no_secret_credential_token_OTP_cookie_or_account_output",
-      "no_Buy_Travel_Work_Care_or_unimplemented_backend_deployment"
+      "No new screen, route, state owner, dependency, backend, Store or delivery implementation",
+      "No invented supplier terms, credit eligibility, provider quote, payment success or cross-Store credit transfer",
+      "No new APK, install, data clear, real payment, cloud deployment, secret access or external messaging",
+      "No screenbook HTML mutation or unrelated product expansion"
     ],
     "dependenciesAndApprovals": [
-      "founder_requested_complete_version_incremented_pre_APK_gate_preparation_2026_08_26",
-      "founder_added_Social_only_backend_cloud_deployment_mapping_for_end_to_end_preflight_qualified_runtime_2026_08_26",
-      "closed_v4_integration_0a40f68dc7697ae226aef469604761fa8b3d1301",
-      "closed_remote_Social_share_tip_dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
-      "installed_predecessor_r60_91_versionCode_2026082591_preserved",
-      "later_exact_founder_authority_required_for_build_and_deployment"
+      "Technically qualified and founder-approved GST checkpoint a0067a63",
+      "Existing T02 unified Checkout and exclusive registered Buy source/test ownership",
+      "T11 authoritative supplier/customer eligibility and provider terms remain required for integrated acceptance",
+      "Founder visual approval of the new T03 screens remains separate from technical acceptance"
     ],
     "testAndEvidencePlan": [
-      "candidate_version_and_retained_history_negative_tests",
-      "integration_graph_tree_remote_and_secret_verification",
-      "wrapper_dependency_hydration_fixture_without_APK",
-      "plugin_integrity_positive_and_negative fixtures",
-      "two_complete_mobile_backend_hosting_and_release_gate cycles",
-      "source_manifest_checksum_and_clean_remote_readback",
-      "five_function_Social_deployment_map_and_allowlist_negative tests",
-      "candidate_preauthorization_gate_with_build_deploy_install_Play_held"
+      "Changed amount, balance, due date or eligibility under the same ID needs new consent; equivalent unchanged agreements retain consent",
+      "Stale term objects cannot silently consent to refreshed conditions; supplier/group identities remain isolated",
+      "Retail prepaid and mixed-basket totals remain correct; legacy pending-payment recovery is preserved",
+      "Compact terms support Change, Retry, small screens, enlarged text and reduced motion",
+      "Empty instructions are optional, saved instructions survive Cart/Checkout interruption, and invalid receiving facts identify affected items",
+      "Focused behavioral checks, existing selected Buy matrix, analysis and actual installed review-app screens"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5346,13 +5476,13 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+    "evidence": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json"
   },
   "authorization": {
-    "state": "founder_acknowledged_mvp_scope",
-    "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+    "state": "existing_ticket_authority_confirmed",
+    "evidence": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "complete_version_incremented_pre_APK_mandatory_gate_preparation_plus_Social_only_end_to_end_preflight_qualified_backend_cloud_deployment_mapping_no_APK_or_deployment_yet_2026_08_26"
+    "founderAcceptance": "Founder approved the GST amendment subject to technical testing and instructed the next cart ticket, then explicitly requested do needful as needed for T03 including the annotated changed-agreement consent risk."
   },
   "execution": {
     "referenceWriteAuthorized": false,
@@ -5361,8 +5491,8 @@
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "pre_APK_preparation_only_one_build_authority_remains_closed_until_later_exact_founder_authorization",
-    "deviceInstallAuthorizationScope": "no_install_uninstall_downgrade_data_clear_or_other_device_mutation_authorized_during_pre_APK_preparation",
+    "buildAuthorizationScope": "T03_source_and_tests_only_no_build_authority",
+    "deviceInstallAuthorizationScope": "No_install_uninstall_or_data_clear_existing_cursorreview_hot_refresh_only",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,
     "playUploadAuthorized": false,

@@ -4413,10 +4413,10 @@ void main() {
           tester.state<ScrollableState>(scroll).position.jumpTo(0);
           await tester.pumpAndSettle();
         }
-        // These checkout captures render the same draft T02 Checkout as the
+        // These checkout captures render the same draft T03 Checkout as the
         // Cart-return suite. Retain every historical reference unchanged.
         final reference = viewport.checkout
-            ? 'cursor-gst-toggle-20261001/'
+            ? 'cursor-t03-20261001/'
                   'buy-v2-t02-checkout-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
             : 'cursor-cart-child-20260930/'

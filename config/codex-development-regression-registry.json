@@ -107043,13 +107043,132 @@
           "indexedFixtureAdmission": "Pre-commit and coordinator correctly rejected stale C01-1 proof after Git staging first admitted five new draft PNGs into git ls-files, changing the fingerprint input set from 4648bd94 to ffbc4832 without changing runtime/test bytes. Earlier successful logs remain immutable but are not final tracked-input qualification. Stage new app/test fixtures before future source freeze. Register three distinct indexed proof owners, retain all six logs, then rerun focused and selected checks against the admitted unchanged ffbc input set. Do not change fingerprint/gate behavior or fabricate receipt bindings. An ignored staging audit initially guessed proof ownership from ticket source owners; it exited before Git mutation and was corrected to the actual primary claim."
         }
       },
+      "t03Execution20261001": {
+        "analysisTrial1": "Closed analysis log SHA256 5d6b15941be372d0772e9af5160f6cfbd0e17ee79f5b8e7a5d7bfcbb8f5641b9 rejected a Set destination argument passed to the reused List composer and one unbraced test statement. Focused tests did not start after analysis exit1. Convert the existing destination set to an immutable-length list and brace the statement; rerun against new source. Existing Retail COD order fixtures are intentionally obsolete under T03 prepaid policy: use explicit prepaid review handoff/reconciliation while retaining order, invoice, discount and restart assertions. No gateway success is synthesized in production.",
+        "focusedTrial2": "Closed focused receipt 40e1d9c5265fbb4ba9cc20cad13dfe1c2b9691724902494e13ea50eeda883615: nine scenarios passed; three widget scenarios failed (six error/result events), two missed-tap warnings. All six supplier-consent changes, retry and payment-eligibility model cases passed. Real defect: the new instructions ExpansionTile used a ValueKey and inherited the Checkout list's PageStorage identifier, then read its double scroll offset as bool on Cart return. Give the tile its own PageStorageKey; do not change stored scroll behavior. Two widget actions were tapped before ensureVisible scroll/layout settled; pump after actual scroll and retain hit-test checks. Preserve this failed log and rerun fresh evidence.",
+        "focusedTrial3": "Closed receipt 188ada8271edf43e5fd99b76fa8e4ec9577a50c6a109f4b4dc8e8123e6b70da2: eight scenarios passed, zero missed-tap warnings, four scenarios failed with cascaded framework errors. The instructions tile's own boolean PageStorage key was inherited by its nested TextField scroll state, causing bool-to-double restoration. Isolate the existing composer children in a retained local PageStorage bucket while keeping the tile and Checkout list identifiers distinct. The payment-schedule test reached submit but returned false; add a bounded notice/state reason and inspect the exact payment/terms call path before interpreting it. No failed receipt qualifies technical acceptance.",
+        "focusedTrial4": "Closed receipt 3902c62274208362c599f5cbd1e0598e8a2d84148278c6c03f962de35c97a58d: eleven scenarios passed, one payment-schedule fixture failed, no missed taps. The instruction storage correction passed normal/200% editing and Cart return. Exact failure state is paymentPending with terms=false: the default device-review commerce adapter intentionally requires a real connector and never confirms online payment. Use the existing _ShopCommerceAdapter test fixture through a shared test-only factory for scenarios requiring explicit confirmed prepaid receipts; retain production pending truth and all payment/order assertions. Source inspection also confirms choosing a different saved address omitted the existing quote/terms invalidation used by add/update/remove address. Reuse that same invalidation and lock address mutation during unresolved payment; prove changed fees affect only their supplier agreement.",
+        "sourceReadRecovery5": "An unnecessary context-only source hunk retained a pre-format test declaration and was rejected without mutation. Apply only the exact adapter declaration and already verified loop prefix. Final changes reuse saved-address quote/terms invalidation, a local instruction storage bucket and the existing test commerce adapter; no new provider, dependency, domain state owner or production payment success path was added.",
+        "selectedTrial1": "The first selected batch closed with 426 passed and five obsolete GST-candidate pixel comparisons failed (ten error/result events); source remained unchanged and the second batch did not run. Preserve the closed log and all twenty generated failure images, archived with verified manifest SHA256 4fde8904c60efd9b4867a3a628a22ed7f5d798ddd30726a06cda1f4daa36c67b. These were newly generated untracked outputs, so only those verified archived files were removed from the failure directory; no user or tracked reference file was discarded. Preserve all prior GST candidate images byte-for-byte. Generate and admit five distinct T03 candidate PNGs, stage them before the next source freeze, retain the same responsive assertions and image comparison, then run all selected cases against that exact input set. Host terms captures with transient toast/off-screen framing are excluded from visual approval and require a fresh framed capture directory. Use prospective Retail copy Pay in full online, not a claim that payment has already occurred.",
+        "motionQualificationReset": "Final UI motion audit identified the new instruction ExpansionTile had no explicit reduced-motion style. Official Flutter expansionAnimationStyle documentation confirms AnimationStyle.noAnimation is the supported override. Stop only the identity-verified owned t03-selected-2 Python runner and its seven-process child tree; retain its interrupted log without terminal-success qualification. Previous indexed focused/capture receipt passed16 against909a4a57; it remains immutable but is superseded by the reduced-motion correction. Add the existing platform override and prove the instruction action becomes hit-testable after one frame under disableAnimations, then rerun the complete selected matrix against final source. No other agent, device, attach process or gate was interrupted or weakened.",
+        "founderClearCorrection": {
+          "request": "Remove duplicate Clear from the public Add instructions row; retain composer Clear/Save/Cancel.",
+          "change": "Existing shared card now retains the preset-row Clear only for Store procurement. Public Cart and Checkout use composer Clear then Save; empty notes remain optional and isolated by destination.",
+          "interruptedReplay": {
+            "path": "apps/mobile/build/checkout-review-20261001/t03-selected-3/selected-1.jsonl",
+            "sha256": "37e8910c288caf235dd00fb58e964dccd4a308bd8401b6364061e34c20d1b0aa",
+            "passed": 374,
+            "errors": 0,
+            "terminalSuccess": false,
+            "qualification": "Excluded; seven verified owned runner processes stopped before editing for founder correction. Other processes untouched."
+          },
+          "toolRecovery": "Three bounded reads still exceeded their output token caps and were not treated as complete reads. Follow-up reads and exact symbol searches recovered required sections. First Clear patch contained an invalid empty hunk; rejected atomically, then reapplied with valid hunks. No source mutation occurred from the rejected patch."
+        },
+        "clearCorrectionToolRecovery": {
+          "rootCause": "Orchestration variable typo, a gate invoked from mobile instead of repository root, and an assumed handoff filename; no runtime source change resulted from these failures.",
+          "detection": "Undefined variable rejected helper apply; PowerShell reported missing root scripts; rg reported nonexistent handoff. Three additional read outputs exceeded caps and were excluded as complete reads.",
+          "prevention": "Use exact tools.apply_patch result binding; run root gates before entering mobile for attach; discover handoff with rg --files; bound reads independently with adequate output budgets.",
+          "retainedEvidence": "Tool results fb0c7e, 18a9bb, 5b5eb1; immutable runner/capture logs remain under existing ignored evidence roots. The helper was subsequently applied and root device memory gate passed before successful attach invocation."
+        },
+        "clearCaptureRecovery": {
+          "rootCause": "The inherited capture helper trusted adb exit code when uiautomator had not produced XML; adb exec-out cat returned an error string while still exiting zero. A real PNG was retained but accessibility parsing failed.",
+          "detection": "t03-clear-home-ime-dismissed XML contains missing-file output and ElementTree rejected it; it is not accepted accessibility evidence.",
+          "prevention": "Validate XML payload before accepting a capture, bounded retry for idle tree, keep each attempt output and preserve original failed XML/PNG. Dismiss IME retained across full restart before observing Cart controls.",
+          "evidence": "apps/mobile/build/checkout-review-20261001/t03-clear-home-ime-dismissed.xml and PNG (3f1a9ca993e28b8c9d438bbacbbf06e06731867769a97fef236ea653e44d98d2). An additional broad filename listing/read was truncated; assumed CURSOR-BUY-SETUP path was absent. Recovered actual owned handoff from current recorded owner claim; use bounded UTF-8 reads."
+        },
+        "clearMetadataRecovery": {
+          "rootCause": "Two non-runtime metadata reads assumed the old binder path and a dictionary-shaped lane collection; the binder lives in gst-toggle-review and lanes is a list.",
+          "detection": "Missing-path and TypeError results; no policy/runtime mutations or qualification resulted from either read. Combined handoff output exceeded its cap and is excluded as a complete read.",
+          "prevention": "Discover ignored helper paths with bounded rg --files --no-ignore and inspect JSON keys/types before selecting. Exact binder and fingerprint implementation were subsequently read without truncation; final binder validates closed receipts by file plus exact test name."
+        },
+        "changeActionVisualCorrection": {
+          "rootCause": "New compact public Change TextButton inherited the default Material button label instead of the explicit Buy text style; the rendered local fixture showed fallback font blocks.",
+          "detection": "Visual inspection of captures-4/buy-t03-selected-terms.png; behavior and hit targets passed but the label render was unsuitable for review.",
+          "prevention": "Use existing Buy body font and navy foreground for the new action; inspect the corrected render and regenerate only the current unapproved T03 candidate PNGs. Preserve all previous approved references and trial captures.",
+          "replay": "Stopped two verified own runner processes at the transition after the first batch (431 successful cases, zero errors, successful terminal log); no final two-batch qualification was produced and no other processes were stopped.",
+          "evidence": "apps/mobile/build/checkout-review-20261001/t03-selected-4/selected-1.jsonl sha256 b4434a93a9a4de21ad2041cd8c2d3ef430c8836db976e97309394048f7b5e1d0. First metadata lane filter raised StopIteration; two guessed support/theme file paths and one action-style file were absent. Exact imports and class paths recovered with bounded symbol reads; no metadata/runtime changes resulted from these failed reads."
+        },
+        "finalT03Progress": {
+          "sourceSha256": "44bdc40381eb1d1a1079635036f3b827078fce8855a9aa6cfdb1f1f2d51a44c4",
+          "analysis": "Seven changed Dart owners clean; analysis-9.log sha256 b97a5e8227a3cca9dcc04c2a02b060a8ce2e2b609386b30baa2112dd346c6726.",
+          "focused": "captures-5 closed successfully: 16 passes, zero failures or warnings, unchanged source; sha256 36edab52176f8b899e4c55f3cc259956593b8f67e7667c4a3a5be57ae79da5f5.",
+          "responsiveCandidates": "drafts-3 closed successfully: five passes; sha256 48e5aba9a4472e5ab18dab00e3f39fc04493d6b07462cd8d286ab84876e9af1e. All five PNGs exactly match the currently staged separate T03 candidates; zero candidate byte changes, no approved GST reference changed. Corrected Change font render inspected separately.",
+          "gateOrchestrationRecovery": "A combined PowerShell gate command checked LASTEXITCODE after a pure PowerShell success. Its null value caused the later independent gate commands to be skipped. Only the printed MVP scope/delivery-lock successes are accepted from that command. Run remaining gates independently with ErrorActionPreference Stop; use LASTEXITCODE only for native commands. No skipped gate is claimed passed."
+        },
+        "finalConsoleRecovery": {
+          "rootCause": "A standalone XML inspection used Python's Windows cp1252 stdout and tried to print the rupee symbol.",
+          "detection": "UnicodeEncodeError in inspection only; the valid native PNG/XML had already been retained. A subsequent Git count returned success, so combined process exit is not used to accept the failed inspection.",
+          "prevention": "Use python -X utf8 for every inspection that can contain customer-facing Unicode and assert individual subprocess results. No runtime, native note or capture content changed from this print failure.",
+          "evidence": "Tool result 622099; apps/mobile/build/checkout-review-20261001/t03-final-source-review-restored PNG/XML remain immutable."
+        },
+        "selectedTrial5": {
+          "rootCause": "Second responsive Checkout suite still referenced prior approved GST pictures instead of current separate T03 candidates.",
+          "detection": "Three strict golden mismatches; all three generated actual PNGs byte-match current T03 candidate PNGs. All other 877 cases passed; no runtime behavioral failure or source drift.",
+          "prevention": "Migrate only the already-owned Dock suite Checkout reference directory to T03; retain all semantic/layout checks and old Cart/GST PNGs. Search selected related references before a visual scope change.",
+          "failedLog": {
+            "path": "apps/mobile/build/checkout-review-20261001/t03-selected-5/selected-2.jsonl",
+            "sha256": "a4f2c02a8db986248dd84044014e1dcfb225099b86abd5c6fbba897a0a77576e",
+            "passed": 446,
+            "failedCases": 3,
+            "terminalSuccess": false
+          },
+          "preservedDiagnostics": {
+            "path": "apps/mobile/build/t03-review-20261001/selected-trial-5-failures/manifest.json",
+            "sha256": "8ba658d6aee6627163dcf66a68aa0893f1ea93546a3d2a77343baa2470f15ce2",
+            "introducedUntrackedFiles": 12,
+            "trackedFilesChanged": 0
+          },
+          "qualification": "Excluded from final success. Complete first batch 431 passes retained; all failures and historical tracked diagnostics preserved."
+        },
+        "qualification": {
+          "sourceSha256": "bb5fe6b33d307e36d5830060b270a8ee5d75d38db4e4357a37ca41f28f672e12",
+          "focusedPassed": 21,
+          "distinctSelectedPassed": 880,
+          "selectedReferences": 939,
+          "failed": 0,
+          "skipped": 0,
+          "hitTestOrOverflowWarnings": 0,
+          "terminalSuccess": true,
+          "analysis": "Eight changed Dart owners clean; analysis-10.log SHA256 4d74725d61269ea65c0db9517d8eead5836646eac96d64e14a4436cb4d641ce3.",
+          "evidence": [
+            {
+              "path": "docs/quality/CURSOR-BUY-T03-20261001-FOCUSED.jsonl",
+              "sha256": "721c6ad93751a2ee8e44dad32a559f892308c8f69e692b1f5443b453c2b2f79b"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T03-20261001-SELECTED-1.jsonl",
+              "sha256": "d7deb30ac8d9dccfba52fa07de3c3838b5c3282e79777445f186d246c1ab7e44"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T03-20261001-SELECTED-2.jsonl",
+              "sha256": "19b2fc9f3e704553785935c1a24f7068ba911b49b0e15f528f2824acbce81bac"
+            }
+          ],
+          "status": "Frontend locally qualified; founder T03 visual approval and T11 authoritative provider integration pending. No APK, real payment, supplier contact or production acceptance.",
+          "native": "Final application owner bytes match the successful native full restart/normal composer review; 200% keyboard-open composer has one Clear, public row none. Original Call on arrival, three items INR837 and font/rotation settings restored. Test-only reference amendment afterward does not imply a different runtime or APK.",
+          "preservation": "All approved GST/Cart PNGs and historical tracked diagnostics unchanged. Three new closed proof owners admitted literally; registry count remains 4618 and gate logic is unchanged. Earlier failed/partial logs remain excluded and preserved."
+        },
+        "preCommitStagingRecovery": {
+          "rootCause": "The first pre-commit gate was invoked before staging the full ticket; only new candidate PNGs were staged.",
+          "detection": "Gate rejected production pre-commit requires one fully staged atomic change set; result 40c516. No failed technical test or source change occurred.",
+          "prevention": "Stage only the exact verified ticket paths after qualification, validate no unstaged change remains and source fingerprint is still bb5fe6b3, then rerun the unchanged pre-commit gate. Never treat unstaged/index mixtures as an atomic checkpoint."
+        },
+        "preCommitLedgerOwnerRecovery": {
+          "rootCause": "Five T03 candidate PNGs were admitted to policy/script ownership but not added to the selected affected-route ledger's parent owner list.",
+          "detection": "Unchanged pre-commit gate rejected missing changed application owners. Exact set comparison identified only the five new PNGs; result 6c986c/e3a6a3. Runtime/test owners were already mapped.",
+          "prevention": "Add those five exact PNG paths to existing selected parent owners, retaining all historical paths. Keep policy ownership, route ledger and tracked-input qualification aligned; do not weaken the checker. Source fingerprint and successful receipts remain unchanged because this is metadata only."
+        }
+      },
       "gstToggleContinuation20261001": {
         "finding": "Resumed approved T02 colour correction used task_start, whose unchanged gate requires the original work base; current clean continuation is 4fba6ccd. No implementation followed that rejection. Register this exact amendment and use the established implementation continuation phase. Two guessed theme/GST-test paths returned missing-file errors; exact rg discovery established real owners before edits.",
         "prevention": "Do not change base/gate policy. Preserve clean HEAD, bounded source reads and immutable old reference/proof owners. Admit and stage all five new draft app/test PNGs before freezing the test input list, then bind fresh receipts. No new regression IDs.",
         "focusedTrial1": "Closed focused run: 22 successful scenarios, one failing legacy T01B GST invoice scenario (two error/result events). That previously unselected test still expected Place order despite the already approved online Pay amount & place order CTA. Current navy switch/normal/200% checks passed. Preserve failed receipt 7c49dbae3cdb6c0fe97fd2ac2b56f918f41c6b5fcade1beb5de56b33634536fb; update only two obsolete label expectations and select this existing invoice-save/optional-GST case. No runtime/payment/GST validation change. An inline fixture-path replacement failed shell quoting before mutation; exact apply_patch replaced it.",
         "deviceAttachRecovery": "First GST reconnect remained at app.start without app.started or reload receipt. It is unqualified; preserve its closed log, stop only that owned attach process, then reconnect to the exact current review-app VM service. No installed APK/app data, other agents or shared port mappings changed.",
         "resumeRecovery20261001": "Mandatory recovery reads exceeded bounded output and were rejected; complete policy and memory were recovered through smaller independent pages. A guessed founder-regression device phase was rejected by argparse before action; its actual phases are setup, implementation, pre_commit, build and close. Device regression-memory phase passed independently. No test or device mutation followed the invalid phase. Read exact checker interfaces before reuse. Original attach PIDs 13408 and 19000 are absent; no process was terminated during initial recovery. Fresh attach PID21096 remains at app.start with no app.started/reload receipt; its immutable resume-full-refresh-1.log is unqualified. Capture gst-resume-before-refresh preserves old Checkout, GST requested, three items and INR837. Stop only identity-verified PID21096, relaunch the exact existing cursorreview package without install/data-clear, then reuse the fresh runtime announcement for attachment. No other device, process or port mapping may be changed. A later mandatory manifest batch exceeded both its per-result and aggregate output limits; reject that read, recover lines 500-749 in independent 125-line pages and 750-916 separately, and replay preservation against the amended registry generation. No runtime edit followed the truncated read.",
-        "postResumeReadRecovery20261001": "Oversized MVP-state projection and coordination/source searches were truncated; those outputs are rejected as complete assessment. Recover exact state authorization/execution/checkpoint scalars, the current continuation and checker bindings, and relevant source through separate bounded owner ranges. A guessed purchase-order Dart filename was absent; discover the actual class in buy_v2_views.dart before reuse. No runtime edit or technical test followed these rejected reads. The manifest and all mandatory UI documents were completely recovered. Refresh exact registry binding and rerun pre-commit before preservation; gate behavior and entry count remain unchanged."
+        "postResumeReadRecovery20261001": "Oversized MVP-state projection and coordination/source searches were truncated; those outputs are rejected as complete assessment. Recover exact state authorization/execution/checkpoint scalars, the current continuation and checker bindings, and relevant source through separate bounded owner ranges. A guessed purchase-order Dart filename was absent; discover the actual class in buy_v2_views.dart before reuse. No runtime edit or technical test followed these rejected reads. The manifest and all mandatory UI documents were completely recovered. Refresh exact registry binding and rerun pre-commit before preservation; gate behavior and entry count remain unchanged.",
+        "t03ReadRecovery20261001": "Read-only T03 reconstruction guessed absent publication-adapter test and ledger filenames; rg established the actual config/buy-founder-regression.json owner. An oversized case/owner projection and combined registry excerpt exceeded output limits and are excluded as complete reads. Recover only exact scalar fields, bounded source ranges and the single existing incident object. No T03 runtime edit, test or device action preceded recovery. Keep entry count 4618, rebind the exact registry hash, admit the current T03 scope and replay implementation gates before source changes.",
+        "t03SourcePatchRecovery": "Two source patches included an unverified function header or obsolete COD subtitle; apply_patch rejected them without mutation. Reread exact declarations/copy and apply bounded source patches. The final COD branch was removed, guards retained for stale state, and three changed Dart owners formatted successfully. Existing gates remain intact; no technical test preceded this registration.",
+        "t03AdmissionPatchRecovery": "The generated metadata patch initially used unsupported numeric hunk headers and a helper assumed wrong indentation; both stopped before mutation. Normalize supported headers and use actual scalar lines; a hash-only patch also assumed a trailing comma and was rejected. Coordination rejected three claimed proof files that do not yet exist, then correctly rejected a mismatched exact claim after only the policy copies were removed. Remove future receipt literals from both identical owner sets until genuine closed logs exist; admit both literal sets immediately before copying receipts. A further gate rejection identified the current MVP state as qualification metadata rather than a storefront owner; move its one exact literal to cursorReviewQualificationOwners while keeping the policy claim unchanged. Do not create placeholder proof or weaken owner-existence/exact-claim/lane checks. MVP and incremental implementation passed; replay coordination against the refreshed registry before runtime, tests or device actions."
       }
     }
   ],

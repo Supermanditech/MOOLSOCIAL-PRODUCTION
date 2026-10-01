@@ -205,6 +205,28 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
   }
 }
 
+BuyV2CommerceAdapter prepaidCommerceFixture() {
+  final reference = 'TEST-PREPAID-${DateTime.now().microsecondsSinceEpoch}';
+  return _ShopCommerceAdapter(
+      snapshot: BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        products: BuyV2Catalogue.allProducts,
+        paymentMethods: const {'UPI', 'Card'},
+      ),
+      placement: BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+        customerMessage: 'Test payment handoff requested.',
+        paymentReference: reference,
+        paymentActionUri: Uri.https('payments.example.test', '/prepaid'),
+      ),
+    )
+    ..reconciliation = BuyV2OrderPlacementResult(
+      outcome: BuyV2OrderPlacementOutcome.confirmed,
+      customerMessage: 'Test payment receipt confirmed.',
+      purchaseReference: reference,
+    );
+}
+
 final class _ShopCommerceAdapter
     implements BuyV2CommerceAdapter, BuyV2VerifiedRatingAdapter {
   _ShopCommerceAdapter({required this.snapshot, required this.placement});
@@ -10286,7 +10308,7 @@ void main() {
       expect(session.selectedAddressId, 'work');
       expect(session.selectedPayment, 'Card');
       expect(session.notice, 'This payment method is not available.');
-      expect(BuyV2Session.paymentMethods, {'UPI', 'Card', 'Cash on Delivery'});
+      expect(BuyV2Session.paymentMethods, {'UPI', 'Card'});
     });
 
     test('Orders search filters only the current order tab', () {
@@ -10518,7 +10540,11 @@ void main() {
 
     test('confirmed order survives a customer-session restart', () async {
       final store = _MemoryCustomerStateStore('account-orders');
-      final first = BuyV2Session(core: BuySession(), customerStateStore: store);
+      final first = BuyV2Session(
+        core: BuySession(),
+        customerStateStore: store,
+        commerceAdapter: prepaidCommerceFixture(),
+      );
       addTearDown(first.dispose);
       final product = first.product('s-tomato');
 
@@ -10526,9 +10552,15 @@ void main() {
       first.openCart(scope: BuyV2CartScope.shop);
       expect(first.openCheckout(), isTrue);
       expect(first.continueCheckoutFromAddress(), isTrue);
-      expect(first.choosePayment('Cash on Delivery'), isTrue);
+      expect(first.choosePayment('Card'), isTrue);
       expect(first.continueCheckoutFromPayment(), isTrue);
-      expect(await first.submitOrder(), isTrue);
+      expect(await first.submitOrder(), isFalse);
+      expect(
+        first.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(await first.continuePayment((_) async => true), isTrue);
+      expect(await first.reconcilePayment(), isTrue);
       expect(first.confirmedOrders, isNotEmpty);
       final orderId = first.confirmedOrders.first.id;
       await Future<void>.delayed(Duration.zero);
@@ -10590,19 +10622,13 @@ void main() {
             }
             expect(session.openCheckout(), isTrue);
             expect(session.continueCheckoutFromAddress(), isTrue);
-            expect(
-              session.choosePayment(wholesale ? 'Card' : 'Cash on Delivery'),
-              isTrue,
-            );
+            expect(session.choosePayment('Card'), isTrue);
             expect(session.continueCheckoutFromPayment(), isTrue);
             final groups = session.checkoutFulfilmentGroups;
             expect(groups, hasLength(wholesale ? 1 : 2));
             final total = session.checkoutPayableTotal;
             // This test isolates retained local order identities, not live payment settlement.
-            expect(
-              wholesale ? session.confirmOrder() : await session.submitOrder(),
-              isTrue,
-            );
+            expect(session.confirmOrder(), isTrue);
             final purchaseId = session.confirmedPurchaseId!;
             expect(
               purchases.containsKey(purchaseId),

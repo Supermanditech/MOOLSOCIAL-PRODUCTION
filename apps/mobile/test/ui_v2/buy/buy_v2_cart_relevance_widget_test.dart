@@ -1128,12 +1128,36 @@ void main() {
       await tester.tap(shopContext);
       await tester.pumpAndSettle();
       await showInMainCartList(tester, shop);
-      final clear = find.byKey(
-        const ValueKey('buy-cart-instruction-shop-none'),
+      expect(
+        find.byKey(const ValueKey('buy-cart-instruction-shop-none')),
+        findsNothing,
       );
+      expect(find.text('Clear'), findsNothing);
+      final addInstructions = find.byKey(
+        const ValueKey('buy-cart-instruction-custom-shop'),
+      );
+      await tester.ensureVisible(addInstructions);
+      await tester.pumpAndSettle();
+      await tester.tap(addInstructions);
+      await tester.pumpAndSettle();
+      final clear = find.byKey(
+        const ValueKey('buy-cart-instruction-clear-draft-shop'),
+      );
+      expect(find.text('Clear'), findsOneWidget);
       await tester.ensureVisible(clear);
       await tester.pumpAndSettle();
       await tester.tap(clear);
+      await tester.pumpAndSettle();
+      expect(
+        session.selectedDeliveryInstructionFor(BuyV2Destination.shop),
+        isNotNull,
+      );
+      final saveInstructions = find.byKey(
+        const ValueKey('buy-cart-instruction-save-shop'),
+      );
+      await tester.ensureVisible(saveInstructions);
+      await tester.pumpAndSettle();
+      await tester.tap(saveInstructions);
       await tester.pumpAndSettle();
       expect(
         session.selectedDeliveryInstructionFor(BuyV2Destination.shop),
@@ -2696,7 +2720,7 @@ class _QuantityTierCommerce extends Fake implements BuyV2CommerceAdapter {
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
     products: [product],
-    paymentMethods: const {'Cash on Delivery'},
+    paymentMethods: const {'UPI'},
     businessVerified: true,
     businessVerificationState: BuyV2BusinessVerificationState.verified,
   );

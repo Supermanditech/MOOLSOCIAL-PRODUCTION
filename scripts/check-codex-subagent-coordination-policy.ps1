@@ -1146,6 +1146,10 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-FOCUSED.jsonl',
   'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-1.jsonl',
   'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T03-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-SELECTED-2.jsonl',
   'apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart',
   'docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-1.jsonl',
@@ -1250,6 +1254,12 @@ $cursorStorefrontOwners = @(
 )
 # Exact founder-authorized source admission for the isolated Redmi review.
 $cursorReviewQualificationOwners = @(
+  'config/mvp-scope-gate-state.json',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
   'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart',
   '.gitignore',

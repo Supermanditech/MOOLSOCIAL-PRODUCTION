@@ -5057,7 +5057,7 @@ class BuyV2Session extends ChangeNotifier {
   static const BuyV2CatalogueMarketplaceTrustAdapter _catalogueTrustFallback =
       BuyV2CatalogueMarketplaceTrustAdapter();
 
-  static const Set<String> paymentMethods = {'UPI', 'Card', 'Cash on Delivery'};
+  static const Set<String> paymentMethods = {'UPI', 'Card'};
 
   static const Set<String> storePaymentMethods = {
     'UPI',
@@ -5378,21 +5378,14 @@ class BuyV2Session extends ChangeNotifier {
   bool get purchaseOrderDetailsComplete =>
       purchaseOrderReference.trim().length >= 3;
 
-  bool get cashOnDeliveryEligibleForCheckout {
-    final lines = checkoutLines;
-    return lines.isNotEmpty &&
-        lines.every(
-          (line) => line.product.destination == BuyV2Destination.shop,
-        ) &&
-        checkoutAmountDueNow <= 5000;
-  }
+  bool get cashOnDeliveryEligibleForCheckout => false;
 
   static const purchaseOrderEligibilityMessage =
       'Purchase order requires a confirmed business account and a wholesale-only basket.';
   static const purchaseOrderDetailsMessage =
       'Enter the purchase order reference used by your business.';
   static const cashOnDeliveryEligibilityMessage =
-      'Cash on Delivery is available for eligible Shop orders up to ₹5,000.';
+      'Retail orders are paid online before placement.';
 
   int _navigationMotionSequence = 0;
   BuyV2NavigationMotionDirection _navigationMotionDirection =
@@ -5646,7 +5639,8 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CartBenefitsLoadState.ready;
   String? cartBenefitsMessage;
   List<BuyV2CommercialPaymentTerm> _commercialPaymentTerms = [];
-  final Map<String, String> _selectedCommercialPaymentTermIds = {};
+  final Map<String, ({String id, String agreement})>
+  _acceptedCommercialPaymentTerms = {};
   int _commercialPaymentTermsRequestSequence = 0;
   BuyV2CommerceLoadState commercialPaymentTermsLoadState =
       BuyV2CommerceLoadState.ready;
@@ -9057,12 +9051,14 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2CommercialPaymentTerm? selectedCommercialPaymentTermFor(
     String fulfilmentKey,
   ) {
-    final selectedId = _selectedCommercialPaymentTermIds[fulfilmentKey];
-    if (selectedId == null) return null;
+    final accepted = _acceptedCommercialPaymentTerms[fulfilmentKey];
+    if (accepted == null) return null;
     return _commercialPaymentTerms
         .where(
           (term) =>
-              term.fulfilmentKey == fulfilmentKey && term.id == selectedId,
+              term.fulfilmentKey == fulfilmentKey &&
+              term.id == accepted.id &&
+              _commercialPaymentAgreement(term) == accepted.agreement,
         )
         .firstOrNull;
   }
@@ -9104,7 +9100,7 @@ class BuyV2Session extends ChangeNotifier {
     final groups = checkoutFulfilmentGroups;
     if (groups.isEmpty) {
       _commercialPaymentTerms = [];
-      _selectedCommercialPaymentTermIds.clear();
+      _acceptedCommercialPaymentTerms.clear();
       commercialPaymentTermsLoadState = BuyV2CommerceLoadState.ready;
       commercialPaymentTermsMessage = null;
       notifyListeners();
@@ -9136,9 +9132,12 @@ class BuyV2Session extends ChangeNotifier {
         snapshot.terms,
         groups,
       );
-      _selectedCommercialPaymentTermIds.removeWhere(
-        (groupKey, selectedId) => !_commercialPaymentTerms.any(
-          (term) => term.fulfilmentKey == groupKey && term.id == selectedId,
+      _acceptedCommercialPaymentTerms.removeWhere(
+        (groupKey, accepted) => !_commercialPaymentTerms.any(
+          (term) =>
+              term.fulfilmentKey == groupKey &&
+              term.id == accepted.id &&
+              _commercialPaymentAgreement(term) == accepted.agreement,
         ),
       );
       for (final group in groups) {
@@ -9150,7 +9149,10 @@ class BuyV2Session extends ChangeNotifier {
             )
             .firstOrNull;
         if (retailAdvance != null) {
-          _selectedCommercialPaymentTermIds[group.key] = retailAdvance.id;
+          _acceptedCommercialPaymentTerms[group.key] = (
+            id: retailAdvance.id,
+            agreement: _commercialPaymentAgreement(retailAdvance),
+          );
         }
       }
       if (checkoutPaymentTermsReviewRequired &&
@@ -9220,7 +9222,9 @@ class BuyV2Session extends ChangeNotifier {
         term.amountDueNow < 0 ||
         term.balanceDue < 0 ||
         term.amountDueNow + term.balanceDue != expectedTotal ||
-        term.balanceDueLabel.trim().isEmpty) {
+        term.balanceDueLabel.trim().isEmpty ||
+        (term.acceptedPaymentMethods.isNotEmpty &&
+            !term.acceptedPaymentMethods.contains(selectedPayment))) {
       return false;
     }
     if (isStoreProcurement) {
@@ -9298,17 +9302,52 @@ class BuyV2Session extends ChangeNotifier {
     };
   }
 
+  String _commercialPaymentAgreement(BuyV2CommercialPaymentTerm term) =>
+      jsonEncode([
+        term.id,
+        term.fulfilmentKey,
+        term.destination.name,
+        term.supplierName,
+        term.kind.name,
+        term.orderTotal,
+        term.amountDueNow,
+        term.balanceDue,
+        term.balanceDueLabel,
+        term.sourceId,
+        term.supplierIsMicroOrSmall,
+        term.advancePercent,
+        term.upiTransactionLimit,
+        term.acceptedPaymentMethods.toList()..sort(),
+        term.netDays,
+        term.financierName,
+        term.annualPercentageRate,
+        term.keyFactsUri?.toString(),
+      ]);
+
   bool chooseCommercialPaymentTerm(BuyV2CommercialPaymentTerm term) {
+    if (_holdCartForPaymentResolution()) return false;
+    final agreement = _commercialPaymentAgreement(term);
+    final current = commercialPaymentTermsFor(term.fulfilmentKey)
+        .where(
+          (candidate) =>
+              candidate.id == term.id &&
+              _commercialPaymentAgreement(candidate) == agreement,
+        )
+        .firstOrNull;
     if (commercialPaymentTermsLoadState != BuyV2CommerceLoadState.ready ||
-        !commercialPaymentTermsFor(
-          term.fulfilmentKey,
-        ).any((candidate) => candidate.id == term.id)) {
+        current == null) {
       notice = 'This payment term is no longer available.';
       notifyListeners();
       return false;
     }
-    _selectedCommercialPaymentTermIds[term.fulfilmentKey] = term.id;
-    notice = '${_commercialPaymentTermLabel(term.kind)} selected.';
+    _acceptedCommercialPaymentTerms[current.fulfilmentKey] = (
+      id: current.id,
+      agreement: agreement,
+    );
+    commercialPaymentTermsMessage = checkoutPaymentTermsReviewRequired
+        ? 'Choose an available payment term for each Wholesale delivery.'
+        : null;
+    notice = '${_commercialPaymentTermLabel(current.kind)} selected.';
     notifyListeners();
     return true;
   }
@@ -13258,13 +13297,16 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool chooseAddress(String id) {
+    if (_holdCartForPaymentResolution()) return false;
     if (!_addresses.any((address) => address.id == id)) {
       notice = 'This saved address could not be found.';
       notifyListeners();
       return false;
     }
-    if (_selectedAddressId != id) _shoppingAreaRevision++;
+    final changed = _selectedAddressId != id;
+    if (changed) _shoppingAreaRevision++;
     _selectedAddressId = id;
+    if (changed) _invalidateAndRefreshCheckoutPricingContracts();
     notice = 'Delivering to ${selectedAddress.shortLine}';
     _persistCustomerState();
     notifyListeners();
@@ -13272,6 +13314,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void addAddress(BuyV2Address address) {
+    if (_holdCartForPaymentResolution()) return;
     _shoppingAreaRevision++;
     _addresses.add(address);
     _selectedAddressId = address.id;
@@ -13282,6 +13325,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool updateAddress(BuyV2Address address) {
+    if (_holdCartForPaymentResolution()) return false;
     final index = _addresses.indexWhere(
       (candidate) => candidate.id == address.id,
     );
@@ -13300,6 +13344,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool removeAddress(String id) {
+    if (_holdCartForPaymentResolution()) return false;
     final index = _addresses.indexWhere((address) => address.id == id);
     if (index < 0) {
       notice = 'This saved address is no longer available.';
@@ -13826,9 +13871,11 @@ class BuyV2Session extends ChangeNotifier {
         amountDueNow: checkoutAmountDueNow,
         idempotencyKey: _checkoutIdempotencyKey!,
         useUpiQr: canChooseUpiQr && useUpiQr,
-        commercialPaymentTermIds: Map.unmodifiable(
-          _selectedCommercialPaymentTermIds,
-        ),
+        commercialPaymentTermIds: Map.unmodifiable({
+          for (final group in checkoutFulfilmentGroups)
+            if (selectedCommercialPaymentTermFor(group.key) case final term?)
+              group.key: term.id,
+        }),
         checkoutQuoteId: _checkoutQuote?.id,
         purchaseOrderRequestId: purchaseOrderRequired
             ? purchaseOrder?.review?.requestId

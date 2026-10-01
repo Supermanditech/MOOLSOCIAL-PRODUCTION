@@ -1,5 +1,6 @@
 import 'buy_v2_qualified_provider_fixture.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'buy_v2_session_test.dart' show prepaidCommerceFixture;
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
@@ -994,6 +995,7 @@ void main() {
           ),
         );
         final session = BuyV2Session(
+          commerceAdapter: prepaidCommerceFixture(),
           core: BuySession(),
           cartBenefitsAdapter: adapter,
         );
@@ -1255,11 +1257,17 @@ void main() {
         session.openCart(scope: BuyV2CartScope.shop);
         expect(session.openCheckout(), isTrue);
         expect(session.continueCheckoutFromAddress(), isTrue);
-        expect(session.choosePayment('Cash on Delivery'), isTrue);
+        expect(session.choosePayment('Card'), isTrue);
         expect(session.continueCheckoutFromPayment(), isTrue);
         final expectedTotal = session.checkoutTotal - coupon.savingAmount;
 
-        final submitted = await session.submitOrder();
+        expect(await session.submitOrder(), isFalse);
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentActionRequired,
+        );
+        expect(await session.continuePayment((_) async => true), isTrue);
+        final submitted = await session.reconcilePayment();
         expect(
           submitted,
           isTrue,
