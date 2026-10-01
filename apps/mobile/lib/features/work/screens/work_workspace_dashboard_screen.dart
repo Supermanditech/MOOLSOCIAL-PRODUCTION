@@ -11390,6 +11390,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   static const _taxComponentLabels = {'cgst': 'CGST ₹', 'sgstAmount': 'SGST ₹',
     'utgst': 'UTGST ₹', 'igst': 'IGST ₹', 'cess': 'Cess ₹'};
   final _reviewAnchor = GlobalKey();
+  final _previewZoom = TransformationController();
   final _name = TextEditingController(), _phone = TextEditingController(),
       _address = TextEditingController(), _gstin = TextEditingController(),
       _reference = TextEditingController(), _date = TextEditingController();
@@ -11582,6 +11583,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     for (final c in [_name, _phone, _address, _gstin, _reference, _date]) { c.dispose(); }
     for (final c in _details.values) { c.dispose(); }
     _supplierFocus.dispose();
+    _previewZoom.dispose();
     for (final line in _goods) { line.dispose(); }
     for (final field in _additional) { field.dispose(); }
     for (final row in _taxRows) { for (final c in row.values) { c.dispose(); } }
@@ -11766,7 +11768,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (expanded) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(key: ValueKey('purchase-panel-$key'),
           crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(instruction,
+            if (key != 'work-purchase-review-section')
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(instruction,
               key: ValueKey('purchase-instruction-$key'),
               style: const TextStyle(fontSize: 12, color: _paperMuted))), ...fields])),
     ]);
@@ -11831,6 +11834,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   ]);
   void _previewPurchase() {
     FocusScope.of(context).unfocus();
+    _previewZoom.value = Matrix4.identity();
     setState(() => _expandedSections.add('work-purchase-review-section'));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final target = _reviewAnchor.currentContext;
@@ -11854,14 +11858,22 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   List<Widget> _reviewPurchase() {
     const quantityKeys = {'receivedQuantity', 'damagedQuantity', 'shortQuantity'};
-    Widget value(String label, String text, String id) => Padding(
-      key: ValueKey('purchase-review-$id'), padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: _paperMuted))),
-        const SizedBox(width: 12),
-        Expanded(flex: 2, child: Text(text, textAlign: TextAlign.right,
-          style: const TextStyle(fontSize: 13, color: _paperInk))),
+    const rule = BorderSide(color: Color(0xff89929c), width: .7);
+    const printedStyle = TextStyle(fontSize: 12, color: Color(0xff171b20), height: 1.25);
+    final used = <String>{};
+    Widget value(String label, String text, String id, {bool cell = false, bool amount = false}) => Padding(
+      key: ValueKey('purchase-review-$id'), padding: EdgeInsets.symmetric(vertical: cell ? 4 : 3),
+      child: Column(crossAxisAlignment: amount ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
+        if (!cell && label.isNotEmpty) Text(label,
+          style: const TextStyle(fontSize: 10, color: Color(0xff424b55), height: 1.2)),
+        Text(text, textAlign: amount ? TextAlign.right : TextAlign.left, style: printedStyle),
       ]));
+    Widget detail(String key, {bool cell = false, bool amount = false}) {
+      used.add(key);
+      return value(_fieldLabels['work-purchase-$key']!, _details[key]!.text, key, cell: cell, amount: amount);
+    }
+    List<Widget> selected(Iterable<String> keys) => [for (final key in keys)
+      if (!used.contains(key) && _details[key]!.text.isNotEmpty) detail(key)];
     List<Widget> extras(String group, {int? item, int? row}) => [
       for (final input in _additional.where((input) => input.record.section == group &&
           input.record.itemIndex == item && input.record.summaryIndex == row))
@@ -11869,65 +11881,199 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           input.value.text, 'extra-${input.record.id}'),
     ];
     List<Widget> details(String group) => [for (final e in _details.entries)
-      if (_detailGroup(e.key) == group && e.value.text.isNotEmpty)
-        value(_fieldLabels['work-purchase-${e.key}']!, e.value.text, e.key)];
+      if (!used.contains(e.key) && _detailGroup(e.key) == group && e.value.text.isNotEmpty) detail(e.key)];
+    Widget column(List<Widget> children) => Padding(padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children));
+    Widget heading(String text) => Padding(padding: const EdgeInsets.only(bottom: 5), child: Text(text,
+      style: printedStyle.copyWith(fontWeight: FontWeight.w700)));
+    Widget pair(String key, List<Widget> left, List<Widget> right) => DecoratedBox(
+      key: Key('purchase-review-paper-$key'), decoration: const BoxDecoration(border: Border(bottom: rule)),
+      child: Table(border: const TableBorder(verticalInside: rule), children: [
+        TableRow(children: [column(left), column(right)]),
+      ]));
+    Widget itemCell(String text, String id, {bool amount = false}) => value('', text, id, cell: true, amount: amount);
+    Widget itemExtra(_PurchaseGoodsInput line, int index, String key, {bool amount = false}) =>
+      line.extra[key]!.text.isEmpty ? const Text('—', style: printedStyle)
+        : itemCell(line.extra[key]!.text, 'item-$index-$key', amount: amount);
+    const primaryItemKeys = {'printedSerial', 'hsn', 'unitCode', 'taxableValue', 'taxAmount', 'lineTotal'};
+    const recordedPaymentKeys = {'paymentStatus', 'paidAmount', 'paymentMethod',
+      'paymentReference', 'paymentDate', 'paymentTerms'};
+    // Paper contains entered supplier-document facts. POS observations stay outside it.
+    final title = _details['documentTitle']!.text;
+    if (title.isNotEmpty) used.add('documentTitle');
+    final copy = _details['documentCopy']!.text;
+    if (copy.isNotEmpty) used.add('documentCopy');
+    final paperParts = <Widget>[
+      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: const BoxDecoration(border: Border(bottom: rule)), child: Row(children: [
+          Expanded(child: Padding(key: title.isEmpty ? null : const ValueKey('purchase-review-documentTitle'),
+            padding: EdgeInsets.zero, child: Text(title.isEmpty ? 'PURCHASE INVOICE' : title,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 1.8,
+                color: Color(0xff17395c))))),
+          if (copy.isNotEmpty) Flexible(child: value('', copy, 'documentCopy', cell: true, amount: true)),
+        ])),
+      pair('header', [
+        Text(_name.text.isEmpty ? 'Supplier details not entered' : _name.text,
+          key: const ValueKey('purchase-review-supplier-Supplier name'),
+          style: printedStyle.copyWith(fontSize: 18, fontWeight: FontWeight.w700)),
+        for (final e in {'Supplier GSTIN':_gstin.text, 'Supplier address':_address.text,
+            'Mobile / phone':_phone.text}.entries)
+          if (e.value.isNotEmpty) value(e.key,e.value,'supplier-${e.key}'),
+        ...details('supplier'), ...extras('supplier'),
+      ], [
+        heading('Invoice details'),
+        if (_reference.text.isNotEmpty) value('Invoice No.',_reference.text,'reference'),
+        if (_date.text.isNotEmpty) value('Invoice date',_date.text,'date'),
+        ...selected(['originalInvoiceDate','dueDate','poReference','placeOfSupply','placeOfSupplyCode']),
+        ...details('invoice'), ...extras('invoice'),
+      ]),
+      pair('buyer', [
+        heading('Billed to'),
+        ...selected(['buyerName','buyerAddress','buyerPhone','buyerEmail','buyerGstin','buyerUin','buyerState','buyerStateCode']),
+        ...extras('buyer'),
+      ], [
+        heading('Shipping address'),
+        ...selected(['deliveryAddress','deliveryState','deliveryStateCode']),
+        ...details('buyer'),
+      ]),
+      DecoratedBox(key: const Key('purchase-review-paper-items'),
+        decoration: const BoxDecoration(border: Border(bottom: rule)),
+        child: Table(key: const Key('purchase-review-item-table'),
+          columnWidths: const {0:FlexColumnWidth(.4),1:FlexColumnWidth(3),2:FlexColumnWidth(.85),
+            3:FlexColumnWidth(.65),4:FlexColumnWidth(.8),5:FlexColumnWidth(.6),
+            6:FlexColumnWidth(1),7:FlexColumnWidth(1),8:FlexColumnWidth(1)},
+          border: const TableBorder(horizontalInside: rule, verticalInside: rule), children: [
+            TableRow(decoration: const BoxDecoration(color: Color(0xfff0f3f5)), children: [
+              for (final label in ['#','Item / description','HSN / SAC','Units','Rate ₹','Qty','Taxable value ₹','Tax ₹','Amount ₹'])
+                Padding(padding: const EdgeInsets.all(6), child: Text(label,
+                  style: printedStyle.copyWith(fontSize: 10, fontWeight: FontWeight.w700))),
+            ]),
+            for (final (index,line) in _goods.indexed) TableRow(children: [
+              Padding(padding: const EdgeInsets.all(6), child: line.extra['printedSerial']!.text.isEmpty
+                ? Text('${index+1}',style:printedStyle) : itemExtra(line,index,'printedSerial')),
+              Padding(padding: const EdgeInsets.all(6), child: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                if (line.name.text.isNotEmpty) itemCell(line.name.text,'item-$index'),
+                if (line.pack.text.isNotEmpty) value('Pack / unit',line.pack.text,'item-$index-Pack / unit'),
+                for (final e in line.extra.entries)
+                  if (!quantityKeys.contains(e.key) && !primaryItemKeys.contains(e.key) && e.value.text.isNotEmpty)
+                    value(_fieldLabels['work-purchase-${e.key}-$index']!,e.value.text,'item-$index-${e.key}'),
+                ...extras('items',item:index),
+              ])),
+              Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'hsn')),
+              Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'unitCode')),
+              Padding(padding:const EdgeInsets.all(6),child:line.cost.text.isEmpty ? const Text('—',style:printedStyle)
+                : itemCell(line.cost.text,'item-$index-Rate ₹',amount:true)),
+              Padding(padding:const EdgeInsets.all(6),child:line.quantity.text.isEmpty ? const Text('—',style:printedStyle)
+                : itemCell(line.quantity.text,'item-$index-Qty',amount:true)),
+              Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'taxableValue',amount:true)),
+              Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'taxAmount',amount:true)),
+              Padding(padding:const EdgeInsets.all(6),child:itemExtra(line,index,'lineTotal',amount:true)),
+            ]),
+          ])),
+      if (extras('items').isNotEmpty) column(extras('items')),
+      Expanded(child: Row(key:const Key('purchase-review-item-space'),
+        crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+          for(final weight in [40,300,85,65,80,60,100,100,100]) Expanded(flex:weight,
+            child:const DecoratedBox(decoration:BoxDecoration(border:Border(right:rule)))),
+        ])),
+      pair('totals', [
+        ...selected(['printedTotalItems','printedTotalQuantity','priceBasis','taxTreatment']),
+        ...extras('tax'),
+      ], [
+        for (final key in ['supplyValue','billDiscount','taxableValue','cgst','sgstAmount','sgst','utgst','igst',
+            'cess','freight','otherCharges','roundOff','totalTax','invoiceTotal','amountPayable'])
+          if (_details[key]!.text.isNotEmpty) Padding(key: ValueKey('purchase-review-$key'),
+            padding: const EdgeInsets.symmetric(vertical: 3), child: Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Expanded(child:Text(_fieldLabels['work-purchase-$key']!,style:printedStyle)),
+              const SizedBox(width:12),
+              Flexible(child:Text(_details[key]!.text,textAlign:TextAlign.right,
+                style:printedStyle.copyWith(fontSize:key=='invoiceTotal'?18:12,
+                  fontWeight:key=='invoiceTotal'?FontWeight.w700:FontWeight.w500))),
+            ])),
+      ]),
+    ];
+    used.addAll(['supplyValue','billDiscount','taxableValue','cgst','sgstAmount','sgst','utgst','igst',
+      'cess','freight','otherCharges','roundOff','totalTax','invoiceTotal','amountPayable']);
+    final amountWords = selected(['amountInWords']);
+    final remainingTax = details('tax');
+    paperParts.addAll([
+      if (amountWords.isNotEmpty) column(amountWords),
+      if (_taxRows.isNotEmpty) column([
+        heading('HSN / tax summary as on invoice'),
+        Table(key:const Key('purchase-review-printed-tax-table'),border:const TableBorder(
+          top:rule,bottom:rule,left:rule,right:rule,horizontalInside:rule,verticalInside:rule),children:[
+          TableRow(children:[for(final key in WorkspacePurchaseEntryDraft.printedTaxKeys)
+            Padding(padding:const EdgeInsets.all(4),child:Text(key=='label'?'Row':key=='hsn'?'HSN / SAC'
+              :key=='taxableValue'?'Taxable ₹':key=='totalTax'?'Total tax ₹':key.replaceAll('Rate',' %'),
+              style:printedStyle.copyWith(fontSize:9,fontWeight:FontWeight.w700)))]),
+          for(final (index,row) in _taxRows.indexed) TableRow(children:[
+            for(final key in WorkspacePurchaseEntryDraft.printedTaxKeys) Padding(padding:const EdgeInsets.all(4),
+              child:row[key]!.text.isEmpty ? const Text('—',style:printedStyle)
+                :itemCell(row[key]!.text,'tax-$index-$key',amount:key!='label'&&key!='hsn')),
+          ]),
+        ]),
+        for(final (index,_) in _taxRows.indexed) ...extras('tax',row:index),
+      ]),
+      if (remainingTax.isNotEmpty) column(remainingTax),
+      if (_details['printedPaymentMark']!.text.isNotEmpty) column([detail('printedPaymentMark',amount:true)]),
+      pair('bank-signatory', [
+        heading('Supplier bank / UPI'),
+        ...selected(['bankName','bankAccount','bankIfsc','bankBranch','upiType','upiId','paymentQrStatus']),
+      ], [
+        heading('For supplier · signature as on bill'),
+        ...selected(['printedCompanyLabel','signatureStatus','signatory','printedSignatoryLabel','printedDeclaration']),
+      ]),
+      pair('notes-terms', [heading('Notes'),...selected(['notes']),...extras('payment')],
+        [heading('Terms & conditions'),...selected(['terms'])]),
+      if (_details['printedFooter']!.text.isNotEmpty) column([detail('printedFooter')]),
+      const Padding(padding:EdgeInsets.all(10),child:Text(
+        'Preview of entered supplier-bill details · not the original attachment',
+        style:TextStyle(fontSize:10,color:Color(0xff424b55)))),
+    ]);
+    final pos = <Widget>[
+      ...selected(recordedPaymentKeys),
+      ...details('payment'),
+      ...details('receipt'),
+      for(final (index,line) in _goods.indexed)
+        for(final e in line.extra.entries)
+          if(quantityKeys.contains(e.key)&&e.value.text.isNotEmpty)
+            value('${line.name.text} · ${_fieldLabels['work-purchase-${e.key}-$index']!}',
+              e.value.text,'receipt-$index-${e.key}'),
+      ...extras('receipt'),
+    ];
     return [
-      const Text('Recorded purchase · Draft', key: Key('work-purchase-review-title'),
-        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-      const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text(
-        'These are your entered details, not the original supplier invoice. Blank fields are not assumed to be zero.',
-        style: TextStyle(fontSize: 12, color: _paperMuted))),
+      Wrap(alignment:WrapAlignment.spaceBetween,crossAxisAlignment:WrapCrossAlignment.center,children:[
+        const Text('Recorded purchase · Draft', key:Key('work-purchase-review-title'),
+          style:TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
+        TextButton(key:const Key('purchase-review-zoom-in'),onPressed:(){
+          final scale=(_previewZoom.value.getMaxScaleOnAxis()*2).clamp(1.0,8.0).toDouble();
+          _previewZoom.value=Matrix4.diagonal3Values(scale,scale,1);
+        },child:const Text('Zoom in')),
+        TextButton(key:const Key('purchase-review-fit'),onPressed:()=>_previewZoom.value=Matrix4.identity(),
+          child:const Text('Fit page')),
+      ]),
       if (_name.text.trim().isEmpty || _reference.text.trim().isEmpty || _date.text.trim().isEmpty ||
           !_goods.any((line) => line.name.text.trim().isNotEmpty))
         const Text('Still to enter: check supplier, invoice number/date and items before saving.',
           style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-      _section('Supplier — Billed by', 'purchase-review-supplier', [
-        for (final e in {'Supplier name': _name.text, 'Mobile / phone': _phone.text,
-            'Supplier address': _address.text, 'Supplier GSTIN': _gstin.text}.entries)
-          if (e.value.isNotEmpty) value(e.key, e.value, 'supplier-${e.key}'),
-        ...details('supplier'), ...extras('supplier'),
-      ]),
-      _section('Invoice details', 'purchase-review-invoice', [
-        if (_reference.text.isNotEmpty) value('Invoice No.', _reference.text, 'reference'),
-        if (_date.text.isNotEmpty) value('Invoice date', _date.text, 'date'),
-        ...details('invoice'), ...extras('invoice'),
-      ]),
-      _section('Billed to & delivery', 'purchase-review-buyer', [...details('buyer'), ...extras('buyer')]),
-      _section('Items on invoice', 'purchase-review-items', [
-        for (final (index, line) in _goods.indexed) ...[
-          if (line.name.text.isNotEmpty) value('Item ${index + 1}', line.name.text, 'item-$index'),
-          for (final e in {'Pack / unit': line.pack.text, 'Qty': line.quantity.text, 'Rate ₹': line.cost.text}.entries)
-            if (e.value.isNotEmpty) value(e.key, e.value, 'item-$index-${e.key}'),
-          for (final e in line.extra.entries)
-            if (!quantityKeys.contains(e.key) && e.value.text.isNotEmpty)
-              value(_fieldLabels['work-purchase-${e.key}-$index']!, e.value.text, 'item-$index-${e.key}'),
-          ...extras('items', item: index),
-        ],
-        ...extras('items'),
-      ]),
-      _section('Tax & totals', 'purchase-review-tax', [
-        ...details('tax'),
-        for (final (index, row) in _taxRows.indexed) ...[
-          const Divider(height: 12, color: _paperRule),
-          Text('Tax-table row ${index + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          for (final e in row.entries)
-            if (e.value.text.isNotEmpty) value(_fieldLabels[e.key == 'label' ? 'purchase-tax-label-$index'
-              : e.key == 'taxableValue' ? 'purchase-tax-taxable-$index' : 'purchase-tax-${e.key}-$index']!,
-              e.value.text, 'tax-$index-${e.key}'),
-          ...extras('tax', row: index),
-        ],
-        ...extras('tax'),
-      ]),
-      _section('Goods received', 'purchase-review-receipt', [
-        ...details('receipt'),
-        for (final (index, line) in _goods.indexed)
-          for (final e in line.extra.entries)
-            if (quantityKeys.contains(e.key) && e.value.text.isNotEmpty)
-              value('Item ${index + 1} · ${_fieldLabels['work-purchase-${e.key}-$index']!}',
-                e.value.text, 'receipt-$index-${e.key}'),
-        ...extras('receipt'),
-      ]),
-      _section('Payment & terms', 'purchase-review-payment', [...details('payment'), ...extras('payment')]),
+      const Text('Pinch to zoom · drag to read',style:TextStyle(fontSize:12,color:_paperMuted)),
+      LayoutBuilder(builder:(context,constraints) {
+        final paper = SizedBox(width:760,child:DecoratedBox(key:const Key('purchase-review-paper'),
+          decoration:const BoxDecoration(color:Colors.white,border:Border.fromBorderSide(rule),
+            boxShadow:[BoxShadow(color:Color(0x22000000),blurRadius:8,offset:Offset(0,3))]),
+          child:ConstrainedBox(constraints:const BoxConstraints(minHeight:1075),
+            child:IntrinsicHeight(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:paperParts)))));
+        return SizedBox(
+          height:(constraints.maxWidth*1.414).clamp(0.0,MediaQuery.sizeOf(context).height*.44).toDouble(),
+          child:ColoredBox(color:const Color(0xffe8ebef),child:InteractiveViewer(
+            key:const Key('purchase-review-zoom'),transformationController:_previewZoom,minScale:1,maxScale:8,
+            child:SizedBox.expand(child:FittedBox(fit:BoxFit.contain,
+              alignment:Alignment.topCenter,child:paper)))));
+      }),
+      const Padding(padding:EdgeInsets.only(top:8),child:Text(
+        'These are your entered details, not the original supplier invoice. Blank fields are not assumed to be zero.',
+        style:TextStyle(fontSize:12,color:_paperMuted))),
+      _section('Recorded goods & payment · not money transferred','purchase-review-pos-observations',pos),
       if (_attachments.isNotEmpty) _section('Original invoice attachments', 'purchase-review-attachments', [
         for (final attachment in _attachments) Text(attachment.fileName,
           style: const TextStyle(fontSize: 12, color: _paperInk)),

@@ -3424,6 +3424,80 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final view in [(360.0, 800.0, 1.0), (320.0, 568.0, 2.0), (800.0, 360.0, 1.5)]) {
+    testWidgets('P05-R09-C07 paper invoice composition preserves facts $view', (tester) async {
+      // Host-only layout fixture; never injected into the OPPO evaluation Store.
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 9, 30);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
+        profiles: [WorkspaceSupplierProfile(id: 'c07-supplier', name: 'C07 fixture supplier',
+          phone: '9999999999', address: 'Supplier address', createdAt: at, updatedAt: at)],
+        draft: WorkspacePurchaseEntryDraft(id: 'c07-draft', supplierId: 'c07-supplier',
+          invoiceReference: 'C07-PAPER', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+          details: {'documentTitle':'TAX INVOICE', 'documentCopy':'ORIGINAL FOR RECIPIENT',
+            'buyerName':'Fixture buyer', 'buyerAddress':'Billing address', 'deliveryAddress':'Shipping address',
+            'invoiceTotal':'150.25', 'roundOff':'0.25', 'bankName':'Fixture bank', 'bankAccount':'00123',
+            'signatory':'Printed signatory', 'notes':'Original note', 'terms':'Original terms',
+            'paymentStatus':'On credit', 'dueDate':'15/10/2026'},
+          goods: [{'productId':'', 'name':'C07 fixture item', 'pack':'1 kg', 'quantity':'2', 'cost':'75',
+            'hsn':'1006', 'unitCode':'KGS', 'taxableValue':'150', 'printedSerial':'1'}]));
+      final original = entry.value;
+      await mount(tester, route:'/app/work/workspace/dashboard', work:work,
+        viewport:Size(view.$1,view.$2), textScale:view.$3);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
+      final preview = find.byKey(const Key('work-purchase-preview'));
+      await revealPurchaseInput(tester, preview); await tester.tap(preview); await tester.pumpAndSettle();
+      final paper = find.byKey(const Key('purchase-review-paper'));
+      expect(paper, findsOneWidget);
+      expect(find.byKey(const ValueKey('purchase-instruction-work-purchase-review-section')),findsNothing,
+        reason:'Preview already has a review summary; a repeated instruction must not push the paper down.');
+      if (view.$1==360.0 && view.$2==800.0) {
+        expect(tester.getBottomLeft(paper).dy,
+          lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('work-purchase-draft-save'))).dy),
+          reason:'The whole fitted paper must remain above the fixed actions on the normal portrait viewport.');
+      }
+      final decoration = tester.widget<DecoratedBox>(paper).decoration as BoxDecoration;
+      expect(decoration.color, Colors.white);
+      expect(decoration.border, isNotNull);
+      for (final block in ['header','buyer','items','totals','bank-signatory','notes-terms']) {
+        expect(find.byKey(Key('purchase-review-paper-$block')), findsOneWidget, reason:block);
+      }
+      final table = tester.widget<Table>(find.byKey(const Key('purchase-review-item-table')));
+      expect(table.children.length, 2);
+      expect(table.children.first.children.length, 9);
+      expect(find.text('TAX INVOICE'), findsOneWidget);
+      expect(find.text('Original note'), findsOneWidget);
+      expect(find.text('Original terms'), findsOneWidget);
+      expect(find.byKey(const ValueKey('purchase-review-item-0-lineTotal')), findsNothing,
+        reason:'Missing printed line amount must not be calculated or changed into zero.');
+      expect(find.byKey(const Key('purchase-review-pos-observations')), findsOneWidget);
+      final viewer = tester.widget<InteractiveViewer>(find.byKey(const Key('purchase-review-zoom')));
+      expect(viewer.panEnabled, isTrue); expect(viewer.scaleEnabled, isTrue);
+      expect(viewer.maxScale, greaterThanOrEqualTo(4));
+      final transform=viewer.transformationController!;
+      expect(transform.value.getMaxScaleOnAxis(),1);
+      final zoomIn=find.byKey(const Key('purchase-review-zoom-in'));
+      await revealPurchaseInput(tester,zoomIn); await tester.tap(zoomIn); await tester.pumpAndSettle();
+      expect(transform.value.getMaxScaleOnAxis(),2);
+      final fit=find.byKey(const Key('purchase-review-fit'));
+      await revealPurchaseInput(tester,fit); await tester.tap(fit); await tester.pumpAndSettle();
+      expect(transform.value.getMaxScaleOnAxis(),1);
+      expect(tester.getBottomLeft(find.byKey(const Key('purchase-review-paper-notes-terms'))).dy,
+        greaterThan(tester.getTopLeft(paper).dy+tester.getRect(paper).height*.75),
+        reason:'Spare page height belongs to the ruled item area, not below the footer.');
+      expect(find.text('Pinch to zoom · drag to read'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+      expect(find.byKey(const Key('work-purchase-draft-save')).hitTestable(), findsOneWidget);
+      expect(entry.value, same(original)); expect(work.workspacePurchases,isEmpty);
+      expect(tester.takeException(),isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P05-R09-C05 steady labels and one reachable draft footer', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
