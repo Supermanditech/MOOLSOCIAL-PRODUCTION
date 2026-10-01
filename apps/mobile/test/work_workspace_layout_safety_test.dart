@@ -3316,6 +3316,7 @@ void main() {
   WorkSession manualPurchaseFixture(_PurchaseEntryFixtureStore entry) =>
     storeViewFixture(null, _ContactDraftFixtureStore(), null, null, null, null, null, null, null, entry);
 
+
   Future<void> revealPurchaseInput(WidgetTester tester, Finder target, {double delta = 60}) async {
     if (target.evaluate().length == 1 && tester.widget(target) is Column) {
       // Static subsections can be taller than the viewport; their title, not centre, is the visible landmark.
@@ -3357,6 +3358,138 @@ void main() {
     if (find.byKey(ValueKey('purchase-panel-$key')).evaluate().isNotEmpty) return;
     await tester.tap(target);
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('P05-R12 save reviewed copy and reopen read-only without changing draft', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 806), textScale: 1);
+    await openPurchaseList(tester);
+    final inventoryBefore = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    final movementsBefore = List<WorkspaceStockMovement>.of(work.workspaceStockMovements);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await expandPurchasePrimarySections(tester);
+    for (final field in {'work-purchase-supplier-name': 'Evaluation R12 supplier',
+      'work-purchase-reference': 'EVAL-R12-01', 'work-purchase-date': '30/09/2026',
+      'work-purchase-item-0': 'Evaluation R12 rice'}.entries) {
+      final input = find.byKey(Key(field.key));
+      await revealPurchaseInput(tester, input);
+      await tester.enterText(input, field.value);
+    }
+    await usePurchaseControl(tester, 'work-purchase-receipt-details');
+    final goodsStatus = find.byKey(const Key('work-purchase-receiptStatus'));
+    await revealPurchaseInput(tester, goodsStatus);
+    await tester.tap(goodsStatus);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Already added to Stock').last);
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-preview')));
+    await tester.tap(find.byKey(const Key('work-purchase-preview')));
+    await tester.pumpAndSettle();
+    final copyAction = find.byKey(const Key('work-purchase-copy-save'));
+    final draftAction = find.byKey(const Key('work-purchase-draft-save'));
+    // Host Ahem text metrics differ from OPPO's device font: permit wrapping,
+    // but retain full labels, explicit hierarchy and accessible hit targets.
+    // Physical normal-font one-row acceptance is recorded separately.
+    expect(tester.widget(copyAction), isA<FilledButton>());
+    expect(tester.widget(draftAction), isA<TextButton>());
+    expect(tester.getSize(copyAction).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(draftAction).height, greaterThanOrEqualTo(48));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    await tester.pumpAndSettle();
+    expect(tester.getSize(copyAction).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(draftAction).height, greaterThanOrEqualTo(48));
+    expect(copyAction.hitTestable(), findsOneWidget);
+    expect(draftAction.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    tester.platformDispatcher.textScaleFactorTestValue = 1;
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-copy-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-copy-save')));
+    await tester.pumpAndSettle();
+    final book = entry.value!;
+    expect(book.copies, hasLength(1));
+    expect(book.copies.single.draft.details['receiptStatus'], 'Already added to Stock');
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), inventoryBefore);
+    expect(work.workspaceStockMovements, movementsBefore);
+    final snapshot = jsonEncode(book.toJson());
+    await tester.tap(find.byKey(ValueKey('work-purchase-copy-${book.copies.single.id}')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-draft-save')), findsNothing);
+    expect(find.byKey(const Key('work-purchase-camera')), findsNothing);
+    expect(find.byKey(const Key('purchase-recorded-download')), findsOneWidget);
+    expect(find.text('Evaluation R12 supplier'), findsWidgets);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('work-purchase-copy-close')));
+    await tester.pumpAndSettle();
+    expect(jsonEncode(entry.value!.toJson()), snapshot);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), inventoryBefore);
+    expect(work.workspaceStockMovements, movementsBefore);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final stale in [false, true]) {
+    testWidgets('P05-R12 refresh preserves typed input after ${stale ? 'stale revision' : 'failed save'}', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      await expandPurchasePrimarySections(tester);
+      for (final field in {'work-purchase-supplier-name': 'Evaluation R12 supplier',
+        'work-purchase-reference': 'EVAL-R12-RETRY', 'work-purchase-date': '30/09/2026',
+        'work-purchase-item-0': 'Evaluation R12 rice'}.entries) {
+        final input = find.byKey(Key(field.key));
+        await revealPurchaseInput(tester, input); await tester.enterText(input, field.value);
+      }
+      if (stale) {
+        await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-purchase-record')));
+        await tester.pumpAndSettle();
+        final competing = jsonDecode(jsonEncode(entry.value!.toJson())) as Map<String, dynamic>;
+        competing['revision'] = 2;
+        (competing['draft'] as Map)['invoiceReference'] = 'OTHER-SAVED-REFERENCE';
+        entry.value = WorkspacePurchaseEntryBook.fromJson(competing);
+      } else { entry.failSave = true; }
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-preview')));
+      await tester.tap(find.byKey(const Key('work-purchase-preview')));
+      await tester.pumpAndSettle();
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-copy-save')));
+      await tester.tap(find.byKey(const Key('work-purchase-copy-save')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-entry-error')), findsOneWidget);
+      expect(entry.value?.copies ?? const <WorkspacePurchaseSavedCopy>[], isEmpty);
+      expect(entry.value?.revision, stale ? 2 : null);
+      entry.failSave = false;
+      final refresh = find.byKey(const Key('work-purchase-refresh-saved'));
+      expect(refresh, findsOneWidget);
+      await revealPurchaseInput(tester, refresh);
+      await tester.tap(refresh);
+      await tester.pumpAndSettle();
+      expect(find.text('Saved records refreshed. Your entries are kept; review the purchase before saving again.'), findsOneWidget);
+      final invoiceSection = find.byKey(const Key('work-purchase-invoice-section'));
+      await revealPurchaseInput(tester, invoiceSection);
+      if (find.byKey(const Key('work-purchase-reference')).evaluate().isEmpty) {
+        await tester.tap(invoiceSection); await tester.pumpAndSettle();
+      }
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text, 'EVAL-R12-RETRY');
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-preview')));
+      await tester.tap(find.byKey(const Key('work-purchase-preview')));
+      await tester.pumpAndSettle();
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-copy-save')));
+      await tester.tap(find.byKey(const Key('work-purchase-copy-save')));
+      await tester.pumpAndSettle();
+      expect(entry.value!.copies, hasLength(1));
+      expect(entry.value!.copies.single.draft.invoiceReference, 'EVAL-R12-RETRY');
+      expect(entry.value!.revision, stale ? 3 : 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('P05-R09-C06 invoice sequence and one-tap complete supplier fields', (tester) async {

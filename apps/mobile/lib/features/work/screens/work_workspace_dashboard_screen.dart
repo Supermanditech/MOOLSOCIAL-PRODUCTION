@@ -11377,9 +11377,10 @@ class _PurchaseAdditionalInput {
 }
 
 class _StoreRecordPurchaseSurface extends StatefulWidget {
-  const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack});
+  const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack, this.savedCopy});
   final WorkSession session;
   final VoidCallback onBack;
+  final WorkspacePurchaseSavedCopy? savedCopy;
   @override
   State<_StoreRecordPurchaseSurface> createState() => _StoreRecordPurchaseState();
 }
@@ -11423,6 +11424,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   late final (String, String, bool)? _scope = widget.session.workspaceSupplierScope;
   WorkspaceSupplierProfile? _supplier;
   WorkspacePurchaseEntryDraft? _original;
+  WorkspacePurchaseSavedCopy? _copyAttempt;
+  bool _copyVerified = false;
+  String? _copyAttemptInput;
+  bool get _readOnly => widget.savedCopy != null;
+  Map<String, String> get _exportLabels => {for (final e in _fieldLabels.entries)
+    if (e.key.startsWith('work-purchase-'))
+      e.key.substring('work-purchase-'.length).replaceFirst(RegExp(r'-\d+$'), ''): e.value};
   bool _recordedSaving = false;
   String? _recordedNotice;
   int? _revision;
@@ -11448,10 +11456,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         'Your Store is unavailable. Reopen this Store to continue.'; });
       return;
     }
-    _original = session.workspacePurchaseEntryDraft;
-    _revision = session.workspacePurchaseEntryRevision;
+    final copy = widget.savedCopy;
+    if (copy != null && !session.workspacePurchaseCopies.any((c) => c.id == copy.id &&
+        jsonEncode(c.toJson()) == jsonEncode(copy.toJson()))) {
+      setState(() { _loading = false; _error = 'This saved purchase copy is unavailable. Return to Purchases and retry.'; });
+      return;
+    }
+    _original = copy?.draft ?? session.workspacePurchaseEntryDraft;
+    _revision = copy?.revision ?? session.workspacePurchaseEntryRevision;
     _draftId = _original?.id ?? session.newWorkspacePurchaseDraftId();
-    _supplier = session.workspaceSuppliers.where((p) => p.id == _original?.supplierId).firstOrNull;
+    _supplier = copy?.supplier ?? session.workspaceSuppliers.where((p) => p.id == _original?.supplierId).firstOrNull;
     _supplierId = _supplier?.id ?? session.newWorkspaceSupplierId();
     _name.text = _supplier?.name ?? '';
     _phone.text = _supplier?.phone ?? '';
@@ -11472,6 +11486,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       ..clear()
       ..addAll((_original?.goods ?? [<String, String>{}]).map(_PurchaseGoodsInput.new));
     _baseline = _input;
+    _copyVerified = copy != null;
+    if (_readOnly) _reviewFocused = true;
     setState(() { _loading = false; _error = null; });
   }
   void _chooseSupplier(WorkspaceSupplierProfile p) {
@@ -11547,20 +11563,37 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (mounted) setState(() => _busy = false);
     }
   }
-  Future<void> _save() async {
-    if (_busy || !_current || _scope == null) return;
+  Future<void> _save({bool reviewed = false}) async {
+    if (_readOnly || _busy || !_current || _scope == null) return;
     final now = DateTime.now();
-    final profile = WorkspaceSupplierProfile(id: _supplierId, name: _name.text.trim(),
+    var profile = WorkspaceSupplierProfile(id: _supplierId, name: _name.text.trim(),
       phone: _phone.text.trim().replaceAll(RegExp(r'[\s()-]'), ''),
       address: _address.text.trim(), gstin: _gstin.text.trim().toUpperCase(),
       createdAt: _supplier?.createdAt ?? now, updatedAt: now);
-    final draft = WorkspacePurchaseEntryDraft(id: _draftId, supplierId: profile.id,
+    var draft = WorkspacePurchaseEntryDraft(id: _draftId, supplierId: profile.id,
       invoiceReference: _reference.text.trim(), invoiceDate: _date.text.trim(),
       createdAt: _original?.createdAt ?? now, updatedAt: now,
       goods: _goods.map((line) => line.fields).toList(),
       details: {for (final e in _details.entries) if (e.value.text.isNotEmpty) e.key: e.value.text},
       attachments: _attachments, additionalFields: _additional.map((f) => f.field).toList(),
       printedTaxRows: _printedTaxRows);
+    if (reviewed) {
+      if (_name.text.trim().isEmpty || _reference.text.trim().isEmpty || _date.text.trim().isEmpty ||
+          !_goods.any((line) => line.name.text.trim().isNotEmpty)) {
+        setState(() => _error = 'Enter supplier, invoice number/date and items before saving a purchase copy. Save draft to finish later.');
+        return;
+      }
+      if (_copyAttempt == null || _copyAttemptInput != _input) {
+        _copyAttemptInput = _input;
+        _copyAttempt = WorkspacePurchaseSavedCopy(
+          id: '$_draftId-reviewed-r${(_revision ?? 0) + 1}',
+          storeName: widget.session.activeWorkspace?.name ?? 'Store',
+          revision: (_revision ?? 0) + 1, savedAt: now, supplier: profile, draft: draft,
+          labels: _exportLabels);
+      }
+      profile = _copyAttempt!.supplier;
+      draft = _copyAttempt!.draft;
+    }
     if (profile.validationError != null || !draft.valid) {
       setState(() => _error = profile.validationError ??
         'Check your entries before saving. Each extra detail needs a heading (up to 120 characters) and details (up to 4,000). Keep up to 200 extra details and 48,000 characters in total. Your entries are kept.');
@@ -11584,7 +11617,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       return;
     }
     final saved = await widget.session.saveWorkspacePurchaseEntry(profile, scope: _scope!,
-      draft: draft, expectedRevision: _revision);
+      draft: draft, expectedRevision: _revision, reviewedCopy: reviewed ? _copyAttempt : null);
     if (!mounted) return;
     setState(() => _busy = false);
     if (saved && _current) {
@@ -11594,6 +11627,41 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       setState(() => _error = widget.session.workspaceSupplierError ??
         'Return to the Store where you started this bill. Your entries are kept.');
     }
+  }
+  Future<void> _refreshSaved() async {
+    if (_busy || !_current) return;
+    if (_draftId.isEmpty || _readOnly) { await _load(retry: true); return; }
+    setState(() { _busy = true; _error = null; });
+    final opened = await widget.session.loadWorkspaceSuppliers(retry: true);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!_current || !opened) {
+      setState(() => _error = widget.session.workspaceSupplierError ??
+        'Cannot reopen saved purchases. Your entries are kept; retry.');
+      return;
+    }
+    final attempted = _copyAttempt;
+    if (attempted != null && widget.session.workspacePurchaseCopies.any((c) =>
+        jsonEncode(c.toJson()) == jsonEncode(attempted.toJson()))) {
+      // Reconcile a committed operation without writing its old draft back.
+      _baseline = _input;
+      widget.onBack();
+      return;
+    }
+    final latest = widget.session.workspacePurchaseEntryDraft;
+    if (latest != null && latest.id != _draftId) {
+      setState(() => _error = 'Another purchase draft is saved. Your entries are kept; return to Purchases to choose it.');
+      return;
+    }
+    setState(() {
+      _original = latest;
+      _supplier = widget.session.workspaceSuppliers.where((p) => p.id == _supplierId).firstOrNull;
+      _revision = widget.session.workspacePurchaseEntryRevision;
+      _copyAttempt = null;
+      _copyAttemptInput = null;
+      _notice = 'Saved records refreshed. Your entries are kept; review the purchase before saving again.';
+      _reviewFocused = false;
+    });
   }
   @override
   void dispose() {
@@ -11949,10 +12017,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     }
   }
   bool _recordedCurrent(WorkspacePurchaseEntryDraft draft, WorkspaceSupplierProfile supplier, int revision) =>
-    mounted && _current && !_dirty && !_busy && !widget.session.workspaceSupplierSaving &&
+    mounted && _current && widget.session.workspaceSuppliersLoaded && !_dirty && !_busy && !widget.session.workspaceSupplierSaving &&
+    (_readOnly ? widget.session.workspacePurchaseCopies.any((c) => c.id == widget.savedCopy!.id &&
+      jsonEncode(c.toJson()) == jsonEncode(widget.savedCopy!.toJson())) :
     widget.session.workspaceSupplierError == null && _original == draft && _supplier == supplier &&
     widget.session.workspacePurchaseEntryDraft == draft && widget.session.workspacePurchaseEntryRevision == revision &&
-    widget.session.workspaceSuppliers.contains(supplier) && draft.supplierId == supplier.id;
+    widget.session.workspaceSuppliers.contains(supplier) && draft.supplierId == supplier.id);
   Future<void> _downloadRecorded() async {
     if (_recordedSaving) return;
     final draft = _original, supplier = _supplier, revision = _revision;
@@ -11965,12 +12035,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     setState(() { _recordedSaving = true; _recordedNotice = null; });
     try {
       final bytes = await generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier,
-        storeName: widget.session.activeWorkspace?.name ?? 'Store', storeId: _scope!.$2,
-        revision: revision, labels: {
-          for (final e in _fieldLabels.entries)
-            if (e.key.startsWith('work-purchase-'))
-              e.key.substring('work-purchase-'.length).replaceFirst(RegExp(r'-\d+$'), ''): e.value,
-        });
+        storeName: widget.savedCopy?.storeName ?? widget.session.activeWorkspace?.name ?? 'Store', storeId: _scope!.$2,
+        revision: revision, labels: widget.savedCopy?.labels ?? _exportLabels);
       if (!_recordedCurrent(draft, supplier, revision)) {
         if (mounted && _current) {
           setState(() => _recordedNotice = 'Saved details changed. Reopen this purchase draft before downloading.');
@@ -12407,9 +12473,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     return [
       _reviewCopies(),
       Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
-        const Text('Purchase entry · Draft', key:Key('work-purchase-review-title'),
-          style:TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
-        if (_goods.any((line) => line.name.text.trim().isNotEmpty && line.extra['lineTotal']!.text.trim().isEmpty))
+        Text(_readOnly ? 'Purchase copy · Saved' : 'Purchase entry · Draft', key:const Key('work-purchase-review-title'),
+          style:const TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
+        if (!_readOnly && _goods.any((line) => line.name.text.trim().isNotEmpty && line.extra['lineTotal']!.text.trim().isEmpty))
           TextButton(key: const Key('purchase-review-edit-amounts'), onPressed: _reviewItemAmounts,
             style: TextButton.styleFrom(foregroundColor: const Color(0xff8b3b13),
               minimumSize: const Size(48,48), padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -12628,14 +12694,27 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       const Text('Draft only — stock, dues and payments stay unchanged.',
         style: TextStyle(fontSize: 11, color: _paperMuted)),
       Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4, children: [
-        TextButton(onPressed: _back, child: const Text('Cancel')),
+        TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 8)),
+          onPressed: _back, child: const Text('Cancel', style: TextStyle(fontSize: 13))),
         if (!_reviewFocused) TextButton(key: const Key('work-purchase-preview'), onPressed: _previewPurchase,
           child: const Text('Preview')),
-        FilledButton(key: const Key('work-purchase-draft-save'),
+        if (_reviewFocused) TextButton(key: const Key('work-purchase-draft-save'),
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 8), foregroundColor: MoolColors.navy,
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          onPressed: () => _save(), child: Text(_busy ? 'Saving…' : 'Save draft')),
+        if (_reviewFocused) FilledButton(key: const Key('work-purchase-copy-save'),
+          style: FilledButton.styleFrom(minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          onPressed: () => _save(reviewed: true), child: Text(_busy ? 'Saving…' : 'Save purchase copy')),
+        if (!_reviewFocused) FilledButton(key: const Key('work-purchase-draft-save'),
           style: FilledButton.styleFrom(minimumSize: const Size(48, 48),
             backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
             textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          onPressed: _save, child: Text(_busy ? 'Saving…' : 'Save draft')),
+          onPressed: () => _save(), child: Text(_busy ? 'Saving…' : 'Save draft')),
       ]),
     ])));
   @override
@@ -12665,7 +12744,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           else if (!widget.session.workspaceSuppliersLoaded || !_current) ...[
             Text(_error ?? 'Return to the same Store to continue.'),
             TextButton(onPressed: _current ? () { setState(() => _loading = true);
-              unawaited(_load(retry: true)); } : null, child: const Text('Retry')),
+              unawaited(_draftId.isNotEmpty && !_readOnly ? _refreshSaved() : _load(retry: true));
+              setState(() => _loading = false); } : null, child: const Text('Retry')),
           ] else AbsorbPointer(absorbing: _busy, child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Wrap(spacing: 4, children: [
@@ -12843,7 +12923,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   _compactFields([_detail('Expected delivery date', 'expectedDeliveryDate', date: true)]),
                   _detail('Delivery / shipping terms', 'shippingTerms'),
                 ]),
-                const Text('Already in Stock? Keep that status to prevent adding the same goods twice when receipt is confirmed.',
+                const Text('Supplier bill came later? For goods saved through Catalogue, Add manually or CSV, choose Already added to Stock. Do not receive those goods again.',
                   style: TextStyle(fontSize: 11, color: MoolColors.ink)), _extraFields('receipt')]),
                 (title: 'Record payment & terms', key: 'work-purchase-payment-details', fields: [
                 const Text('Record what you have actually paid. A Paid stamp on the bill is kept separately below.',
@@ -12884,6 +12964,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
               if (_error != null) Text(_error!, key: const Key('work-purchase-entry-error'),
                 style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
+              if (_error != null && !_readOnly) TextButton(key: const Key('work-purchase-refresh-saved'),
+                onPressed: _refreshSaved, child: const Text('Refresh saved records · keep my entries')),
               if (!pinned) _draftActions(),
             ])),
         ]);
@@ -12896,8 +12978,31 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         child: Theme(data: Theme.of(context).copyWith(textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(minimumSize: const Size(48, 48), foregroundColor: MoolColors.navy,
             textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)))),
-          child: Column(children: [Expanded(child: form), if (ready && pinned) _draftActions()])));
+          child: Column(children: [Expanded(child: _readOnly && !_loading
+            ? ready && _copyVerified ? _savedCopyView(constraints.maxHeight)
+              : ListView(padding: const EdgeInsets.all(12), children: [
+                Text(_error ?? 'Return to Purchases to reopen this saved copy.'),
+                TextButton(onPressed: _back, child: const Text('Close'))]) : form),
+            if (!_readOnly && ready && pinned) _draftActions()])));
     });
+  }
+  Widget _savedCopyView(double height) {
+    final copy = widget.savedCopy!;
+    // Keep the historical labels, not wording derived from a later editable draft.
+    for (final key in _fieldLabels.keys.toList()) {
+      final normalized = key.substring('work-purchase-'.length).replaceFirst(RegExp(r'-\d+$'), '');
+      if (copy.labels.containsKey(normalized)) _fieldLabels[key] = copy.labels[normalized]!;
+    }
+    return ListView(key: const Key('work-purchase-saved-copy'), primary: false,
+      physics: _readingPointers.isEmpty ? null : const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(12), children: [
+        Row(children: [const Expanded(child: Text('Purchase copy',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+          TextButton(key: const Key('work-purchase-copy-close'), onPressed: _back, child: const Text('Close'))]),
+        Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision} · Not posted to books',
+          style: const TextStyle(fontSize: 11, color: _paperMuted)),
+        ...(_sourceAttachment == null ? _reviewPurchase(height) : _reviewOriginal(height)),
+      ]);
   }
   Widget _goodsRow(int index) {
     final line = _goods[index];
@@ -13020,6 +13125,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   List<String>? _purchaseHistory;
   String _purchaseFilter = 'All';
   bool _recordPurchase = false;
+  WorkspacePurchaseSavedCopy? _savedCopy;
 
   @override
   void initState() {
@@ -13068,11 +13174,13 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       _purchaseSearch.clear();
       _purchaseFilter = 'All';
       _recordPurchase = false;
+      _savedCopy = null;
     }
-    if (_recordPurchase && !statement) {
+    if ((_recordPurchase || _savedCopy != null) && !statement) {
       return _StoreRecordPurchaseSurface(
-        key: widget.purchaseEntryKey ?? ValueKey(('record-purchase', session.workspaceSupplierScope)), session: session,
-        onBack: () => setState(() => _recordPurchase = false));
+        key: widget.purchaseEntryKey ?? ValueKey(('record-purchase', session.workspaceSupplierScope, _savedCopy?.id)), session: session,
+        savedCopy: _savedCopy,
+        onBack: () => setState(() { _recordPurchase = false; _savedCopy = null; }));
     }
     final selected = session.focusedWorkspacePurchase;
     final returning =
@@ -13337,6 +13445,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           .whereType<String>().join(' ').toLowerCase();
       return _matchesReceiptFilter(record) && terms.every(searchable.contains);
     }).toList();
+    final savedCopies = session.workspacePurchaseCopies.where((c) => _purchaseFilter == 'All' &&
+      terms.every('${c.supplier.name} ${c.supplier.phone} ${c.draft.invoiceReference} ${c.draft.invoiceDate}'
+        .toLowerCase().contains)).toList()..sort((a, b) => b.savedAt.compareTo(a.savedAt));
     return CustomScrollView(
       key: PageStorageKey('work-purchases-$storeId-$statement'),
       primary: false,
@@ -13413,6 +13524,19 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
             if (index == 0) { return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (!statement && session.workspaceSupplierError != null) ...[
+              Text(session.workspaceSupplierError!, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+              TextButton(onPressed: () async { await session.loadWorkspaceSuppliers(retry: true);
+                if (mounted) setState(() {}); }, child: const Text('Retry saved purchases')),
+            ],
+            if (!statement && savedCopies.isNotEmpty) ...[
+              const Text('Saved purchase copies', style: TextStyle(fontSize: 13,
+                fontWeight: FontWeight.w700, color: MoolColors.navy)),
+            ],
+            if (!statement && _purchaseFilter != 'All' && session.workspacePurchaseCopies.isNotEmpty)
+              const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
+                'Receipt filters show MoolSocial deliveries. Choose All for saved purchase copies.',
+                style: TextStyle(fontSize: 11, color: MoolColors.ink))),
             if (!session.workspacePurchasesConnected)
               const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
                 'MoolSocial purchase updates unavailable · manual bill drafts remain available',
@@ -13421,7 +13545,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
               const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
                 'Available updates only · full history unavailable',
                 style: TextStyle(fontSize: 11, color: MoolColors.muted))),
-            if (visible.isEmpty) ...[
+            if (visible.isEmpty && savedCopies.isEmpty) ...[
               Text(records.isEmpty ? 'No linked supplier deliveries' : 'No matching purchases',
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
               Text(records.isEmpty
@@ -13436,7 +13560,31 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   child: const Text('Show all purchases'))),
             ],
             ]); }
-            final record = visible[index - 1];
+            if (index <= savedCopies.length) {
+              final copy = savedCopies[index - 1];
+              final amount = WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal'] ?? '');
+              return InkWell(key: ValueKey('work-purchase-copy-${copy.id}'),
+                onTap: () {
+                  if (!session.workspaceSuppliersLoaded || !session.workspacePurchaseCopies.contains(copy) ||
+                      session.activeWorkspace?.id != storeId) { return; }
+                  _purchaseSearchFocus.unfocus();
+                  setState(() => _savedCopy = copy);
+                }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    _StoreMoneyLine(alignAmountToEnd: true,
+                      leading: Text(copy.supplier.name, style: const TextStyle(fontSize: 13,
+                        fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                      value: amount == null ? 'Total not entered' : _purchaseAmount(amount),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                    Text('${copy.draft.invoiceReference} · ${copy.draft.invoiceDate}',
+                      style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+                    Row(children: [Expanded(child: Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision} · Not posted',
+                      style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
+                      const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy)]),
+                    const Divider(height: 1),
+                  ])));
+            }
+            final record = visible[index - savedCopies.length - 1];
             return KeyedSubtree(
                 key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
                 child: InkWell(
@@ -13492,7 +13640,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                     ])),
                 ),
               );
-          }, childCount: visible.length + 1)),
+          }, childCount: visible.length + savedCopies.length + 1)),
         ),
       ],
     );

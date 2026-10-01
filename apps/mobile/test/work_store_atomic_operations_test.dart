@@ -591,6 +591,112 @@ void main() {
     await expectLater(owner().read('account-A', 'store-A', qa: true), throwsA(isA<WorkGatewayException>()));
     expect(await owner().read('other-account', 'store-A', qa: true), isNull);
   });
+  // R12 fixtures are automated evidence only, never runtime acceptance records.
+  WorkspacePurchaseSavedCopy copyFixture({String id = 'reviewed-copy-A', int revision = 2}) {
+    final book = entryFixture();
+    return WorkspacePurchaseSavedCopy(id: id, storeName: 'Evaluation Store',
+      revision: revision, savedAt: book.draft!.updatedAt,
+      supplier: book.profiles.single, draft: book.draft!, labels: {'invoiceTotal': 'Invoice total ₹'});
+  }
+  WorkspacePurchaseEntryBook copyBook({int revision = 2, String reference = 'EVAL-P-001',
+      List<WorkspacePurchaseSavedCopy>? copies}) {
+    final book = entryFixture(revision: revision, reference: reference);
+    return WorkspacePurchaseEntryBook(account: book.account, store: book.store, qa: book.qa,
+      revision: revision, profiles: book.profiles, draft: book.draft,
+      copies: copies ?? [copyFixture()]);
+  }
+  test('P05-R12 legacy history empty and saved copies defensively immutable', () {
+    expect(WorkspacePurchaseEntryBook.fromJson(entryFixture().toJson()).copies, isEmpty);
+    final book = WorkspacePurchaseEntryBook.fromJson(copyBook().toJson());
+    expect(book.copies.single.draft.invoiceReference, 'EVAL-P-001');
+    expect(() => book.copies.clear(), throwsUnsupportedError);
+    expect(() => book.copies.single.labels['invoiceTotal'] = 'Changed', throwsUnsupportedError);
+    expect(() => book.copies.single.draft.goods.single['cost'] = '0', throwsUnsupportedError);
+    expect(book.toJson(), copyBook().toJson());
+  });
+  test('P05-R12 strict copy validation scope duplicate identity and posted data', () {
+    for (final mutate in <void Function(Map<String, dynamic>)>[
+      (r) => (r['copies'] as List).add((r['copies'] as List).single),
+      (r) => ((r['copies'] as List).single as Map)['revision'] = 3,
+      (r) => (((r['copies'] as List).single as Map)['draft'] as Map)['stage'] = 'posted',
+      (r) => (((r['copies'] as List).single as Map)['supplier'] as Map)['id'] = 'wrong-supplier',
+      (r) => r['copies'] = null,
+    ]) {
+      final raw = jsonDecode(jsonEncode(copyBook().toJson())) as Map<String, dynamic>;
+      mutate(raw);
+      expect(() => WorkspacePurchaseEntryBook.fromJson(raw), throwsFormatException);
+    }
+  });
+  test('P05-R12 restart later draft changes preserve historical supplier and data', () async {
+    final storage = _OrderJournalStorage();
+    SecureWorkPurchaseEntryStore owner() => SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    await owner().save(entryFixture(), expectedRevision: null);
+    await owner().save(copyBook(), expectedRevision: 1);
+    final later = jsonDecode(jsonEncode(copyBook(revision: 3, reference: 'LATER-DRAFT').toJson())) as Map;
+    ((later['profiles'] as List).single as Map)['name'] = 'Later supplier name';
+    await owner().save(WorkspacePurchaseEntryBook.fromJson(later), expectedRevision: 2);
+    final restored = (await owner().read('account-A', 'store-A', qa: true))!;
+    expect(restored.draft!.invoiceReference, 'LATER-DRAFT');
+    expect(restored.profiles.single.name, 'Later supplier name');
+    expect(restored.copies.single.toJson(), copyFixture().toJson());
+    expect(await owner().read('account-A', 'other-store', qa: true), isNull);
+    expect(await owner().read('account-A', 'store-A', qa: false), isNull);
+  });
+  test('P05-R12 append-only storage rejects deletion mutation stale and retries lost reply', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(entryFixture(), expectedRevision: null);
+    storage.loseWriteResponseOnce = true;
+    await owner.save(copyBook(), expectedRevision: 1);
+    await owner.save(copyBook(), expectedRevision: 1);
+    expect((await owner.read('account-A', 'store-A', qa: true))!.copies, hasLength(1));
+    await expectLater(owner.save(copyBook(revision: 3, copies: []), expectedRevision: 2),
+      throwsA(isA<WorkGatewayException>()));
+    final altered = WorkspacePurchaseSavedCopy(id: 'reviewed-copy-A', storeName: 'Changed',
+      revision: 2, savedAt: copyFixture().savedAt, supplier: copyFixture().supplier,
+      draft: copyFixture().draft, labels: copyFixture().labels);
+    await expectLater(owner.save(copyBook(revision: 3, copies: [altered]), expectedRevision: 2),
+      throwsA(isA<WorkGatewayException>()));
+    await expectLater(owner.save(copyBook(revision: 3), expectedRevision: 1),
+      throwsA(isA<WorkGatewayException>()));
+    storage.failWrite = true;
+    await expectLater(owner.save(copyBook(revision: 3), expectedRevision: 2), throwsStateError);
+    expect((await owner.read('account-A', 'store-A', qa: true))!.toJson(), copyBook().toJson());
+  });
+  test('P05-R12 capacity rejects safely and still permits draft-only saves at copy count limit', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(entryFixture(), expectedRevision: null);
+    final copies = [for (var i = 0; i < 1000; i++) copyFixture(id: 'copy-$i')];
+    final full = copyBook(copies: copies);
+    await owner.save(full, expectedRevision: 1);
+    await owner.save(copyBook(revision: 3, reference: 'DRAFT-STILL-EDITABLE', copies: copies), expectedRevision: 2);
+    expect((await owner.read('account-A', 'store-A', qa: true))!.copies, hasLength(1000));
+    expect(() => WorkspacePurchaseEntryBook.fromJson(copyBook(revision: 4,
+      copies: [...copies, copyFixture(id: 'overflow')]).toJson()), throwsFormatException);
+    final sizeStorage = _OrderJournalStorage();
+    final sizeOwner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: sizeStorage);
+    await sizeOwner.save(entryFixture(), expectedRevision: null);
+    final before = (await sizeOwner.read('account-A', 'store-A', qa: true))!.toJson();
+    final base = entryFixture();
+    final big = WorkspacePurchaseEntryDraft(id: base.draft!.id, supplierId: base.draft!.supplierId,
+      invoiceReference: 'BIG-FIXTURE', invoiceDate: base.draft!.invoiceDate,
+      createdAt: base.draft!.createdAt, updatedAt: base.draft!.updatedAt,
+      goods: List.generate(200, (i) => {'productId': 'sku-$i', 'name': 'Evaluation item $i',
+        'specifications': 'x' * 1000, 'pack': 'pcs', 'quantity': '1', 'cost': '1'}));
+    final overBytes = WorkspacePurchaseEntryBook(account: base.account, store: base.store, qa: base.qa,
+      revision: 2, profiles: base.profiles, draft: big, copies: [
+        for (var i = 0; i < 100; i++) WorkspacePurchaseSavedCopy(id: 'big-$i',
+          storeName: 'Store', revision: 2, savedAt: big.updatedAt,
+          supplier: base.profiles.single, draft: big, labels: const {})]);
+    expect(big.valid, isTrue);
+    expect(overBytes.copies.every((copy) => copy.valid), isTrue);
+    expect(WorkspacePurchaseEntryBook.fromJson(overBytes.toJson()).copies, hasLength(100));
+    expect(utf8.encode(jsonEncode(overBytes.toJson())).length, greaterThan(10 * 1024 * 1024));
+    await expectLater(sizeOwner.save(overBytes, expectedRevision: 1),
+      throwsA(isA<WorkGatewayException>().having((e) => e.message, 'capacity explanation', contains('storage is full'))));
+    expect((await sizeOwner.read('account-A', 'store-A', qa: true))!.toJson(), before);
+  });
   test('P02 purchase entry stale revision and corrupt record preserve prior data', () async {
     final storage = _OrderJournalStorage();
     final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);

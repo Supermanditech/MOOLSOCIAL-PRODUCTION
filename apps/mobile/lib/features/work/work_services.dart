@@ -1787,6 +1787,15 @@ class SecureWorkPurchaseEntryStore implements WorkPurchaseEntryStore {
       if (previous?.revision != expectedRevision || frozen.revision != (expectedRevision ?? 0) + 1) {
         throw const WorkGatewayException('Your purchase draft changed. Reopen Purchases before saving again.');
       }
+      for (final copy in previous?.copies ?? const <WorkspacePurchaseSavedCopy>[]) {
+        final retained = frozen.copies.where((c) => c.id == copy.id).firstOrNull;
+        if (retained == null || jsonEncode(retained.toJson()) != jsonEncode(copy.toJson())) {
+          throw const WorkGatewayException('Earlier purchase copies must be kept unchanged. Reopen Purchases.');
+        }
+      }
+      if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
+        throw const WorkGatewayException('Purchase storage is full. Your saved records are kept; do not clear app data.');
+      }
       try {
         await _storage.write(key: key, value: bytes);
       } on Object {

@@ -3157,3 +3157,64 @@ close pending physical landscape/enlarged-text or exact-APK verification.
 All40 selected layout/atomic regressions passed; log:
 outputs/home-cleanup-regression-20260926.txt. Source removals remain recoverable
 from Git; no local evidence or previous development history was erased.
+
+## P05-R12 saved purchase-copy history — 2 October 2026
+
+Founder continuation: implement the pending registered R12 within the existing
+purchase journey; preserve the approved entry and paper-copy layout. This is
+MVP-supporting, not a new procurement/accounting system. Supplier information,
+reviewed invoice data, additional fields, source links, Store name and amounts
+must be frozen when the owner explicitly saves a reviewed purchase copy.
+Save draft remains independent. Existing Purchases exposes saved copies, with
+the same preview and supplier-file/download owners. No duplicate route/screen.
+
+Reuse assessment: the scoped encrypted purchase book currently retains one
+editable draft. Extend that book additively; legacy version1 remains readable.
+Use existing WorkSession account/Store/evaluation guards, revisions and CAS;
+preserve existing copies on every draft save. Stable operation identity must
+reconcile retries and reject identity/content collisions. Supplier attachments
+remain digest-addressed in the existing private draft directory; replacement
+does not delete a saved file. Missing files show recovery, not another invoice.
+
+Proof owners: work_models.dart, work_session.dart, work_services.dart,
+work_workspace_dashboard_screen.dart and existing atomic/layout test owners.
+New owner count: zero. Native OCR, translation/logo extraction, journals,
+stock/payment posting, auth/Restock, cloud retention, backend/other-tree edits,
+APK build/install and push are excluded. Phone-local history is not a promised
+one/two-year cloud archive. No historical snapshots are invented on migration.
+
+Tests before handoff: legacy/strict codecs, immutable supplier/draft snapshots,
+Store isolation, retry/collision/CAS/failure protection, source-file integrity,
+compact/read-only preview and download identity. OPPO actual evaluation draft
+save/reopen/download/restart remains pending until observed. Host fixtures are
+automated evidence only. Architect reviewed the bounded plan from supplied facts;
+that is neither repository inspection nor acceptance.
+
+R12 continuation checkpoint (2 October, not founder acceptance): focused-v6
+8 passed; P05-screen-v2 57 passed; analysis-v5 clean. Unchanged model/storage
+owners passed the full atomic suite earlier this continuation:420 passed,
+11 skipped. Logs and screenshots are retained in the task outputs folder.
+OPPO hot reload verified the compact review footer and saved the existing
+evaluation EVAL-P-3009-01 through Review -> Save purchase copy, revision9.
+It reopened read-only and remained exactly one history row after a subsequent
+debug restart. Both downloads worked before restart; supplier bytes match
+SHA25665d3c260628cacc657ab3ba8186532d100968000423cb90c2e0782a993911fed.
+Observed oil3, rice97, Basmati3 and displayed stock27025/dues1786 remained
+unchanged; this is not physical proof for every SKU or all ledger state.
+Current host tests explicitly preserve inventory/movements when saving the
+Already added to Stock choice. Founder bill-later rule covers Catalogue,
+Add manually and CSV; complete three-path receiving/posting qualification
+remains P03/P04/P08/P09 work, not an accounting effect of saving this copy.
+
+Children: C01 debug-heap shape mismatch recovered by restart/loading the same
+scoped persisted records, with no nullable-history fallback or data clear.
+C02 initial financial-statement leak hypothesis disproved by the existing
+early statement-register return; no production patch. Proposed extra actual
+financial-parent regression remains untested. C03 footer verified physically
+at360dp; host Ahem typography cannot prove one-row device fit, so tests retain
+primary/secondary hierarchy,48dp targets and2x reachability/nooverflow.
+C04 remains OPEN: the reused recorded PDF still calls an immutable saved copy
+Draft. Next bounded batch must admit its exact existing PDF-export owner and
+correct saved-copy heading/metadata/footer/recovery wording while preserving
+ordinary draft exports and unposted status. Do not close R12 or start posting.
+Details: C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/purchase-r12-export-child-20261002.json.

@@ -6177,37 +6177,85 @@ class WorkspacePurchaseEntryDraft {
 
 /// One recoverable entry plus its private supplier identities, atomically saved.
 /// This is not the posted purchase register or a financial journal.
+/// A reviewed, unposted purchase copy; independent of the editable draft.
+class WorkspacePurchaseSavedCopy {
+  WorkspacePurchaseSavedCopy({required this.id, required this.storeName,
+    required this.revision, required this.savedAt, required this.supplier,
+    required this.draft, required Map<String, String> labels})
+      : labels = Map.unmodifiable(labels);
+  final String id, storeName;
+  final int revision;
+  final DateTime savedAt;
+  final WorkspaceSupplierProfile supplier;
+  final WorkspacePurchaseEntryDraft draft;
+  final Map<String, String> labels;
+  bool get valid => id.trim().isNotEmpty && id.length <= 240 &&
+    storeName.trim().isNotEmpty && storeName.length <= 200 && revision >= 1 &&
+    supplier.validationError == null && draft.valid && draft.supplierId == supplier.id &&
+    !savedAt.isBefore(draft.updatedAt) && labels.length <= 200 &&
+    labels.entries.every((e) => e.key.isNotEmpty && e.key.length <= 120 &&
+      e.value.isNotEmpty && e.value.length <= 200);
+  Map<String, Object?> toJson() => {'id': id, 'storeName': storeName,
+    'revision': revision, 'savedAt': savedAt.toIso8601String(),
+    'supplier': supplier.toJson(), 'draft': draft.toJson(), 'labels': labels};
+  static WorkspacePurchaseSavedCopy fromJson(Object? raw) {
+    const keys = {'id', 'storeName', 'revision', 'savedAt', 'supplier', 'draft', 'labels'};
+    try {
+      if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+          raw['labels'] is! Map) { throw const FormatException('Invalid purchase copy'); }
+      final copy = WorkspacePurchaseSavedCopy(id: raw['id'] as String,
+        storeName: raw['storeName'] as String, revision: raw['revision'] as int,
+        savedAt: DateTime.parse(raw['savedAt'] as String),
+        supplier: WorkspaceSupplierProfile.fromJson(raw['supplier']),
+        draft: WorkspacePurchaseEntryDraft.fromJson(raw['draft']),
+        labels: Map<String, String>.from(raw['labels'] as Map));
+      if (!copy.valid) throw const FormatException('Invalid purchase copy');
+      return copy;
+    } on Object {
+      throw const FormatException('Saved purchase copy needs recovery. Records have been kept.');
+    }
+  }
+}
+
 class WorkspacePurchaseEntryBook {
   WorkspacePurchaseEntryBook({required this.account, required this.store,
     required this.qa, required this.revision, required List<WorkspaceSupplierProfile> profiles,
-    this.draft})
-      : profiles = List.unmodifiable(profiles);
+    this.draft, List<WorkspacePurchaseSavedCopy> copies = const []})
+      : profiles = List.unmodifiable(profiles), copies = List.unmodifiable(copies);
   final String account, store;
   final bool qa;
   final int revision;
   final List<WorkspaceSupplierProfile> profiles;
   final WorkspacePurchaseEntryDraft? draft;
+  final List<WorkspacePurchaseSavedCopy> copies;
   Map<String, Object?> toJson() => {'version': 1, 'account': account, 'store': store,
     'qa': qa, 'revision': revision, 'profiles': profiles.map((p) => p.toJson()).toList(),
-    'draft': draft?.toJson()};
+    'draft': draft?.toJson(), if (copies.isNotEmpty) 'copies': copies.map((c) => c.toJson()).toList()};
   static WorkspacePurchaseEntryBook fromJson(Object? raw) {
-    const keys = {'version', 'account', 'store', 'qa', 'revision', 'profiles', 'draft'};
+    const keys = {'version', 'account', 'store', 'qa', 'revision', 'profiles', 'draft', 'copies'};
     try {
-      if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+      if (raw is! Map || !keys.difference({'copies'}).every(raw.containsKey) ||
+          !raw.keys.every(keys.contains) ||
           raw['version'] != 1 || raw['profiles'] is! List ||
-          (raw['profiles'] as List).length > 10000) {
+          (raw['profiles'] as List).length > 10000 ||
+          (raw.containsKey('copies') && (raw['copies'] is! List || (raw['copies'] as List).length > 1000))) {
         throw const FormatException('Invalid supplier directory');
       }
       final result = WorkspacePurchaseEntryBook(account: raw['account'] as String,
         store: raw['store'] as String, qa: raw['qa'] as bool, revision: raw['revision'] as int,
         profiles: [for (final p in raw['profiles'] as List) WorkspaceSupplierProfile.fromJson(p)],
-        draft: raw['draft'] == null ? null : WorkspacePurchaseEntryDraft.fromJson(raw['draft']));
+        draft: raw['draft'] == null ? null : WorkspacePurchaseEntryDraft.fromJson(raw['draft']),
+        copies: [for (final c in (raw['copies'] as List? ?? const [])) WorkspacePurchaseSavedCopy.fromJson(c)]);
       final ids = <String>{};
+      final copyIds = <String>{};
       if (result.account.trim().isEmpty || result.store.trim().isEmpty || result.revision < 1 ||
           result.profiles.any((p) => !ids.add(p.id)) ||
           (result.draft != null && (!ids.contains(result.draft!.supplierId) ||
             result.draft!.attachments.any((a) => a.owner !=
-              jsonEncode([result.account, result.store, result.qa, result.draft!.id]))))) {
+              jsonEncode([result.account, result.store, result.qa, result.draft!.id])))) ||
+          result.copies.any((c) => !copyIds.add(c.id) || c.revision > result.revision ||
+            c.draft.attachments.any((a) => a.owner !=
+              jsonEncode([result.account, result.store, result.qa, c.draft.id])))) {
         throw const FormatException('Invalid supplier scope');
       }
       return result;

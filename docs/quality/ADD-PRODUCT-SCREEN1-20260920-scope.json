@@ -16,9 +16,9 @@
     "currentTicketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
     "selectedTicketAssessment": {
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
-      "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
+      "customerOutcome": "P05-R12: retailer saves a reviewed purchase copy and retrieves its frozen details/files from existing Purchases independently of later draft edits.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "4ABF0596AFE66EBB58CB67891AF1735E8DA2AB0DEA0ADA5E7C54E697D580B2C9",
+      "manifestSha256": "60D886C679AB42934A1AD5E3F85B9AC2544E612053DC67653B59D4B329E528E7",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -27,20 +27,20 @@
         "new_necessary_work"
       ],
       "sharedImplementationOwners": [
-        "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
       ],
-      "newScreens": [
-        "Add product entry inside existing picker owner"
-      ],
+      "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Existing picker lacks the approved three-way entry. Reuse blank product/editor, catalogue picker/scanner and importer; no duplicate business rules.",
+      "necessityProof": "Existing purchase book only retains an editable draft. Add immutable snapshots inside that same encrypted owner; reuse existing purchase-paper preview, private attachment viewer and download. No new implementation owner, screen, route or accounting rules.",
       "robustnessCoverage": [
-        "Empty Store and cancellation",
-        "All three existing handler destinations",
-        "Compact/landscape/large-text fitment",
-        "Store-switch recovery"
+        "Legacy version1 reads and strict saved-copy validation",
+        "Frozen draft/supplier/Store identity after edits; preserve history on draft save",
+        "CAS, stable retry/collision, unavailable files and failed-save recovery",
+        "Compact/enlarged read-only preview, Back, exact download and Store-switch isolation"
       ],
       "adjustments": [
         "Ticket-specific verified checkpoint instead of absent central v88; no acceptance implied"
@@ -61,13 +61,13 @@
   "state": "ticket_disclosed_and_authorized",
   "checkpoint": {
     "branch": "work/codex-ui/add-product-screen1-20260920",
-    "head": "a425fd89445a4650533b14903d99215cfed74034",
+      "head": "9050f69d458988eab24c45417db0e325e0aacb2f",
     "successorRegistered": true,
     "approvalState": "Founder approved exact Screen 1 checkpoint exception and narrow blocker registration; Counter Sale physical retest remains pending."
   },
   "ticket": {
     "id": "UAW-ADD-PRODUCT-SCREEN1-20260920",
-    "customerOutcome": "Retailer opens Add product and chooses catalogue search/scan, manual entry or CSV using existing shared Store handlers.",
+    "customerOutcome": "P05-R12 saved reviewed purchase-copy history through existing Purchases, with current draft and approved paper layout preserved.",
     "classification": "mvp_supporting",
     "classificationReason": "Existing Retailer/Grocery inventory entry supporting the approved Buy-to-Store commerce launch.",
     "minimumCompleteScope": [
@@ -80,7 +80,8 @@
       "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review",
       "23 September founder-authorized continuation: implement the 31 grouped r66.38 Store/catalogue/Counter Sale findings, fix related child defects during local tests, and present all affected actual screens together for founder approval before a new APK",
       "24 September founder bounded extension v1: shared contextual A4/58/80 mm printing, evidence-backed orphan-history recovery, and manual-photo stock-to-POS continuity; local tests and Git preservation before guarded APK; no automatic installation",
-      "26 September Store home authority v1: HOME-01–04 correction, reproduce HOME-05/06, explicit wallet Actions expand/manual collapse with central reflow, remove working-screen contextual rails while preserving actions, local and OPPO hot-reload tests"
+      "26 September Store home authority v1: HOME-01–04 correction, reproduce HOME-05/06, explicit wallet Actions expand/manual collapse with central reflow, remove working-screen contextual rails while preserving actions, local and OPPO hot-reload tests",
+      "2 October founder continuation P05-R12 only: immutable reviewed purchase-copy snapshots in existing encrypted scoped book; existing Purchases/preview/download; draft-save and legacy compatibility; local tests then OPPO hot reload. No posting, backend or new APK authority."
     ],
     "explicitExclusions": [
       "CSV batch-review redesign pending its screenwise approval",
@@ -110,8 +111,8 @@
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": true,
-    "deviceInstallAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
     "externalServiceWriteAuthorized": false
   }
 }

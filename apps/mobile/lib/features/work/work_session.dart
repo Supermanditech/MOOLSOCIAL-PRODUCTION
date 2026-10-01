@@ -718,6 +718,7 @@ class WorkSession extends ChangeNotifier {
   Future<bool> saveWorkspacePurchaseEntry(WorkspaceSupplierProfile profile, {
     required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft,
     required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy,
   }) async {
     final key = _supplierKey;
     if (key == null || key != scope || !workspaceSuppliersLoaded || workspaceSupplierSaving ||
@@ -725,6 +726,23 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     final old = _supplierDirectories[key];
+    if (reviewedCopy != null) {
+      final prior = old?.copies.where((c) => c.id == reviewedCopy.id).firstOrNull;
+      if (prior != null) {
+        if (jsonEncode(prior.toJson()) == jsonEncode(reviewedCopy.toJson())) return true;
+        _supplierErrors[key] = 'This saved copy has different details. Reopen Purchases before saving again.';
+        notifyListeners();
+        return false;
+      }
+      if (!reviewedCopy.valid || reviewedCopy.revision != (expectedRevision ?? 0) + 1 ||
+          jsonEncode(reviewedCopy.draft.toJson()) != jsonEncode(draft.toJson()) ||
+          jsonEncode(reviewedCopy.supplier.toJson()) != jsonEncode(profile.toJson()) ||
+          (old?.copies.length ?? 0) >= 1000) {
+        _supplierErrors[key] = 'Cannot save this purchase copy. Your draft and earlier copies are kept; reopen Purchases.';
+        notifyListeners();
+        return false;
+      }
+    }
     if (old?.revision != expectedRevision || !draft.valid || draft.supplierId != profile.id ||
         (old?.draft != null && (old!.draft!.id != draft.id ||
           old.draft!.createdAt != draft.createdAt))) {
@@ -756,7 +774,8 @@ class WorkSession extends ChangeNotifier {
     }
     final saved = WorkspacePurchaseEntryBook(account: key.$1, store: key.$2,
       qa: key.$3, revision: (old?.revision ?? 0) + 1,
-      profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft);
+      profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft,
+      copies: [...?old?.copies, ?reviewedCopy]);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     notifyListeners();
@@ -780,6 +799,8 @@ class WorkSession extends ChangeNotifier {
     }
   }
   int? get workspacePurchaseEntryRevision => _supplierDirectories[_supplierKey]?.revision;
+  List<WorkspacePurchaseSavedCopy> get workspacePurchaseCopies =>
+    _supplierDirectories[_supplierKey]?.copies ?? const [];
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
 
