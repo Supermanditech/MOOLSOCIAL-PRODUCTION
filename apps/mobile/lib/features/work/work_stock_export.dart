@@ -1233,6 +1233,239 @@ Future<Uint8List> _generateStockLedgerFile(
   );
 }
 
+/// A copy of saved, unposted retailer entries, never a reissued supplier bill.
+/// Original attachments and their visual evidence remain separate documents.
+Future<Uint8List> generateStorePurchaseRecordedCopy({
+  required WorkspacePurchaseEntryDraft draft,
+  required WorkspaceSupplierProfile supplier,
+  required String storeName,
+  required String storeId,
+  required int revision,
+  required Map<String, String> labels,
+}) async {
+  if (!draft.valid || supplier.validationError != null ||
+      draft.supplierId != supplier.id || storeId.isEmpty || revision < 0) {
+    throw const FormatException('Reopen the saved purchase draft before downloading.');
+  }
+  final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-Variable.ttf'));
+  final document = pw.Document(title: 'Recorded purchase copy - ${draft.invoiceReference}',
+    author: 'MoolSocial', subject: 'Saved unposted purchase draft; not the supplier original');
+  final embedded = font.getFont(pw.Context(document: document.document));
+  final allText = [storeName, storeId, draft.id, supplier.id, supplier.name,
+    supplier.phone, supplier.address, supplier.gstin, draft.invoiceReference, draft.invoiceDate,
+    ...labels.values, ...draft.details.values, ...draft.goods.expand((r) => r.values),
+    ...draft.printedTaxRows.expand((r) => r.values),
+    ...draft.additionalFields.expand((f) => [f.label, f.value]),
+  ].join(' ');
+  if (allText.runes.any((r) => r > 32 && !embedded.isRuneSupported(r))) {
+    throw const FormatException('Some bill characters cannot be shown in this PDF. Download the original invoice to keep them.');
+  }
+  const ink = PdfColor.fromInt(0xff171b20);
+  const navy = PdfColor.fromInt(0xff17395c);
+  const rule = PdfColor.fromInt(0xff89929c);
+  final border = pw.Border.all(color: rule, width: .5);
+  const moneyKeys = {'cost', 'taxableValue', 'taxAmount', 'lineTotal', 'supplyValue',
+    'billDiscount', 'cgst', 'sgstAmount', 'sgst', 'utgst', 'igst', 'cess', 'freight',
+    'otherCharges', 'roundOff', 'totalTax', 'invoiceTotal', 'amountPayable', 'paidAmount',
+    'mrp', 'sellingPrice', 'discount'};
+  String label(String key) => labels[key] ?? key.replaceAllMapped(
+    RegExp(r'[A-Z]'), (m) => ' ${m[0]}').replaceFirstMapped(RegExp(r'^.'), (m) => m[0]!.toUpperCase());
+  String amount(String raw) {
+    final minor = WorkspacePurchaseEntryDraft.printedPaise(raw);
+    if (minor == null) return raw.isEmpty ? 'Not entered' : raw;
+    final digits = (minor.abs() ~/ 100).toString();
+    final head = digits.length > 3 ? digits.substring(0, digits.length - 3) : '';
+    final groups = <String>[];
+    for (var end = head.length; end > 0; end -= 2) {
+      groups.insert(0, head.substring(end >= 2 ? end - 2 : 0, end));
+    }
+    return '${minor < 0 ? '-' : ''}${head.isEmpty ? digits : '${groups.join(',')},${digits.substring(digits.length - 3)}'}'
+      '.${(minor.abs() % 100).toString().padLeft(2, '0')}';
+  }
+  String displayed(String key, String? raw) => moneyKeys.contains(key)
+    ? amount(raw ?? '') : (raw == null || raw.isEmpty ? 'Not entered' : raw);
+  pw.Widget text(String value, {double size = 9, bool bold = false}) => pw.Text(value,
+    style: pw.TextStyle(fontSize: size, color: ink,
+      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal));
+  // Split long source text into bounded rows, not ellipses or truncated values.
+  List<String> chunks(String value) {
+    if (value.isEmpty) return ['Not entered'];
+    final runes = value.runes.toList();
+    return [for (var i = 0; i < runes.length; i += 300)
+      String.fromCharCodes(runes.sublist(i, (i + 300).clamp(0, runes.length)))];
+  }
+  pw.Widget table(List<String> headers, List<List<String>> rows,
+      {Map<int, pw.TableColumnWidth>? widths, Set<int> amounts = const {}}) =>
+    pw.TableHelper.fromTextArray(headers: headers, data: rows, columnWidths: widths,
+      border: pw.TableBorder.all(color: rule, width: .5),
+      headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xfff0f3f5)),
+      headerStyle: pw.TextStyle(fontSize: 8, color: ink, fontWeight: pw.FontWeight.bold),
+      cellStyle: const pw.TextStyle(fontSize: 8, color: ink),
+      cellPadding: const pw.EdgeInsets.all(5),
+      cellAlignments: {for (final i in amounts) i: pw.Alignment.topRight});
+  pw.Widget fields(Iterable<String> keys) => table(const ['Detail', 'As entered'], [
+    for (final key in keys) if (draft.details[key]?.isNotEmpty ?? false)
+      for (final (index, part) in chunks(draft.details[key]!).indexed)
+        [index == 0 ? label(key) : '${label(key)} (continued)', moneyKeys.contains(key) ? amount(part) : part],
+  ], widths: const {0: pw.FlexColumnWidth(1), 1: pw.FlexColumnWidth(2)});
+  pw.Widget block(String heading, List<(String, String)> facts) => pw.Container(
+    padding: const pw.EdgeInsets.all(9),
+    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+      text(heading, bold: true),
+      for (final (key, value) in facts) if (value.isNotEmpty)
+        pw.Padding(padding: const pw.EdgeInsets.only(top: 3), child: text('$key: $value')),
+    ]));
+  pw.Widget pair(pw.Widget left, pw.Widget right) => pw.Table(
+    border: pw.TableBorder.all(color: rule, width: .5),
+    columnWidths: const {0: pw.FlexColumnWidth(), 1: pw.FlexColumnWidth()},
+    children: [pw.TableRow(children: [left, right])]);
+  final d = draft.details;
+  const coreItemKeys = {'printedSerial', 'name', 'pack', 'unitCode', 'hsn', 'cost', 'quantity',
+    'taxableValue', 'taxAmount', 'lineTotal'};
+  const posItemKeys = {'productId', 'receivedQuantity', 'damagedQuantity', 'shortQuantity',
+    'sellingPrice', 'mrp', 'barcode', 'alreadyInStock'};
+  const posKeys = {'receiptStatus', 'receivedDate', 'expectedDeliveryDate', 'shippingTerms',
+    'paymentStatus', 'paidAmount', 'paymentMethod', 'paymentReference', 'paymentDate', 'paymentTerms'};
+  final used = <String>{'documentTitle', 'documentCopy', 'supplierEmail', 'originalInvoiceDate',
+    'dueDate', 'poReference', 'placeOfSupply', 'placeOfSupplyCode', 'buyerName', 'buyerAddress',
+    'buyerPhone', 'buyerEmail', 'buyerGstin', 'buyerUin', 'buyerState', 'buyerStateCode',
+    'deliveryAddress', 'deliveryState', 'deliveryStateCode'};
+  final totalKeys = ['printedTotalItems', 'printedTotalQuantity', 'supplyValue', 'billDiscount',
+    'taxableValue', 'cgst', 'sgstAmount', 'sgst', 'utgst', 'igst', 'cess', 'freight',
+    'otherCharges', 'roundOff', 'totalTax', 'invoiceTotal', 'amountPayable', 'amountInWords'];
+  final bankKeys = ['bankName', 'bankAccount', 'bankIfsc', 'bankBranch', 'upiType', 'upiId', 'paymentQrStatus'];
+  final signKeys = ['printedCompanyLabel', 'signatureStatus', 'signatory', 'printedSignatoryLabel', 'printedDeclaration'];
+  used.addAll([...totalKeys, ...bankKeys, ...signKeys, 'notes', 'terms', 'printedFooter', ...posKeys]);
+  final financialKeys = totalKeys.where((key) => moneyKeys.contains(key) &&
+    (d[key]?.isNotEmpty ?? false)).toList();
+  final financialTable = pw.Table(columnWidths: const {0: pw.FlexColumnWidth(1.6),
+      1: pw.FlexColumnWidth(2), 2: pw.FlexColumnWidth(1.2)}, children: [
+    for (final key in financialKeys) pw.TableRow(children: [pw.SizedBox(),
+      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Align(alignment: pw.Alignment.topRight,
+        child: text(label(key), bold: key == 'invoiceTotal', size: key == 'invoiceTotal' ? 12 : 9))),
+      pw.Container(padding: const pw.EdgeInsets.all(4),
+        decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: rule, width: .5))),
+        alignment: pw.Alignment.topRight,
+        child: text('₹${amount(d[key]!)}', bold: key == 'invoiceTotal', size: key == 'invoiceTotal' ? 12 : 9)),
+    ]),
+  ]);
+  final widgets = <pw.Widget>[
+    text('Recorded purchase copy - Unposted draft', size: 11, bold: true),
+    pw.SizedBox(height: 5),
+    text('Saved retailer entries, not the original supplier invoice. No stock, dues or payment posting.', size: 8),
+    pw.SizedBox(height: 10),
+    pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(9),
+      decoration: pw.BoxDecoration(border: border),
+      child: pw.Text(d['documentTitle']?.isNotEmpty == true ? d['documentTitle']! : 'PURCHASE INVOICE',
+        style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: navy))),
+    pair(block('Supplier', [('Name', supplier.name), ('GSTIN', supplier.gstin),
+      ('Address', supplier.address), ('Phone', supplier.phone), ('Email', d['supplierEmail'] ?? '')]),
+      block('Invoice details', [('Invoice No.', draft.invoiceReference), ('Invoice date', draft.invoiceDate),
+        for (final key in ['originalInvoiceDate', 'dueDate', 'poReference', 'placeOfSupply', 'placeOfSupplyCode', 'documentCopy'])
+          (key == 'documentCopy' ? 'Copy marking on supplier bill' : label(key), d[key] ?? '')])),
+    pair(block('Billed to', [for (final key in ['buyerName', 'buyerAddress', 'buyerPhone', 'buyerEmail',
+      'buyerGstin', 'buyerUin', 'buyerState', 'buyerStateCode']) (label(key), d[key] ?? '')]),
+      block('Shipping address', [for (final key in ['deliveryAddress', 'deliveryState', 'deliveryStateCode'])
+        (label(key), d[key] ?? '')])),
+    table(const ['#', 'Item / description', 'HSN / SAC', 'Units', 'Rate ₹', 'Qty',
+      'Taxable ₹', 'Tax ₹', 'Amount ₹'], [
+        for (final (index, line) in draft.goods.indexed)
+          for (final (partIndex, part) in chunks([line['name'] ?? '', line['pack'] ?? ''].where((s) => s.isNotEmpty).join('\n')).indexed)
+            [partIndex == 0 ? line['printedSerial']?.isNotEmpty == true ? line['printedSerial']! : '${index + 1}' : '${index + 1} cont.',
+              part, if (partIndex == 0) ...[displayed('hsn', line['hsn']), displayed('unitCode', line['unitCode']),
+                displayed('cost', line['cost']), displayed('quantity', line['quantity']),
+                displayed('taxableValue', line['taxableValue']), displayed('taxAmount', line['taxAmount']),
+                displayed('lineTotal', line['lineTotal'])] else ...List.filled(7, '')],
+      ], widths: const {0: pw.FlexColumnWidth(.45), 1: pw.FlexColumnWidth(2.8),
+        2: pw.FlexColumnWidth(.8), 3: pw.FlexColumnWidth(.7), 4: pw.FlexColumnWidth(.9),
+        5: pw.FlexColumnWidth(.6), 6: pw.FlexColumnWidth(1), 7: pw.FlexColumnWidth(.9), 8: pw.FlexColumnWidth(1)},
+      amounts: const {4, 5, 6, 7, 8}),
+    pw.SizedBox(height: 8),
+    if (['printedTotalItems', 'printedTotalQuantity'].any((key) => d[key]?.isNotEmpty ?? false))
+      text([for (final key in ['printedTotalItems', 'printedTotalQuantity'])
+        if (d[key]?.isNotEmpty ?? false) '${label(key)}: ${d[key]}'].join(' / ')),
+    if (financialKeys.isNotEmpty)
+      if (financialKeys.every((key) => d[key]!.runes.length <= 40))
+        pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [text('Invoice totals as entered', bold: true), financialTable]))
+      else ...[pw.NewPage(freeSpace: 180), text('Invoice totals as entered', bold: true), financialTable],
+    if (d['amountInWords']?.isNotEmpty ?? false)
+      for (final part in chunks(d['amountInWords']!))
+        pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(6),
+          decoration: pw.BoxDecoration(border: border), child: text('Amount in words: $part')),
+  ];
+  if (draft.goods.any((line) => (line['lineTotal'] ?? '').isEmpty)) {
+    widgets.add(text('Item amounts not entered: compare with the original supplier invoice. Missing amounts are not zero.', size: 8));
+  }
+  if (draft.printedTaxRows.isNotEmpty) {
+    widgets.addAll([pw.SizedBox(height: 8), text('HSN / tax summary as on invoice', bold: true)]);
+    final columns = WorkspacePurchaseEntryDraft.printedTaxKeys.where((key) => key == 'label' ||
+      key == 'hsn' || draft.printedTaxRows.any((row) => row[key]?.isNotEmpty ?? false)).toList();
+    for (var offset = 2; offset < columns.length; offset += 5) {
+      final group = [...columns.take(2), ...columns.skip(offset).take(5)];
+      widgets.add(table([for (final key in group) key == 'label' ? 'Row' : key == 'hsn' ? 'HSN / SAC' : label(key)],
+        [for (final row in draft.printedTaxRows) [for (final key in group) displayed(key, row[key])]],
+        amounts: {for (var i = 2; i < group.length; i++) i}));
+    }
+    if (columns.length == 2) {
+      widgets.add(table(const ['Row', 'HSN / SAC'], [
+        for (final row in draft.printedTaxRows) [displayed('label', row['label']), displayed('hsn', row['hsn'])]]));
+    }
+  }
+  widgets.addAll([
+    if (bankKeys.any((key) => d[key]?.isNotEmpty ?? false)) ...[
+      pw.SizedBox(height: 8), text('Supplier bank / UPI instructions', bold: true), fields(bankKeys)],
+    if (signKeys.any((key) => d[key]?.isNotEmpty ?? false)) ...[
+      pw.SizedBox(height: 8), text('Signatory details as entered from bill - not verified', bold: true), fields(signKeys)],
+    if (['notes', 'terms', 'printedFooter'].any((key) => d[key]?.isNotEmpty ?? false)) ...[
+      pw.SizedBox(height: 8), text('Notes & terms', bold: true), fields(['notes', 'terms', 'printedFooter'])],
+    if (d.keys.any((k) => !used.contains(k))) fields(d.keys.where((k) => !used.contains(k))),
+  ]);
+  final itemDetails = <List<String>>[
+    for (final (index, line) in draft.goods.indexed)
+      for (final e in line.entries) if (!coreItemKeys.contains(e.key) && !posItemKeys.contains(e.key) && e.value.isNotEmpty)
+        for (final (partIndex, part) in chunks(e.value).indexed)
+          ['Item ${index + 1}', '${label(e.key)}${partIndex == 0 ? '' : ' (continued)'}',
+            moneyKeys.contains(e.key) ? amount(part) : part],
+  ];
+  if (itemDetails.isNotEmpty) {
+    widgets.addAll([text('Further item details', bold: true),
+      table(const ['Item', 'Detail', 'As entered'], itemDetails)]);
+  }
+  if (draft.additionalFields.isNotEmpty) {
+    widgets.addAll([text('Additional invoice details', bold: true),
+      table(const ['Belongs to', 'Heading on invoice', 'As entered'], [
+        for (final f in draft.additionalFields)
+          for (final (index, part) in chunks(f.value).indexed)
+            ['${f.section}${f.itemIndex == null ? '' : ' - Item ${f.itemIndex! + 1}'}'
+              '${f.summaryIndex == null ? '' : ' - Tax row ${f.summaryIndex! + 1}'}'
+              '${f.reviewed ? '' : ' - needs review'}', '${f.label}${index == 0 ? '' : ' (continued)'}', part],
+      ])]);
+  }
+  widgets.addAll([pw.SizedBox(height: 10), text('Goods & payment details - retailer draft, not posted', bold: true),
+    fields(posKeys),
+    table(const ['Item', 'Retailer detail', 'As entered'], [
+      for (final (index, line) in draft.goods.indexed)
+        for (final e in line.entries) if (posItemKeys.contains(e.key) && e.value.isNotEmpty)
+          ['Item ${index + 1}', label(e.key), displayed(e.key, e.value)],
+    ]),
+    pw.SizedBox(height: 8),
+    pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [text('Record reference', bold: true), table(const ['Detail', 'Saved value'], [
+      ['Store', storeName], ['Store ID', storeId], ['Draft ID', draft.id], ['Supplier ID', supplier.id],
+      ['Saved revision', '$revision'], ['Saved on', draft.updatedAt.toIso8601String()],
+      for (final a in draft.attachments) ['Original attachment SHA-256', a.digest],
+    ])])),
+  ]);
+  document.addPage(pw.MultiPage(pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(24), maxPages: 1000,
+    theme: pw.ThemeData.withFont(base: font, bold: font),
+    footer: (context) => pw.Padding(padding: const pw.EdgeInsets.only(top: 8), child:
+      text('Recorded purchase copy | ${draft.invoiceReference} | Unposted draft | Page ${context.pageNumber} of ${context.pagesCount}', size: 8)),
+    build: (_) => widgets));
+  return document.save();
+}
+
 /// Shared renderer only. Callers must validate account, coverage and balances
 /// before constructing a report; this does not authorize or issue a document.
 class StoreReportPdfGroup {

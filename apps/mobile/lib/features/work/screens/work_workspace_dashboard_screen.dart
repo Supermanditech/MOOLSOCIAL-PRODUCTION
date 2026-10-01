@@ -11421,6 +11421,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   late final (String, String, bool)? _scope = widget.session.workspaceSupplierScope;
   WorkspaceSupplierProfile? _supplier;
   WorkspacePurchaseEntryDraft? _original;
+  bool _recordedSaving = false;
+  String? _recordedNotice;
   int? _revision;
   String _supplierId = '', _draftId = '', _baseline = '';
   bool _loading = true, _busy = false, _leaving = false;
@@ -11941,6 +11943,54 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (mounted) setState(() => _sourceSaving = false);
     }
   }
+  bool _recordedCurrent(WorkspacePurchaseEntryDraft draft, WorkspaceSupplierProfile supplier, int revision) =>
+    mounted && _current && !_dirty && !_busy && !widget.session.workspaceSupplierSaving &&
+    widget.session.workspaceSupplierError == null && _original == draft && _supplier == supplier &&
+    widget.session.workspacePurchaseEntryDraft == draft && widget.session.workspacePurchaseEntryRevision == revision &&
+    widget.session.workspaceSuppliers.contains(supplier) && draft.supplierId == supplier.id;
+  Future<void> _downloadRecorded() async {
+    if (_recordedSaving) return;
+    final draft = _original, supplier = _supplier, revision = _revision;
+    if (draft == null || supplier == null || revision == null || !_recordedCurrent(draft, supplier, revision)) {
+      setState(() => _recordedNotice = _dirty || draft == null
+        ? 'Save draft, then reopen it to download the saved copy. Your entries are kept.'
+        : 'Saved details changed or are unavailable. Reopen this purchase draft and retry.');
+      return;
+    }
+    setState(() { _recordedSaving = true; _recordedNotice = null; });
+    try {
+      final bytes = await generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier,
+        storeName: widget.session.activeWorkspace?.name ?? 'Store', storeId: _scope!.$2,
+        revision: revision, labels: {
+          for (final e in _fieldLabels.entries)
+            if (e.key.startsWith('work-purchase-'))
+              e.key.substring('work-purchase-'.length).replaceFirst(RegExp(r'-\d+$'), ''): e.value,
+        });
+      if (!_recordedCurrent(draft, supplier, revision)) {
+        if (mounted && _current) {
+          setState(() => _recordedNotice = 'Saved details changed. Reopen this purchase draft before downloading.');
+        }
+        return;
+      }
+      // Filename binds to the saved immutable draft version, not typed bill text.
+      final stamp = draft.updatedAt.microsecondsSinceEpoch;
+      final result = await FilePicker.saveFile(dialogTitle: 'Save recorded purchase copy',
+        fileName: 'purchase-recorded-$stamp-r$revision.pdf', mimeType: 'application/pdf',
+        type: FileType.custom, allowedExtensions: ['pdf'], bytes: bytes);
+      if (_recordedCurrent(draft, supplier, revision)) {
+        setState(() => _recordedNotice = result == null
+          ? 'Download cancelled. Your saved draft is kept.' : 'Recorded copy saved. Purchase draft remains unposted.');
+      }
+    } on FormatException catch (error) {
+      if (mounted && _current) setState(() => _recordedNotice = error.message);
+    } on Object {
+      if (mounted && _current) {
+        setState(() => _recordedNotice = 'Could not download the recorded copy. Your saved draft is kept; retry.');
+      }
+    } finally {
+      if (mounted) setState(() => _recordedSaving = false);
+    }
+  }
   String _invoiceMoney(String text, {bool currency = false}) {
     final minor = WorkspacePurchaseEntryDraft.printedPaise(text);
     if (minor == null) return text;
@@ -11970,6 +12020,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         tooltip: _sourceSaving ? 'Saving original…' : 'Download original',
         onPressed: _sourceSaving ? null : _downloadSource,
         icon: const Icon(Icons.download_outlined, size: 20, color: MoolColors.navy)),
+      if (!original) Tooltip(message: 'Download recorded purchase copy', child: TextButton(
+        key: const Key('purchase-recorded-download'),
+        onPressed: _recordedSaving ? null : _downloadRecorded,
+        child: Text(_recordedSaving ? 'Preparing…' : 'Download'))),
     ]);
   }
   void _zoomInvoice() {
@@ -12325,6 +12379,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             child:IntrinsicHeight(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:paperParts)))));
         return FittedBox(fit: BoxFit.fitWidth, alignment: Alignment.topLeft, child: paper);
       }),
+      if (_recordedNotice != null) Padding(padding: const EdgeInsets.only(top: 6),
+        child: Text(_recordedNotice!, key: const Key('purchase-recorded-notice'),
+          style: const TextStyle(fontSize: 12, color: MoolColors.navy))),
       const Padding(padding:EdgeInsets.only(top:6),child:Text(
         'Entered bill details · blank amounts are not zero.',
         style:TextStyle(fontSize:11,color:_paperMuted))),

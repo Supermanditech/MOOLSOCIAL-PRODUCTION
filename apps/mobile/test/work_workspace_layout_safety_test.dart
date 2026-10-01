@@ -258,14 +258,17 @@ class _PurchaseOriginalSaveFixture extends FilePickerPlatform {
   Uint8List? bytes;
   String? name,mime;
   bool fail=false;
+  int calls=0;
+  Completer<Uri?>? holdSave;
   Uri? result;
   @override
   Future<Uri?> saveFile({required String fileName,required Uint8List bytes,required String mimeType,
     String? dialogTitle,String? initialDirectory,Function(FilePickerStatus)? onFileSaving,
     WindowsOptions windowsOptions=const WindowsOptions(),LinuxOptions linuxOptions=const LinuxOptions(),
     WebOptions webOptions=const WebOptions()}) async {
-    this.bytes=Uint8List.fromList(bytes);name=fileName;mime=mimeType;
+    calls++; this.bytes=Uint8List.fromList(bytes);name=fileName;mime=mimeType;
     if(fail) throw PlatformException(code:'host_fixture_unavailable');
+    if(holdSave!=null) { return holdSave!.future; }
     return result;
   }
 }
@@ -4804,6 +4807,121 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+  testWidgets('P05-R11-C02 download saved copy cancels retries and rejects dirty or stale records', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 9, 30);
+    final profile = WorkspaceSupplierProfile(id: 'export-supplier', name: 'Host export supplier', createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'export-draft', supplierId: profile.id,
+      invoiceReference: 'HOST-EXPORT-1', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+      goods: [{'name': 'Host-only oil', 'pack': '1 L', 'quantity': '12', 'cost': '230', 'productId': ''}],
+      details: {'invoiceTotal': '2840', 'paymentStatus': 'On credit'});
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [profile], draft: draft);
+    final picker = _PurchaseOriginalSaveFixture();
+    final previous = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-preview');
+    final saved = work.workspacePurchaseEntryDraft;
+    Future<void> download() async {
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const Key('purchase-recorded-download')));
+        for (var i = 0; i < 40 && picker.bytes == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+        }
+      });
+      await tester.pumpAndSettle();
+    }
+    await download();
+    expect(picker.name, startsWith('purchase-recorded-'));
+    expect(picker.mime, 'application/pdf');
+    expect(ascii.decode(picker.bytes!.take(4).toList()), '%PDF');
+    expect(find.text('Download cancelled. Your saved draft is kept.'), findsOneWidget);
+    expect(work.workspacePurchaseEntryDraft, same(saved));
+    expect(work.workspacePurchases, isEmpty);
+    picker.bytes = null; picker.holdSave = Completer<Uri?>();
+    final beforeDoubleTap = picker.calls;
+    await download();
+    await tester.tap(find.byKey(const Key('purchase-recorded-download')));
+    await tester.pumpAndSettle();
+    expect(picker.calls, beforeDoubleTap + 1);
+    picker.holdSave!.complete(null); picker.holdSave = null;
+    await tester.pumpAndSettle();
+    picker.bytes = null; picker.fail = true;
+    await download();
+    expect(find.text('Could not download the recorded copy. Your saved draft is kept; retry.'), findsOneWidget);
+    picker.bytes = null; picker.fail = false; picker.result = Uri.file('/host-only/export.pdf');
+    await download();
+    expect(find.text('Recorded copy saved. Purchase draft remains unposted.'), findsOneWidget);
+    await usePurchaseControl(tester, 'work-purchase-invoice-section');
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-reference')));
+    await tester.enterText(find.byKey(const Key('work-purchase-reference')), 'UNSAVED-CHANGE');
+    await usePurchaseControl(tester, 'work-purchase-preview');
+    picker.bytes = null;
+    await tester.tap(find.byKey(const Key('purchase-recorded-download')));
+    await tester.pumpAndSettle();
+    expect(picker.bytes, isNull);
+    expect(find.text('Save draft, then reopen it to download the saved copy. Your entries are kept.'), findsOneWidget);
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-reference')));
+    await tester.enterText(find.byKey(const Key('work-purchase-reference')), draft.invoiceReference);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 2, profiles: [profile], draft: draft);
+    await work.loadWorkspaceSuppliers(retry: true);
+    await revealPurchaseInput(tester, find.byKey(const Key('purchase-recorded-download')));
+    await tester.tap(find.byKey(const Key('purchase-recorded-download')));
+    await tester.pumpAndSettle();
+    expect(picker.bytes, isNull);
+    expect(find.text('Saved details changed or are unavailable. Reopen this purchase draft and retry.'), findsOneWidget);
+    final originalStore = work.activeWorkspace!;
+    work.activateWorkspace(WorkWorkspace(id: 'HOST-OTHER-STORE', name: 'Host other Store',
+      profileId: originalStore.profileId, profileLabel: originalStore.profileLabel,
+      area: originalStore.area, verified: true));
+    await tester.pumpAndSettle();
+    expect(picker.bytes, isNull);
+    expect(find.byKey(const Key('purchase-recorded-download')), findsNothing);
+    expect(work.workspacePurchases, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P05-R11-C02 PDF keeps reference-field union and paginates long extra values', (tester) async {
+    final at = DateTime.utc(2026, 9, 30);
+    final supplier = WorkspaceSupplierProfile(id: 'host-pdf-supplier', name: 'HOST ONLY invoice supplier',
+      phone: '9000012345', address: 'Host address', createdAt: at, updatedAt: at);
+    for (final long in [false, true]) {
+      // Labelled automated renderer fixtures, never device acceptance records.
+      final details = {for (final key in WorkspacePurchaseEntryDraft.detailKeys) key: 'Entered $key'};
+      details.addAll({'documentTitle': 'TAX INVOICE', 'invoiceTotal': '123456.78',
+        'taxableValue': '100000', 'roundOff': '-0.50', 'terms': long ? List.filled(200, 'Terms kept exactly. ').join() : 'Source terms'});
+      final draft = WorkspacePurchaseEntryDraft(id: 'host-pdf-draft', supplierId: supplier.id,
+        invoiceReference: 'HOST-PDF-1', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: [for (var i = 0; i < (long ? 20 : 2); i++) {
+          'name': 'Host-only item ${i + 1}', 'pack': '1 kg', 'quantity': '2', 'cost': '12.50',
+          'productId': 'host-product-$i',
+          for (final key in WorkspacePurchaseEntryDraft.goodsExtraKeys) key: 'Item $i $key',
+        }], details: details,
+        printedTaxRows: [{for (final key in WorkspacePurchaseEntryDraft.printedTaxKeys) key: 'Tax $key'}],
+        additionalFields: [WorkspacePurchaseAdditionalField(id: 'host-extra', section: 'items', itemIndex: 1,
+          label: 'Warranty on item', value: long ? List.filled(150, 'Exact supplier warranty. ').join() : 'Two years')]);
+      expect(draft.valid, isTrue);
+      final bytes = await tester.runAsync(() => generateStorePurchaseRecordedCopy(draft: draft,
+        supplier: supplier, storeName: 'HOST ONLY Store', storeId: 'host-store', revision: 1, labels: const {}));
+      expect(ascii.decode(bytes!.take(4).toList()), '%PDF');
+      final output = Platform.environment['PURCHASE_PDF_QA_OUT_DIR'];
+      if (output != null) {
+        await tester.runAsync(() async {
+          await File('$output/purchase-recorded-host-${long ? 'long' : 'full'}.pdf').writeAsBytes(bytes);
+        });
+      }
+    }
+  });
+
   testWidgets('P05-R09-C04 full invoice wording contract keeps field meanings and source values', (tester) async {
     final entry=_PurchaseEntryFixtureStore();
     final work=manualPurchaseFixture(entry);
