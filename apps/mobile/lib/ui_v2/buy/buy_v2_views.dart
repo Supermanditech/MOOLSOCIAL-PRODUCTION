@@ -9814,7 +9814,7 @@ class _GstInvoiceCard extends StatelessWidget {
                         ),
                         child: Icon(
                           Icons.receipt_long_outlined,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: BuyV2Colors.navy,
                           size: 20,
                         ),
                       ),
@@ -9842,6 +9842,15 @@ class _GstInvoiceCard extends StatelessWidget {
                         child: Switch.adaptive(
                           value: requested,
                           onChanged: (_) {},
+                          activeThumbColor: Colors.white,
+                          activeTrackColor: BuyV2Colors.navy,
+                          inactiveThumbColor: BuyV2Colors.navy,
+                          inactiveTrackColor: Colors.white,
+                          trackOutlineColor: WidgetStateProperty.resolveWith(
+                            (states) => states.contains(WidgetState.selected)
+                                ? Colors.transparent
+                                : BuyV2Colors.line,
+                          ),
                         ),
                       ),
                     ],
@@ -10299,6 +10308,17 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                                 dense: true,
                                 contentPadding: EdgeInsets.zero,
                                 value: _remember,
+                                activeThumbColor: Colors.white,
+                                activeTrackColor: BuyV2Colors.navy,
+                                inactiveThumbColor: BuyV2Colors.navy,
+                                inactiveTrackColor: Colors.white,
+                                trackOutlineColor:
+                                    WidgetStateProperty.resolveWith(
+                                      (states) =>
+                                          states.contains(WidgetState.selected)
+                                          ? Colors.transparent
+                                          : BuyV2Colors.line,
+                                    ),
                                 onChanged: widget.controller.busy
                                     ? null
                                     : (value) =>

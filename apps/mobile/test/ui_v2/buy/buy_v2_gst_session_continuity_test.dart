@@ -4,6 +4,7 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 void main() {
@@ -105,6 +106,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('buy-gst-remember')), findsOneWidget);
+      final remember = tester.widget<SwitchListTile>(
+        find.byKey(const ValueKey('buy-gst-remember')),
+      );
+      expect(remember.activeTrackColor, BuyV2Colors.navy);
+      expect(remember.activeThumbColor, Colors.white);
+      expect(remember.inactiveTrackColor, Colors.white);
+      expect(remember.inactiveThumbColor, BuyV2Colors.navy);
+      expect(remember.trackOutlineColor!.resolve({}), BuyV2Colors.line);
       expect(find.text('Use again until you close the app'), findsOneWidget);
       expect(
         find.text('These details are cleared when you close the app.'),

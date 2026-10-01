@@ -95,6 +95,31 @@ void main() {
       expect(gst, findsOne);
       final button = tester.widget<FilledButton>(gst);
       expect(button.style!.foregroundColor!.resolve({}), BuyV2Colors.navy);
+      final request = find.byKey(const ValueKey('buy-gst-request-shop'));
+      final toggle = find.descendant(of: request, matching: find.byType(Switch));
+      var control = tester.widget<Switch>(toggle);
+      expect(control.value, isTrue);
+      expect(control.activeTrackColor, BuyV2Colors.navy);
+      expect(control.activeThumbColor, Colors.white);
+      expect(control.inactiveTrackColor, Colors.white);
+      expect(control.inactiveThumbColor, BuyV2Colors.navy);
+      expect(control.trackOutlineColor!.resolve({}), BuyV2Colors.line);
+      expect(
+        control.trackOutlineColor!.resolve({WidgetState.selected}),
+        Colors.transparent,
+      );
+      await tester.ensureVisible(request);
+      await tester.pumpAndSettle();
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+      control = tester.widget<Switch>(toggle);
+      expect(control.value, isFalse);
+      expect(gstController.requestedFor(BuyV2Destination.shop), isFalse);
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+      expect(gstController.requestedFor(BuyV2Destination.shop), isTrue);
+      expect(session.cartLines, hasLength(1));
+      expect(session.checkoutAmountDueNow, 37);
       expect(find.byKey(const ValueKey('buy-upi-use-qr')), findsNothing);
       session.upiQrAvailable = true;
       session.chooseUpiQr(false);

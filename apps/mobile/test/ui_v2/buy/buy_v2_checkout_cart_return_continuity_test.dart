@@ -2207,7 +2207,7 @@ void main() {
     expect(find.text('Add GST details'), findsOneWidget);
     expect(find.textContaining('Personal'), findsNothing);
     expect(find.textContaining('Business purchase'), findsNothing);
-    expect(find.text('Place order'), findsOneWidget);
+    expect(find.text('Pay ₹37 & place order'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
     await tester.pumpAndSettle();
@@ -2235,7 +2235,7 @@ void main() {
     expect(find.text('GST details'), findsOneWidget);
     expect(find.text('Shree Balaji Retail'), findsWidgets);
     expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
-    expect(find.text('Place order'), findsOneWidget);
+    expect(find.text('Pay ₹37 & place order'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
       findsOneWidget,
@@ -3284,7 +3284,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-upi-checkout-20261001/'
+            'candidate_captures/cursor-gst-toggle-20261001/'
             'buy-v2-t02-checkout-${viewport.label}.png',
           ),
         );

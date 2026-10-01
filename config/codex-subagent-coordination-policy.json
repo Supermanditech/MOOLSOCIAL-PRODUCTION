@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "33AFD8F976C93EBA533DF8ACF998F27D0EA82DF4A55096221B6D3F05F8E85636"
+    "sha256": "04C6E608A26FF471BA115A6A0CB8B84E6E16998B34E493A45638B43359526443"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -248,7 +248,15 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart",
         "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-FOCUSED.jsonl",
         "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-1.jsonl",
-        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-2.jsonl"
+        "docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-2.jsonl",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png",
+        "docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-2.jsonl"
       ]
     },
     {
