@@ -21116,7 +21116,14 @@
           "https://www.indiacode.nic.in/bitstream/123456789/2187/2/A187209.pdf"
         ],
         "legalInterpretation": "A UX inference from pre-purchase disclosure and affirmative consent requirements; not a prescribed statutory screen layout or one universal B2B schedule. Consumer rights and commercial/resale scope must be distinguished.",
-        "executionBoundary": "Next sweep requires relevant call-path review, recorded ownership/admission and normal existing gates before runtime edits; this record does not complete that implementation or authorize APK/live payment."
+        "executionBoundary": "Next sweep requires relevant call-path review, recorded ownership/admission and normal existing gates before runtime edits; this record does not complete that implementation or authorize APK/live payment.",
+        "readinessAssessment": "Exact product/content contracts have no published supplier policy version or acceptance-required field. The payment-term adapter is order-dependent, and its only other source implementation is the explicitly TEST Store review catalogue. Store/backend owner must establish the published-policy and buyer acceptance receipt contracts before the next runtime sweep. Existing root Buy model/content ownership does not authorize modifying that producer.",
+        "minimumOwnerInputs": [
+          "Authoritative supplier/Store plus applicable listing or offer scope",
+          "Published policy ID and current revision/version",
+          "Actual policy disclosure and explicit acceptance-required decision",
+          "Buyer-scoped acceptance receipt bound to policy and intended quantity, with persistence and refresh revalidation"
+        ]
       }
     },
     {

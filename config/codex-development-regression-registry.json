@@ -105072,6 +105072,50 @@
           ],
           "productQualificationUnchanged": true,
           "sourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da"
+        },
+        "supplierNextSweepReadBoundary20261002": {
+          "incident": "A scoped rg against the append-only integration handoff emitted long historical paragraphs and exceeded the tool output budget",
+          "disposition": "Truncated output rejected as complete evidence; no runtime edit, policy invention or admission claim made",
+          "rootCause": "Match count bounded individual patterns but did not bound long paragraph bytes or cumulative historical matches",
+          "recovery": "Reuse the fully read current supplierTermsNextSweep20261002 record and current handoff subsection; inspect exact source adapter call sites using line inventories and fixed bounded ranges",
+          "architectReview": "Existing read-only architect confirmed the recovery; bound characters as well as lines and reuse previously read current sections only while their source remains unchanged",
+          "mutationBoundary": "Both clean handoff gates passed before this registry/policy update; no runtime or Store owner changed"
+        },
+        "sharedInstructionsGitPreservation20261002": {
+          "implementationCommit": "9776f44cd2cfb199b08523222ab83900c975d189",
+          "branch": "work/cursor-ui/buy-ready-20260921",
+          "normalPush": "passed",
+          "remoteHead": "9776f44cd2cfb199b08523222ab83900c975d189",
+          "rawStatusBytes": 0,
+          "rawStatusRecords": 0,
+          "rawStatusSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "rawStatusExitCode": 0,
+          "preCommitMemoryAndCoordination": "passed against registry count4618 and exact bound hash",
+          "incrementalImplementation": "passed",
+          "postCommitMemoryAndCoordinationHandoff": "passed",
+          "incrementalHandoff": "passed",
+          "sourceSha256": "ca11c250b7d2bcb4e944693a4d05a9b06e2e5a7b6f99bca5e5744934622e68da",
+          "scope": "Qualified shared-instruction implementation checkpoint; not founder visual acceptance, ticket_close, APK or integrated provider acceptance"
+        },
+        "supplierPolicySourceAssessment20261002": {
+          "state": "next_sweep_awaits_authoritative_store_published_policy_contract",
+          "actualContractsReviewed": [
+            "apps/mobile/lib/features/buy/buy_v2_models.dart:579 BuyV2Product has Store identity and returnPolicy, but no versioned published acceptance policy",
+            "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart:1197 BuyV2ProductContentSnapshot has no policy publication/version/acceptance-required fields",
+            "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart:2235 BuyV2CommercialPaymentTerm and :2292 adapter require fulfilment groups and quoted payment amounts",
+            "apps/mobile/lib/features/work/work_services.dart:303 _StoreReviewProcurementCatalogue is explicitly a TEST catalogue with orders/payments/messages unavailable; :451 loadTerms produces TEST supplier payment terms"
+          ],
+          "sourceSearch": "Narrow Dart source search found no publishedPolicy, supplierPolicy, acceptanceRequired, termsVersion, termsRevision or supplierTerms implementation",
+          "minimumOwnerInputs": [
+            "Authoritative supplier/Store and applicable listing or offer scope",
+            "Published policy identity and current revision/version",
+            "Displayable actual policy and explicit acceptance-required decision",
+            "Buyer-scoped acceptance receipt bound to exact policy and intended add quantity; persistence and revalidation contract"
+          ],
+          "architectAssessment": "Published policies must be separate from order-dependent financial terms; all increasing quantity paths share one guarded add intent. Ticking an initially unchecked acceptance adds once, cancellation adds nothing, and changed policy/offer requires revalidation",
+          "admissionAssessment": "Existing root claim includes Buy models/content/session/views and focused tests, but it does not supply authoritative Store publication data or establish permission to mutate the Store/backend producer. No successor runtime sweep or shared producer mutation started",
+          "uiDecision": "Keep supplier policy on the product sheet; show the add-time popup only when the supplier policy requires consent. No blanket Cart gate or extra completion tap. Preserve separate final financial agreement review",
+          "implementationStatus": "queued, not implemented or represented as supplier consent authority"
         }
       },
       "storeCategoryResumeQualification20260925": {
