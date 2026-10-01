@@ -1269,7 +1269,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   }
   final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-Variable.ttf'));
   final document = pw.Document(title: 'Recorded purchase copy - ${draft.invoiceReference}',
-    author: 'MoolSocial', subject: 'Saved unposted purchase draft; not the supplier original');
+    author: 'MoolSocial', subject: 'Saved unposted purchase draft; supplier copy retained separately');
   final embedded = font.getFont(pw.Context(document: document.document));
   final allText = [storeName, storeId, draft.id, supplier.id, supplier.name,
     supplier.phone, supplier.address, supplier.gstin, draft.invoiceReference, draft.invoiceDate,
@@ -1278,7 +1278,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     ...draft.additionalFields.expand((f) => [f.label, f.value]),
   ].join(' ');
   if (allText.runes.any((r) => r > 32 && !embedded.isRuneSupported(r))) {
-    throw const FormatException('Some bill characters cannot be shown in this PDF. Download the original invoice to keep them.');
+    throw const FormatException('Some bill characters cannot be shown in this PDF. Download the supplier copy to keep them.');
   }
   const ink = PdfColor.fromInt(0xff171b20);
   const navy = PdfColor.fromInt(0xff17395c);
@@ -1292,7 +1292,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     RegExp(r'[A-Z]'), (m) => ' ${m[0]}').replaceFirstMapped(RegExp(r'^.'), (m) => m[0]!.toUpperCase());
   String amount(String raw) {
     final minor = WorkspacePurchaseEntryDraft.printedPaise(raw);
-    if (minor == null) return raw.isEmpty ? 'Not entered' : raw;
+    if (minor == null) return raw.isEmpty ? '—' : raw;
     final digits = (minor.abs() ~/ 100).toString();
     final head = digits.length > 3 ? digits.substring(0, digits.length - 3) : '';
     final groups = <String>[];
@@ -1303,13 +1303,13 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
       '.${(minor.abs() % 100).toString().padLeft(2, '0')}';
   }
   String displayed(String key, String? raw) => moneyKeys.contains(key)
-    ? amount(raw ?? '') : (raw == null || raw.isEmpty ? 'Not entered' : raw);
+    ? amount(raw ?? '') : (raw == null || raw.isEmpty ? '—' : raw);
   pw.Widget text(String value, {double size = 9, bool bold = false}) => pw.Text(value,
     style: pw.TextStyle(fontSize: size, color: ink,
       fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal));
   // Split long source text into bounded rows, not ellipses or truncated values.
   List<String> chunks(String value) {
-    if (value.isEmpty) return ['Not entered'];
+    if (value.isEmpty) return ['—'];
     final runes = value.runes.toList();
     return [for (var i = 0; i < runes.length; i += 300)
       String.fromCharCodes(runes.sublist(i, (i + 300).clamp(0, runes.length)))];
@@ -1362,17 +1362,18 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
       1: pw.FlexColumnWidth(2), 2: pw.FlexColumnWidth(1.2)}, children: [
     for (final key in financialKeys) pw.TableRow(children: [pw.SizedBox(),
       pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Align(alignment: pw.Alignment.topRight,
-        child: text(label(key), bold: key == 'invoiceTotal', size: key == 'invoiceTotal' ? 12 : 9))),
+        child: text(label(key).replaceAll('₹', '').trim(), bold: key == 'invoiceTotal', size: key == 'invoiceTotal' ? 12 : 9))),
       pw.Container(padding: const pw.EdgeInsets.all(4),
         decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: rule, width: .5))),
         alignment: pw.Alignment.topRight,
-        child: text('₹${amount(d[key]!)}', bold: key == 'invoiceTotal', size: key == 'invoiceTotal' ? 12 : 9)),
+        child: text('${WorkspacePurchaseEntryDraft.printedPaise(d[key]!) == null ? '' : '₹'}${amount(d[key]!)}',
+          bold: key == 'invoiceTotal', size: key == 'invoiceTotal' ? 12 : 9)),
     ]),
   ]);
   final widgets = <pw.Widget>[
     text('Purchase entry - Recorded copy (Draft)', size: 11, bold: true),
     pw.SizedBox(height: 5),
-    text('Saved retailer entries, not the original supplier invoice. No stock, dues or payment posting.', size: 8),
+    text('Saved bill details for review. Supplier copy kept separately. No stock, dues or payment posting.', size: 8),
     pw.SizedBox(height: 10),
     pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(9),
       decoration: pw.BoxDecoration(border: border),
@@ -1385,10 +1386,17 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
         ('Supplier document type', storePurchaseDocumentTypeLabel(d['documentType'] ?? '')),
         for (final key in ['originalInvoiceDate', 'dueDate', 'poReference', 'placeOfSupply', 'placeOfSupplyCode', 'documentCopy'])
           (key == 'documentCopy' ? 'Copy marking on supplier bill' : label(key), d[key] ?? '')])),
-    pair(block('Billed to', [for (final key in ['buyerName', 'buyerAddress', 'buyerPhone', 'buyerEmail',
-      'buyerGstin', 'buyerUin', 'buyerState', 'buyerStateCode']) (label(key), d[key] ?? '')]),
-      block('Shipping address', [for (final key in ['deliveryAddress', 'deliveryState', 'deliveryStateCode'])
-        (label(key), d[key] ?? '')])),
+    if (d.entries.any((e) => e.key.startsWith('buyer') && e.value.isNotEmpty) ||
+        d.entries.any((e) => e.key.startsWith('delivery') && e.value.isNotEmpty))
+      if (d.entries.any((e) => e.key.startsWith('buyer') && e.value.isNotEmpty) &&
+          d.entries.any((e) => e.key.startsWith('delivery') && e.value.isNotEmpty))
+        pair(block('Billed to', [for (final key in ['buyerName', 'buyerAddress', 'buyerPhone', 'buyerEmail',
+          'buyerGstin', 'buyerUin', 'buyerState', 'buyerStateCode']) (label(key), d[key] ?? '')]),
+          block('Shipping address', [for (final key in ['deliveryAddress', 'deliveryState', 'deliveryStateCode'])
+            (label(key), d[key] ?? '')]))
+      else block(d.entries.any((e) => e.key.startsWith('buyer') && e.value.isNotEmpty) ? 'Billed to' : 'Shipping address',
+        [for (final key in ['buyerName', 'buyerAddress', 'buyerPhone', 'buyerEmail', 'buyerGstin', 'buyerUin',
+          'buyerState', 'buyerStateCode', 'deliveryAddress', 'deliveryState', 'deliveryStateCode']) (label(key), d[key] ?? '')]),
     table(const ['#', 'Item / description', 'HSN / SAC', 'Units', 'Rate ₹', 'Qty',
       'Taxable ₹', 'Tax ₹', 'Amount ₹'], [
         for (final (index, line) in draft.goods.indexed)
@@ -1416,8 +1424,12 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
         pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(6),
           decoration: pw.BoxDecoration(border: border), child: text('Amount in words: $part')),
   ];
-  if (draft.goods.any((line) => (line['lineTotal'] ?? '').isEmpty)) {
-    widgets.add(text('Item amounts not entered: compare with the original supplier invoice. Missing amounts are not zero.', size: 8));
+  widgets.add(text('— = not entered, not zero. Compare missing details with the supplier copy.', size: 8));
+  if (!d.entries.any((e) => e.key.startsWith('buyer') && e.value.isNotEmpty)) {
+    widgets.add(text('Billed-to details not entered.', size: 8));
+  }
+  if (financialKeys.any((key) => WorkspacePurchaseEntryDraft.printedPaise(d[key]!) == null)) {
+    widgets.add(text('Some amount fields contain text. Review them against the supplier bill; they are not calculated totals.', size: 8));
   }
   if (draft.printedTaxRows.isNotEmpty) {
     widgets.addAll([pw.SizedBox(height: 8), text('HSN / tax summary as on invoice', bold: true)]);
@@ -1464,20 +1476,27 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
               '${f.reviewed ? '' : ' - needs review'}', '${f.label}${index == 0 ? '' : ' (continued)'}', part],
       ])]);
   }
-  widgets.addAll([pw.SizedBox(height: 10), text('Goods & payment details - retailer draft, not posted', bold: true),
-    fields(posKeys),
-    table(const ['Item', 'Retailer detail', 'As entered'], [
+  final retailerItemRows = <List<String>>[
       for (final (index, line) in draft.goods.indexed)
-        for (final e in line.entries) if (posItemKeys.contains(e.key) && e.value.isNotEmpty)
+        for (final e in line.entries) if (posItemKeys.contains(e.key) && e.key != 'productId' && e.value.isNotEmpty)
           ['Item ${index + 1}', label(e.key), displayed(e.key, e.value)],
-    ]),
-    pw.SizedBox(height: 8),
+  ];
+  widgets.addAll([
+    if (posKeys.any((key) => d[key]?.isNotEmpty ?? false) || retailerItemRows.isNotEmpty)
+      ...[pw.SizedBox(height: 10), text('Goods & payment details - retailer draft, not posted', bold: true),
+        if (posKeys.any((key) => d[key]?.isNotEmpty ?? false)) fields(posKeys),
+        if (retailerItemRows.isNotEmpty) table(const ['Item', 'Retailer detail', 'As entered'], retailerItemRows)],
+    pw.NewPage(),
     pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: [text('Record reference', bold: true), table(const ['Detail', 'Saved value'], [
+      children: [text('Record details - saved references', size: 13, bold: true),
+      text('For tracing this saved draft. These references are not supplier-invoice fields.', size: 8),
+      pw.SizedBox(height: 8), table(const ['Detail', 'Saved value'], [
       ['Purchase voucher No.', storePurchaseUnpostedVoucherNumber],
       ['Store', storeName], ['Store ID', storeId], ['Draft ID', draft.id], ['Supplier ID', supplier.id],
       ['Saved revision', '$revision'], ['Saved on', draft.updatedAt.toIso8601String()],
-      for (final a in draft.attachments) ['Original attachment SHA-256', a.digest],
+      for (final (index, line) in draft.goods.indexed)
+        if (line['productId']?.isNotEmpty ?? false) ['Item ${index + 1} product ID', line['productId']!],
+      for (final a in draft.attachments) ['Supplier copy SHA-256', a.digest],
     ])])),
   ]);
   document.addPage(pw.MultiPage(pageFormat: PdfPageFormat.a4,
