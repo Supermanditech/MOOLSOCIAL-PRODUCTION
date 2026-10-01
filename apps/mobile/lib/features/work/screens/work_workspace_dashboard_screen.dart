@@ -11370,7 +11370,8 @@ class _PurchaseAdditionalInput {
   WorkspacePurchaseAdditionalField get field => WorkspacePurchaseAdditionalField(
     id: record.id, label: label.text, value: value.text, section: record.section,
     itemIndex: record.itemIndex, summaryIndex: record.summaryIndex,
-    sourceDigest: record.sourceDigest, sourcePage: record.sourcePage, reviewed: reviewed);
+    sourceDigest: record.sourceDigest, sourcePage: record.sourcePage,
+    sourceItemIndex: record.sourceItemIndex, reviewed: reviewed);
   void dispose() { label.dispose(); value.dispose(); }
 }
 
@@ -11585,12 +11586,38 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final selected = _additional.where((f) => f.record.section == section &&
       f.record.itemIndex == itemIndex && f.record.summaryIndex == summaryIndex);
     final owner = '$section-${itemIndex ?? 'all'}-${summaryIndex ?? 'all'}';
-    return _section('Additional invoice fields${selected.isEmpty ? '' : ' · ${selected.length}'}',
+    return _section(selected.isEmpty ? 'Missing a field?' : 'Other invoice details · ${selected.length}',
       'work-purchase-extra-$owner', [
+        if (selected.isEmpty) const Text('Add any heading and its details that appear on your invoice.',
+          style: TextStyle(fontSize: 11, color: MoolColors.muted)),
         for (final input in selected) ...[
-          _field('Field name as printed', input.label, 'purchase-extra-label-${input.record.id}',
+          if (input.record.sourceItemIndex != null && input.record.itemIndex == null) ...[
+            Text('From scanned item ${input.record.sourceItemIndex! + 1}. Choose the entered item it belongs to.',
+              style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+            DropdownButtonFormField<int>(key: Key('purchase-extra-match-${input.record.id}'),
+              isExpanded: true, decoration: const InputDecoration(labelText: 'Match to entered item',
+                filled: false, isDense: true),
+              items: [for (final (index, line) in _goods.indexed)
+                DropdownMenuItem(value: index, child: Text('Item ${index + 1} · ${line.name.text}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: MoolColors.ink)))],
+              onChanged: (index) {
+                if (index == null) return;
+                final field = input.field;
+                setState(() {
+                  input.reviewed = false;
+                  input.record = WorkspacePurchaseAdditionalField(id: field.id,
+                    label: field.label, value: field.value, section: field.section, itemIndex: index,
+                    sourceDigest: field.sourceDigest, sourcePage: field.sourcePage,
+                    sourceItemIndex: field.sourceItemIndex, reviewed: false);
+                });
+                _sectionControllers.putIfAbsent('work-purchase-item-details-$index', ExpansibleController.new).expand();
+                _sectionControllers.putIfAbsent('work-purchase-extra-items-$index-all', ExpansibleController.new).expand();
+              }),
+          ],
+          _field('Heading on invoice', input.label, 'purchase-extra-label-${input.record.id}',
             limit: 120, changed: (_) => setState(() => input.reviewed = false)),
-          _field('Details as printed', input.value, 'purchase-extra-value-${input.record.id}',
+          _field('Value / details', input.value, 'purchase-extra-value-${input.record.id}',
             limit: 4000, multiline: true, changed: (_) => setState(() => input.reviewed = false)),
           Row(children: [Expanded(child: Text(input.reviewed ? 'Checked against invoice' : 'Check against invoice',
             style: const TextStyle(fontSize: 11, color: MoolColors.ink))),
@@ -11610,7 +11637,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               id: 'manual-${DateTime.now().microsecondsSinceEpoch}', label: '', value: '',
               section: section, itemIndex: itemIndex, summaryIndex: summaryIndex)))),
           icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Add invoice field', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
+          label: const Text('Add missing field', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
       ]);
   }
   Future<void> _removeInvoiceRow(int index, {bool tax = false}) async {
@@ -11631,15 +11658,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           input.record = WorkspacePurchaseAdditionalField(id: f.id, label: f.label, value: f.value,
             section: f.section, itemIndex: tax ? f.itemIndex : linked - 1,
             summaryIndex: tax ? linked - 1 : f.summaryIndex, sourceDigest: f.sourceDigest,
-            sourcePage: f.sourcePage, reviewed: f.reviewed);
+            sourcePage: f.sourcePage, sourceItemIndex: f.sourceItemIndex, reviewed: f.reviewed);
         }
       }
       if (tax) { for (final c in _taxRows.removeAt(index).values) { c.dispose(); } }
       else { _goods.removeAt(index).dispose(); }
     });
   }
-  Widget _printedTaxTable() => _section('Tax table printed on invoice', 'work-purchase-printed-tax-table', [
-    const Text('Copy the original rows, including TOTAL. These do not recalculate your bill.',
+  Widget _printedTaxTable() => _section('HSN / tax table on bill', 'work-purchase-printed-tax-table', [
+    const Text('Copy the rows and TOTAL from your bill. These are kept as shown, not recalculated.',
       style: TextStyle(fontSize: 11, color: MoolColors.ink)),
     for (final (index, row) in _taxRows.indexed) ...[
       Row(children: [Expanded(child: Text('Tax row ${index + 1}',
@@ -11662,7 +11689,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       key: const Key('work-purchase-add-tax-row'), onPressed: _taxRows.length >= 100 ? null :
         () => setState(() => _taxRows.add({for (final key in WorkspacePurchaseEntryDraft.printedTaxKeys)
           key: TextEditingController()})), icon: const Icon(Icons.add_rounded, size: 16),
-      label: const Text('Add printed tax row', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
+      label: const Text('Add tax-table row', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
   ]);
   Widget _field(String label, TextEditingController controller, String key, {
       int limit = 200, TextInputType? keyboard, FocusNode? focus,
@@ -11671,13 +11698,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     minLines: 1, maxLines: multiline ? null : 1,
     textAlign: keyboard?.index == TextInputType.number.index ? TextAlign.right : TextAlign.left,
     textInputAction: TextInputAction.next, onChanged: changed ?? (_) => setState(() {}),
-    style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+    style: const TextStyle(fontSize: 13, color: MoolColors.ink, letterSpacing: 0),
     decoration: InputDecoration(labelText: label, hintText: hint, counterText: '', filled: false,
       labelStyle: const TextStyle(fontSize: 12, color: MoolColors.muted),
       hintStyle: const TextStyle(fontSize: 13, color: MoolColors.muted),
       isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 8),
-      border: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
-      enabledBorder: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
+      border: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffd9d5cb))),
+      enabledBorder: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffd9d5cb))),
       focusedBorder: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
       disabledBorder: InputBorder.none, errorBorder: InputBorder.none,
       focusedErrorBorder: InputBorder.none));
@@ -11690,10 +11717,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         setState(() { if (expanded) { _expandedSections.remove(key); } else { _expandedSections.add(key); } });
       }, child: Container(constraints: const BoxConstraints(minHeight: 52),
         padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xffdce1eb), width: .5))),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xffd9d5cb), width: .5))),
         child: Row(children: [
           Container(width: 24, height: 24, alignment: Alignment.center,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xfff0f1f8)),
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xffeeece5)),
             child: Text(number.toString().padLeft(2, '0'),
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MoolColors.navy))),
           const SizedBox(width: 10),
@@ -11714,9 +11741,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     key: Key(key), tilePadding: EdgeInsets.zero, childrenPadding: EdgeInsets.zero,
     controller: _sectionControllers.putIfAbsent(key, ExpansibleController.new),
     dense: true, minTileHeight: 48, iconColor: MoolColors.navy, collapsedIconColor: MoolColors.navy,
-    shape: const Border(bottom: BorderSide(color: Color(0xffdce1eb), width: .5)),
-    collapsedShape: const Border(bottom: BorderSide(color: Color(0xffdce1eb), width: .5)),
-    title: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: MoolColors.navy)),
+    backgroundColor: Colors.transparent, collapsedBackgroundColor: Colors.transparent,
+    shape: const Border(bottom: BorderSide(color: Color(0xffd9d5cb), width: .5)),
+    collapsedShape: const Border(bottom: BorderSide(color: Color(0xffd9d5cb), width: .5)),
+    title: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0, color: MoolColors.navy)),
     children: [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children)]);
   Widget _optionalDetails(List<({String title, String key, List<Widget> fields})> sections) {
     return Column(key: const Key('work-purchase-optional-controls'),
@@ -11727,11 +11755,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             'work-purchase-tax-details' => _details['documentType']!.text.isEmpty
               ? 'Bill type, totals and tax' : _details['documentType']!.text,
             'work-purchase-buyer-details' => _details['buyerName']!.text.isEmpty
-              ? 'Business and billing address' : _details['buyerName']!.text,
+              ? 'Your business and billing address' : _details['buyerName']!.text,
             'work-purchase-receipt-details' => _details['receiptStatus']!.text.isEmpty
-              ? 'Receipt and delivery details' : _details['receiptStatus']!.text,
+              ? 'Check received, short or damaged goods' : _details['receiptStatus']!.text,
             'work-purchase-payment-details' => _details['paymentStatus']!.text.isEmpty
-              ? 'Paid amount and due date' : [ _details['paymentStatus']!.text,
+              ? 'Amount paid, credit and due date' : [ _details['paymentStatus']!.text,
                   if (_details['dueDate']!.text.isNotEmpty) 'Due ${_details['dueDate']!.text}'].join(' · '),
             _ => '',
           }),
@@ -11749,11 +11777,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
     decoration: InputDecoration(labelText: label, filled: false, isDense: true,
       labelStyle: const TextStyle(fontSize: 12, color: MoolColors.muted),
-      border: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
-      enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffdce1eb))),
+      border: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffd9d5cb))),
+      enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffd9d5cb))),
       focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
       contentPadding: const EdgeInsets.symmetric(vertical: 10)),
-    items: [const DropdownMenuItem(value: '', child: Text('Not recorded')),
+    items: [const DropdownMenuItem(value: '', child: Text('Select, if applicable')),
       for (final value in choices) DropdownMenuItem(value: value, child: Text(value))],
     onChanged: (value) => setState(() => _details[key]!.text = value ?? ''));
   Widget _compactFields(List<Widget> fields, {double width = 138}) => LayoutBuilder(
@@ -11796,9 +11824,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (index >= 0) { setState(() {
         _attachments[index] = read;
         final suggestions = WorkPurchaseInvoiceSuggestions.parse(read.detectedText);
+        final retained = _retainDetectedExtras(read, suggestions, useGoods: false);
         _openSuggestedSections(suggestions);
         if (suggestions.fields.isEmpty && suggestions.goods.isEmpty && suggestions.additionalFields.isEmpty) {
           _notice = 'No clear bill details found. Your entries are kept; enter details manually.';
+        } else {
+          _notice = retained
+            ? 'Details read. Any extra headings are added for checking. Use detected details to fill blank fields; your entries stay unchanged.'
+            : 'Check the detected text. Some details need manual entry or item matching; the original is kept.';
         }
       }); }
     } on Object catch (e) {
@@ -11807,6 +11840,35 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           'Text could not be read. Your invoice is kept; retry or enter its details manually.');
       }
     } finally { if (mounted) setState(() => _busy = false); }
+  }
+  bool _retainDetectedExtras(WorkspacePurchaseInvoiceAttachment a,
+      WorkPurchaseInvoiceSuggestions suggestions, {required bool useGoods}) {
+    var keptAll = !suggestions.additionalOverflow;
+    for (final field in suggestions.additionalFields) {
+      // An extracted row index does not identify an existing manually entered item.
+      if (field.itemIndex != null && !useGoods) { keptAll = false; }
+      final id = '${a.digest.substring(0, 16)}-${field.id}';
+      final existing = _additional.where((f) => f.record.id == id).firstOrNull;
+      if (existing != null) {
+        if (useGoods && field.itemIndex != null && existing.record.itemIndex == null) {
+          final kept = existing.field;
+          existing.record = WorkspacePurchaseAdditionalField(id: kept.id, label: kept.label,
+            value: kept.value, section: kept.section, itemIndex: field.itemIndex,
+            sourceDigest: kept.sourceDigest, sourcePage: kept.sourcePage,
+            sourceItemIndex: kept.sourceItemIndex, reviewed: kept.reviewed);
+        }
+        continue;
+      }
+      final size = _additional.fold<int>(0, (sum, f) => sum + f.label.text.length + f.value.text.length);
+      if (_additional.length >= 200 || size + field.label.length + field.value.length > 48000) {
+        keptAll = false; continue;
+      }
+      _additional.add(_PurchaseAdditionalInput(WorkspacePurchaseAdditionalField(
+        id: id, label: field.label, value: field.value, section: field.section,
+        itemIndex: useGoods ? field.itemIndex : null,
+        sourceItemIndex: field.itemIndex, sourceDigest: a.digest)));
+    }
+    return keptAll;
   }
   void _applySuggestions(WorkspacePurchaseInvoiceAttachment a) {
     final suggestions = WorkPurchaseInvoiceSuggestions.parse(a.detectedText);
@@ -11829,24 +11891,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         _goods.single.dispose();
         _goods..clear()..addAll(suggestions.goods.map(_PurchaseGoodsInput.new));
       }
-      var keptAll = !suggestions.additionalOverflow;
-      for (final field in suggestions.additionalFields) {
-        // A detected item number is not a match to a manually entered invoice row.
-        if (field.itemIndex != null && !useGoods) { keptAll = false; continue; }
-        final id = '${a.digest.substring(0, 16)}-${field.id}';
-        if (_additional.any((f) => f.record.id == id)) continue;
-        final size = _additional.fold<int>(0, (sum, f) => sum + f.label.text.length + f.value.text.length);
-        if (_additional.length >= 200 || size + field.label.length + field.value.length > 48000) {
-          keptAll = false; continue;
-        }
-        _additional.add(_PurchaseAdditionalInput(WorkspacePurchaseAdditionalField(
-          id: id, label: field.label, value: field.value, section: field.section,
-          itemIndex: field.itemIndex, sourceDigest: a.digest)));
-      }
+      final keptAll = _retainDetectedExtras(a, suggestions, useGoods: useGoods);
       _error = null;
       _openSuggestedSections(suggestions);
       _notice = keptAll
-        ? 'Check detected details and additional fields against your bill. Existing entries were kept.'
+        ? 'Check the filled details against your bill, correct anything needed, then save. Your earlier entries were kept.'
         : 'Some details need manual entry or item matching. The full detected text and original are kept; check them before saving.';
     });
   }
@@ -11870,6 +11919,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         _sectionControllers.putIfAbsent('work-purchase-extra-$owner', ExpansibleController.new).expand();
         if (field.itemIndex != null) {
           _expandedSections.add('work-purchase-items-section');
+          _sectionControllers.putIfAbsent('work-purchase-extra-items-all-all', ExpansibleController.new).expand();
           _sectionControllers.putIfAbsent('work-purchase-item-details-${field.itemIndex}',
             ExpansibleController.new).expand();
         }
@@ -11884,16 +11934,17 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           snapshot.hasData ? Image.memory(snapshot.data!, height: 220, fit: BoxFit.contain)
             : Text(snapshot.hasError ? 'Original invoice unavailable. Attach it again.' : 'Opening invoice…')),
       Wrap(spacing: 8, children: [TextButton.icon(onPressed: () => _scan(a), icon: const Icon(Icons.document_scanner_outlined, size: 18),
-        label: const Text('Read invoice details')), TextButton(onPressed: () {
+        key: Key('work-purchase-read-${a.digest}'), label: const Text('Read photo details')), TextButton(onPressed: () {
           if (_additional.any((f) => f.record.sourceDigest == a.digest)) {
             setState(() => _error = 'This original supports additional fields. Keep it, or remove those fields before detaching it.');
           } else { setState(() => _attachments.remove(a)); }
         },
         child: const Text('Remove attachment'))]),
       if (a.detectedText.isNotEmpty) ...[
-        const Text('Check the details read from your invoice before using them.', style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+        const Text('Compare with the original. Use detected details, then check and correct the form.', style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         SelectableText(a.detectedText, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-        TextButton(onPressed: () => _applySuggestions(a), child: const Text('Fill empty fields'))],
+        TextButton(key: Key('work-purchase-use-${a.digest}'),
+          onPressed: () => _applySuggestions(a), child: const Text('Use detected details'))],
     ]);
   @override
   Widget build(BuildContext context) {
@@ -11904,8 +11955,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (_details['invoiceTotal']!.text.isNotEmpty) '₹${_details['invoiceTotal']!.text}'].join(' · ');
     final itemCount = _goods.where((line) => line.name.text.trim().isNotEmpty).length;
     final linkedCount = _goods.where((line) => line.productId.isNotEmpty).length;
+    final unmatchedExtras = _additional.where((f) => f.record.section == 'items' && f.record.itemIndex == null).length;
     final hsnSummary = WorkspacePurchaseEntryDraft.printedHsnSummary(_goods.map((line) => line.fields).toList());
-    return ListView(key: const Key('work-record-purchase'), primary: false,
+    return DecoratedBox(key: const Key('work-purchase-paper'),
+      decoration: const BoxDecoration(gradient: LinearGradient(
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [Color(0xfffffefb), Color(0xfffbf8f0)])),
+      child: ListView(key: const Key('work-record-purchase'), primary: false,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(12, 0, 12, 24 + MediaQuery.viewInsetsOf(context).bottom),
         children: [
@@ -11933,9 +11989,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                   icon: const Icon(Icons.attach_file_rounded, size: 16), label: const Text('Choose photo / PDF')))]),
-              const Text('Attach a copy for your records. Details won’t fill automatically.',
-                key: Key('work-purchase-attachment-purpose'),
-                style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+              Text(_attachments.any((a) => a.detectedText.isNotEmpty)
+                ? 'Check the original → correct the details → save draft.'
+                : _attachments.isNotEmpty
+                  ? 'Copy from the attached bill, or use Read photo details. Leave details not shown blank.'
+                  : 'Enter details as shown on your supplier bill. You can keep a photo / PDF with it.',
+                key: const Key('work-purchase-attachment-purpose'),
+                style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
               for (final a in _attachments) _attachment(a),
               _purchaseSection('Supplier', 'work-purchase-supplier-section', [
                 LayoutBuilder(builder: (context, constraints) {
@@ -11966,18 +12026,18 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   child: Text(p.phone.isEmpty ? p.name : '${p.name} · ${p.phone}',
                     style: const TextStyle(fontSize: 13, color: MoolColors.navy))),
               if (_moreSupplier) ...[
-                _field('Phone (optional)', _phone, 'work-purchase-supplier-phone',
+                _field('Mobile / phone', _phone, 'work-purchase-supplier-phone',
                   limit: 20, keyboard: TextInputType.phone),
-                _detail('Email (optional)', 'supplierEmail'),
-                _field('Address (optional)', _address, 'work-purchase-supplier-address', limit: 500, multiline: true),
-                _field('GSTIN from invoice (optional)', _gstin, 'work-purchase-supplier-gstin', limit: 15)],
+                _detail('Email', 'supplierEmail'),
+                _field('Supplier address', _address, 'work-purchase-supplier-address', limit: 500, multiline: true),
+                _field('Supplier GSTIN', _gstin, 'work-purchase-supplier-gstin', limit: 15)],
               _extraFields('supplier'),
               ], number: 1, summary: _name.text.isEmpty ? 'Name, contact and GSTIN' : _name.text),
               _purchaseSection('Invoice details', 'work-purchase-invoice-section', [
                 LayoutBuilder(builder: (context, constraints) {
-                final fields = [_field('Invoice number', _reference, 'work-purchase-reference', limit: 120),
+                final fields = [_field('Invoice No.', _reference, 'work-purchase-reference', limit: 120),
                   _field('Invoice date', _date, 'work-purchase-date', limit: 10, hint: 'DD/MM/YYYY',
-                    keyboard: TextInputType.datetime), _detail('Total ₹', 'invoiceTotal', number: true)];
+                    keyboard: TextInputType.datetime), _detail('Bill total ₹', 'invoiceTotal', number: true)];
                 if (constraints.maxWidth < 300 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
                   return _compactFields(fields, width: 150);
                 }
@@ -11985,20 +12045,23 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   SizedBox(width: 88, child: fields[1]), const SizedBox(width: 12),
                   SizedBox(width: 100, child: fields[2])]);
               }),
-              _section('Other invoice references', 'work-purchase-document-references', [
-                _detail('Invoice title as printed', 'documentTitle'),
-                _detail('Date exactly as printed', 'originalInvoiceDate'),
-                _detail('Purchase order no., if printed', 'poReference'),
-                _detail('Copy label on bill (optional)', 'documentCopy'),
-                _compactFields([_detail('Printed total items', 'printedTotalItems'),
-                  _detail('Printed total quantity', 'printedTotalQuantity')]),
-                _detail('Closing text on invoice', 'printedFooter'),
+              _section('More bill details', 'work-purchase-document-references', [
+                const Text('Copy these only if shown on the bill. Keep its original wording.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                _detail('Invoice heading', 'documentTitle'),
+                _detail('Original date wording', 'originalInvoiceDate'),
+                _detail('Purchase order No.', 'poReference'),
+                _detail('Copy type / label', 'documentCopy'),
+                _compactFields([_detail('Total items', 'printedTotalItems'),
+                  _detail('Total quantity', 'printedTotalQuantity')]),
+                _detail('Footer / closing text', 'printedFooter'),
               ]),
-              _detail('Notes (optional)', 'notes'),
+              _detail('Notes', 'notes'),
               _extraFields('invoice'),
               ], number: 2, summary: invoiceSummary.isEmpty ? 'Bill number, date and total' : invoiceSummary),
               _purchaseSection('Items on invoice', 'work-purchase-items-section', [
               for (var i = 0; i < _goods.length; i++) _goodsRow(i),
+              if (unmatchedExtras > 0) _extraFields('items'),
               Align(alignment: Alignment.centerLeft, child: TextButton.icon(
                 key: const Key('work-purchase-add-line'), onPressed: _goods.length >= 200 ? null
                   : () => setState(() => _goods.add(_PurchaseGoodsInput())),
@@ -12006,9 +12069,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 label: const Text('Add item', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
               ], number: 3, summary: itemCount == 0
                 ? 'Add items or match saved products'
-                : '$itemCount ${itemCount == 1 ? 'item' : 'items'} · $linkedCount linked to Stock'),
+                : '$itemCount ${itemCount == 1 ? 'item' : 'items'} · $linkedCount linked to Stock'
+                  '${unmatchedExtras == 0 ? '' : ' · $unmatchedExtras details to match'}'),
               _optionalDetails([
                 (title: 'Bill & tax', key: 'work-purchase-tax-details', fields: [
+                const Text('Use the totals and tax shown on your bill. Leave missing amounts blank.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 _choice('Bill type', 'documentType', ['GST invoice', 'Bill of supply', 'Other bill']),
                 for (final warning in WorkspacePurchaseEntryDraft.reviewInvoiceFormat(
                     _reference.text, _date.text, _details['documentType']!.text))
@@ -12016,22 +12082,22 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                     style: const TextStyle(fontSize: 11, color: Color(0xff8b3b13))),
                 _compactFields([_detail('Place of supply', 'placeOfSupply'),
                   _detail('State code', 'placeOfSupplyCode')]),
-                _choice('Item prices', 'priceBasis', ['Before tax', 'Including tax']),
-                _choice('Tax shown on bill', 'taxTreatment', ['CGST + SGST', 'CGST + UTGST', 'IGST', 'No tax',
+                _choice('Rates include GST?', 'priceBasis', ['Before tax', 'Including tax']),
+                _choice('GST type', 'taxTreatment', ['CGST + SGST', 'CGST + UTGST', 'IGST', 'No tax',
                   if (_details['taxTreatment']!.text == 'CGST + SGST / UTGST') 'CGST + SGST / UTGST']),
                 _choice('Reverse charge shown?', 'reverseCharge', ['Yes', 'No']),
                 _compactFields([_detail('Taxable value ₹', 'taxableValue', number: true),
-                  _detail('Goods value ₹', 'supplyValue', number: true),
+                  _detail('Subtotal ₹', 'supplyValue', number: true),
                   _detail('CGST ₹', 'cgst', number: true), _detail('SGST ₹', 'sgstAmount', number: true),
                   _detail('UTGST ₹', 'utgst', number: true),
                   _detail('IGST ₹', 'igst', number: true), _detail('Cess ₹', 'cess', number: true),
-                  _detail('Bill discount ₹', 'billDiscount', number: true), _detail('Freight ₹', 'freight', number: true),
+                  _detail('Bill discount ₹', 'billDiscount', number: true), _detail('Transport charges ₹', 'freight', number: true),
                   _detail('Other charges ₹', 'otherCharges', number: true), _detail('Round off ₹', 'roundOff', number: true)]),
                 const SizedBox(height: 8),
-                _compactFields([_detail('Printed total tax ₹', 'totalTax', number: true),
-                  _detail('Printed payable ₹', 'amountPayable', number: true)]),
-                _detail('Amount in words on bill', 'amountInWords'),
-                _section('Tax rates printed in totals', 'work-purchase-printed-rates', [
+                _compactFields([_detail('Total GST / tax ₹', 'totalTax', number: true),
+                  _detail('Payable on bill ₹', 'amountPayable', number: true)]),
+                _detail('Amount in words', 'amountInWords'),
+                _section('GST rates in bill totals', 'work-purchase-printed-rates', [
                   _compactFields([_detail('CGST %', 'printedCgstRate'),
                     _detail('SGST %', 'printedSgstRate'), _detail('UTGST %', 'printedUtgstRate'),
                     _detail('IGST %', 'printedIgstRate'), _detail('Total GST %', 'printedTaxRate')]),
@@ -12040,9 +12106,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 for (final warning in WorkspacePurchaseEntryDraft.reviewAmounts(
                     {for (final e in _details.entries) e.key: e.value.text}))
                   Text(warning, style: const TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-                _section('HSN summary from entered items', 'work-purchase-hsn-summary', [
+                _section('Calculated HSN summary', 'work-purchase-hsn-summary', [
                   if (hsnSummary.isEmpty)
-                    const Text('Enter each item’s HSN, taxable value and printed tax to see a complete summary.',
+                    const Text('Enter item HSN, taxable value and tax to see a summary. The original tax table is kept separately above.',
                       style: TextStyle(fontSize: 12, color: MoolColors.ink)),
                   for (final row in hsnSummary)
                     Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
@@ -12056,73 +12122,78 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   _compactFields([_detail('Earlier SGST / UTGST ₹', 'sgst', number: true)]),
                   const Text('Earlier combined tax entry kept. Check the original before separating it.',
                     style: TextStyle(fontSize: 11, color: MoolColors.muted))],
-                const Text('Copy printed amounts. Taxable value is the taxed amount after discount, before GST.',
+                const Text('Taxable value means the amount after discount, before GST.',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted)),
-                _section('Original invoice evidence', 'work-purchase-original-evidence', [
-                  _choice('E-invoice details on bill', 'eInvoiceStatus',
+                _section('E-invoice & signature details', 'work-purchase-original-evidence', [
+                  _choice('E-invoice details', 'eInvoiceStatus',
                     ['IRN / QR shown', 'Supplier declaration shown', 'Not shown']),
                   if (_details['eInvoiceStatus']!.text == 'IRN / QR shown' || _details['irn']!.text.isNotEmpty) ...[
-                    _field('IRN on invoice', _details['irn']!, 'work-purchase-irn', limit: 64),
-                    _compactFields([_detail('Acknowledgement', 'ackNumber'),
-                      _detail('Acknowledged on', 'ackDate', date: true)]),
-                    _choice('QR code on invoice', 'qrStatus', ['Shown on invoice', 'Not shown'])],
+                    _field('IRN', _details['irn']!, 'work-purchase-irn', limit: 64),
+                    _compactFields([_detail('Acknowledgement No.', 'ackNumber'),
+                      _detail('Acknowledgement date', 'ackDate', date: true)]),
+                    _choice('E-invoice QR', 'qrStatus', ['Shown on invoice', 'Not shown'])],
                   if (_details['eInvoiceStatus']!.text == 'Supplier declaration shown' ||
                       _details['eInvoiceDeclaration']!.text.isNotEmpty)
-                    _detail('Supplier declaration on bill', 'eInvoiceDeclaration'),
-                  _choice('Supplier signature on bill', 'signatureStatus',
+                    _detail('Supplier declaration', 'eInvoiceDeclaration'),
+                  _choice('Signature on invoice', 'signatureStatus',
                     ['Signed on invoice', 'Electronic document', 'Not shown']),
-                  _detail('Signatory name on bill', 'signatory'),
-                  _detail('Company wording near signature', 'printedCompanyLabel'),
-                  _detail('Signatory label as printed', 'printedSignatoryLabel'),
-                  _detail('Printed signing declaration', 'printedDeclaration'),
+                  _detail('Name below signature', 'signatory'),
+                  _detail('Company name near signature', 'printedCompanyLabel'),
+                  _detail('Signature label', 'printedSignatoryLabel'),
+                  _detail('Signing declaration', 'printedDeclaration'),
                   const Text('Keep the original copy. Entering these details does not verify the invoice or claim tax credit.',
                     style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 ]), _extraFields('tax')]),
                 (title: 'Buyer details', key: 'work-purchase-buyer-details', fields: [
-                _detail('Business name on bill', 'buyerName'), _detail('Business address on bill', 'buyerAddress'),
-                _compactFields([_detail('Buyer phone', 'buyerPhone'), _detail('Buyer email', 'buyerEmail')]),
-                _field('Your GSTIN on bill (optional)', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15),
+                const Text('Billed to means your business. Copy its details from the invoice.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
+                _detail('Billed to / business name', 'buyerName'), _detail('Billing address', 'buyerAddress'),
+                _compactFields([_detail('Mobile / phone', 'buyerPhone'), _detail('Email', 'buyerEmail')]),
+                _field('Your GSTIN', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15),
                 _field('UIN, only if printed', _details['buyerUin']!, 'work-purchase-buyerUin', limit: 15),
                 _compactFields([_detail('Buyer State', 'buyerState'), _detail('State code', 'buyerStateCode')]),
-                _section('Delivery address on invoice', 'work-purchase-delivery-details', [
-                  _detail('Delivery address, if different', 'deliveryAddress'),
+                _section('Shipping address', 'work-purchase-delivery-details', [
+                  _detail('Address, if different from billing', 'deliveryAddress'),
                   _compactFields([_detail('Delivery State', 'deliveryState'), _detail('State code', 'deliveryStateCode')]),
                 ]), _extraFields('buyer')]),
                 (title: 'Goods received', key: 'work-purchase-receipt-details', fields: [
+                const Text('Check the goods in hand. Enter received, damaged or short quantities under each item.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 _choice('Goods status', 'receiptStatus', ['Received at Store', 'Awaiting delivery', 'Already added to Stock']),
-                _compactFields([_detail('Received on', 'receivedDate', date: true)]),
-                _section('Delivery plan & terms', 'work-purchase-delivery-plan', [
-                  _compactFields([_detail('Expected on', 'expectedDeliveryDate', date: true)]),
-                  _detail('Shipping terms on bill', 'shippingTerms'),
+                _compactFields([_detail('Received date', 'receivedDate', date: true)]),
+                _section('Delivery date & terms', 'work-purchase-delivery-plan', [
+                  _compactFields([_detail('Expected delivery date', 'expectedDeliveryDate', date: true)]),
+                  _detail('Delivery / shipping terms', 'shippingTerms'),
                 ]),
                 const Text('Already in Stock? Keep that status to prevent adding the same goods twice when receipt is confirmed.',
                   style: TextStyle(fontSize: 11, color: MoolColors.ink)), _extraFields('receipt')]),
                 (title: 'Payment', key: 'work-purchase-payment-details', fields: [
+                const Text('Record what you have actually paid. A Paid stamp on the bill is kept separately below.',
+                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 _choice('Payment status', 'paymentStatus', ['Paid', 'Part paid', 'On credit']),
                 _compactFields([_detail('Amount paid ₹', 'paidAmount', number: true), _detail('Pay by date', 'dueDate', date: true)]),
-                _choice('Paid by', 'paymentMethod', ['Cash', 'UPI', 'Bank transfer', 'Card', 'Other']),
+                _choice('Payment mode', 'paymentMethod', ['Cash', 'UPI', 'Bank transfer', 'Card', 'Other']),
                 _compactFields([_detail('Payment reference', 'paymentReference'),
-                  _detail('Paid on', 'paymentDate', date: true)]),
-                _detail('Agreed payment terms', 'paymentTerms'),
-                _detail('Payment wording printed on bill', 'printedPaymentMark'),
-                _section('Supplier payment instructions', 'work-purchase-supplier-instructions', [
-                  const Text('Printed instructions only—not verified bank details or a payment receipt.',
+                  _detail('Payment date', 'paymentDate', date: true)]),
+                _detail('Payment / credit terms', 'paymentTerms'),
+                _detail('Paid / payable wording on bill', 'printedPaymentMark'),
+                _section('Supplier bank, UPI & terms', 'work-purchase-supplier-instructions', [
+                  const Text('Copy supplier payment details from the invoice. This does not make or confirm a payment.',
                     style: TextStyle(fontSize: 12, color: MoolColors.ink)),
                   _detail('Bank name', 'bankName'), _detail('Account number', 'bankAccount'),
                   _compactFields([_detail('IFSC', 'bankIfsc'), _detail('Branch', 'bankBranch')]),
                   _compactFields([_detail('UPI app / type', 'upiType'), _detail('UPI ID', 'upiId')]),
-                  _choice('Payment QR on bill', 'paymentQrStatus', ['Shown on invoice', 'Not shown']),
-                  _detail('Supplier terms on bill', 'terms'),
+                  _choice('Payment QR', 'paymentQrStatus', ['Shown on invoice', 'Not shown']),
+                  _detail('Terms & conditions', 'terms'),
                 ]),
-                const Text('This records your bill details. It does not send money or update supplier balances yet.',
-                  style: TextStyle(fontSize: 11, color: MoolColors.ink)), _extraFields('payment')]),
+                _extraFields('payment')]),
               ]),
               if (_notice != null) Text(_notice!, key: const Key('work-purchase-entry-notice'),
                 style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
               if (_error != null) Text(_error!, key: const Key('work-purchase-entry-error'),
                 style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
               const Padding(padding: EdgeInsets.only(top: 8, bottom: 4),
-                child: Text('Save to continue later. Stock and supplier balances stay unchanged.',
+                child: Text('Check your entries, then save this draft. No stock, supplier dues or payment is updated.',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted))),
               Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4,
                 children: [TextButton(onPressed: _back, child: const Text('Cancel')),
@@ -12132,7 +12203,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                     textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   onPressed: _save, child: Text(_busy ? 'Saving…' : 'Save draft'))]),
             ])),
-        ]);
+        ]));
   }
   Widget _goodsRow(int index) {
     final line = _goods[index];
@@ -12143,21 +12214,21 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(padding: const EdgeInsets.only(top: 8), child: Text('Item ${index + 1}',
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy))),
-      Row(children: [Expanded(child: _field('Item description on invoice', line.name, 'work-purchase-item-$index',
+      Row(children: [Expanded(child: _field('Item / description', line.name, 'work-purchase-item-$index',
         lookup: true)),
         if (_goods.length > 1) IconButton(tooltip: 'Remove item ${index + 1}',
           onPressed: () => _removeInvoiceRow(index),
           icon: const Icon(Icons.close_rounded, size: 18, color: MoolColors.navy))]),
       if (line.productId.isNotEmpty) Row(children: [Expanded(child: Text(linkedProduct == null
         ? 'Linked Stock product unavailable. Match this item again.'
-        : 'Stock product: ${linkedProduct.title} · ${linkedProduct.pack}',
+        : 'Matched in Stock: ${linkedProduct.title} · ${linkedProduct.pack}',
         key: Key('work-purchase-stock-link-$index'),
         style: const TextStyle(fontSize: 11, color: MoolColors.ink))),
         TextButton(key: Key('work-purchase-change-stock-$index'),
           onPressed: () => setState(() => line.productId = ''), child: const Text('Change'))]),
       if (line.name.text.trim().isNotEmpty && line.productId.isEmpty)
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Row(children: [
-          const Expanded(child: Text('Not matched to Stock · complete product details before receipt',
+          const Expanded(child: Text('Choose a saved product below, or Add product if it is new.',
             key: Key('work-purchase-unmatched-item'),
             style: TextStyle(fontSize: 11, color: MoolColors.ink))),
           TextButton(key: Key('work-purchase-add-product-$index'),
@@ -12183,19 +12254,19 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           child: _field('Pack / unit', line.pack, 'work-purchase-pack-$index')),
         SizedBox(width: quantityWidth, child: _field('Qty', line.quantity, 'work-purchase-quantity-$index',
           limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
-        SizedBox(width: priceWidth, child: _field('Unit price ₹', line.cost, 'work-purchase-cost-$index',
+        SizedBox(width: priceWidth, child: _field('Rate ₹', line.cost, 'work-purchase-cost-$index',
           limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
       ]); }),
       _compactFields([_field('HSN / SAC', line.extra['hsn']!, 'work-purchase-hsn-$index'),
         _field('Taxable value ₹', line.extra['taxableValue']!, 'work-purchase-taxableValue-$index',
           keyboard: const TextInputType.numberWithOptions(decimal: true)),
-        _field('Printed tax ₹', line.extra['taxAmount']!, 'work-purchase-taxAmount-$index',
+        _field('Tax amount ₹', line.extra['taxAmount']!, 'work-purchase-taxAmount-$index',
           keyboard: const TextInputType.numberWithOptions(decimal: true)),
         _field('Item amount ₹', line.extra['lineTotal']!, 'work-purchase-lineTotal-$index',
           keyboard: const TextInputType.numberWithOptions(decimal: true))]),
       _section('More item details', 'work-purchase-item-details-$index', [
-        _field('Item number as printed', line.extra['printedSerial']!, 'work-purchase-printedSerial-$index'),
-        _field('Model / specifications on bill', line.extra['specifications']!,
+        _field('S No. / item No.', line.extra['printedSerial']!, 'work-purchase-printedSerial-$index'),
+        _field('Model / specifications', line.extra['specifications']!,
           'work-purchase-specifications-$index', limit: 1000, multiline: true),
         const Text('HSN is the item code printed on the bill. Leave unavailable details blank.',
           style: TextStyle(fontSize: 11, color: MoolColors.ink)),
@@ -12209,7 +12280,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             hint: e.key == 'expiry' ? 'DD/MM/YYYY' : e.key == 'barcode' ? 'Barcode / supplier code' : null,
             keyboard: const ['hsn','barcode','batch','expiry','unitCode'].contains(e.key) ? null :
               const TextInputType.numberWithOptions(decimal: true))]),
-        _section('GST split on invoice', 'work-purchase-gst-split-$index', [
+        _section('Item GST breakup', 'work-purchase-gst-split-$index', [
           const Text('Copy each tax rate and amount shown. Leave components not shown blank.',
             style: TextStyle(fontSize: 11, color: MoolColors.muted)),
           _compactFields([for (final e in const {'cgstRate':'CGST %', 'cgst':'CGST ₹',

@@ -237,6 +237,23 @@ class _EntryFilePicker extends FilePickerPlatform {
   }
 }
 
+// Labelled widget fixture: callback/review behaviour only, not physical OCR.
+class _PurchaseScanReviewFixture extends WorkPurchaseInvoiceCapture {
+  _PurchaseScanReviewFixture(this.bytes) : super(currentScope: () => null);
+  final Uint8List bytes;
+  bool fail = false;
+  @override
+  Future<Uint8List> read((String, String, bool) scope, String draftId,
+      WorkspacePurchaseInvoiceAttachment attachment) async => bytes;
+  @override
+  Future<WorkspacePurchaseInvoiceAttachment> scan((String, String, bool) scope,
+      String draftId, WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (fail) throw const WorkGatewayException('Could not read this photo. Your entries are kept.');
+    return attachment.withText('Invoice no: OCR-123\nWarranty: Two years\n'
+      'Item | Qty | Rate | Supplier code\nDetected item | 1 | 40 | SUP-01');
+  }
+}
+
 class _InvoiceDeliveryFixtureStore
     implements WorkInvoiceDeliveryPreferenceStore {
   final values = <String, WorkspaceInvoiceDeliveryPreference>{};
@@ -1982,12 +1999,14 @@ void main() {
     WorkPendingProofStore? pendingProofStore,
     WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryStore,
     WorkPurchaseEntryStore? purchaseEntryStore,
+    WorkPurchaseInvoiceCapture? purchaseInvoiceCapture,
   ]) {
     final work =
         WorkSession(
             gateway: gateway,
             contactDraftStore: contactStore,
             purchaseEntryStore: purchaseEntryStore,
+            purchaseInvoiceCapture: purchaseInvoiceCapture,
             pendingProofStore: pendingProofStore,
             counterDraftStore: _CounterDraftFixtureStore(),
             ledgerFormDraftStore: _LedgerFormFixtureStore(),
@@ -3517,14 +3536,19 @@ void main() {
     expect(find.byKey(const Key('work-record-purchase-back')), findsNothing);
     expect(find.text('Photograph invoice'), findsOneWidget);
     expect(find.text('Choose photo / PDF'), findsOneWidget);
-    expect(find.text('Attach a copy for your records. Details won’t fill automatically.'), findsOneWidget);
+    expect(find.text('Enter details as shown on your supplier bill. You can keep a photo / PDF with it.'), findsOneWidget);
+    final paper = tester.widget<DecoratedBox>(find.byKey(const Key('work-purchase-paper'))).decoration as BoxDecoration;
+    final backgrounds = (paper.gradient! as LinearGradient).colors;
     expect(find.text('Supplier'), findsOneWidget, reason: 'The new section header groups the persistent supplier field.');
     for (final key in ['work-purchase-camera', 'work-purchase-attach']) {
       expect(tester.getSize(find.byKey(Key(key))).height, greaterThanOrEqualTo(48));
     }
     final supplier = tester.widget<TextField>(find.byKey(const Key('work-purchase-supplier-name')));
     final label = supplier.decoration!.labelStyle!.color!;
-    expect((Colors.white.computeLuminance() + .05) / (label.computeLuminance() + .05), greaterThanOrEqualTo(4.5));
+    for (final background in backgrounds) {
+      expect((background.computeLuminance() + .05) / (label.computeLuminance() + .05), greaterThanOrEqualTo(4.5));
+      expect((background.computeLuminance() + .05) / (supplier.style!.color!.computeLuminance() + .05), greaterThanOrEqualTo(7));
+    }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -3980,9 +4004,9 @@ void main() {
       await open('work-purchase-extra-$owner');
       await open('work-purchase-add-extra-$owner');
       final name = find.byWidgetPredicate((w) => w is TextField &&
-        w.decoration?.labelText == 'Field name as printed').last;
+        w.decoration?.labelText == 'Heading on invoice').last;
       final content = find.byWidgetPredicate((w) => w is TextField &&
-        w.decoration?.labelText == 'Details as printed').last;
+        w.decoration?.labelText == 'Value / details').last;
       await revealPurchaseInput(tester, name); await tester.enterText(name, label);
       await revealPurchaseInput(tester, content); await tester.enterText(content, value);
     }
@@ -4074,7 +4098,7 @@ void main() {
       await open('work-purchase-invoice-section');
       await open('work-purchase-extra-invoice-all-all');
       await open('work-purchase-add-extra-invoice-all-all');
-      final value = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText=='Details as printed');
+      final value = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText=='Value / details');
       await revealPurchaseInput(tester,value); await tester.enterText(value,'Long printed detail '*15);
       await open('work-purchase-tax-details'); await open('work-purchase-printed-tax-table');
       await open('work-purchase-add-tax-row'); await open('purchase-tax-components-0');
@@ -4096,8 +4120,8 @@ void main() {
       final control=find.byKey(Key(key)); await revealPurchaseInput(tester,control);
       await tester.tap(control); await tester.pumpAndSettle();
     }
-    final name=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Field name as printed');
-    final value=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Details as printed');
+    final name=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Heading on invoice');
+    final value=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Value / details');
     await revealPurchaseInput(tester,name); await tester.enterText(name,'Long field');
     await revealPurchaseInput(tester,value); await tester.enterText(value,'a'*4001);
     expect(tester.widget<TextField>(value).controller!.text.length,4001);
@@ -4207,6 +4231,95 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+  testWidgets('P05-R09-C02 familiar invoice labels and one save explanation across seven sections', (tester) async {
+    await mount(tester, route:'/app/work/workspace/dashboard',
+      work:manualPurchaseFixture(_PurchaseEntryFixtureStore()));
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
+    await expandPurchasePrimarySections(tester);
+    for (final suffix in ['tax-details', 'buyer-details', 'receipt-details', 'payment-details',
+        'document-references', 'supplier-instructions']) {
+      final target=find.byKey(Key('work-purchase-$suffix'));
+      await revealPurchaseInput(tester,target); await tester.tap(target); await tester.pumpAndSettle();
+    }
+    for (final expected in {'reference':'Invoice No.', 'invoiceTotal':'Bill total ₹',
+        'documentTitle':'Invoice heading', 'item-0':'Item / description', 'cost-0':'Rate ₹',
+        'amountPayable':'Payable on bill ₹', 'buyerName':'Billed to / business name',
+        'buyerAddress':'Billing address', 'receivedDate':'Received date',
+        'paymentDate':'Payment date', 'terms':'Terms & conditions'}.entries) {
+      expect(tester.widget<TextField>(find.byKey(Key('work-purchase-${expected.key}')))
+        .decoration!.labelText, expected.value);
+    }
+    expect(find.text('Check your entries, then save this draft. No stock, supplier dues or payment is updated.'), findsOneWidget);
+    expect(find.text('This records your bill details. It does not send money or update supplier balances yet.'), findsNothing);
+    expect(find.text('Preview invoice'), findsNothing, reason:'No pretend original-format preview destination.');
+    expect(find.text('Submit purchase'), findsNothing, reason:'Saving a draft is not receipt or ledger posting.');
+    await revealPurchaseInput(tester,find.byKey(const Key('work-purchase-draft-save')));
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final enteredItems in [false, true]) {
+    testWidgets('P05-R15-C01 automated scan retains extras before acceptance and protects edits $enteredItems', (tester) async {
+      final bytes=(await tester.runAsync(_catalogueTestPhoto))!;
+      final capture=_PurchaseScanReviewFixture(bytes);
+      final entry=_PurchaseEntryFixtureStore();
+      final work=storeViewFixture(null,_ContactDraftFixtureStore(),null,null,null,null,null,null,null,entry,capture);
+      final scope=work.workspaceSupplierScope!;
+      final at=DateTime.utc(2026,9,30);
+      final digest='c'*64;
+      entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,
+        profiles:[WorkspaceSupplierProfile(id:'supplier-fixture',name:'Entered supplier',createdAt:at,updatedAt:at)],
+        draft:WorkspacePurchaseEntryDraft(id:'draft-fixture',supplierId:'supplier-fixture',
+          invoiceReference:'MANUAL-KEPT',invoiceDate:'',createdAt:at,updatedAt:at,
+          goods:[enteredItems ? {'productId':'','name':'Entered item','pack':'1 kg','quantity':'2','cost':'50'}
+            : {'productId':'','name':'','pack':'','quantity':'','cost':''}],
+          attachments:[WorkspacePurchaseInvoiceAttachment(owner:jsonEncode([scope.$1,scope.$2,scope.$3,'draft-fixture']),
+            digest:digest,fileName:'Automated scan-review fixture.png',contentType:'image/png',
+            byteLength:bytes.length,source:'upload')]));
+      await mount(tester,route:'/app/work/workspace/dashboard',work:work);
+      await openPurchaseList(tester); await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.pumpAndSettle();
+      Future<void> tap(String key) async {
+        final target=find.byKey(Key(key)); await revealPurchaseInput(tester,target);
+        await tester.tap(target); await tester.pumpAndSettle();
+      }
+      await tap('work-purchase-document-$digest');
+      await tap('work-purchase-read-$digest');
+      final extra=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Value / details');
+      expect(extra,findsNWidgets(2),reason:'Invoice and unassigned item extras appear immediately, before acceptance.');
+      expect(find.text('Check the detected text. Some details need manual entry or item matching; the original is kept.'), findsOneWidget);
+      expect(tester.widget<TextField>(extra.first).controller!.text,'Two years');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text,'MANUAL-KEPT');
+      await revealPurchaseInput(tester,extra.first); await tester.enterText(extra.first,'Retailer correction');
+      await tap('work-purchase-read-$digest');
+      expect(extra,findsNWidgets(2),reason:'Repeated reading must not create duplicate extras.');
+      expect(tester.widget<TextField>(extra.first).controller!.text,'Retailer correction');
+      await tap('work-purchase-use-$digest');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-item-0'))).controller!.text,
+        enteredItems ? 'Entered item' : 'Detected item');
+      expect(extra,findsNWidgets(2),reason:'All captured extras stay editable regardless of matching.');
+      final match=find.byWidgetPredicate((w)=>w is DropdownButtonFormField<int>);
+      expect(match,enteredItems ? findsOneWidget : findsNothing,
+        reason:'Only accepting new candidate rows proves a detected item-index match.');
+      if (enteredItems) {
+        await revealPurchaseInput(tester,match); await tester.tap(match); await tester.pumpAndSettle();
+        await tester.tap(find.text('Item 1 · Entered item').last); await tester.pumpAndSettle();
+        expect(match,findsNothing,reason:'Explicit retailer choice moves the extra into the correct item.');
+      }
+      capture.fail=true;
+      await tap('work-purchase-read-$digest');
+      expect(find.byKey(const Key('work-purchase-entry-error')),findsOneWidget);
+      expect(tester.widget<TextField>(extra.first).controller!.text,'Retailer correction');
+      expect(entry.value!.draft!.additionalFields,isEmpty,reason:'Reading/review alone does not save or post.');
+      await tap('work-purchase-draft-save');
+      expect(entry.value!.draft!.additionalFields.map((f)=>(f.value,f.itemIndex,f.sourceItemIndex)),containsAll([
+        ('Retailer correction',null,null), ('SUP-01',0,0)]));
+      expect(tester.takeException(),isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P05 OCR fixture fills empty fields only and preserves entered product identity', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -4231,8 +4344,8 @@ void main() {
     await revealPurchaseInput(tester, attachment);
     await tester.tap(attachment);
     await tester.pumpAndSettle();
-    await revealPurchaseInput(tester, find.text('Fill empty fields'));
-    await tester.tap(find.text('Fill empty fields'));
+    await revealPurchaseInput(tester, find.text('Use detected details'));
+    await tester.tap(find.text('Use detected details'));
     await tester.pumpAndSettle();
     for (final expected in {'work-purchase-supplier-name': 'Entered supplier',
       'work-purchase-reference': 'MANUAL-KEPT', 'work-purchase-date': '30/09/2026',
@@ -4241,7 +4354,7 @@ void main() {
     }
     expect(find.byKey(const Key('work-purchase-entry-error')), findsNothing);
     expect(find.byKey(const Key('work-purchase-entry-notice')), findsOneWidget);
-    final unknown = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText == 'Details as printed');
+    final unknown = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText == 'Value / details');
     expect(unknown, findsOneWidget, reason:'Detected unfamiliar labels open for review without replacing entered items.');
     expect(tester.widget<TextField>(unknown).controller!.text, 'Two years');
     expect(find.byKey(const Key('work-purchase-paidAmount')), findsNothing,

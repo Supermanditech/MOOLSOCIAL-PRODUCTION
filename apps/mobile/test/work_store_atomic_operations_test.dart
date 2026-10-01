@@ -783,6 +783,23 @@ void main() {
         entryFixture().draft!.toJson());
     });
   }
+  test('P05-R15-C01 scanned row identity is distinct from matched item identity', () {
+    final field=WorkspacePurchaseAdditionalField(id:'scanned-extra',label:'Supplier code',
+      value:'00123',section:'items',sourceDigest:'a'*64,sourceItemIndex:2);
+    final restored=WorkspacePurchaseAdditionalField.fromJson(field.toJson());
+    expect(restored.sourceItemIndex,2);
+    expect(restored.itemIndex,isNull,reason:'Detected item position does not identify an entered item.');
+    for (final invalid in ['noSource','negative','large','wrongSection']) {
+      final raw=field.toJson();
+      switch(invalid) {
+        case 'noSource': raw.remove('sourceDigest');
+        case 'negative': raw['sourceItemIndex']=-1;
+        case 'large': raw['sourceItemIndex']=200;
+        case 'wrongSection': raw['section']='invoice';
+      }
+      expect(()=>WorkspacePurchaseAdditionalField.fromJson(raw),throwsFormatException);
+    }
+  });
   test('P05-R15 candidate extras preserve unknown item columns and invalid known values', () {
     final parsed = WorkPurchaseInvoiceSuggestions.parse('Warranty: Two years\n'
       'Invoice date: 17 Jun 2023\nInvoice total: ₹ 9,52,399.00\n'

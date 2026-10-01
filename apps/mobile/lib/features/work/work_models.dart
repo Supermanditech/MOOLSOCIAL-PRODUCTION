@@ -5959,9 +5959,9 @@ class WorkspacePurchaseInvoiceAttachment {
 class WorkspacePurchaseAdditionalField {
   const WorkspacePurchaseAdditionalField({required this.id, required this.label,
     required this.value, required this.section, this.itemIndex, this.summaryIndex,
-    this.sourceDigest, this.sourcePage, this.reviewed = false});
+    this.sourceDigest, this.sourcePage, this.sourceItemIndex, this.reviewed = false});
   final String id, label, value, section;
-  final int? itemIndex, summaryIndex, sourcePage;
+  final int? itemIndex, summaryIndex, sourcePage, sourceItemIndex;
   final String? sourceDigest;
   final bool reviewed;
   static const sections = {'supplier', 'invoice', 'items', 'tax', 'buyer', 'receipt', 'payment'};
@@ -5970,16 +5970,19 @@ class WorkspacePurchaseAdditionalField {
     (itemIndex == null || section == 'items' && itemIndex! >= 0) &&
     (summaryIndex == null || section == 'tax' && summaryIndex! >= 0) &&
     (sourceDigest == null || RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceDigest!)) &&
+    (sourceItemIndex == null || section == 'items' && sourceDigest != null &&
+      sourceItemIndex! >= 0 && sourceItemIndex! < 200) &&
     (sourcePage == null || sourceDigest != null && sourcePage! > 0 && sourcePage! <= 10000);
   Map<String, Object?> toJson() => {'version': 1, 'id': id, 'label': label,
     'value': value, 'section': section, 'reviewed': reviewed,
     if (itemIndex != null) 'itemIndex': itemIndex,
     if (summaryIndex != null) 'summaryIndex': summaryIndex,
     if (sourceDigest != null) 'sourceDigest': sourceDigest,
+    if (sourceItemIndex != null) 'sourceItemIndex': sourceItemIndex,
     if (sourcePage != null) 'sourcePage': sourcePage};
   static WorkspacePurchaseAdditionalField fromJson(Object? raw) {
     const required = {'version', 'id', 'label', 'value', 'section', 'reviewed'};
-    const optional = {'itemIndex', 'summaryIndex', 'sourceDigest', 'sourcePage'};
+    const optional = {'itemIndex', 'summaryIndex', 'sourceDigest', 'sourcePage', 'sourceItemIndex'};
     if (raw is! Map || !required.every(raw.containsKey) || raw['version'] != 1 ||
         !raw.keys.every((key) => required.contains(key) || optional.contains(key))) {
       throw const FormatException('Additional invoice field needs recovery');
@@ -5988,7 +5991,8 @@ class WorkspacePurchaseAdditionalField {
       label: raw['label'] as String, value: raw['value'] as String,
       section: raw['section'] as String, reviewed: raw['reviewed'] as bool,
       itemIndex: raw['itemIndex'] as int?, summaryIndex: raw['summaryIndex'] as int?,
-      sourceDigest: raw['sourceDigest'] as String?, sourcePage: raw['sourcePage'] as int?);
+      sourceDigest: raw['sourceDigest'] as String?, sourcePage: raw['sourcePage'] as int?,
+      sourceItemIndex: raw['sourceItemIndex'] as int?);
     if (!field.valid) throw const FormatException('Invalid additional invoice field');
     return field;
   }
