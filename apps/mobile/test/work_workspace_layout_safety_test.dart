@@ -3534,8 +3534,8 @@ void main() {
     await expandPurchasePrimarySections(tester);
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     expect(find.byKey(const Key('work-record-purchase-back')), findsNothing);
-    expect(find.text('Photograph invoice'), findsOneWidget);
-    expect(find.text('Choose photo / PDF'), findsOneWidget);
+    expect(find.text('Take invoice photo'), findsOneWidget);
+    expect(find.text('Attach photo / PDF'), findsOneWidget);
     expect(find.text('Enter details as shown on your supplier bill. You can keep a photo / PDF with it.'), findsOneWidget);
     final paper = tester.widget<DecoratedBox>(find.byKey(const Key('work-purchase-paper'))).decoration as BoxDecoration;
     final backgrounds = (paper.gradient! as LinearGradient).colors;
@@ -4004,9 +4004,9 @@ void main() {
       await open('work-purchase-extra-$owner');
       await open('work-purchase-add-extra-$owner');
       final name = find.byWidgetPredicate((w) => w is TextField &&
-        w.decoration?.labelText == 'Heading on invoice').last;
+        w.decoration?.labelText == 'Heading on bill').last;
       final content = find.byWidgetPredicate((w) => w is TextField &&
-        w.decoration?.labelText == 'Value / details').last;
+        w.decoration?.labelText == 'Details on bill').last;
       await revealPurchaseInput(tester, name); await tester.enterText(name, label);
       await revealPurchaseInput(tester, content); await tester.enterText(content, value);
     }
@@ -4098,7 +4098,7 @@ void main() {
       await open('work-purchase-invoice-section');
       await open('work-purchase-extra-invoice-all-all');
       await open('work-purchase-add-extra-invoice-all-all');
-      final value = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText=='Value / details');
+      final value = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText=='Details on bill');
       await revealPurchaseInput(tester,value); await tester.enterText(value,'Long printed detail '*15);
       await open('work-purchase-tax-details'); await open('work-purchase-printed-tax-table');
       await open('work-purchase-add-tax-row'); await open('purchase-tax-components-0');
@@ -4120,8 +4120,8 @@ void main() {
       final control=find.byKey(Key(key)); await revealPurchaseInput(tester,control);
       await tester.tap(control); await tester.pumpAndSettle();
     }
-    final name=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Heading on invoice');
-    final value=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Value / details');
+    final name=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Heading on bill');
+    final value=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Details on bill');
     await revealPurchaseInput(tester,name); await tester.enterText(name,'Long field');
     await revealPurchaseInput(tester,value); await tester.enterText(value,'a'*4001);
     expect(tester.widget<TextField>(value).controller!.text.length,4001);
@@ -4231,29 +4231,104 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
-  testWidgets('P05-R09-C02 familiar invoice labels and one save explanation across seven sections', (tester) async {
-    await mount(tester, route:'/app/work/workspace/dashboard',
-      work:manualPurchaseFixture(_PurchaseEntryFixtureStore()));
+  testWidgets('P05-R09-C04 full invoice wording contract keeps field meanings and source values', (tester) async {
+    final entry=_PurchaseEntryFixtureStore();
+    final work=manualPurchaseFixture(entry);
+    final scope=work.workspaceSupplierScope!;
+    final at=DateTime.utc(2026,9,30);
+    // Host-only copy fixture, not a runtime purchase or physical OCR result.
+    entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,
+      profiles:[WorkspaceSupplierProfile(id:'copy-supplier',name:'Copy fixture supplier',createdAt:at,updatedAt:at)],
+      draft:WorkspacePurchaseEntryDraft(id:'copy-draft',supplierId:'copy-supplier',invoiceReference:'COPY-KEPT',
+        invoiceDate:'30/09/2026',createdAt:at,updatedAt:at,
+        goods:[{'productId':'','name':'Copy fixture item','pack':'1 kg','quantity':'1','cost':'40'}],
+        details:{'sgst':'1','eInvoiceStatus':'IRN / QR shown','eInvoiceDeclaration':'Source declaration kept'}));
+    await mount(tester, route:'/app/work/workspace/dashboard',work:work);
     await openPurchaseList(tester);
     await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
-    for (final suffix in ['tax-details', 'buyer-details', 'receipt-details', 'payment-details',
-        'document-references', 'supplier-instructions']) {
+    for (final suffix in ['supplier-more','document-references','tax-details','buyer-details',
+        'receipt-details','payment-details','item-details-0','gst-split-0','printed-rates',
+        'printed-tax-table','add-tax-row','original-evidence','delivery-details',
+        'delivery-plan','supplier-instructions','extra-invoice-all-all','add-extra-invoice-all-all']) {
       final target=find.byKey(Key('work-purchase-$suffix'));
       await revealPurchaseInput(tester,target); await tester.tap(target); await tester.pumpAndSettle();
     }
-    for (final expected in {'reference':'Invoice No.', 'invoiceTotal':'Bill total ₹',
-        'documentTitle':'Invoice heading', 'item-0':'Item / description', 'cost-0':'Rate ₹',
-        'amountPayable':'Payable on bill ₹', 'buyerName':'Billed to / business name',
-        'buyerAddress':'Billing address', 'receivedDate':'Received date',
-        'paymentDate':'Payment date', 'terms':'Terms & conditions'}.entries) {
-      expect(tester.widget<TextField>(find.byKey(Key('work-purchase-${expected.key}')))
-        .decoration!.labelText, expected.value);
+    final components=find.byKey(const Key('purchase-tax-components-0'));
+    await revealPurchaseInput(tester,components); await tester.tap(components); await tester.pumpAndSettle();
+    void expectLabel(String key,String label) {
+      final target=find.byKey(Key(key));
+      expect(target,findsOneWidget,reason:key);
+      final widget=tester.widget(target);
+      final decoration=widget is TextField ? widget.decoration! : tester.widget<InputDecorator>(
+        find.descendant(of:target,matching:find.byType(InputDecorator)).first).decoration;
+      expect(decoration.labelText,label,reason:key);
+    }
+    final details={
+      'documentType':'Bill type','placeOfSupply':'Place of supply','placeOfSupplyCode':'State code',
+      'buyerName':'Billed to / business name','buyerAddress':'Billing address','buyerGstin':'Your GSTIN',
+      'buyerUin':'UIN, only if printed','buyerPhone':'Mobile / phone','buyerEmail':'Email',
+      'buyerState':'Billing State','buyerStateCode':'State code','deliveryAddress':'Address, if different from billing',
+      'deliveryState':'Shipping State','deliveryStateCode':'State code','priceBasis':'Rates include GST?',
+      'taxTreatment':'GST type','reverseCharge':'Reverse charge shown?','billDiscount':'Bill discount ₹',
+      'freight':'Transport charges ₹','otherCharges':'Other charges ₹','roundOff':'Round off ₹',
+      'taxableValue':'Taxable value ₹','supplyValue':'Subtotal ₹','cgst':'CGST ₹','sgst':'Earlier SGST / UTGST ₹',
+      'sgstAmount':'SGST ₹','utgst':'UTGST ₹','igst':'IGST ₹','cess':'Cess ₹','invoiceTotal':'Bill total ₹',
+      'receiptStatus':'Goods status','receivedDate':'Received date','expectedDeliveryDate':'Expected delivery date',
+      'shippingTerms':'Delivery / shipping terms','paymentStatus':'Payment status','paidAmount':'Amount paid ₹',
+      'paymentMethod':'Payment mode','paymentReference':'Payment reference','paymentDate':'Payment date',
+      'dueDate':'Pay by date','paymentTerms':'Payment / credit terms','notes':'Notes',
+      'eInvoiceStatus':'E-invoice details','irn':'IRN','ackNumber':'Acknowledgement No.','ackDate':'Acknowledgement date',
+      'qrStatus':'E-invoice QR','signatureStatus':'Signature on invoice','eInvoiceDeclaration':'Supplier declaration',
+      'supplierEmail':'Email','poReference':'Purchase order No.','documentCopy':'Invoice copy type',
+      'totalTax':'Total GST / tax ₹','amountPayable':'Amount payable ₹','amountInWords':'Amount in words',
+      'bankName':'Bank name','bankAccount':'Account number','bankIfsc':'IFSC','bankBranch':'Branch',
+      'upiType':'UPI app / type','upiId':'UPI ID','paymentQrStatus':'Payment QR','terms':'Terms & conditions',
+      'signatory':'Signed by (name)','documentTitle':'Invoice heading','originalInvoiceDate':'Date as shown on bill',
+      'printedTotalItems':'Total items','printedTotalQuantity':'Total quantity','printedTaxRate':'Total GST %',
+      'printedCgstRate':'CGST %','printedSgstRate':'SGST %','printedUtgstRate':'UTGST %','printedIgstRate':'IGST %',
+      'printedPaymentMark':'Payment note on supplier bill','printedFooter':'Note at bottom of bill',
+      'printedSignatoryLabel':'Text below signature','printedCompanyLabel':'Business name near signature',
+      'printedDeclaration':'Signature note on bill'};
+    expect(details.keys.toSet(),WorkspacePurchaseEntryDraft.detailKeys);
+    for(final field in details.entries) { expectLabel('work-purchase-${field.key}',field.value); }
+    for(final field in {'supplier-name':'Supplier name or phone','supplier-phone':'Mobile / phone',
+      'supplier-address':'Supplier address','supplier-gstin':'Supplier GSTIN','reference':'Invoice No.',
+      'date':'Invoice date','item-0':'Item / description','pack-0':'Pack / unit','quantity-0':'Qty',
+      'cost-0':'Rate ₹','stock-search-0':'Find saved product'}.entries) {
+      expectLabel('work-purchase-${field.key}',field.value);
+    }
+    final goods={'hsn':'HSN / SAC','barcode':'Barcode / item code','freeQuantity':'Free qty','batch':'Batch No.',
+      'expiry':'Expiry date','mrp':'MRP ₹','sellingPrice':'Selling price ₹','discount':'Discount ₹','gstRate':'GST %',
+      'cess':'Cess ₹','lineTotal':'Item amount ₹','receivedQuantity':'Received qty','damagedQuantity':'Damaged qty',
+      'shortQuantity':'Short qty','unitCode':'Unit code on bill','taxableValue':'Taxable value ₹',
+      'cgstRate':'CGST %','cgst':'CGST ₹','sgstRate':'SGST %','sgst':'SGST ₹','utgstRate':'UTGST %',
+      'utgst':'UTGST ₹','igstRate':'IGST %','igst':'IGST ₹','cessRate':'Cess %',
+      'specifications':'Model / specifications','taxAmount':'Tax amount ₹','printedSerial':'S No. / item No.'};
+    expect(goods.keys.toSet(),WorkspacePurchaseEntryDraft.goodsExtraKeys);
+    for(final field in goods.entries) { expectLabel('work-purchase-${field.key}-0',field.value); }
+    final tax={'label':'Row heading','hsn':'HSN / SAC','taxableValue':'Taxable value ₹','cgstRate':'CGST %','cgst':'CGST ₹',
+      'sgstRate':'SGST %','sgst':'SGST ₹','utgstRate':'UTGST %','utgst':'UTGST ₹','igstRate':'IGST %','igst':'IGST ₹',
+      'cessRate':'Cess %','cess':'Cess ₹','taxRate':'Total GST %','totalTax':'Total tax ₹'};
+    expect(tax.keys.toSet(),WorkspacePurchaseEntryDraft.printedTaxKeys);
+    for(final field in tax.entries) {
+      expectLabel('purchase-tax-${field.key=='taxableValue' ? 'taxable' : field.key}-0',field.value);
+    }
+    expect(find.text('Your business — Billed to'),findsOneWidget);
+    expect(find.text('Fill blank fields'),findsNothing,reason:'No scan action without read text.');
+    expect(find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Heading on bill'),findsOneWidget);
+    expect(find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Details on bill'),findsOneWidget);
+    for(final old in ['Buyer details','Original date wording','Copy type / label','Footer / closing text',
+        'Paid / payable wording on bill','Photograph invoice','Choose photo / PDF']) {
+      expect(find.text(old),findsNothing);
     }
     expect(find.text('Check your entries, then save this draft. No stock, supplier dues or payment is updated.'), findsOneWidget);
     expect(find.text('This records your bill details. It does not send money or update supplier balances yet.'), findsNothing);
     expect(find.text('Preview invoice'), findsNothing, reason:'No pretend original-format preview destination.');
     expect(find.text('Submit purchase'), findsNothing, reason:'Saving a draft is not receipt or ledger posting.');
+    expect(entry.value!.draft!.invoiceReference,'COPY-KEPT');
+    expect(entry.value!.draft!.details['eInvoiceDeclaration'],'Source declaration kept');
+    expect(entry.value!.draft!.additionalFields,isEmpty,reason:'Copy review does not save or post records.');
     await revealPurchaseInput(tester,find.byKey(const Key('work-purchase-draft-save')));
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -4286,9 +4361,9 @@ void main() {
       }
       await tap('work-purchase-document-$digest');
       await tap('work-purchase-read-$digest');
-      final extra=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Value / details');
+      final extra=find.byWidgetPredicate((w)=>w is TextField && w.decoration?.labelText=='Details on bill');
       expect(extra,findsNWidgets(2),reason:'Invoice and unassigned item extras appear immediately, before acceptance.');
-      expect(find.text('Check the detected text. Some details need manual entry or item matching; the original is kept.'), findsOneWidget);
+      expect(find.text('Check the text read from the bill. Enter missing details or match the items; the original is kept.'), findsOneWidget);
       expect(tester.widget<TextField>(extra.first).controller!.text,'Two years');
       expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text,'MANUAL-KEPT');
       await revealPurchaseInput(tester,extra.first); await tester.enterText(extra.first,'Retailer correction');
@@ -4344,8 +4419,8 @@ void main() {
     await revealPurchaseInput(tester, attachment);
     await tester.tap(attachment);
     await tester.pumpAndSettle();
-    await revealPurchaseInput(tester, find.text('Use detected details'));
-    await tester.tap(find.text('Use detected details'));
+    await revealPurchaseInput(tester, find.text('Fill blank fields'));
+    await tester.tap(find.text('Fill blank fields'));
     await tester.pumpAndSettle();
     for (final expected in {'work-purchase-supplier-name': 'Entered supplier',
       'work-purchase-reference': 'MANUAL-KEPT', 'work-purchase-date': '30/09/2026',
@@ -4354,7 +4429,7 @@ void main() {
     }
     expect(find.byKey(const Key('work-purchase-entry-error')), findsNothing);
     expect(find.byKey(const Key('work-purchase-entry-notice')), findsOneWidget);
-    final unknown = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText == 'Value / details');
+    final unknown = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText == 'Details on bill');
     expect(unknown, findsOneWidget, reason:'Detected unfamiliar labels open for review without replacing entered items.');
     expect(tester.widget<TextField>(unknown).controller!.text, 'Two years');
     expect(find.byKey(const Key('work-purchase-paidAmount')), findsNothing,
