@@ -725,6 +725,79 @@ void main() {
     bad['draft']['details']['postedPayable'] = '2840';
     expect(() => WorkspacePurchaseEntryBook.fromJson(bad), throwsFormatException);
   });
+  test('P05-R10 printed reference differential retains observations not receipts', () {
+    final raw = entryFixture().toJson();
+    (raw['draft'] as Map)['details'] = {'documentTitle': 'Consulting Invoice',
+      'printedTotalItems': '3', 'printedTotalQuantity': '3 pcs', 'printedTaxRate': '0.25%',
+      'printedPaymentMark': 'Amount Paid', 'printedFooter': 'Thank you'};
+    final draft = WorkspacePurchaseEntryBook.fromJson(raw).draft!;
+    expect(draft.details['documentTitle'], 'Consulting Invoice');
+    expect(draft.details.containsKey('paidAmount'), false);
+    expect(draft.details.containsKey('paymentStatus'), false);
+  });
+  test('P05-R15 additional fields and printed tax rows survive secure restart', () async {
+    final raw = jsonDecode(jsonEncode(entryFixture().toJson())) as Map<String, dynamic>;
+    final draft = raw['draft'] as Map<String, dynamic>;
+    draft['printedTaxRows'] = [{'label':'TOTAL', 'taxableValue':'8,07,117.80',
+      'igstRate':'18%', 'igst':'1,45,281.20', 'totalTax':'1,45,281.20'}];
+    draft['additionalFields'] = [
+      const WorkspacePurchaseAdditionalField(id:'field-A', label:'Warranty period',
+        value:'  2 years\nSupplier terms apply  ', section:'invoice', reviewed:true).toJson(),
+      const WorkspacePurchaseAdditionalField(id:'field-B', label:'Serial / IMEI',
+        value:'001234500', section:'items', itemIndex:0).toJson(),
+      const WorkspacePurchaseAdditionalField(id:'field-C', label:'Special levy',
+        value:'₹ 125.00 as printed', section:'tax', summaryIndex:0).toJson()];
+    final book = WorkspacePurchaseEntryBook.fromJson(raw);
+    final storage = _OrderJournalStorage();
+    await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .save(book, expectedRevision: null);
+    final restored = await SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage)
+      .read('account-A', 'store-A', qa:true);
+    expect(restored!.toJson(), book.toJson());
+    expect(restored.draft!.additionalFields.first.value, '  2 years\nSupplier terms apply  ');
+    expect(restored.draft!.printedTaxRows.single['igstRate'], '18%');
+    expect(restored.draft!.additionalFields[1].itemIndex, 0);
+    expect(restored.draft!.additionalFields[2].summaryIndex, 0);
+    expect(restored.draft!.id, entryFixture().draft!.id);
+    expect(restored.draft!.details.containsKey('paidAmount'), isFalse);
+    expect(() => restored.draft!.printedTaxRows.single['igst'] = '0', throwsUnsupportedError);
+  });
+  for (final invalid in ['duplicate', 'item', 'summary', 'scope', 'version', 'value', 'label', 'rule']) {
+    test('P05-R15 rejects unsafe additional field $invalid without dropping saved data', () {
+      final raw = jsonDecode(jsonEncode(entryFixture().draft!.toJson())) as Map<String, dynamic>;
+      final extra = const WorkspacePurchaseAdditionalField(id:'field-A', label:'Raw field',
+        value:'Original', section:'invoice').toJson();
+      raw['additionalFields'] = [extra];
+      switch (invalid) {
+        case 'duplicate': (raw['additionalFields'] as List).add(extra);
+        case 'item': extra['section']='items'; extra['itemIndex']=1;
+        case 'summary': extra['section']='tax'; extra['summaryIndex']=0;
+        case 'scope': extra['sourceDigest']='a'*64;
+        case 'version': extra['version']=2;
+        case 'value': extra['value']='a'*4001;
+        case 'label': extra['label']='';
+        case 'rule': extra['postPayment']=true;
+      }
+      expect(() => WorkspacePurchaseEntryDraft.fromJson(raw), throwsFormatException);
+      expect(WorkspacePurchaseEntryDraft.fromJson(entryFixture().draft!.toJson()).toJson(),
+        entryFixture().draft!.toJson());
+    });
+  }
+  test('P05-R15 candidate extras preserve unknown item columns and invalid known values', () {
+    final parsed = WorkPurchaseInvoiceSuggestions.parse('Warranty: Two years\n'
+      'Invoice date: 17 Jun 2023\nInvoice total: ₹ 9,52,399.00\n'
+      'Item | Qty | Rate | Serial / IMEI | Tax amount\nPhone | 1 | 40 | 00123 | 7.20 (18%)');
+    expect(parsed.fields.containsKey('invoiceDate'), false);
+    expect(parsed.fields.containsKey('invoiceTotal'), false);
+    expect(parsed.additionalFields.map((f) => (f.label, f.value, f.itemIndex)), containsAll([
+      ('Warranty', 'Two years', null), ('Invoice date', '17 Jun 2023', null),
+      ('Invoice total', '₹ 9,52,399.00', null), ('Serial / IMEI', '00123', 0),
+      ('Tax amount', '7.20 (18%)', 0)]));
+    expect(parsed.additionalFields.every((f) => !f.reviewed), true);
+    expect(parsed.goods.single['productId'], isEmpty);
+    expect(parsed.goods.single.containsKey('taxAmount'), false);
+    expect(WorkPurchaseInvoiceSuggestions.parse('Extra: ${'a'*4001}').additionalOverflow, true);
+  });
   test('P05-R05-C01 longer supplier terms and specifications retain bounded originals', () {
     final terms = 'Evaluation supplier terms. ' * 120;
     final specs = 'Evaluation model. ' * 40;

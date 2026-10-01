@@ -5955,20 +5955,68 @@ class WorkspacePurchaseInvoiceAttachment {
   }
 }
 
+/// Unmapped invoice content is information, never a generated posting rule.
+class WorkspacePurchaseAdditionalField {
+  const WorkspacePurchaseAdditionalField({required this.id, required this.label,
+    required this.value, required this.section, this.itemIndex, this.summaryIndex,
+    this.sourceDigest, this.sourcePage, this.reviewed = false});
+  final String id, label, value, section;
+  final int? itemIndex, summaryIndex, sourcePage;
+  final String? sourceDigest;
+  final bool reviewed;
+  static const sections = {'supplier', 'invoice', 'items', 'tax', 'buyer', 'receipt', 'payment'};
+  bool get valid => id.isNotEmpty && id.length <= 200 && label.trim().isNotEmpty &&
+    label.length <= 120 && value.length <= 4000 && sections.contains(section) &&
+    (itemIndex == null || section == 'items' && itemIndex! >= 0) &&
+    (summaryIndex == null || section == 'tax' && summaryIndex! >= 0) &&
+    (sourceDigest == null || RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceDigest!)) &&
+    (sourcePage == null || sourceDigest != null && sourcePage! > 0 && sourcePage! <= 10000);
+  Map<String, Object?> toJson() => {'version': 1, 'id': id, 'label': label,
+    'value': value, 'section': section, 'reviewed': reviewed,
+    if (itemIndex != null) 'itemIndex': itemIndex,
+    if (summaryIndex != null) 'summaryIndex': summaryIndex,
+    if (sourceDigest != null) 'sourceDigest': sourceDigest,
+    if (sourcePage != null) 'sourcePage': sourcePage};
+  static WorkspacePurchaseAdditionalField fromJson(Object? raw) {
+    const required = {'version', 'id', 'label', 'value', 'section', 'reviewed'};
+    const optional = {'itemIndex', 'summaryIndex', 'sourceDigest', 'sourcePage'};
+    if (raw is! Map || !required.every(raw.containsKey) || raw['version'] != 1 ||
+        !raw.keys.every((key) => required.contains(key) || optional.contains(key))) {
+      throw const FormatException('Additional invoice field needs recovery');
+    }
+    final field = WorkspacePurchaseAdditionalField(id: raw['id'] as String,
+      label: raw['label'] as String, value: raw['value'] as String,
+      section: raw['section'] as String, reviewed: raw['reviewed'] as bool,
+      itemIndex: raw['itemIndex'] as int?, summaryIndex: raw['summaryIndex'] as int?,
+      sourceDigest: raw['sourceDigest'] as String?, sourcePage: raw['sourcePage'] as int?);
+    if (!field.valid) throw const FormatException('Invalid additional invoice field');
+    return field;
+  }
+}
+
 /// Manual/reviewed input only: saving cannot post stock, dues or payments.
 class WorkspacePurchaseEntryDraft {
   WorkspacePurchaseEntryDraft({required this.id, required this.supplierId,
     required this.invoiceReference, required this.invoiceDate,
     required this.createdAt, required this.updatedAt,
     required List<Map<String, String>> goods, Map<String, String> details = const {},
-    List<WorkspacePurchaseInvoiceAttachment> attachments = const []})
+    List<WorkspacePurchaseInvoiceAttachment> attachments = const [],
+    List<WorkspacePurchaseAdditionalField> additionalFields = const [],
+    List<Map<String, String>> printedTaxRows = const []})
       : goods = List.unmodifiable(goods.map((line) => Map<String, String>.unmodifiable(line))),
-        details = Map.unmodifiable(details), attachments = List.unmodifiable(attachments);
+        details = Map.unmodifiable(details), attachments = List.unmodifiable(attachments),
+        additionalFields = List.unmodifiable(additionalFields),
+        printedTaxRows = List.unmodifiable(printedTaxRows.map((row) => Map<String, String>.unmodifiable(row)));
   final String id, supplierId, invoiceReference, invoiceDate;
   final DateTime createdAt, updatedAt;
   final List<Map<String, String>> goods;
   final Map<String, String> details;
   final List<WorkspacePurchaseInvoiceAttachment> attachments;
+  final List<WorkspacePurchaseAdditionalField> additionalFields;
+  final List<Map<String, String>> printedTaxRows;
+  static const printedTaxKeys = {'label', 'hsn', 'taxableValue', 'cgstRate', 'cgst',
+    'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate', 'cess',
+    'taxRate', 'totalTax'};
   static const detailKeys = {'documentType', 'placeOfSupply', 'buyerName', 'buyerAddress',
     'buyerGstin', 'priceBasis', 'taxTreatment', 'reverseCharge', 'billDiscount',
     'freight', 'otherCharges', 'roundOff', 'taxableValue', 'cgst', 'sgst', 'igst',
@@ -5980,12 +6028,16 @@ class WorkspacePurchaseEntryDraft {
     'eInvoiceDeclaration', 'supplierEmail', 'buyerPhone', 'buyerEmail', 'poReference',
     'documentCopy', 'totalTax', 'amountPayable', 'amountInWords', 'bankName',
     'bankAccount', 'bankIfsc', 'bankBranch', 'upiType', 'upiId', 'paymentQrStatus',
-    'terms', 'signatory', 'expectedDeliveryDate', 'shippingTerms', 'paymentTerms'};
+    'terms', 'signatory', 'expectedDeliveryDate', 'shippingTerms', 'paymentTerms',
+    'documentTitle', 'originalInvoiceDate', 'printedTotalItems', 'printedTotalQuantity',
+    'printedTaxRate', 'printedCgstRate', 'printedSgstRate', 'printedUtgstRate',
+    'printedIgstRate', 'printedPaymentMark', 'printedFooter', 'printedSignatoryLabel',
+    'printedCompanyLabel', 'printedDeclaration'};
   static const goodsExtraKeys = {'hsn', 'barcode', 'freeQuantity', 'batch', 'expiry',
     'mrp', 'sellingPrice', 'discount', 'gstRate', 'cess', 'lineTotal',
     'receivedQuantity', 'damagedQuantity', 'shortQuantity', 'unitCode', 'taxableValue',
     'cgstRate', 'cgst', 'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate',
-    'specifications', 'taxAmount'};
+    'specifications', 'taxAmount', 'printedSerial'};
   /// Printed rupee amounts only; never rounds input or invents missing zeroes.
   static int? printedPaise(String? input) {
     if (input == null) return null;
@@ -6068,6 +6120,15 @@ class WorkspacePurchaseEntryDraft {
       attachments.length <= 3 && attachments.every((a) => a.valid) &&
       attachments.fold<int>(0, (sum, a) => sum + a.byteLength) <= 20 * 1024 * 1024 &&
       attachments.map((a) => a.digest).toSet().length == attachments.length &&
+      printedTaxRows.length <= 100 && printedTaxRows.every((row) =>
+        row.keys.every(printedTaxKeys.contains) && row.values.every((value) => value.length <= 200)) &&
+      additionalFields.length <= 200 &&
+      additionalFields.map((field) => field.id).toSet().length == additionalFields.length &&
+      additionalFields.fold<int>(0, (size, field) => size + field.label.length + field.value.length) <= 48000 &&
+      additionalFields.every((field) => field.valid &&
+        (field.itemIndex == null || field.itemIndex! < goods.length) &&
+        (field.summaryIndex == null || field.summaryIndex! < printedTaxRows.length) &&
+        (field.sourceDigest == null || attachments.any((a) => a.digest == field.sourceDigest))) &&
       goods.every((line) =>
         const ['productId', 'name', 'pack', 'quantity', 'cost'].every(line.containsKey) &&
         line.keys.every((k) => const ['productId', 'name', 'pack', 'quantity', 'cost'].contains(k) ||
@@ -6079,12 +6140,15 @@ class WorkspacePurchaseEntryDraft {
     'updatedAt': updatedAt.toUtc().toIso8601String(),
     'source': 'manual', 'stage': 'draft', 'goods': goods,
     if (details.isNotEmpty) 'details': details,
-    if (attachments.isNotEmpty) 'attachments': attachments.map((a) => a.toJson()).toList()};
+    if (attachments.isNotEmpty) 'attachments': attachments.map((a) => a.toJson()).toList(),
+    if (additionalFields.isNotEmpty) 'additionalFields': additionalFields.map((f) => f.toJson()).toList(),
+    if (printedTaxRows.isNotEmpty) 'printedTaxRows': printedTaxRows};
   static WorkspacePurchaseEntryDraft fromJson(Object? raw) {
     const keys = {'id', 'supplierId', 'invoiceReference', 'invoiceDate',
       'createdAt', 'updatedAt', 'source', 'stage', 'goods'};
     if (raw is! Map || !keys.every(raw.containsKey) ||
-        !raw.keys.every((k) => keys.contains(k) || k == 'details' || k == 'attachments') ||
+        !raw.keys.every((k) => keys.contains(k) || k == 'details' || k == 'attachments' ||
+          k == 'additionalFields' || k == 'printedTaxRows') ||
         raw['source'] != 'manual' || raw['stage'] != 'draft' || raw['goods'] is! List) {
       throw const FormatException('Invalid purchase draft');
     }
@@ -6097,7 +6161,11 @@ class WorkspacePurchaseEntryDraft {
       goods: [for (final line in raw['goods'] as List) (line as Map).cast<String, String>()],
       details: raw['details'] == null ? const {} : (raw['details'] as Map).cast<String, String>(),
       attachments: raw['attachments'] == null ? const [] :
-        [for (final a in raw['attachments'] as List) WorkspacePurchaseInvoiceAttachment.fromJson(a)]);
+        [for (final a in raw['attachments'] as List) WorkspacePurchaseInvoiceAttachment.fromJson(a)],
+      additionalFields: raw['additionalFields'] == null ? const [] :
+        [for (final f in raw['additionalFields'] as List) WorkspacePurchaseAdditionalField.fromJson(f)],
+      printedTaxRows: raw['printedTaxRows'] == null ? const [] :
+        [for (final row in raw['printedTaxRows'] as List) (row as Map).cast<String, String>()]);
     if (!draft.valid) throw const FormatException('Invalid purchase draft');
     return draft;
   }

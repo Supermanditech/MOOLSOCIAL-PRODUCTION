@@ -1476,9 +1476,12 @@ class WorkPurchaseInvoiceCapture {
 
 /// Conservative labelled suggestions only. Unlabelled/ambiguous values remain for review.
 class WorkPurchaseInvoiceSuggestions {
-  WorkPurchaseInvoiceSuggestions(this.fields, this.goods);
+  WorkPurchaseInvoiceSuggestions(this.fields, this.goods, {
+    this.additionalFields = const [], this.additionalOverflow = false});
   final Map<String, String> fields;
   final List<Map<String, String>> goods;
+  final List<WorkspacePurchaseAdditionalField> additionalFields;
+  final bool additionalOverflow;
   static WorkPurchaseInvoiceSuggestions parse(String text) {
     const labels = {'supplier': 'supplierName', 'sold by': 'supplierName',
       'supplier address':'supplierAddress', 'supplier phone':'supplierPhone',
@@ -1494,7 +1497,10 @@ class WorkPurchaseInvoiceSuggestions {
       'buyer state':'buyerState', 'buyer state code':'buyerStateCode',
       'delivery address':'deliveryAddress', 'delivery state':'deliveryState',
       'delivery state code':'deliveryStateCode', 'place of supply code':'placeOfSupplyCode',
-      'invoice no': 'invoiceReference', 'invoice number': 'invoiceReference',
+      'invoice no': 'invoiceReference', 'invoice number': 'invoiceReference', 'invoice #': 'invoiceReference',
+      'document title':'documentTitle', 'original invoice date':'originalInvoiceDate',
+      'total items':'printedTotalItems', 'total quantity':'printedTotalQuantity',
+      'printed payment mark':'printedPaymentMark', 'footer':'printedFooter',
       'bill no': 'invoiceReference', 'invoice date': 'invoiceDate', 'bill date': 'invoiceDate',
       'place of supply': 'placeOfSupply', 'taxable value': 'taxableValue',
       'goods value':'supplyValue', 'cgst': 'cgst', 'sgst': 'sgstAmount', 'utgst':'utgst',
@@ -1503,38 +1509,67 @@ class WorkPurchaseInvoiceSuggestions {
       'ack date':'ackDate', 'acknowledgement date':'ackDate',
       'grand total': 'invoiceTotal', 'invoice total': 'invoiceTotal'};
     final candidates = <String, Set<String>>{};
+    final originalCandidates = <String, List<(String, String)>>{};
+    final additional = <WorkspacePurchaseAdditionalField>[];
+    var additionalSize = 0;
+    var overflow = false;
+    void keepRaw(String label, String value, {String section = 'invoice', int? itemIndex}) {
+      if (label.isEmpty || label.length > 120 || value.length > 4000 ||
+          additional.length >= 200 || additionalSize + label.length + value.length > 48000) {
+        overflow = true; return;
+      }
+      additionalSize += label.length + value.length;
+      final identity = crypto.sha256.convert(utf8.encode(jsonEncode(
+        [section, itemIndex, label, value, additional.length]))).toString();
+      additional.add(WorkspacePurchaseAdditionalField(id: 'detected-$identity',
+        label: label, value: value, section: section, itemIndex: itemIndex));
+    }
     final rows = text.split(RegExp(r'\r?\n'));
     for (final row in rows) {
-      final match = RegExp(r'^\s*([^:]{1,40})\s*:\s*(.+?)\s*$').firstMatch(row);
+      final match = RegExp(r'^\s*([^:]+?)\s*:\s*(.+?)\s*$').firstMatch(row);
       if (match == null) continue;
       final key = labels[match[1]!.trim().toLowerCase().replaceAll('.', '')];
       final value = match[2]!.trim();
       if (key == null || value.length > (key == 'terms' ? 4000 :
           const ['shippingTerms', 'paymentTerms', 'amountInWords'].contains(key) ||
-          key.endsWith('Address') ? 500 : 120)) { continue; }
-      if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) continue;
-      if (key == 'irn' && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) continue;
+          key.endsWith('Address') ? 500 : 120)) { keepRaw(match[1]!.trim(), value); continue; }
+      if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) {
+        keepRaw(match[1]!.trim(), value); continue;
+      }
+      if (key == 'irn' && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) {
+        keepRaw(match[1]!.trim(), value); continue;
+      }
       if (const {'supplyValue', 'taxableValue', 'cgst', 'sgstAmount', 'sgst', 'utgst',
           'igst', 'cess', 'invoiceTotal', 'totalTax', 'amountPayable'}.contains(key)) {
         final amount = double.tryParse(value);
-        if (amount == null || !amount.isFinite || amount < 0) continue;
+        if (amount == null || !amount.isFinite || amount < 0) {
+          keepRaw(match[1]!.trim(), value); continue;
+        }
       }
       if (key == 'invoiceDate' || key == 'ackDate' || key == 'expectedDeliveryDate') {
-        if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value)) continue;
+        if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value)) {
+          keepRaw(match[1]!.trim(), value); continue;
+        }
         final parts = value.split('/').map(int.parse).toList();
         final date = DateTime(parts[2], parts[1], parts[0]);
-        if (date.year != parts[2] || date.month != parts[1] || date.day != parts[0]) continue;
+        if (date.year != parts[2] || date.month != parts[1] || date.day != parts[0]) {
+          keepRaw(match[1]!.trim(), value); continue;
+        }
       }
       (candidates[key] ??= {}).add(value);
+      (originalCandidates[key] ??= []).add((match[1]!.trim(), value));
     }
     final fields = {for (final e in candidates.entries) if (e.value.length == 1) e.key: e.value.single};
+    for (final e in candidates.entries.where((e) => e.value.length > 1)) {
+      for (final (label, value) in originalCandidates[e.key]!) { keepRaw(label, value); }
+    }
     // Only explicit tab/pipe tables: guessing whitespace columns risks price/quantity swaps.
     final goods = <Map<String, String>>[];
-    List<String>? headers;
-    const columns = {'description':'name', 'item':'name', 'product':'name', 'qty':'quantity',
+    List<String>? headers, originalHeaders;
+    const columns = {'description':'name', 'item':'name', 'product':'name', 'services':'name', 'qty':'quantity',
       'quantity':'quantity', 'rate':'cost', 'cost':'cost', 'unit':'pack', 'hsn':'hsn',
       'units':'pack', 'hsn/sac':'hsn', 'specifications':'specifications', 'model':'specifications',
-      'tax amount':'taxAmount', 'rate/item':'cost',
+      'tax amount':'taxAmount', 'rate/item':'cost', 's no':'printedSerial', '#':'printedSerial',
       'uqc':'unitCode', 'unit code':'unitCode', 'discount':'discount',
       'taxable value':'taxableValue', 'gst %':'gstRate', 'gst rate':'gstRate',
       'cgst %':'cgstRate', 'cgst rate':'cgstRate', 'cgst':'cgst', 'cgst amount':'cgst',
@@ -1543,19 +1578,24 @@ class WorkPurchaseInvoiceSuggestions {
       'igst %':'igstRate', 'igst rate':'igstRate', 'igst':'igst', 'igst amount':'igst',
       'cess %':'cessRate', 'cess rate':'cessRate', 'cess':'cess', 'amount':'lineTotal'};
     for (final row in rows) {
-      if (!row.contains('|') && !row.contains('\t')) { headers = null; continue; }
+      if (!row.contains('|') && !row.contains('\t')) { headers = null; originalHeaders = null; continue; }
       final cells = row.split(RegExp(r'\||\t')).map((c) => c.trim()).toList();
       final mapped = cells.map((c) => columns[c.toLowerCase()] ?? '').toList();
       if (mapped.contains('name') && mapped.contains('quantity') && mapped.contains('cost')) {
         final known = mapped.where((key) => key.isNotEmpty).toList();
         headers = known.toSet().length == known.length ? mapped : null;
+        originalHeaders = cells;
         continue;
       }
       final rowHeaders = headers;
       if (rowHeaders == null || cells.length != rowHeaders.length ||
           cells.indexed.any((cell) => cell.$2.length > (rowHeaders[cell.$1] == 'specifications' ? 1000 : 200))) { continue; }
       final line = <String, String>{'productId':'', 'name':'', 'pack':'', 'quantity':'', 'cost':''};
+      final extraCells = <(String, String)>[];
       for (var i=0; i<rowHeaders.length; i++) { if (rowHeaders[i].isNotEmpty) line[rowHeaders[i]] = cells[i]; }
+      for (var i=0; i<rowHeaders.length; i++) {
+        if (rowHeaders[i].isEmpty && cells[i].isNotEmpty) extraCells.add((originalHeaders![i], cells[i]));
+      }
       // Retain proven columns; uncertain optional numeric cells need manual review.
       for (final key in const ['discount', 'taxableValue', 'gstRate', 'cgstRate', 'cgst',
           'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate', 'cess', 'lineTotal', 'taxAmount']) {
@@ -1563,6 +1603,8 @@ class WorkPurchaseInvoiceSuggestions {
         if (value == null || value.isEmpty) continue;
         final number = double.tryParse(value);
         if (number == null || !number.isFinite || number < 0) {
+          final columnIndex = rowHeaders.indexOf(key);
+          extraCells.add((originalHeaders![columnIndex], value));
           line.remove(key);
         }
       }
@@ -1570,10 +1612,14 @@ class WorkPurchaseInvoiceSuggestions {
       final cost = double.tryParse(line['cost']!);
       if (line['name']!.isNotEmpty && quantity != null && quantity.isFinite && quantity > 0 &&
           cost != null && cost.isFinite && cost >= 0 && goods.length < 200) {
+        for (final cell in extraCells) {
+          keepRaw(cell.$1, cell.$2, section: 'items', itemIndex: goods.length);
+        }
         goods.add(line);
       }
     }
-    return WorkPurchaseInvoiceSuggestions(Map.unmodifiable(fields), List.unmodifiable(goods));
+    return WorkPurchaseInvoiceSuggestions(Map.unmodifiable(fields), List.unmodifiable(goods),
+      additionalFields: List.unmodifiable(additional), additionalOverflow: overflow);
   }
 }
 
