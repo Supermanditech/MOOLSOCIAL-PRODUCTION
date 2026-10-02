@@ -3258,3 +3258,53 @@ Local verification incident: failed scalar filename projection caused an
 unintended task-directory copy of phone Downloads; phone untouched. Exact cleanup
 was blocked; user notified, cleanup pending. Do not inspect/share/commit its
 unrelated contents. App checkout is separate; stage only the seven exact owners.
+
+R12-C05/C06 successor reuse assessment (2 October): founder go-ahead authorizes
+bounded pagination and saved-on wording correction, MVP-supporting. Reuse the
+already claimed/admitted work_stock_export.dart renderer and layout safety test;
+no new route, screen, schema, backend or implementation owner. Keep supplier
+invoice fields on their paper pages; retailer-only receipt/payment rows share
+the existing separate record-reference annexure. Use word-safe bounded text
+continuations with exact character retention and an overlong-token fallback.
+Saved-on uses the same stored instant rendered explicitly in UTC, consistently
+before/after codec reopening, without changing invoice date, revision or records.
+Preserve all document fields, unknown values, source bytes, A4 styling and C04
+draft/saved distinctions. Test default/false/saved exports, short/long terms,
+whitespace/runes, local/UTC same instant, field reconstruction, page count and
+rendered geometry, then shared export and purchase regressions plus analysis.
+Reuse the same OPPO revision9 without a new save; download only an absent-before
+unique exact filename and pull only that validated literal file. Native OCR,
+posting, backend, APK, push and all earlier deferred work remain excluded.
+The quarantined task-local copy incident still needs user cleanup; never inspect
+its unrelated contents or describe the whole task workspace as cleaned.
+
+R12-C05/C06 qualification (2 October): both bounded renderer corrections are
+implemented, with no form/model/storage or posting changes. Failing-before
+confirms ordinary-word splitting and a valid sixty-item trace-table export
+failure. Retain the invalid host-fixture and timestamp-baseline diagnostic
+failures separately; neither was an app failure. Four focused,61 P05,442
+atomic/invoice (11 existing skipped) and4 STOCK17 checks pass; analysis of the
+two changed Dart owners is clean. These suites overlap, not a unique test total.
+Nine labelled host PDFs reconstruct all source values, preserve default/false
+equivalence excluding CreationDate, and show identical explicit UTC saved-on
+for local/UTC representations of the same instant. All23 host pages rendered
+and visually inspected. Long terms reduce from3to2 pages without a payment-only
+orphan; sixty items paginate across7pages with all item/reference rows retained.
+These large cases are host-only, not claimed as device input/acceptance.
+
+OPPO hot reload8libraries; reuse the same actual-app saved revision9,
+EVAL-P-3009-01,2840.00,On credit. One absent-before exact named PDF downloaded:
+purchase-c05-r9-20261002-v1.pdf, SHA A2450B4AE68032BAB5163A1001DEA00F7D498C6817C46027873906350941CDDE.
+Both device PDF pages rendered/inspected. Ordered supplier, retailer-payment and
+reference sections match the isolated C04 baseline after only explicit UTC-label
+normalization; metadata matches excluding CreationDate. Saved-on now reads
+2026-10-01T21:24:43.374521Z with UTC label; supplier dates/IDs/revision unchanged.
+The earlier source/C04 device downloads retain SHA65D3C260/7BD65C8F using only
+their literal exact paths. History still one row; displayed Stock27025/dues1786
+unchanged; saved supplier source reopens. No new save, debug restart, APK,
+transaction, backend or push in this batch. Founder review and overall R12
+acceptance remain separate. Device long-text/sixty-item, backend reuse/retention,
+all entry paths/downstream posting and private task-folder cleanup remain open.
+Architect reviewed supplied diff/results and required ordered section comparison
+in addition to token counts; that check passes. Local checkpoint is exactly six
+owners, not the seven-owner preceding C04 batch.

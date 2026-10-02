@@ -1254,6 +1254,26 @@ String storePurchaseSupplierDocumentHeading({required String title, required Str
 const storePurchaseUnpostedVoucherNumber = 'Not assigned (draft)';
 const storePurchaseSavedCopyVoucherNumber = 'Not assigned (not posted)';
 
+/// Bounded PDF continuations; joining them preserves the exact source text.
+List<String> storePurchasePdfTextParts(String value) {
+  if (value.isEmpty) return [''];
+  final runes = value.runes.toList();
+  bool separator(int rune) => String.fromCharCode(rune).trim().isEmpty;
+  final parts = <String>[];
+  for (var start = 0; start < runes.length;) {
+    final limit = (start + 300).clamp(0, runes.length);
+    var end = limit;
+    if (end < runes.length && !separator(runes[end])) {
+      while (end > start && !separator(runes[end - 1])) { end--; }
+      // A single overlong token still needs bounded, rune-safe rows.
+      if (end == start) end = limit;
+    }
+    parts.add(String.fromCharCodes(runes.sublist(start, end)));
+    start = end;
+  }
+  return parts;
+}
+
 /// A copy of saved, unposted retailer entries, never a reissued supplier bill.
 /// Original attachments and their visual evidence remain separate documents.
 Future<Uint8List> generateStorePurchaseRecordedCopy({
@@ -1316,9 +1336,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   // Split long source text into bounded rows, not ellipses or truncated values.
   List<String> chunks(String value) {
     if (value.isEmpty) return ['—'];
-    final runes = value.runes.toList();
-    return [for (var i = 0; i < runes.length; i += 300)
-      String.fromCharCodes(runes.sublist(i, (i + 300).clamp(0, runes.length)))];
+    return storePurchasePdfTextParts(value);
   }
   pw.Widget table(List<String> headers, List<List<String>> rows,
       {Map<int, pw.TableColumnWidth>? widths, Set<int> amounts = const {}}) =>
@@ -1489,26 +1507,31 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
           ['Item ${index + 1}', label(e.key), displayed(e.key, e.value)],
   ];
   widgets.addAll([
+    // Retailer-owned observations share the separate record annexure. They
+    // must not leave a lone payment row between supplier and reference pages.
+    pw.NewPage(),
     if (posKeys.any((key) => d[key]?.isNotEmpty ?? false) || retailerItemRows.isNotEmpty)
-      ...[pw.SizedBox(height: 10), text(isSavedCopy
+      ...[text(isSavedCopy
         ? 'Goods & payment details - retailer record, not posted'
         : 'Goods & payment details - retailer draft, not posted', bold: true),
         if (posKeys.any((key) => d[key]?.isNotEmpty ?? false)) fields(posKeys),
         if (retailerItemRows.isNotEmpty) table(const ['Item', 'Retailer detail', 'As entered'], retailerItemRows)],
-    pw.NewPage(),
-    pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: [text('Record details - saved references', size: 13, bold: true),
+    // Keep the heading and first short row together, without making an
+    // arbitrarily large product-reference table unbreakable.
+    pw.NewPage(freeSpace: 180),
+    pw.SizedBox(height: 10),
+    text('Record details - saved references', size: 13, bold: true),
       text(isSavedCopy
         ? 'For tracing this saved purchase copy. These references are not supplier-invoice fields.'
         : 'For tracing this saved draft. These references are not supplier-invoice fields.', size: 8),
       pw.SizedBox(height: 8), table(const ['Detail', 'Saved value'], [
       ['Purchase voucher No.', isSavedCopy ? storePurchaseSavedCopyVoucherNumber : storePurchaseUnpostedVoucherNumber],
       ['Store', storeName], ['Store ID', storeId], [isSavedCopy ? 'Source entry ID' : 'Draft ID', draft.id], ['Supplier ID', supplier.id],
-      ['Saved revision', '$revision'], ['Saved on', draft.updatedAt.toIso8601String()],
+      ['Saved revision', '$revision'], ['Saved on (UTC)', draft.updatedAt.toUtc().toIso8601String()],
       for (final (index, line) in draft.goods.indexed)
         if (line['productId']?.isNotEmpty ?? false) ['Item ${index + 1} product ID', line['productId']!],
       for (final a in draft.attachments) ['Supplier copy SHA-256', a.digest],
-    ])])),
+    ]),
   ]);
   document.addPage(pw.MultiPage(pageFormat: PdfPageFormat.a4,
     margin: const pw.EdgeInsets.all(24), maxPages: 1000,

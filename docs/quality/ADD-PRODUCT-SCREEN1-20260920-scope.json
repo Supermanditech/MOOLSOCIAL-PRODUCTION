@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "P05-R12: retailer saves a reviewed purchase copy and retrieves its frozen details/files from existing Purchases independently of later draft edits.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "37D7FB49E85984056CF850120262FCD17A02E50A667AE50891B879D7002844A0",
+      "manifestSha256": "C8C1ADA81459A5B7B4B5A388B8F57AA28CB2E563BE12518F9DCCADDEB69E4E01",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -36,7 +36,7 @@
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "R12 reviewed snapshots reuse existing purchase-paper preview and download. C04 admits the existing work_stock_export.dart owner for explicit saved-copy versus draft wording; it is already held in the primary claim. Preserve all fields, default draft behavior and unposted disclosure. No new owner, screen, route, storage or accounting rules.",
+      "necessityProof": "R12 reviewed snapshots reuse existing purchase-paper preview/download and claimed work_stock_export.dart. C05/C06 correct word-safe exact text continuations, isolated retailer rows and explicit UTC saved-on representation. Retailer-only information shares the existing reference annexure; allow large trace tables to paginate, keep headings with following content. Preserve fields, source bytes, draft/saved distinctions and unposted disclosure. No new owner, screen, route, storage or accounting rules.",
       "robustnessCoverage": [
         "Legacy version1 reads and strict saved-copy validation",
         "Frozen draft/supplier/Store identity after edits; preserve history on draft save",

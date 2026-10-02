@@ -5271,6 +5271,56 @@ void main() {
     });
   }
 
+  test('P05-R12-C05 PDF text continuations preserve separators and words', () {
+    for (final source in ['', 'Short source', List.filled(70, 'Source wording kept exactly. ').join(),
+        List.filled(50, '  Multiple  spaces\tand\nnewlines 😀 stay.\n').join(),
+        '${List.filled(701, '😀').join()} end', '${List.filled(650, 'X').join()} after']) {
+      final parts = storePurchasePdfTextParts(source);
+      expect(parts.join(), source);
+      expect(parts.every((part) => part.runes.length <= 300), isTrue);
+    }
+    final words = List.filled(70, 'Source wording kept exactly. ').join();
+    final parts = storePurchasePdfTextParts(words);
+    for (final part in parts.take(parts.length - 1)) {
+      expect(part.endsWith(' '), isTrue,
+        reason: 'Ordinary words must not be broken at the continuation boundary.');
+    }
+    expect(storePurchasePdfTextParts(List.filled(650, 'X').join()).map((p) => p.length), [300, 300, 50]);
+  });
+
+  testWidgets('P05-R12-C05 C06 PDF large references and same-instant times', (tester) async {
+    // Host-only renderer fixtures, never user-flow purchase acceptance data.
+    final at = DateTime.utc(2026, 10, 1, 21, 24, 43, 374, 521);
+    final supplier = WorkspaceSupplierProfile(id: 'host-c05-supplier', name: 'HOST ONLY C05 supplier',
+      createdAt: at, updatedAt: at);
+    for (final variant in ['utc', 'local', 'many-items']) {
+      final draft = WorkspacePurchaseEntryDraft(id: 'host-c05-entry', supplierId: supplier.id,
+        invoiceReference: 'HOST-C05-1', invoiceDate: '01/10/2026', createdAt: at,
+        updatedAt: variant == 'local' ? at.toLocal() : at,
+        goods: [for (var i = 0; i < (variant == 'many-items' ? 60 : 1); i++) {
+          'name': 'HOST ONLY item ${i + 1}', 'pack': '1 kg', 'quantity': '1', 'cost': '40',
+          'productId': 'host-c05-product-$i', 'receivedQuantity': '1'}],
+        details: {'invoiceTotal': variant == 'many-items' ? '2400' : '40',
+          'paymentStatus': 'On credit', 'receiptStatus': 'Already added to Stock'});
+      final before = jsonEncode(draft.toJson());
+      expect(draft.valid, isTrue);
+      final bytes = await tester.runAsync(() => generateStorePurchaseRecordedCopy(draft: draft,
+        supplier: supplier, storeName: 'HOST ONLY Store', storeId: 'host-c05-store',
+        revision: 9, labels: const {}, isSavedCopy: true));
+      expect(bytes, isNotNull, reason: 'Report the renderer failure, not a secondary null-check exception.');
+      expect(ascii.decode(bytes!.take(4).toList()), '%PDF');
+      expect(jsonEncode(draft.toJson()), before);
+      final output = Platform.environment['PURCHASE_PDF_QA_OUT_DIR'];
+      if (output != null) {
+        await tester.runAsync(() async {
+          final file = File('$output/purchase-c05-$variant.pdf');
+          if (await file.exists()) { throw StateError('Preserve previous PDF evidence'); }
+          await file.writeAsBytes(bytes);
+        });
+      }
+    }
+  });
+
   testWidgets('P05-R12-C04 PDF draft and saved copy preserve invoice fields', (tester) async {
     // Labelled automated renderer fixtures only; no app store writes.
     final at = DateTime.utc(2026, 10, 2);
