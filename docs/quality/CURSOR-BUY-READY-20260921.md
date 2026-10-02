@@ -980,3 +980,19 @@ commit coverage, local/remote verification and recovery artifacts. This supersed
 the earlier uncommitted cutoff state without changing app source or device claims.
 All eleven tickets and children still require next-Redmi replay with backend;
 DEP-01/02/03 remain explicit. No backend work or new APK starts from this handoff.
+
+## Current Cart execution — 2 October 2026
+
+The founder authorized T06 payment grouping followed by T07 recovery and A09,
+then a stop before T08. T06 frontend implementation has clean seven-owner analysis,
+28 focused passes and924 distinct selected passes against final unchanged source.
+Actual Redmi Cart/Checkout and shared instructions were reviewed after full Dart
+restart, including200-percent text; original device settings were restored.
+See T06 qualification in `CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md` and the
+founder ledger's `cartPaymentGroupingT0620261002` for exact evidence.
+
+Native grouping, backend and workspace provider execution remain deferred;
+workspace implementation is **Codex after integration**. Google and Maps
+dependencies remain listed. The historical commit-prefix blocker prevents formal
+handoff. Save an ordinary correctly prefixed T06 feature checkpoint, then admit
+the already-authorized T07/A09 recovery sweep. No new APK or live payment.

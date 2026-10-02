@@ -2002,6 +2002,565 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  Future<
+    (
+      BuyV2Session,
+      TestGroupedPaymentCommerce,
+      _MemoryCustomerStateStore,
+      TestPaymentQuote,
+    )
+  >
+  groupedFixture({
+    bool credit = false,
+    bool allCredit = false,
+    bool manualDispose = false,
+    DateTime Function()? clock,
+  }) async {
+    final core = BuySession();
+    final commerce = TestGroupedPaymentCommerce();
+    final store = _MemoryCustomerStateStore('test-t06-buyer');
+    final quote = TestPaymentQuote();
+    final terms = TestGroupedPaymentTerms()..credit = credit;
+    final products = testPaymentProducts
+        .map(
+          (product) => product.id == 's-rice' || product.id == 'w-rice'
+              ? product.copyWith(storeId: 'test-second-store')
+              : product,
+        )
+        .toList();
+    commerce.snapshot = BuyV2CommerceSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      products: products,
+      paymentMethods: const {'UPI', 'Card'},
+      businessVerified: true,
+      addresses: const [_instructionAddress],
+      selectedAddressId: _instructionAddress.id,
+    );
+    quote.groupsFor = (lines, method) => [
+      for (var i = 0; i < lines.length; i++)
+        BuyV2CheckoutPaymentGroup(
+          id: 'test-group-$i',
+          fulfilmentKeys: {lines[i].fulfilmentKey},
+          paymentMethod: method,
+          total: lines[i].total,
+          amountDueNow: credit && lines[i].fulfilmentKey.startsWith('wholesale')
+              ? 0
+              : lines[i].total,
+        ),
+    ];
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      customerStateStore: store,
+      productFactsAdapter: BuyTestEligibilityFacts(
+        delegate: _T01CDeliveryFactsAdapter(),
+      ),
+      reviewDataEnabled: false,
+      catalogueNow: clock ?? DateTime.now,
+      checkoutQuoteAdapter: quote,
+      commercialPaymentTermsAdapter: credit ? terms : null,
+    );
+    if (!manualDispose) addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(
+      session.addProduct(allCredit ? 'w-notebook' : 's-tomato'),
+      isTrue,
+      reason: session.notice,
+    );
+    expect(
+      session.addProduct(
+        allCredit
+            ? 'w-rice'
+            : credit
+            ? 'w-notebook'
+            : 's-rice',
+      ),
+      isTrue,
+      reason: session.notice,
+    );
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCheckoutQuote();
+    if (credit) {
+      await session.refreshCommercialPaymentTerms();
+      for (final group in session.checkoutFulfilmentGroups) {
+        expect(
+          session.chooseCommercialPaymentTerm(
+            session.commercialPaymentTermsFor(group.key).single,
+          ),
+          isTrue,
+        );
+      }
+    }
+    expect(session.checkoutPaymentGroups, hasLength(2));
+    return (session, commerce, store, quote);
+  }
+
+  test(
+    'T06 paid groups require separate commitments and retain completed orders',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      final firstAmount = session.checkoutPaymentActionAmount;
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      final first = commerce.requests.single;
+      expect(first.lines, hasLength(1));
+      expect(first.amountDueNow, firstAmount);
+      expect(session.orders, hasLength(1));
+      expect(session.quantityFor(first.lines.single.product.id), 0);
+      expect(session.checkoutPaymentNumber, 2);
+      expect(
+        store.snapshot!.checkoutPaymentAttempt!.groups.first.state,
+        BuyV2CheckoutSubmissionState.confirmed,
+      );
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(2));
+      final second = commerce.requests.last;
+      expect(second.checkoutAttemptId, first.checkoutAttemptId);
+      expect(second.idempotencyKey, isNot(first.idempotencyKey));
+      expect(second.paymentGroupId, isNot(first.paymentGroupId));
+      expect(session.orders, hasLength(1));
+      expect(
+        session.quantityFor(second.lines.single.product.id),
+        greaterThan(0),
+      );
+      await session.submitOrder();
+      expect(commerce.requests, hasLength(2));
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.reconciledKeys, [second.idempotencyKey]);
+      expect(session.orders, hasLength(2));
+      expect(session.checkoutHasGroupedCommitment, isFalse);
+      expect(session.confirmedOrders, hasLength(2));
+    },
+  );
+
+  test('T06 persists before placement and rejects repeated taps', () async {
+    final (session, commerce, store, _) = await groupedFixture();
+    final response = Completer<BuyV2OrderPlacementResult>();
+    commerce.onGroup = (request) {
+      expect(
+        store
+            .snapshot!
+            .checkoutPaymentAttempt!
+            .groups
+            .first
+            .request
+            .idempotencyKey,
+        request.idempotencyKey,
+      );
+      return response.future;
+    };
+    final first = session.submitOrder();
+    for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(commerce.requests, hasLength(1));
+    expect(await session.submitOrder(), isFalse);
+    response.complete(
+      testGroupedPlacement(
+        commerce.requests.single,
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+      ),
+    );
+    expect(await first, isFalse);
+    expect(commerce.requests, hasLength(1));
+    expect(
+      session.checkoutPaymentActionAmount,
+      commerce.requests.single.amountDueNow,
+    );
+  });
+
+  test('T06 durable write failure prevents any connector placement', () async {
+    final (session, commerce, store, _) = await groupedFixture();
+    store.rejectWrites = true;
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, isEmpty);
+    expect(session.orders, isEmpty);
+    expect(session.checkoutPaymentAttempt, isNotNull);
+    expect(
+      session.currentCheckoutPaymentGroup!.state,
+      BuyV2CheckoutSubmissionState.idle,
+    );
+  });
+
+  for (final invalid in [
+    'empty',
+    'duplicate',
+    'scope',
+    'total',
+    'due',
+    'currency',
+    'method',
+  ]) {
+    test('T06 rejects authoritative invalid group plan $invalid', () async {
+      final (session, commerce, _, quote) = await groupedFixture();
+      quote.groupsFor = (lines, method) => invalid == 'empty'
+          ? []
+          : [
+              for (var i = 0; i < lines.length; i++)
+                BuyV2CheckoutPaymentGroup(
+                  id: invalid == 'duplicate' ? 'same' : 'group-$i',
+                  fulfilmentKeys: {
+                    invalid == 'scope' ? 'unknown' : lines[i].fulfilmentKey,
+                  },
+                  paymentMethod: invalid == 'method' ? 'Card' : method,
+                  total: lines[i].total + (invalid == 'total' ? 1 : 0),
+                  amountDueNow: lines[i].total + (invalid == 'due' ? 1 : 0),
+                  currency: invalid == 'currency' ? 'USD' : 'INR',
+                ),
+            ];
+      await session.refreshCheckoutQuote();
+      expect(session.checkoutPaymentGroupReviewRequired, isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, isEmpty);
+    });
+  }
+
+  for (final mismatch in ['group', 'paid']) {
+    test(
+      'T06 mismatched $mismatch response holds original payment and Cart',
+      () async {
+        final (session, commerce, _, _) = await groupedFixture();
+        commerce.onGroup = (request) => testGroupedPlacement(
+          request,
+          groupId: mismatch == 'group' ? 'other-group' : null,
+          paidNow: mismatch == 'paid' ? request.amountDueNow + 1 : null,
+        );
+        expect(await session.submitOrder(), isFalse);
+        expect(session.orders, isEmpty);
+        expect(
+          session.quantityFor(commerce.requests.single.lines.single.product.id),
+          1,
+        );
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
+        );
+        expect(
+          session.checkoutPaymentActionAmount,
+          commerce.requests.single.amountDueNow,
+        );
+      },
+    );
+  }
+
+  test(
+    'T06 credit group completes once before paid group and survives payment failure',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture(credit: true);
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: request.amountDueNow == 0
+            ? BuyV2OrderPlacementOutcome.confirmed
+            : BuyV2OrderPlacementOutcome.failed,
+      );
+      expect(await session.submitOrder(), isFalse);
+      expect(
+        commerce.requests,
+        hasLength(2),
+        reason:
+            '${session.notice}; state=${session.checkoutSubmissionState}; '
+            'dues=${commerce.requests.map((request) => request.amountDueNow)}; '
+            'orders=${session.orders.length}; current=${session.currentCheckoutPaymentGroup?.state}',
+      );
+      expect(commerce.requests.first.amountDueNow, 0);
+      expect(commerce.requests.last.amountDueNow, greaterThan(0));
+      expect(session.orders, hasLength(1));
+      expect(session.orders.single.balanceDue, commerce.requests.first.total);
+      expect(session.orders.single.status, BuyV2OrderStatus.preparing);
+      expect(
+        store.snapshot!.checkoutPaymentAttempt!.groups.first.state,
+        BuyV2CheckoutSubmissionState.confirmed,
+      );
+      await session.submitOrder();
+      expect(commerce.requests, hasLength(2));
+    },
+  );
+
+  for (final allocation in ['valid', 'totals', 'due']) {
+    test(
+      'T06 compatible two-Store payment validates supplier allocation $allocation',
+      () async {
+        final credit = allocation == 'due';
+        final (session, commerce, _, quote) = await groupedFixture(
+          credit: credit,
+        );
+        quote.groupsFor = (lines, method) => [
+          BuyV2CheckoutPaymentGroup(
+            id: 'compatible',
+            fulfilmentKeys: lines.map((line) => line.fulfilmentKey).toSet(),
+            paymentMethod: method,
+            total: lines.fold(0, (sum, line) => sum + line.total),
+            amountDueNow: lines.fold(
+              0,
+              (sum, line) =>
+                  sum +
+                  (credit && line.fulfilmentKey.startsWith('wholesale')
+                      ? 0
+                      : line.total),
+            ),
+          ),
+        ];
+        await session.refreshCheckoutQuote();
+        if (credit) await session.refreshCommercialPaymentTerms();
+        commerce.onGroup = (request) {
+          final first = request.lines.first;
+          final last = request.lines.last;
+          final dueForFirst =
+              first.product.destination == BuyV2Destination.wholesale && credit
+              ? 0
+              : first.total;
+          final dueForLast =
+              last.product.destination == BuyV2Destination.wholesale && credit
+              ? 0
+              : last.total;
+          return testGroupedPlacement(
+            request,
+            allocations: {
+              first.product.id: (
+                allocation == 'totals' ? last.total : first.total,
+                allocation == 'totals'
+                    ? last.total
+                    : allocation == 'due'
+                    ? dueForLast
+                    : dueForFirst,
+              ),
+              last.product.id: (
+                allocation == 'totals' ? first.total : last.total,
+                allocation == 'totals'
+                    ? first.total
+                    : allocation == 'due'
+                    ? dueForFirst
+                    : dueForLast,
+              ),
+            },
+          );
+        };
+        expect(await session.submitOrder(), allocation == 'valid');
+        expect(commerce.requests, hasLength(1));
+        if (allocation == 'valid') {
+          expect(session.confirmedOrders, hasLength(2));
+          expect(session.cartLines, isEmpty);
+        } else {
+          expect(session.orders, isEmpty);
+          expect(session.cartLines, hasLength(2));
+          expect(
+            session.checkoutSubmissionState,
+            BuyV2CheckoutSubmissionState.paymentUnknown,
+          );
+          expect(
+            session.currentCheckoutPaymentGroup!.request.idempotencyKey,
+            commerce.requests.single.idempotencyKey,
+          );
+        }
+      },
+    );
+  }
+
+  test(
+    'T06 original obligation allocations and absent URI survive persistence',
+    () async {
+      final (session, _, memory, _) = await groupedFixture();
+      await session.submitOrder();
+      final original = memory.snapshot!;
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: memory.ownerScope,
+      );
+      expect(await store.write(original), isTrue);
+      final restored = (await store.read())!.checkoutPaymentAttempt!;
+      expect(restored.groups, hasLength(2));
+      for (var i = 0; i < restored.groups.length; i++) {
+        final group = restored.groups[i];
+        expect(group.hasValidObligations, isTrue);
+        expect(
+          group.request.idempotencyKey,
+          original.checkoutPaymentAttempt!.groups[i].request.idempotencyKey,
+        );
+        expect(group.paymentActionUri, isNull);
+        expect(group.obligations.single.totalMinor, group.request.total * 100);
+        expect(
+          group.request.lines.single.product.storeId,
+          original
+              .checkoutPaymentAttempt!
+              .groups[i]
+              .request
+              .lines
+              .single
+              .product
+              .storeId,
+        );
+      }
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      final groups = encoded['checkoutPaymentAttempt']['groups'] as List;
+      groups.first['obligations'].first['dueNowMinor'] += 1;
+      preferences.values[key] = jsonEncode(encoded);
+      expect(
+        (await store.read())!
+            .checkoutPaymentAttempt!
+            .groups
+            .first
+            .hasValidObligations,
+        isFalse,
+      );
+      groups[1]['request']['idempotencyKey'] =
+          groups[0]['request']['idempotencyKey'];
+      preferences.values[key] = jsonEncode(encoded);
+      expect((await store.read())!.checkoutPaymentAttempt, isNull);
+    },
+  );
+
+  test('T06 all credit obligations submit once without a payment', () async {
+    final (session, commerce, _, _) = await groupedFixture(
+      credit: true,
+      allCredit: true,
+    );
+    commerce.onGroup = (request) => testGroupedPlacement(request);
+    expect(session.checkoutPaymentCount, 0);
+    expect(await session.submitOrder(), isTrue);
+    expect(commerce.requests, hasLength(2));
+    expect(
+      commerce.requests.every((request) => request.amountDueNow == 0),
+      isTrue,
+    );
+    expect(session.confirmedOrders, hasLength(2));
+    expect(
+      session.confirmedOrders.every(
+        (order) => order.amountPaidNow == 0 && order.balanceDue == order.total,
+      ),
+      isTrue,
+    );
+    await session.submitOrder();
+    expect(commerce.requests, hasLength(2));
+  });
+
+  test(
+    'T06 network loss recovers original key without another placement',
+    () async {
+      final (session, commerce, _, _) = await groupedFixture();
+      commerce.onGroup = (_) => throw StateError('Isolated network loss');
+      expect(await session.submitOrder(), isFalse);
+      final original = commerce.requests.single;
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      await session.submitOrder();
+      expect(commerce.requests, hasLength(1));
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.recoveredKeys, [original.idempotencyKey]);
+      expect(session.orders, hasLength(1));
+    },
+  );
+
+  test('T06 late disposed response cannot place an order locally', () async {
+    final (session, commerce, _, _) = await groupedFixture(manualDispose: true);
+    var disposed = false;
+    addTearDown(() {
+      if (!disposed) session.dispose();
+    });
+    final gate = Completer<BuyV2OrderPlacementResult>();
+    commerce.onGroup = (_) => gate.future;
+    final pending = session.submitOrder();
+    for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(commerce.requests, hasLength(1));
+    session.dispose();
+    disposed = true;
+    gate.complete(testGroupedPlacement(commerce.requests.single));
+    expect(await pending, isFalse);
+    expect(session.orders, isEmpty);
+  });
+
+  test(
+    'T06 expired unfinished group reviews without repaying completed group',
+    () async {
+      var now = DateTime.now();
+      final (session, commerce, _, _) = await groupedFixture(clock: () => now);
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      expect(await session.submitOrder(), isFalse);
+      now = now.add(const Duration(hours: 2));
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(session.orders, hasLength(1));
+      expect(session.reviewRemainingGroupedCheckout(), isTrue);
+      expect(session.orders, hasLength(1));
+      expect(
+        session.quantityFor(commerce.requests.single.lines.single.product.id),
+        0,
+      );
+    },
+  );
+
+  test(
+    'T06 malformed confirmation retains provider reference for original recovery',
+    () async {
+      final (session, commerce, _, _) = await groupedFixture();
+      commerce.onGroup = (request) =>
+          testGroupedPlacement(request, paidNow: request.amountDueNow + 1);
+      expect(await session.submitOrder(), isFalse);
+      final original = commerce.requests.single;
+      expect(
+        session.currentCheckoutPaymentGroup!.paymentReference,
+        'test-${original.paymentGroupId}',
+      );
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.reconciledKeys, [original.idempotencyKey]);
+      expect(commerce.recoveredKeys, isEmpty);
+      expect(commerce.requests, hasLength(1));
+      expect(session.orders, hasLength(1));
+    },
+  );
+
+  test(
+    'T06 published payment limit applies per explicit group with original scope',
+    () async {
+      final (session, commerce, _, _) = await groupedFixture();
+      final maximum = session.checkoutPaymentGroups
+          .map((group) => group.amountDueNow)
+          .reduce((a, b) => a > b ? a : b);
+      final before = commerce.snapshot;
+      commerce.snapshot = BuyV2CommerceSnapshot(
+        state: before.state,
+        products: before.products,
+        paymentMethods: before.paymentMethods,
+        paymentCapabilities: [
+          testPaymentCapability(session, maximumMinor: maximum * 100),
+        ],
+        businessVerified: true,
+        addresses: before.addresses,
+        selectedAddressId: before.selectedAddressId,
+      );
+      await session.restoreCommerce();
+      await session.refreshCheckoutQuote();
+      expect(session.checkoutAmountDueNow, greaterThan(maximum));
+      expect(session.paymentEligibilityFor('UPI').selectable, isTrue);
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(await session.submitOrder(), isTrue);
+      expect(commerce.requests, hasLength(2));
+      expect(
+        commerce.requests.every((request) => request.amountDueNow <= maximum),
+        isTrue,
+      );
+      expect(session.confirmedOrders, hasLength(2));
+    },
+  );
+
   Future<(BuyV2Session, TestPaymentCommerce)> paymentFixture({
     TestPaymentQuote? quote,
   }) async {
@@ -2029,6 +2588,24 @@ void main() {
     expect(session.openCheckout(), isTrue);
     return (session, commerce);
   }
+
+  test('T06 group publication needs explicit connector opt-in', () async {
+    final quote = TestPaymentQuote()
+      ..groupsFor = (lines, method) => [
+        BuyV2CheckoutPaymentGroup(
+          id: 'unsupported',
+          fulfilmentKeys: lines.map((line) => line.fulfilmentKey).toSet(),
+          paymentMethod: method,
+          total: lines.single.total,
+          amountDueNow: lines.single.total,
+        ),
+      ];
+    final (session, commerce) = await paymentFixture(quote: quote);
+    await session.refreshCheckoutQuote();
+    expect(session.checkoutPaymentGroupReviewRequired, isTrue);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, isEmpty);
+  });
 
   Future<void> publishPayments(
     BuyV2Session session,

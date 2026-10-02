@@ -10455,6 +10455,40 @@ class _CheckoutQuoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final attempt = session.checkoutPaymentAttempt;
+    if (attempt != null) {
+      final agreed = attempt.groups.fold<int>(
+        0,
+        (sum, group) => sum + group.request.total,
+      );
+      final placed = attempt.groups
+          .where(
+            (group) => group.state == BuyV2CheckoutSubmissionState.confirmed,
+          )
+          .fold<int>(0, (sum, group) => sum + group.request.total);
+      return Container(
+        key: const ValueKey('buy-checkout-committed-totals'),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CartAmountRow(
+              label: 'Agreed total',
+              value: buyV2Money(agreed),
+              strong: true,
+            ),
+            if (placed > 0) ...[
+              _CartAmountRow(label: 'Placed orders', value: buyV2Money(placed)),
+              _CartAmountRow(
+                label: 'Remaining orders',
+                value: buyV2Money(agreed - placed),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
     if (!session.checkoutQuoteEnabled) return const SizedBox.shrink();
     final quote = session.checkoutQuote;
     if (session.checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
@@ -11174,6 +11208,47 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
           : null,
     );
   }
+  final group = session.currentCheckoutPaymentGroup;
+  if (group != null) {
+    if (session.checkoutSubmissionState == BuyV2CheckoutSubmissionState.idle) {
+      if (session.checkoutPaymentGroupReviewRequired ||
+          !session.catalogueNow().isBefore(
+            session.checkoutPaymentAttempt!.quoteValidUntil,
+          )) {
+        return (
+          'Review remaining checkout',
+          session.reviewRemainingGroupedCheckout,
+        );
+      }
+      return (
+        session.checkoutPaymentActionAmount == 0
+            ? 'Place orders'
+            : 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} · Payment ${session.checkoutPaymentNumber} of ${session.checkoutPaymentCount}',
+        () async {
+          final committedAmount = session.checkoutPaymentActionAmount;
+          final committedMethod = session.selectedPayment;
+          final attemptId = session.checkoutPaymentAttempt?.id;
+          await session.submitOrder();
+          if (session.view == BuyV2View.checkout &&
+              session.checkoutPaymentAttempt?.id == attemptId &&
+              session.checkoutPaymentActionAmount == committedAmount &&
+              session.selectedPayment == committedMethod &&
+              session.checkoutSubmissionState ==
+                  BuyV2CheckoutSubmissionState.paymentActionRequired &&
+              paymentHandoff != null) {
+            await session.continuePayment(paymentHandoff);
+          }
+        },
+      );
+    }
+    if (const {
+      BuyV2CheckoutSubmissionState.failed,
+      BuyV2CheckoutSubmissionState.cancelled,
+      BuyV2CheckoutSubmissionState.unavailable,
+    }.contains(session.checkoutSubmissionState)) {
+      return ('Check payment', session.reconcilePayment);
+    }
+  }
   final selectedPaymentAvailable =
       _buyV2CustomerPaymentChoices(
         session,
@@ -11184,7 +11259,7 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
       return (
         paymentHandoff == null
             ? 'Unavailable'
-            : 'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
+            : 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)}',
         paymentHandoff == null
             ? null
             : () => session.continuePayment(paymentHandoff),
@@ -11229,26 +11304,32 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
           session.purchaseOrderReviewRequired ||
           session.checkoutQuoteReviewRequired ||
           session.checkoutPaymentTermsReviewRequired ||
+          session.checkoutPaymentGroupReviewRequired ||
           session.checkoutBenefitReviewRequired ||
           session.checkoutPriceReviewRequired ||
           session.checkoutPromiseReviewRequired;
+      final orderWord = session.checkoutFulfilmentGroups.length > 1
+          ? 'orders'
+          : 'order';
       final label =
           session.selectedPayment == 'Cash on Delivery' ||
               session.checkoutAmountDueNow == 0
-          ? 'Place order'
+          ? 'Place $orderWord'
           : session.canChooseUpiQr && session.useUpiQr
-          ? 'Show QR · ${buyV2Money(session.checkoutAmountDueNow)}'
-          : 'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place order';
+          ? 'Show QR · ${buyV2Money(session.checkoutPaymentActionAmount)}'
+          : session.checkoutPaymentCount > 1
+          ? 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} · Payment 1 of ${session.checkoutPaymentCount}'
+          : 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} & place $orderWord';
       return (
         label,
         reviewBlocked
             ? null
             : () async {
-                final committedAmount = session.checkoutAmountDueNow;
+                final committedAmount = session.checkoutPaymentActionAmount;
                 final committedMethod = session.selectedPayment;
                 await session.submitOrder();
                 if (session.view == BuyV2View.checkout &&
-                    session.checkoutAmountDueNow == committedAmount &&
+                    session.checkoutPaymentActionAmount == committedAmount &&
                     session.selectedPayment == committedMethod &&
                     session.checkoutSubmissionState ==
                         BuyV2CheckoutSubmissionState.paymentActionRequired &&
@@ -11785,6 +11866,11 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
             session: session,
             hasPaymentHandoff: widget.hasPaymentHandoff,
           ),
+        if (!session.collectionCheckoutSelected &&
+            (session.checkoutPaymentGroups.isNotEmpty ||
+                session.checkoutPaymentAttempt != null ||
+                session.checkoutPaymentGroupReviewRequired))
+          _CheckoutPaymentGroups(session: session),
         if (selected != null && (!_choosingPayment || locked))
           _CheckoutCard(
             key: const ValueKey('buy-checkout-confirm-payment'),
@@ -11923,7 +12009,7 @@ class _CheckoutUpiQrState extends State<_CheckoutUpiQr> {
       children: [
         Text('Scan with another phone’s UPI app', style: context.buyBody),
         Text(
-          '${buyV2Money(widget.session.checkoutAmountDueNow)} · MoolSocial',
+          '${buyV2Money(widget.session.checkoutPaymentActionAmount)} · MoolSocial',
           style: context.buyBody,
         ),
         Text(
@@ -12064,6 +12150,114 @@ class _BuyDecisionLayout extends StatelessWidget {
   );
 }
 
+class _CheckoutPaymentGroups extends StatelessWidget {
+  const _CheckoutPaymentGroups({required this.session});
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = session.checkoutPaymentGroups;
+    final attempt = session.checkoutPaymentAttempt;
+    final count = session.checkoutPaymentCount;
+    final orderCount = attempt == null
+        ? session.checkoutFulfilmentGroups.length
+        : attempt.groups.expand((group) => group.fulfilmentKeys).toSet().length;
+    final heading = session.checkoutPaymentGroupReviewRequired
+        ? 'Check payment groups'
+        : count == 0
+        ? 'No payment due now · place orders'
+        : '${count == 1 ? '1 payment' : '$count separate payments'} · $orderCount ${orderCount == 1 ? 'order' : 'orders'}';
+    return Semantics(
+      key: const ValueKey('buy-checkout-payment-groups'),
+      container: true,
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(heading, style: context.buyBody),
+            if (session.checkoutPaymentGroupReviewRequired)
+              Text(
+                'Refresh and review the payment amounts before placing orders.',
+                style: context.buyMeta,
+              )
+            else if (groups.isEmpty)
+              Text(
+                session.checkoutFulfilmentGroups
+                    .map((group) => group.partner)
+                    .toSet()
+                    .join(' · '),
+                style: context.buyMeta,
+              )
+            else
+              for (final group in groups)
+                Builder(
+                  builder: (context) {
+                    final progress = attempt?.groups
+                        .where(
+                          (value) => value.request.paymentGroupId == group.id,
+                        )
+                        .firstOrNull;
+                    final lines =
+                        progress?.request.lines ??
+                        session.checkoutFulfilmentGroups
+                            .where(
+                              (value) =>
+                                  group.fulfilmentKeys.contains(value.key),
+                            )
+                            .expand((value) => value.lines)
+                            .toList();
+                    final scope = lines
+                        .map((line) => line.product.seller)
+                        .toSet()
+                        .join(' · ');
+                    final state = progress?.state;
+                    final status =
+                        state == BuyV2CheckoutSubmissionState.confirmed
+                        ? 'Placed'
+                        : state == null ||
+                              state == BuyV2CheckoutSubmissionState.idle
+                        ? 'Not submitted'
+                        : 'Check original payment';
+                    final due = group.amountDueNow == 0
+                        ? 'No payment due now'
+                        : '${buyV2Money(group.amountDueNow)} with ${group.paymentMethod}';
+                    final balance = group.total - group.amountDueNow;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        '$scope\n$due · $status${balance > 0 ? ' · ${buyV2Money(balance)} due later' : ''}',
+                        style: context.buyMeta,
+                      ),
+                    );
+                  },
+                ),
+            if (session.currentCheckoutPaymentGroup?.state ==
+                BuyV2CheckoutSubmissionState.idle)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: BuyV2ActionStyle.primaryForeground,
+                  minimumSize: const Size(64, 44),
+                  textStyle: context.buyBody.copyWith(fontFamily: 'Inter'),
+                ),
+                onPressed: session.checkoutBusy
+                    ? null
+                    : session.reviewRemainingGroupedCheckout,
+                child: const Text('Review remaining checkout'),
+              ),
+            if (count > 1)
+              Text(
+                'Each payment covers its listed group. Completed orders are kept if another payment fails.',
+                style: context.buyMeta,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CheckoutPaymentStateRow extends StatelessWidget {
   const _CheckoutPaymentStateRow({
     required this.session,
@@ -12096,7 +12290,7 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
       BuyV2CheckoutSubmissionState.paymentActionRequired => (
         Icons.lock_outline_rounded,
         'Ready for secure payment',
-        'Pay ${buyV2Money(session.checkoutAmountDueNow)} to MoolSocial with ${session.selectedPayment}.',
+        'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} to MoolSocial with ${session.selectedPayment}.',
       ),
       BuyV2CheckoutSubmissionState.paymentPending => (
         Icons.schedule_rounded,
@@ -12111,12 +12305,16 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
       BuyV2CheckoutSubmissionState.cancelled => (
         Icons.cancel_outlined,
         'Payment cancelled',
-        'No order was placed. Your Cart is unchanged.',
+        session.checkoutHasGroupedCommitment
+            ? 'Completed groups are kept. Check this original payment before choosing again.'
+            : 'No order was placed. Your Cart is unchanged.',
       ),
       BuyV2CheckoutSubmissionState.failed => (
         Icons.error_outline_rounded,
         'Payment not completed',
-        'No order was placed. Your Cart is unchanged.',
+        session.checkoutHasGroupedCommitment
+            ? 'Completed groups are kept. Check this original payment before choosing again.'
+            : 'No order was placed. Your Cart is unchanged.',
       ),
       BuyV2CheckoutSubmissionState.unavailable => (
         Icons.cloud_off_outlined,
@@ -12611,7 +12809,7 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
               final countStyle = context.buyMeta.copyWith(fontSize: 8);
               final amountText = session.collectionCheckoutSelected
                   ? _collectionCheckoutAmount(session)
-                  : buyV2Money(session.checkoutAmountDueNow);
+                  : buyV2Money(session.checkoutPaymentActionAmount);
               const amountStyle = TextStyle(
                 color: BuyV2Colors.ink,
                 fontSize: 19,

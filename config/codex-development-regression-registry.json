@@ -107652,6 +107652,524 @@
           "prevention": "Add those five exact PNG paths to existing selected parent owners, retaining all historical paths. Keep policy ownership, route ledger and tracked-input qualification aligned; do not weaken the checker. Source fingerprint and successful receipts remain unchanged because this is metadata only."
         }
       },
+      "cartT06T07Execution20261002": {
+        "status": "authorized_reconstruction_before_scope_admission",
+        "authority": "Founder execute these authorizes T06 payment grouping, then T07 recovery including A09 as sequential frontend subworkflows of existing BUY-ACTION-POLISH-20260926-01 / UAW-CURSOR-BUY-READY-20260921. No formal ticket closure, new branch, backend/Google execution, new APK or live payment authority inferred.",
+        "baseline": "e329d01a144ae5348a19d9e714a2c175eb62cca7",
+        "branch": "work/cursor-ui/buy-ready-20260921",
+        "initialGit": {
+          "bytes": 0,
+          "records": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderrBytes": 0,
+          "exitCode": 0
+        },
+        "initialGates": {
+          "coordination": "implementation passed root247 activeTasks3 registry4618",
+          "memory": "implementation passed BuildMode none; complete current memory read through line3698"
+        },
+        "inventoryReadFailure": {
+          "command": "rg -n T06|T07|payment grouping|recovery|A09 docs/quality/CURSOR-BUY* with filename globs",
+          "exitCode": 123,
+          "rootCause": "A positional Windows path contained a wildcard component. Exact literal directory plus -g is required; all search output rejected.",
+          "impact": "No source/evidence/device mutation; short Git status was empty, then independently replaced by mandated raw digest and scalar identities.",
+          "correction": "Before retry inspect every path for wildcard components, use literal verified docs/quality root with filename filters, then bounded exact heading reads.",
+          "prevention": "Existing permanent memory Windows literal-root rule; exact-path and nonzero-exit checks apply to every next inventory.",
+          "architectReview": "Existing architect confirmed register REG4647 before retry; no scope/admission waiver. T06 then T07 sequential under same open parent; actual call paths and reused owners before final plan."
+        },
+        "founderT05Approval": "Founder approved the locally verified T05 checkpoint in chat before selecting next scopes. This is not live/provider acceptance or formal ticket_close.",
+        "carryForward": {
+          "a09": "open frontend pending submitted32/display37 recovery, T07",
+          "formalHandoff": "blocked by earlier0e90 missing required prefix; history/gate/baseline unchanged",
+          "supplierPopup": "T03 frontend followup remains queued separately"
+        },
+        "deferred": [
+          "Backend execution",
+          "Workspace payment/quote/capability/recipient and supplier mapping: Codex after integration",
+          "Google shopping-area/current-location and separately gated delivery Maps source/key/permission work"
+        ],
+        "stopRule": "Complete sequential T06 and T07 scoped device/fix/test/retest/evidence and ordinary prefixed checkpoints, preserve unresolved actual children and formal failure, then stop before T08.",
+        "handoffHeadingReadRecovery": {
+          "incident": "A requested handoff window based on rg line3850 returned section8 implementation sequence rather than T06/T07 headings. Its content is rejected as exact ticket-scope reading evidence. No runtime edit, test or device action followed it.",
+          "rootCause": "Retained mixed CR/newline structure makes rg line numbering differ from Python splitlines indexing; this previously recorded T05 lesson recurred.",
+          "correction": "Locate exact ## T06 and ## T07 headings within the current owner using the same splitter as the subsequent read; require unique boundaries and read complete bounded heading blocks.",
+          "prevention": "Never transfer line numbers between different newline/splitting systems. Required scope reads verify the expected heading and content, not only command exit.",
+          "priorSource": "Existing REG4647 T05 reconstructionReadRecovery already names this root cause; original records remain intact."
+        },
+        "boundedInventoryTruncation": {
+          "status": "rejected_as_completeness_evidence_before_retry",
+          "command": "rg --files docs/quality -g '*T05*' -g '*T06*' -g '*MVP*' -g '*SUBTASK*' -g '*CONTRACT*'",
+          "observedExit": 0,
+          "originalTokenCount": 12920,
+          "outputBudget": 4000,
+          "cause": "Broad historical MVP and contract filename filters were unnecessary for two known current cart subworkflows.",
+          "correction": "Read exact known T05 contract and selected assessment owners; narrow any necessary filename inventory to CURSOR-BUY-T06/T07 only.",
+          "runtimeMutation": false,
+          "registryCountPreserved": 4618
+        },
+        "t06InitialAnalysisFailure": {
+          "status": "registered_before_fix_and_retry",
+          "session": 1460,
+          "exit": 1,
+          "issues": 18,
+          "secondPass": "Four-owner analyzer exited 0 after type fixes but retained 8 new flow-control info diagnostics; clean-analysis acceptance is not claimed. Formatter split the remaining compact guards. Wrap every reported new guard before retry.",
+          "internalReviewBeforeBehaviorTests": "Group result validation must conserve paid-now and balance separately, match order product IDs/method/minor totals, and reject scope defects. Re-check actor after awaited result persistence before automatic zero-due continuation. An unsubmitted zero-due preparation failure must still disclose the first paid amount on the next commitment; pending zero-due status displays its own amount. UI handoff requires the current Checkout and committed amount/method.",
+          "errors": 9,
+          "findings": "The submission enum actually belongs to session, contrary to the reconstructed model-owner assumption, so contract/store references were unresolved. Existing payment/bank validation helpers take one placement result rather than two values. Nine newly introduced flow-control braces also fail the existing analyzer convention.",
+          "correction": "Move the existing unchanged enum into the existing contract owner, re-export it from session to preserve existing import callers, call validators with their actual result signature, and enclose the new if bodies. No new state enum, dependency or ignored diagnostic.",
+          "acceptance": "No successful source-analysis result is claimed for this attempt."
+        },
+        "toolStateResumeFailure": {
+          "status": "registered_before_readback_and_analysis_retry",
+          "finding": "After founder continue input, orchestration load(buyCwd/pyPrefix) returned undefined. Reconcile helper source patch applied by absolute path, but readback command became undefined@' and PowerShell rejected it (exit 1); analyzer process was never created because undefined/apps/mobile was invalid (os error 267).",
+          "correction": "Use explicit authorized worktree and UTF-8 command prefix in each exec invocation after user input; verify branch and HEAD before dependent work. No analyzer result is claimed and no fallback directory is used.",
+          "sourcePatch": "Existing session _reconcileGroupedPayment and reviewRemainingGroupedCheckout additions retained; technical verification pending."
+        },
+        "t06SessionPatchContextFailure": {
+          "status": "registered_before_scoped_patch_retry",
+          "action": "First T06 session wiring apply_patch",
+          "failure": "Expected approvedPurchaseOrder conditional lines were absent; owner patch rejected before mutation.",
+          "cause": "A remembered local variable shape was used instead of the exact current preflight PO context.",
+          "correction": "Read the exact current placement block and patch verified contexts in smaller owner-bounded sections; do not change validation to fit the patch.",
+          "runtimeOwnersAlreadyEdited": [
+            "buy_v2_content_contracts.dart",
+            "buy_v2_saved_products_store.dart"
+          ],
+          "sessionMutationFromRejectedPatch": false
+        },
+        "nativeCapturePathFailure": {
+          "status": "registered_before_capture_retry",
+          "baselineFullRestart": "attach exit 0, restart code 0, detached true; session 33448 closed",
+          "captureExit": 1,
+          "finding": "PNG captured while app still displayed its normal startup screen; uiautomator dump returned 0 but adb pull failed for /data/local/tmp/codex-cart-t06-baseline-landing.xml. Exact read-only ls confirmed file absent (exit 1). No paired-screen proof is claimed.",
+          "retainedPartialEvidence": "apps/mobile/build/t06-t07-cart-20261002/t06-baseline-landing.png",
+          "correction": "Use the established previous device capture pattern, inspect dump diagnostics and require file existence/parse before proof; retain failures and use a fresh unique capture label.",
+          "runtimeMutation": false
+        },
+        "t06Admission": {
+          "contractPath": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json",
+          "contractSha256": "1280DB8ABBFF9F38931BEEF701CEDB56204B0D26691121A4751F6479CB3C9C53",
+          "rootClaims": 248,
+          "mvpGateExit": 0,
+          "incrementalImplementationGateExit": 0,
+          "memoryImplementationGateExit": 0,
+          "coordinationGateExit": 1,
+          "pairedAllowlistRepairGateExit": 0,
+          "pairedAllowlistRepairGateSession": 4545,
+          "deviceMemoryGateExit": 0,
+          "deviceMemoryGateSession": 96625,
+          "baselineNativeEvidence": {
+            "cart": "t06-baseline-cart",
+            "cartPngSha256": "aed7a0b8b931c57208012f1a12fe9fdde558dba3f8c14bc73fa5d1f39b6ee7bb",
+            "checkout": "t06-baseline-checkout",
+            "checkoutPngSha256": "931aec3fa5484b26a4dc4a250f8f48b119c2f55bf42d0881ed12abffecfcb66a",
+            "actualJourney": "Existing native mixed Cart has 3 items/837 INR; saved receiving address and Call on arrival survive full restart. Checkout reachable; supplier terms keep final Pay disabled. No payment attempt.",
+            "source": "e329d01a / bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e"
+          },
+          "coordinationRejection": "Cursor claim must contain only its exact setup and selected storefront owners.",
+          "cause": "Actual T06 contract was claimed but its paired exact checker allowlist entry was omitted.",
+          "correctionBeforeRetry": "Add only the actual immutable T06 contract to the existing cursor claim allowlist; future receipts stay unclaimed, no runtime boundary or check is weakened.",
+          "architectPlanReview": "Optional group metadata belongs to existing authoritative quote, with exact partition and independent amount conservation, explicit scoped placement opt-in, account-bound durable requests and independent completion. Existing pending amounts without a saved attempt remain unknown rather than reconstructed.",
+          "baselineCodeFinding": "Existing all-basket place/reconcile and whole-Cart completion have no obligation group publication, independent result state or frozen account-scoped group requests. T06 repairs these frontend contracts/states; authenticated workspace grouping and backend T11 execution remain Codex after integration/deferred.",
+          "handoffAdmissionReadRecovery": "The first handoff insertion readback used unanchored substring ## T06 and returned only # because it matched inside ### T06. Rejected as readback proof before retry; use exact anchored heading lines and require the complete admission block ending at the peer ## T06 heading. No incorrect document edit occurred.",
+          "runtimeMutationBeforeAdmission": false
+        },
+        "aggregateReadBudgetRecovery": {
+          "status": "rejected_partial_UI_read_before_retry",
+          "tool": "functions.exec batched bounded source reads",
+          "cause": "Per-command budgets were sufficient but their 13333-token aggregate exceeded the default 10000-token wrapper budget.",
+          "correction": "Keep each source read below the aggregate wrapper budget; set an explicit max_output_tokens for any deliberately larger independent batch.",
+          "lostOwner": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "scopeProjectionRecurrence": "A subsequent root-claim projection printed all 247 owners and all historical preselection keys, exceeding its 2500-token command budget (9707 original tokens). Rejected as admission evidence before retry; corrected projection checks only required exact owner membership and current ticket/execution scalars.",
+          "encodingReadFailure": "A bounded session-test read omitted encoding and Windows cp1252 rejected byte 0x81 (exit 1). Later the corrected handoff bounds parsed successfully but stdout cp1252 rejected the rupee character (exit 1). Both partial reads rejected before retry, no source mutation. All subsequent pathlib reads use explicit UTF-8 and each Python text-output invocation sets PYTHONIOENCODING=utf-8 or reconfigures stdout explicitly.",
+          "mvpAdmissionAnchorFailure": "Two T06 patch-generation attempts failed before patch creation or MVP mutation (both exit 1): selectedTicketAssessment also occurs in protected-candidate history, then substring matching top-level ticket also matched deeper indentation. Architect reviewed the recurrence. Retry uses start-of-line exact indentation within the actual bounded object, JSON raw_decode value bounds, an explicit allowed structural-difference list, unchanged protectedCandidateState and input-source hash. No rollback or gate exception.",
+          "runtimeMutation": false,
+          "registryCountPreserved": 4618
+        },
+        "boundedReadAndGroupSourceReview3": {
+          "status": "registered_before_correction",
+          "readFailure": "A combined source read requested 7413 output tokens against its 6400-token cap and was truncated. Its omitted spans are not evidence; subsequent reads use at most 120 lines per command and inspect truncation.",
+          "fixtureDefect": "The unrun isolated group fixture uses non-existent BuyV2OrderStatus.placed. Actual enum is preparing, confirmed, dispatched, arriving, delivered. Use preparing to preserve payment versus supplier-acceptance distinction.",
+          "sourceFindings": [
+            "Persisted group decoder accepts duplicate idempotency keys across groups and decodes absent action URI as an empty URI.",
+            "Group QR/payment amount getter and bank-transfer amount text still read whole-Cart due rather than current frozen group obligation."
+          ],
+          "boundary": "T06 group corrections only; legacy A09 frozen amount and cancellation recovery remain T07. No live payment or backend integration evidence."
+        },
+        "boundedReadReview4": {
+          "status": "registered_before_further_implementation",
+          "failure": "A 255-line combined read produced 2941 tokens against cap2850, truncating 91 tokens. No omitted span is accepted as evidence.",
+          "correction": "Use one relevant block per result or explicitly cap aggregate characters below9000 and request5000 output tokens; do not estimate a token cap from line count alone.",
+          "review": "Architect was consulted for the repeated read failure. The isolated fixture enum correction is a source review finding before execution, not a failed test. Group result tests will also reject cross-destination order facts."
+        },
+        "t06FocusedFailure1": {
+          "status": "registered_before_fix_or_retry",
+          "command": "python -B apps/mobile/build/t06-t07-cart-20261002/checks.py focused t06-focused-1",
+          "exitCode": 1,
+          "sourceSha256": "248e328418b5337bcc3c027d033a8c8aeb623b312438f26b6fb078efb4c57eb0",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-focused-1.jsonl",
+          "logSha256": "fde69b5b224f294d164ba4ea5e22d32e2ab98339c4c672349ec9831c1f070eae",
+          "inspectionFailure": "The first JSONL inspection parsed every line as JSON and stopped on Flutter's non-JSON banner (JSONDecodeError, exit1). Retry uses the existing check runner's skip-non-JSON parser; no omitted source block is considered read.",
+          "passed": 12,
+          "failedTests": 1,
+          "failure": "T06 credit group completes once before paid group and survives payment failure: expected two group requests, actual one. No payment or integration claim; determine whether fixture scope or remaining-group revalidation caused the hold."
+        },
+        "jsonlInspectionFailure2": {
+          "status": "registered_before_retry",
+          "exitCode": 1,
+          "failure": "JSONL inspection skipped non-JSON text but called get on a JSON list (AttributeError). Existing checks.py correctly also requires a dict. No source block following the failed parser was read.",
+          "correction": "Reuse both guards from the existing parser: catch ValueError then isinstance(event, dict). Read source independently. Architect consulted for repeated inspection failure; test acceptance unchanged."
+        },
+        "t06FocusedFailure2": {
+          "status": "registered_before_fix_or_retry",
+          "exitCode": 1,
+          "sourceSha256": "f5d1b323b39f49d95da9e7a5fd436bb9acf67a5eed70cf2f3d68da81af4e8919",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-focused-2.jsonl",
+          "logSha256": "7d8537570c05bb99e6679f70f52f4646537aa32c81ca055c797056fe411c00f6",
+          "passed": 12,
+          "failedTests": 1,
+          "diagnostic": "Zero-due request completed (orders1, due0). Next group remains idle; generic remaining-review guard prevents paid placement. No repeated connector call.",
+          "review": "Architect consulted for repeated behavior failure. Inspect prune/revalidation; preserve unfinished original agreements only while retaining live actor, price, quantity, address, expiry and eligibility gates."
+        },
+        "t06WidgetFailure1": {
+          "status": "registered_before_fix_or_retry",
+          "exitCode": 1,
+          "sourceSha256": "a61fcf8c93a5953e91a76bd7c99e7ef49bfded846bb3eec787dc629688e38940",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-focused-4.jsonl",
+          "logSha256": "8f173442bd2a50a5733a063d5a2fed76313bc4aa30cc21f20eb2535f3fcabca8",
+          "passed": 13,
+          "failedTests": 4,
+          "failure": "All four newly added group-disclosure widget cases fail; inspect actual framework messages before fixing. Session cases pass, no technical or native acceptance claimed."
+        },
+        "t06WidgetFailure2": {
+          "status": "registered_before_fix_or_retry",
+          "exitCode": 1,
+          "sourceSha256": "f0a47a9f0c75f96839bb8224e0c1953fda20911bd040f711ae9065f7f50bf5f4",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-focused-5.jsonl",
+          "logSha256": "76b94867ff2c513b6d219c933bf2a5edfc5fcc35f57a21af3e4deb7286bb294a",
+          "passed": 13,
+          "failedTests": 4,
+          "cause": "After correctly scrolling to the lazy group disclosure, the expected 'payment 1 of 2' text is absent. Actual dock copy is 'Pay amount · 1 of 2'. This is a copy/test mismatch, not demonstrated overflow.",
+          "correction": "Explicitly label Payment 1 of N in the dock and retain narrow, landscape,200% and reduced-motion checks. Architect consulted; no weaker layout assertion."
+        },
+        "t06PerFulfilmentAllocationReview": {
+          "status": "registered_before_correction",
+          "finding": "Group confirmation currently conserves aggregate total/due/balance but can miss swapped supplier allocations inside a compatible multi-Store payment group.",
+          "correction": "Freeze existing authoritative quote and accepted-term total/due per original fulfilment in minor units; persist exact scope and conservation before effects; match each independent supplier order to its original complete fulfilment lines and allocation. Missing or malformed confirmation stays unresolved with original key/reference.",
+          "review": "Architect reviewed the boundary. Do not infer missing original allocations from current Cart, split aggregate figures, add a provider or weaken payment recovery.",
+          "testsRequired": [
+            "valid compatible two-Store result",
+            "swapped supplier totals and due/balance with unchanged aggregate",
+            "allocation persistence round-trip"
+          ]
+        },
+        "t06FixturePatchRejection": {
+          "status": "registered_before_retry",
+          "failure": "Fixture allocation-helper patch expected a one-line productIds expression that Dart formatting had split. Patch atomically rejected; fixture unchanged. The independent Store decoder patch completed.",
+          "correction": "Read the current formatted fixture helper and replace only its bounded body using exact context. No behavior or validation exception."
+        },
+        "t06AnalysisFailure4": {
+          "status": "registered_before_fix_or_retry",
+          "exitCode": 1,
+          "sourceSha256": "04d323906b66d8a316cb0c1dbd80d7043b71bdbfb502efeb417f0e76450ca9ad",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-analysis-4.log",
+          "logSha256": "6ea2c7231b8daff0a424be25c710e361679624035bc7113326ed1828e8ea04ac",
+          "issues": [
+            "New test awaits a synchronous review bool",
+            "New opt-in test references local paymentFixture before declaration"
+          ],
+          "sourceReview": "Late-dispose case also needs one disposal owner; current helper teardown would dispose twice. Correct fixture lifetime before running behavior tests.",
+          "correction": "Remove invalid await; register the opt-in test after its existing helper declaration; make manual disposal explicit in the isolated fixture only. Runtime obligations compile without analyzer issues."
+        },
+        "t06ReferenceRetentionReview": {
+          "status": "registered_before_test_retry",
+          "sourceCorrection": "After parent/group/key echoes match, retain the provider reference before validating order allocations. A malformed confirmation can then reconcile that original payment.",
+          "patchIncident": "An empty, unnecessary test patch used a stale one-line expectation context and was rejected; no test mutation. The independent session reference-retention patch completed. Add a standalone named behavioral case using a verified insertion anchor; do not retry the empty patch.",
+          "boundary": "Wrong parent/group/key echoes never introduce an unrelated provider reference."
+        },
+        "t06ProjectionReadFailure": {
+          "status": "registered_before_further_projection_or_device_work",
+          "failures": [
+            "Policy projection recursively printed all primary lane metadata rather than only the active owner claim:2677 tokens against2400 cap, truncated.",
+            "A grep of long handoff paragraphs returned2330 tokens against1500 cap, truncated. Omitted portions are not treated as read."
+          ],
+          "correction": "Select only the unique primary /root object containing its248 owners; print bounded scalar/count or short filename lists. Read long Markdown blocks with exact headings and character bounds rather than raw long-line grep.",
+          "captureHelper": "New captures now retain unique numbered diagnostics per command; old successful PNG/XML pairs remain unchanged.",
+          "focused": {
+            "passed": 28,
+            "sourceSha256": "140282fdbc10100020b628a26d1878c7bcaff49498374744b24de7cdc19733b5",
+            "log": "apps/mobile/build/t06-t07-cart-20261002/t06-focused-9.jsonl",
+            "logSha256": "f8e12fed2412eb4ebfa5c2f2d247c54fa4ec393ae504d96f083445d1898323aa",
+            "analysis": "Seven affected Dart owners; no issues; t06-analysis-7.log SHA2562f7b0279fea9422cdf7ce07dc3fadec56fb4e209e52e2837513fd0ab1aacdb29."
+          },
+          "requiredSelectedStatus": "running_not_verified",
+          "nativeStatus": "new_source_refresh_and_journey_pending",
+          "closure": false
+        },
+        "t06SelectedAndOwnershipFailure1": {
+          "status": "registered_before_fix_archive_or_retry",
+          "coordinatorExitCode": 1,
+          "coordinatorFailure": "Required selected tests generated apps/mobile/test/ui_v2/buy/failures/buy-v2-t02-checkout-360x800-android_isolatedDiff.png outside the primary claim. No ownership bypass.",
+          "selectedStatus": "running_with_failure_not_qualified",
+          "finding": "Payment-group summary is rendered for legacy Checkout without published payment-group metadata; it alters the existing approved Checkout golden.",
+          "correction": "Keep the group disclosure for authoritative published plans and frozen group commitments. Preserve legacy UI and approved reference images. After the run closes, retain introduced failure artifacts in the bounded ignored evidence directory, then rerun fresh owner/memory gates before source correction and retesting.",
+          "boundary": "Do not update golden references, weaken selected checks, discard user files or claim selected/device acceptance."
+        },
+        "t06SelectedFailureClosed1": {
+          "status": "registered_before_correction_and_retry",
+          "exitCode": 1,
+          "batch": 1,
+          "passed": 434,
+          "failedTests": 3,
+          "sourceSha256": "140282fdbc10100020b628a26d1878c7bcaff49498374744b24de7cdc19733b5",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-selected-1/selected-1.jsonl",
+          "logSha256": "4d1e502bc11e3359d0ecf80e98783fd83a59c2c5fcd76be6d86589322521ba89",
+          "failedCases": [
+            "R58.8.6 responsive360x800 Android candidate capture",
+            "R58.8.6 responsive390x844 iOS candidate capture",
+            "R58.8.6 responsive430x932 iOS candidate capture"
+          ],
+          "diagnosis": "Actual/master360x800 images were inspected. The only displayed difference is the added legacy1-payment/1-order summary and Store line; approved reference is unchanged.",
+          "archiveBoundary": "Only twelve newly introduced untracked buy-v2-t02-checkout diagnostic images from these three completed failures may move to build/t06-t07-cart-20261002/t06-selected-1/generated-golden-failures, with exact whitelist, resolved path and checksum checks. Preserve all earlier failure files and approved references.",
+          "inventoryReadIncident": "Raw rg of all failure PNGs returned1807 tokens against1700 cap, truncated and included earlier unrelated evidence. The replacement is the Git untracked projection scoped to the exact current generated image whitelist; original inventory is not authoritative for movement.",
+          "batches2And3": "not_run_due_to_failed_batch1",
+          "nativeStatus": "pending_no_acceptance"
+        },
+        "t06GroupVisualFindings1": {
+          "status": "registered_before_correction",
+          "sourceSha256": "fa29ce789cbdf2f09b7092bbd509cfd551d2d63052739ca891c97e6f4f8fe62c",
+          "focusedPassed": 28,
+          "focusedLogSha256": "c5689751aaee3322e1247fff5a5cbdd2e29ac0939c17170165edc0bcc707beeb",
+          "screenshots": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-1",
+          "visualDefect": "After first group placement, the live Cart fingerprint no longer matches the original whole quote. Checkout incorrectly shows total-needs-refresh/previous-total-expired while the original frozen second payment is still valid and enabled.",
+          "correction": "For an existing group commitment, display agreed total, placed-order total and remaining-order total from its frozen requests; preserve the existing quote/refresh view for the legacy uncommitted path. Missing original financial facts remain held. Add widget assertion against the false expired notice.",
+          "captureLimitation": "The new Review remaining TextButton has fallback-font black blocks in the isolated Flutter screenshot; native manifestation is not established. Give this new button the existing Buy text style, preserving font scaling and tap semantics.",
+          "boundary": "Only isolated provider screens inspected; no live/native grouped payment claim. All legacy approved golden images stay unchanged."
+        },
+        "t06AnalysisSourceDrift10": {
+          "status": "registered_before_retry",
+          "analysisProcessExitCode": 0,
+          "qualificationExitCode": 1,
+          "sourceSha256": "6d892626485a2404c03bc08bdd303925d3a7430ab39c43d011c5305a71df765a",
+          "unchangedSource": false,
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t06-analysis-10.log",
+          "logSha256": "16cba943b89df10898e3555c15dc263e235278645234bdd652442ededfd75101",
+          "cause": "An assertion was narrowed from Placed to with UPI-Placed after wait returned a still-running analysis session. Focused tests also started before analysis closed. Neither run is final qualification for this source generation.",
+          "correction": "Close all current Flutter command sessions before any source edit or new Flutter command. Inspect session_id versus exit_code explicitly. Rerun analysis and focused tests serially with fresh labels against unchanged final source; no concurrency exception or weakened source check.",
+          "focused11Status": "active_not_final_qualification",
+          "legacyReferenceImages": "unchanged"
+        },
+        "t06VisualFontReview2": {
+          "status": "registered_before_correction",
+          "sourceSha256": "6628c4ffb1d50af02a0ae9b35bd5db8b12cb550fbdf2843cc2ea4c3278768c53",
+          "serialAnalysis": "t06-analysis-11: exit 0, unchanged source, no issues",
+          "serialFocused": "t06-focused-12: exit 0, 28 passed, unchanged source",
+          "serialGolden": "t06-golden-retest-2: exit 0, 5 passed, unchanged source",
+          "visualFinding": "Viewed fresh groups-first-completed PNG: agreed/placed/remaining totals are correct; Review remaining checkout still renders fallback font blocks. Reuse existing term Change TextButton style with explicit Inter at button level and verify in the existing journey.",
+          "toolFailure": "A repeated Windows rg call used nonexistent wildcard path arguments and an overly broad buyBody search: exit 1, 4685 tokens truncated at 3100. Excluded as evidence. Correct with exact known paths and bounded marker excerpts.",
+          "architectReview": "instruction_architect conceptual follow-up requested before correction; no filesystem access or ownership delegated",
+          "limits": "Isolated qualified provider screenshots; no native grouped payment qualification or live payment executed. Backend/workspace integration remains held."
+        },
+        "t06BindingContextRejection": {
+          "status": "registered_before_retry",
+          "failure": "Policy patch guessed registrySha256 and comma; actual exact owner key is sha256 without comma. apply_patch rejected atomically, no policy mutation. Read exact SHA line before corrected binding."
+        },
+        "t06FinalLocalQualification": {
+          "status": "local_qualified_native_refresh_pending",
+          "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+          "analysis": "t06-analysis-12: exit0, seven owners, no issues, unchanged source",
+          "focused": "t06-focused-13: exit0, 28 passed, no failures or warnings, unchanged source",
+          "selected": "t06-selected-2: three serial closed batches, 437+474+13=924 distinct cases, 983 references, 53 files, zero failures/skips/hit-test/overflow warnings, terminal success, unchanged source",
+          "proofs": "Four closed logs copied and checksum verified at docs/quality/CURSOR-BUY-T06-GROUPS-20261002-{FOCUSED,SELECTED-1,SELECTED-2,SELECTED-3}.jsonl; all 983 selected case local records bound by exact file/name to final source. Dry-run validation and apply both exited0.",
+          "visual": "Six fresh isolated group captures in t06-group-visuals-4; viewed normal/200-percent portrait and landscape, completed/failed journeys. Agreed/placed/remaining totals and the existing explicit Inter TextButton style now render correctly. Approved legacy goldens preserved.",
+          "gitSubjectValidation": "Selected cursor_ui commitPrefix ui and workId buy-ready-20260921 verified against ui(buy-ready-20260921): implement T06 payment groups; branch/upstream remain at e329d01a. No commit or push yet."
+        },
+        "t06NativeRefreshFailure1": {
+          "status": "registered_before_retry",
+          "label": "t06-final-refresh-1",
+          "attachExit": 1,
+          "restarted": false,
+          "detached": false,
+          "observed": "Machine attach emitted daemon.connected and app.start but did not establish app.started before helper timeout. Redmi pidof selected package returned no process. Exact package launcher activity was resolved and launched; no APK or app data changed.",
+          "next": "Check the launched existing app, run fresh applicable owner/memory/device gates, then retry attach with a unique label. No fresh source qualification inferred from the failed refresh.",
+          "installed": "TG8HCYTGGQT885OF, com.moolsocial.app.cursorreview, 1.0.0-r66.36-cursorreview, code2026092701, original font_scale1.0",
+          "holds": "Native group orchestration absent; backend deferred, workspace provider Codex after integration; Google and historical naming blocker remain listed."
+        },
+        "t06NativeRotationCaptureFailure": {
+          "status": "registered_before_retry",
+          "label": "t06-final-portrait-landing",
+          "failure": "capture.py exited1: XML ParseError syntax error line1 column0 immediately after temporary portrait lock. Partial introduced artifacts retained, no source changed, no image/XML qualification inferred.",
+          "previousRefresh": "t06-final-refresh-2 closed exit0, restartCode0, detached true; native landscape t06-final-landing PNG/XML captured successfully.",
+          "settings": "Original accelerometer_rotation1, user_rotation0, font_scale1.0 durably recorded in ignored t06-device-ui-settings.json; portrait lock is temporary and exact settings will be restored.",
+          "correction": "Inspect only unique command diagnostics for this capture; establish stable UI and retry with unique label after fresh applicable gates. Architect conceptual repeated-error review requested. No APK/data clear/live payment."
+        },
+        "t06FrontendCheckpointQualification": {
+          "ticket": "T06",
+          "status": "frontend_locally_verified_integration_deferred_formal_handoff_blocked",
+          "contract": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json",
+          "baseline": "e329d01a144ae5348a19d9e714a2c175eb62cca7",
+          "authority": "Founder execute these and continue selects T06 then T07/A09 under the existing Buy parent and standing lane ticket; checkpoint T06 independently, continue already-authorized T07, stop before T08.",
+          "outcome": "Disclose authoritative payment groups and count before commitment; durably freeze requests and each fulfilment allocation before effects; preserve completed and credit orders when another payment fails; reconcile original group identities without resubmission. Payment success does not imply supplier acceptance.",
+          "repairs": [
+            "Exact scope partition, independent total/due conservation, published per-group payment limits and explicit connector opt-in",
+            "Durable immutable grouped requests, per-fulfilment obligations and independent outcome/cart cleanup",
+            "Zero-due obligations submit once under the initial explicit commitment; paid groups use separate explicit actions",
+            "Retain original provider reference for malformed echoed confirmation; reject swapped Store allocations and stale/disposed results",
+            "Frozen agreed/placed/remaining totals after one group completes; expired unsubmitted remainder can be reviewed without clearing completed orders",
+            "Render group summary only for an explicit published/frozen group plan, preserving approved legacy goldens; reuse existing Inter button style"
+          ],
+          "isolatedVisualReview": {
+            "status": "six_final_qualified_provider_captures_visually_reviewed",
+            "folder": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4",
+            "coverage": "320x800 and640x360 at1.0/2.0 text, reduced motion, first group completed and second payment failed",
+            "limit": "Explicit isolated provider fixtures, not live Store/payment or native grouped orchestration evidence",
+            "evidence": [
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4/groups-320x800-1.0-review.png",
+                "sha256": "3e9be746d5d7d6512bd80f79581cec7e58d74f8cc51d5e338b45056309774e02"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4/groups-320x800-2.0-review.png",
+                "sha256": "815282ccbe71bfe742d790d51de79ba8237e6317f30638eb59fe0aa6396d0899"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4/groups-640x360-1.0-review.png",
+                "sha256": "afa4ef0d7d358f58d1a7e7788c9139512293bb276bfc6bfa09ac6c93208fef62"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4/groups-640x360-2.0-review.png",
+                "sha256": "af264ff94d69a7a4d98c6458754bc19960036553170759313815ba4a3a8469b7"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4/groups-first-completed.png",
+                "sha256": "b3167dd22b45c06472c55621a2f139b23476d9e26c8572afd3822102079e86dc"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-group-visuals-4/groups-second-payment-failed.png",
+                "sha256": "f8e53b8c54b844be649bec2579cc6fd926649088f067a34e32c018fd697caa9e"
+              }
+            ]
+          },
+          "deviceReview": {
+            "status": "actual_Redmi_existing_native_legacy_flow_reviewed",
+            "device": "TG8HCYTGGQT885OF",
+            "packageId": "com.moolsocial.app.cursorreview",
+            "installedVersion": "1.0.0-r66.36-cursorreview",
+            "installedVersionCode": 2026092701,
+            "refresh": "t06-final-refresh-2: full Dart restart code0, detach true, attach exit0",
+            "journey": "Existing mixed Cart restored2products/3items/837rupees; Checkout retains the receiving address and single Call on arrival instruction. Public instruction strip has no Clear; Clear is only inside its composer. Cancelled an unchanged draft. Normal and200-percent text retain total/action access; payment remains disabled at the supplier-agreement prerequisite, and no payment was attempted.",
+            "limits": "Installed review provider has no published paymentGroups or GroupAdapter. No new APK, install, data clear, live payment or native grouped-payment claim.",
+            "settingsRestored": "Exact original accelerometer_rotation1/user_rotation0/font_scale1.0 restored and read back successfully",
+            "runtimeOwnerSha256": {
+              "apps/mobile/lib/features/buy/buy_v2_session.dart": "c67bcd32c0f99cf58ba9284a485490c0c5709b294758764f8a65568d5dac4614",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart": "e67c3d3d064507966e23d60099942cab6d1653a2c64e640b13a2a54f394fa08f",
+              "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart": "d832d073df57e328092a4b6a33f8c793072ab1102d16232545efe480945c1abd",
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "cb152f883467e9ff053b70ccad9276cbe83ca10f56f297c537cb81fe292b527a"
+            },
+            "evidence": [
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-cart.png",
+                "sha256": "bf34e85c259387a1504a91b45ae3e3941084ea6ab5003b42adc22b6a413347cf"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-cart.xml",
+                "sha256": "49d0cf0281a57dd2e99cf58f85074a32bd8e922a48786b700e49479d8f5dfcbf"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-checkout.png",
+                "sha256": "a067b1c9c921638e5edbbc9256566f74c1a67f908cf7426c878b48c4fde6eea1"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-checkout.xml",
+                "sha256": "d299ecbd70f3bd18a4acb174c680a74a2589d84b436c2ebf0f7e3d434b799c80"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-instruction-composer.png",
+                "sha256": "bc43a88dc1c8b2f8fb2822565c6a16ddd78c41977ecaa133e022ea192d7588b2"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-instruction-composer.xml",
+                "sha256": "e7c26cfffff539eed094e24de54add024382d135405e1e7d0e8411a2ad5954a3"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-checkout-text200-scroll.png",
+                "sha256": "de1c5e20d947edf63bf2e8fa55c6d5940ea9add7167844f29d76057d9b840e02"
+              },
+              {
+                "path": "apps/mobile/build/t06-t07-cart-20261002/t06-final-checkout-text200-scroll.xml",
+                "sha256": "d5debfdc5999d6da1d8dc29605a11a0de5f0003940c46fd35a5c165c4e181374"
+              }
+            ]
+          },
+          "integrationHolds": [
+            "T11 backend payment-group orchestration and authoritative recovery integration deferred",
+            "Workspace provider mapping and implementation: Codex after integration",
+            "Google shopping-area/current-location dependency remains listed; Maps source/key/permissions separately gated",
+            "T03 supplier-policy product-sheet/add-popup work remains separate from agreed payment obligations",
+            "Formal coordinator handoff remains blocked by ancestor0e90a6ca missing ui(buy-ready-20260921): prefix; no history rewrite or baseline exception authorized"
+          ],
+          "carryForward": [
+            "T07",
+            "BUY-ACTION-POLISH-20260926-01-A09",
+            "BUY-ACTION-POLISH-20260926-01-A08"
+          ],
+          "excludedEvidence": "Earlier failed/concurrent/source-drift runs, initial failed native refresh and rotation capture are retained and registered, excluded from final qualification. Approved reference images untouched;12introduced golden failure PNGs archived with matching checksums.",
+          "architectReview": "Conceptual checkpoint review found no material gap; requires durable separation of frontend/isolated/native/integration status, final precommit gates, ordinary feature checkpoint and remote/clean verification; then T07/A09. No formal closure claim.",
+          "contractSha256": "1280db8abbff9f38931beef701cedb56204b0d26691121a4751f6479cb3c9c53",
+          "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+          "localQualification": {
+            "focusedPassed": 28,
+            "selectedDistinctPassed": 924,
+            "selectedReferences": 983,
+            "selectedFiles": 53,
+            "selectedBatches": 3,
+            "failed": 0,
+            "skipped": 0,
+            "hitTestOrOverflowWarnings": 0,
+            "terminalSuccess": true,
+            "unchangedSource": true,
+            "evidence": [
+              {
+                "path": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-FOCUSED.jsonl",
+                "sha256": "3c384b246c240bbc4066898166a6936be6671154bbfca6942326812649fe298a",
+                "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d"
+              },
+              {
+                "path": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl",
+                "sha256": "b9e5a856577e5e0174ced161f9994bfa5057acc6d0964600f63b209b62de00fd",
+                "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d"
+              },
+              {
+                "path": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl",
+                "sha256": "15dea252ea067840bebd51c0d519b0192626b8a1db362348d9e99dcdeee65e48",
+                "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d"
+              },
+              {
+                "path": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl",
+                "sha256": "ebd1f1ff5d7418364d389b6ec34915d53fccae72b44e90f182a3239ec02d5d11",
+                "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d"
+              }
+            ],
+            "analysis": {
+              "owners": 7,
+              "result": "No issues found",
+              "path": "apps/mobile/build/t06-t07-cart-20261002/t06-analysis-12.log",
+              "sha256": "fc49523be451bd3c7cc7fe539359c2b17c50850ebe8ad8cd3b955eb1f5fbeaa9"
+            }
+          }
+        },
+        "t06DocumentationContextRejection": {
+          "status": "registered_before_retry",
+          "failure": "Authored handoff patch based on read_text.splitlines heading/blank-line context rejected atomically. No handoff or Ready mutation occurred. Historical mixed CRCRLF/CRLF may differ from the patch physical-line model.",
+          "correction": "Inspect bounded raw bytes at the unique T06 heading, use exact physical line endings or a unique superseding note anchor; preserve historical content and avoid whole-file normalization. Architect repeated-error conceptual review requested. Final Dart/tests/native qualification unchanged."
+        },
+        "t06DocumentationDiffWhitespace": {
+          "status": "registered_before_correction",
+          "failure": "git diff --check exited1 for the newly changed T06 status line: inherited CRCRLF at that exact line is treated as trailing whitespace. No runtime/test failure or source fingerprint change.",
+          "previousCorrection": "Exact status bytes were replaced within the unique T06 section after SHA assertion, preserving all surrounding bytes; apply_patch-authored qualification note appended. Ready note applied successfully.",
+          "correction": "Remove only the two inherited CR bytes at the changed status line ending, retaining every other historical byte and all appended notes. Rerun affected diff/metadata/precommit checks; no runtime rerun needed."
+        }
+      },
       "t05PaymentEligibilityAutonomous20261002": {
         "status": "frontend_locally_verified_integration_deferred_formal_handoff_blocked",
         "authority": "Founder next on 2 October 2026 authorizes the next bounded frontend subworkflow T05 under existing BUY-ACTION-POLISH-20260926-01 and UAW-CURSOR-BUY-READY-20260921. No new ticket/branch or handoff acceptance is inferred.",

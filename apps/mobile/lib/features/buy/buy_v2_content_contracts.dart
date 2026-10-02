@@ -1942,6 +1942,8 @@ class BuyV2OrderPlacementRequest {
     this.purchaseOrderRequestId,
     this.purchaseOrderRevision,
     this.procurementContext,
+    this.checkoutAttemptId,
+    this.paymentGroupId,
   });
 
   final List<BuyV2CartLine> lines;
@@ -1964,6 +1966,11 @@ class BuyV2OrderPlacementRequest {
   final String? purchaseOrderRequestId;
   final String? purchaseOrderRevision;
   final BuyV2ProcurementContext? procurementContext;
+
+  /// Present together only for an explicitly supported group-scoped placement.
+  /// Deduplicate the immutable key and authorize only these lines and amounts.
+  final String? checkoutAttemptId;
+  final String? paymentGroupId;
 }
 
 @immutable
@@ -1979,6 +1986,9 @@ class BuyV2OrderPlacementResult {
     this.orders = const [],
     this.failureKind,
     this.affectedProductId,
+    this.checkoutAttemptId,
+    this.paymentGroupId,
+    this.idempotencyKey,
   });
 
   final BuyV2OrderPlacementOutcome outcome;
@@ -1991,6 +2001,11 @@ class BuyV2OrderPlacementResult {
   final List<BuyV2Order> orders;
   final BuyV2OrderPlacementFailureKind? failureKind;
   final String? affectedProductId;
+
+  /// Group connectors echo all three identities for placement and recovery.
+  final String? checkoutAttemptId;
+  final String? paymentGroupId;
+  final String? idempotencyKey;
 }
 
 /// Supplied by the authenticated MoolSocial merchant payment connector only.
@@ -2383,6 +2398,115 @@ class BuyV2CheckoutQuoteLine {
   final int total;
 }
 
+enum BuyV2CheckoutSubmissionState {
+  idle,
+  submitting,
+  paymentActionRequired,
+  paymentPending,
+  paymentUnknown,
+  cancelled,
+  confirmed,
+  failed,
+  unavailable,
+}
+
+@immutable
+class BuyV2CheckoutPaymentGroup {
+  const BuyV2CheckoutPaymentGroup({
+    required this.id,
+    required this.fulfilmentKeys,
+    required this.paymentMethod,
+    required this.total,
+    required this.amountDueNow,
+    this.currency = 'INR',
+  });
+
+  final String id;
+  final Set<String> fulfilmentKeys;
+  final String paymentMethod;
+  final int total;
+  final int amountDueNow;
+  final String currency;
+}
+
+/// Frozen progress in the existing account-scoped customer-state owner.
+/// A submitted request is historical evidence, never a fresh quote or grant.
+@immutable
+class BuyV2CheckoutFulfilmentObligation {
+  const BuyV2CheckoutFulfilmentObligation({
+    required this.fulfilmentKey,
+    required this.productIds,
+    required this.totalMinor,
+    required this.dueNowMinor,
+  });
+  final String fulfilmentKey;
+  final Set<String> productIds;
+  final int totalMinor;
+  final int dueNowMinor;
+}
+
+@immutable
+class BuyV2CheckoutGroupAttempt {
+  const BuyV2CheckoutGroupAttempt({
+    required this.request,
+    required this.fulfilmentKeys,
+    this.obligations = const [],
+    this.state = BuyV2CheckoutSubmissionState.idle,
+    this.paymentReference,
+    this.paymentActionUri,
+    this.bankTransferInstructions,
+    this.confirmedOrderIds = const [],
+  });
+
+  final BuyV2OrderPlacementRequest request;
+  final Set<String> fulfilmentKeys;
+  final List<BuyV2CheckoutFulfilmentObligation> obligations;
+  final BuyV2CheckoutSubmissionState state;
+  final String? paymentReference;
+  final Uri? paymentActionUri;
+  final BuyV2BankTransferInstructions? bankTransferInstructions;
+  final List<String> confirmedOrderIds;
+
+  bool get hasValidObligations {
+    final scopes = <String>{};
+    final products = <String>{};
+    return obligations.isNotEmpty &&
+        obligations.every(
+          (value) =>
+              scopes.add(value.fulfilmentKey) &&
+              value.productIds.isNotEmpty &&
+              value.productIds.every(products.add) &&
+              value.dueNowMinor >= 0 &&
+              value.totalMinor >= value.dueNowMinor &&
+              value.totalMinor <= 9007199254740991,
+        ) &&
+        setEquals(scopes, fulfilmentKeys) &&
+        setEquals(
+          products,
+          request.lines.map((line) => line.product.id).toSet(),
+        ) &&
+        obligations.fold<int>(0, (sum, value) => sum + value.totalMinor) ==
+            request.total * 100 &&
+        obligations.fold<int>(0, (sum, value) => sum + value.dueNowMinor) ==
+            request.amountDueNow * 100;
+  }
+}
+
+@immutable
+class BuyV2CheckoutPaymentAttempt {
+  const BuyV2CheckoutPaymentAttempt({
+    required this.id,
+    required this.ownerScope,
+    required this.quoteValidUntil,
+    required this.groups,
+  });
+
+  final String id;
+  final String ownerScope;
+  final DateTime quoteValidUntil;
+  final List<BuyV2CheckoutGroupAttempt> groups;
+}
+
 @immutable
 class BuyV2CheckoutQuote {
   const BuyV2CheckoutQuote({
@@ -2392,6 +2516,7 @@ class BuyV2CheckoutQuote {
     required this.validUntil,
     required this.lines,
     required this.total,
+    this.paymentGroups,
   });
 
   final String id;
@@ -2400,6 +2525,11 @@ class BuyV2CheckoutQuote {
   final DateTime validUntil;
   final List<BuyV2CheckoutQuoteLine> lines;
   final int total;
+
+  /// Authenticated compatible obligations, allocated from this exact quote.
+  /// Null retains legacy whole-basket placement. Empty/invalid is a hold.
+  /// Never infer groups by dividing an amount to bypass a payment limit.
+  final List<BuyV2CheckoutPaymentGroup>? paymentGroups;
 }
 
 @immutable
@@ -2656,6 +2786,18 @@ abstract interface class BuyV2PendingOrderRecoveryAdapter {
   Future<BuyV2OrderPlacementResult> recoverOrder({
     required String idempotencyKey,
   });
+}
+
+/// Opt in beside the existing commerce connector after workspace integration.
+/// Each request is one immutable obligation within the disclosed commitment.
+/// Reconciliation/recovery use the existing operations and echo group identity;
+/// success of one group does not imply atomic checkout or supplier acceptance.
+abstract interface class BuyV2GroupedOrderPlacementAdapter {
+  /// Confirmation returns one independent order for each original quoted
+  /// fulfilment, preserving its complete lines and agreed total/due allocation.
+  Future<BuyV2OrderPlacementResult> placePaymentGroup(
+    BuyV2OrderPlacementRequest request,
+  );
 }
 
 abstract interface class BuyV2CommerceAdapter {

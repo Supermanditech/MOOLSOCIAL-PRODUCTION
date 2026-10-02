@@ -1154,6 +1154,12 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl',
   'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl',
   'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl',
+  # Exact current T06 contract; future receipts are admitted only when closed.
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl',

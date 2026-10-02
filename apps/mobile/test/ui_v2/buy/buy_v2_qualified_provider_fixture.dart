@@ -92,6 +92,11 @@ BuyV2CommerceSnapshot testPaymentSnapshot(
 class TestPaymentQuote implements BuyV2CheckoutQuoteAdapter {
   int charge = 0;
   Completer<void>? gate;
+  List<BuyV2CheckoutPaymentGroup> Function(
+    List<BuyV2CheckoutQuoteLine>,
+    String,
+  )?
+  groupsFor;
   @override
   Future<BuyV2CheckoutQuoteSnapshot> loadQuote({
     required List<BuyV2FulfilmentGroup> groups,
@@ -128,9 +133,167 @@ class TestPaymentQuote implements BuyV2CheckoutQuoteAdapter {
         validUntil: now.add(const Duration(hours: 1)),
         lines: lines,
         total: lines.fold(0, (total, line) => total + line.total),
+        paymentGroups: groupsFor?.call(lines, selectedPaymentMethod),
       ),
     );
   }
+}
+
+/// Isolated group connector. Never installed in native review or live commerce.
+class TestGroupedPaymentCommerce extends TestPaymentCommerce
+    implements
+        BuyV2GroupedOrderPlacementAdapter,
+        BuyV2PendingOrderRecoveryAdapter {
+  final originalRequests = <String, BuyV2OrderPlacementRequest>{};
+  final reconciledKeys = <String>[];
+  final recoveredKeys = <String>[];
+  FutureOr<BuyV2OrderPlacementResult> Function(BuyV2OrderPlacementRequest)?
+  onGroup;
+  FutureOr<BuyV2OrderPlacementResult> Function(BuyV2OrderPlacementRequest)?
+  onReconcile;
+
+  @override
+  Future<BuyV2OrderPlacementResult> placePaymentGroup(
+    BuyV2OrderPlacementRequest request,
+  ) async {
+    requests.add(request);
+    originalRequests[request.idempotencyKey] = request;
+    return onGroup == null
+        ? testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          )
+        : await onGroup!(request);
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async {
+    reconciledKeys.add(idempotencyKey);
+    final request = originalRequests[idempotencyKey]!;
+    return onReconcile == null
+        ? testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          )
+        : await onReconcile!(request);
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> recoverOrder({
+    required String idempotencyKey,
+  }) async {
+    recoveredKeys.add(idempotencyKey);
+    final request = originalRequests[idempotencyKey]!;
+    return onReconcile == null
+        ? testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          )
+        : await onReconcile!(request);
+  }
+}
+
+BuyV2OrderPlacementResult testGroupedPlacement(
+  BuyV2OrderPlacementRequest request, {
+  BuyV2OrderPlacementOutcome outcome = BuyV2OrderPlacementOutcome.confirmed,
+  String? groupId,
+  int? paidNow,
+  List<BuyV2Order>? orders,
+  Map<String, (int, int)>? allocations,
+}) => BuyV2OrderPlacementResult(
+  outcome: outcome,
+  customerMessage: 'Isolated grouped provider response.',
+  checkoutAttemptId: request.checkoutAttemptId,
+  paymentGroupId: groupId ?? request.paymentGroupId,
+  idempotencyKey: request.idempotencyKey,
+  purchaseReference: request.checkoutAttemptId,
+  paymentReference: 'test-${request.paymentGroupId}',
+  paymentActionUri: outcome == BuyV2OrderPlacementOutcome.paymentActionRequired
+      ? Uri.https('payments.example.test', '/group')
+      : null,
+  orders:
+      orders ??
+      (outcome == BuyV2OrderPlacementOutcome.confirmed
+          ? [
+              for (final lines
+                  in allocations == null
+                      ? [request.lines]
+                      : [
+                          for (final line in request.lines) [line],
+                        ])
+                BuyV2Order(
+                  id: 'test-order-${request.idempotencyKey}-${lines.first.product.id}',
+                  destination: lines.first.product.destination,
+                  title: 'Test group order',
+                  itemSummary: 'Isolated test lines',
+                  total:
+                      allocations?[lines.first.product.id]?.$1 ?? request.total,
+                  partner: lines.first.product.seller,
+                  partnerType: lines.first.product.sellerType,
+                  promise: 'Test delivery promise',
+                  destinationLabel: request.address.shortLine,
+                  progress: 0,
+                  status: BuyV2OrderStatus.preparing,
+                  purchaseId: request.checkoutAttemptId,
+                  productIds: lines.map((line) => line.product.id).toList(),
+                  lines: lines,
+                  paymentMethod: request.paymentMethod,
+                  amountPaidNow:
+                      paidNow ??
+                      allocations?[lines.first.product.id]?.$2 ??
+                      request.amountDueNow,
+                  balanceDue:
+                      (allocations?[lines.first.product.id]?.$1 ??
+                          request.total) -
+                      (allocations?[lines.first.product.id]?.$2 ??
+                          request.amountDueNow),
+                  recipient: request.address.recipient,
+                  addressLine: request.address.line,
+                ),
+            ]
+          : const []),
+);
+
+class TestGroupedPaymentTerms implements BuyV2CommercialPaymentTermsAdapter {
+  bool credit = false;
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async => BuyV2CommercialPaymentTermsSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    terms: [
+      for (final group in groups)
+        BuyV2CommercialPaymentTerm(
+          id: 'test-term-${group.key}',
+          fulfilmentKey: group.key,
+          destination: group.destination,
+          supplierName: group.partner,
+          kind: group.destination != BuyV2Destination.wholesale
+              ? BuyV2CommercialPaymentTermKind.retailAdvance
+              : credit
+              ? BuyV2CommercialPaymentTermKind.supplierCredit
+              : BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+          orderTotal: quotedTotalsByFulfilmentKey[group.key]!,
+          amountDueNow:
+              credit && group.destination == BuyV2Destination.wholesale
+              ? 0
+              : quotedTotalsByFulfilmentKey[group.key]!,
+          balanceDue: credit && group.destination == BuyV2Destination.wholesale
+              ? quotedTotalsByFulfilmentKey[group.key]!
+              : 0,
+          balanceDueLabel: 'Test agreed balance',
+          sourceId: 'isolated-test-terms',
+          netDays: credit && group.destination == BuyV2Destination.wholesale
+              ? 30
+              : null,
+        ),
+    ],
+  );
 }
 
 /// Simulated provider grants for named test SKUs only. These are not live

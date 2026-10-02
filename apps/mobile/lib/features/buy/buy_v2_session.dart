@@ -17,6 +17,8 @@ import 'buy_v2_search_relevance.dart';
 import 'buy_v2_saved_products_store.dart';
 import 'buy_v2_shopping_alerts.dart';
 
+export 'buy_v2_content_contracts.dart' show BuyV2CheckoutSubmissionState;
+
 String _buyV2SavedKey(BuyV2Product product) => product.storeId == null
     ? '${product.destination.name}|${product.canonicalId}'
     : '${product.destination.name}|listing:${Uri.encodeComponent(product.id)}';
@@ -177,18 +179,6 @@ typedef _BuyV2RecoveryOrigin = ({
   String? productId,
   String? orderId,
 });
-
-enum BuyV2CheckoutSubmissionState {
-  idle,
-  submitting,
-  paymentActionRequired,
-  paymentPending,
-  paymentUnknown,
-  cancelled,
-  confirmed,
-  failed,
-  unavailable,
-}
 
 final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
   const _BuyV2UnavailableCommerceAdapter();
@@ -5113,7 +5103,7 @@ class BuyV2Session extends ChangeNotifier {
       }
       return checkoutLines.fold(0, (total, line) => total + line.total * 100);
     }
-    return checkoutAmountDueNow * 100;
+    return checkoutPaymentActionAmount * 100;
   }
 
   BuyV2PaymentEligibility paymentEligibilityFor(String method) {
@@ -5126,7 +5116,11 @@ class BuyV2Session extends ChangeNotifier {
     return _evaluatePayment(method, checkoutPaymentAmountMinor);
   }
 
-  BuyV2PaymentEligibility _evaluatePayment(String method, int amountMinor) {
+  BuyV2PaymentEligibility _evaluatePayment(
+    String method,
+    int amountMinor, {
+    Set<String>? fulfilmentKeys,
+  }) {
     BuyV2PaymentEligibility blocked(
       String reason, [
       BuyV2PaymentCapability? cap,
@@ -5152,7 +5146,9 @@ class BuyV2Session extends ChangeNotifier {
         );
       }
       cap = matching.single;
-      final keys = checkoutFulfilmentGroups.map((group) => group.key).toSet();
+      final keys =
+          fulfilmentKeys ??
+          checkoutFulfilmentGroups.map((group) => group.key).toSet();
       final now = catalogueNow();
       if (!cap.valid ||
           keys.isEmpty ||
@@ -5213,6 +5209,160 @@ class BuyV2Session extends ChangeNotifier {
   String? _pendingPurchaseOrderRevision;
   BuyV2PurchaseOrderReview? _pendingPurchaseOrderApproval;
   String? _checkoutIdempotencyKey;
+  BuyV2CheckoutPaymentAttempt? _checkoutPaymentAttempt;
+
+  BuyV2CheckoutPaymentAttempt? get checkoutPaymentAttempt =>
+      _checkoutPaymentAttempt?.ownerScope == customerStateStore?.ownerScope
+      ? _checkoutPaymentAttempt
+      : null;
+
+  BuyV2CheckoutGroupAttempt? get currentCheckoutPaymentGroup =>
+      checkoutPaymentAttempt?.groups
+          .where(
+            (group) => group.state != BuyV2CheckoutSubmissionState.confirmed,
+          )
+          .firstOrNull;
+
+  bool get checkoutHasGroupedCommitment => currentCheckoutPaymentGroup != null;
+
+  int get checkoutPaymentActionAmount {
+    final current = currentCheckoutPaymentGroup;
+    if (current != null) {
+      if (current.request.amountDueNow > 0 ||
+          current.state != BuyV2CheckoutSubmissionState.idle) {
+        return current.request.amountDueNow;
+      }
+      return checkoutPaymentAttempt!.groups
+              .where(
+                (group) =>
+                    group.state != BuyV2CheckoutSubmissionState.confirmed &&
+                    group.request.amountDueNow > 0,
+              )
+              .firstOrNull
+              ?.request
+              .amountDueNow ??
+          0;
+    }
+    return checkoutPaymentGroups
+            .where((group) => group.amountDueNow > 0)
+            .firstOrNull
+            ?.amountDueNow ??
+        checkoutAmountDueNow;
+  }
+
+  List<BuyV2CheckoutPaymentGroup> get checkoutPaymentGroups {
+    final attempt = checkoutPaymentAttempt;
+    if (attempt != null) {
+      return List.unmodifiable([
+        for (final group in attempt.groups)
+          BuyV2CheckoutPaymentGroup(
+            id: group.request.paymentGroupId!,
+            fulfilmentKeys: group.fulfilmentKeys,
+            paymentMethod: group.request.paymentMethod,
+            total: group.request.total,
+            amountDueNow: group.request.amountDueNow,
+          ),
+      ]);
+    }
+    return _validCheckoutPaymentGroups()
+        ? List.unmodifiable(_checkoutQuote!.paymentGroups!)
+        : const [];
+  }
+
+  int get checkoutPaymentCount => checkoutPaymentGroups.isEmpty
+      ? (checkoutAmountDueNow > 0 ? 1 : 0)
+      : checkoutPaymentGroups.where((group) => group.amountDueNow > 0).length;
+
+  int get checkoutPaymentNumber =>
+      (checkoutPaymentAttempt?.groups
+              .where(
+                (group) =>
+                    group.request.amountDueNow > 0 &&
+                    group.state == BuyV2CheckoutSubmissionState.confirmed,
+              )
+              .length ??
+          0) +
+      1;
+
+  bool get checkoutPaymentGroupReviewRequired =>
+      (currentCheckoutPaymentGroup?.hasValidObligations == false) ||
+      (_checkoutQuote?.paymentGroups != null &&
+          !checkoutHasGroupedCommitment &&
+          !_validCheckoutPaymentGroups());
+
+  bool _validCheckoutPaymentGroups() {
+    final quote = _checkoutQuote;
+    final plan = quote?.paymentGroups;
+    if (quote == null ||
+        plan == null ||
+        plan.isEmpty ||
+        plan.length > 100 ||
+        isStoreProcurement ||
+        collectionCheckoutSelected ||
+        commerceAdapter is! BuyV2GroupedOrderPlacementAdapter ||
+        checkoutQuoteReviewRequired ||
+        checkoutPaymentTermsReviewRequired) {
+      return false;
+    }
+    final quoted = {for (final line in quote.lines) line.fulfilmentKey: line};
+    final seen = <String>{};
+    final ids = <String>{};
+    var total = 0;
+    var due = 0;
+    for (final group in plan) {
+      if (group.id.trim().isEmpty ||
+          group.id.length > 128 ||
+          !ids.add(group.id) ||
+          group.currency != 'INR' ||
+          group.fulfilmentKeys.isEmpty ||
+          group.total < group.amountDueNow ||
+          group.amountDueNow < 0 ||
+          group.total > 90071992547409 ||
+          group.paymentMethod != selectedPayment) {
+        return false;
+      }
+      var expectedTotal = 0;
+      var expectedDue = 0;
+      for (final key in group.fulfilmentKeys) {
+        final line = quoted[key];
+        if (line == null || !seen.add(key)) {
+          return false;
+        }
+        expectedTotal += line.total;
+        expectedDue += commercialPaymentTermsEnabled
+            ? selectedCommercialPaymentTermFor(key)!.amountDueNow
+            : line.total;
+      }
+      if (group.total != expectedTotal ||
+          group.amountDueNow != expectedDue ||
+          (group.amountDueNow > 0 &&
+              !_evaluatePayment(
+                group.paymentMethod,
+                group.amountDueNow * 100,
+              ).selectable)) {
+        return false;
+      }
+      total += group.total;
+      due += group.amountDueNow;
+    }
+    return seen.length == quoted.length &&
+        total == quote.total &&
+        due == checkoutAmountDueNow;
+  }
+
+  String? _checkoutPaymentPlanConsent() => _checkoutQuote?.paymentGroups == null
+      ? null
+      : jsonEncode([
+          for (final group in _checkoutQuote!.paymentGroups!)
+            [
+              group.id,
+              (group.fulfilmentKeys.toList()..sort()),
+              group.paymentMethod,
+              group.currency,
+              group.total,
+              group.amountDueNow,
+            ],
+        ]);
   String? _paymentReference;
   Uri? _paymentActionUri;
   bool upiQrAvailable = false;
@@ -5231,7 +5381,7 @@ class BuyV2Session extends ChangeNotifier {
             qr != null &&
             qr.validFor(
               reference: _paymentReference,
-              amountMinor: checkoutAmountDueNow * 100,
+              amountMinor: checkoutPaymentActionAmount * 100,
               now: catalogueNow(),
             )
         ? qr
@@ -5376,6 +5526,7 @@ class BuyV2Session extends ChangeNotifier {
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting;
 
   bool get checkoutRequiresResolution =>
+      checkoutHasGroupedCommitment ||
       (collectionCheckout?.unresolved ?? false) ||
       checkoutSubmissionState ==
           BuyV2CheckoutSubmissionState.paymentActionRequired ||
@@ -7599,6 +7750,11 @@ class BuyV2Session extends ChangeNotifier {
     _pendingPurchaseOrderRevision = snapshot.pendingPurchaseOrderRevision;
     _pendingPurchaseOrderApproval = null;
     _checkoutIdempotencyKey = snapshot.checkoutIdempotencyKey;
+    _checkoutPaymentAttempt =
+        snapshot.checkoutPaymentAttempt?.ownerScope ==
+            customerStateStore?.ownerScope
+        ? snapshot.checkoutPaymentAttempt
+        : null;
     _paymentReference = snapshot.paymentReference;
     _paymentActionUri = snapshot.paymentActionUri;
     _bankTransferInstructions = snapshot.bankTransferInstructions;
@@ -7780,6 +7936,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     final store = customerStateStore;
     if (store == null || store.ownerScope == null) return null;
+    _syncCheckoutGroupState();
     _customerStateMutationRevision += 1;
     if (customerStateRecoveryPending) {
       // Once a retained SKU is present in the live Cart, later removal must
@@ -7850,6 +8007,7 @@ class BuyV2Session extends ChangeNotifier {
           ? null
           : _pendingPurchaseOrderRevision,
       checkoutIdempotencyKey: _checkoutIdempotencyKey,
+      checkoutPaymentAttempt: checkoutPaymentAttempt,
       paymentReference: _paymentReference,
       paymentActionUri: _paymentActionUri,
       bankTransferInstructions: _bankTransferInstructions,
@@ -11581,6 +11739,12 @@ class BuyV2Session extends ChangeNotifier {
 
   bool retryCheckoutPayment() {
     if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (checkoutHasGroupedCommitment) {
+      notice =
+          'Check the original group payment before choosing again. Completed orders are kept.';
+      notifyListeners();
+      return false;
+    }
     if (checkoutSubmissionState != BuyV2CheckoutSubmissionState.cancelled &&
         checkoutSubmissionState != BuyV2CheckoutSubmissionState.failed &&
         checkoutSubmissionState != BuyV2CheckoutSubmissionState.unavailable) {
@@ -13663,9 +13827,21 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool _requirePaymentEligible() {
+    final group = currentCheckoutPaymentGroup;
+    if (group?.request.amountDueNow == 0 ||
+        (group == null &&
+            checkoutPaymentGroups.isNotEmpty &&
+            checkoutPaymentGroups.every((group) => group.amountDueNow == 0))) {
+      return true;
+    }
     final eligibility = _evaluatePayment(
-      selectedPayment,
+      group?.request.paymentMethod ?? selectedPayment,
       checkoutPaymentAmountMinor,
+      fulfilmentKeys: group == null
+          ? null
+          : checkoutPaymentAttempt!.groups
+                .expand((group) => group.fulfilmentKeys)
+                .toSet(),
     );
     if (eligibility.selectable) return true;
     notice = eligibility.reason;
@@ -13800,6 +13976,10 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (checkoutHasGroupedCommitment) {
+      if (checkoutBusy) return Future.value(false);
+      return _submitNextGroupedPayment();
+    }
     if (purchaseOrderReviewRequired) {
       notice = 'Check the supplier terms and response before payment.';
       notifyListeners();
@@ -13973,6 +14153,7 @@ class BuyV2Session extends ChangeNotifier {
   Future<bool> _placeOrderAfterPreflight() async {
     if (!_allowProcurementLines(checkoutLines)) return false;
     final consentedAmountMinor = checkoutPaymentAmountMinor;
+    final consentedPaymentPlan = _checkoutPaymentPlanConsent();
     final procurementEpoch = _procurementEpoch;
     final previous = _navigationSurfaceIdentity;
     final lines = checkoutLines;
@@ -14089,6 +14270,16 @@ class BuyV2Session extends ChangeNotifier {
         _pendingPurchaseOrderApproval?.buyerAccountId;
     _pendingPurchaseOrderRequestId = _pendingPurchaseOrderApproval?.requestId;
     _pendingPurchaseOrderRevision = _pendingPurchaseOrderApproval?.revision;
+    if (consentedPaymentPlan != _checkoutPaymentPlanConsent() ||
+        checkoutPaymentGroupReviewRequired) {
+      notice =
+          'Payment groups changed. Review the amounts and payment count before placing orders.';
+      notifyListeners();
+      return false;
+    }
+    if (_checkoutQuote?.paymentGroups != null) {
+      return _beginGroupedCheckout(lines, address);
+    }
     _checkoutIdempotencyKey ??=
         'shop-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-'
         '${_checkoutAttemptSequence++}';
@@ -14177,10 +14368,530 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
+  Future<bool> _beginGroupedCheckout(
+    List<BuyV2CartLine> lines,
+    BuyV2Address address,
+  ) async {
+    final owner = customerStateStore?.ownerScope;
+    final quote = _checkoutQuote;
+    if (owner == null || quote == null || !_validCheckoutPaymentGroups()) {
+      notice = 'Payment groups could not be saved. Your Cart is unchanged.';
+      notifyListeners();
+      return false;
+    }
+    final id =
+        'checkout-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-'
+        '${_checkoutAttemptSequence++}';
+    _publicDeliveryInstruction = publicDeliveryInstruction ?? '';
+    final fulfilments = checkoutFulfilmentGroups;
+    final plan = quote.paymentGroups!;
+    // Zero-due obligations belong to the explicit initial commitment. They
+    // submit once before the first payment; paid groups still require one tap each.
+    final ordered = [
+      ...plan.where((group) => group.amountDueNow == 0),
+      ...plan.where((group) => group.amountDueNow > 0),
+    ];
+    _checkoutPaymentAttempt = BuyV2CheckoutPaymentAttempt(
+      id: id,
+      ownerScope: owner,
+      quoteValidUntil: quote.validUntil,
+      groups: List.unmodifiable([
+        for (final group in ordered)
+          BuyV2CheckoutGroupAttempt(
+            fulfilmentKeys: Set.unmodifiable(group.fulfilmentKeys),
+            obligations: List.unmodifiable([
+              for (final fulfilment in fulfilments)
+                if (group.fulfilmentKeys.contains(fulfilment.key))
+                  BuyV2CheckoutFulfilmentObligation(
+                    fulfilmentKey: fulfilment.key,
+                    productIds: Set.unmodifiable(fulfilment.productIds),
+                    totalMinor:
+                        quote.lines
+                            .singleWhere(
+                              (line) => line.fulfilmentKey == fulfilment.key,
+                            )
+                            .total *
+                        100,
+                    dueNowMinor:
+                        (commercialPaymentTermsEnabled
+                            ? selectedCommercialPaymentTermFor(
+                                fulfilment.key,
+                              )!.amountDueNow
+                            : quote.lines
+                                  .singleWhere(
+                                    (line) =>
+                                        line.fulfilmentKey == fulfilment.key,
+                                  )
+                                  .total) *
+                        100,
+                  ),
+            ]),
+            request: BuyV2OrderPlacementRequest(
+              lines: List.unmodifiable(
+                fulfilments
+                    .where((value) => group.fulfilmentKeys.contains(value.key))
+                    .expand((value) => value.lines),
+              ),
+              address: address,
+              paymentMethod: group.paymentMethod,
+              total: group.total,
+              amountDueNow: group.amountDueNow,
+              idempotencyKey: '$id:${Uri.encodeComponent(group.id)}',
+              checkoutAttemptId: id,
+              paymentGroupId: group.id,
+              checkoutQuoteId: quote.id,
+              useUpiQr: group.amountDueNow > 0 && useUpiQr,
+              commercialPaymentTermIds: Map.unmodifiable({
+                for (final key in group.fulfilmentKeys)
+                  if (selectedCommercialPaymentTermFor(key) case final term?)
+                    key: term.id,
+              }),
+              deliveryInstructionsByProductId: Map.unmodifiable({
+                for (final line
+                    in fulfilments
+                        .where(
+                          (value) => group.fulfilmentKeys.contains(value.key),
+                        )
+                        .expand((value) => value.lines))
+                  line.product.id: ?deliveryInstructionTextFor(
+                    line.product.destination,
+                  ),
+              }),
+              purchaseOrderRequestId: _pendingPurchaseOrderRequestId,
+              purchaseOrderRevision: _pendingPurchaseOrderRevision,
+            ),
+          ),
+      ]),
+    );
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+    return _submitNextGroupedPayment();
+  }
+
+  int _groupOperationSequence = 0;
+
+  bool _groupOperationCurrent(
+    BuyV2CheckoutPaymentAttempt attempt,
+    BuyV2CheckoutGroupAttempt group,
+    int sequence,
+    BuyV2CollectionIdentity? identity,
+  ) =>
+      !_collectionDisposed &&
+      procurementScopeCurrent &&
+      customerStateStore?.ownerScope == attempt.ownerScope &&
+      checkoutPaymentAttempt?.id == attempt.id &&
+      currentCheckoutPaymentGroup?.request.idempotencyKey ==
+          group.request.idempotencyKey &&
+      _groupOperationSequence == sequence &&
+      collectionIdentity?.value?.accountId == identity?.accountId &&
+      collectionIdentity?.value?.sessionId == identity?.sessionId;
+
+  void _replaceCheckoutGroup(BuyV2CheckoutGroupAttempt updated) {
+    final attempt = checkoutPaymentAttempt;
+    if (attempt == null) return;
+    _checkoutPaymentAttempt = BuyV2CheckoutPaymentAttempt(
+      id: attempt.id,
+      ownerScope: attempt.ownerScope,
+      quoteValidUntil: attempt.quoteValidUntil,
+      groups: List.unmodifiable([
+        for (final group in attempt.groups)
+          group.request.idempotencyKey == updated.request.idempotencyKey
+              ? updated
+              : group,
+      ]),
+    );
+  }
+
+  void _syncCheckoutGroupState() {
+    final group = currentCheckoutPaymentGroup;
+    if (group == null ||
+        _checkoutIdempotencyKey != group.request.idempotencyKey) {
+      return;
+    }
+    _replaceCheckoutGroup(
+      BuyV2CheckoutGroupAttempt(
+        request: group.request,
+        fulfilmentKeys: group.fulfilmentKeys,
+        obligations: group.obligations,
+        state: checkoutSubmissionState,
+        paymentReference: _paymentReference,
+        paymentActionUri: _paymentActionUri,
+        bankTransferInstructions: _bankTransferInstructions,
+        confirmedOrderIds: group.confirmedOrderIds,
+      ),
+    );
+  }
+
+  Future<bool> _submitNextGroupedPayment() async {
+    final attempt = checkoutPaymentAttempt;
+    var group = currentCheckoutPaymentGroup;
+    if (attempt == null ||
+        group == null ||
+        checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting) {
+      return false;
+    }
+    if (group.state != BuyV2CheckoutSubmissionState.idle) {
+      notice = 'Check this payment before starting another one.';
+      notifyListeners();
+      return false;
+    }
+    while (group != null) {
+      final request = group.request;
+      // Cached purchased products supply historical facts only. Live Cart
+      // eligibility must still authorize every never-submitted line.
+      final liveLinesMatch = request.lines.every((line) {
+        final live = _cart[line.product.id];
+        return live != null &&
+            live.quantity == line.quantity &&
+            live.product.canonicalId == line.product.canonicalId &&
+            live.product.storeId == line.product.storeId &&
+            live.product.variant == line.product.variant &&
+            live.product.pack == line.product.pack &&
+            live.product.price == line.product.price;
+      });
+      final address = selectedAddressOrNull;
+      if (!group.hasValidObligations ||
+          !catalogueNow().isBefore(attempt.quoteValidUntil) ||
+          !liveLinesMatch ||
+          address == null ||
+          jsonEncode([
+                address.id,
+                address.recipient,
+                address.phone,
+                address.line,
+                address.area,
+                address.pinCode,
+                address.landmark,
+              ]) !=
+              jsonEncode([
+                request.address.id,
+                request.address.recipient,
+                request.address.phone,
+                request.address.line,
+                request.address.area,
+                request.address.pinCode,
+                request.address.landmark,
+              ]) ||
+          !_checkoutEligibilityCurrent(placingOrder: true) ||
+          request.commercialPaymentTermIds.entries.any(
+            (entry) =>
+                selectedCommercialPaymentTermFor(entry.key)?.id != entry.value,
+          ) ||
+          commerceAdapter is! BuyV2GroupedOrderPlacementAdapter) {
+        notice =
+            'The remaining checkout needs review. Completed orders are kept.';
+        notifyListeners();
+        return false;
+      }
+      final sequence = ++_groupOperationSequence;
+      final identity = collectionIdentity?.value;
+      _checkoutIdempotencyKey = request.idempotencyKey;
+      _paymentReference = null;
+      _paymentActionUri = null;
+      _upiQrAction = null;
+      _bankTransferInstructions = null;
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
+      _syncCheckoutGroupState();
+      final saved = _persistCustomerState();
+      notice = null;
+      notifyListeners();
+      var retained = false;
+      try {
+        retained = await (saved ?? Future.value(false)).timeout(
+          const Duration(seconds: 15),
+        );
+      } catch (_) {
+        retained = false;
+      }
+      if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+        return false;
+      }
+      if (!retained) {
+        // No connector action occurred. Restore this group to unsubmitted;
+        // completed groups stay in the same snapshot before the next try.
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+        _syncCheckoutGroupState();
+        _checkoutIdempotencyKey = null;
+        notice = 'Checkout could not be saved. No new payment was started.';
+        notifyListeners();
+        return false;
+      }
+      BuyV2OrderPlacementResult result;
+      try {
+        result = await (commerceAdapter as BuyV2GroupedOrderPlacementAdapter)
+            .placePaymentGroup(request)
+            .timeout(const Duration(seconds: 15));
+      } catch (_) {
+        if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+          return false;
+        }
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+        notice = 'This payment needs checking. Do not pay again.';
+        _persistCustomerState();
+        notifyListeners();
+        return false;
+      }
+      if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+        return false;
+      }
+      final confirmed = await _handleGroupedOrderPlacement(result);
+      if (_collectionDisposed ||
+          customerStateStore?.ownerScope != attempt.ownerScope ||
+          collectionIdentity?.value?.accountId != identity?.accountId ||
+          collectionIdentity?.value?.sessionId != identity?.sessionId) {
+        return false;
+      }
+      if (!confirmed ||
+          request.amountDueNow > 0 ||
+          !checkoutHasGroupedCommitment) {
+        return confirmed && !checkoutHasGroupedCommitment;
+      }
+      group = currentCheckoutPaymentGroup;
+    }
+    return false;
+  }
+
+  bool _groupConfirmedOrdersMatch(
+    BuyV2OrderPlacementResult result,
+    BuyV2CheckoutGroupAttempt group,
+  ) {
+    final request = group.request;
+    final reference = result.purchaseReference;
+    final expected = {for (final line in request.lines) line.product.id: line};
+    final seen = <String>{};
+    final orderIds = <String>{};
+    if (!group.hasValidObligations ||
+        result.orders.length != group.obligations.length ||
+        reference == null ||
+        reference.trim().isEmpty ||
+        result.orders.isEmpty ||
+        result.orders.any((order) => order.amountPaidNow == null) ||
+        result.orders.fold<int>(
+              0,
+              (sum, order) => sum + (order.amountPaidNow ?? 0),
+            ) !=
+            request.amountDueNow ||
+        result.orders.fold<int>(0, (sum, order) => sum + order.balanceDue) !=
+            request.total - request.amountDueNow ||
+        result.orders.fold<int>(0, (sum, order) => sum + order.total) !=
+            request.total) {
+      return false;
+    }
+    for (final order in result.orders) {
+      final obligation = group.obligations
+          .where(
+            (value) => setEquals(value.productIds, order.productIds.toSet()),
+          )
+          .firstOrNull;
+      if (order.id.trim().isEmpty ||
+          obligation == null ||
+          order.total * 100 != obligation.totalMinor ||
+          order.amountPaidNow! * 100 != obligation.dueNowMinor ||
+          !orderIds.add(order.id) ||
+          _orders.any((existing) => existing.id == order.id) ||
+          order.purchaseId != reference ||
+          order.paymentMethod != request.paymentMethod ||
+          order.amountPaidNow! < 0 ||
+          order.balanceDue < 0 ||
+          (order.totalMinor != null && order.totalMinor != order.total * 100) ||
+          order.amountPaidNow! + order.balanceDue != order.total ||
+          order.lines.isEmpty ||
+          !setEquals(
+            order.productIds.toSet(),
+            order.lines.map((line) => line.product.id).toSet(),
+          ) ||
+          order.productIds.length != order.lines.length ||
+          order.lines.any((line) {
+            final original = expected[line.product.id];
+            return original == null ||
+                order.destination != line.product.destination ||
+                !seen.add(line.product.id) ||
+                line.quantity != original.quantity ||
+                line.product.canonicalId != original.product.canonicalId ||
+                line.product.storeId != original.product.storeId ||
+                line.product.destination != original.product.destination ||
+                line.product.variant != original.product.variant ||
+                line.product.pack != original.product.pack ||
+                line.product.price != original.product.price;
+          })) {
+        return false;
+      }
+    }
+    return seen.length == expected.length &&
+        (request.purchaseOrderRequestId == null ||
+            _purchaseOrderConfirmationMatches(
+              result,
+              request.lines,
+              expectedTotal: request.total,
+            ));
+  }
+
+  Future<bool> _handleGroupedOrderPlacement(
+    BuyV2OrderPlacementResult result,
+  ) async {
+    final attempt = checkoutPaymentAttempt;
+    final group = currentCheckoutPaymentGroup;
+    if (attempt == null || group == null) return false;
+    final request = group.request;
+    if (result.checkoutAttemptId != attempt.id ||
+        result.paymentGroupId != request.paymentGroupId ||
+        result.idempotencyKey != request.idempotencyKey ||
+        (group.paymentReference != null &&
+            result.paymentReference != null &&
+            group.paymentReference != result.paymentReference)) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'The response could not be matched to this payment. Do not pay again.';
+      _persistCustomerState();
+      notifyListeners();
+      return false;
+    }
+    // The matching provider reference remains recoverable even if its order
+    // allocation cannot be accepted locally.
+    _paymentReference = result.paymentReference ?? group.paymentReference;
+    if (result.outcome == BuyV2OrderPlacementOutcome.confirmed) {
+      if (!_groupConfirmedOrdersMatch(result, group)) {
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+        notice = 'This order result needs checking. Do not pay again.';
+        _persistCustomerState();
+        notifyListeners();
+        return false;
+      }
+      _orders.insertAll(0, result.orders);
+      _currentDeliveryOrderIds.addAll(result.orders.map((order) => order.id));
+      _replaceCheckoutGroup(
+        BuyV2CheckoutGroupAttempt(
+          request: request,
+          fulfilmentKeys: group.fulfilmentKeys,
+          obligations: group.obligations,
+          state: BuyV2CheckoutSubmissionState.confirmed,
+          paymentReference: result.paymentReference ?? group.paymentReference,
+          confirmedOrderIds: List.unmodifiable(
+            result.orders.map((order) => order.id),
+          ),
+        ),
+      );
+      for (final line in request.lines) {
+        _cart.remove(line.product.id);
+      }
+      _pruneCartSelections();
+      _checkoutIdempotencyKey = null;
+      _paymentReference = null;
+      _paymentActionUri = null;
+      _bankTransferInstructions = null;
+      _upiQrAction = null;
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+      notice = 'This group is placed. Completed orders are kept separately.';
+      if (!checkoutHasGroupedCommitment) _finishGroupedCheckout(attempt);
+      final saved = _persistCustomerState();
+      notifyListeners();
+      try {
+        return await (saved ?? Future.value(false));
+      } catch (_) {
+        return false;
+      }
+    }
+    _paymentReference = result.paymentReference ?? group.paymentReference;
+    _paymentActionUri = _validPaymentAction(result)
+        ? result.paymentActionUri
+        : null;
+    _bankTransferInstructions = _validBankTransferAction(result)
+        ? result.bankTransferInstructions
+        : group.bankTransferInstructions;
+    final qr = result.upiQrAction;
+    _upiQrAction =
+        request.useUpiQr &&
+            qr?.validFor(
+                  reference: _paymentReference,
+                  amountMinor: request.amountDueNow * 100,
+                  now: catalogueNow(),
+                ) ==
+                true
+        ? qr
+        : null;
+    checkoutSubmissionState = switch (result.outcome) {
+      BuyV2OrderPlacementOutcome.paymentActionRequired =>
+        _upiQrAction != null
+            ? BuyV2CheckoutSubmissionState.paymentPending
+            : (_paymentActionUri != null || _bankTransferInstructions != null)
+            ? BuyV2CheckoutSubmissionState.paymentActionRequired
+            : BuyV2CheckoutSubmissionState.paymentUnknown,
+      BuyV2OrderPlacementOutcome.paymentPending =>
+        BuyV2CheckoutSubmissionState.paymentPending,
+      BuyV2OrderPlacementOutcome.paymentUnknown =>
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      BuyV2OrderPlacementOutcome.cancelled =>
+        BuyV2CheckoutSubmissionState.cancelled,
+      BuyV2OrderPlacementOutcome.failed => BuyV2CheckoutSubmissionState.failed,
+      BuyV2OrderPlacementOutcome.unavailable =>
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      BuyV2OrderPlacementOutcome.confirmed =>
+        BuyV2CheckoutSubmissionState.confirmed,
+    };
+    notice = result.customerMessage;
+    _persistCustomerState();
+    notifyListeners();
+    return false;
+  }
+
+  void _finishGroupedCheckout(BuyV2CheckoutPaymentAttempt attempt) {
+    final previous = _navigationSurfaceIdentity;
+    final ids = attempt.groups
+        .expand((group) => group.confirmedOrderIds)
+        .toSet();
+    // Include the just-completed group, whose updated snapshot replaces attempt.
+    ids.addAll(
+      checkoutPaymentAttempt!.groups.expand((group) => group.confirmedOrderIds),
+    );
+    _confirmedOrders = List.unmodifiable(
+      _orders.where((order) => ids.contains(order.id)),
+    );
+    _confirmedPurchaseId = attempt.id;
+    _confirmedDestinations = _confirmedOrders
+        .map((order) => order.destination)
+        .toSet();
+    _confirmedProductCount = attempt.groups.fold(
+      0,
+      (sum, group) => sum + group.request.lines.length,
+    );
+    _confirmedItemCount = attempt.groups.fold(
+      0,
+      (sum, group) =>
+          sum +
+          group.request.lines.fold<int>(
+            0,
+            (count, line) => count + line.quantity,
+          ),
+    );
+    _confirmedTotal = attempt.groups.fold(
+      0,
+      (sum, group) => sum + group.request.total,
+    );
+    _confirmedAmountPaidNow = attempt.groups.fold(
+      0,
+      (sum, group) => sum + group.request.amountDueNow,
+    );
+    _confirmedBalanceDue = _confirmedTotal - _confirmedAmountPaidNow;
+    _checkoutPaymentAttempt = null;
+    cartScope = BuyV2CartScope.all;
+    checkoutScope = BuyV2CartScope.all;
+    checkoutStep = BuyV2CheckoutStep.address;
+    destination = BuyV2Destination.orders;
+    view = BuyV2View.confirmation;
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.confirmed;
+    purchaseOrderReference = '';
+    notice = null;
+    _clearCheckoutPromiseSnapshot();
+    _notifyNavigationIfChanged(
+      previous,
+      BuyV2NavigationMotionDirection.forward,
+    );
+  }
+
   bool _purchaseOrderConfirmationMatches(
     BuyV2OrderPlacementResult placement,
-    List<BuyV2CartLine> purchased,
-  ) {
+    List<BuyV2CartLine> purchased, {
+    int? expectedTotal,
+  }) {
     final approval = _pendingPurchaseOrderApproval ?? purchaseOrder?.review;
     final purchaseId = placement.purchaseReference;
     if (approval == null ||
@@ -14192,7 +14903,7 @@ class BuyV2Session extends ChangeNotifier {
         purchaseId.trim().isEmpty ||
         placement.orders.isEmpty ||
         placement.orders.fold<int>(0, (sum, order) => sum + order.total) !=
-            checkoutPayableTotal) {
+            (expectedTotal ?? checkoutPayableTotal)) {
       return false;
     }
     final expected = {for (final line in purchased) line.product.id: line};
@@ -14553,7 +15264,103 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
+  Future<bool> _reconcileGroupedPayment() async {
+    final attempt = checkoutPaymentAttempt;
+    final group = currentCheckoutPaymentGroup;
+    if (attempt == null ||
+        group == null ||
+        checkoutBusy ||
+        group.state == BuyV2CheckoutSubmissionState.idle) {
+      return false;
+    }
+    final sequence = ++_groupOperationSequence;
+    final identity = collectionIdentity?.value;
+    final request = group.request;
+    _checkoutIdempotencyKey = request.idempotencyKey;
+    _paymentReference = group.paymentReference;
+    _paymentActionUri = group.paymentActionUri;
+    _bankTransferInstructions = group.bankTransferInstructions;
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
+    _persistCustomerState();
+    notifyListeners();
+    BuyV2OrderPlacementResult result;
+    try {
+      if (request.purchaseOrderRequestId != null &&
+          !await _restorePendingPurchaseOrder(
+            attempt.groups.expand((value) => value.request.lines).toList(),
+            request.address,
+          )) {
+        if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+          return false;
+        }
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+        notice =
+            'The original supplier agreement needs checking. Do not pay again.';
+        _persistCustomerState();
+        notifyListeners();
+        return false;
+      }
+      if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+        return false;
+      }
+      final reference = group.paymentReference;
+      if (reference != null) {
+        result = await commerceAdapter
+            .reconcileOrder(
+              idempotencyKey: request.idempotencyKey,
+              paymentReference: reference,
+            )
+            .timeout(const Duration(seconds: 15));
+      } else if (commerceAdapter is BuyV2PendingOrderRecoveryAdapter) {
+        result = await (commerceAdapter as BuyV2PendingOrderRecoveryAdapter)
+            .recoverOrder(idempotencyKey: request.idempotencyKey)
+            .timeout(const Duration(seconds: 15));
+      } else {
+        throw StateError('Original attempt lookup unavailable');
+      }
+    } catch (_) {
+      if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+        return false;
+      }
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'Payment status is unavailable. Do not pay again. Check later or get order help.';
+      _persistCustomerState();
+      notifyListeners();
+      return false;
+    }
+    if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+      return false;
+    }
+    return _handleGroupedOrderPlacement(result);
+  }
+
+  /// Only never-submitted obligations can be released for a fresh review.
+  /// Submitted groups, including locally left/cancelled ones, require recovery.
+  bool reviewRemainingGroupedCheckout() {
+    final attempt = checkoutPaymentAttempt;
+    if (attempt == null ||
+        checkoutBusy ||
+        attempt.groups.any(
+          (group) =>
+              group.state != BuyV2CheckoutSubmissionState.confirmed &&
+              group.state != BuyV2CheckoutSubmissionState.idle,
+        )) {
+      return false;
+    }
+    _checkoutPaymentAttempt = null;
+    _clearCheckoutPaymentAttempt();
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+    checkoutStep = BuyV2CheckoutStep.payment;
+    _invalidateAndRefreshCheckoutPricingContracts();
+    notice = 'Review the remaining checkout. Completed orders are kept.';
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
   Future<bool> reconcilePayment() async {
+    if (checkoutHasGroupedCommitment) return _reconcileGroupedPayment();
     if (!procurementScopeCurrent) return false;
     final procurementEpoch = _procurementEpoch;
     final recoveryOwner = collectionIdentity?.value;
@@ -14666,6 +15473,14 @@ class BuyV2Session extends ChangeNotifier {
         checkoutSubmissionState !=
             BuyV2CheckoutSubmissionState.paymentActionRequired) {
       return false;
+    }
+    if (checkoutHasGroupedCommitment) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      notice =
+          'You can leave safely. Check the original payment before choosing again.';
+      _persistCustomerState();
+      notifyListeners();
+      return true;
     }
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.cancelled;
     _checkoutIdempotencyKey = null;
@@ -14939,6 +15754,9 @@ class BuyV2Session extends ChangeNotifier {
       _cart.values.toList(growable: false),
     ).map((group) => group.key).toSet();
     _tipsByFulfilmentKey.removeWhere((key, _) => !groupKeys.contains(key));
+    // Completing one frozen group changes Cart membership, not the buyer's
+    // accepted agreements for the unchanged, unfinished original groups.
+    if (checkoutHasGroupedCommitment) return;
     _invalidateLiveCartBenefits();
     if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
       unawaited(refreshCartBenefits());

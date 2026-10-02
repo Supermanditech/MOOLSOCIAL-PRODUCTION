@@ -10,11 +10,26 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_payment_sheet_motion.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'buy_v2_qualified_provider_fixture.dart';
+import 'buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
+
+class _T06WidgetCustomerState implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'isolated-t06-widget-buyer';
+  BuyV2CustomerStateSnapshot? snapshot;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -66,6 +81,160 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-payment-sheet')));
     await tester.pump();
     if (settle) await tester.pumpAndSettle();
+  }
+
+  Future<void> captureGroups(WidgetTester tester, String label) async {
+    const directory = String.fromEnvironment('BUY_T06_VISUAL_DIRECTORY');
+    if (directory.isEmpty) return;
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('buy-t06-group-screen')),
+    );
+    await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 2);
+      try {
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        final folder = Directory(directory);
+        await folder.create(recursive: true);
+        final file = File('${folder.path}/$label.png');
+        expect(await file.exists(), isFalse);
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+      } finally {
+        image.dispose();
+      }
+    });
+  }
+
+  for (final size in [const Size(320, 800), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'T06 group scopes and payment count fit ${size.width} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final commerce = TestGroupedPaymentCommerce();
+          const address = BuyV2Address(
+            id: 'test-groups-address',
+            kind: BuyV2AddressKind.home,
+            label: 'Home',
+            recipient: 'Test buyer',
+            phone: '9000000000',
+            line: 'Test street',
+            area: 'Jodhpur',
+            pinCode: '342003',
+            landmark: '',
+          );
+          commerce.snapshot = BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [
+              for (final product in testPaymentProducts)
+                product.id == 's-rice'
+                    ? product.copyWith(storeId: 'test-second-store')
+                    : product,
+            ],
+            paymentMethods: const {'UPI', 'Card'},
+            addresses: const [address],
+            selectedAddressId: address.id,
+          );
+          final quote = TestPaymentQuote()
+            ..groupsFor = (lines, method) => [
+              for (var i = 0; i < lines.length; i++)
+                BuyV2CheckoutPaymentGroup(
+                  id: 'test-group-$i',
+                  fulfilmentKeys: {lines[i].fulfilmentKey},
+                  paymentMethod: method,
+                  total: lines[i].total,
+                  amountDueNow: lines[i].total,
+                ),
+            ];
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: commerce,
+            productFactsAdapter: const BuyTestEligibilityFacts(),
+            checkoutQuoteAdapter: quote,
+            reviewDataEnabled: false,
+            customerStateStore: _T06WidgetCustomerState(),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          expect(session.addProduct('s-tomato'), isTrue);
+          expect(session.addProduct('s-rice'), isTrue);
+          session.openCart();
+          expect(session.openCheckout(), isTrue);
+          await session.refreshCheckoutQuote();
+          session.checkoutStep = BuyV2CheckoutStep.payment;
+          final gst = BuyV2GstInvoiceController();
+          addTearDown(gst.dispose);
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              disableAnimations: true,
+              home: RepaintBoundary(
+                key: const ValueKey('buy-t06-group-screen'),
+                child: Scaffold(
+                  body: BuyV2CheckoutView(
+                    session: session,
+                    gstInvoiceController: gst,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('buy-checkout-payment-groups')),
+            180,
+            scrollable: find.byType(Scrollable).first,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('2 separate payments · 2 orders'), findsOneWidget);
+          expect(find.textContaining('Payment 1 of 2'), findsOneWidget);
+          expect(
+            find.textContaining('Completed orders are kept'),
+            findsOneWidget,
+          );
+          expect(commerce.requests, isEmpty);
+          expect(tester.takeException(), isNull);
+          await captureGroups(
+            tester,
+            'groups-${size.width.toInt()}x${size.height.toInt()}-$scale-review',
+          );
+          if (size.width == 320 && scale == 1) {
+            commerce.onGroup = (request) => testGroupedPlacement(request);
+            expect(await session.submitOrder(), isFalse);
+            await tester.pumpAndSettle();
+            expect(find.textContaining('Payment 2 of 2'), findsOneWidget);
+            expect(find.text('Checkout total needs a refresh'), findsNothing);
+            expect(
+              find.byKey(const ValueKey('buy-checkout-committed-totals')),
+              findsOneWidget,
+            );
+            expect(find.text('Agreed total'), findsOneWidget);
+            expect(find.text('Placed orders'), findsOneWidget);
+            expect(find.text('Remaining orders'), findsOneWidget);
+            expect(find.textContaining('with UPI · Placed'), findsOneWidget);
+            expect(session.orders, hasLength(1));
+            await captureGroups(tester, 'groups-first-completed');
+            commerce.onGroup = (request) => testGroupedPlacement(
+              request,
+              outcome: BuyV2OrderPlacementOutcome.failed,
+            );
+            expect(await session.submitOrder(), isFalse);
+            await tester.pumpAndSettle();
+            expect(find.textContaining('with UPI · Placed'), findsOneWidget);
+            expect(find.text('Check payment'), findsWidgets);
+            expect(session.orders, hasLength(1));
+            expect(commerce.requests, hasLength(2));
+            expect(tester.takeException(), isNull);
+            await captureGroups(tester, 'groups-second-payment-failed');
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
   }
 
   for (final size in [const Size(320, 800), const Size(640, 360)]) {

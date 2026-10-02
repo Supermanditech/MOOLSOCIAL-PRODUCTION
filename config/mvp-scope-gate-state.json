@@ -1673,9 +1673,9 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Choose a supported payment method using truthful published amount limits and scoped collection details; retain a valid preference and explain unavailable choices before commitment. Recheck the final quoted due-now amount without editing an unresolved attempt.",
-      "manifestPath": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json",
-      "manifestSha256": "335946EB0BB839B2F58E391BDA1B449C215E96F2752AA57F4B1A5D8400198B44",
+      "customerOutcome": "See the scope, amount and number of payments before commitment; place no-payment-due orders once and authorize only the current compatible group, preserving completed orders when another group fails.",
+      "manifestPath": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json",
+      "manifestSha256": "1280DB8ABBFF9F38931BEEF701CEDB56204B0D26691121A4751F6479CB3C9C53",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -1686,59 +1686,58 @@
       ],
       "sharedImplementationOwners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Existing owner has only method-name availability, no scoped typed amount-limit publication. Necessary model/evaluation stays in existing C/S/V owners, with no duplicate screen/route/service/backend; fees reuse current quotes and A08 reuses identity/current basket.",
+      "necessityProof": "Existing all-basket placement and key/reference persistence cannot express independent compatible obligations. Add optional quote groups and provider opt-in to the existing contract; freeze requests and reuse the existing session/state owner, without another service, route or backend.",
       "robustnessCoverage": [
-        "Published minimum/maximum and supplied remaining limits use inclusive minor-unit boundaries; absent bounds remain unknown",
-        "RTGS observes the authoritative RBI INR minimum and any stricter published bank limit; no universal UPI/Card ceiling or automatic split is invented",
-        "Currency, fulfilment scope, duplicate/invalid metadata and expiry cannot authorize a choice or submitted request",
-        "A valid previous method survives refresh; stale callback/removed capability cannot silently change an in-flight method or revive old eligibility",
-        "Final quote/term changes re-evaluate due-now before placement; no request is placed for a newly ineligible amount",
-        "Current quoted payment fees and actual scoped recipient are disclosed; unavailable values are truthful and unknowns are not zero/free/verified",
-        "Missing collection identity disables preparation with the existing saved-Cart reason; successful current identity remains usable",
-        "Payment chooser, large INR values through one crore, 200% text, reduced motion and keyboard/dock continuity are tested locally; actual native versus isolated capability fixture evidence is separate",
-        "Required affected and selected Buy checks close successfully against final unchanged source, or actual unresolved children are linked"
+        "A published plan partitions selected fulfilment groups without duplicate, omitted or unknown scope; total and due-now independently match the current reviewed agreements",
+        "Compatible single payment uses Pay amount and place orders; multiple payments disclose Payment 1 of N and all scopes before commitment; no due-now payment uses Place orders",
+        "Group requests contain only that group's lines, instructions, term IDs and allocated quoted amounts with parent/group identities",
+        "Durable preparation failure prevents side effects; repeated taps cannot duplicate logical attempts and late callbacks cannot alter another owner/group",
+        "A completed credit or paid group survives later failure; completion of one group neither removes other lines nor claims whole purchase success",
+        "Pending/unknown groups are reconciled using original keys rather than fresh placement; submitted groups stay immutable when the live Cart quote changes",
+        "Unsubmitted expired or changed agreements require review; no automatic provider-limit splitting or fabricated compatibility",
+        "Focused and affected selected Buy checks close against final source; normal/200-percent native Checkout remains reachable and truthful with actual review data",
+        "New provider group states are isolated test evidence only until workspace integration; T07 owns legacy A09 snapshot and recovery repair"
       ],
       "adjustments": [
-        "Inspect synchronized existing Redmi Checkout/payment choices before runtime changes",
-        "Add only necessary versioned, time/currency/fulfilment-scoped per-method capability metadata and shared evaluation",
-        "Preserve legacy authorized availability as unknown metadata through existing provider checks; do not fabricate limits, remaining balance, recipient or free transfer",
-        "New trade methods require current explicit scoped capabilities; retail COD stays excluded",
-        "Use the same decision for choice, continuation and final post-quote preflight; pending attempts remain held, including A09",
-        "Bind recipient to the actual scoped payment destination, fee to the current applicable quote, and retain post-placement bank instructions separately",
-        "Repair A08 missing collection identity action eligibility within this destination scope; show its existing truthful recovery reason",
-        "Guard capability refresh against stale responses and preserve valid method preference",
-        "Test boundaries, scope/currency/expiry/refresh, unknown metadata, fees, pending hold and responsive large amounts; re-hot-refresh native and record actual scope",
-        "Preserve normal correctly prefixed feature checkpoint, known handoff failure/open children, then stop before T06"
+        "Audit synchronized existing Redmi Cart/Checkout before runtime changes",
+        "Publish optional group metadata in the existing quote; validate an exact partition of fulfilment groups and independent total/due-now conservation",
+        "Require explicit provider support for group-scoped placement; absent metadata keeps the existing compatible single-basket path, invalid or empty publication holds commitment",
+        "Freeze group requests, scope, amounts, quote identity and stable idempotency keys in the existing account-scoped store before any placement",
+        "Reuse placement/reconciliation while preserving independent confirmed orders, pending groups and unfinished groups; no whole-Cart cleanup after partial success",
+        "Submit zero-due groups once within explicit commitment; each additional paid group requires its own action",
+        "Disclose group scopes, payment count, current amount and completed progress before actions; no supplier-acceptance inference from payment success",
+        "Test mixed paid/credit scope, second failure, duplicate taps, stale/out-of-order responses, invalid plans and persistence failure; qualify actual native legacy path separately",
+        "Record frontend verification versus deferred workspace/backend acceptance and make a safe correctly prefixed checkpoint before T07"
       ],
       "explicitExclusions": [
-        "No new screen, route, service, dependency, fee calculator or payment splitting",
-        "No Store/Counter Sale/CSV/backend/Google/authentication/release configuration changes or other-worktree mutation",
-        "No new APK/install/uninstall/data clear/live payment/supplier contact or screenbook edit",
-        "No T03 supplier-policy popup, T06 grouping or T07 pending amount snapshot repair in this pass",
-        "No history rewriting, baseline advance, new historical subject exception, formal ticket_close or integrated acceptance claim"
+        "No new screen, route, service, dependency, payment gateway or provider-limit splitting",
+        "No Store, Counter Sale, CSV, backend, Google, authentication, release configuration or screenbook mutation",
+        "No new APK/install/uninstall/data clear, live payment or supplier contact",
+        "No T03 supplier-policy popup, T08 order status/balances or later cart-ticket implementation",
+        "No history rewrite, baseline advance, historical subject exception, formal ticket_close or integrated acceptance claim"
       ],
       "dependenciesAndApprovals": [
-        "Existing root Buy ownership; optional shared contract handoff is recorded before source changes, no Store/backend producer mutation",
-        "Workspace method capability, quote, recipient and payment adapter mappings: Codex after integration; authenticated publication and live acceptance require separate evidence",
-        "Backend execution remains deferred; T11-T13 frontend contracts/states may proceed with isolated fixtures",
-        "Google shopping area/current-location and separately gated delivery Maps source/key/permission work stay listed",
-        "Existing Redmi TG8HCYTGGQT885OF / com.moolsocial.app.cursorreview synchronization only; no new APK authority",
-        "A09 pending display drift and the preserved 0e90a6ca naming handoff blocker remain open; neither becomes new payment authority"
+        "Existing root claims own all runtime/test files; shared quote/request contract additions are Buy-side optional metadata and explicit provider opt-in, no Store producer edit",
+        "Workspace quote grouping, scoped placement/idempotency/recovery mapping: Codex after integration; backend orchestration T11 execution remains deferred",
+        "T11-T13 frontend contracts/states can proceed with isolated fixtures; authenticated live multi-payment acceptance needs separate integration evidence",
+        "Existing Redmi TG8HCYTGGQT885OF/com.moolsocial.app.cursorreview hot refresh only; no new build/install authority",
+        "Google shopping area/current-location and separately gated delivery Maps source/key/permission work remain listed",
+        "Preserve historical 0e90a6ca subject handoff blocker without rewriting history or adding an exception"
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "assessed_before_T05_bounded_native_audit",
-      "evidencePath": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json"
+      "implementationState": "assessed_before_T06_bounded_native_audit",
+      "evidencePath": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5202,46 +5201,45 @@
   "ticket": {
     "id": "BUY-ACTION-POLISH-20260926-01",
     "parentTicketId": "UAW-CURSOR-BUY-READY-20260921",
-    "customerOutcome": "Choose a supported payment method using truthful published amount limits and scoped collection details; retain a valid preference and explain unavailable choices before commitment. Recheck the final quoted due-now amount without editing an unresolved attempt.",
+    "customerOutcome": "See the scope, amount and number of payments before commitment; place no-payment-due orders once and authorize only the current compatible group, preserving completed orders when another group fails.",
     "classification": "mvp_required",
-    "classificationReason": "Safe payment eligibility and truthful destination/charges are necessary for the selected commerce journey.",
+    "classificationReason": "Truthful commitment and independent payment results are necessary for mixed-Cart commerce.",
     "minimumCompleteScope": [
-      "Inspect synchronized existing Redmi Checkout/payment choices before runtime changes",
-      "Add only necessary versioned, time/currency/fulfilment-scoped per-method capability metadata and shared evaluation",
-      "Preserve legacy authorized availability as unknown metadata through existing provider checks; do not fabricate limits, remaining balance, recipient or free transfer",
-      "New trade methods require current explicit scoped capabilities; retail COD stays excluded",
-      "Use the same decision for choice, continuation and final post-quote preflight; pending attempts remain held, including A09",
-      "Bind recipient to the actual scoped payment destination, fee to the current applicable quote, and retain post-placement bank instructions separately",
-      "Repair A08 missing collection identity action eligibility within this destination scope; show its existing truthful recovery reason",
-      "Guard capability refresh against stale responses and preserve valid method preference",
-      "Test boundaries, scope/currency/expiry/refresh, unknown metadata, fees, pending hold and responsive large amounts; re-hot-refresh native and record actual scope",
-      "Preserve normal correctly prefixed feature checkpoint, known handoff failure/open children, then stop before T06"
+      "Audit synchronized existing Redmi Cart/Checkout before runtime changes",
+      "Publish optional group metadata in the existing quote; validate an exact partition of fulfilment groups and independent total/due-now conservation",
+      "Require explicit provider support for group-scoped placement; absent metadata keeps the existing compatible single-basket path, invalid or empty publication holds commitment",
+      "Freeze group requests, scope, amounts, quote identity and stable idempotency keys in the existing account-scoped store before any placement",
+      "Reuse placement/reconciliation while preserving independent confirmed orders, pending groups and unfinished groups; no whole-Cart cleanup after partial success",
+      "Submit zero-due groups once within explicit commitment; each additional paid group requires its own action",
+      "Disclose group scopes, payment count, current amount and completed progress before actions; no supplier-acceptance inference from payment success",
+      "Test mixed paid/credit scope, second failure, duplicate taps, stale/out-of-order responses, invalid plans and persistence failure; qualify actual native legacy path separately",
+      "Record frontend verification versus deferred workspace/backend acceptance and make a safe correctly prefixed checkpoint before T07"
     ],
     "explicitExclusions": [
-      "No new screen, route, service, dependency, fee calculator or payment splitting",
-      "No Store/Counter Sale/CSV/backend/Google/authentication/release configuration changes or other-worktree mutation",
-      "No new APK/install/uninstall/data clear/live payment/supplier contact or screenbook edit",
-      "No T03 supplier-policy popup, T06 grouping or T07 pending amount snapshot repair in this pass",
-      "No history rewriting, baseline advance, new historical subject exception, formal ticket_close or integrated acceptance claim"
+      "No new screen, route, service, dependency, payment gateway or provider-limit splitting",
+      "No Store, Counter Sale, CSV, backend, Google, authentication, release configuration or screenbook mutation",
+      "No new APK/install/uninstall/data clear, live payment or supplier contact",
+      "No T03 supplier-policy popup, T08 order status/balances or later cart-ticket implementation",
+      "No history rewrite, baseline advance, historical subject exception, formal ticket_close or integrated acceptance claim"
     ],
     "dependenciesAndApprovals": [
-      "Existing root Buy ownership; optional shared contract handoff is recorded before source changes, no Store/backend producer mutation",
-      "Workspace method capability, quote, recipient and payment adapter mappings: Codex after integration; authenticated publication and live acceptance require separate evidence",
-      "Backend execution remains deferred; T11-T13 frontend contracts/states may proceed with isolated fixtures",
-      "Google shopping area/current-location and separately gated delivery Maps source/key/permission work stay listed",
-      "Existing Redmi TG8HCYTGGQT885OF / com.moolsocial.app.cursorreview synchronization only; no new APK authority",
-      "A09 pending display drift and the preserved 0e90a6ca naming handoff blocker remain open; neither becomes new payment authority"
+      "Existing root claims own all runtime/test files; shared quote/request contract additions are Buy-side optional metadata and explicit provider opt-in, no Store producer edit",
+      "Workspace quote grouping, scoped placement/idempotency/recovery mapping: Codex after integration; backend orchestration T11 execution remains deferred",
+      "T11-T13 frontend contracts/states can proceed with isolated fixtures; authenticated live multi-payment acceptance needs separate integration evidence",
+      "Existing Redmi TG8HCYTGGQT885OF/com.moolsocial.app.cursorreview hot refresh only; no new build/install authority",
+      "Google shopping area/current-location and separately gated delivery Maps source/key/permission work remain listed",
+      "Preserve historical 0e90a6ca subject handoff blocker without rewriting history or adding an exception"
     ],
     "testAndEvidencePlan": [
-      "Published minimum/maximum and supplied remaining limits use inclusive minor-unit boundaries; absent bounds remain unknown",
-      "RTGS observes the authoritative RBI INR minimum and any stricter published bank limit; no universal UPI/Card ceiling or automatic split is invented",
-      "Currency, fulfilment scope, duplicate/invalid metadata and expiry cannot authorize a choice or submitted request",
-      "A valid previous method survives refresh; stale callback/removed capability cannot silently change an in-flight method or revive old eligibility",
-      "Final quote/term changes re-evaluate due-now before placement; no request is placed for a newly ineligible amount",
-      "Current quoted payment fees and actual scoped recipient are disclosed; unavailable values are truthful and unknowns are not zero/free/verified",
-      "Missing collection identity disables preparation with the existing saved-Cart reason; successful current identity remains usable",
-      "Payment chooser, large INR values through one crore, 200% text, reduced motion and keyboard/dock continuity are tested locally; actual native versus isolated capability fixture evidence is separate",
-      "Required affected and selected Buy checks close successfully against final unchanged source, or actual unresolved children are linked"
+      "A published plan partitions selected fulfilment groups without duplicate, omitted or unknown scope; total and due-now independently match the current reviewed agreements",
+      "Compatible single payment uses Pay amount and place orders; multiple payments disclose Payment 1 of N and all scopes before commitment; no due-now payment uses Place orders",
+      "Group requests contain only that group's lines, instructions, term IDs and allocated quoted amounts with parent/group identities",
+      "Durable preparation failure prevents side effects; repeated taps cannot duplicate logical attempts and late callbacks cannot alter another owner/group",
+      "A completed credit or paid group survives later failure; completion of one group neither removes other lines nor claims whole purchase success",
+      "Pending/unknown groups are reconciled using original keys rather than fresh placement; submitted groups stay immutable when the live Cart quote changes",
+      "Unsubmitted expired or changed agreements require review; no automatic provider-limit splitting or fabricated compatibility",
+      "Focused and affected selected Buy checks close against final source; normal/200-percent native Checkout remains reachable and truthful with actual review data",
+      "New provider group states are isolated test evidence only until workspace integration; T07 owns legacy A09 snapshot and recovery repair"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5501,13 +5499,13 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json"
+    "evidence": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json"
   },
   "authorization": {
     "state": "existing_ticket_authority_confirmed",
-    "evidence": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json",
+    "evidence": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder next on 2 October 2026 selects T05 as a bounded frontend subworkflow under the existing open Buy parent and standing lane ticket; audit Git/Redmi, register actual defects, scoped fixes/tests/native retest, verified scope or unresolved child, safe prefixed feature checkpoint, then stop. Existing formal handoff failure remains open. Backend execution deferred; workspace mapping Codex after integration; Google dependencies listed."
+    "founderAcceptance": "Founder execute these on 2 October 2026 explicitly selects T06 then T07 including open A09 under the existing Buy parent and standing lane ticket. Follow scope/Git, existing Redmi hot refresh and journey/screenshots, defect registration, scoped fixes, tests, final native retest, evidence and safe prefixed Git checkpoints. Continue into T07 after T06; stop before T08. Backend execution deferred, workspace providers Codex after integration, Google dependencies listed."
   },
   "execution": {
     "referenceWriteAuthorized": false,
@@ -5516,7 +5514,7 @@
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "T05_source_and_tests_only_no_build_authority",
+    "buildAuthorizationScope": "T06_T07_source_and_tests_only_no_build_authority",
     "deviceInstallAuthorizationScope": "No_install_uninstall_or_data_clear_existing_cursorreview_hot_refresh_only",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,

@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "2FCB3E53075D6D79C5BDDC72C89CCD4F6EF1702A2AA1B702E8F18C81C1F92689"
+    "sha256": "D2600EC66D3B84BEC73A2F7422766D353AE0A27FA3549CCD142C0DB809DEA24F"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -280,7 +280,12 @@
         "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl",
         "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl",
         "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl",
-        "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl"
+        "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl"
       ]
     },
     {
