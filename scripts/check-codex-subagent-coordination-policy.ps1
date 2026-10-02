@@ -1160,6 +1160,14 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl',
   'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl',
   'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl',
+  # Exact authorized T07 contract; receipts are admitted only after closing.
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json',
+  # Exact founder-authorized artifact-retention maintenance, primary serialized.
+  'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json',
+  'scripts/check-codex-development-regression-memory.ps1',
+  'scripts/artifact-evidence-retention.ps1',
+  'scripts/check-cleanup-artifact-retention.ps1',
+  'scripts/test-artifact-evidence-retention.ps1',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl',
@@ -3195,6 +3203,21 @@ if ($ProductionLane -ceq 'baseline') {
         $effectiveOwner -cin $addProductBootstrapOwners
       )
       $allowedOwner = $false
+      # Separately founder-authorized primary maintenance; all ordinary checks run.
+      # The expected authority hash is fixed independently in the helper.
+      . (Join-Path $PSScriptRoot 'artifact-evidence-retention.ps1')
+      $retentionAuthorityPath = Join-Path $root 'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json'
+      $retentionAuthoritySha = if (Test-Path -LiteralPath $retentionAuthorityPath -PathType Leaf) {
+        (Get-FileHash -LiteralPath $retentionAuthorityPath -Algorithm SHA256).Hash
+      } else { '' }
+      $retentionMaintenanceOwner = Test-ArtifactRetentionMaintenanceOwner @{
+        Role=$AgentRole; Task=$AgentTask; ClaimTask=$currentClaim[0].task; ClaimRole=$currentClaim[0].role
+        Root=$rootForward; Branch=$branch; Lane=$ProductionLane; WorkId=$ProductionWorkId
+        TicketId=$ProductionTicketId; Phase=$ProductionPhase; Owner=$effectiveOwner
+        AuthoritySha256=$retentionAuthoritySha
+        GenerationVerified=([int]$policy.registryBinding.entryCount -eq $ExpectedRegistryEntryCount -and
+          [string]$policy.registryBinding.sha256 -ceq $ExpectedRegistrySha256)
+      }
       # Founder requested completion of dialog-free Stock downloads, frontend only.
       # Admit exactly its bridge and registration; no auth, manifest or release changes.
       $addProductStockDownloadOwner = (
@@ -3241,7 +3264,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($retentionMaintenanceOwner -or $cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -3253,7 +3276,7 @@ if ($ProductionLane -ceq 'baseline') {
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
-          $cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
+          $retentionMaintenanceOwner -or $cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
           $addProductPhotoRouteOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or

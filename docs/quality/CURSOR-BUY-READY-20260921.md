@@ -996,3 +996,148 @@ workspace implementation is **Codex after integration**. Google and Maps
 dependencies remain listed. The historical commit-prefix blocker prevents formal
 handoff. Save an ordinary correctly prefixed T06 feature checkpoint, then admit
 the already-authorized T07/A09 recovery sweep. No new APK or live payment.
+
+### T06 checkpoint saved; T07 execution held
+
+T06 is committed/pushed as `ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd`;
+clean status and local/remote equality were verified. T07 scope/ownership,
+incremental and coordinator admission passed, but its mandatory memory gate
+failed on missing historical r60.52 AAB evidence. No T07 runtime/test edits
+or device attempts occurred; A09 remains unresolved. The exact artifact,
+bounded investigation and restore/governance requirement are recorded in the
+latest T07 handoff section and existing REG4647. Admission/hold records are
+uncommitted; do not bypass the gate to implement or checkpoint T07. Stop before
+T08 until authentic evidence restoration or explicit governance resolution.
+
+### Historical artifact retention repair verified — 2 October 2026
+
+The founder authorized this repair after the cleanup deleted permanent evidence.
+The original hold above is retained as incident history and is now resolved by
+explicit, exact historical-loss governance. Three rejected, non-reusable binaries
+remain lost; no binary was rebuilt, substituted, recovered or approved. The
+immutable authority is `docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json`,
+SHA256 `70F6FE4BAB84B29D9A0C323B6B48CC2CFC2515E25761431AEF2F69E186138370`.
+Original registry evidence paths and rejection/provenance records remain intact.
+The memory gate allows exactly five consuming references to these three lost
+artifacts, validates independently pinned original evidence, rejects changed or
+wrong restored identity and current-candidate collisions across accepted roots,
+and grants no build, install, promotion or release authority.
+
+The external executed cleanup plan remains retired: `-Apply` refuses execution.
+Its inline reference-aware guard matches the tracked source, protects audit roots
+and ancestors containing evidence, and verifies every current registered active
+root before deletion. No cleanup was executed. Final external SHA256:
+`90D2D59DCA7CFF509536EBE022BC3EE31B6DF57AB982776D3367197521653CA3`.
+
+Final verification: 39 checks passed on each of PowerShell7.6.6 (session18292,
+exit0) and Windows PowerShell5.1.26100.9444 (session99382, exit0); six files passed
+syntax parsing on each. Actual implementation memory gate session48580 closed0:
+4618 entries,2552 applicable,3 retired artifacts,5 exact consuming references.
+Architect excerpt review found no remaining checkpoint blocker after its
+ancestor, complete-root-inventory and cross-root candidate findings were fixed
+and tested. Earlier trials remain historical and do not qualify final source.
+
+Application source/test diff against T06 `ee258a5e` is zero; its source fingerprint
+remains `7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d`.
+A09 remains authorized, in_progress, reproduced, and locally/device unqualified.
+Only its premature selected test reservation is deferred for this maintenance
+checkpoint; all983 existing T06 references stay selected. Reselect and qualify
+A09 during actual T07 runtime work. No T07 runtime fix, Redmi attempt, live
+integration or formal ticket closure is claimed. Required final precommit and
+ordinary prefixed commit/push follow; then resume T07 under fresh gates, not T08.
+Backend remains deferred; workspace mapping is Codex after integration. Google,
+Maps, T03 supplier-policy work and the historical0e90a6ca handoff blocker remain.
+
+Durable final verification transcripts:
+
+Host 7.6.6; closed session18292; exit0; original log SHA256 `3d6f6a1635ac59ab95c9606c26b6c2fd3bc601971b4672b14cc88693a511f978`.
+
+```text
+PASS maintenance rejects wrong Role
+PASS maintenance rejects wrong Task
+PASS maintenance rejects wrong ClaimTask
+PASS maintenance rejects wrong ClaimRole
+PASS maintenance rejects wrong Root
+PASS maintenance rejects wrong Branch
+PASS maintenance rejects wrong Lane
+PASS maintenance rejects wrong WorkId
+PASS maintenance rejects wrong TicketId
+PASS maintenance rejects wrong Phase
+PASS maintenance rejects wrong Owner
+PASS maintenance rejects wrong AuthoritySha256
+PASS maintenance rejects wrong GenerationVerified
+PASS exact three historical artifacts / five consumers; unlisted evidence denied
+PASS current candidate references retired artifact without registry or contract changes
+PASS absolute current candidate references retired artifact under another accepted evidence root
+PASS changed registry path / unused retirement
+PASS changed registry consumer identity
+PASS missing retirement authority document
+PASS tampered retirement digest
+PASS tampered retirement duplicate
+PASS tampered retirement extra
+PASS tampered retirement current-candidate
+PASS tampered retirement deletion-evidence
+PASS changed independent original provenance
+PASS present binary with wrong identity
+PASS present same-size binary with wrong checksum
+PASS cleanup protects registry/manifests/audit roots and permits ordinary generated candidate
+PASS recursive ancestor protects referenced evidence outside audit roots; sibling remains eligible
+PASS recursive ancestor protects unindexed review candidates
+PASS cleanup inventory outside authorized workspace
+PASS live registered inventory includes production and active roots, excludes explicit inactive removal
+PASS missing active snapshot inventory
+PASS mismatched active snapshot roots
+PASS active root omitted from both snapshots
+PASS newly registered active root after capture
+PASS unchanged active snapshot
+PASS active HEAD changed during cleanup
+PASS active status changed during cleanup
+Artifact evidence retention tests passed: 39; fixtures retained: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\apps\mobile\build\artifact-retention-tests-9d7ae9e49ef7434a870eb3d0aeea31c2
+VERIFIED host=7.6.6; syntaxFiles=6; cleanupExecuted=false; exit=0
+```
+
+Host 5.1.26100.9444; closed session99382; exit0; original log SHA256 `abf12a6b2b09bfa27d89b832e7ccd44ef0221a611a48e76cfe0aa8046a05d615`.
+
+```text
+PASS maintenance rejects wrong Role
+PASS maintenance rejects wrong Task
+PASS maintenance rejects wrong ClaimTask
+PASS maintenance rejects wrong ClaimRole
+PASS maintenance rejects wrong Root
+PASS maintenance rejects wrong Branch
+PASS maintenance rejects wrong Lane
+PASS maintenance rejects wrong WorkId
+PASS maintenance rejects wrong TicketId
+PASS maintenance rejects wrong Phase
+PASS maintenance rejects wrong Owner
+PASS maintenance rejects wrong AuthoritySha256
+PASS maintenance rejects wrong GenerationVerified
+PASS exact three historical artifacts / five consumers; unlisted evidence denied
+PASS current candidate references retired artifact without registry or contract changes
+PASS absolute current candidate references retired artifact under another accepted evidence root
+PASS changed registry path / unused retirement
+PASS changed registry consumer identity
+PASS missing retirement authority document
+PASS tampered retirement digest
+PASS tampered retirement duplicate
+PASS tampered retirement extra
+PASS tampered retirement current-candidate
+PASS tampered retirement deletion-evidence
+PASS changed independent original provenance
+PASS present binary with wrong identity
+PASS present same-size binary with wrong checksum
+PASS cleanup protects registry/manifests/audit roots and permits ordinary generated candidate
+PASS recursive ancestor protects referenced evidence outside audit roots; sibling remains eligible
+PASS recursive ancestor protects unindexed review candidates
+PASS cleanup inventory outside authorized workspace
+PASS live registered inventory includes production and active roots, excludes explicit inactive removal
+PASS missing active snapshot inventory
+PASS mismatched active snapshot roots
+PASS active root omitted from both snapshots
+PASS newly registered active root after capture
+PASS unchanged active snapshot
+PASS active HEAD changed during cleanup
+PASS active status changed during cleanup
+Artifact evidence retention tests passed: 39; fixtures retained: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\apps\mobile\build\artifact-retention-tests-d5b14bcec64346449682fcfa57e83a71
+VERIFIED host=5.1.26100.9444; syntaxFiles=6; cleanupExecuted=false; exit=0
+```

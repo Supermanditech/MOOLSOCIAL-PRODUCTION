@@ -22224,6 +22224,89 @@
             "sha256": "fc49523be451bd3c7cc7fe539359c2b17c50850ebe8ad8cd3b955eb1f5fbeaa9"
           }
         }
+      },
+      "cartPaymentRecoveryT0720261002": {
+        "status": "scope_admitted_historical_retention_hold_resolved_T07_runtime_pending",
+        "contract": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
+        "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+        "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+        "passingAdmission": "MVP scope, incremental and coordinator/implementation passed; root claims253, entries4618.",
+        "failedGate": "Implementation memory gate exit1: historical REG-20260816-2611 missing r60.52 AAB. Failure registered before searches or retry.",
+        "missingEvidence": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/MoolSocial-1.0.0-r60.52-2026081352-release.aab",
+        "boundedInvestigation": [
+          "Checker's assigned, production, registered worktree and valid archive evidence roots did not contain the exact path",
+          "Approved archive exact-filename search and immediate metadata/SHA manifests had no authentic copy or match",
+          "Exact-path HEAD and all-ref Git history contain no tracked AAB/object",
+          "Memory checker has no local changes; last tracked revision c294656f467eac3ff28bba75ae79d10e882196d1",
+          "Retained REG2611 Markdown prohibits rebuilding, repairing, substituting or promoting r60.52"
+        ],
+        "architectReview": "Stop at admitted-but-blocked scope if authentic evidence cannot be restored. Preserve gate failure and bounded searches, no T07 runtime edit or historical check weakening; leave evidence-only changes reviewable if checkpoint requirements remain unmet.",
+        "implementation": "No T07 runtime/test source edits or device attempts; original T06 source and qualified evidence remain unchanged. A09 remains unresolved and has no passing local/device receipt.",
+        "checkpoint": "Founder-authorized retention maintenance checkpoint; no application source changed. Required final pre_commit, ordinary prefixed commit and remote equality follow. This is not T07 acceptance.",
+        "nextAction": "Save verified retention checkpoint, then rerun admission gates and execute already-authorized T07/A09 recovery. Stop before T08.",
+        "dependencies": "Backend deferred; workspace original-key/financial-retry/late-settlement mapping Codex after integration. Google/Maps and T03 supplier-policy work remain separate. Historical0e90a6ca formal handoff blocker remains unchanged.",
+        "originalHoldCheckpoint": "T06 ordinary feature commit/push ee258a5e verified clean with remote equality before T07 admission. T07 admission/hold changes remain unstaged/uncommitted; pre_commit is not claimed because A09 qualification and mandatory evidence restoration are absent.",
+        "retentionResolution": {
+          "schemaVersion": 1,
+          "state": "verified_checkpoint_pending",
+          "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+          "artifactsLost": 3,
+          "retiredRegistryReferences": 5,
+          "authenticBinariesRecovered": 0,
+          "releaseAuthority": false,
+          "cleanupExecuted": false,
+          "files": {
+            "docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json": "70f6fe4bab84b29d9a0c323b6b48cc2cfc2515e25761431aef2f69e186138370",
+            "scripts/artifact-evidence-retention.ps1": "4b2dbb76952e2a2b826cb3d267fa9ce3abf3663055111843e1176dac4b0c1a00",
+            "scripts/check-cleanup-artifact-retention.ps1": "de49040b8201a3070133d1e878e1e8d67a673dd991edb32f421db85c64e73beb",
+            "scripts/test-artifact-evidence-retention.ps1": "fafa67deb58f4a6be2a5fad454c4a0bb78df052b98ce03ddb7ca85f45c080e5b",
+            "scripts/check-codex-development-regression-memory.ps1": "d34e928908a322aa4b70a8d0b6489b7e12f2a4187a77adfc24aa6e063209422e",
+            "scripts/check-codex-subagent-coordination-policy.ps1": "683bdf2770648b9c56c83c1fd5c1621654df5b6956b55980466542e6fc7177bc"
+          },
+          "externalCleanup": {
+            "path": "C:/Users/jisal/Documents/Codex/2026-10-02/ch/outputs/Clean-C-Drive.ps1",
+            "sha256": "90d2d59dca7cff509536ebe022bc3ee31b6df57ab982776d3367197521653ca3",
+            "retiredApplyRefusalPreserved": true,
+            "inlineGuardMatches": true,
+            "recursiveGuards": 2
+          },
+          "applicationDiffRelativeToT06": [],
+          "memoryGate": {
+            "session": 48580,
+            "exitCode": 0,
+            "entries": 4618,
+            "applicable": 2552,
+            "retiredHistoricalArtifacts": 3,
+            "exactRetiredReferences": 5,
+            "noReleaseAuthority": true
+          },
+          "architectReview": {
+            "task": "/root/retention_architect",
+            "result": "no_remaining_checkpoint_blocker",
+            "scope": "supplied_code_excerpts_and_reported_results_only"
+          },
+          "checks": [
+            {
+              "host": "7.6.6",
+              "session": 18292,
+              "exitCode": 0,
+              "passed": 39,
+              "syntaxFiles": 6,
+              "log": "apps/mobile/build/t06-t07-cart-20261002/retention-qualified-ps7.log",
+              "sha256": "3d6f6a1635ac59ab95c9606c26b6c2fd3bc601971b4672b14cc88693a511f978"
+            },
+            {
+              "host": "5.1.26100.9444",
+              "session": 99382,
+              "exitCode": 0,
+              "passed": 39,
+              "syntaxFiles": 6,
+              "log": "apps/mobile/build/t06-t07-cart-20261002/retention-qualified-ps51.log",
+              "sha256": "abf12a6b2b09bfa27d89b832e7ccd44ef0221a611a48e76cfe0aa8046a05d615"
+            }
+          ]
+        },
+        "selectionDeferral": "Only the premature A09 selected-case reservation is deferred until actual T07 runtime work. Existing 983 T06 selected references and all passing receipts remain qualified against unchanged source. A09 stays in_progress, authorized, reproduced, local/device null and unresolved; no acceptance requirement is waived."
       }
     },
     {
@@ -24744,7 +24827,7 @@
       "id": "BUY-ACTION-POLISH-20260926-01-A09",
       "title": "Pending Checkout amount drifts after a review-only coupon expires",
       "kind": "defect_ticket",
-      "status": "open",
+      "status": "in_progress",
       "parents": [
         "BUY-ACTION-POLISH-20260926-01"
       ],
@@ -24755,17 +24838,17 @@
         "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart"
       ],
-      "implementationAuthorized": false,
-      "founderApproval": null,
-      "planningStatus": "registered_frontend_recovery_follow_up_after_bounded_t04",
+      "implementationAuthorized": true,
+      "founderApproval": "Founder execute these and continue authorizes T07 including A09, after verified T06 checkpoint ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd; stop before T08.",
+      "planningStatus": "T07_authorized_runtime_pending_after_verified_retention_checkpoint",
       "cases": [
         {
           "id": "BUY-ACTION-POLISH-20260926-01-A09/1",
           "route": "Checkout unresolved payment",
           "state": "Timed review-only coupon expires after actual placement",
           "expected": "Submitted request and pending Checkout both retain32rupees; new current-cart eligibility may expire only outside the frozen attempt.",
-          "testFile": "apps/mobile/build/t04-offers-20261002/pending-expiry_test.dart",
-          "testName": "T04 review-only pending expiry preserves submitted amount",
+          "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+          "testName": "T07 pending expiry preserves submitted amount",
           "local": null,
           "device": null
         }
@@ -24783,7 +24866,90 @@
         },
         "scope": "Review-only non-live campaign path without authoritative quote; no live provider acceptance inferred.",
         "repairLane": "Frontend frozen pending-amount and durable recovery boundary, eligible for T07 follow-up. Scheduling after integration is separate from necessity; live integration is not a technical prerequisite for correcting this local display.",
-        "architectReview": "Astra confirmed the founder-authorized stop with unresolved child, retained evidence and partial T04 qualification. No full total-continuity or ticket_close claim."
+        "architectReview": "Astra confirmed the founder-authorized stop with unresolved child, retained evidence and partial T04 qualification. No full total-continuity or ticket_close claim.",
+        "t07ExecutionHold": {
+          "status": "scope_admitted_historical_retention_hold_resolved_T07_runtime_pending",
+          "contract": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
+          "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+          "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+          "passingAdmission": "MVP scope, incremental and coordinator/implementation passed; root claims253, entries4618.",
+          "failedGate": "Implementation memory gate exit1: historical REG-20260816-2611 missing r60.52 AAB. Failure registered before searches or retry.",
+          "missingEvidence": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/MoolSocial-1.0.0-r60.52-2026081352-release.aab",
+          "boundedInvestigation": [
+            "Checker's assigned, production, registered worktree and valid archive evidence roots did not contain the exact path",
+            "Approved archive exact-filename search and immediate metadata/SHA manifests had no authentic copy or match",
+            "Exact-path HEAD and all-ref Git history contain no tracked AAB/object",
+            "Memory checker has no local changes; last tracked revision c294656f467eac3ff28bba75ae79d10e882196d1",
+            "Retained REG2611 Markdown prohibits rebuilding, repairing, substituting or promoting r60.52"
+          ],
+          "architectReview": "Stop at admitted-but-blocked scope if authentic evidence cannot be restored. Preserve gate failure and bounded searches, no T07 runtime edit or historical check weakening; leave evidence-only changes reviewable if checkpoint requirements remain unmet.",
+          "implementation": "No T07 runtime/test source edits or device attempts; original T06 source and qualified evidence remain unchanged. A09 remains unresolved and has no passing local/device receipt.",
+          "checkpoint": "Founder-authorized retention maintenance checkpoint; no application source changed. Required final pre_commit, ordinary prefixed commit and remote equality follow. This is not T07 acceptance.",
+          "nextAction": "Save verified retention checkpoint, then rerun admission gates and execute already-authorized T07/A09 recovery. Stop before T08.",
+          "dependencies": "Backend deferred; workspace original-key/financial-retry/late-settlement mapping Codex after integration. Google/Maps and T03 supplier-policy work remain separate. Historical0e90a6ca formal handoff blocker remains unchanged.",
+          "originalHoldCheckpoint": "T06 ordinary feature commit/push ee258a5e verified clean with remote equality before T07 admission. T07 admission/hold changes remain unstaged/uncommitted; pre_commit is not claimed because A09 qualification and mandatory evidence restoration are absent.",
+          "retentionResolution": {
+            "schemaVersion": 1,
+            "state": "verified_checkpoint_pending",
+            "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+            "artifactsLost": 3,
+            "retiredRegistryReferences": 5,
+            "authenticBinariesRecovered": 0,
+            "releaseAuthority": false,
+            "cleanupExecuted": false,
+            "files": {
+              "docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json": "70f6fe4bab84b29d9a0c323b6b48cc2cfc2515e25761431aef2f69e186138370",
+              "scripts/artifact-evidence-retention.ps1": "4b2dbb76952e2a2b826cb3d267fa9ce3abf3663055111843e1176dac4b0c1a00",
+              "scripts/check-cleanup-artifact-retention.ps1": "de49040b8201a3070133d1e878e1e8d67a673dd991edb32f421db85c64e73beb",
+              "scripts/test-artifact-evidence-retention.ps1": "fafa67deb58f4a6be2a5fad454c4a0bb78df052b98ce03ddb7ca85f45c080e5b",
+              "scripts/check-codex-development-regression-memory.ps1": "d34e928908a322aa4b70a8d0b6489b7e12f2a4187a77adfc24aa6e063209422e",
+              "scripts/check-codex-subagent-coordination-policy.ps1": "683bdf2770648b9c56c83c1fd5c1621654df5b6956b55980466542e6fc7177bc"
+            },
+            "externalCleanup": {
+              "path": "C:/Users/jisal/Documents/Codex/2026-10-02/ch/outputs/Clean-C-Drive.ps1",
+              "sha256": "90d2d59dca7cff509536ebe022bc3ee31b6df57ab982776d3367197521653ca3",
+              "retiredApplyRefusalPreserved": true,
+              "inlineGuardMatches": true,
+              "recursiveGuards": 2
+            },
+            "applicationDiffRelativeToT06": [],
+            "memoryGate": {
+              "session": 48580,
+              "exitCode": 0,
+              "entries": 4618,
+              "applicable": 2552,
+              "retiredHistoricalArtifacts": 3,
+              "exactRetiredReferences": 5,
+              "noReleaseAuthority": true
+            },
+            "architectReview": {
+              "task": "/root/retention_architect",
+              "result": "no_remaining_checkpoint_blocker",
+              "scope": "supplied_code_excerpts_and_reported_results_only"
+            },
+            "checks": [
+              {
+                "host": "7.6.6",
+                "session": 18292,
+                "exitCode": 0,
+                "passed": 39,
+                "syntaxFiles": 6,
+                "log": "apps/mobile/build/t06-t07-cart-20261002/retention-qualified-ps7.log",
+                "sha256": "3d6f6a1635ac59ab95c9606c26b6c2fd3bc601971b4672b14cc88693a511f978"
+              },
+              {
+                "host": "5.1.26100.9444",
+                "session": 99382,
+                "exitCode": 0,
+                "passed": 39,
+                "syntaxFiles": 6,
+                "log": "apps/mobile/build/t06-t07-cart-20261002/retention-qualified-ps51.log",
+                "sha256": "abf12a6b2b09bfa27d89b832e7ccd44ef0221a611a48e76cfe0aa8046a05d615"
+              }
+            ]
+          },
+          "selectionDeferral": "Only the premature A09 selected-case reservation is deferred until actual T07 runtime work. Existing 983 T06 selected references and all passing receipts remain qualified against unchanged source. A09 stays in_progress, authorized, reproduced, local/device null and unresolved; no acceptance requirement is waived."
+        }
       }
     }
   ],

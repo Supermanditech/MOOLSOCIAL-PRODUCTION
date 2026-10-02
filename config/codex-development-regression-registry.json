@@ -108168,6 +108168,176 @@
           "failure": "git diff --check exited1 for the newly changed T06 status line: inherited CRCRLF at that exact line is treated as trailing whitespace. No runtime/test failure or source fingerprint change.",
           "previousCorrection": "Exact status bytes were replaced within the unique T06 section after SHA assertion, preserving all surrounding bytes; apply_patch-authored qualification note appended. Ready note applied successfully.",
           "correction": "Remove only the two inherited CR bytes at the changed status line ending, retaining every other historical byte and all appended notes. Rerun affected diff/metadata/precommit checks; no runtime rerun needed."
+        },
+        "t07Admission": {
+          "status": "frontend_recovery_admitted_before_runtime_edits",
+          "contract": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
+          "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+          "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+          "t06Checkpoint": "Closed pre_commit gate passed, ordinary prefixed feature commit/push; clean raw status bytes0 and remote equals local HEAD verified.",
+          "authority": "Founder execute these and continue authorizes T06 then T07/A09. T06 complete within frontend scope, continue T07 then stop before T08.",
+          "ownership": "Existing root seven runtime/test owners; exact new immutable T07 contract added to root metadata and paired checker. No future receipts claimed.",
+          "observedDefects": [
+            "A09 retained reproduction: immutable request32, current pending display37 after coupon expiry",
+            "Legacy request is constructed after an await and non-PO placement does not wait for durable recovery state",
+            "Legacy recovery uses current Cart/address/amount and local cancellation clears the original key/reference",
+            "Bank-transfer instructions are absent from the existing legacy snapshot codec",
+            "Handoff failure or generic failed/cancelled results permit fresh retry without trusted financial closure"
+          ],
+          "architectReview": "Reuse immutable group submission and codecs with a separate owner-scoped legacy wrapper; no invented group/quote identity. Save trusted financial closure before unlocking, retain released identities, guard stale callbacks. Explicit closure-write failure and bank/PO cold restoration evidence required.",
+          "limits": "Backend deferred; workspace original lookup/retry/late-settlement mapping Codex after integration. Native legacy and isolated recovery evidence distinct. Google dependencies and historical0e90a6ca subject blocker retained. No APK/live payment/T08 authority."
+        },
+        "t07MemoryEvidenceFailure1": {
+          "status": "registered_before_retry_or_runtime_edit",
+          "command": "check-codex-development-regression-memory.ps1 -Phase implementation -BuildMode none -EvidenceArchiveRoot MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904",
+          "exitCode": 1,
+          "entry": "REG-20260816-2611-C33N-POSTBUILD-EVIDENCE-LOOKUP-GUESSED-NONEXISTENT-RELEASE-DIRECTORY",
+          "missing": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/MoolSocial-1.0.0-r60.52-2026081352-release.aab",
+          "correction": "Discover the existing preserved evidence archive and supply its approved actual root. Do not fabricate/copy the artifact, weaken the checker, mutate another worktree or proceed to runtime edits before a passing memory gate. Other T07 admission gates passed."
+        },
+        "t07ExecutionHold": {
+          "status": "scope_admitted_execution_blocked_by_mandatory_memory_evidence",
+          "contract": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
+          "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+          "sourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+          "passingAdmission": "MVP scope, incremental and coordinator/implementation passed; root claims253, entries4618.",
+          "failedGate": "Implementation memory gate exit1: historical REG-20260816-2611 missing r60.52 AAB. Failure registered before searches or retry.",
+          "missingEvidence": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/MoolSocial-1.0.0-r60.52-2026081352-release.aab",
+          "boundedInvestigation": [
+            "Checker's assigned, production, registered worktree and valid archive evidence roots did not contain the exact path",
+            "Approved archive exact-filename search and immediate metadata/SHA manifests had no authentic copy or match",
+            "Exact-path HEAD and all-ref Git history contain no tracked AAB/object",
+            "Memory checker has no local changes; last tracked revision c294656f467eac3ff28bba75ae79d10e882196d1",
+            "Retained REG2611 Markdown prohibits rebuilding, repairing, substituting or promoting r60.52"
+          ],
+          "architectReview": "Stop at admitted-but-blocked scope if authentic evidence cannot be restored. Preserve gate failure and bounded searches, no T07 runtime edit or historical check weakening; leave evidence-only changes reviewable if checkpoint requirements remain unmet.",
+          "implementation": "No T07 runtime/test source edits or device attempts; original T06 source and qualified evidence remain unchanged. A09 remains unresolved and has no passing local/device receipt.",
+          "checkpoint": "T06 ordinary feature commit/push ee258a5e verified clean with remote equality before T07 admission. T07 admission/hold changes remain unstaged/uncommitted; pre_commit is not claimed because A09 qualification and mandatory evidence restoration are absent.",
+          "nextAction": "Restore the authentic retained artifact or obtain explicit governance resolution; rerun applicable gates, then execute the authorized T07/A09 scoped sweep. No T08.",
+          "dependencies": "Backend deferred; workspace original-key/financial-retry/late-settlement mapping Codex after integration. Google/Maps, T03 policy, A08 and existing historical0e90a6ca handoff blocker retained."
+        },
+        "retentionFixAdmission20261002": {
+          "status": "founder_authorized_maintenance_before_gate_edits",
+          "authority": "Founder: I authorise you to fix this with production grade discipline while keep observation and subagents in picture to make it successful fix.",
+          "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+          "scope": "Repair the cleanup-caused loss of three historical regression binary references and prevent recurrence. Primary owns governance edits serially in assigned worktree; cleanup script is the exact founder-supplied external file. Preserve all existing T07 admission/hold changes and T06 runtime/test source. No other-worktree mutation, APK rebuild, install, provider action or promotion.",
+          "subagents": "retention_architect conceptual plan/final review; retention_provenance read-only authenticated artifact/checksum investigation. No concurrent source writers.",
+          "cause": "Cleanup journal marks all five registry-referenced binary paths for deletion. Two identities still have surviving copies; three are genuinely unavailable in current gate roots. Tracked-only protection omitted permanent regression evidence references.",
+          "approach": "Authenticate existing backups first; otherwise explicit loss/retirement record must bind each exact registry ID/path, independent original checksum/manifests and cleanup evidence. Memory validation may acknowledge only exact approved historical retired artifacts, preserving all live/release checks and permanent incident records. Protect evidence references during future cleanup before any deletion.",
+          "technicalReadFailure": "One preparation shell invocation omitted the here-string opener; PowerShell parser rejected before running Python or changing any file. Registered before corrected read. Use complete bounded UTF8 here-string invocation."
+        },
+        "retentionProvenancePointerFailure": {
+          "status": "registered_before_correction_or_retry",
+          "exitCode": 1,
+          "cause": "Read-only provenance agent supplied aggregate /aabSha256 as a root JSON pointer; actual file nests it. Preparation validation stopped with KeyError before creating a retention contract or editing any gate. Agent's earlier raw-journal no-match was also corrected by decoded JSON rows.",
+          "prevention": "Validate every exact pointer against actual parsed objects; derive nested paths from bounded key traversal and bind original source blob/hash from pre-cleanup Git. Keep independent source validation before gate edits. No blind reliance on summarized agent results."
+        },
+        "retentionOwnerPreparationFailure": {
+          "status": "registered_before_fix_or_retry",
+          "exitCode": 1,
+          "cause": "Coordinator correctly rejected a newly declared maintenance script owner whose file had not yet been prepared. No runtime source or memory gate was edited.",
+          "correction": "Prepare the exact authorized maintenance files, then pass the unchanged owner-existence and overlap checks before activating the memory gate import. Keep the serialized ownership transfer and founder scope explicit; do not exempt missing owners."
+        },
+        "retentionLaneAdmissionFailure": {
+          "status": "registered_before_correction_or_retry",
+          "exitCode": 1,
+          "cause": "Fresh maintenance ownership was registered and files exist, but the ordinary Cursor lane correctly excludes the memory checker. Updating the review-owner list alone did not grant a primary governance maintenance exception.",
+          "correction": "Use an exact founder-authorized primary maintenance exception pinned to assigned root/branch/lane/work/ticket, the five declared owners and the immutable retirement contract checksum. Admit implementation/precommit/handoff only; no broad scripts, build, install, acceptance or release authority. Keep ordinary lane protections unchanged.",
+          "architect": "Requested review because owner admission error repeated; no memory gate activation before admission succeeds."
+        },
+        "retentionCleanupWalkFailure": {
+          "status": "registered_before_termination_correction_or_retry",
+          "test": "test-artifact-evidence-retention.ps1",
+          "observed": "Maintenance and retirement negative checks passed, but the cleanup inventory traversal did not complete. PowerShell7 ConvertFrom-Json creates DateTime objects for ISO dates; traversing all PSObject properties recurses through DateTime.Date indefinitely.",
+          "correction": "Walk only JSON containers (PSCustomObject, arrays and dictionaries), treating DateTime/numbers/booleans as scalars. Stop only the uniquely identified owned test process. Retain its partial output and fixtures; rerun fresh owner gate and complete both PS7 and Windows PowerShell5.1 tests."
+        },
+        "retentionRepairResumeObservations20261002": {
+          "state": "registered_before_followup",
+          "readOutput": {
+            "incident": "Two resumed mandatory-read outputs exceeded the result budget; they are not new complete-read proof. Previously retained independent complete reads remain the authority.",
+            "prevention": "Use bounded independent pages for any required reread; never qualify a truncated output."
+          },
+          "externalCleanupPreimage": {
+            "expectedSha256": "262C3993C12DF3141FDDFaa519386B6E437E84960DE4CB5D6432DED2B96562D2",
+            "observedSha256": "514C8A9579F77B00E00EFCA211FF0E51C15E2BC3013A923DD9CAA5B80AC8DA12",
+            "observation": "The external script acquired a bounded retirement safeguard after the preserved preimage: -Apply throws and preview returns before reading the old plan. The prepared original-preimage patch was not applied.",
+            "resolution": "Preserve the retirement safeguard exactly, prepare the evidence-aware additions against the actual current preimage, compare hashes before mutation, and execute no cleanup."
+          }
+        },
+        "retentionArchitectConcreteFindings20261002": {
+          "reviewer": "/root/retention_architect",
+          "state": "registered_before_correction",
+          "finding1": "Cleanup protection must reject ancestors of retained evidence at every recursive removal, including unindexed audit roots; unrelated siblings remain eligible.",
+          "finding2": "Snapshot maps must cover the complete current registered non-removal-root inventory, including newly registered active roots, not just matching nonempty keys.",
+          "finding3": "A current APK candidate path must not reuse a retired historical binary even when the retirement contract and registry consumers are unchanged.",
+          "qualification": "The initial 32-case dual-host passes qualify the earlier source only. New final source requires fresh dual-host tests and gates. The external old plan remains disabled and no destructive cleanup occurred."
+        },
+        "retentionArchitectAlternativeRootFinding20261002": {
+          "state": "registered_before_correction",
+          "finding": "Current candidate collision detection must resolve retired paths under every accepted evidence root, including absolute candidate paths under the production evidence root.",
+          "resolution": "Compare RepositoryRoot and every EvidenceRoot; add an unchanged-contract/registry negative test with an absolute retired candidate path under a second evidence root; rerun final dual-host verification.",
+          "readOutputObservation": "A subsequent MVP diff output was also truncated and was not qualified as complete evidence. Retained assessment contract and machine gates remain authoritative; no truncated read or diff is used as proof."
+        },
+        "artifactRetentionRepairQualification": {
+          "schemaVersion": 1,
+          "state": "verified_checkpoint_pending",
+          "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+          "artifactsLost": 3,
+          "retiredRegistryReferences": 5,
+          "authenticBinariesRecovered": 0,
+          "releaseAuthority": false,
+          "cleanupExecuted": false,
+          "files": {
+            "docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json": "70f6fe4bab84b29d9a0c323b6b48cc2cfc2515e25761431aef2f69e186138370",
+            "scripts/artifact-evidence-retention.ps1": "4b2dbb76952e2a2b826cb3d267fa9ce3abf3663055111843e1176dac4b0c1a00",
+            "scripts/check-cleanup-artifact-retention.ps1": "de49040b8201a3070133d1e878e1e8d67a673dd991edb32f421db85c64e73beb",
+            "scripts/test-artifact-evidence-retention.ps1": "fafa67deb58f4a6be2a5fad454c4a0bb78df052b98ce03ddb7ca85f45c080e5b",
+            "scripts/check-codex-development-regression-memory.ps1": "d34e928908a322aa4b70a8d0b6489b7e12f2a4187a77adfc24aa6e063209422e",
+            "scripts/check-codex-subagent-coordination-policy.ps1": "683bdf2770648b9c56c83c1fd5c1621654df5b6956b55980466542e6fc7177bc"
+          },
+          "externalCleanup": {
+            "path": "C:/Users/jisal/Documents/Codex/2026-10-02/ch/outputs/Clean-C-Drive.ps1",
+            "sha256": "90d2d59dca7cff509536ebe022bc3ee31b6df57ab982776d3367197521653ca3",
+            "retiredApplyRefusalPreserved": true,
+            "inlineGuardMatches": true,
+            "recursiveGuards": 2
+          },
+          "applicationDiffRelativeToT06": [],
+          "memoryGate": {
+            "session": 48580,
+            "exitCode": 0,
+            "entries": 4618,
+            "applicable": 2552,
+            "retiredHistoricalArtifacts": 3,
+            "exactRetiredReferences": 5,
+            "noReleaseAuthority": true
+          },
+          "architectReview": {
+            "task": "/root/retention_architect",
+            "result": "no_remaining_checkpoint_blocker",
+            "scope": "supplied_code_excerpts_and_reported_results_only"
+          },
+          "checks": [
+            {
+              "host": "7.6.6",
+              "session": 18292,
+              "exitCode": 0,
+              "passed": 39,
+              "syntaxFiles": 6,
+              "log": "apps/mobile/build/t06-t07-cart-20261002/retention-qualified-ps7.log",
+              "sha256": "3d6f6a1635ac59ab95c9606c26b6c2fd3bc601971b4672b14cc88693a511f978"
+            },
+            {
+              "host": "5.1.26100.9444",
+              "session": 99382,
+              "exitCode": 0,
+              "passed": 39,
+              "syntaxFiles": 6,
+              "log": "apps/mobile/build/t06-t07-cart-20261002/retention-qualified-ps51.log",
+              "sha256": "abf12a6b2b09bfa27d89b832e7ccd44ef0221a611a48e76cfe0aa8046a05d615"
+            }
+          ],
+          "a09": "Open, reproduced, authorized; selection reservation deferred for maintenance only, no passing receipt or waiver."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

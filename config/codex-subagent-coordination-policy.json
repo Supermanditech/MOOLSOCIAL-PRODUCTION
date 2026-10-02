@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "D2600EC66D3B84BEC73A2F7422766D353AE0A27FA3549CCD142C0DB809DEA24F"
+    "sha256": "133F4A70930861C076845824E61D7B86BF836B8AECEB75CF6254FF30D57D9CBE"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -285,7 +285,13 @@
         "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-FOCUSED.jsonl",
         "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl",
         "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl",
-        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl"
+        "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json",
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/artifact-evidence-retention.ps1",
+        "scripts/check-cleanup-artifact-retention.ps1",
+        "scripts/test-artifact-evidence-retention.ps1"
       ]
     },
     {
@@ -294,7 +300,6 @@
       "owners": [
         "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
-        "scripts/check-codex-development-regression-memory.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },

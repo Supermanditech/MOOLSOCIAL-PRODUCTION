@@ -3864,7 +3864,7 @@ Admission review found that current all-basket placement, whole-Cart completion 
 
 ## T07 — Resume, bank-transfer pending and safe recovery
 
-- **Lane:** Public. **Status:** specified; not implemented or newly tested.
+- **Lane:** Public. **Status:** scope admitted on 2 October 2026; execution blocked by mandatory historical evidence; no T07 implementation or new technical qualification.
 - **Depends on:** T06.
 - **Where:** S/C: pending-order recovery, reconciliation, existing account-scoped persistence and balance-payment adapters; V: _CheckoutPaymentStateRow and confirmation/continuation UI.
 - **Logic/change:** Reconcile original immutable attempt before retry. Allow exit during pending transfer/payment; do not require screenshot/UTR as ordinary success proof. Restore completed/pending/unfinished groups separately. Handle late payment after cancellation through original attempt/refund policy.
@@ -4562,3 +4562,85 @@ Seven-owner analysis is clean. All28 focused cases and924 distinct selected case
 Existing Redmi `TG8HCYTGGQT885OF`, package `com.moolsocial.app.cursorreview`, version `1.0.0-r66.36-cursorreview`/code2026092701, completed `t06-final-refresh-2` with restart0/detachtrue/exit0. Actual Cart retains two products, three items and INR837; receiving address and shared Call on arrival survive. Clear appears only inside the composer. Normal/200-percent text retain total/action access. Original font and rotation were restored and read back. Four reviewed PNG/XML pairs and runtime-owner hashes are recorded. Initial failed attach and transient rotation capture are registered and excluded. No APK, data clear, live payment or supplier acceptance occurred.
 
 Native review has no authoritative payment groups or grouped placement connector; group execution proof is isolated. T11 backend orchestration remains deferred; workspace provider implementation is **Codex after integration**. Google shopping-area/current-location and separately gated Maps source/key/permissions remain listed. T03 supplier-policy/add-popup work remains separate. T07/A09 recovery is next and is not yet implemented. The historical commit-prefix blocker remains open: frontend qualification is not formal handoff or ticket closure. Save an ordinary correctly prefixed feature checkpoint, verify clean status/remote equality, then admit T07; stop before T08.
+
+## T07 admission and mandatory evidence hold — 2 October 2026
+
+T06 passed the closed precommit gate and was committed/pushed as
+`ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd`,
+`ui(buy-ready-20260921): implement T06 payment groups`. Local/remote equality
+and clean raw Git status were verified before T07 admission. This completes
+the preceding checkpoint instruction without claiming formal handoff.
+
+T07's immutable contract is `CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json`.
+The existing root owns its seven runtime/test owners and exact contract;
+scope, incremental and coordinator/implementation gates passed. A09 remains
+unfixed and unqualified: its retained32-versus37 reproduction is preserved.
+No T07 runtime or test source has been edited and no T07 device attempt started.
+
+The mandatory implementation memory gate exited1 because historical
+`REG-20260816-2611-C33N-POSTBUILD-EVIDENCE-LOOKUP-GUESSED-NONEXISTENT-RELEASE-DIRECTORY`
+references a missing artifact:
+`artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/MoolSocial-1.0.0-r60.52-2026081352-release.aab`.
+The current checker probes the assigned worktree, production and registered
+workspace worktrees, plus the approved dirty-worktree archive. Bounded checks
+found no exact artifact or archive-manifest match; exact-path Git history has
+no retained object. The memory checker has no local change and its last tracked
+revision is `c294656f467eac3ff28bba75ae79d10e882196d1`. An earlier summarized
+memory success is not substituted for this actual failing gate.
+
+The failure and investigation are registered under existing
+`REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES` /
+`cartT06T07Execution20261002`, before retry or runtime edits. Historical evidence
+explicitly prohibits rebuilding, repairing, substituting or promoting r60.52.
+Do not remove the missing-evidence requirement or fabricate a replacement.
+Restore authentic retained evidence, or obtain an explicit governance resolution,
+then rerun applicable gates before implementing T07. The evidence-only admission
+changes remain reviewable and uncommitted; A09 lacks the passing qualification
+needed for another precommit checkpoint.
+
+Backend remains deferred; workspace original-key lookup, financial retry authority
+and late-settlement mapping remain **Codex after integration**. Google and Maps,
+T03 supplier-policy work, A08 collection identity and the historical0e90a6ca
+handoff blocker remain listed. T08 was not started.
+
+### Historical artifact retention repair verified — 2 October 2026
+
+The founder authorized this repair after the cleanup deleted permanent evidence.
+The original hold above is retained as incident history and is now resolved by
+explicit, exact historical-loss governance. Three rejected, non-reusable binaries
+remain lost; no binary was rebuilt, substituted, recovered or approved. The
+immutable authority is `docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json`,
+SHA256 `70F6FE4BAB84B29D9A0C323B6B48CC2CFC2515E25761431AEF2F69E186138370`.
+Original registry evidence paths and rejection/provenance records remain intact.
+The memory gate allows exactly five consuming references to these three lost
+artifacts, validates independently pinned original evidence, rejects changed or
+wrong restored identity and current-candidate collisions across accepted roots,
+and grants no build, install, promotion or release authority.
+
+The external executed cleanup plan remains retired: `-Apply` refuses execution.
+Its inline reference-aware guard matches the tracked source, protects audit roots
+and ancestors containing evidence, and verifies every current registered active
+root before deletion. No cleanup was executed. Final external SHA256:
+`90D2D59DCA7CFF509536EBE022BC3EE31B6DF57AB982776D3367197521653CA3`.
+
+Final verification: 39 checks passed on each of PowerShell7.6.6 (session18292,
+exit0) and Windows PowerShell5.1.26100.9444 (session99382, exit0); six files passed
+syntax parsing on each. Actual implementation memory gate session48580 closed0:
+4618 entries,2552 applicable,3 retired artifacts,5 exact consuming references.
+Architect excerpt review found no remaining checkpoint blocker after its
+ancestor, complete-root-inventory and cross-root candidate findings were fixed
+and tested. Earlier trials remain historical and do not qualify final source.
+
+Application source/test diff against T06 `ee258a5e` is zero; its source fingerprint
+remains `7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d`.
+A09 remains authorized, in_progress, reproduced, and locally/device unqualified.
+Only its premature selected test reservation is deferred for this maintenance
+checkpoint; all983 existing T06 references stay selected. Reselect and qualify
+A09 during actual T07 runtime work. No T07 runtime fix, Redmi attempt, live
+integration or formal ticket closure is claimed. Required final precommit and
+ordinary prefixed commit/push follow; then resume T07 under fresh gates, not T08.
+Backend remains deferred; workspace mapping is Codex after integration. Google,
+Maps, T03 supplier-policy work and the historical0e90a6ca handoff blocker remain.
+
+The complete dual-host final test transcripts are retained in the Ready owner
+above; hashes and closed sessions are bound in the founder ledger.

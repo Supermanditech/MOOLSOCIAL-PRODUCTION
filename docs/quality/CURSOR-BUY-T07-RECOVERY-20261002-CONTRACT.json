@@ -1,0 +1,67 @@
+{
+  "ticketId": "BUY-ACTION-POLISH-20260926-01",
+  "laneTicketId": "UAW-CURSOR-BUY-READY-20260921",
+  "capability": "T07 original payment recovery, including A09",
+  "actor": "Public buyers resuming mixed Cart Checkout",
+  "customerOutcome": "Retain the submitted amount and original payment identity across exit, expiry, restart and uncertainty; preserve completed orders and permit another payment only after trusted financial retry authorization.",
+  "classification": "mvp_required",
+  "classificationReason": "Recovery must prevent duplicate payment and display the original financial commitment truthfully.",
+  "founderAuthorization": "Founder execute these and continue authorizes T06 then T07/A09 under the existing Buy parent and standing lane ticket. Follow scope/Git, existing Redmi hot refresh and journey/screenshots, register defects, scoped fixes, tests, re-hot-refresh/retest, verified status or unresolved child, safe prefixed Git checkpoint, then stop before T08. Backend execution deferred; workspace providers Codex after integration; Google dependencies listed.",
+  "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+  "baselineSourceSha256": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+  "priorContract": "docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json",
+  "owners": [
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart"
+  ],
+  "reuse": [
+    "Existing immutable group request and fulfilment obligations, with separate legacy attempt ownership and no invented published group identity",
+    "Existing account-scoped CustomerStateStore and request/order/bank codecs",
+    "Existing place/reconcile/recover operations, session locks, ownership guards and supplier-approval restoration",
+    "Existing responsive payment state row and action bar; isolated provider fixtures only"
+  ],
+  "minimumCompleteScope": [
+    "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
+    "Freeze complete legacy request and allocation before effects; await durable owner-scoped storage for non-review placement",
+    "Fix A09 using the frozen original total/due/lines even when offers expire; older key-only records show unknown agreed amount with original-check/help hold",
+    "Persist bank instructions and original supplier request context for cold recovery; never rebuild a pending agreement from new Cart selections",
+    "Retain original key/reference on local exit, handoff failure, timeout and uncertain failed/cancelled outcomes; guard late/disposed/account/session callbacks",
+    "Verify confirmed orders against frozen complete allocations before cleanup; preserve completed groups independently",
+    "Add an explicit trusted financial retry-authorization result defaulting false; accept it only for matching original reconciliation and terminal failed/cancelled without orders, saving closure before unlocking",
+    "Retain released original attempts for attributable later reconciliation; no automatic repayment/refund on late settlement",
+    "Qualify focused and affected selected cases, screenshots and actual native legacy retest; record isolated versus integrated evidence and checkpoint safely"
+  ],
+  "acceptance": [
+    "A09 submitted32 remains32 after the current coupon expires; original request never changes",
+    "Storage failure stops placement before side effects; submitting restores unknown and original bank/request/allocation data survives cold restart",
+    "Local cancellation and handoff/network failure preserve original identity and prevent fresh submission",
+    "Generic failed/cancelled outcomes do not authorize retry; only a matching trusted financial authorization does, and failed closure storage keeps the hold",
+    "Recovery confirms only original products, quantities, suppliers, amounts and allocations; malformed/stale/other-owner results cannot mutate Cart or orders",
+    "Completed groups survive later failure; only never-submitted or durably financially closed obligations can return to review",
+    "Normal/200-percent text recovery states keep amount/status/help reachable without overflow or duplicate-pay actions",
+    "All required checks close against final source; native legacy evidence and isolated recovery evidence remain distinct from live integration"
+  ],
+  "motionAssessment": "Reuse existing finite state/modal motion and reduced-motion responsive layout. No new screen, route or animation.",
+  "dependenciesAndApprovals": [
+    "Existing root claims own the seven runtime/test owners; optional Buy-side result metadata requires workspace mapping after integration, no Store producer edit",
+    "Backend orchestration/settlement/refund execution remains deferred to T11/T12; workspace original-key lookup, trusted retry authorization and late-settlement discrepancy mapping: Codex after integration",
+    "Redmi TG8HCYTGGQT885OF/com.moolsocial.app.cursorreview existing1.0.0-r66.36+2026092701 hot refresh only; no build/install/live payment authority",
+    "Google shopping-area/current-location and separately gated Maps source/key/permissions remain listed",
+    "T03 published supplier-policy product-sheet/add-popup remains separate; A08 collection identity remains an unresolved child outside this repair",
+    "Existing0e90a6ca historical subject handoff blocker remains; no history rewrite or exception"
+  ],
+  "explicitExclusions": [
+    "No new service, dependency, route, payment gateway or fabricated quote/group/provider authority",
+    "No backend, Store, Counter Sale, CSV, Google, authentication, release settings or screenbook edits",
+    "No APK build/install/uninstall/data clear, live payment or supplier contact",
+    "No T08-T10 implementation, T03 policy-popup change, automatic refund or integrated acceptance claim",
+    "No history rewrite, baseline advance, historical subject exception or formal ticket_close"
+  ],
+  "timelineImpactDays": 0,
+  "timelineReason": "Already authorized Cart recovery subworkflow; integrated settlement and formal handoff remain separately held."
+}

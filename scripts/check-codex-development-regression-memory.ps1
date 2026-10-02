@@ -108,6 +108,9 @@ function Test-RepositoryPathGate([string]$Value) {
   return $Value -cmatch '^[A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)+$'
 }
 
+. (Join-Path $PSScriptRoot 'artifact-evidence-retention.ps1')
+$retiredReferences = Get-RetiredRegressionArtifacts -RepositoryRoot $root -Registry $registry -EvidenceRoots $evidenceRoots.ToArray()
+
 $ids = @($entries | ForEach-Object { [string]$_.id })
 if ($entries.Count -eq 0 -or $ids.Count -ne @($ids | Select-Object -Unique).Count) {
   throw 'Regression registry entries are missing or duplicated.'
@@ -120,7 +123,8 @@ foreach ($entry in $entries) {
     throw "Regression entry $($entry.id) lacks phase, gate or evidence."
   }
   foreach ($relative in @($entry.evidence)) {
-    if (-not (Test-RegistryOwnerExists ([string]$relative))) {
+    if (-not (Test-RegistryOwnerExists ([string]$relative)) -and
+        -not $retiredReferences.ContainsKey([string]$entry.id + '|' + [string]$relative)) {
       throw "Regression entry $($entry.id) references missing repository evidence: $relative"
     }
   }
@@ -152,4 +156,4 @@ if ($Phase -eq 'build') {
   }
 }
 $applicable = @($entries | Where-Object { $Phase -eq 'general' -or @($_.appliesTo) -contains $Phase })
-Write-Output "Codex regression memory passed: entries=$($entries.Count); applicable=$($applicable.Count); phase=$Phase; buildMode=$BuildMode."
+Write-Output "Codex regression memory passed: entries=$($entries.Count); applicable=$($applicable.Count); phase=$Phase; buildMode=$BuildMode; retiredHistoricalArtifacts=3; exactRetiredReferences=$($retiredReferences.Count); noReleaseAuthority=true."
