@@ -1,5 +1,53 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## 2 October — Store-specific admission correction; application writes held
+
+Founder approved the exact Store admission/ownership correction, preserving the
+old release task. Inspection corrects the earlier blocker diagnosis: this branch
+already owns `docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json`, and the
+existing MVP gate accepts its explicit `-StatePath`. No owner expansion, shared
+gate rewrite or replacement of `config/mvp-scope-gate-state.json` is necessary.
+The unrelated readiness record remains byte-identical (SHA256
+`B6934A51A7FA7939761EB4E44D4C3394A178D972CF2C67FBD4BC622A4CCAE4CC`).
+
+Current outcome is a truthful Store-only admission checkpoint. This is
+`mvp_supporting`: reuse existing scope, continuation and incremental controls;
+retain historical R12 assessment, bind this manifest hash, and fail closed for
+application writes. No new screen, route, service, state owner or dependency.
+The existing `/root` claim remains 82 owners. No runtime, backend, posting,
+payment, APK, install, authentication bypass, other-tree change or push authority.
+
+Run the scope check with BOTH explicit Store path and exact existing ticket:
+`scripts/check-mvp-scope-gate-state.ps1 -StatePath
+docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json -CandidateId
+UAW-ADD-PRODUCT-SCREEN1-20260920 -RequireExecutionAuthorized`.
+That pass admits this metadata correction only: `runtimeWriteAuthorized=false`.
+Do not replace it with the default-global readiness pass. Use the existing
+Store incremental record explicitly for continuation/handoff; do not restart
+this descendant checkout with a `task_start` baseline claim.
+
+Next candidate remains P-03: preserve Catalogue/manual/CSV opening-stock entry
+method, as-of date, product/SKU, original quantity/unit and supplied cost. Supplier
+may be unknown; cost alone creates no supplier bill or payable. Existing goods
+must not be stocked again when their supplier bill arrives later. Source review
+finds shared product/editor/import/journal owners already in this claim, but
+generic Opening quantity / Imported product quantity does not establish all
+three entry methods or frozen original cost/unit/as-of provenance. This is an
+identified implementation gap, not completed P-03 or validated accounting.
+
+Finish P-03's exact reuse/duplicate assessment, then fresh founder-input reads,
+concrete decision and Check before any application edit. Retain old unknown
+provenance honestly and test each actual entry journey separately, restart
+continuity, retry/failure/Store isolation and bill-later anti-double-stock linkage.
+P-04 balances, P-08 receipt posting and P-09 payable/payment owners stay separate.
+C11 physical duplicate/Cancel verification carries to the next free OPPO session;
+OPPO is on a call and has not been touched for this correction.
+
+Metadata qualification: explicit Store positive check; wrong-ticket, stale-hash
+and missing-assessment rejection; runtime/foreign-owner/global-state preservation;
+continuation, incremental and regression-memory gates. A passing metadata check
+is not application test, device, backend-reuse or founder visual acceptance.
+
 ## 24 September evening — Git reconciliation and compact discount amendment
 
 Founder asks to preserve incremental development for the preceding 24 hours

@@ -14,7 +14,7 @@
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
     "currentTicketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
-    "selectedTicketAssessment": {
+    "priorR12SelectedTicketAssessment": {
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "P05-R12: retailer saves a reviewed purchase copy and retrieves its frozen details/files from existing Purchases independently of later draft edits.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
@@ -57,21 +57,59 @@
       "timelineImpactDays": 1,
       "within60To75DayLock": true,
       "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Correct this Store continuation's exact admission record without replacing the unrelated release task or granting P03 application/posting authority.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "DBEA4E1EB54B44580E8B57C5A14E334F7DDF0A9536201176B1D2FD715FDE5906",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+      "sharedImplementationOwners": [
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "necessityProof": "Existing MVP gate StatePath and already-owned Store scope record are sufficient. Only admission metadata, current handoff and registry binding change; no gate/script/claim expansion, alternate state owner or global release replacement. Inventory and duplicate assertions apply to this admission correction, not unfinished P03 application assessment.",
+      "robustnessCoverage": [
+        "Exact Store path and existing UAW identity pass; unrelated default release is not used as Store authority",
+        "Wrong ticket, stale manifest and missing selected assessment reject",
+        "Global release bytes and all active owner claims remain identical",
+        "Application/backend/build/install/external flags remain false; deferred device checks remain open"
+      ],
+      "adjustments": ["Use existing separate Store StatePath instead of the default unrelated release path; preserve prior R12 assessment"],
+      "explicitExclusions": ["No P03 application edit or accounting/stock posting", "No global release state, gate code, claims, other tree, backend, APK, device call interaction or push change"],
+      "dependenciesAndApprovals": ["Founder exact admission-only go ahead, 2 October", "Fresh P03 reuse assessment and founder-input Check required before any later application edit"],
+      "timelineImpactDays": 0,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
     }
   },
   "state": "ticket_disclosed_and_authorized",
   "checkpoint": {
     "branch": "work/codex-ui/add-product-screen1-20260920",
-      "head": "9050f69d458988eab24c45417db0e325e0aacb2f",
+    "head": "c9a4f277e79f09153938475ce828e62eee0baf1b",
     "successorRegistered": true,
-    "approvalState": "Founder approved exact Screen 1 checkpoint exception and narrow blocker registration; Counter Sale physical retest remains pending."
+    "priorApprovalState": "Founder approved exact Screen 1 checkpoint exception and narrow blocker registration; Counter Sale physical retest remains pending.",
+    "approvalState": "Founder approved only Store-specific admission correction. Existing owned scope record is reused; P03 remains candidate and C11 actual duplicate/Cancel device qualification remains pending."
   },
   "ticket": {
     "id": "UAW-ADD-PRODUCT-SCREEN1-20260920",
-    "customerOutcome": "P05-R12 saved reviewed purchase-copy history through existing Purchases, with current draft and approved paper layout preserved.",
+    "customerOutcome": "Correct exact Store admission/ownership records while preserving the old release task and all existing application/device boundaries.",
     "classification": "mvp_supporting",
-    "classificationReason": "Existing Retailer/Grocery inventory entry supporting the approved Buy-to-Store commerce launch.",
+    "classificationReason": "Bounded coordination correction supporting the existing POS purchase journey, not new product functionality or release activation.",
     "minimumCompleteScope": [
+      "Use the already-owned Store scope record and explicit StatePath; retain existing UAW continuation and 82-owner claim",
+      "Preserve old release state byte-for-byte and prior R12 assessment",
+      "Bind current handoff hash and record exact positive/negative metadata checks",
+      "Keep all application/posting/backend/build/install/external writes disabled; P03 candidate assessment remains incomplete"
+    ],
+    "priorMinimumCompleteScope": [
       "Screen 1 three entry choices wired to existing handlers",
       "Shared Store photo reference with exact identity, preview isolation and existing Buy rendering; no media backend",
       "Founder-authorized Store-contextual Add to Store copy and exact Store-to-Buy photo route/cache binding with local renderer tests",
@@ -85,17 +123,21 @@
       "2 October founder continuation P05-R12 only: immutable reviewed purchase-copy snapshots in existing encrypted scoped book; existing Purchases/preview/download; draft-save and legacy compatibility; local tests then OPPO hot reload. No posting, backend or new APK authority."
     ],
     "explicitExclusions": [
+      "No application source change, P03 selection, stock/ledger/payment posting, global release replacement or new ownership",
+      "No device interaction during OPPO call, APK, backend, other-tree change or push",
       "CSV batch-review redesign pending its screenwise approval",
       "Backend",
       "Unapproved builds/installs or live service writes; Cursor edits/integration",
       "Counter Sale work unrelated to the 31 grouped r66.38 findings, directly related child defects, or founder bounded extension v1 printing/history/photos"
     ],
     "dependenciesAndApprovals": [
-      "Founder approval of the complete locally tested correction batch before any new APK"
+      "Founder exact metadata correction approval; no application authority inferred",
+      "Complete P03 reuse/duplicate inventory and fresh founder-input Check before later application edits; C11 physical checks remain deferred"
     ],
     "testAndEvidencePlan": [
-      "Focused entry actions and connected navigation",
-      "Compact/large-text local renders"
+      "Explicit Store scope positive check; wrong ticket, stale manifest and missing assessment negative checks",
+      "Unchanged global release hash and all active owner claims; runtime/backend/build/install/external false",
+      "Continuation/incremental/regression-memory gates and scoped clean local checkpoint; no OPPO acceptance claim"
     ]
   },
   "founderDisclosure": {
@@ -109,11 +151,22 @@
   },
   "execution": {
     "referenceWriteAuthorized": false,
-    "runtimeWriteAuthorized": true,
+    "runtimeWriteAuthorized": false,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
     "externalServiceWriteAuthorized": false
+  },
+  "nextCandidate": {
+    "id": "P-03",
+    "state": "candidate_not_selected_application_writes_held",
+    "customerOutcome": "Preserve opening-stock provenance and original quantity/unit/cost/as-of across Catalogue/manual/CSV, permitting unknown supplier and later bill linkage without duplicate stock.",
+    "reuseInventoryComplete": false,
+    "duplicateSearchComplete": false,
+    "observedOwners": ["work_models.dart WorkspaceStockMovement", "work_session.dart addOrUpdateWorkspaceProduct/importWorkspaceProducts", "Existing Add Product, product editor, CSV review and Already added to Stock purchase flow"],
+    "observedGaps": ["Opening quantity and Imported product quantity do not distinguish all three entry methods", "Movement freezes quantity/time but not original unit/cost/as-of provenance", "Purchase product review must remain distinct from invoice entry and later supplier/receipt/payable posting"],
+    "requiredBeforeApplicationEdit": ["Finish exact P03 reuse/duplicate assessment", "Fresh founder-input reads, concrete decision and Check", "Update only this Store scope record for the bounded P03 outcome before enabling application writes"],
+    "deferred": ["P04 existing supplier bills/balances", "P08 receipt posting", "P09 payable/payment posting", "C11 OPPO duplicate/Cancel retest when device is free"]
   }
 }
