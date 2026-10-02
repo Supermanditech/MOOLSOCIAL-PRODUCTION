@@ -1,5 +1,36 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## 2 October — P03-C02 CSV retry identity safeguard
+
+Founder explicitly answered YES to switching this existing ticket from audit to
+implementation. Only the existing CSV failed-save callback and host regressions
+are in scope. Require unique exact submitted IDs and coverage of both frozen
+review/stock maps before persistence; allow unchanged rows in another order.
+Preserve approved UI, saved provenance and movements. No new screen, owner,
+posting, backend, APK, other-tree change or push. All 29 current founder sources
+were independently read through END SOURCE; fresh decision/Check passed.
+
+Architect conceptual review supports the bounded correction and adds owned-stock
+mismatch and successful unchanged retry after rejection. Host adversarial inputs
+are not an established ordinary-UI reproduction. OPPO normal-route Cancel and
+saved-stock continuity remain separate qualification. Current P03 scope manifest
+hash became stale after the retention handoff append; refresh its exact local
+assessment reference only, preserving the earlier assessment and release locks.
+No application edit followed the failed check. Local implementation is complete:
+16 intended CSV/P03 layout cases pass, 440 atomic tests pass with 11 unchanged
+mode-specific skips, and both changed Dart owners analyze clean. Duplicate A/A
+failed before and passes after. Rejection makes no storage call; unchanged and
+reordered retries retain provenance/movement IDs through host restart. Explicit
+fixture restoration is not automatic app repair. Three AP030 Home tests fail on
+both current and exact original dashboard source (old Home-action widget lookup);
+retain their baseline log separately, no whole-estate green claim or Home change.
+
+Architect review of the supplied exact diff finds no blocker to local preservation,
+not independent test/device acceptance. Owned attach98064 detached with verified
+Flutter `d` semantics before tests. At device preflight OPPO was on a Simplex call;
+no screenshot/tap/reload performed. Hot reload and physical CSV navigation/Cancel
+verification remain pending until free. No saved data, APK, backend or push change.
+
 ## 2 October — Store-only retention maintenance admission
 
 Founder explicitly approved Store-only admission of published repair

@@ -316,12 +316,14 @@ class _InventoryWriteFailureFixture implements WorkInventoryStore {
   _InventoryWriteFailureFixture(this.delegate);
   final WorkInventoryStore delegate;
   bool failSave = false;
+  int saveAttempts = 0;
   @override
   Future<WorkspaceSavedInventory?> read(String account, String store,
       {required bool qa}) => delegate.read(account, store, qa: qa);
   @override
   Future<void> save(WorkspaceSavedInventory inventory,
       {required int? expectedRevision}) async {
+    saveAttempts++;
     if (failSave) throw StateError('Test-only inventory write failure');
     await delegate.save(inventory, expectedRevision: expectedRevision);
   }
@@ -13699,6 +13701,104 @@ void main() {
       addTearDown(restarted.dispose);
       expect(await restarted.loadWorkspaceInventory(), isTrue);
       expect(restarted.workspaceCatalogueItems.single.toInventoryJson(), original.toInventoryJson());
+      expect(restarted.workspaceStockMovements.map((m) => m.id), movementIds);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scenario in [
+    'duplicate', 'omitted', 'foreign', 'edited', 'reordered',
+    'owned changed', 'owned missing', 'store changed',
+  ]) {
+    testWidgets('P03-C02 host-only CSV retry identity $scenario', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      final storage = _InventoryWriteFailureFixture(SecureWorkInventoryStore(
+        accountScope: () => account.accountScope));
+      const store = WorkWorkspace(id: 'qa-p03-c02-csv-retry',
+        name: 'P03-C02 evaluation Store', profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery', area: 'Local QA', verified: true);
+      WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: storage)
+        ..selectedProfile = workProfiles.first ..workspaceId = store.id
+        ..activeWorkspace = store ..reviewStage = WorkReviewStage.live
+        ..initialWorkspaceStateLoaded = true ..retailerSetupSaved = true;
+      final work = fresh();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile(
+        'title,brand,pack,purchasePrice,sellingPrice,stock\n'
+        'P03-C02 rice,Evaluation,1 kg,40,50,5\n'
+        'P03-C02 tea,Evaluation,250 g,80,100,6\n');
+      addTearDown(() => FilePickerPlatform.instance = previous);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openAddProductsFromHome(tester);
+      await chooseAddProductMode(tester, 'import');
+      await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+      await tester.pumpAndSettle();
+      final review = tester.widget<StoreProductImportReviewScreen>(
+        find.byType(StoreProductImportReviewScreen));
+      final rows = review.review.rows.map((row) => row.product!).toList();
+      expect(rows, hasLength(2));
+      storage.failSave = true;
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      await tester.pumpAndSettle();
+      expect(await work.workspaceInventorySaved, isFalse);
+      final originals = List.of(work.workspaceCatalogueItems);
+      final originalJson = originals.map((p) => p.toInventoryJson()).toList();
+      final movementIds = work.workspaceStockMovements.map((m) => m.id).toList();
+      expect(originals.every((p) => p.stockEntry!.method == WorkspaceStockEntryMethod.csv), isTrue);
+      storage.failSave = false;
+      if (scenario == 'owned changed') {
+        work.workspaceCatalogueItems[1] = originals[1].copyWith(title: 'Changed owned stock');
+      } else if (scenario == 'owned missing') {
+        work.workspaceCatalogueItems.removeLast();
+      } else if (scenario == 'store changed') {
+        work.activeWorkspace = null;
+        work.workspaceId = 'other-store';
+      }
+      final submitted = switch (scenario) {
+        'duplicate' => [rows[0], rows[0]],
+        'omitted' => [rows[0]],
+        'foreign' => [rows[0], WorkspaceCatalogueItem.fromInventoryJson({
+          ...rows[1].toInventoryJson(), 'id': 'foreign-product-id',
+        })],
+        'edited' => [rows[0].copyWith(title: 'Edited review'), rows[1]],
+        'reordered' => [rows[1], rows[0]],
+        _ => rows,
+      };
+      final attemptsBefore = storage.saveAttempts;
+      final ownedBefore = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+      final scopedMovementsBefore = work.workspaceStockMovements.map((m) => m.id).toList();
+      final error = await review.saveProducts(submitted);
+      if (scenario == 'reordered') {
+        expect(error, isNull);
+        expect(storage.saveAttempts, attemptsBefore + 1);
+      } else {
+        expect(error, contains(scenario == 'store changed'
+          ? 'Your store changed' : 'reviewed products changed'));
+        expect(storage.saveAttempts, attemptsBefore,
+          reason: 'Rejected callback must not invoke storage.');
+        expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), ownedBefore);
+        expect(work.workspaceStockMovements.map((m) => m.id), scopedMovementsBefore);
+        expect(await storage.read(account.accountScope, store.id, qa: true), isNull);
+        work.activeWorkspace = store;
+        work.workspaceId = store.id;
+        work.workspaceCatalogueItems..clear()..addAll(originals);
+        expect(work.workspaceStockMovements.map((m) => m.id), movementIds);
+        // Recovery uses the original frozen attempt, not a new import.
+        await tester.tap(find.byKey(const Key('work-import-save')));
+        await tester.pumpAndSettle();
+        expect(find.byType(StoreProductImportReviewScreen), findsNothing);
+        expect(storage.saveAttempts, attemptsBefore + 1);
+      }
+      expect(await work.workspaceInventorySaved, isTrue);
+      expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), originalJson);
+      expect(work.workspaceStockMovements.map((m) => m.id), movementIds);
+      await tester.pumpWidget(const SizedBox.shrink());
+      final restarted = fresh();
+      addTearDown(restarted.dispose);
+      expect(await restarted.loadWorkspaceInventory(), isTrue);
+      expect(restarted.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), originalJson);
       expect(restarted.workspaceStockMovements.map((m) => m.id), movementIds);
       expect(tester.takeException(), isNull);
     });

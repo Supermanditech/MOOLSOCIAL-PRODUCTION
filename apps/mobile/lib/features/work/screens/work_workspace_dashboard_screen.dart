@@ -16445,8 +16445,17 @@ class _WorkspaceCatalogueSurfaceState
                     for (final p in widget.session.workspaceCatalogueItems)
                       p.id: p,
                   };
+                  final submittedIds = products.map((p) => p.id).toSet();
+                  // A retry must cover every frozen row exactly once. Row count
+                  // and per-row equality alone would accept A/A in place of A/B.
                   if (products.length != savedCount || attemptedReview == null ||
-                      attemptedStock == null || products.any(
+                      attemptedStock == null ||
+                      submittedIds.length != products.length ||
+                      submittedIds.length != attemptedReview!.length ||
+                      submittedIds.length != attemptedStock!.length ||
+                      !submittedIds.containsAll(attemptedReview!.keys) ||
+                      !submittedIds.containsAll(attemptedStock!.keys) ||
+                      products.any(
                     (p) =>
                         attemptedReview![p.id] != jsonEncode(
                           p.copyWith(publicListing: false).toInventoryJson()) ||
