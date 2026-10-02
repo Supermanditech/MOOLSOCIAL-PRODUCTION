@@ -1,5 +1,66 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## 2 October — P03 opening-stock provenance continuation
+
+Founder: go ahead with the next ticket; OPPO device checks may carry to the next
+hot reload because it was on a call. The agent selects already-mapped P03/SO13/
+SO17, not a new accounting engine. The later message reports OPPO connected;
+local qualification precedes device use. C11 duplicate/Cancel remains open.
+
+Reuse/duplicate inventory is complete for this bounded P03 foundation: existing
+Catalogue/manual editors and CSV-only review call existing session save/import;
+WorkspaceCatalogueItem, its inventory codec/copyWith and encrypted inventory CAS
+own the stock-entry snapshot. Existing purchase product setup and generic/JSON
+imports do not establish those three origins. There is no second suitable frozen
+entry record: movement quantity/time exists but loses original SKU, pack and cost,
+and rejects zero movement. A product snapshot supports zero/availability-only
+entry without fabricating a stock movement. Supplier may remain unknown.
+
+Minimum scope: explicit actual entry method; original product/SKU/pack/stock mode,
+quantity and supplied purchase cost/pack measure; recorded-at and stock-as-of
+defaulting to entry time, not invented historical receipt date. Preserve immutable
+snapshot through later edits, retained schema compatibility, failed save/retry and
+account/Store/QA isolation. Newer records fail closed for old writers. Snapshot is
+descriptive, never a second quantity delta or bill/payment/payable.
+
+Smallest existing owners: work_models.dart, work_services.dart, work_session.dart,
+dashboard entry callbacks and the existing atomic/layout tests. No new screen,
+route, service, backend owner or dependency. Approved presentation stays intact.
+Existing Already added to Stock and unposted reviewed purchase copy remain; test
+that recording a later bill does not change quantity. Durable posting allocation
+and opening supplier balances are P08/P04, not evidence from that selector alone.
+
+Architect reviewed six risks; product-owned immutable snapshot, explicit source
+callbacks, versioned codec/write guards, original rather than current values and
+stable retry address them. Fresh26-source founder decision/Check and exact scoped
+MVP, continuation/incremental and memory gates precede implementation. Local
+fixtures are host tests only. Each actual Catalogue/manual/CSV save, restart and
+late-bill quantity check remains pending until individually evidenced on OPPO.
+
+Runtime authorization is limited to this frontend P03 foundation. No ledger or
+financial posting, P04/P08/P09 implementation, APK/install/OCR/auth/backend,
+other-tree mutation, external service write or push. Same existing root82 claim,
+UAW identity, explicit Store StatePath and original continuation baseline remain.
+The old global release state and the prior admission/R12 records are preserved.
+Local scoped commit follows qualification; Git safety is not device acceptance.
+
+Local qualification: 440 atomic tests pass, 11 pre-existing mode-specific skips;
+8 selected screen tests pass; six affected owners analyze clean. Two CSV retry
+tests fail before the frozen attempted-review/attempted-stock correction and pass
+after. Original entry facts and movement IDs survive host retry/restart. Late
+already-stocked bill copy retains original6/current4 without extra stock/finance.
+Fixtures are host evidence only. Physical data creation/hotreload did not occur.
+
+Device preflight is blocked at REG2611's missing retired r60.52 AAB evidence,
+despite using the registered archive root. Exact worktree/archive paths are absent;
+the historical narrative prohibits rebuilding/reusing/promoting it. Do not fabricate
+that file or rewrite the old reference without separate authority. Existing release
+state remains unchanged. Request narrow reference reconciliation; actual OPPO
+three-path/restart/bill-later and C11 remain open. Architect source review found no
+blocking defect; P03-C02 defensive exact-unique-ID-set CSV retry check is registered
+as remaining, not omitted or implied complete. New private-photo and physical
+accessibility variants are also pending. Checkpoint is local preservation only.
+
 ## 2 October — Store-specific admission correction; application writes held
 
 Founder approved the exact Store admission/ownership correction, preserving the

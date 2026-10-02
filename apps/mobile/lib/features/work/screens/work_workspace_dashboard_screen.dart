@@ -16099,6 +16099,7 @@ class _WorkspaceCatalogueSurfaceState
                 key: catalogueEditorKey,
                 session: widget.session,
                 product: catalogueProduct!,
+                stockEntryMethod: WorkspaceStockEntryMethod.catalogue,
                 embeddedPage: true,
                 guardRouteExit: false,
                 onDone: () => setPageState(() => catalogueProduct = null),
@@ -16112,6 +16113,7 @@ class _WorkspaceCatalogueSurfaceState
           key: manualEditorKey,
           session: widget.session,
           product: manualProduct,
+          stockEntryMethod: WorkspaceStockEntryMethod.manual,
           embeddedPage: true,
           guardRouteExit: false,
           onSaved: () => Navigator.of(pageContext).pop(true),
@@ -16313,6 +16315,7 @@ class _WorkspaceCatalogueSurfaceState
       if (!current()) return 'Your store changed. Import the file again.';
       if (!mounted) return null;
       var savedCount = 0;
+      Map<String, String>? attemptedReview, attemptedStock;
       final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (reviewContext) => StoreProductImportReviewScreen(
@@ -16442,12 +16445,13 @@ class _WorkspaceCatalogueSurfaceState
                     for (final p in widget.session.workspaceCatalogueItems)
                       p.id: p,
                   };
-                  if (products.any(
+                  if (products.length != savedCount || attemptedReview == null ||
+                      attemptedStock == null || products.any(
                     (p) =>
-                        jsonEncode(owned[p.id]?.toInventoryJson()) !=
-                        jsonEncode(
-                          p.copyWith(publicListing: false).toInventoryJson(),
-                        ),
+                        attemptedReview![p.id] != jsonEncode(
+                          p.copyWith(publicListing: false).toInventoryJson()) ||
+                        attemptedStock![p.id] !=
+                          jsonEncode(owned[p.id]?.toInventoryJson()),
                   )) {
                     return 'The reviewed products changed. Keep this review open and check the unsaved Store stock.';
                   }
@@ -16480,8 +16484,18 @@ class _WorkspaceCatalogueSurfaceState
               widget.session.importWorkspaceProducts(
                 products.map((p) => p.copyWith(publicListing: false)).toList(),
                 addOnly: true,
+                stockEntryMethod: csvOnly ? WorkspaceStockEntryMethod.csv : null,
               );
               savedCount = products.length;
+              // Freeze both sides of the attempted save. Provenance is created
+              // by the session, not the review editor; retry it without inventing
+              // a new entry time or hiding actual review/inventory changes.
+              attemptedReview = Map.unmodifiable({for (final p in products)
+                p.id: jsonEncode(p.copyWith(publicListing: false).toInventoryJson())});
+              final attemptedOwned = {for (final p in widget.session.workspaceCatalogueItems)
+                p.id: p};
+              attemptedStock = Map.unmodifiable({for (final p in products)
+                p.id: jsonEncode(attemptedOwned[p.id]?.toInventoryJson())});
               if (widget.session.localInventoryEnabled &&
                   !await widget.session.workspaceInventorySaved) {
                 return widget.session.workspaceInventoryError ??
@@ -18975,6 +18989,7 @@ class _CatalogueProductEditor extends StatefulWidget {
     this.validateImport,
     this.onImportReviewed,
     this.purchaseScope,
+    this.stockEntryMethod,
   });
 
   final WorkSession session;
@@ -18990,6 +19005,8 @@ class _CatalogueProductEditor extends StatefulWidget {
   final ValueChanged<WorkspaceProductImportRow>? onImportReviewed;
   // Only new-product setup launched by a purchase. All other editors are unchanged.
   final (String, String, bool)? purchaseScope;
+  // Explicit creation route only; edits and purchase/CSV draft review do not post.
+  final WorkspaceStockEntryMethod? stockEntryMethod;
 
   @override
   State<_CatalogueProductEditor> createState() =>
@@ -19891,7 +19908,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           reviewedProduct.copyWith(publicListing: false)));
         return;
       }
-      widget.session.addOrUpdateWorkspaceProduct(reviewedProduct);
+      widget.session.addOrUpdateWorkspaceProduct(
+        reviewedProduct, stockEntryMethod: widget.stockEntryMethod);
       if (widget.session.localInventoryEnabled) {
         final persisted = _pendingInventorySave
             ? await widget.session.retryWorkspaceInventorySave()

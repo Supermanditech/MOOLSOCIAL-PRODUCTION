@@ -7342,6 +7342,8 @@ class WorkSession extends ChangeNotifier {
         {
           'id': product.id,
           'canonicalId': product.canonicalId,
+          if (product.stockEntry != null)
+            'stockEntry': product.stockEntry!.toJson(),
           if (product.packMeasure != null)
             'packMeasure': product.packMeasure!.toJson(),
           if (product.wholesaleOffer != null)
@@ -8613,21 +8615,29 @@ class WorkSession extends ChangeNotifier {
   void addOrUpdateWorkspaceProduct(
     WorkspaceCatalogueItem product, {
     String stockReason = 'Product quantity updated',
+    WorkspaceStockEntryMethod? stockEntryMethod,
   }) {
     final index = workspaceCatalogueItems.indexWhere(
       (item) => item.id == product.id,
     );
     if (index == -1) {
+      product = _withOriginalStockEntry(product, stockEntryMethod);
       workspaceCatalogueItems.add(product);
       _recordWorkspaceActivity('${product.title} added to your catalogue.');
       _recordWorkspaceStockMovement(
         product: product,
         kind: WorkspaceStockMovementKind.openingStock,
-        quantityDelta: product.stock,
+        quantityDelta: product.stockMode == WorkspaceStockMode.exactQuantity
+            ? product.stock : 0,
         reason: 'Opening quantity',
       );
     } else {
       final previous = workspaceCatalogueItems[index];
+      if (previous.stockEntry != null) {
+        product = product.copyWith(stockEntry: previous.stockEntry);
+      } else if (product.stockEntry != null) {
+        throw const FormatException('Existing stock origin cannot be inferred.');
+      }
       workspaceCatalogueItems[index] = product;
       _recordWorkspaceActivity('${product.title} price and stock updated.');
       _recordWorkspaceStockMovement(
@@ -8656,6 +8666,7 @@ class WorkSession extends ChangeNotifier {
   void importWorkspaceProducts(
     List<WorkspaceCatalogueItem> products, {
     bool addOnly = false,
+    WorkspaceStockEntryMethod? stockEntryMethod,
   }) {
     if (addOnly) {
       // Validate the complete local batch before recording any inventory or
@@ -8716,7 +8727,25 @@ class WorkSession extends ChangeNotifier {
       byId.putIfAbsent(workspaceCatalogueItems[i].id, () => i);
       bySku.putIfAbsent(workspaceCatalogueItems[i].sku, () => i);
     }
-    for (final product in products) {
+    // Prepare every snapshot before mutation. JSON/generic import is unknown;
+    // only the explicit CSV-only caller supplies csv after reviewed row fixes.
+    final prepared = <WorkspaceCatalogueItem>[];
+    for (var product in products) {
+      final previous = workspaceCatalogueItems.where((p) =>
+          p.id == product.id || p.sku == product.sku).firstOrNull;
+      if (previous?.stockEntry != null) {
+        if (previous!.id != product.id) {
+          throw const FormatException('Keep the original Store product identity.');
+        }
+        product = product.copyWith(stockEntry: previous.stockEntry);
+      } else if (previous != null && product.stockEntry != null) {
+        throw const FormatException('Existing stock origin cannot be inferred.');
+      } else if (previous == null) {
+        product = _withOriginalStockEntry(product, stockEntryMethod);
+      }
+      prepared.add(product);
+    }
+    for (final product in prepared) {
       final idIndex = byId[product.id], skuIndex = bySku[product.sku];
       final index = idIndex == null
           ? skuIndex ?? -1
@@ -8730,7 +8759,8 @@ class WorkSession extends ChangeNotifier {
         _recordWorkspaceStockMovement(
           product: product,
           kind: WorkspaceStockMovementKind.goodsReceived,
-          quantityDelta: product.stock,
+          quantityDelta: product.stockMode == WorkspaceStockMode.exactQuantity
+              ? product.stock : 0,
           reason: 'Imported product quantity',
         );
       } else {
@@ -8753,6 +8783,32 @@ class WorkSession extends ChangeNotifier {
     showNotice('${products.length} products imported into your catalogue.');
     _persistOperationalState('catalogue-imported');
     _queueInventorySave();
+  }
+
+  WorkspaceCatalogueItem _withOriginalStockEntry(
+    WorkspaceCatalogueItem product,
+    WorkspaceStockEntryMethod? method,
+  ) {
+    if (method == null) {
+      if (product.stockEntry != null) {
+        throw const FormatException('Use the original stock-entry flow.');
+      }
+      return product; // No guess for legacy/generic/purchase product setup.
+    }
+    final at = DateTime.now().toUtc();
+    final entry = WorkspaceStockEntry(
+      method: method, productId: product.id, sku: product.sku, pack: product.pack,
+      stockMode: product.stockMode,
+      quantity: product.stockMode == WorkspaceStockMode.exactQuantity
+          ? product.stock : null,
+      purchasePriceRupees: product.purchasePrice,
+      recordedAt: at, stockAsOf: at,
+      packMeasure: product.packMeasure,
+    );
+    if (!entry.valid) {
+      throw const FormatException('Review the original stock quantity and purchase price.');
+    }
+    return product.copyWith(stockEntry: entry);
   }
 
   void retireWorkspaceProduct(String productId) {

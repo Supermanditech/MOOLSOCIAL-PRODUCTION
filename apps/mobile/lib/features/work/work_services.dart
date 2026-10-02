@@ -1905,6 +1905,19 @@ class SecureWorkInventoryStore implements WorkInventoryStore {
           'Store stock changed elsewhere. Reload it before saving again.',
         );
       }
+      // Original stock-entry facts are retained, not editable current values.
+      // Reject dropped products/provenance too: an older or stale writer must
+      // not erase their origin while advancing the inventory revision.
+      if (previous != null) {
+        final next = {for (final p in frozen.products) p.id: p};
+        if (previous.products.any((p) =>
+            next[p.id]?.stockEntry?.contentIdentity !=
+                p.stockEntry?.contentIdentity)) {
+          throw const WorkGatewayException(
+            'Original stock-entry details changed. Reload Stock before saving again.',
+          );
+        }
+      }
       try {
         await _storage.write(key: key, value: bytes);
       } on Object {

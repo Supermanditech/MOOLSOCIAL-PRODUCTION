@@ -6307,6 +6307,78 @@ class WorkspacePurchaseEntryBook {
   }
 }
 
+enum WorkspaceStockEntryMethod { catalogue, manual, csv }
+
+/// Original retailer-entered stock facts, not a bill, receipt or payable.
+/// Null on legacy/nonqualifying routes means the entry source is unverified.
+class WorkspaceStockEntry {
+  const WorkspaceStockEntry({
+    required this.method,
+    required this.productId,
+    required this.sku,
+    required this.pack,
+    required this.stockMode,
+    required this.quantity,
+    required this.purchasePriceRupees,
+    required this.recordedAt,
+    required this.stockAsOf,
+    this.packMeasure,
+  });
+
+  final WorkspaceStockEntryMethod method;
+  final String productId, sku, pack;
+  final WorkspaceStockMode stockMode;
+  // Availability-only has no counted quantity; never use its placeholder count.
+  final int? quantity;
+  final int purchasePriceRupees;
+  final DateTime recordedAt, stockAsOf;
+  final WorkspacePackMeasure? packMeasure;
+
+  bool get valid =>
+      [productId, sku, pack].every((s) => s.trim().isNotEmpty && s.length <= 16000) &&
+      purchasePriceRupees > 0 && purchasePriceRupees <= 2147483647 &&
+      !stockAsOf.isAfter(recordedAt) &&
+      (stockMode == WorkspaceStockMode.availabilityOnly
+          ? quantity == null
+          : quantity != null && quantity! >= 0 && quantity! <= 2147483647) &&
+      (packMeasure == null || packMeasure!.valid);
+
+  Map<String, Object?> toJson() => {
+    'version': 1, 'method': method.name, 'productId': productId, 'sku': sku,
+    'pack': pack, 'stockMode': stockMode.name, 'quantity': quantity,
+    'purchasePriceRupees': purchasePriceRupees,
+    'recordedAt': recordedAt.toUtc().toIso8601String(),
+    'stockAsOf': stockAsOf.toUtc().toIso8601String(),
+    'packMeasure': packMeasure?.toJson(),
+  };
+
+  String get contentIdentity => jsonEncode(toJson());
+
+  static WorkspaceStockEntry? fromJson(Object? raw) {
+    if (raw == null) return null;
+    const invalid = FormatException('Original stock-entry details need recovery.');
+    try {
+      if (raw is! Map || raw['version'] != 1) throw invalid;
+      final measure = WorkspacePackMeasure.fromJson(raw['packMeasure']);
+      if (raw['packMeasure'] != null && measure == null) throw invalid;
+      final entry = WorkspaceStockEntry(
+        method: WorkspaceStockEntryMethod.values.byName(raw['method'] as String),
+        productId: raw['productId'] as String, sku: raw['sku'] as String,
+        pack: raw['pack'] as String,
+        stockMode: WorkspaceStockMode.values.byName(raw['stockMode'] as String),
+        quantity: raw['quantity'] as int?,
+        purchasePriceRupees: raw['purchasePriceRupees'] as int,
+        recordedAt: DateTime.parse(raw['recordedAt'] as String),
+        stockAsOf: DateTime.parse(raw['stockAsOf'] as String), packMeasure: measure,
+      );
+      if (!entry.valid) throw invalid;
+      return entry;
+    } on FormatException { rethrow; }
+      on TypeError { throw invalid; }
+      on ArgumentError { throw invalid; }
+  }
+}
+
 /// Device-owned inventory only. QA data cannot be restored into production.
 /// This checkpoint carries no invoice, payment, publication or backend authority.
 class WorkspaceSavedInventory {
@@ -6328,7 +6400,7 @@ class WorkspaceSavedInventory {
   final List<WorkspaceStockMovement> movements;
 
   Map<String, Object?> toJson() => {
-    'version': 1,
+    'version': products.any((p) => p.stockEntry != null) ? 2 : 1,
     'account': account,
     'store': store,
     'qa': qa,
@@ -6357,7 +6429,7 @@ class WorkspaceSavedInventory {
     );
     try {
       if (raw is! Map ||
-          raw['version'] != 1 ||
+          !const [1, 2].contains(raw['version']) ||
           raw['products'] is! List ||
           raw['movements'] is! List) {
         throw invalid;
@@ -6397,11 +6469,15 @@ class WorkspaceSavedInventory {
       final ids = <String>{};
       final movements = <String>{};
       if (result.account.trim().isEmpty ||
+          raw['version'] != (result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
           result.store.trim().isEmpty ||
           result.revision < 1 ||
           result.products.any(
             (p) =>
                 !ids.add(p.id) ||
+                (p.stockEntry != null &&
+                    (!p.stockEntry!.valid || p.stockEntry!.productId != p.id ||
+                     p.stockEntry!.recordedAt.isAfter(result.savedAt))) ||
                 (!result.qa &&
                     p.cataloguePhoto?.status ==
                         WorkspaceCataloguePhotoStatus.testOnly),
@@ -6543,6 +6619,7 @@ class WorkspaceCatalogueItem {
     this.wholesaleOffer,
     this.retailEnabled = true,
     this.content = const WorkspaceProductContent(),
+    this.stockEntry,
   });
 
   final String id;
@@ -6582,6 +6659,7 @@ class WorkspaceCatalogueItem {
   final WorkspaceWholesaleOffer? wholesaleOffer;
   final bool retailEnabled;
   final WorkspaceProductContent content;
+  final WorkspaceStockEntry? stockEntry;
 
   /// Projection only; callers still need publication authority and a content
   /// source revision. Does not create a preview route or publish the product.
@@ -6827,7 +6905,9 @@ class WorkspaceCatalogueItem {
   /// Device inventory record, not publication or financial authority.
   /// Keep QA/production and account/Store identity in the enclosing checkpoint.
   Map<String, Object?> toInventoryJson() => {
-    'version': 1,
+    // Old readers reject this version instead of silently dropping provenance.
+    'version': stockEntry == null ? 1 : 2,
+    if (stockEntry != null) 'stockEntry': stockEntry!.toJson(),
     'id': id,
     'canonicalId': canonicalId,
     'categoryId': categoryId,
@@ -6870,7 +6950,11 @@ class WorkspaceCatalogueItem {
     const invalid = FormatException(
       'Saved product needs recovery. Its data has been kept.',
     );
-    if (raw is! Map || raw['version'] != 1) throw invalid;
+    if (raw is! Map || !const [1, 2].contains(raw['version']) ||
+        (raw['version'] == 2 && raw['stockEntry'] == null) ||
+        (raw['version'] == 1 && raw['stockEntry'] != null)) {
+      throw invalid;
+    }
     String text(String key, {bool required = false}) {
       final value = raw[key];
       if (value is! String ||
@@ -6924,6 +7008,7 @@ class WorkspaceCatalogueItem {
       );
       WorkspaceProductContent.parse(content.inputValues);
       final product = WorkspaceCatalogueItem(
+        stockEntry: WorkspaceStockEntry.fromJson(raw['stockEntry']),
         id: text('id', required: true),
         canonicalId: text('canonicalId', required: true),
         categoryId: text('categoryId', required: true),
@@ -6963,6 +7048,9 @@ class WorkspaceCatalogueItem {
         content: content,
       );
       if (photo != null && !photo.matches(product)) throw invalid;
+      if (product.stockEntry != null && product.stockEntry!.productId != product.id) {
+        throw invalid;
+      }
       if (privatePhoto != null && !privatePhoto.matches(product)) throw invalid;
       return product;
     } on FormatException {
@@ -6975,6 +7063,7 @@ class WorkspaceCatalogueItem {
   }
 
   WorkspaceCatalogueItem copyWith({
+    WorkspaceStockEntry? stockEntry,
     WorkspaceProductContent? content,
     String? canonicalId,
     String? categoryId,
@@ -7016,6 +7105,7 @@ class WorkspaceCatalogueItem {
     bool clearWholesaleOffer = false,
   }) => WorkspaceCatalogueItem(
     id: id,
+    stockEntry: stockEntry ?? this.stockEntry,
     content: content ?? this.content,
     canonicalId: canonicalId ?? this.canonicalId,
     categoryId: categoryId ?? this.categoryId,

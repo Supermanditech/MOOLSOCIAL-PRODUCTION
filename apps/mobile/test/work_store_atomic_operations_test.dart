@@ -1696,6 +1696,201 @@ void main() {
       },
     );
   });
+  // Host fixtures only. Each physical entry path still needs OPPO acceptance.
+  group('P03 host-only opening-stock provenance', () {
+    final base = workspaceMasterCatalogue.last.copyWith(
+      stock: 6, purchasePrice: 25, sellingPrice: 30, publicListing: false);
+    final at = DateTime.utc(2026, 10, 2);
+    WorkspaceStockEntry entry() => WorkspaceStockEntry(
+      method: WorkspaceStockEntryMethod.manual, productId: base.id,
+      sku: base.sku, pack: base.pack, stockMode: base.stockMode, quantity: 6,
+      purchasePriceRupees: 25, recordedAt: at, stockAsOf: at);
+    WorkspaceSavedInventory checkpoint(List<WorkspaceCatalogueItem> products,
+        {int revision = 1, bool qa = true}) => WorkspaceSavedInventory(
+      account: 'account-A', store: _commandStore.id, qa: qa,
+      revision: revision, savedAt: at, products: products, movements: const []);
+
+    test('legacy unknown and strict new schema roundtrip', () {
+      expect(WorkspaceCatalogueItem.fromInventoryJson(base.toInventoryJson()).stockEntry, isNull);
+      final product = base.copyWith(stockEntry: entry());
+      final saved = checkpoint([product]);
+      expect(saved.toJson()['version'], 2);
+      expect(WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(saved.toJson())))
+        .products.single.stockEntry!.contentIdentity, entry().contentIdentity);
+      for (final patch in <Map<String, Object?>>[
+        {'version': 1}, {'stockEntry': null}, {'version': 3},
+        {'stockEntry': {...entry().toJson(), 'quantity': -1}},
+        {'stockEntry': {...entry().toJson(), 'method': 'guessed'}},
+        {'stockEntry': {...entry().toJson(), 'productId': 'different'}},
+        {'stockEntry': {...entry().toJson(), 'stockAsOf': '2026-10-03'}},
+        {'stockEntry': {...entry().toJson(), 'purchasePriceRupees': 0}},
+      ]) {
+        expect(() => WorkspaceCatalogueItem.fromInventoryJson({
+          ...product.toInventoryJson(), ...patch}), throwsFormatException);
+      }
+      expect(() => WorkspaceSavedInventory.fromJson({...saved.toJson(), 'version': 1}),
+        throwsFormatException);
+    });
+
+    for (final method in WorkspaceStockEntryMethod.values) {
+      test('${method.name} freezes original facts through restart and later edits', () async {
+        final device = _OrderJournalStorage();
+        final owner = _CommandAccountStore();
+        WorkSession fresh() => WorkSession(gateway: ReviewWorkGateway(),
+          contactDraftStore: owner, inventoryStore: SecureWorkInventoryStore(
+            accountScope: () => owner.accountScope, storage: device))
+          ..activeWorkspace = _commandStore;
+        final first = fresh();
+        expect(await first.loadWorkspaceInventory(), isTrue);
+        if (method == WorkspaceStockEntryMethod.csv) {
+          first.importWorkspaceProducts([base], addOnly: true, stockEntryMethod: method);
+        } else {
+          first.addOrUpdateWorkspaceProduct(base, stockEntryMethod: method);
+        }
+        expect(await first.workspaceInventorySaved, isTrue);
+        final original = first.workspaceCatalogueItems.single.stockEntry!;
+        expect(original.method, method);
+        expect(original.quantity, 6);
+        expect(original.purchasePriceRupees, 25);
+        expect(original.sku, base.sku);
+        expect(original.stockAsOf, original.recordedAt);
+        first.dispose();
+        final restarted = fresh();
+        addTearDown(restarted.dispose);
+        expect(await restarted.loadWorkspaceInventory(), isTrue);
+        expect(restarted.workspaceCatalogueItems.single.stockEntry!.contentIdentity,
+          original.contentIdentity);
+        restarted.addOrUpdateWorkspaceProduct(restarted.workspaceCatalogueItems.single
+          .copyWith(stock: 4, purchasePrice: 26, sku: 'EDITED-SKU', pack: 'Edited pack'),
+          stockEntryMethod: WorkspaceStockEntryMethod.manual);
+        expect(await restarted.workspaceInventorySaved, isTrue);
+        final edited = restarted.workspaceCatalogueItems.single;
+        expect(edited.stockEntry!.contentIdentity, original.contentIdentity);
+        expect(edited.stock, 4);
+        expect(edited.purchasePrice, 26);
+        expect(edited.stockEntry!.pack, base.pack);
+        expect(restarted.workspaceInvoices, isEmpty);
+        expect(restarted.workspaceFinance, isNull);
+        expect(restarted.workspacePurchaseCopies, isEmpty);
+      });
+    }
+
+    for (final mode in WorkspaceStockMode.values) {
+      test('zero/count-unknown ${mode.name} does not invent a movement', () {
+        final work = WorkSession(gateway: ReviewWorkGateway())..activeWorkspace = _commandStore;
+        addTearDown(work.dispose);
+        work.addOrUpdateWorkspaceProduct(base.copyWith(stock: 0, stockMode: mode),
+          stockEntryMethod: WorkspaceStockEntryMethod.manual);
+        final saved = work.workspaceCatalogueItems.single;
+        expect(saved.stockEntry!.quantity,
+          mode == WorkspaceStockMode.exactQuantity ? 0 : null);
+        expect(saved.stockEntry!.purchasePriceRupees, 25);
+        expect(work.workspaceStockMovements, isEmpty);
+      });
+    }
+
+    test('generic and legacy edits never infer an origin', () {
+      final work = WorkSession(gateway: ReviewWorkGateway())..activeWorkspace = _commandStore;
+      addTearDown(work.dispose);
+      work.importWorkspaceProducts([base], addOnly: true);
+      work.addOrUpdateWorkspaceProduct(base.copyWith(stock: 4),
+        stockEntryMethod: WorkspaceStockEntryMethod.manual);
+      expect(work.workspaceCatalogueItems.single.stockEntry, isNull);
+    });
+
+    test('storage rejects dropped rewritten and retroactive origin; scope remains isolated', () async {
+      final device = _OrderJournalStorage();
+      final storage = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: device);
+      final product = base.copyWith(stockEntry: entry());
+      await storage.save(checkpoint([product]), expectedRevision: null);
+      final altered = WorkspaceStockEntry.fromJson({...entry().toJson(), 'quantity': 5})!;
+      for (final products in [<WorkspaceCatalogueItem>[], [base],
+          [base.copyWith(stockEntry: altered)]]) {
+        await expectLater(storage.save(checkpoint(products, revision: 2), expectedRevision: 1),
+          throwsA(isA<WorkGatewayException>()));
+      }
+      expect((await storage.read('account-A', _commandStore.id, qa: true))!.revision, 1);
+      expect(await storage.read('account-A', _commandStore.id, qa: false), isNull);
+      expect(await storage.read('account-A', 'other-store', qa: true), isNull);
+      await storage.save(checkpoint([base], qa: false), expectedRevision: null);
+      await expectLater(storage.save(checkpoint([product], revision: 2, qa: false), expectedRevision: 1),
+        throwsA(isA<WorkGatewayException>()));
+    });
+
+    test('failed-save retry and lost native reply keep the same snapshot', () async {
+      final device = _OrderJournalStorage()..failWrite = true;
+      final owner = _CommandAccountStore();
+      final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: owner,
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => owner.accountScope,
+          storage: device))..activeWorkspace = _commandStore;
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      work.addOrUpdateWorkspaceProduct(base, stockEntryMethod: WorkspaceStockEntryMethod.manual);
+      expect(await work.workspaceInventorySaved, isFalse);
+      final original = work.workspaceCatalogueItems.single.stockEntry!.contentIdentity;
+      final movementIds = work.workspaceStockMovements.map((m) => m.id).toList();
+      device.failWrite = false;
+      device.loseWriteResponseOnce = true;
+      expect(await work.retryWorkspaceInventorySave(), isTrue);
+      final saved = await SecureWorkInventoryStore(accountScope: () => owner.accountScope,
+        storage: device).read('account-A', _commandStore.id, qa: true);
+      expect(saved!.products.single.stockEntry!.contentIdentity, original);
+      expect(saved.movements.map((m) => m.id), movementIds);
+      expect(saved.products.single.stock, 6);
+    });
+
+    test('later already-stocked bill copy keeps original quantity without stocking again', () async {
+      final device = _OrderJournalStorage();
+      final owner = _CommandAccountStore();
+      WorkSession fresh() => WorkSession(gateway: ReviewWorkGateway(),
+        contactDraftStore: owner, inventoryStore: SecureWorkInventoryStore(
+          accountScope: () => owner.accountScope, storage: device),
+        purchaseEntryStore: SecureWorkPurchaseEntryStore(
+          accountScope: () => owner.accountScope, storage: device))
+        ..activeWorkspace = _commandStore;
+      final work = fresh();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      work.addOrUpdateWorkspaceProduct(base, stockEntryMethod: WorkspaceStockEntryMethod.manual);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final original = work.workspaceCatalogueItems.single.stockEntry!.contentIdentity;
+      work.addOrUpdateWorkspaceProduct(work.workspaceCatalogueItems.single.copyWith(stock: 4));
+      expect(await work.workspaceInventorySaved, isTrue);
+      final movements = work.workspaceStockMovements.map((m) => m.id).toList();
+      expect(await work.loadWorkspaceSuppliers(), isTrue);
+      final now = DateTime.now().toUtc();
+      final supplier = WorkspaceSupplierProfile(id: 'p03-host-supplier',
+        name: 'P03 evaluation supplier', createdAt: now, updatedAt: now);
+      final draft = WorkspacePurchaseEntryDraft(id: 'p03-host-bill',
+        supplierId: supplier.id, invoiceReference: 'P03-HOST-BILL',
+        invoiceDate: '2026-10-02', createdAt: now, updatedAt: now,
+        goods: [{'productId': base.id, 'name': base.title, 'pack': base.pack,
+          'quantity': '6', 'cost': '25'}],
+        details: const {'receiptStatus': 'Already added to Stock'});
+      final copy = WorkspacePurchaseSavedCopy(id: 'p03-host-copy',
+        storeName: _commandStore.name, revision: 1, savedAt: now,
+        supplier: supplier, draft: draft, labels: const {});
+      expect(await work.saveWorkspacePurchaseEntry(supplier,
+        scope: work.workspaceSupplierScope!, draft: draft,
+        expectedRevision: null, reviewedCopy: copy), isTrue);
+      expect(work.workspaceCatalogueItems.single.stock, 4);
+      expect(work.workspaceStockMovements.map((m) => m.id), movements);
+      expect(work.workspaceCatalogueItems.single.stockEntry!.contentIdentity, original);
+      expect(work.workspaceFinance, isNull);
+      work.dispose();
+      final restarted = fresh();
+      addTearDown(restarted.dispose);
+      expect(await restarted.loadWorkspaceInventory(), isTrue);
+      expect(await restarted.loadWorkspaceSuppliers(), isTrue);
+      expect(restarted.workspaceCatalogueItems.single.stock, 4);
+      expect(restarted.workspacePurchaseCopies.single.draft.goods.single['productId'], base.id);
+      expect(restarted.workspacePurchaseCopies.single.draft.goods.single['quantity'], '6');
+      expect(restarted.workspacePurchaseCopies.single.draft.details['receiptStatus'],
+        'Already added to Stock');
+      expect(restarted.workspaceFinance, isNull);
+      expect(restarted.workspaceCatalogueItems.single.stockEntry!.contentIdentity, original);
+    });
+  });
+
   group('LOCALSTOCK durable inventory', () {
     WorkspaceSavedInventory record({bool qa = true, int revision = 1}) =>
         WorkspaceSavedInventory(

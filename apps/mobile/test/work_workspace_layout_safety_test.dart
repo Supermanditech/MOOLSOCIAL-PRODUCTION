@@ -13112,6 +13112,9 @@ void main() {
         expect(await work.workspaceInventorySaved, isTrue);
         final saved = work.workspaceCatalogueItems.single;
         expect(saved.privatePhoto, isNotNull);
+        expect(saved.stockEntry!.method, entryPath == 'csv'
+          ? WorkspaceStockEntryMethod.csv : WorkspaceStockEntryMethod.manual);
+        expect(saved.stockEntry!.quantity, saved.stock);
         expect(saved.cataloguePhoto, isNull);
         expect(saved.publicListing, isFalse);
         final record = saved.toInventoryJson();
@@ -13598,6 +13601,109 @@ void main() {
     );
   }
 
+  for (final method in [WorkspaceStockEntryMethod.catalogue, WorkspaceStockEntryMethod.manual]) {
+    testWidgets('P03 host-only actual editor callback ${method.name}', (tester) async {
+      final work = storeViewFixture()..workspaceCatalogueItems.clear();
+      work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(
+        stockMode: WorkspaceStockMode.exactQuantity, lowStockThreshold: 5,
+        customerListingRequested: false));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 806));
+      await openAddProductsFromHome(tester);
+      if (method == WorkspaceStockEntryMethod.manual) {
+        await chooseAddProductMode(tester, 'enter');
+        for (final entry in [
+          ('work-product-title', 'P03 evaluation rice'),
+          ('work-product-brand', 'Evaluation'), ('work-product-pack', '1 kg'),
+        ]) {
+          final field = find.byKey(Key(entry.$1));
+          await reveal(tester, field);
+          await tester.enterText(field, entry.$2);
+        }
+      } else {
+        final choice = find.byKey(Key('work-catalogue-add-${workspaceMasterCatalogue.first.id}'));
+        await reveal(tester, choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+      }
+      for (final entry in [
+        ('work-product-purchase-price', '25'), ('work-product-selling-price', '30'),
+        ('work-product-stock', '6'),
+      ]) {
+        final field = find.byKey(Key(entry.$1));
+        await reveal(tester, field);
+        await tester.enterText(field, entry.$2);
+      }
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      final saved = work.workspaceCatalogueItems.single;
+      expect(saved.stockEntry!.method, method);
+      expect(saved.stockEntry!.quantity, 6);
+      expect(saved.stockEntry!.purchasePriceRupees, 25);
+      expect(saved.stockEntry!.sku, saved.sku);
+      expect(work.workspaceStockMovements, hasLength(1));
+      expect(work.workspacePurchaseCopies, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final changedReview in [false, true]) {
+    testWidgets('P03 host-only CSV failed save retry changed=$changedReview', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      final storage = _InventoryWriteFailureFixture(SecureWorkInventoryStore(
+        accountScope: () => account.accountScope));
+      const store = WorkWorkspace(id: 'qa-p03-csv-retry', name: 'P03 evaluation Store',
+        profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery',
+        area: 'Local QA', verified: true);
+      WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: storage)
+        ..selectedProfile = workProfiles.first ..workspaceId = store.id
+        ..activeWorkspace = store ..reviewStage = WorkReviewStage.live
+        ..initialWorkspaceStateLoaded = true ..retailerSetupSaved = true;
+      final work = fresh();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile();
+      addTearDown(() => FilePickerPlatform.instance = previous);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openAddProductsFromHome(tester);
+      await chooseAddProductMode(tester, 'import');
+      await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+      await tester.pumpAndSettle();
+      final review = tester.widget<StoreProductImportReviewScreen>(find.byType(StoreProductImportReviewScreen));
+      storage.failSave = true;
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      await tester.pumpAndSettle();
+      expect(await work.workspaceInventorySaved, isFalse);
+      final original = work.workspaceCatalogueItems.single;
+      final movementIds = work.workspaceStockMovements.map((m) => m.id).toList();
+      expect(original.stockEntry!.method, WorkspaceStockEntryMethod.csv);
+      storage.failSave = false;
+      if (changedReview) {
+        final changed = review.review.rows.single.product!.copyWith(title: 'Edited after failed save');
+        expect(await review.saveProducts([changed]), contains('reviewed products changed'));
+        expect(work.workspaceCatalogueItems.single.stockEntry!.contentIdentity,
+          original.stockEntry!.contentIdentity);
+        expect(await storage.read(account.accountScope, store.id, qa: true), isNull);
+      }
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      await tester.pumpAndSettle();
+      expect(find.byType(StoreProductImportReviewScreen), findsNothing);
+      expect(await work.workspaceInventorySaved, isTrue);
+      expect(work.workspaceStockMovements.map((m) => m.id), movementIds);
+      expect(work.workspaceCatalogueItems.single.toInventoryJson(), original.toInventoryJson());
+      await tester.pumpWidget(const SizedBox.shrink());
+      final restarted = fresh();
+      addTearDown(restarted.dispose);
+      expect(await restarted.loadWorkspaceInventory(), isTrue);
+      expect(restarted.workspaceCatalogueItems.single.toInventoryJson(), original.toInventoryJson());
+      expect(restarted.workspaceStockMovements.map((m) => m.id), movementIds);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final scenario in ['cancel', 'import', 'failure', 'store switch']) {
     testWidgets('ADDENTRY02 CSV $scenario uses existing importer', (
       tester,
@@ -13657,6 +13763,9 @@ void main() {
           (p) => p.title == 'Local rice',
         );
         expect(added.stock, 5);
+        expect(added.stockEntry!.method, WorkspaceStockEntryMethod.csv);
+        expect(added.stockEntry!.quantity, 5);
+        expect(added.stockEntry!.purchasePriceRupees, added.purchasePrice);
         expect(added.sellingPrice, 50);
         expect(added.publicListing, isFalse);
         expect(
