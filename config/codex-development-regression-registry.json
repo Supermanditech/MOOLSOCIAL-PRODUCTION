@@ -108338,6 +108338,535 @@
             }
           ],
           "a09": "Open, reproduced, authorized; selection reservation deferred for maintenance only, no passing receipt or waiver."
+        },
+        "t07ResumeAfterRetentionCheckpoint": {
+          "state": "admission_reconstruction",
+          "founderAuthorization": "NOW CONTINUE WITH YOUR SCOPE CURSOR OWNED ONE",
+          "checkpoint": "1a66f12c4153d98962cc639945af215d44b1d7c1",
+          "baselineApplicationSource": "7aa0f6ed1d5916996b63c2ba49a835b06007dfc5b19c51dc831e6497e4b5ed0d",
+          "scope": "Resume T07/A09 under existing Cursor Buy parent and lane. Freeze original commitments, persist before effects, reconcile original identity, require trusted retry closure. Stop before T08.",
+          "readOutputObservation": "The initial combined reread exceeded the aggregate tool output budget. It is excluded as fresh complete-read evidence. Mandatory owners will be reread independently in bounded pages; no parser, source mutation or device action relied on the truncated output.",
+          "prevention": "Return each complete mandatory owner independently; cap pages below aggregate output allowance and verify EOF."
+        },
+        "t07InstalledPathValidationFailure": {
+          "state": "registered_before_diagnostic_or_retry",
+          "command": "Recognized Redmi review package pm path validation before sha256sum",
+          "exitCode": 1,
+          "observation": "The safe literal-path assertion rejected the installation path before checksum comparison or any file write. No mismatch, source loss or APK failure is inferred.",
+          "rootCauseToVerify": "The original permitted path alphabet may exclude Android's standard tilde-prefixed installation directories.",
+          "prevention": "Inspect only the recognized package's returned path structure, validate the standard platform path alphabet without shell metacharacters, then checksum using an argument array. Retain the failed attempt and refresh generation before retry."
+        },
+        "t07NativeCaptureEncodingFailure": {
+          "state": "registered_before_correction_or_recovery_read",
+          "exitCode": 1,
+          "rootCause": "New ignored capture helper omitted the existing explicit UTF-8 stdout convention; default cp1252 rejected the rupee symbol only during console formatting.",
+          "impact": "02-cart.png and 02-cart.xml were successfully captured before formatting failed. No UI failure or lost screenshot is inferred. Original files remain intact and must not be overwritten.",
+          "prevention": "Configure every Python helper stdout as UTF-8 and read the existing retained capture for recovery; use a fresh unique label for later screenshots.",
+          "evidence": [
+            "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/02-cart.png",
+            "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/02-cart.xml"
+          ]
+        },
+        "t07RepeatedReadBoundaryFailure": {
+          "state": "registered_before_correction",
+          "observations": [
+            "Session source pages7978tokens exceeded7400 command cap",
+            "Printing whole existing execution subtree14521tokens exceeded3000 command cap"
+          ],
+          "impact": "No source edits relied on clipped material; no application source mutation yet. Only small selected fields/pages may be emitted next.",
+          "prevention": "Bound content characters and line ranges BEFORE emitting; <=180lines and12000characters per read; do not emit large registry subtrees; inspect tool truncation metadata.",
+          "architectReview": "instruction_architect reviewed correction; use content bounds rather than treating token cap as a safe bound."
+        },
+        "t07NativeAdmissionAudit": {
+          "state": "baseline_native_cart_checkout_reviewed",
+          "installedSha256": "7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5",
+          "fullRefreshSession": 41465,
+          "fullRefreshExit": 0,
+          "cart": "2products3items837; normal text Checkout reachable; no new Cart visual defect observed.",
+          "checkout": "Supplier choices currently block payment; generic optional delivery note remains; order groups scroll beneath sticky837. No live payment launched.",
+          "captures": [
+            "01-initial",
+            "02-cart",
+            "03-checkout"
+          ],
+          "sourceFindings": [
+            "Legacy request built after asynchronous persistence using mutable amount/method/terms",
+            "General legacy placement does not await durable recovery write",
+            "Cancellation clears original key despite uncertainty",
+            "Reconciliation rebuilds from current Cart",
+            "Top-level bank instructions are not persisted"
+          ],
+          "scope": "Existing T07 immutable contract; source findings registered before fixes. Native review fixture is distinct from provider recovery test fixtures."
+        },
+        "t07ReadBoundaryCorrection3": {
+          "state": "registered_before_correction",
+          "failures": [
+            "Another mixed source/registry read2862tokens clipped at2800",
+            "models.read_text without explicitencoding failed cp1252 UnicodeDecodeError after sessionpage"
+          ],
+          "impact": "No source edits or qualification inferred; sessionpage before encodingfailure was complete, later owners unread.",
+          "correction": "Use a single bounded ignored helper with explicit UTF8stdout ANDfileencoding, <=180lines<=12000characters; outputcap6000. Registry emits only exactsmallselectedfields.",
+          "architect": "Existinginstruction_architect repeated-boundaryreview incorporated."
+        },
+        "t07MetadataPatchRootFailure": {
+          "state": "registered_before_correction",
+          "failure": "Generated founder patch used relative config path; apply_patch resolves from workspace parent and rejected atomically before mutation.",
+          "correction": "Every generated patch uses absolute verified Cursor worktree path. Prefix only ignored patch target, apply exactsmallmetadata change, readback and gates.",
+          "outputObservation": "Earlier full A09 emitted2207tokens with1800 cap; excluded as complete-read evidence. Later explicit smallkeys/cases were fully reread. Do not emit retainednestedhistory."
+        },
+        "t07SourcePatchOrderingFailure": {
+          "state": "registered_before_correction",
+          "failure": "Session apply_patch combined hunks in nonmonotonic source order; expected restore anchor could not be located after later retry hunk. Atomic rejection, session unchanged.",
+          "correction": "Apply each precise ordered session segment separately; root owns all source edits. No test pass inferred; validate newly inserted fields via readback before running analysis."
+        },
+        "t07ScriptAnchorFailure": {
+          "state": "registered_before_diagnostic_and_retry",
+          "failure": "Ignored patch-preparation script raised ValueError at guessed next-function boundary; no patch emitted and no session mutation.",
+          "correction": "Read exact nearby function signatures and regenerate the bounded patch with assertions for every unique anchor. Do not infer return types from names."
+        },
+        "t07InitialAnalysisFailure": {
+          "state": "registered_before_fix_or_retry",
+          "session": 73903,
+          "exitCode": 1,
+          "sourceSha256": "4ec0d8bf323f607d1b9cea5c384a189ceb5645f743b0bb27206e99e1e2a49123",
+          "logSha256": "5abbead29acd9f689935c5cddf877e84d2773b39bcc67338aa0074a210d234c2",
+          "finding": "20 newly authored flow-control brace info diagnostics; no compilation errors reported. No clean-analysis pass claimed. Existing T06 convention lesson recurred.",
+          "correction": "Wrap every reported new guard before analysis retry; use exact diagnostic body lines only within two owned source files.",
+          "readIncident": "Requested139lines from retained reproduction shorterthan139 caused bounded-read assertion before emission. Independent later UTF8wholefile read790tokens completed; reproduction preserved. Helper input needs actual EOF bounds.",
+          "subagents": "Provenance subagent correctly stopped at absent read claim; root supplied facts for conceptual test review only, no shared source writer."
+        },
+        "t07AnalysisNullableCaptureFailure": {
+          "state": "registered_before_fix_and_retry",
+          "session": 41830,
+          "exitCode": 1,
+          "sourceSha256": "4efa6bcc2c2638fcaa0d6e1b91c4ba3b08702e8dc865a7ea141ecfbd845fd19c",
+          "logSha256": "2dfe5396e48342b5351cf36eb49e77478842b8937751077bd625fdc4555f1711",
+          "finding": "One argument_type_not_assignable: async late-group observer captures mutable nullable loop group; promotion does not survive closure. No successful analysis claimed.",
+          "correction": "Capture the current non-null submitted group into a final local before registering observer, preserving exact original payload. Prior20brace diagnostics resolved."
+        },
+        "t07WidgetConstAnalysisFailure": {
+          "state": "registered_before_fix_and_retry",
+          "session": 84982,
+          "exitCode": 1,
+          "sourceSha256": "b38e077b722321a6cc2a15f3afeb0e34c8fb9c13118fa53935ca703c0f807dac",
+          "logSha256": "87f7392fd38172d8056f44764d0602629d01ada76eb93e47211a2e7cc4635b25",
+          "finding": "One const_eval_property_access in the new widget fixture selectedAddressId: address.id. All runtime owners compile; no clean-analysis pass claimed.",
+          "correction": "Use the same explicit const test address ID literal in the retained fixture, preserving its exact identity."
+        },
+        "repeatedBoundedReadEof20261002": {
+          "status": "recorded_before_retry",
+          "command": "read-bounded.py checks.py 1 150",
+          "exitCode": 1,
+          "cause": "Requested end line without first discovering actual EOF; bounded helper refused with assertion before content read.",
+          "prevention": "Discover exact line/character count before every helper read; choose independent pages bounded by observed EOF and output capacity.",
+          "qualifiedEvidence": false,
+          "architectReviewRequested": true
+        },
+        "policyBindingPatchAnchor20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Guessed policy SHA field/indentation; absolute patch rejected atomically with no policy mutation.",
+          "prevention": "Read observed exact binding key/context or generate a one-owner diff from current UTF-8 bytes before applying.",
+          "qualifiedEvidence": false
+        },
+        "t07FocusedFailure20261002": {
+          "status": "recorded_before_diagnosis_or_retry",
+          "receipt": {
+            "exitCode": 1,
+            "sourceSha256": "6f4ae31bf2f133885c97d817df94a96493340849074fe0b63413f6931d200631",
+            "unchangedSource": true,
+            "sha256": "dbb7d72bd7c48d2d4c4e26d44de7ad82a74d8a7ac1d499092a128d367ffef1f0",
+            "passed": 38,
+            "failed": 50,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t07-focused-1.jsonl",
+          "qualification": false,
+          "observedFailures": [
+            "key-only historical recovery assertion",
+            "malformed retained attempt assertion",
+            "released earlier settlement assertion"
+          ],
+          "prevention": "Read exact closed machine test errors and matching call paths; fix real behavior or incomplete isolated fixture, preserve strict financial matching and repeat affected focused suite."
+        },
+        "t07FocusedSecondFailure20261002": {
+          "status": "recorded_before_diagnosis_or_retry",
+          "receipt": {
+            "exitCode": 1,
+            "sourceSha256": "7fc0839c562dfcb778232068bbe59212db87a2d50b9f505e50241be256fe42ca",
+            "unchangedSource": true,
+            "sha256": "4574f7c69987f9591f7ec8ab2c63f07b706998e8ffd7cddfd999635da1e64e5f",
+            "passed": 61,
+            "failed": 4,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t07-focused-2.jsonl",
+          "qualification": false,
+          "prevention": "Read remaining two exact failures and owner call paths; maintain original payment hold and strict confirmation matching."
+        },
+        "t07FocusedThirdFailure20261002": {
+          "status": "recorded_before_retry",
+          "receipt": {
+            "exitCode": 1,
+            "sourceSha256": "f043432f810eff7746a88430459a2d4645691ef0032309692e9adf97ac2a8cb6",
+            "unchangedSource": true,
+            "sha256": "20ed18b03cf8af33aef3a22aac494e171fe245d33badb10235d28237ed28adcc",
+            "passed": 12,
+            "failed": 3,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "cause": "New fixture guessed unavailable cartCount getter; compilation refused.",
+          "prevention": "Use observed quantityFor original product IDs; run clean scoped analysis before behavioral retry.",
+          "qualified": false
+        },
+        "t07RecoveryVisualDefect20261002": {
+          "status": "open",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t07-host-recovery-2/t07-320x800-2.0-keyonly-true.png",
+          "observed": "At 200% text the Original total label is squeezed into fragments beside Needs checking, despite no overflow exception.",
+          "fixScope": "Existing Checkout quote card: stack recovery labels and values when enlarged text or narrow constraints require it; keep original key hold and sticky Check payment reachable.",
+          "acceptance": "Regenerate screenshots at 320x800 and 640x360, scales1/2 for known/unknown original amounts; inspect full words and run affected tests."
+        },
+        "t07FocusedFourthFailure20261002": {
+          "status": "recorded_before_diagnosis_or_retry",
+          "receipt": {
+            "exitCode": 1,
+            "sourceSha256": "e9bd1ef50a2860e3877c452ff6ddcfcc6e8617c079f828acb27743106ba8a69c",
+            "unchangedSource": true,
+            "sha256": "466fe201a9e711095c3bcc2257886688e46f53c8b9d6c2289b8f73e8aa04028d",
+            "passed": 67,
+            "failed": 2,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t07-focused-4.jsonl",
+          "qualified": false,
+          "observed": "Only cold-confirmed test expected recoveredKeys entry after successful same-key confirmation; actual list empty. Need inspect isolated fixture distinction between reference reconciliation and key-only recovery; do not change payment runtime to satisfy a log assertion."
+        },
+        "t07EvidenceClaimAdmission20261002": {
+          "status": "recorded_before_correction",
+          "exitCode": 1,
+          "cause": "Added six exact T07 evidence owners to root claim before checking separate Cursor lane owner allowlist; coordinator correctly refused. No evidence copies were created.",
+          "prevention": "Restore claim generation, inspect exact lane owner declaration, admit exact T07 evidence paths through existing primary coordination metadata before claiming or copying; do not weaken validator or wildcard lane scope."
+        },
+        "t07EvidenceOwnerExistence20261002": {
+          "status": "recorded_before_reconstruction_or_retry",
+          "exitCode": 1,
+          "cause": "Exact evidence allowlist matched, but gate requires claimed files to exist before claiming. No evidence files were created and no qualified receipt was faked.",
+          "prevention": "Inspect existing new-owner admission workflow/flags; restore passing recorded generation until closed immutable receipts and exact owner bootstrap can be admitted together. Architect reviewing repeated admission error."
+        },
+        "t07SelectedFirstFailure20261002": {
+          "status": "recorded_before_diagnosis_or_retry",
+          "batch1": {
+            "batch": 1,
+            "exitCode": 0,
+            "passed": 445,
+            "sourceSha256": "bb9e5568cff82b39fb2fefdd6694d5c1f26a1026bfd706a4016be2350bf4a0a5",
+            "unchangedSource": true,
+            "terminalSuccess": true,
+            "failures": 0,
+            "warnings": 0,
+            "sha256": "3650e4d5dbef842fff707b9f8c7279bb231e12e70805657235437117a6d461ca"
+          },
+          "batch2": {
+            "batch": 2,
+            "exitCode": 1,
+            "passed": 455,
+            "sourceSha256": "bb9e5568cff82b39fb2fefdd6694d5c1f26a1026bfd706a4016be2350bf4a0a5",
+            "unchangedSource": true,
+            "terminalSuccess": false,
+            "failures": 24,
+            "warnings": 0,
+            "sha256": "ec62c2918f726248f60ecc7b567963472ccb6fc35c9fa01907265c2e3a51d219"
+          },
+          "qualification": false,
+          "prevention": "Inspect exact failed selected test fixtures and call paths; add real isolated owner-scoped persistence and strict matching confirmations where tests expect placement. Preserve production no-store hold, no weakened financial validation."
+        },
+        "t07FinancialClosureCodecReview20261002": {
+          "status": "inferred_pending_reproduction",
+          "architect": "/root/retention_architect",
+          "concern": "Tolerant confirmedOrderIds parser may collapse malformed IDs to empty and accept financiallyClosed=true with terminal failed/cancelled state.",
+          "scope": "Require raw explicit empty JSON array for financially closed legacy/group records; reproduce first, keep all unrelated decoding unchanged."
+        },
+        "t07QualifierPreparationRefusal20261002": {
+          "status": "recorded_before_retry",
+          "exitCode": 1,
+          "cause": "Temporary qualifier guard rejected t06- substring retained in established t06-t07 output folder; it refused before creating script or any durable receipt.",
+          "prevention": "Check specific old receipt identifiers only, preserving established folder; qualifier must derive required manifest/reference counts and validate all closed exact-source receipts."
+        },
+        "t07FounderMatrixAdmission20261002": {
+          "status": "recorded_before_diagnosis_or_retry",
+          "session": 85033,
+          "exitCode": 1,
+          "cause": "Coordinator rejected immutable founder scenario matrix after primary appended40 technical T07 cases to existing parent cases. Original scenarios were not intentionally removed or edited.",
+          "prevention": "Inspect exact immutable matrix comparison, preserve every original case and requirement pin; register technical recovery coverage through existing permitted evidence/metadata rather than changing founder contract or weakening validator."
+        },
+        "t07MatrixPatchLocation20261002": {
+          "status": "recorded_before_correction",
+          "introducedCaseLocations": [
+            {
+              "ticket": "R6634-C01",
+              "introducedCount": 40
+            }
+          ],
+          "cause": "Generated apply_patch hunk used generic trailing local/device context without unique ticket/case anchor; expected prepared JSON location was not verified after application. Immutable matrix gate detected drift.",
+          "prevention": "Move only40 introduced technical cases to intended parent with wide unique case-ID context, assert exact semantic readback and immutable first5-ticket core hash before fresh gate. Never change original founder cases or expected contract digest."
+        },
+        "t07MatrixDiagnosticKeyError20261002": {
+          "status": "recorded_before_retry",
+          "exitCode": 1,
+          "cause": "Diagnostic guessed title/kind core fields rather than using just-read founderRequirement/parents/cases schema.",
+          "prevention": "Use observed actual schema, sequential dependent reads and transformations."
+        },
+        "t07ResumeReadBoundary20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Resume summary said registrar had38 lines; current observed file has35. Bounded reader refused before emitting contents.",
+          "prevention": "Use observed actual EOF metadata before every bounded read; never trust summarized line counts."
+        },
+        "t07ResumeDiagnosticEncoding20261002": {
+          "status": "recorded_before_retry",
+          "cause": "QR log projection used Windows default stdout encoding and failed on Unicode; log and source untouched.",
+          "prevention": "All Python diagnostic commands use -X utf8."
+        },
+        "t07ClosureRunnerQuoting20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Nested quote replacement in PowerShell Python command failed syntax validation; runner was not created and no Flutter process started.",
+          "prevention": "Use literal PowerShell here-string for Python helper generation; verify helper exists before executing."
+        },
+        "t07FinancialClosureCodecReproduction20261002": {
+          "status": "reproduced_before_correction",
+          "receipt": {
+            "exitCode": 1,
+            "sourceSha256": "ca79a1c88b5b05ed6932210dd3c1f558a03adfa4c9ff95d22b0ca6200630ab5e",
+            "unchangedSource": true,
+            "sha256": "43154d4782ee3b564a47453ed217721499f04e9f2d41a3feffc0443361aceccf",
+            "passed": 0,
+            "failed": 2,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t07-closure-edge-repro-1.jsonl",
+          "observed": "Legacy financiallyClosed=true with failed state and missing raw confirmedOrderIds did not set incomplete recovery. Test stopped at first malformed variant; grouped path uses same tolerant parsing risk.",
+          "correction": "Require raw confirmedOrderIds to be List and empty for financial closure in both decoders. Preserve original key and incomplete hold for missing/null/object/nonempty arrays.",
+          "qualified": false
+        },
+        "t07AffectedFailure20261002": {
+          "status": "recorded_before_diagnosis_or_retry",
+          "receipt": {
+            "exitCode": 1,
+            "sourceSha256": "d4d4d989064b353a69b6f3aae04da16cec366765611461da87222d000a215a56",
+            "unchangedSource": true,
+            "sha256": "1017f7c8934233dec08c44b4fdaa93f9a78bc88edaca275438b10fe7ae52fa0f",
+            "passed": 137,
+            "failed": 8,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t07-affected-1.jsonl",
+          "observed": "Four T03 instruction-history fixtures still fail; other affected checks pass. New checkout cannot manufacture older independent instructions. Inspect complete original-agreement fixture and provider instruction facts before correction.",
+          "qualified": false
+        },
+        "t07ProgressProjectionFailure20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Temporary progress projection treated Flutter daemon JSON list as dict; diagnostic failed, source/log unchanged.",
+          "prevention": "Filter each decoded line for dict before event.get; prefer final closed receipts over progress projections."
+        },
+        "t07InstructionFixtureCompile20261002": {
+          "status": "recorded_before_correction",
+          "cause": "Primary guessed fulfilmentKey on BuyV2CartLine instead of inspecting existing BuyV2FulfilmentGroup construction.",
+          "analysis": {
+            "exitCode": 1,
+            "sourceSha256": "9c5dbf5a53692f5eea7bd93722a7e70508706e25f96c1dbefe7b8d63b764ea7d",
+            "unchangedSource": true,
+            "sha256": "50ac8665b93cc30c60bbf5cc8cbe237b2ef242541a1f71150740d749185f8438",
+            "passed": 0,
+            "failed": 0,
+            "warnings": 0,
+            "terminalSuccess": true
+          },
+          "affected": {
+            "exitCode": 1,
+            "sourceSha256": "3dd8acbaea791674bb9b6b1a51504c76335322842a9561ce1c323a6a4592b426",
+            "unchangedSource": true,
+            "sha256": "5e0493a852f43d32c10afc18ec34cd5ac4595f7a9efa4e09eaa96e9cf99edfe5",
+            "passed": 18,
+            "failed": 3,
+            "warnings": 0,
+            "terminalSuccess": false
+          },
+          "processMistake": "Root launched dependent formatting/affected command in same orchestration as analysis polling without checking exitCode; analysis failed and dependent run also compile failed.",
+          "prevention": "Inspect actual grouping model and use it. Every dependent tool call must explicitly require previous exitCode0; never start a retry from a returned failed receipt.",
+          "qualified": false
+        },
+        "t07InstructionPatchContext20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Patch used pre-format expression shape; Dart formatter split firstWhere predicate across lines. apply_patch refused atomically, no source changed.",
+          "prevention": "Read actual formatted source before patch; unique semantic anchors and post-apply content verification."
+        },
+        "t07InstructionGroupGetter20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Root guessed cartFulfilmentGroups instead of reading observed public getter directly before private grouping function. Analyzer failed; dependent test was not launched.",
+          "analysis": {
+            "exitCode": 1,
+            "sourceSha256": "fe9bf46265b9705ad59cc9554677d6fb2e2de821470b196a24e2f40d9324e8d2",
+            "unchangedSource": true,
+            "sha256": "3b004e4e290e3f4ccba22f90e7e236de7c19539ebb78dd309bee14a59ae227fc",
+            "passed": 0,
+            "failed": 0,
+            "warnings": 0,
+            "terminalSuccess": true
+          },
+          "prevention": "Read exact getter 8647..8653; use only actual name and read back. Architect called on repeated mistake.",
+          "qualified": false
+        },
+        "t07NativeAdmissionHost20261002": {
+          "status": "recorded_before_retry",
+          "cause": "New gate wrapper launched legacy powershell from inherited PS7 environment; Get-FileHash module was unavailable in that subprocess. Device admission stopped before any device action.",
+          "gateLog": "apps/mobile/build/t06-t07-cart-20261002/t07-final-native-admission-1-memory-device.log",
+          "gateLogSha256": "d7376e99bc6dafcdaec40f023a73b76fc48d626e127da7f09a72782e6bc3435e",
+          "exitCode": 1,
+          "prevention": "Use observed current PowerShell7 host for wrapper, preserving all gate arguments and validation. Keep closed965 selected pass against sourcebe62; this host failure grants no device authority."
+        },
+        "t07NativeReceiptCwd20261002": {
+          "status": "recorded_before_correction",
+          "cause": "Native baseline receipt used repository-relative apps/mobile prefix while running in apps/mobile. Read-only APK/version/font assertions passed, but receipt write failed before emitting metadata. Shell then continued to already-authorized hot restart instead of short-circuiting.",
+          "receiptCreated": false,
+          "hotRestart": {
+            "session": 11934,
+            "exitCode": 0,
+            "restartCode": 0,
+            "detached": true,
+            "log": "apps/mobile/build/t06-t07-cart-20261002/t07-qualified-hot-restart-1.log"
+          },
+          "prevention": "Each dependent command runs in a separate guarded tool result. Use explicit root cwd and absolute/observed paths. Preserve raw attach log privately; capture fresh checksum/font/source metadata and sanitized restart evidence, then rerun fresh device admission."
+        },
+        "t07NativeKeyboardTiming20261002": {
+          "status": "recorded_before_next_device_action",
+          "cause": "Composer auto-focused; keyboard transition moved content after earlier XML bounds. Follow-up field tap landed during transition and changed only unsaved draft from Call on arrival to Call on arrivals.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/06-note-keyboard.xml",
+          "prevention": "Use post-keyboard observed XML bounds before each action; Cancel this draft and verify saved instruction remains original. No new payment or saved-note mutation.",
+          "sourceChanged": false
+        },
+        "t07NativeProofPath20261002": {
+          "status": "recorded_before_retry",
+          "cause": "Artifact assembly attempted relative Path.relative_to(absolute root). All preceding native/font/checksum/source/XML assertions passed; proof write had not occurred.",
+          "verifiedBeforeAssemblyError": {
+            "fontScaleRestored": "1.0",
+            "installedSha256": "7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5",
+            "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+            "originalPaymentRecoveryVerified": false
+          },
+          "prevention": "Use already repository-relative capture paths as_posix directly. Retry only artifact preservation under fresh coordinator; no repeat device action required."
+        },
+        "t07NativeCartCosmeticFollowUp20261002": {
+          "status": "unresolved_existing_T10_follow_up",
+          "observed": "Wholesale minimum-order summary has trailing separator and duplicate semantic punctuation, while quantities and837 total stay correct.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/09-checkout-payment-navigation.xml",
+          "scope": "Cosmetic outside T07 payment recovery; retain for existing T10 visual-polish sweep. No extra ticket/REG number invented."
+        },
+        "t07ResumeBoundedSearch20261002": {
+          "status": "registered_before_follow_up",
+          "incident": "A broad rg search included unrelated giant single-line historical metadata and the output was truncated (5398 tokens before truncation). No source edit or qualification resulted.",
+          "rootCause": "The query included generic fingerprint and contract terms rather than exact current metadata anchors; max_output_tokens cannot make an overbroad read semantically complete.",
+          "detection": "Tool explicitly reported truncated output.",
+          "prevention": "Use JSON projection for named current subtrees; use rg --only-matching or exact key anchors and bound subsequent reads by observed EOF and character counts. Do not retry the broad query.",
+          "evidence": "Retained tool result chunk 33a04d; owner unchanged by this read."
+        },
+        "t07ResumeDocProjection20261002": {
+          "status": "registered_before_follow_up",
+          "incident": "Official documentation search returned oversized nested JSON; directly emitting the full result truncated it. No configuration or runtime change resulted.",
+          "rootCause": "Root printed entire connector result rather than projecting hit URLs and targeted content. Same output-boundary mistake recurred after a broad rg read.",
+          "prevention": "Parse connector text JSON and project only exact URLs/targeted sections; cap content before emitting, retain fetched result in tool store. Architect followup requested for repeated error.",
+          "evidence": "Retained official docs search tool result; no local owner changed by search."
+        },
+        "t07FinalFrontendQualification20261002": {
+          "status": "frontend_qualified_real_provider_recovery_integration_pending",
+          "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+          "analysis": {
+            "session": 64850,
+            "exitCode": 0,
+            "affectedDartOwners": 7
+          },
+          "affected": {
+            "session": 84244,
+            "exitCode": 0,
+            "passed": 141,
+            "T06T07FocusedCases": 69
+          },
+          "selected": {
+            "session": 27365,
+            "exitCode": 0,
+            "distinctCases": 965,
+            "references": 1025,
+            "files": 53,
+            "batches": [
+              445,
+              468,
+              52
+            ],
+            "failures": 0,
+            "warnings": 0,
+            "unchangedSource": true
+          },
+          "evidence": {
+            "report": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.json",
+            "sha256": "66cb0d1b8a1134e2dd7512d092b2882e3588d051573d71192ead876bca4f9175",
+            "archive": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip",
+            "archiveSha256": "105c621179c2b04e0075b2120d38195159113453f83ae798ee83da3e16730751",
+            "closedOwners": 6,
+            "rootClaims": 264,
+            "rawAttachExcluded": true
+          },
+          "native": {
+            "hotRestartSession": 11934,
+            "exitCode": 0,
+            "mixedCartCheckoutAmount": 837,
+            "normalAnd200PercentLayout": true,
+            "sharedInstructionClearInsideComposerOnly": true,
+            "fontScaleRestored": "1.0",
+            "apkSha256Unchanged": "7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5",
+            "newBuildOrInstall": false,
+            "livePayOrInjectedRecovery": false,
+            "originalProviderRecoveryVerified": false
+          },
+          "history": "Retention repair1a66f12c verified; original incidents/trials preserved. Founder ledger current metadata supersedes stale pending-runtime text while nesting original history. Handoff raw prefixes preserved byte-for-byte.",
+          "review": "Astra supplied-facts review finds no further implementation issue; requires scoped checkpoint and explicit integration/historical gate limitations.",
+          "dependencies": [
+            "Backend deferred",
+            "Workspace recovery mapping Codex after integration",
+            "Google/Maps and T03 supplier-policy separate",
+            "Existing T10 cosmetic separator follow-up",
+            "Founder visual approval pending",
+            "Historical0e90a6ca formal closure blocker unchanged"
+          ],
+          "checkpoint": "Required pre_commit, scoped ordinary commit/push and exact clean remote readback pending; no whole T07 acceptance. Stop before T08.",
+          "efficiency": "Latest active Sol/xhigh differs from saved Sol/high. Existing Luna/medium helper and Sol/medium worker/Astra/high architect roles retained. Task guidance prefers Medium for routine work; active switch needs founder model picker. No shared configuration or separate lane modified."
+        },
+        "t07CheckpointFinalState20261002": {
+          "memory": {
+            "session": 75561,
+            "exitCode": 0,
+            "entries": 4618,
+            "applicable": 2552,
+            "retiredArtifacts": 3,
+            "exactReferences": 5,
+            "releaseAuthority": false,
+            "logSha256": "0698814df39d03bcf8279bb885254063f8702ec31d79c55b0348ec30ad35725d"
+          },
+          "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+          "ownedCheckpointFiles": 19,
+          "originalFounderContractsUnchanged": 5,
+          "selectionClarification": "Earlier efficiency audit describes this turn-start record Sol/xhigh and saved Sol/high. Founder subsequently supplied screenshot Sol/Medium selected; no newer turn_context exists yet. Keep selection, verify fresh turn when available. Saved defaults and shared/other-lane settings unchanged.",
+          "status": "required scoped staging/pre_commit/commit/push/remote readback next; provider recovery and historical formal closure remain pending; stop before T08"
+        },
+        "t07CheckpointLiteralProof20261002": {
+          "status": "registered_before_follow_up",
+          "incident": "An auxiliary coordinator-diff assertion guessed the indentation/trailing-comma of six admitted allowlist strings and failed before any stage or mutation. No gate or source test failed.",
+          "rootCause": "Root constructed expected raw lines from a guessed format instead of inspecting the actual small diff or comparing normalized literal values.",
+          "detection": "AssertionError on first evidence owner literal; no source modified.",
+          "prevention": "Read the bounded actual coordinator diff; assert added literal path set and zero removed/nonliteral lines independently of indentation. Do not infer validation changes from this failed formatting assertion.",
+          "evidence": "Tool chunk e71e9e; helper did not write an owner."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

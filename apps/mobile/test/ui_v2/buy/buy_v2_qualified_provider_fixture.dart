@@ -140,6 +140,68 @@ class TestPaymentQuote implements BuyV2CheckoutQuoteAdapter {
 }
 
 /// Isolated group connector. Never installed in native review or live commerce.
+class TestLegacyRecoveryCommerce extends TestPaymentCommerce
+    implements BuyV2PendingOrderRecoveryAdapter {
+  final originalRequests = <String, BuyV2OrderPlacementRequest>{};
+  final reconciledKeys = <String>[];
+  final recoveredKeys = <String>[];
+  FutureOr<BuyV2OrderPlacementResult> Function(BuyV2OrderPlacementRequest)?
+  onPlace;
+  FutureOr<BuyV2OrderPlacementResult> Function(BuyV2OrderPlacementRequest)?
+  onReconcile;
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async {
+    requests.add(request);
+    originalRequests[request.idempotencyKey] = request;
+    return onPlace == null
+        ? testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+            reference: 'test-legacy-${request.idempotencyKey}',
+          )
+        : await onPlace!(request);
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async {
+    reconciledKeys.add(idempotencyKey);
+    return _recover(idempotencyKey);
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> recoverOrder({
+    required String idempotencyKey,
+  }) async {
+    recoveredKeys.add(idempotencyKey);
+    return _recover(idempotencyKey);
+  }
+
+  Future<BuyV2OrderPlacementResult> _recover(String key) async {
+    final request = originalRequests[key];
+    if (request == null) {
+      return BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
+        customerMessage: 'Original agreement unavailable in isolated fixture.',
+        idempotencyKey: key,
+      );
+    }
+    return onReconcile == null
+        ? testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+            reference: 'test-legacy-$key',
+          )
+        : await onReconcile!(request);
+  }
+}
+
+/// Explicitly opted-in grouped fixture; no native/live injection.
 class TestGroupedPaymentCommerce extends TestPaymentCommerce
     implements
         BuyV2GroupedOrderPlacementAdapter,
@@ -203,14 +265,17 @@ BuyV2OrderPlacementResult testGroupedPlacement(
   int? paidNow,
   List<BuyV2Order>? orders,
   Map<String, (int, int)>? allocations,
+  bool retryAllowed = false,
+  String? reference,
 }) => BuyV2OrderPlacementResult(
   outcome: outcome,
   customerMessage: 'Isolated grouped provider response.',
   checkoutAttemptId: request.checkoutAttemptId,
   paymentGroupId: groupId ?? request.paymentGroupId,
   idempotencyKey: request.idempotencyKey,
-  purchaseReference: request.checkoutAttemptId,
-  paymentReference: 'test-${request.paymentGroupId}',
+  retryAllowed: retryAllowed,
+  purchaseReference: reference ?? request.checkoutAttemptId,
+  paymentReference: 'test-${request.paymentGroupId ?? request.idempotencyKey}',
   paymentActionUri: outcome == BuyV2OrderPlacementOutcome.paymentActionRequired
       ? Uri.https('payments.example.test', '/group')
       : null,
@@ -237,7 +302,7 @@ BuyV2OrderPlacementResult testGroupedPlacement(
                   destinationLabel: request.address.shortLine,
                   progress: 0,
                   status: BuyV2OrderStatus.preparing,
-                  purchaseId: request.checkoutAttemptId,
+                  purchaseId: reference ?? request.checkoutAttemptId,
                   productIds: lines.map((line) => line.product.id).toList(),
                   lines: lines,
                   paymentMethod: request.paymentMethod,

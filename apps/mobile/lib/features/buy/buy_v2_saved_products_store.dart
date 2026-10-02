@@ -153,6 +153,10 @@ class BuyV2CustomerStateSnapshot {
     this.pendingPurchaseOrderRevision,
     this.checkoutIdempotencyKey,
     this.checkoutPaymentAttempt,
+    this.legacyCheckoutAttempt,
+    this.retainedLegacyCheckoutAttempts = const [],
+    this.retainedCheckoutPaymentAttempts = const [],
+    this.paymentRecoveryIncomplete = false,
     this.paymentReference,
     this.paymentActionUri,
     this.bankTransferInstructions,
@@ -194,6 +198,10 @@ class BuyV2CustomerStateSnapshot {
   final String? pendingPurchaseOrderRevision;
   final String? checkoutIdempotencyKey;
   final BuyV2CheckoutPaymentAttempt? checkoutPaymentAttempt;
+  final BuyV2LegacyCheckoutAttempt? legacyCheckoutAttempt;
+  final List<BuyV2LegacyCheckoutAttempt> retainedLegacyCheckoutAttempts;
+  final List<BuyV2CheckoutPaymentAttempt> retainedCheckoutPaymentAttempts;
+  final bool paymentRecoveryIncomplete;
   final String? paymentReference;
   final Uri? paymentActionUri;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
@@ -248,7 +256,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
       final decoded = jsonDecode(source);
       if (decoded is! Map<String, Object?>) return null;
       if (decoded.containsKey('procurementDraft') &&
-          _decodeProcurementDraft(decoded['procurementDraft']) == null) {
+          _decodeProcurementDraft(decoded['procurementDraft']) == null &&
+          decoded['checkoutIdempotencyKey'] == null &&
+          !decoded.containsKey('legacyCheckoutAttempt') &&
+          !decoded.containsKey('checkoutPaymentAttempt')) {
         return null;
       }
       return _decodeSnapshot(decoded);
@@ -259,6 +270,16 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    if (snapshot.legacyCheckoutAttempt?.ownerScope != null &&
+            snapshot.legacyCheckoutAttempt!.ownerScope != ownerScope ||
+        snapshot.retainedLegacyCheckoutAttempts.any(
+          (attempt) => attempt.ownerScope != ownerScope,
+        ) ||
+        snapshot.retainedCheckoutPaymentAttempts.any(
+          (attempt) => attempt.ownerScope != ownerScope,
+        )) {
+      return false;
+    }
     if (snapshot.procurementDraft case final draft?
         when draft.ownerScope != ownerScope) {
       return false;
@@ -312,8 +333,21 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'checkoutIdempotencyKey': snapshot.checkoutIdempotencyKey,
     if (snapshot.checkoutPaymentAttempt case final attempt?)
       'checkoutPaymentAttempt': _encodePaymentAttempt(attempt),
+    if (snapshot.legacyCheckoutAttempt case final attempt?)
+      'legacyCheckoutAttempt': _encodeLegacyAttempt(attempt),
+    'retainedLegacyCheckoutAttempts': [
+      for (final attempt in snapshot.retainedLegacyCheckoutAttempts)
+        _encodeLegacyAttempt(attempt),
+    ],
+    'retainedCheckoutPaymentAttempts': [
+      for (final attempt in snapshot.retainedCheckoutPaymentAttempts)
+        _encodePaymentAttempt(attempt),
+    ],
+    'paymentRecoveryIncomplete': snapshot.paymentRecoveryIncomplete,
     'paymentReference': snapshot.paymentReference,
     'paymentActionUri': snapshot.paymentActionUri?.toString(),
+    if (snapshot.bankTransferInstructions case final bank?)
+      'bankTransferInstructions': _encodeTransfer(bank),
     'shoppingIntent': snapshot.shoppingIntent,
     'checkoutSubmissionState': snapshot.checkoutSubmissionState,
     'selectedBrands': snapshot.selectedBrands.toList(growable: false),
@@ -387,8 +421,25 @@ final class BuyV2SharedPreferencesCustomerStateStore
         checkoutPaymentAttempt: _decodePaymentAttempt(
           source['checkoutPaymentAttempt'],
         ),
+        legacyCheckoutAttempt: _decodeLegacyAttempt(
+          source['legacyCheckoutAttempt'],
+        ),
+        retainedLegacyCheckoutAttempts:
+            _objectList(source['retainedLegacyCheckoutAttempts'])
+                .map(_decodeLegacyAttempt)
+                .whereType<BuyV2LegacyCheckoutAttempt>()
+                .toList(growable: false),
+        retainedCheckoutPaymentAttempts:
+            _objectList(source['retainedCheckoutPaymentAttempts'])
+                .map(_decodePaymentAttempt)
+                .whereType<BuyV2CheckoutPaymentAttempt>()
+                .toList(growable: false),
+        paymentRecoveryIncomplete: _paymentRecoveryIncomplete(source),
         paymentReference: _string(source['paymentReference']),
         paymentActionUri: _uri(source['paymentActionUri']),
+        bankTransferInstructions: _decodeTransfer(
+          source['bankTransferInstructions'],
+        ),
         shoppingIntent: _string(source['shoppingIntent']),
         checkoutSubmissionState: _string(source['checkoutSubmissionState']),
         selectedBrands: _stringList(source['selectedBrands']).toSet(),
@@ -413,52 +464,213 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'id': attempt.id,
     'ownerScope': attempt.ownerScope,
     'quoteValidUntil': attempt.quoteValidUntil.toIso8601String(),
-    'groups': [
-      for (final group in attempt.groups)
-        {
-          'fulfilmentKeys': group.fulfilmentKeys.toList(),
-          'obligations': [
-            for (final value in group.obligations)
+    'lateSettlementNeedsReview': attempt.lateSettlementNeedsReview,
+    'groups': [for (final group in attempt.groups) _encodeFrozenPayment(group)],
+  };
+
+  Map<String, Object?> _encodeFrozenPayment(BuyV2CheckoutGroupAttempt group) =>
+      {
+        'fulfilmentKeys': group.fulfilmentKeys.toList(),
+        'obligations': [
+          for (final value in group.obligations)
+            {
+              'fulfilmentKey': value.fulfilmentKey,
+              'productIds': value.productIds.toList(),
+              'totalMinor': value.totalMinor,
+              'dueNowMinor': value.dueNowMinor,
+            },
+        ],
+        'state': group.state.name,
+        'financiallyClosed': group.financiallyClosed,
+        'paymentReference': group.paymentReference,
+        'paymentActionUri': group.paymentActionUri?.toString(),
+        if (group.bankTransferInstructions case final bank?)
+          'bankTransferInstructions': _encodeTransfer(bank),
+        'confirmedOrderIds': group.confirmedOrderIds,
+        'request': {
+          'checkoutAttemptId': group.request.checkoutAttemptId,
+          'paymentGroupId': group.request.paymentGroupId,
+          'idempotencyKey': group.request.idempotencyKey,
+          'paymentMethod': group.request.paymentMethod,
+          'total': group.request.total,
+          'amountDueNow': group.request.amountDueNow,
+          'address': _encodeAddress(group.request.address),
+          'commercialPaymentTermIds': group.request.commercialPaymentTermIds,
+          'deliveryInstructionsByProductId':
+              group.request.deliveryInstructionsByProductId,
+          'checkoutQuoteId': group.request.checkoutQuoteId,
+          'purchaseOrderRequestId': group.request.purchaseOrderRequestId,
+          'purchaseOrderRevision': group.request.purchaseOrderRevision,
+          'useUpiQr': group.request.useUpiQr,
+          if (group.request.procurementContext case final context?)
+            'procurementContext': _encodeProcurementContext(context),
+          'lines': [
+            for (final line in group.request.lines)
               {
-                'fulfilmentKey': value.fulfilmentKey,
-                'productIds': value.productIds.toList(),
-                'totalMinor': value.totalMinor,
-                'dueNowMinor': value.dueNowMinor,
+                'productId': line.product.id,
+                'quantity': line.quantity,
+                'purchasedProduct': _encodePurchasedProduct(line.product),
               },
           ],
-          'state': group.state.name,
-          'paymentReference': group.paymentReference,
-          'paymentActionUri': group.paymentActionUri?.toString(),
-          if (group.bankTransferInstructions case final bank?)
-            'bankTransferInstructions': _encodeTransfer(bank),
-          'confirmedOrderIds': group.confirmedOrderIds,
-          'request': {
-            'checkoutAttemptId': group.request.checkoutAttemptId,
-            'paymentGroupId': group.request.paymentGroupId,
-            'idempotencyKey': group.request.idempotencyKey,
-            'paymentMethod': group.request.paymentMethod,
-            'total': group.request.total,
-            'amountDueNow': group.request.amountDueNow,
-            'address': _encodeAddress(group.request.address),
-            'commercialPaymentTermIds': group.request.commercialPaymentTermIds,
-            'deliveryInstructionsByProductId':
-                group.request.deliveryInstructionsByProductId,
-            'checkoutQuoteId': group.request.checkoutQuoteId,
-            'purchaseOrderRequestId': group.request.purchaseOrderRequestId,
-            'purchaseOrderRevision': group.request.purchaseOrderRevision,
-            'useUpiQr': group.request.useUpiQr,
-            'lines': [
-              for (final line in group.request.lines)
-                {
-                  'productId': line.product.id,
-                  'quantity': line.quantity,
-                  'purchasedProduct': _encodePurchasedProduct(line.product),
-                },
-            ],
-          },
         },
-    ],
+      };
+
+  Map<String, Object?> _encodeLegacyAttempt(
+    BuyV2LegacyCheckoutAttempt attempt,
+  ) => {
+    'version': 1,
+    'ownerScope': attempt.ownerScope,
+    'purchaseOrderAccountId': attempt.purchaseOrderAccountId,
+    'lateSettlementNeedsReview': attempt.lateSettlementNeedsReview,
+    'payment': _encodeFrozenPayment(attempt.payment),
   };
+
+  BuyV2LegacyCheckoutAttempt? _decodeLegacyAttempt(Object? value) {
+    final source = _objectMap(value);
+    final owner = _string(source['ownerScope']);
+    final group = _objectMap(source['payment']);
+    final request = _objectMap(group['request']);
+    final key = _string(request['idempotencyKey']);
+    final method = _string(request['paymentMethod']);
+    final address = _decodeAddress(_objectMap(request['address']));
+    final lines = _decodeOrderLines(request['lines']);
+    final total = request['total'];
+    final due = request['amountDueNow'];
+    final scopes = _stringList(group['fulfilmentKeys']);
+    final state = _enumByName(
+      BuyV2CheckoutSubmissionState.values,
+      _string(group['state']),
+    );
+    final context = _decodeProcurementContext(request['procurementContext']);
+    if (source['version'] != 1 ||
+        owner == null ||
+        owner != ownerScope ||
+        request['checkoutAttemptId'] != null ||
+        request['paymentGroupId'] != null ||
+        key == null ||
+        method == null ||
+        address == null ||
+        lines.isEmpty ||
+        request['lines'] is! List ||
+        lines.length != (request['lines'] as List).length ||
+        lines.map((line) => line.product.id).toSet().length != lines.length ||
+        total is! int ||
+        due is! int ||
+        due < 0 ||
+        total < due ||
+        total > 90071992547409 ||
+        scopes.isEmpty ||
+        scopes.toSet().length != scopes.length ||
+        state == null ||
+        request['useUpiQr'] is! bool ||
+        (request.containsKey('procurementContext') && context == null)) {
+      return null;
+    }
+    final payment = BuyV2CheckoutGroupAttempt(
+      request: BuyV2OrderPlacementRequest(
+        lines: List.unmodifiable(lines),
+        address: address,
+        paymentMethod: method,
+        total: total,
+        amountDueNow: due,
+        idempotencyKey: key,
+        useUpiQr: request['useUpiQr'] as bool,
+        commercialPaymentTermIds: Map.unmodifiable(
+          _stringMap(request['commercialPaymentTermIds']),
+        ),
+        deliveryInstructionsByProductId: Map.unmodifiable(
+          _stringMap(request['deliveryInstructionsByProductId']),
+        ),
+        checkoutQuoteId: _string(request['checkoutQuoteId']),
+        purchaseOrderRequestId: _string(request['purchaseOrderRequestId']),
+        purchaseOrderRevision: _string(request['purchaseOrderRevision']),
+        procurementContext: context,
+      ),
+      fulfilmentKeys: Set.unmodifiable(scopes),
+      obligations: _decodeObligations(group['obligations']),
+      state: state == BuyV2CheckoutSubmissionState.submitting
+          ? BuyV2CheckoutSubmissionState.paymentUnknown
+          : state,
+      paymentReference: _string(group['paymentReference']),
+      paymentActionUri: _uri(group['paymentActionUri']),
+      bankTransferInstructions: _decodeTransfer(
+        group['bankTransferInstructions'],
+      ),
+      confirmedOrderIds: List.unmodifiable(
+        _stringList(group['confirmedOrderIds']),
+      ),
+      financiallyClosed: group['financiallyClosed'] == true,
+    );
+    if (!payment.hasValidObligations ||
+        (payment.financiallyClosed &&
+            (group['confirmedOrderIds'] is! List ||
+                (group['confirmedOrderIds'] as List).isNotEmpty ||
+                !const {
+                  BuyV2CheckoutSubmissionState.failed,
+                  BuyV2CheckoutSubmissionState.cancelled,
+                }.contains(state)))) {
+      return null;
+    }
+    return BuyV2LegacyCheckoutAttempt(
+      ownerScope: owner,
+      payment: payment,
+      purchaseOrderAccountId: _string(source['purchaseOrderAccountId']),
+      lateSettlementNeedsReview: source['lateSettlementNeedsReview'] == true,
+    );
+  }
+
+  bool _paymentRecoveryIncomplete(Map<String, Object?> source) {
+    if (source['paymentRecoveryIncomplete'] == true ||
+        (source.containsKey('procurementDraft') &&
+            _decodeProcurementDraft(source['procurementDraft']) == null) ||
+        (source.containsKey('legacyCheckoutAttempt') &&
+            _decodeLegacyAttempt(source['legacyCheckoutAttempt']) == null) ||
+        (source.containsKey('checkoutPaymentAttempt') &&
+            _decodePaymentAttempt(source['checkoutPaymentAttempt']) == null)) {
+      return true;
+    }
+    for (final pair in [
+      ('retainedLegacyCheckoutAttempts', _decodeLegacyAttempt),
+      ('retainedCheckoutPaymentAttempts', _decodePaymentAttempt),
+    ]) {
+      final raw = source[pair.$1];
+      if (raw != null &&
+          (raw is! List || raw.any((item) => pair.$2(item) == null))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Map<String, Object?> _encodeProcurementContext(
+    BuyV2ProcurementContext context,
+  ) => {
+    'accountId': context.accountId,
+    'storeId': context.storeId,
+    'purpose': context.purpose.name,
+    'originOperationId': context.originOperationId,
+  };
+
+  static BuyV2ProcurementContext? _decodeProcurementContext(Object? value) {
+    final source = _objectMap(value);
+    final account = _string(source['accountId']);
+    final store = _string(source['storeId']);
+    final purpose = _enumByName(
+      BuyV2ProcurementPurpose.values,
+      _string(source['purpose']),
+    );
+    final origin = _string(source['originOperationId']);
+    if (account == null || store == null || purpose == null || origin == null) {
+      return null;
+    }
+    final context = BuyV2ProcurementContext(
+      accountId: account,
+      storeId: store,
+      purpose: purpose,
+      originOperationId: origin,
+    );
+    return context.hasIdentity ? context : null;
+  }
 
   BuyV2CheckoutPaymentAttempt? _decodePaymentAttempt(Object? value) {
     final source = _objectMap(value);
@@ -498,6 +710,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
         _string(group['state']),
       );
       if (request['checkoutAttemptId'] != id ||
+          (request.containsKey('procurementContext') &&
+              _decodeProcurementContext(request['procurementContext']) ==
+                  null) ||
           groupId == null ||
           !ids.add(groupId) ||
           key == null ||
@@ -517,6 +732,15 @@ final class BuyV2SharedPreferencesCustomerStateStore
           scope.isEmpty ||
           scope.any((value) => !keys.add(value)) ||
           state == null ||
+          (group.containsKey('financiallyClosed') &&
+              group['financiallyClosed'] is! bool) ||
+          (group['financiallyClosed'] == true &&
+              (!const {
+                    BuyV2CheckoutSubmissionState.failed,
+                    BuyV2CheckoutSubmissionState.cancelled,
+                  }.contains(state) ||
+                  group['confirmedOrderIds'] is! List ||
+                  (group['confirmedOrderIds'] as List).isNotEmpty)) ||
           request['useUpiQr'] is! bool) {
         return null;
       }
@@ -541,6 +765,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
             ),
             purchaseOrderRequestId: _string(request['purchaseOrderRequestId']),
             purchaseOrderRevision: _string(request['purchaseOrderRevision']),
+            procurementContext: _decodeProcurementContext(
+              request['procurementContext'],
+            ),
           ),
           fulfilmentKeys: Set.unmodifiable(scope),
           obligations: _decodeObligations(group['obligations']),
@@ -555,6 +782,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           confirmedOrderIds: List.unmodifiable(
             _stringList(group['confirmedOrderIds']),
           ),
+          financiallyClosed: group['financiallyClosed'] == true,
         ),
       );
     }
@@ -563,6 +791,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       ownerScope: owner,
       quoteValidUntil: expiry,
       groups: List.unmodifiable(groups),
+      lateSettlementNeedsReview: source['lateSettlementNeedsReview'] == true,
     );
   }
 

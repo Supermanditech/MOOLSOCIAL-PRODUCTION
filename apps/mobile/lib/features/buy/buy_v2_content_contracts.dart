@@ -1989,6 +1989,7 @@ class BuyV2OrderPlacementResult {
     this.checkoutAttemptId,
     this.paymentGroupId,
     this.idempotencyKey,
+    this.retryAllowed = false,
   });
 
   final BuyV2OrderPlacementOutcome outcome;
@@ -2006,6 +2007,10 @@ class BuyV2OrderPlacementResult {
   final String? checkoutAttemptId;
   final String? paymentGroupId;
   final String? idempotencyKey;
+
+  /// Trusted financial permission for a new payment, not order-status advice.
+  /// Accepted only from reconciliation of the original terminal attempt.
+  final bool retryAllowed;
 }
 
 /// Supplied by the authenticated MoolSocial merchant payment connector only.
@@ -2456,6 +2461,7 @@ class BuyV2CheckoutGroupAttempt {
     this.paymentActionUri,
     this.bankTransferInstructions,
     this.confirmedOrderIds = const [],
+    this.financiallyClosed = false,
   });
 
   final BuyV2OrderPlacementRequest request;
@@ -2466,6 +2472,7 @@ class BuyV2CheckoutGroupAttempt {
   final Uri? paymentActionUri;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
   final List<String> confirmedOrderIds;
+  final bool financiallyClosed;
 
   bool get hasValidObligations {
     final scopes = <String>{};
@@ -2499,12 +2506,30 @@ class BuyV2CheckoutPaymentAttempt {
     required this.ownerScope,
     required this.quoteValidUntil,
     required this.groups,
+    this.lateSettlementNeedsReview = false,
   });
 
   final String id;
   final String ownerScope;
   final DateTime quoteValidUntil;
   final List<BuyV2CheckoutGroupAttempt> groups;
+  final bool lateSettlementNeedsReview;
+}
+
+/// A legacy payment retains its real request without invented group identities.
+/// Cached request facts authorize recovery only, never another placement.
+@immutable
+class BuyV2LegacyCheckoutAttempt {
+  const BuyV2LegacyCheckoutAttempt({
+    required this.ownerScope,
+    required this.payment,
+    this.purchaseOrderAccountId,
+    this.lateSettlementNeedsReview = false,
+  });
+  final String ownerScope;
+  final BuyV2CheckoutGroupAttempt payment;
+  final String? purchaseOrderAccountId;
+  final bool lateSettlementNeedsReview;
 }
 
 @immutable

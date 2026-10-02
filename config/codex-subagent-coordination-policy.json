@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "133F4A70930861C076845824E61D7B86BF836B8AECEB75CF6254FF30D57D9CBE"
+    "sha256": "2EAD0C8DA6C32A4A336C4C2C181C96CFFDAE6257CF8AAD849CC6BB290CB02D6F"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -291,7 +291,13 @@
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/artifact-evidence-retention.ps1",
         "scripts/check-cleanup-artifact-retention.ps1",
-        "scripts/test-artifact-evidence-retention.ps1"
+        "scripts/test-artifact-evidence-retention.ps1",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.json",
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip"
       ]
     },
     {

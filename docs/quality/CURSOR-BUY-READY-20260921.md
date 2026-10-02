@@ -1141,3 +1141,33 @@ PASS active status changed during cleanup
 Artifact evidence retention tests passed: 39; fixtures retained: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\apps\mobile\build\artifact-retention-tests-d5b14bcec64346449682fcfa57e83a71
 VERIFIED host=5.1.26100.9444; syntaxFiles=6; cleanupExecuted=false; exit=0
 ```
+
+
+## T07 frontend qualification and Cursor-owned checkpoint — 2 October 2026
+
+This section supersedes the earlier T07 pending-runtime notes while preserving their admission and artifact-loss history. Cursor branch `work/cursor-ui/buy-ready-20260921` starts this checkpoint from remotely verified retention commit `1a66f12c4153d98962cc639945af215d44b1d7c1`; T06 remains `ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd`.
+
+T07 frontend recovery and A09 are implemented and locally qualified at source SHA-256 `be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24`. Original request, amount, owner and allocations are frozen and durably saved before submission. Uncertain/incomplete retained attempts cannot authorize new Pay; confirmation and financially closed retry must match original facts. A09 retains the submitted32 amount after current-cart coupon expiry. Both complete frozen historical instructions and genuinely key-only older snapshots have truthful regression coverage.
+
+- Analysis: seven affected Dart owners clean, session64850 exit0.
+- Affected:141 passing cases, including69 T06/T07 cases; session84244 exit0.
+- Selected:965 distinct passing cases,1025 selected references,53 files; batches445/468/52, session27365 exit0. Closed logs show unchanged source and zero failures/warnings.
+- Immutable contract: `CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json`, SHA-256 `c7f7f1d3c12e6755baf4ffc9aba7f0cf1f0c4078a5fc1d3857bc073dde936d8a`.
+- Durable report: [T07 evidence](CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.json), SHA-256 `66cb0d1b8a1134e2dd7512d092b2882e3588d051573d71192ead876bca4f9175`.
+- Durable archive: [T07 receipts and screenshots](CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip), SHA-256 `105c621179c2b04e0075b2120d38195159113453f83ae798ee83da3e16730751`,133 members. Raw attach/session material is excluded. Failed/superseded trials remain separately retained and do not qualify the final source.
+
+Redmi TG8HCYTGGQT885OF used the existing `com.moolsocial.app.cursorreview` r66.36 package. Full hot restart session11934 closed exit0 at the qualified Dart source. Mixed Cart/Checkout retained2 products/3 items/837 through navigation at normal and200percent text. One shared optional delivery note remains; Clear appears only inside its composer, and cancelling the keyboard draft retains the saved note. Payment method navigation was checked without starting payment. Font scale restored1.0. Installed APK SHA-256 remains `7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5`; this authenticates the retained package, not the refreshed Dart source. No APK build/install, native recovery-fixture injection or live Pay occurred.
+
+A09 local display recovery is verified; original-key real-provider recovery remains unverified and integration-pending. Existing A09 stays in_progress with device recovery evidence null. Backend is deferred. Workspace original-key lookup, financial retry permission, late settlement and original-key support handoff remain **Codex after integration**. Google/Maps and T03 supplier-policy acceptance remain separate. The observed Wholesale minimum-order trailing separator/semantic punctuation is recorded for existing T10 visual polish.
+
+Historical retention hold is resolved at1a66f12c without recovering or substituting lost rejected binaries. The original failure/deletion/rejection evidence remains preserved. Founder visual approval is pending. Formal handoff/ticket_close remains unclaimed because historical commit0e90a6ca lacks the required subject prefix; no history rewrite or gate weakening is authorized.
+
+Required pre_commit, ordinary scoped feature commit/push and clean exact remote readback follow this evidence capture. Their actual closed results are retained in the post-checkpoint receipt; this narrative does not pre-claim success. Stop before T08.
+
+### Founder-directed time and credit arrangement for this Cursor task
+
+This ongoing turn started with a recorded GPT-6.1 Sol/Extra High (`xhigh`) context; saved shared user defaults are GPT-6.1 Sol/High with auto_review/on-request. Host approval policy is currently never, distinct from the saved default. No project config, selected profile, default-subagent-model override or model/reasoning flags were found in the inspected current launch ancestry. Saved roles already use explorer/researcher Luna/Medium, worker Sol/Medium and architect Astra/High; existing task spawns match those scoped review roles.
+
+Retain shared defaults and other lanes. Prefer Medium for well-defined implementation and final metadata/checkpoint work; escalate only for unresolved architecture, concurrency or difficult debugging, then return to Medium. Keep the same tests, ownership and acceptance gates. Use a small group for useful independent review, root as sole current editor, and avoid duplicate exploration/testing. The founder's new instruction applies this task guidance now; it does not itself change the active reasoning control. The founder subsequently supplied a screenshot showing GPT-6.1 Sol/Medium selected in the Cursor composer. There is no newer turn_context record yet; the existing turn-start log is not a live reading of that picker. Retain the selection and verify a fresh turn record when available; no automatic mid-turn switch or configuration repair is claimed.
+
+Sources: [model/reasoning selection](https://learn.chatgpt.com/docs/models#choose-a-model), [subagent settings](https://learn.chatgpt.com/docs/agent-configuration/subagents#choosing-models-and-reasoning), [configuration precedence](https://learn.chatgpt.com/docs/config-file/config-basic#configuration-precedence). This audit covers the Cursor-owned lane; no separate Store worktree or shared configuration was modified.

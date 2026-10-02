@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "ticket": "UAW-CURSOR-BUY-READY-20260921",
+  "parent": "BUY-ACTION-POLISH-20260926-01",
+  "scope": "T07/A09 frontend recovery; stop beforeT08",
+  "state": "frontend_qualified_real_provider_recovery_integration_pending",
+  "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+  "baselineCommit": "1a66f12c4153d98962cc639945af215d44b1d7c1",
+  "immutableContract": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
+  "analysis": {
+    "exitCode": 0,
+    "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+    "unchangedSource": true,
+    "sha256": "69ea2a33c2c9930b1c6650d34b2eeac2bbbe2815c4d64725587ac23d4ab6a6a2",
+    "passed": 0,
+    "failed": 0,
+    "warnings": 0,
+    "terminalSuccess": true
+  },
+  "affected": {
+    "exitCode": 0,
+    "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+    "unchangedSource": true,
+    "sha256": "dabb91f7242d02031692d431d0050d853cc6bacf53214c6640fdfb4b33df2009",
+    "passed": 141,
+    "failed": 0,
+    "warnings": 0,
+    "terminalSuccess": true
+  },
+  "T06T07FocusedCases": 69,
+  "selected": [
+    {
+      "batch": 1,
+      "exitCode": 0,
+      "passed": 445,
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "61add0fe6bbdba700554065ec9d925f98f9ab6e4d2e91042be8fd60303a00cac"
+    },
+    {
+      "batch": 2,
+      "exitCode": 0,
+      "passed": 468,
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "d0d8aaeb6012e65f93e827b4e2b2787c7a2884ff7ecd8f9a5bfdea844084ec85"
+    },
+    {
+      "batch": 3,
+      "exitCode": 0,
+      "passed": 52,
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "ae4899c937172e0607395c697da914769583253364fce0a206694bfc9e6b799f"
+    }
+  ],
+  "distinctSelectedCases": 965,
+  "selectedReferences": 1025,
+  "closedReceipts": [
+    {
+      "path": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-FOCUSED.jsonl",
+      "sha256": "dabb91f7242d02031692d431d0050d853cc6bacf53214c6640fdfb4b33df2009",
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-1.jsonl",
+      "sha256": "61add0fe6bbdba700554065ec9d925f98f9ab6e4d2e91042be8fd60303a00cac",
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-2.jsonl",
+      "sha256": "d0d8aaeb6012e65f93e827b4e2b2787c7a2884ff7ecd8f9a5bfdea844084ec85",
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-3.jsonl",
+      "sha256": "ae4899c937172e0607395c697da914769583253364fce0a206694bfc9e6b799f",
+      "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24"
+    }
+  ],
+  "archive": {
+    "path": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip",
+    "sha256": "105c621179c2b04e0075b2120d38195159113453f83ae798ee83da3e16730751",
+    "members": 133
+  },
+  "native": {
+    "status": "native_cart_checkout_layout_and_navigation_verified_original_payment_integration_pending",
+    "sourceSha256": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+    "baseline": {
+      "device": "TG8HCYTGGQT885OF",
+      "package": "com.moolsocial.app.cursorreview",
+      "versionName": "1.0.0-r66.36-cursorreview",
+      "versionCode": 2026092701,
+      "installedApkSha256": "7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5",
+      "fontScaleBeforeAccessibilityRetest": "1.0",
+      "hotRestart": {
+        "session": 11934,
+        "exitCode": 0,
+        "restartCode": 0,
+        "detached": true,
+        "fullRestart": true,
+        "sourceBefore": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+        "sourceAfter": "be62e47d9a84488e5703e4abf1c38353dad36e340a16985a8bae0221599e3a24",
+        "rawLogPrivate": true
+      },
+      "apkBuiltOrInstalled": false,
+      "nativeRecoveryFixtureInjected": false,
+      "livePaymentStarted": false
+    },
+    "fontScaleRestored": "1.0",
+    "installedApkSha256After": "7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5",
+    "finalDeviceReadback": "Passed checksum/font/source assertions before artifact path failure; recorded under REG4647/t07NativeProofPath20261002. No later device settings or app changes.",
+    "checks": [
+      "mixed Cart2 products/3 items/837 retained through Checkout",
+      "one shared optional note; Clear inside composer only",
+      "keyboard draft cancellation retains original note",
+      "payment chooser opens and original Card selection retained without payment",
+      "Cart/Checkout return at200 percent keeps837 and reachable Checkout",
+      "normal font restored; APK checksum unchanged"
+    ],
+    "nativeOriginalPaymentRecoveryVerified": false,
+    "A09": "local verified; original-key provider recovery remains integration-pending",
+    "deferred": [
+      "Backend deferred",
+      "Workspace original-key lookup, financial retry permission, late settlement and original-key support handoff: Codex after integration",
+      "Google/Maps separate",
+      "T03 supplier-policy provider acceptance separate",
+      "Historical0e90a6ca formal handoff blocker retained"
+    ],
+    "visualFollowUp": {
+      "target": "existing T10 visual-polish sweep",
+      "finding": "Wholesale minimum-order summary retains trailing separator and duplicate semantic punctuation. Cosmetic, outside T07 recovery scope.",
+      "evidence": "t07-native-after/09-checkout-payment-navigation.xml",
+      "status": "unresolved_follow_up"
+    },
+    "screenshots": [
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/01-initial.png",
+        "sha256": "2e78140a78f20bf922d6a55de87f171d01f9978b31251785eebaf05e691c45fc"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/01-initial.xml",
+        "sha256": "50b2bb80ec42124b2c54ebb4940cf5eab51a87d7d77a1b21dbbc6ddfb6415956"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/02-cart.png",
+        "sha256": "8c4af938893ca870ec4ffdd291d9df041b94ec3d022eac23de8d265dc4d14371"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/02-cart.xml",
+        "sha256": "f8ccc3748263a1ad92d68640d4fe9c2abaa9015193f5b6a6c82fa246ba3ec4fd"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/03-checkout.png",
+        "sha256": "5bb172effab189165919d0942683dabd789b2b68b6f882cc3fb7187302c69639"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-before/03-checkout.xml",
+        "sha256": "25382d1c4d6ea7965547b0979f1a8a23d5055c5737f4ef977a10a6cea1275c7c"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/01-qualified-initial.png",
+        "sha256": "4a3b84823c3a37a99ae6c78838456014b5e90060091fab08e4bedc1b90a165eb"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/01-qualified-initial.xml",
+        "sha256": "50b2bb80ec42124b2c54ebb4940cf5eab51a87d7d77a1b21dbbc6ddfb6415956"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/02-cart-normal.png",
+        "sha256": "5e9b7e44e0b925e7289fca12b189ff655b476051356ba7dbbcbc9d8ace6cf04d"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/02-cart-normal.xml",
+        "sha256": "b04865139614b9865542c4060a681d95fe56f730465e21dcaf62e4b09a03f122"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/03-checkout-normal.png",
+        "sha256": "4cd09688681db5aaea96b3376814c2738f9a8f0a5b736860fc0906c272e778c5"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/03-checkout-normal.xml",
+        "sha256": "25382d1c4d6ea7965547b0979f1a8a23d5055c5737f4ef977a10a6cea1275c7c"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/04-instruction-composer.png",
+        "sha256": "0792f43551640ddef91c848e5bceb35375dcd56f585493a89d2fb71ec183eca3"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/04-instruction-composer.xml",
+        "sha256": "15d2d01b8f6847325855a44fd1e0bbae8a6af085ad973870e721a11945f0a29c"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/05-shared-note-field.png",
+        "sha256": "cc552c87c1b487d3020d0c111970a6145ae5b09d7d402018f424db549ba433f5"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/05-shared-note-field.xml",
+        "sha256": "50d80f18b7f06a170493f1ab6d9fd76cc160222d3cec486a945188d0a622a71f"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/06-note-keyboard.png",
+        "sha256": "c2702613b466678e37a38af542c670f47c3609fc95a8df558af97400aee75910"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/06-note-keyboard.xml",
+        "sha256": "35a046d4d33e276c3f628296886dfa78c0cf80d6188ff8c048a3c5d53ec4e345"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/07-note-cancel-target.png",
+        "sha256": "d75c8782a0f3d9a4e919a34e1424f6849afc43fa75eac8f41c82ce1a7004b4b5"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/07-note-cancel-target.xml",
+        "sha256": "35a046d4d33e276c3f628296886dfa78c0cf80d6188ff8c048a3c5d53ec4e345"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/08-note-cancel-verified.png",
+        "sha256": "8eb5793ea0cd23e9bd944fbb0d38cf37dee8ba8b950fd6f2266037a65a6be1cd"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/08-note-cancel-verified.xml",
+        "sha256": "c6e86cb7c390b03d5095cab6a92af173004865d2d64e997bf8ba9001778b7e24"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/09-checkout-payment-navigation.png",
+        "sha256": "2fb6f4bce7c2e8e762f0a31d61d70d9aeea2601b7cb7c7e0a1de3fe8ae5c762b"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/09-checkout-payment-navigation.xml",
+        "sha256": "8edc1c1c01af243398656731ec2ad960437d29dbbe35e06be311f85ac8c5d8f4"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/10-payment-choice-review.png",
+        "sha256": "1efbb131c4979336335ee686e24fe5972ca48c6962eeb724316b7b78ffe4bb61"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/10-payment-choice-review.xml",
+        "sha256": "ca4144fdde5111ab54a8b2a1bf37588f120afef9fe0c8bfe53b8115b6459aaef"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/11-checkout-200-payment.png",
+        "sha256": "65ecb9e14d7e85cc237022e6cf3c87e1af703adaeb38087e75b67ff69e2c7746"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/11-checkout-200-payment.xml",
+        "sha256": "503659d9373bfa418212be4e4164e0a20647c0a77fc4805c598cc46ea628ff4a"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/12-checkout-200-top.png",
+        "sha256": "451ba3adca1a7bb38a3c21591e84519eb00e04b094c3133233bcbc2db7a2ff1c"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/12-checkout-200-top.xml",
+        "sha256": "091ed89ed46bdf5f9abe9a9e3fb5a44e90e13cc13c8ea80886bf012643e4d25e"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/13-cart-return-200.png",
+        "sha256": "619083093c7481ab6708b6d1cc15002176885f9b2bb82dcc6d2475b0b4817a88"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/13-cart-return-200.xml",
+        "sha256": "4d053b8a091f3e7cb30d6111fb24ecf4c24e336dd374125b6e7ccc75f2f8ea76"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/14-checkout-return-200.png",
+        "sha256": "60b00f6e763a18f765596adeba02c6335977468be4a300054047fa6fedc33462"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/14-checkout-return-200.xml",
+        "sha256": "091ed89ed46bdf5f9abe9a9e3fb5a44e90e13cc13c8ea80886bf012643e4d25e"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/15-checkout-final-normal.png",
+        "sha256": "6a5ec788bd710f3924116ae701a02805d239e324f816fb442fe2d75d1e30d8c6"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t07-native-after/15-checkout-final-normal.xml",
+        "sha256": "15d2d01b8f6847325855a44fd1e0bbae8a6af085ad973870e721a11945f0a29c"
+      }
+    ]
+  },
+  "founderVisualApproval": "pending",
+  "formalTicketClose": "not claimed; historic0e90a6ca subject blocker retained",
+  "remainingIntegrationChild": "existing A09 remains integration-pending; local verified, device original-payment recovery null",
+  "architectReview": {
+    "task": "/root/retention_architect",
+    "factsOnly": true,
+    "result": "No additional blocker apparent; final selected/device/checkpoint conditions retained"
+  },
+  "checkpoint": "required pre_commit and scoped commit/remote readback follow; not claimed yet"
+}

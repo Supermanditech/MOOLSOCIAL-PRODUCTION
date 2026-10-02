@@ -1162,6 +1162,12 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl',
   # Exact authorized T07 contract; receipts are admitted only after closing.
   'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip',
   # Exact founder-authorized artifact-retention maintenance, primary serialized.
   'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json',
   'scripts/check-codex-development-regression-memory.ps1',

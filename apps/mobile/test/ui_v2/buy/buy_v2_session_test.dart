@@ -233,6 +233,30 @@ class _T04CartBenefits extends BuyV2SeededCartBenefitsAdapter {
       : const [];
 }
 
+class _T07TimedCoupon extends BuyV2SeededCartBenefitsAdapter {
+  _T07TimedCoupon(this.until);
+  final DateTime until;
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => kind == BuyV2CartBenefitKind.coupon
+      ? [
+          BuyV2CartBenefit(
+            id: 'pending-expiry',
+            kind: kind,
+            destination: BuyV2Destination.shop,
+            title: 'Isolated timed coupon',
+            detail: 'Original amount recovery fixture',
+            sourceId: 't07-expiry-test',
+            savingAmount: 5,
+            validUntil: until,
+          ),
+        ]
+      : const [];
+}
+
 class _T04LiveBenefits extends _T04CartBenefits
     implements BuyV2LiveCartBenefitsAdapter {
   Completer<BuyV2CartBenefitsSnapshot>? gate;
@@ -461,6 +485,7 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
   Completer<void>? pendingWrite;
   int writeCalls = 0;
   bool rejectWrites = false;
+  void Function(BuyV2CustomerStateSnapshot)? onSaved;
 
   @override
   Future<BuyV2CustomerStateSnapshot?> read() async =>
@@ -472,6 +497,7 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
     if (pendingWrite case final pending?) await pending.future;
     if (rejectWrites) return false;
     this.snapshot = snapshot;
+    onSaved?.call(snapshot);
     return true;
   }
 }
@@ -2002,6 +2028,630 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  Future<(BuyV2Session, TestLegacyRecoveryCommerce, _MemoryCustomerStateStore)>
+  legacyRecoveryFixture({
+    bool manualDispose = false,
+    ValueNotifier<BuyV2CollectionIdentity?>? identity,
+  }) async {
+    final core = BuySession();
+    final commerce = TestLegacyRecoveryCommerce()
+      ..snapshot = testPaymentSnapshot(
+        null,
+        addresses: const [_instructionAddress],
+      );
+    final store = _MemoryCustomerStateStore('test-t07-buyer');
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      customerStateStore: store,
+      collectionIdentity: identity,
+      productFactsAdapter: BuyTestEligibilityFacts(
+        delegate: _T01CDeliveryFactsAdapter(),
+      ),
+      reviewDataEnabled: false,
+      checkoutQuoteAdapter: TestPaymentQuote(),
+    );
+    if (!manualDispose) {
+      addTearDown(session.dispose);
+    }
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+    session.openCart();
+    expect(session.openCheckout(), isTrue, reason: session.notice);
+    await session.refreshCheckoutQuote();
+    return (session, commerce, store);
+  }
+
+  BuyV2OrderPlacementResult legacyResult(
+    BuyV2OrderPlacementRequest request, {
+    BuyV2OrderPlacementOutcome outcome = BuyV2OrderPlacementOutcome.confirmed,
+    bool retryAllowed = false,
+  }) => testGroupedPlacement(
+    request,
+    outcome: outcome,
+    retryAllowed: retryAllowed,
+    reference: 'test-legacy-${request.idempotencyKey}',
+  );
+
+  test('T07 pending expiry preserves submitted amount', () async {
+    var now = DateTime.now();
+    final core = BuySession();
+    final commerce = TestLegacyRecoveryCommerce()
+      ..snapshot = testPaymentSnapshot(
+        null,
+        addresses: const [_instructionAddress],
+      );
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      productFactsAdapter: _T01CDeliveryFactsAdapter(),
+      cartBenefitsAdapter: _T07TimedCoupon(now.add(const Duration(minutes: 1))),
+      catalogueNow: () => now,
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    session.addProduct('s-tomato');
+    expect(
+      session.chooseCartBenefit(
+        session.cartBenefits(kind: BuyV2CartBenefitKind.coupon).single,
+      ),
+      isTrue,
+    );
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests.single.total, 32);
+    now = now.add(const Duration(minutes: 2));
+    expect(session.checkoutPayableTotal, 32);
+    expect(session.checkoutAmountDueNow, 32);
+    expect(session.checkoutPaymentActionAmount, 32);
+    expect(session.legacyCheckoutAttempt!.payment.request.total, 32);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, hasLength(1));
+  });
+
+  test('T07 freezes complete request before delayed durable write', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    session.setCustomDeliveryInstruction(
+      destination: BuyV2Destination.shop,
+      text: 'Call on arrival',
+    );
+    await Future<void>.delayed(Duration.zero);
+    store.pendingWrite = Completer<void>();
+    final pending = session.submitOrder();
+    for (var i = 0; i < 50 && session.legacyCheckoutAttempt == null; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    final original = session.legacyCheckoutAttempt!.payment.request;
+    expect(commerce.requests, isEmpty);
+    expect(session.checkoutBusy, isTrue);
+    expect(await session.submitOrder(), isFalse);
+    session.selectedPayment = 'Card';
+    expect(session.chooseAddress(_instructionAddress.id), isFalse);
+    store.pendingWrite!.complete();
+    expect(await pending, isFalse);
+    expect(commerce.requests.single, same(original));
+    expect(commerce.requests.single.paymentMethod, 'UPI');
+    expect(
+      commerce.requests.single.deliveryInstructionsByProductId['s-tomato'],
+      'Call on arrival',
+    );
+    expect(original.checkoutAttemptId, isNull);
+    expect(original.paymentGroupId, isNull);
+  });
+
+  test('T07 failed initial storage prevents placement', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    store.rejectWrites = true;
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, isEmpty);
+    expect(session.legacyCheckoutAttempt, isNull);
+    expect(session.quantityFor('s-tomato'), 1);
+    expect(session.checkoutRequiresResolution, isFalse);
+  });
+
+  for (final outcome in [
+    BuyV2OrderPlacementOutcome.failed,
+    BuyV2OrderPlacementOutcome.cancelled,
+    BuyV2OrderPlacementOutcome.unavailable,
+  ]) {
+    test('T07 submitted $outcome never authorizes a fresh payment', () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      commerce.onPlace = (request) =>
+          legacyResult(request, outcome: outcome, retryAllowed: true);
+      expect(await session.submitOrder(), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(session.quantityFor('s-tomato'), 1);
+    });
+  }
+
+  test('T07 local exit and handoff failure retain original payment', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    commerce.onPlace = (request) => legacyResult(
+      request,
+      outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+    );
+    await session.submitOrder();
+    final key = commerce.requests.single.idempotencyKey;
+    expect(await session.continuePayment((_) async => false), isFalse);
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(store.snapshot!.checkoutIdempotencyKey, key);
+    commerce.onReconcile = (request) => legacyResult(
+      request,
+      outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+    );
+    await session.reconcilePayment();
+    expect(session.cancelPaymentAttempt(), isTrue);
+    expect(store.snapshot!.checkoutIdempotencyKey, key);
+    commerce.onReconcile = legacyResult;
+    expect(await session.reconcilePayment(), isTrue);
+    expect(commerce.reconciledKeys, [key, key]);
+    expect(commerce.requests, hasLength(1));
+    expect(session.orders, hasLength(1));
+    expect(session.quantityFor('s-tomato'), 0);
+  });
+
+  test(
+    'T07 trusted original financial closure is saved before choosing again',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      final key = commerce.requests.single.idempotencyKey;
+      commerce.onReconcile = (request) => legacyResult(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        retryAllowed: true,
+      );
+      await session.reconcilePayment();
+      expect(session.checkoutRequiresResolution, isFalse);
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .payment
+            .financiallyClosed,
+        isTrue,
+      );
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .payment
+            .request
+            .idempotencyKey,
+        key,
+      );
+      expect(session.retryCheckoutPayment(), isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(2));
+      expect(commerce.requests.last.idempotencyKey, isNot(key));
+    },
+  );
+
+  test('T07 financial closure write failure keeps the original hold', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    await session.submitOrder();
+    final key = commerce.requests.single.idempotencyKey;
+    store.rejectWrites = true;
+    commerce.onReconcile = (request) => legacyResult(
+      request,
+      outcome: BuyV2OrderPlacementOutcome.cancelled,
+      retryAllowed: true,
+    );
+    await session.reconcilePayment();
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(session.legacyCheckoutAttempt!.payment.request.idempotencyKey, key);
+    expect(session.retryCheckoutPayment(), isFalse);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, hasLength(1));
+    expect(store.snapshot!.retainedLegacyCheckoutAttempts, isEmpty);
+  });
+
+  for (final mismatch in ['key', 'missing permission', 'orders']) {
+    test('T07 rejects financial retry authorization with $mismatch', () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      commerce.onReconcile = (request) => BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        customerMessage: 'Isolated closure response',
+        idempotencyKey: mismatch == 'key'
+            ? 'other-attempt'
+            : request.idempotencyKey,
+        retryAllowed: mismatch != 'missing permission',
+        orders: mismatch == 'orders' ? legacyResult(request).orders : const [],
+      );
+      await session.reconcilePayment();
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+    });
+  }
+
+  test(
+    'T07 confirmation save failure preserves Cart then reconciles once',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      commerce.onPlace = (request) {
+        store.rejectWrites = true;
+        return legacyResult(request);
+      };
+      expect(await session.submitOrder(), isFalse);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      store.rejectWrites = false;
+      commerce.onReconcile = legacyResult;
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(session.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .payment
+            .confirmedOrderIds,
+        hasLength(1),
+      );
+    },
+  );
+
+  for (final mismatch in ['quantity', 'supplier', 'price', 'amount']) {
+    test('T07 frozen confirmation rejects mismatched $mismatch', () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      commerce.onPlace = (request) {
+        final line = request.lines.single;
+        final changed = BuyV2OrderPlacementRequest(
+          lines: [
+            line.copyWith(
+              quantity: mismatch == 'quantity' ? line.quantity + 1 : null,
+              product: line.product.copyWith(
+                storeId: mismatch == 'supplier'
+                    ? 'other-store'
+                    : line.product.storeId,
+                price: mismatch == 'price'
+                    ? line.product.price + 1
+                    : line.product.price,
+              ),
+            ),
+          ],
+          address: request.address,
+          paymentMethod: request.paymentMethod,
+          total: request.total + (mismatch == 'amount' ? 1 : 0),
+          amountDueNow: request.amountDueNow,
+          idempotencyKey: request.idempotencyKey,
+        );
+        return legacyResult(changed);
+      };
+      expect(await session.submitOrder(), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.orders, isEmpty);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.retryCheckoutPayment(), isFalse);
+    });
+  }
+
+  test(
+    'T07 catalogue replacement cannot change the submitted item or amount',
+    () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      final original = commerce.requests.single;
+      commerce.snapshot = BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        products: [
+          for (final product in testPaymentProducts)
+            if (product.id != 's-tomato') product,
+        ],
+        paymentMethods: const {'UPI', 'Card'},
+        addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id,
+      );
+      await session.restoreCommerce();
+      expect(
+        session.checkoutLines.single.product.price,
+        original.lines.single.product.price,
+      );
+      expect(session.checkoutAmountDueNow, original.amountDueNow);
+      commerce.onReconcile = legacyResult;
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.requests, hasLength(1));
+      expect(session.orders.single.lines.single.product.id, 's-tomato');
+    },
+  );
+
+  test(
+    'T07 key-only historical recovery never substitutes current Cart agreement',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final original = BuyV2CustomerStateSnapshot(
+        cartQuantities: {'s-tomato': 1},
+        checkoutIdempotencyKey: 'original-old-key',
+        checkoutSubmissionState: 'paymentPending',
+        addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id,
+      );
+      final core = BuySession();
+      addTearDown(core.dispose);
+      store.snapshot = original;
+      final restored = BuyV2Session(
+        core: core,
+        customerStateStore: store,
+        commerceAdapter: commerce,
+        reviewDataEnabled: false,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      expect(restored.checkoutRecoveryAmountKnown, isFalse);
+      expect(restored.checkoutRequiresResolution, isTrue);
+      expect(await restored.reconcilePayment(), isFalse);
+      expect(commerce.recoveredKeys, ['original-old-key']);
+      expect(commerce.requests, isEmpty);
+      expect(restored.quantityFor('s-tomato'), 1);
+      expect(restored.orders, isEmpty);
+      expect(restored.retryCheckoutPayment(), isFalse);
+      expect(session.orders, isEmpty);
+    },
+  );
+
+  test(
+    'T07 malformed retained attempt keeps original key and recovery hold',
+    () async {
+      final (_, commerce, memory) = await legacyRecoveryFixture();
+      final first = (await legacyRecoveryFixture()).$1;
+      await first.submitOrder();
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: 'test-t07-buyer',
+      );
+      final payment = first.legacyCheckoutAttempt!;
+      await store.write(
+        BuyV2CustomerStateSnapshot(
+          cartQuantities: {'s-tomato': 1},
+          checkoutIdempotencyKey: payment.payment.request.idempotencyKey,
+          legacyCheckoutAttempt: payment,
+          checkoutSubmissionState: 'paymentPending',
+        ),
+      );
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      encoded['legacyCheckoutAttempt']['payment']['request']['total'] =
+          'invalid';
+      preferences.values[key] = jsonEncode(encoded);
+      memory.snapshot = await store.read();
+      expect(memory.snapshot!.paymentRecoveryIncomplete, isTrue);
+      expect(
+        memory.snapshot!.checkoutIdempotencyKey,
+        payment.payment.request.idempotencyKey,
+      );
+      final core = BuySession();
+      addTearDown(core.dispose);
+      final restored = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        customerStateStore: memory,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      expect(restored.checkoutRecoveryBlocked, isTrue);
+      expect(restored.checkoutRecoveryAmountKnown, isFalse);
+      expect(await restored.submitOrder(), isFalse);
+      expect(commerce.requests, isEmpty);
+    },
+  );
+
+  test(
+    'T07 released earlier settlement never overwrites a newer payment',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final response = Completer<BuyV2OrderPlacementResult>();
+      commerce.onPlace = (_) => response.future;
+      final pending = session.submitOrder();
+      for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final earlier = commerce.requests.single;
+      expect(await pending, isFalse);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      commerce.onReconcile = (request) => legacyResult(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        retryAllowed: true,
+      );
+      await session.reconcilePayment();
+      expect(session.retryCheckoutPayment(), isTrue);
+      commerce.onPlace = (request) => legacyResult(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+      );
+      await session.submitOrder();
+      final newer = commerce.requests.last;
+      response.complete(legacyResult(earlier));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      expect(
+        session.legacyCheckoutAttempt!.payment.request.idempotencyKey,
+        newer.idempotencyKey,
+      );
+      expect(session.checkoutRecoveryBlocked, isTrue);
+      expect(session.orders, isEmpty);
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .lateSettlementNeedsReview,
+        isTrue,
+      );
+      expect(commerce.requests, hasLength(2));
+    },
+  );
+
+  test(
+    'T07 original bank and supplier request facts survive cold retention',
+    () async {
+      final (session, _, _) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      final original = session.legacyCheckoutAttempt!.payment;
+      final context = BuyV2ProcurementContext(
+        accountId: 'test-buyer',
+        storeId: 'test-store',
+        purpose: BuyV2ProcurementPurpose.values.first,
+        originOperationId: 'test-operation',
+      );
+      final owner = context.customerStateOwnerScope;
+      final request = BuyV2OrderPlacementRequest(
+        lines: original.request.lines,
+        address: original.request.address,
+        paymentMethod: 'Bank transfer',
+        total: original.request.total,
+        amountDueNow: original.request.amountDueNow,
+        idempotencyKey: original.request.idempotencyKey,
+        commercialPaymentTermIds: const {'original-supplier': 'original-term'},
+        deliveryInstructionsByProductId: const {'s-tomato': 'Receiving desk'},
+        purchaseOrderRequestId: 'original-po',
+        purchaseOrderRevision: 'original-revision',
+        procurementContext: context,
+      );
+      const bank = BuyV2BankTransferInstructions(
+        beneficiaryName: 'Isolated merchant',
+        bankName: 'Test bank',
+        accountNumber: '000012345678',
+        ifsc: 'TEST0000001',
+        transferReference: 'original-bank-reference',
+      );
+      final retained = BuyV2LegacyCheckoutAttempt(
+        ownerScope: owner,
+        purchaseOrderAccountId: 'test-buyer',
+        payment: BuyV2CheckoutGroupAttempt(
+          request: request,
+          fulfilmentKeys: original.fulfilmentKeys,
+          obligations: original.obligations,
+          state: BuyV2CheckoutSubmissionState.submitting,
+          paymentReference: 'original-bank-reference',
+          bankTransferInstructions: bank,
+        ),
+      );
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: owner,
+      );
+      expect(
+        await store.write(
+          BuyV2CustomerStateSnapshot(
+            cartQuantities: {'s-tomato': 1},
+            legacyCheckoutAttempt: retained,
+            checkoutIdempotencyKey: request.idempotencyKey,
+            paymentReference: 'original-bank-reference',
+            bankTransferInstructions: bank,
+            checkoutSubmissionState: 'submitting',
+          ),
+        ),
+        isTrue,
+      );
+      final read = (await store.read())!;
+      final restored = read.legacyCheckoutAttempt!;
+      expect(
+        read.bankTransferInstructions!.transferReference,
+        'original-bank-reference',
+      );
+      expect(
+        restored.payment.state,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      expect(
+        restored.payment.bankTransferInstructions!.accountNumber,
+        bank.accountNumber,
+      );
+      expect(restored.payment.request.purchaseOrderRequestId, 'original-po');
+      expect(
+        restored.payment.request.purchaseOrderRevision,
+        'original-revision',
+      );
+      expect(restored.purchaseOrderAccountId, 'test-buyer');
+      expect(
+        restored.payment.request.procurementContext!.originOperationId,
+        context.originOperationId,
+      );
+      expect(
+        restored.payment.request.commercialPaymentTermIds,
+        request.commercialPaymentTermIds,
+      );
+      expect(
+        restored.payment.request.deliveryInstructionsByProductId,
+        request.deliveryInstructionsByProductId,
+      );
+      expect(restored.payment.request.checkoutAttemptId, isNull);
+      expect(restored.payment.request.paymentGroupId, isNull);
+    },
+  );
+
+  for (final change in ['account', 'session']) {
+    test('T07 changed $change rejects an original late response', () async {
+      final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'session-a',
+        ),
+      );
+      addTearDown(identity.dispose);
+      final (session, commerce, store) = await legacyRecoveryFixture(
+        identity: identity,
+      );
+      final response = Completer<BuyV2OrderPlacementResult>();
+      commerce.onPlace = (_) => response.future;
+      final pending = session.submitOrder();
+      for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final request = commerce.requests.single;
+      identity.value = BuyV2CollectionIdentity(
+        accountId: change == 'account' ? 'buyer-b' : 'buyer-a',
+        sessionId: 'session-b',
+      );
+      response.complete(legacyResult(request));
+      expect(await pending, isFalse);
+      expect(session.orders, isEmpty);
+      expect(store.snapshot!.orders, isEmpty);
+      expect(session.quantityFor('s-tomato'), 1);
+    });
+  }
+
+  test(
+    'T07 disposed original response cannot mutate retained orders',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture(
+        manualDispose: true,
+      );
+      final response = Completer<BuyV2OrderPlacementResult>();
+      commerce.onPlace = (_) => response.future;
+      final pending = session.submitOrder();
+      for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final request = commerce.requests.single;
+      session.dispose();
+      response.complete(legacyResult(request));
+      expect(await pending, isFalse);
+      expect(store.snapshot!.orders, isEmpty);
+    },
+  );
+
   Future<
     (
       BuyV2Session,
@@ -2096,6 +2746,297 @@ void main() {
     expect(session.checkoutPaymentGroups, hasLength(2));
     return (session, commerce, store, quote);
   }
+
+  test(
+    'T07 confirmed save has one cleanup owner across repeated taps',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final saved = Completer<void>();
+      commerce.onPlace = (request) {
+        store.pendingWrite = saved;
+        return legacyResult(request);
+      };
+      final submission = session.submitOrder();
+      for (var i = 0; i < 100 && !session.orders.any((_) => true); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(session.checkoutBusy, isTrue);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(await session.reconcilePayment(), isFalse);
+      expect(await session.submitOrder(), isFalse);
+      expect(session.addProduct('s-tomato'), isFalse);
+      saved.complete();
+      expect(await submission, isTrue);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(session.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+      expect(commerce.recoveredKeys, isEmpty);
+    },
+  );
+
+  test(
+    'T07 cold confirmed snapshot rechecks original key before cleanup',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture(
+        manualDispose: true,
+      );
+      store.onSaved = (snapshot) {
+        if (snapshot.legacyCheckoutAttempt?.payment.state ==
+            BuyV2CheckoutSubmissionState.confirmed) {
+          session.dispose();
+        }
+      };
+      commerce.onPlace = (request) => legacyResult(request);
+      expect(await session.submitOrder(), isFalse);
+      store.onSaved = null;
+      final original = commerce.requests.single;
+      expect(store.snapshot!.cartQuantities['s-tomato'], 1);
+      expect(
+        store.snapshot!.legacyCheckoutAttempt!.payment.confirmedOrderIds,
+        hasLength(1),
+      );
+      final core = BuySession();
+      addTearDown(core.dispose);
+      final restored = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        customerStateStore: store,
+        reviewDataEnabled: false,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      expect(restored.checkoutRequiresResolution, isTrue);
+      expect(restored.quantityFor('s-tomato'), 1);
+      expect(restored.checkoutPayableTotal, original.total);
+      commerce.onReconcile = (request) => legacyResult(request);
+      expect(await restored.reconcilePayment(), isTrue);
+      expect(restored.quantityFor('s-tomato'), 0);
+      expect(restored.orders, hasLength(1));
+      expect(await restored.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(commerce.reconciledKeys, [original.idempotencyKey]);
+    },
+  );
+
+  test(
+    'T07 timed out confirmed write stays ordered before later reconciliation',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final saved = Completer<void>();
+      commerce.onPlace = (request) {
+        store.pendingWrite = saved;
+        return legacyResult(request);
+      };
+      expect(await session.submitOrder(), isFalse);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.checkoutRequiresResolution, isTrue);
+      commerce.onReconcile = (request) => legacyResult(request);
+      final checking = session.reconcilePayment();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      expect(session.checkoutBusy, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      saved.complete();
+      expect(await checking, isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(store.snapshot!.cartQuantities.containsKey('s-tomato'), isFalse);
+      expect(store.snapshot!.checkoutIdempotencyKey, isNull);
+      expect(store.snapshot!.legacyCheckoutAttempt, isNull);
+      expect(store.snapshot!.retainedLegacyCheckoutAttempts, hasLength(1));
+      expect(store.snapshot!.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  test(
+    'T07 grouped financial closure save failure cannot release payment',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      await session.submitOrder();
+      commerce.onReconcile = (request) {
+        store.rejectWrites = true;
+        return testGroupedPlacement(
+          request,
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          retryAllowed: true,
+        );
+      };
+      expect(await session.reconcilePayment(), isFalse);
+      expect(session.currentCheckoutPaymentGroup!.financiallyClosed, isFalse);
+      expect(session.reviewRemainingGroupedCheckout(), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.quantityFor('s-rice'), 1);
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  test(
+    'T07 closed payment requires an explicit empty retained order list',
+    () async {
+      for (final grouped in [false, true]) {
+        late BuyV2CustomerStateSnapshot snapshot;
+        late String owner;
+        late String originalKey;
+        if (grouped) {
+          final (session, commerce, memory, _) = await groupedFixture();
+          commerce.onGroup = (request) => testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          );
+          expect(await session.submitOrder(), isFalse);
+          snapshot = memory.snapshot!;
+          owner = memory.ownerScope;
+          originalKey = commerce.requests.single.idempotencyKey;
+        } else {
+          final (session, commerce, memory) = await legacyRecoveryFixture();
+          expect(await session.submitOrder(), isFalse);
+          snapshot = memory.snapshot!;
+          owner = memory.ownerScope;
+          originalKey = commerce.requests.single.idempotencyKey;
+        }
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(
+          preferences,
+          ownerScope: owner,
+        );
+        expect(await store.write(snapshot), isTrue);
+        final storageKey = preferences.values.keys.single;
+        final original = preferences.values[storageKey]!;
+        for (final variant in [
+          'empty',
+          'missing',
+          'null',
+          'object',
+          'blank',
+          'null-item',
+          'order',
+        ]) {
+          final encoded = jsonDecode(original) as Map<String, dynamic>;
+          final payment = grouped
+              ? encoded['checkoutPaymentAttempt']['groups'][0]
+              : encoded['legacyCheckoutAttempt']['payment'];
+          payment['state'] = 'failed';
+          payment['financiallyClosed'] = true;
+          if (variant == 'missing') {
+            payment.remove('confirmedOrderIds');
+          } else {
+            payment['confirmedOrderIds'] = switch (variant) {
+              'empty' => <Object?>[],
+              'null' => null,
+              'object' => <String, Object?>{},
+              'blank' => <Object?>[''],
+              'null-item' => <Object?>[null],
+              _ => <Object?>['existing-order'],
+            };
+          }
+          preferences.values[storageKey] = jsonEncode(encoded);
+          final recovered = (await store.read())!;
+          expect(
+            recovered.paymentRecoveryIncomplete,
+            variant != 'empty',
+            reason: 'grouped=$grouped variant=$variant',
+          );
+          expect(recovered.checkoutIdempotencyKey, originalKey);
+          if (variant != 'empty') {
+            expect(recovered.legacyCheckoutAttempt, isNull);
+            expect(recovered.checkoutPaymentAttempt, isNull);
+          }
+        }
+      }
+    },
+  );
+
+  test(
+    'T07 corrupt grouped financial closure restores a recovery hold',
+    () async {
+      final (session, commerce, memory, _) = await groupedFixture();
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+      );
+      await session.submitOrder();
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: memory.ownerScope,
+      );
+      await store.write(memory.snapshot!);
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      encoded['checkoutPaymentAttempt']['groups'][0]['financiallyClosed'] =
+          true;
+      preferences.values[key] = jsonEncode(encoded);
+      final recovered = (await store.read())!;
+      expect(recovered.paymentRecoveryIncomplete, isTrue);
+      expect(recovered.checkoutPaymentAttempt, isNull);
+      expect(
+        recovered.checkoutIdempotencyKey,
+        commerce.requests.single.idempotencyKey,
+      );
+    },
+  );
+
+  test(
+    'T07 group confirmation save failure retains original Cart and key',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      commerce.onGroup = (request) {
+        store.rejectWrites = true;
+        return testGroupedPlacement(request);
+      };
+      expect(await session.submitOrder(), isFalse);
+      final request = commerce.requests.single;
+      expect(session.quantityFor(request.lines.single.product.id), 1);
+      expect(
+        session.currentCheckoutPaymentGroup!.request.idempotencyKey,
+        request.idempotencyKey,
+      );
+      expect(session.checkoutRequiresResolution, isTrue);
+      store.rejectWrites = false;
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.quantityFor(request.lines.single.product.id), 0);
+      expect(session.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  test(
+    'T07 group financial closure preserves completed orders in retained history',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      await session.submitOrder();
+      final completed = session.orders.single.id;
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      await session.submitOrder();
+      expect(session.reviewRemainingGroupedCheckout(), isFalse);
+      commerce.onReconcile = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        retryAllowed: true,
+      );
+      await session.reconcilePayment();
+      expect(session.currentCheckoutPaymentGroup!.financiallyClosed, isTrue);
+      expect(session.reviewRemainingGroupedCheckout(), isTrue);
+      expect(session.orders.single.id, completed);
+      await Future<void>.delayed(Duration.zero);
+      final retained = store.snapshot!.retainedCheckoutPaymentAttempts.single;
+      expect(retained.groups.first.confirmedOrderIds, [completed]);
+      expect(retained.groups.last.financiallyClosed, isTrue);
+      expect(commerce.requests, hasLength(2));
+    },
+  );
 
   test(
     'T06 paid groups require separate commitments and retain completed orders',
@@ -2578,6 +3519,7 @@ void main() {
       ),
       reviewDataEnabled: false,
       checkoutQuoteAdapter: quote,
+      customerStateStore: _MemoryCustomerStateStore('test-payment-eligibility'),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
@@ -3088,6 +4030,16 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        if (!invalid) {
+          await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('buy-upi-order-qr')),
+            180,
+            scrollable: find.descendant(
+              of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+        }
         expect(
           find.byKey(const ValueKey('buy-upi-order-qr')),
           invalid ? findsNothing : findsOne,
@@ -3268,6 +4220,9 @@ void main() {
     () async {
       final fixture = await _openProductionCheckout(
         outcome: BuyV2OrderPlacementOutcome.failed,
+        customerStateStore: _MemoryCustomerStateStore(
+          'delivery-note-placement',
+        ),
       );
       addTearDown(fixture.session.dispose);
       final destination = fixture.session.cartLines.first.product.destination;
@@ -3736,6 +4691,33 @@ void main() {
       test(
         'T03 pending instructions survive restart shared $shared second note $secondNote',
         () async {
+          final groupingCore = BuySession();
+          final grouping = BuyV2Session(
+            core: groupingCore,
+            productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          );
+          addTearDown(grouping.dispose);
+          addTearDown(groupingCore.dispose);
+          for (final id in ['s-tomato', 'w-notebook']) {
+            expect(grouping.addProduct(id), isTrue);
+          }
+          grouping.openCart(scope: BuyV2CartScope.all);
+          final groups = grouping.scopedCartFulfilmentGroups;
+          final lines = groups.expand((group) => group.lines).toList();
+          // Older submitted instructions are retained facts, not a new checkout.
+          final request = BuyV2OrderPlacementRequest(
+            lines: lines,
+            address: _instructionAddress,
+            paymentMethod: 'Card',
+            total: lines.fold<int>(0, (sum, line) => sum + line.total),
+            amountDueNow: lines.fold<int>(0, (sum, line) => sum + line.total),
+            idempotencyKey: 'pending-instructions-1',
+            deliveryInstructionsByProductId: {
+              's-tomato': shared ? 'Shared gate' : 'Side entrance',
+              if (shared || secondNote)
+                'w-notebook': shared ? 'Shared gate' : 'Warehouse gate',
+            },
+          );
           final store = _MemoryCustomerStateStore('pending-instructions')
             ..snapshot = BuyV2CustomerStateSnapshot(
               addresses: const [_instructionAddress],
@@ -3747,15 +4729,110 @@ void main() {
               },
               publicDeliveryInstruction: shared ? 'Shared gate' : null,
               selectedPayment: 'Card',
-              checkoutIdempotencyKey: 'pending-instructions-1',
+              checkoutIdempotencyKey: request.idempotencyKey,
+              paymentReference: 'payment-instructions-1',
+              checkoutSubmissionState: 'paymentPending',
+              legacyCheckoutAttempt: BuyV2LegacyCheckoutAttempt(
+                ownerScope: 'pending-instructions',
+                payment: BuyV2CheckoutGroupAttempt(
+                  request: request,
+                  fulfilmentKeys: groups.map((group) => group.key).toSet(),
+                  obligations: [
+                    for (final group in groups)
+                      BuyV2CheckoutFulfilmentObligation(
+                        fulfilmentKey: group.key,
+                        productIds: group.productIds.toSet(),
+                        totalMinor: group.total * 100,
+                        dueNowMinor: group.total * 100,
+                      ),
+                  ],
+                  state: BuyV2CheckoutSubmissionState.paymentPending,
+                  paymentReference: 'payment-instructions-1',
+                ),
+              ),
+            );
+          final persisted = BuyV2SharedPreferencesCustomerStateStore(
+            _R669StringPreferences(),
+            ownerScope: store.ownerScope,
+          );
+          expect(await persisted.write(store.snapshot!), isTrue);
+          store.snapshot = await persisted.read();
+          expect(store.snapshot!.paymentRecoveryIncomplete, isFalse);
+          final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+          adapter.reconciliation = BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.confirmed,
+            customerMessage: 'Original instruction payment confirmed.',
+            idempotencyKey: request.idempotencyKey,
+            purchaseReference: 'pending-instructions-purchase',
+            paymentReference: 'payment-instructions-1',
+            orders: [
+              for (final line in request.lines)
+                BuyV2Order(
+                  id: 'instruction-order-${line.product.id}',
+                  destination: line.product.destination,
+                  title: line.product.title,
+                  itemSummary: 'Original submitted product',
+                  total: line.total,
+                  partner: line.product.seller,
+                  partnerType: line.product.partnerRole,
+                  promise: line.product.deliveryPromise,
+                  destinationLabel: request.address.shortLine,
+                  recipient: request.address.recipient,
+                  addressLine: request.address.line,
+                  progress: 0,
+                  status: BuyV2OrderStatus.preparing,
+                  purchaseId: 'pending-instructions-purchase',
+                  productIds: [line.product.id],
+                  lines: [line],
+                  paymentMethod: request.paymentMethod,
+                  amountPaidNow: line.total,
+                  deliveryInstruction:
+                      request.deliveryInstructionsByProductId[line.product.id],
+                ),
+            ],
+          );
+          final keyOnlyStore = _MemoryCustomerStateStore(store.ownerScope)
+            ..snapshot = BuyV2CustomerStateSnapshot(
+              addresses: const [_instructionAddress],
+              selectedAddressId: _instructionAddress.id,
+              cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+              customDeliveryInstructions: {
+                BuyV2Destination.shop: 'Side entrance',
+                if (secondNote) BuyV2Destination.wholesale: 'Warehouse gate',
+              },
+              publicDeliveryInstruction: shared ? 'Shared gate' : null,
+              selectedPayment: 'Card',
+              checkoutIdempotencyKey: request.idempotencyKey,
               paymentReference: 'payment-instructions-1',
               checkoutSubmissionState: 'paymentPending',
             );
+          final keyOnlyCore = BuySession();
+          final keyOnly = BuyV2Session(
+            core: keyOnlyCore,
+            customerStateStore: keyOnlyStore,
+            commerceAdapter: adapter,
+            productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          );
+          addTearDown(keyOnly.dispose);
+          addTearDown(keyOnlyCore.dispose);
+          await keyOnly.restoreCustomerState();
+          expect(await keyOnly.reconcilePayment(), isFalse);
+          expect(keyOnly.checkoutRequiresResolution, isTrue);
+          expect(keyOnly.checkoutIdempotencyKey, request.idempotencyKey);
+          expect(keyOnly.confirmedOrders, isEmpty);
+          expect(
+            keyOnlyStore.snapshot!.customDeliveryInstructions,
+            store.snapshot!.customDeliveryInstructions,
+          );
+          expect(
+            keyOnlyStore.snapshot!.publicDeliveryInstruction,
+            store.snapshot!.publicDeliveryInstruction,
+          );
           final core = BuySession();
           final session = BuyV2Session(
             core: core,
             customerStateStore: store,
-            commerceAdapter: prepaidCommerceFixture(),
+            commerceAdapter: adapter,
             productFactsAdapter: _T01CDeliveryFactsAdapter(),
           );
           addTearDown(session.dispose);
@@ -7308,6 +8385,9 @@ void main() {
                 partnerType: line.product.partnerRole,
                 promise: 'Within 1 day',
                 destinationLabel: address.shortLine,
+                recipient: request.address.recipient,
+                addressLine: request.address.line,
+                amountPaidNow: line.total,
                 progress: 0,
                 status: BuyV2OrderStatus.preparing,
                 purchaseId: 'delivery-purchase',

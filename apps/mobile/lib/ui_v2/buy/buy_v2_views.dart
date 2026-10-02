@@ -124,9 +124,11 @@ String _checkoutFulfilmentCountLabel(BuyV2FulfilmentGroup group) =>
           '${_itemCountLabel(group.itemCount)}';
 
 String _checkoutDockCountLabel(BuyV2Session session) =>
-    session.collectionCheckoutSelected &&
-        session.checkoutLines.isEmpty &&
-        session.cartLines.isNotEmpty
+    !session.checkoutRecoveryAmountKnown
+    ? 'Original payment'
+    : session.collectionCheckoutSelected &&
+          session.checkoutLines.isEmpty &&
+          session.cartLines.isNotEmpty
     ? 'Cart saved'
     : session.checkoutScope == BuyV2CartScope.wholesale ||
           _containsOnlyWholesaleLines(session.checkoutLines)
@@ -10456,6 +10458,47 @@ class _CheckoutQuoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final attempt = session.checkoutPaymentAttempt;
+    if (session.checkoutRequiresResolution &&
+        attempt == null &&
+        !session.collectionCheckoutSelected) {
+      final original = session.legacyCheckoutAttempt?.payment.request;
+      final stacked =
+          original == null || MediaQuery.textScalerOf(context).scale(14) > 18;
+      return Container(
+        key: const ValueKey('buy-checkout-original-payment-totals'),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CartAmountRow(
+              label: 'Original total',
+              value: original == null
+                  ? 'Needs checking'
+                  : buyV2Money(original.total),
+              strong: true,
+              stacked: stacked,
+            ),
+            if (original != null)
+              _CartAmountRow(
+                label: 'Original amount due now',
+                value: buyV2Money(original.amountDueNow),
+                stacked: stacked,
+              ),
+            if (original != null && original.total > original.amountDueNow)
+              _CartAmountRow(
+                label: 'Balance due',
+                value: buyV2Money(original.total - original.amountDueNow),
+                stacked: stacked,
+              ),
+            Text(
+              'Check this payment before choosing again.',
+              style: context.buyMeta,
+            ),
+          ],
+        ),
+      );
+    }
     if (attempt != null) {
       final agreed = attempt.groups.fold<int>(
         0,
@@ -11209,7 +11252,19 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
     );
   }
   final group = session.currentCheckoutPaymentGroup;
+  if (session.checkoutRecoveryBlocked) {
+    return (
+      'Check payment',
+      session.checkoutBusy ? null : session.reconcilePayment,
+    );
+  }
   if (group != null) {
+    if (group.financiallyClosed) {
+      return (
+        'Review remaining checkout',
+        session.reviewRemainingGroupedCheckout,
+      );
+    }
     if (session.checkoutSubmissionState == BuyV2CheckoutSubmissionState.idle) {
       if (session.checkoutPaymentGroupReviewRequired ||
           !session.catalogueNow().isBefore(
@@ -11248,6 +11303,15 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
     }.contains(session.checkoutSubmissionState)) {
       return ('Check payment', session.reconcilePayment);
     }
+  }
+  if (session.checkoutRequiresResolution &&
+      (session.checkoutSubmissionState !=
+              BuyV2CheckoutSubmissionState.paymentActionRequired ||
+          !session.checkoutRecoveryAmountKnown)) {
+    return (
+      'Check payment',
+      session.checkoutBusy ? null : session.reconcilePayment,
+    );
   }
   final selectedPaymentAvailable =
       _buyV2CustomerPaymentChoices(
@@ -12274,60 +12338,72 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
         state == BuyV2CheckoutSubmissionState.paymentActionRequired &&
         session.paymentActionUri != null &&
         !hasPaymentHandoff;
-    final content = switch (state) {
-      BuyV2CheckoutSubmissionState.submitting => (
-        Icons.autorenew_rounded,
-        'Checking payment',
-        'Please wait. Do not start another payment.',
-      ),
-      BuyV2CheckoutSubmissionState.paymentActionRequired
-          when handoffUnavailable =>
-        (
-          Icons.cloud_off_outlined,
-          'Payment unavailable right now',
-          'Try again later, or cancel to choose another method.',
-        ),
-      BuyV2CheckoutSubmissionState.paymentActionRequired => (
-        Icons.lock_outline_rounded,
-        'Ready for secure payment',
-        'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} to MoolSocial with ${session.selectedPayment}.',
-      ),
-      BuyV2CheckoutSubmissionState.paymentPending => (
-        Icons.schedule_rounded,
-        'Payment confirmation pending',
-        'Do not pay again. Check the same payment for an update.',
-      ),
-      BuyV2CheckoutSubmissionState.paymentUnknown => (
-        Icons.help_outline_rounded,
-        'Payment status needs checking',
-        'Do not pay again until this payment has been checked.',
-      ),
-      BuyV2CheckoutSubmissionState.cancelled => (
-        Icons.cancel_outlined,
-        'Payment cancelled',
-        session.checkoutHasGroupedCommitment
-            ? 'Completed groups are kept. Check this original payment before choosing again.'
-            : 'No order was placed. Your Cart is unchanged.',
-      ),
-      BuyV2CheckoutSubmissionState.failed => (
-        Icons.error_outline_rounded,
-        'Payment not completed',
-        session.checkoutHasGroupedCommitment
-            ? 'Completed groups are kept. Check this original payment before choosing again.'
-            : 'No order was placed. Your Cart is unchanged.',
-      ),
-      BuyV2CheckoutSubmissionState.unavailable => (
-        Icons.cloud_off_outlined,
-        'Payment unavailable right now',
-        'No order was placed. Try again shortly.',
-      ),
-      BuyV2CheckoutSubmissionState.idle ||
-      BuyV2CheckoutSubmissionState.confirmed => (
-        Icons.check_circle_outline_rounded,
-        '',
-        '',
-      ),
-    };
+    final content = session.checkoutRecoveryBlocked
+        ? (
+            Icons.help_outline_rounded,
+            'Original payment needs checking',
+            'Do not pay again. Get order help for this payment.',
+          )
+        : switch (state) {
+            BuyV2CheckoutSubmissionState.submitting => (
+              Icons.autorenew_rounded,
+              'Checking payment',
+              'Please wait. Do not start another payment.',
+            ),
+            BuyV2CheckoutSubmissionState.paymentActionRequired
+                when handoffUnavailable =>
+              (
+                Icons.cloud_off_outlined,
+                'Payment unavailable right now',
+                'Check the original payment before choosing again. You can leave safely.',
+              ),
+            BuyV2CheckoutSubmissionState.paymentActionRequired => (
+              Icons.lock_outline_rounded,
+              'Ready for secure payment',
+              session.checkoutRecoveryAmountKnown
+                  ? 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} to MoolSocial with ${session.checkoutCommittedPaymentMethod}.'
+                  : 'The original amount needs checking. Do not pay again.',
+            ),
+            BuyV2CheckoutSubmissionState.paymentPending => (
+              Icons.schedule_rounded,
+              'Payment confirmation pending',
+              'Do not pay again. Check the same payment for an update.',
+            ),
+            BuyV2CheckoutSubmissionState.paymentUnknown => (
+              Icons.help_outline_rounded,
+              'Payment status needs checking',
+              'Do not pay again until this payment has been checked.',
+            ),
+            BuyV2CheckoutSubmissionState.cancelled => (
+              Icons.cancel_outlined,
+              'Payment cancelled',
+              session.checkoutHasGroupedCommitment
+                  ? 'Completed groups are kept. Check this original payment before choosing again.'
+                  : session.checkoutRequiresResolution
+                  ? 'Check the original payment before choosing again. Your Cart is retained.'
+                  : 'No order was placed. Your Cart is unchanged.',
+            ),
+            BuyV2CheckoutSubmissionState.failed => (
+              Icons.error_outline_rounded,
+              'Payment not completed',
+              session.checkoutHasGroupedCommitment
+                  ? 'Completed groups are kept. Check this original payment before choosing again.'
+                  : session.checkoutRequiresResolution
+                  ? 'Check the original payment before choosing again. Your Cart is retained.'
+                  : 'No order was placed. Your Cart is unchanged.',
+            ),
+            BuyV2CheckoutSubmissionState.unavailable => (
+              Icons.cloud_off_outlined,
+              'Payment unavailable right now',
+              'No order was placed. Try again shortly.',
+            ),
+            BuyV2CheckoutSubmissionState.idle ||
+            BuyV2CheckoutSubmissionState.confirmed => (
+              Icons.check_circle_outline_rounded,
+              '',
+              '',
+            ),
+          };
     final attention =
         handoffUnavailable ||
         state == BuyV2CheckoutSubmissionState.paymentPending ||
@@ -12335,7 +12411,7 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
         state == BuyV2CheckoutSubmissionState.failed ||
         state == BuyV2CheckoutSubmissionState.unavailable;
     final actionLabel = switch (state) {
-      BuyV2CheckoutSubmissionState.paymentActionRequired => 'Cancel',
+      BuyV2CheckoutSubmissionState.paymentActionRequired => 'Leave payment',
       BuyV2CheckoutSubmissionState.paymentPending => 'Not shown?',
       _ => null,
     };
@@ -12581,7 +12657,9 @@ class _CheckoutOrderDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (session.collectionCheckoutSelected) return const SizedBox.shrink();
-    final groups = session.checkoutFulfilmentGroups;
+    final groups = session.checkoutRecoveryAmountKnown
+        ? session.checkoutFulfilmentGroups
+        : const <BuyV2FulfilmentGroup>[];
     final selectedBenefits = session.selectedCartBenefitsFor(
       session.checkoutDestinations,
     );
@@ -12592,7 +12670,8 @@ class _CheckoutOrderDetails extends StatelessWidget {
           BuyV2PurchaseOrderPanel(session: session),
           const SizedBox(height: 8),
         ],
-        if (session.checkoutDeliveryEstimateReviewRequired)
+        if (session.checkoutDeliveryEstimateReviewRequired &&
+            !session.checkoutRequiresResolution)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(
@@ -12632,25 +12711,30 @@ class _CheckoutOrderDetails extends StatelessWidget {
           controller: gstInvoiceController,
         ),
         const SizedBox(height: 8),
-        if (session.checkoutQuoteEnabled) ...[
+        if (session.checkoutQuoteEnabled ||
+            session.checkoutRequiresResolution) ...[
           _CheckoutQuoteCard(session: session),
           const SizedBox(height: 8),
         ],
-        if (session.commercialPaymentTermsEnabled) ...[
+        if (session.commercialPaymentTermsEnabled &&
+            !session.checkoutRequiresResolution) ...[
           _CheckoutCommercialPaymentTerms(session: session),
           const SizedBox(height: 8),
         ],
         _CheckoutDeliveryInstructions(key: instructionsKey, session: session),
         const SizedBox(height: 8),
-        if (session.checkoutBenefitReviewRequired) ...[
+        if (session.checkoutBenefitReviewRequired &&
+            !session.checkoutRequiresResolution) ...[
           _CartBenefitEligibilityState(session: session),
           const SizedBox(height: 8),
         ],
-        if (session.checkoutPriceReviewRequired) ...[
+        if (session.checkoutPriceReviewRequired &&
+            !session.checkoutRequiresResolution) ...[
           _CheckoutPriceChangeReview(session: session),
           const SizedBox(height: 8),
         ],
-        if (session.checkoutPromiseReviewRequired) ...[
+        if (session.checkoutPromiseReviewRequired &&
+            !session.checkoutRequiresResolution) ...[
           _CheckoutPromiseChangeReview(session: session),
           const SizedBox(height: 8),
         ],
@@ -12667,7 +12751,8 @@ class _CheckoutOrderDetails extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (selectedBenefits.isNotEmpty) ...[
+        if (selectedBenefits.isNotEmpty &&
+            !session.checkoutRequiresResolution) ...[
           const SizedBox(height: 8),
           Container(
             key: const ValueKey('buy-checkout-confirm-benefits'),
@@ -12809,7 +12894,9 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
               final countStyle = context.buyMeta.copyWith(fontSize: 8);
               final amountText = session.collectionCheckoutSelected
                   ? _collectionCheckoutAmount(session)
-                  : buyV2Money(session.checkoutPaymentActionAmount);
+                  : session.checkoutRecoveryAmountKnown
+                  ? buyV2Money(session.checkoutPaymentActionAmount)
+                  : 'Amount needs checking';
               const amountStyle = TextStyle(
                 color: BuyV2Colors.ink,
                 fontSize: 19,
@@ -23918,35 +24005,42 @@ class _CartAmountRow extends StatelessWidget {
     required this.value,
     this.valueColor,
     this.strong = false,
+    this.stacked = false,
   });
 
   final String label;
   final String value;
   final Color? valueColor;
   final bool strong;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
+    final labelText = Text(
+      label,
+      style: strong ? context.buyBody : context.buyMeta,
+    );
+    final valueText = Text(
+      value,
+      style: TextStyle(
+        color: valueColor ?? BuyV2Colors.ink,
+        fontSize: strong ? 14 : 12,
+        fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: strong ? context.buyBody : context.buyMeta,
+      child: stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [labelText, const SizedBox(height: 2), valueText],
+            )
+          : Row(
+              children: [
+                Expanded(child: labelText),
+                valueText,
+              ],
             ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? BuyV2Colors.ink,
-              fontSize: strong ? 14 : 12,
-              fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

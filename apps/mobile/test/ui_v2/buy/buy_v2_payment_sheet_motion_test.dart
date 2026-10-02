@@ -106,6 +106,119 @@ void main() {
 
   for (final size in [const Size(320, 800), const Size(640, 360)]) {
     for (final scale in [1.0, 2.0]) {
+      for (final keyOnly in [false, true]) {
+        testWidgets(
+          'T07 recovery amount and check action fit ${size.width} text $scale keyOnly $keyOnly',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            addTearDown(tester.view.reset);
+            const address = BuyV2Address(
+              id: 't07-address',
+              kind: BuyV2AddressKind.home,
+              label: 'Home',
+              recipient: 'Test buyer',
+              phone: '9000000000',
+              line: 'Test street',
+              area: 'Jodhpur',
+              pinCode: '342003',
+              landmark: '',
+            );
+            final core = BuySession();
+            final commerce = TestLegacyRecoveryCommerce()
+              ..snapshot = testPaymentSnapshot(
+                null,
+                addresses: const [address],
+              );
+            final store = _T06WidgetCustomerState();
+            if (keyOnly) {
+              store.snapshot = const BuyV2CustomerStateSnapshot(
+                cartQuantities: {'s-tomato': 1},
+                checkoutIdempotencyKey: 'original-key-only',
+                checkoutSubmissionState: 'paymentPending',
+                addresses: [address],
+                selectedAddressId: 't07-address',
+              );
+            }
+            final session = BuyV2Session(
+              core: core,
+              commerceAdapter: commerce,
+              customerStateStore: store,
+              productFactsAdapter: const BuyTestEligibilityFacts(),
+              checkoutQuoteAdapter: TestPaymentQuote(),
+              reviewDataEnabled: false,
+            );
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            await session.restoreCommerce();
+            await session.restoreCustomerState();
+            if (!keyOnly) {
+              expect(session.addProduct('s-tomato'), isTrue);
+              session.openCart();
+              expect(session.openCheckout(), isTrue);
+              await session.refreshCheckoutQuote();
+              expect(await session.submitOrder(), isFalse);
+              expect(session.legacyCheckoutAttempt, isNotNull);
+            }
+            session.checkoutStep = BuyV2CheckoutStep.payment;
+            final gst = BuyV2GstInvoiceController();
+            addTearDown(gst.dispose);
+            await tester.pumpWidget(
+              app(
+                session,
+                textScale: scale,
+                disableAnimations: true,
+                home: RepaintBoundary(
+                  key: const ValueKey('buy-t06-group-screen'),
+                  child: Scaffold(
+                    body: BuyV2CheckoutView(
+                      session: session,
+                      gstInvoiceController: gst,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final primary = find.byKey(
+              const ValueKey('buy-checkout-primary-payment'),
+            );
+            expect(primary, findsOneWidget);
+            expect(
+              find.descendant(
+                of: primary,
+                matching: find.text('Check payment'),
+              ),
+              findsOneWidget,
+            );
+            expect(find.textContaining('Pay ₹'), findsNothing);
+            if (keyOnly) {
+              expect(find.text('Amount needs checking'), findsOneWidget);
+            } else {
+              expect(
+                session.checkoutPaymentActionAmount,
+                commerce.requests.single.amountDueNow,
+              );
+            }
+            expect(tester.takeException(), isNull);
+            await captureGroups(
+              tester,
+              't07-${size.width.toInt()}x${size.height.toInt()}-$scale-keyonly-$keyOnly',
+            );
+            await tester.tap(primary);
+            await tester.pumpAndSettle();
+            expect(commerce.requests.length, keyOnly ? 0 : 1);
+            expect(session.checkoutRequiresResolution, isTrue);
+            expect(tester.takeException(), isNull);
+            expect(tester.getSize(primary).height, greaterThanOrEqualTo(44));
+          },
+        );
+      }
+    }
+  }
+
+  for (final size in [const Size(320, 800), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
       testWidgets(
         'T06 group scopes and payment count fit ${size.width} text $scale',
         (tester) async {
