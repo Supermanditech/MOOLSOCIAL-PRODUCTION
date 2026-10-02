@@ -354,7 +354,7 @@ class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
 
 class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
   _LedgerCheckpointFixtureStore({this.creditFailure = 'none'});
-  final String creditFailure;
+  String creditFailure;
   int saveAttempts = 0;
   WorkspaceLedgerCheckpoint? value;
   @override
@@ -4490,6 +4490,130 @@ void main() {
       storeId: scope.$2, adapter: StoreReviewCustomerCollectionGateway(finance),
       checkpointStore: checkpoint), isTrue);
     return work;
+  }
+
+  for (final mode in ['normal', 'unknown', 'included', 'historical-unlinked',
+      'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape']) {
+    testWidgets('PURCHASEBILLUI saved bill confirmation $mode', (tester) async {
+      // Labelled host fixture: not runtime or physical device acceptance data.
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 9, 30);
+      final supplier = WorkspaceSupplierProfile(id: 'bill-ui-supplier', name: 'Evaluation supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      final draft = WorkspacePurchaseEntryDraft(id: 'bill-ui-draft', supplierId: supplier.id,
+        invoiceReference: 'EVAL-BILL-UI', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: [{'productId': '', 'name': 'Evaluation rice', 'pack': '1 kg', 'quantity': '2', 'cost': '50'}],
+        details: {'invoiceTotal': '100'});
+      final copy = WorkspacePurchaseSavedCopy(id: 'bill-ui-copy', storeName: 'Evaluation Store',
+        revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+      expect(copy.valid, isTrue);
+      final historical = mode == 'included' || mode == 'historical-unlinked';
+      final opening = WorkspaceSupplierOpeningRecord(id: 'bill-ui-opening', basisId: 'bill-ui-basis',
+        account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id,
+        revision: 1, asOfDate: historical ? '2026-10-01' : '2026-09-29', savedAt: at,
+        amountMinor: mode == 'unknown' ? null : mode == 'included' ? 10000 : 0,
+        supplierCredit: false, sourceNote: 'HOST evaluation balance',
+        bills: mode == 'historical-unlinked' ? const [] : [WorkspaceOpeningBillLink(copyId: copy.id,
+          copyRevision: copy.revision, draftId: draft.id, inclusion: mode == 'included'
+            ? WorkspaceOpeningBillInclusion.included : WorkspaceOpeningBillInclusion.excluded)]);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier], draft: draft,
+        copies: mode == 'historical-unlinked' ? const [] : [copy], openingRecords: [opening]);
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      if (mode != 'unknown') {
+        expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+          expectedRevision: 1, confirmedAt: DateTime.now()), isTrue, reason: work.workspaceSupplierError);
+      }
+      if (mode == 'historical-unlinked') {
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+          revision: 2, profiles: [supplier], draft: draft, copies: [copy], openingRecords: [opening]);
+        expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      }
+      if (mode == 'latest-unposted') {
+        final laterDraft = WorkspacePurchaseEntryDraft(id: 'later-bill-ui-draft', supplierId: supplier.id,
+          invoiceReference: 'EVAL-LATER-UI', invoiceDate: '01/10/2026', createdAt: at, updatedAt: at,
+          goods: draft.goods, details: draft.details);
+        final first = WorkspacePurchaseSavedCopy(id: 'later-copy-r1', storeName: copy.storeName,
+          revision: 2, savedAt: at, supplier: supplier, draft: laterDraft, labels: const {});
+        final latest = WorkspacePurchaseSavedCopy(id: 'later-copy-r2', storeName: copy.storeName,
+          revision: 3, savedAt: at, supplier: supplier, draft: laterDraft, labels: const {});
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+          revision: 3, profiles: [supplier], draft: laterDraft, copies: [copy, first, latest], openingRecords: [opening]);
+        expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      }
+      if (mode == 'other-revision') {
+        expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope,
+          expectedPurchaseRevision: 1, expectedLedgerRevision: 1,
+          openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: DateTime.now()), isTrue);
+        final revised = WorkspacePurchaseSavedCopy(id: 'bill-ui-copy-r2', storeName: copy.storeName,
+          revision: 2, savedAt: DateTime.now(), supplier: supplier, draft: draft, labels: const {});
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+          revision: 2, profiles: [supplier], draft: draft, copies: [copy, revised], openingRecords: [opening]);
+        expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      }
+      final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: mode == 'landscape' ? const Size(915, 412) : const Size(320, 568),
+        textScale: mode == 'landscape' ? 2 : 1.4);
+      await openPurchaseList(tester);
+      final selectedId = mode == 'other-revision' ? 'bill-ui-copy-r2'
+        : mode == 'latest-unposted' ? 'later-copy-r2' : copy.id;
+      if (find.byKey(ValueKey('work-purchase-copy-$selectedId')).evaluate().isEmpty) {
+        await tester.drag(find.byKey(const Key('work-purchase-search')), const Offset(0, -240));
+        await tester.pumpAndSettle();
+      }
+      await tester.ensureVisible(find.byKey(ValueKey('work-purchase-copy-$selectedId')));
+      await tester.tap(find.byKey(ValueKey('work-purchase-copy-$selectedId')));
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(const Key('work-purchase-bill-confirm'));
+      if (['unknown', 'historical-unlinked', 'other-revision'].contains(mode)) {
+        expect(confirm, findsNothing);
+        expect(work.workspaceSupplierLedger(supplier.id)?.purchaseBills.length ?? 0,
+          mode == 'other-revision' ? 1 : 0);
+      } else {
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancel').last);
+        await tester.pumpAndSettle();
+        final before = checkpoint.saveAttempts;
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        if (mode == 'changed-dialog') {
+          entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+            revision: 2, profiles: [supplier], draft: draft, copies: [copy], openingRecords: [opening]);
+          await work.loadWorkspaceSuppliers(retry: true);
+        }
+        if (mode == 'failed-save') checkpoint.creditFailure = 'before-save';
+        if (mode == 'lost-ack') checkpoint.creditFailure = 'lost-ack';
+        await tester.tap(find.byKey(const Key('work-purchase-bill-confirm-accept')));
+        await tester.pumpAndSettle();
+        if (mode == 'changed-dialog') {
+          expect(checkpoint.saveAttempts, before);
+          expect(find.text('Saved records changed. Reopen this bill before confirming.'), findsOneWidget);
+        } else if (mode == 'failed-save' || mode == 'lost-ack') {
+          expect(find.text('Supplier account status unavailable'), findsOneWidget);
+          checkpoint.creditFailure = 'none';
+          await tester.ensureVisible(find.byKey(const Key('work-purchase-bill-recover')));
+          await tester.tap(find.byKey(const Key('work-purchase-bill-recover')));
+          await tester.pumpAndSettle();
+          expect(work.workspaceSupplierLedger(supplier.id)!.purchaseBills.length, mode == 'lost-ack' ? 1 : 0);
+          expect(checkpoint.saveAttempts, before + 1);
+        } else {
+          expect(work.workspaceSupplierLedger(supplier.id)!.payableMinor, 10000);
+          expect(work.workspaceSupplierLedger(supplier.id)!.purchaseBills.length, 1,
+            reason: '${work.workspaceSupplierError} / ${find.byKey(const Key('work-purchase-bill-notice')).evaluate().map((e) => (e.widget as Text).data).join()}');
+          expect(find.text('Bill confirmed in supplier account'), findsOneWidget);
+          expect(confirm, findsNothing);
+        }
+      }
+      expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {

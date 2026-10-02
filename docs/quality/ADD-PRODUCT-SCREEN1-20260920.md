@@ -3691,3 +3691,32 @@ bill confirmation, payments/advance allocation, supplier returns/credits/refunds
 statements and actual OPPO journeys remain required. Allocation totals do not tell
 whether damaged goods were paid or free; later monetary credits must collect that
 explicitly. No native/backend/production atomicity or founder acceptance claimed.
+
+### 3 October continuation: saved-bill confirmation controls (host only)
+
+Saved purchase copies now recover scoped supplier-account evidence and distinguish
+unverified status, an exact confirmed copy and a different confirmed revision.
+The Purchases list no longer hardcodes Not posted. Write availability only gates
+actions; it cannot turn a known confirmed bill into an unposted bill. New
+confirmation is offered only for the exact latest reviewed copy. A compact
+Cancel/Confirm dialog explains new liability, already-in-opening treatment or
+zero-total confirmation; it never receives goods or records supplier payment.
+Changed records during the dialog reject with reopen guidance. Failed/uncertain
+saves require recovery; a committed lost reply recovers the confirmed bill with
+no second write. Confirmation uses the immutable posted opening assertion.
+
+26 focused widget checks pass, zero failures/skips, native exit0 and JSON
+done.success=true: ten PURCHASEBILLUI cases plus existing opening, reviewed-copy,
+next-purchase and recovery coverage. Includes 320px enlarged text and 915px
+landscape at2.0 text, unknown balance, exact historical inclusion, later historical
+bill without binding, different accepted revision, latest unposted revision,
+failed save, lost acknowledgement and changed dialog. Task reporter
+`purchase-bill-confirmation-ui-20261003-v2.jsonl`, SHA256
+`68A9CFB19B01525A4C8E0EDFC48CE9B3FF2D27F32F10DE83EB6519A73EAB0A79`.
+First analysis/fixture failures are retained in regression entry4635.
+
+No OPPO or runtime acceptance yet. A historical bill discovered after opening
+confirmation remains explicitly blocked pending an accounting-correction journey;
+it cannot silently amend the posted opening. Receiving independent of bills,
+unit/prior-Stock review, payments/advance allocation, returns/credits/refunds,
+statements and the complete device correction cycle remain open in this goal.

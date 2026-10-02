@@ -11467,6 +11467,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       setState(() { _loading = false; _error = 'This saved purchase copy is unavailable. Return to Purchases and retry.'; });
       return;
     }
+    if (copy != null) {
+      await session.recoverCustomerLedger();
+      if (!mounted || !_current) return;
+    }
     if (widget.startNew && copy == null && !session.workspacePurchaseDraftReviewed) {
       setState(() { _loading = false; _error = 'Finish and save the current purchase copy before starting another bill. Return to Purchases to resume it.'; });
       return;
@@ -13061,10 +13065,102 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         Row(children: [const Expanded(child: Text('Purchase copy',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
           TextButton(key: const Key('work-purchase-copy-close'), onPressed: _back, child: const Text('Close'))]),
-        Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision} · Not posted to books',
+        Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision}',
           style: const TextStyle(fontSize: 11, color: _paperMuted)),
+        _savedBillActions(copy),
         ...(_sourceAttachment == null ? _reviewPurchase(height) : _reviewOriginal(height)),
       ]);
+  }
+  WorkspaceOpeningBillInclusion? _billTreatment(WorkspacePurchaseSavedCopy copy,
+      WorkspaceSupplierLedger ledger) {
+    final opening = ledger.openingRecord;
+    final day = copy.draft.invoiceIssuedDay;
+    if (opening == null || day == null) return null;
+    final links = opening.bills.where((link) => link.draftId == copy.draft.id).toList();
+    if (links.isNotEmpty) {
+      final link = links.singleOrNull;
+      return link != null && link.copyId == copy.id && link.copyRevision == copy.revision &&
+          link.inclusion != WorkspaceOpeningBillInclusion.unknown ? link.inclusion : null;
+    }
+    final date = DateTime.parse(opening.asOfDate);
+    return day.isAfter(DateTime.utc(date.year, date.month, date.day))
+      ? WorkspaceOpeningBillInclusion.excluded : null;
+  }
+  Widget _savedBillActions(WorkspacePurchaseSavedCopy copy) {
+    final session = widget.session;
+    final ready = session.workspaceInvoiceHistoryLoaded;
+    final ledger = ready ? session.workspaceSupplierLedger(copy.supplier.id) : null;
+    final accepted = ledger?.purchaseBills[copy.draft.id];
+    final same = accepted != null && jsonEncode(accepted.copy.toJson()) == jsonEncode(copy.toJson());
+    final treatment = ledger == null ? null : _billTreatment(copy, ledger);
+    final latest = session.workspaceLatestPurchaseCopies.where((item) => item.draft.id == copy.draft.id).toList();
+    final latestExact = latest.length == 1 && jsonEncode(latest.single.toJson()) == jsonEncode(copy.toJson());
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(!ready ? 'Supplier account status unavailable'
+        : same ? 'Bill confirmed in supplier account'
+        : accepted != null ? 'Another saved revision is confirmed · this copy is not posted'
+        : 'Not posted to books', key: const Key('work-purchase-bill-status'),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+      if (same) const Text('Stock receipt and supplier payment are recorded separately.',
+        style: TextStyle(fontSize: 11, color: _paperMuted)),
+      if (session.workspaceSupplierOpeningConfirmationAvailable && !ready)
+        TextButton(key: const Key('work-purchase-bill-recover'),
+          onPressed: _busy ? null : () => _load(retry: true), child: const Text('Retry supplier account')),
+      if (ready && accepted == null && treatment == null)
+        Text(ledger?.openingRecord == null
+          ? 'Purchases → Opening dues: confirm this supplier’s starting balance. Confirm zero only if there are no earlier dues or advances.'
+          : 'This earlier bill is not linked to the confirmed starting balance. Confirmation is blocked until a separate accounting correction is reviewed; the saved bill is kept unchanged.',
+          style: const TextStyle(fontSize: 11, color: _paperMuted)),
+      if (ready && accepted == null && !latestExact)
+        const Text('Open the latest saved revision to confirm this bill.',
+          style: TextStyle(fontSize: 11, color: _paperMuted)),
+      if (ready && accepted == null && treatment != null && latestExact &&
+          session.workspaceSupplierOpeningConfirmationAvailable)
+        TextButton.icon(key: const Key('work-purchase-bill-confirm'),
+          onPressed: _busy || session.workspaceSupplierSaving ? null : () => _confirmSavedBill(copy),
+          icon: const Icon(Icons.check_circle_outline, size: 18), label: const Text('Confirm bill in supplier account')),
+      if (_notice != null) Text(_notice!, key: const Key('work-purchase-bill-notice'),
+        style: const TextStyle(fontSize: 12, color: _paperInk)),
+    ]);
+  }
+  Future<void> _confirmSavedBill(WorkspacePurchaseSavedCopy copy) async {
+    final session = widget.session;
+    final scope = _scope;
+    final ledger = session.workspaceSupplierLedger(copy.supplier.id);
+    if (_busy || !_current || scope == null ||
+        !session.workspaceInvoiceHistoryLoaded || ledger == null) { return; }
+    final treatment = _billTreatment(copy, ledger);
+    if (treatment == null) return;
+    final bookRevision = session.workspacePurchaseEntryRevision;
+    if (bookRevision == null) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Confirm supplier bill?'),
+      content: Text(treatment == WorkspaceOpeningBillInclusion.included
+        ? 'This bill is already included in the confirmed starting balance. Confirming it will not add the amount again. Stock and payments stay unchanged.'
+        : WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal']) == 0
+          ? 'This zero-total bill will be recorded without adding an amount owed. Stock and payments stay unchanged.'
+          : 'This bill will be recorded in the supplier account. Its invoice total adds to the amount owed; Stock and payments stay unchanged.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(key: const Key('work-purchase-bill-confirm-accept'),
+          onPressed: () => Navigator.pop(context, true), child: const Text('Confirm bill'))]));
+    if (!mounted || !_current) return;
+    setState(() => _busy = false);
+    if (confirmed != true) return;
+    if (session.workspacePurchaseEntryRevision != bookRevision ||
+        session.workspaceSupplierLedger(copy.supplier.id)?.revision != ledger.revision) {
+      setState(() => _notice = 'Saved records changed. Reopen this bill before confirming.');
+      return;
+    }
+    setState(() { _busy = true; _notice = null; });
+    final saved = await session.confirmWorkspacePurchaseBill(copy, scope: scope,
+      expectedPurchaseRevision: bookRevision, expectedLedgerRevision: ledger.revision,
+      openingTreatment: treatment, confirmedAt: DateTime.now());
+    if (!mounted || !_current) return;
+    setState(() { _busy = false;
+      _notice = saved ? 'Bill confirmed. No goods or payment recorded.'
+        : session.workspaceSupplierError ?? 'Confirmation status needs recovery. Retry the supplier account before confirming again.'; });
   }
   Widget _goodsRow(int index) {
     final line = _goods[index];
@@ -14310,6 +14406,12 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             if (index <= savedCopies.length) {
               final copy = savedCopies[index - 1];
               final amount = WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal'] ?? '');
+              final accepted = session.workspaceInvoiceHistoryLoaded
+                ? session.workspaceSupplierLedger(copy.supplier.id)?.purchaseBills[copy.draft.id] : null;
+              final postingStatus = !session.workspaceInvoiceHistoryLoaded ? 'Supplier status not checked'
+                : accepted == null ? 'Not posted'
+                : jsonEncode(accepted.copy.toJson()) == jsonEncode(copy.toJson())
+                  ? 'Bill confirmed' : 'Different revision confirmed';
               return InkWell(key: ValueKey('work-purchase-copy-${copy.id}'),
                 onTap: () {
                   if (!session.workspaceSuppliersLoaded || !session.workspacePurchaseCopies.contains(copy) ||
@@ -14325,7 +14427,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
                     Text('${copy.draft.invoiceReference} · ${copy.draft.invoiceDate}',
                       style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-                    Row(children: [Expanded(child: Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision} · Not posted',
+                    Row(children: [Expanded(child: Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision} · $postingStatus',
                       style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
                       const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy)]),
                     const Divider(height: 1),
