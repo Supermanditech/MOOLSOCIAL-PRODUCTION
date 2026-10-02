@@ -835,6 +835,197 @@ class WorkSession extends ChangeNotifier {
   WorkspaceSupplierOpeningRecord? workspaceSupplierOpeningRecord(
     String supplierId,
   ) => _supplierDirectories[_supplierKey]?.openingRecordFor(supplierId);
+  bool get workspaceSupplierOpeningConfirmationAvailable =>
+      !_disposed && !_productionSession && _supplierKey?.$3 == true &&
+      _supplierStorage is WorkPurchaseEntryRevisionGuard &&
+      _storeData.ledgerCheckpointStore != null &&
+      _storeData.customerCollectionGateway is StoreReviewCustomerCollectionGateway;
+
+  /// Confirm saved opening evidence in the existing financial checkpoint.
+  /// Review-only until an authoritative production supplier adapter is connected.
+  /// Saving the evidence alone never posts it or changes Stock.
+  Future<bool> confirmWorkspaceSupplierOpeningRecord(
+    WorkspaceSupplierOpeningRecord record, {
+    required (String, String, bool) scope,
+    required int expectedRevision,
+    required DateTime confirmedAt,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key) || _supplierNeedsReload.contains(key) ||
+        !record.valid || record.account != key.$1 || record.store != key.$2 ||
+        record.qa != key.$3 ||
+        _supplierStorage is! WorkPurchaseEntryRevisionGuard ||
+        data.customerCollectionGateway is! StoreReviewCustomerCollectionGateway) {
+      return false;
+    }
+    bool reject(String message) {
+      if (_supplierKey == key) {
+        _supplierValidationErrors[key] = message;
+        notifyListeners();
+      }
+      return false;
+    }
+
+    // Reserve the purchase book while awaiting checkpoint recovery/save. This
+    // prevents confirmation of evidence superseded by a simultaneous edit.
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(data, _storeData)) {
+        return false;
+      }
+      final previous = data.supplierLedgers[(key.$1, record.supplierId)];
+      if (previous != null) {
+        if (previous.openingRecord != null &&
+            jsonEncode(previous.openingRecord!.toJson()) == jsonEncode(record.toJson()) &&
+            !data.staleSupplierLedgers.contains((key.$1, record.supplierId))) {
+          return true; // Saved response was lost: acknowledge, never post twice.
+        }
+        return reject('This supplier already has posted records. Keep them unchanged; a starting balance cannot replace its account.');
+      }
+      final guarded = _supplierStorage as WorkPurchaseEntryRevisionGuard;
+      return await guarded.withReviewedBook(key.$1, key.$2, qa: key.$3,
+        expectedRevision: expectedRevision, action: (book) async {
+          if (_disposed || _supplierKey != key || !identical(data, _storeData)) return false;
+          final saved = book.openingRecordFor(record.supplierId);
+          final supplier = book.profiles
+              .where((p) => p.id == record.supplierId).firstOrNull;
+          if (saved == null || supplier == null ||
+              jsonEncode(saved.toJson()) != jsonEncode(record.toJson())) {
+            return reject('Opening details changed. Reopen the supplier and review the latest saved balance.');
+          }
+          final localConfirmation = confirmedAt.toLocal();
+          final confirmationDay = DateTime(localConfirmation.year,
+              localConfirmation.month, localConfirmation.day);
+          final openingDay = DateTime.tryParse(record.asOfDate);
+          if (openingDay == null || openingDay.isAfter(confirmationDay)) {
+            return reject('Starting date cannot be after the date you confirm the balance.');
+          }
+          final copies = book.latestReviewedCopies
+              .where((c) => c.supplier.id == record.supplierId).toList();
+          if (copies.length != record.bills.length ||
+              copies.any((copy) => record.bills.where((link) =>
+                link.copyId == copy.id && link.copyRevision == copy.revision &&
+                link.draftId == copy.draft.id &&
+                link.inclusion != WorkspaceOpeningBillInclusion.unknown).length != 1)) {
+            return reject('For each saved supplier bill, confirm whether it is already included in this starting balance.');
+          }
+          final opening = WorkspaceSupplierLedger.confirmedOpening(record,
+            accountScope: key.$1, workspaceId: key.$2,
+            supplierId: supplier.id, supplierName: supplier.name,
+            qa: key.$3, confirmedAt: confirmedAt);
+          if (opening == null) {
+            return reject('Check the saved amount and bill inclusion before confirming. An unknown balance cannot be posted.');
+          }
+          return saveWorkspaceSupplierLedger(opening);
+        });
+    } on Object {
+      _supplierNeedsReload.add(key);
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      return reject('Balance confirmation needs recovery. Reopen Purchases; your saved records are kept.');
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) notifyListeners();
+    }
+  }
+
+  /// Accept the exact reviewed bill into the supplier account, without receipt
+  /// or payment effects. Production requires the future authoritative adapter.
+  Future<bool> confirmWorkspacePurchaseBill(
+    WorkspacePurchaseSavedCopy copy, {
+    required (String, String, bool) scope,
+    required int expectedPurchaseRevision,
+    required int expectedLedgerRevision,
+    required WorkspaceOpeningBillInclusion openingTreatment,
+    required DateTime confirmedAt,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope ||
+        !workspaceSupplierOpeningConfirmationAvailable ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key) || _supplierNeedsReload.contains(key) ||
+        !copy.valid) {
+      return false;
+    }
+    bool reject(String message) {
+      if (!_disposed && _supplierKey == key) {
+        _supplierValidationErrors[key] = message;
+        notifyListeners();
+      }
+      return false;
+    }
+    // Freeze nested document data before awaiting recovery or store queues.
+    final bill = WorkspaceSupplierBillAcceptance(copy: copy,
+      acceptedAt: confirmedAt, openingTreatment: openingTreatment);
+    if (!bill.valid) {
+      return reject('Check the supplier invoice number, date, items and invoice total before confirming the bill.');
+    }
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(data, _storeData)) {
+        return false;
+      }
+      final ledger = workspaceSupplierLedger(bill.copy.supplier.id);
+      if (ledger == null || ledger.openingRecord == null) {
+        return reject('Confirm this supplier’s opening balance first. Confirm zero if there are no earlier dues or advances.');
+      }
+      for (final other in _supplierLedgerCheckpointEntries(data).values) {
+        if (other.supplierId != ledger.supplierId && other.purchaseBills.containsKey(bill.billId)) {
+          return reject('This bill is already confirmed for another supplier. Reopen its saved supplier account; do not record it twice.');
+        }
+      }
+      final accepted = ledger.purchaseBills[bill.billId];
+      if (accepted != null) {
+        return jsonEncode(accepted.copy.toJson()) == jsonEncode(bill.copy.toJson()) &&
+            accepted.openingTreatment == bill.openingTreatment
+            ? true : reject('This bill is already confirmed with different details. Its accounting record has been kept unchanged.');
+      }
+      if (ledger.revision != expectedLedgerRevision) {
+        return reject('Supplier account changed. Reopen it before confirming the bill.');
+      }
+      final guarded = _supplierStorage as WorkPurchaseEntryRevisionGuard;
+      return await guarded.withReviewedBook(key.$1, key.$2, qa: key.$3,
+        expectedRevision: expectedPurchaseRevision, action: (book) async {
+          if (_disposed || _supplierKey != key || !identical(data, _storeData)) {
+            return false;
+          }
+          final latest = book.latestReviewedCopies.where((item) =>
+            item.draft.id == bill.billId).toList();
+          if (latest.length != 1 ||
+              jsonEncode(latest.single.toJson()) != jsonEncode(bill.copy.toJson()) ||
+              book.duplicateInvoice(bill.copy.draft) != null) {
+            return reject('Saved bill changed or its invoice number is already used. Reopen Purchases and review the latest copy.');
+          }
+          final next = ledger.acceptReviewedBill(bill,
+            expectedRevision: expectedLedgerRevision);
+          if (next == null) {
+            return reject('Check this bill’s starting-balance inclusion and supplier account. No Stock, payment or dues were changed.');
+          }
+          return saveWorkspaceSupplierLedger(next);
+        });
+    } on Object {
+      _supplierNeedsReload.add(key);
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      return reject('Bill confirmation needs recovery. Reopen Purchases to check its saved status before trying again.');
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) {
+        notifyListeners();
+      }
+    }
+  }
+
   Future<bool> saveWorkspaceSupplierOpeningRecord(
     WorkspaceSupplierOpeningRecord record, {
     required (String, String, bool) scope,

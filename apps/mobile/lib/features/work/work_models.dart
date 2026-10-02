@@ -1903,6 +1903,8 @@ class WorkspaceLedgerCheckpoint {
             entry.value.accountScope == finance.accountScope &&
             entry.value.workspaceId == finance.workspaceId,
       ) &&
+      supplierLedgers.values.expand((ledger) => ledger.purchaseBills.keys).toSet().length ==
+          supplierLedgers.values.fold<int>(0, (count, ledger) => count + ledger.purchaseBills.length) &&
       billedInvoices.length == billedOrders.length &&
       billedInvoices.entries.every(
         (entry) =>
@@ -2617,37 +2619,56 @@ class WorkspaceReceiptDraft {
 
 enum WorkspaceSupplierEntryKind { bill, advance, payment, creditNote, refund }
 
+/// The document that authorizes a supplier accounting fact. A manual bill or
+/// supplier advance must never manufacture a MoolSocial order identity.
+enum WorkspaceSupplierEntryOrigin {
+  moolSocialOrder,
+  manualPurchase,
+  supplierAccount,
+}
+
 /// Confirmed supplier money facts. Orders and receipts are deliberately not
 /// financial entries; receiving a shipment cannot create another bill/payment.
 class WorkspaceSupplierLedgerEntry {
   const WorkspaceSupplierLedgerEntry({
     required this.operationId,
-    required this.orderId,
     required this.reference,
     required this.kind,
     required this.amountMinor,
     required this.postedAt,
+    this.orderId,
+    this.purchaseId,
+    this.origin = WorkspaceSupplierEntryOrigin.moolSocialOrder,
     this.billId,
     this.paymentMethod,
   });
 
-  final String operationId, orderId, reference;
-  final String? billId, paymentMethod;
+  final String operationId, reference;
+  final String? orderId, purchaseId, billId, paymentMethod;
+  final WorkspaceSupplierEntryOrigin origin;
   final WorkspaceSupplierEntryKind kind;
   final int amountMinor;
   final DateTime postedAt;
 
   bool get valid =>
-      [
-        operationId,
-        orderId,
-        reference,
-      ].every((value) => value.trim().isNotEmpty) &&
+      [operationId, reference].every((value) => value.trim().isNotEmpty) &&
+      _validOrigin &&
       amountMinor > 0 &&
       _financeAmountValid(amountMinor) &&
       (paymentMethod == null || paymentMethod!.trim().isNotEmpty) &&
       (billId == null || billId!.trim().isNotEmpty) &&
       (kind != WorkspaceSupplierEntryKind.bill || billId != null);
+
+  bool get _validOrigin => switch (origin) {
+    WorkspaceSupplierEntryOrigin.moolSocialOrder =>
+      orderId?.trim().isNotEmpty == true && purchaseId == null,
+    WorkspaceSupplierEntryOrigin.manualPurchase =>
+      purchaseId?.trim().isNotEmpty == true && orderId == null,
+    WorkspaceSupplierEntryOrigin.supplierAccount =>
+      orderId == null &&
+          purchaseId == null &&
+          kind != WorkspaceSupplierEntryKind.bill,
+  };
 
   int get payableDeltaMinor => switch (kind) {
     WorkspaceSupplierEntryKind.bill ||
@@ -2660,6 +2681,9 @@ class WorkspaceSupplierLedgerEntry {
   Map<String, Object?> toJson() => {
     'operationId': operationId,
     'orderId': orderId,
+    if (origin != WorkspaceSupplierEntryOrigin.moolSocialOrder)
+      'origin': origin.name,
+    if (purchaseId != null) 'purchaseId': purchaseId,
     'reference': reference,
     'billId': billId,
     if (paymentMethod != null) 'paymentMethod': paymentMethod,
@@ -2667,6 +2691,63 @@ class WorkspaceSupplierLedgerEntry {
     'amountMinor': amountMinor,
     'postedAt': postedAt.toUtc().toIso8601String(),
   };
+}
+
+/// Immutable bill acceptance, independent of receipt and payment. The supplier
+/// document is frozen here; editing a saved copy cannot rewrite posted books.
+class WorkspaceSupplierBillAcceptance {
+  WorkspaceSupplierBillAcceptance({
+    required WorkspacePurchaseSavedCopy copy,
+    required this.acceptedAt,
+    required this.openingTreatment,
+  }) : copy = WorkspacePurchaseSavedCopy.fromJson(
+         jsonDecode(jsonEncode(copy.toJson())));
+
+  final WorkspacePurchaseSavedCopy copy;
+  final DateTime acceptedAt;
+  final WorkspaceOpeningBillInclusion openingTreatment;
+  String get billId => copy.draft.id;
+  int? get amountMinor =>
+      WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal']);
+  bool get addsLiability =>
+      openingTreatment == WorkspaceOpeningBillInclusion.excluded &&
+      (amountMinor ?? 0) > 0;
+  bool get valid => copy.valid && copy.draft.invoiceReference.trim().isNotEmpty &&
+      copy.draft.invoiceIssuedDay != null &&
+      amountMinor != null && amountMinor! >= 0 &&
+      _financeAmountValid(amountMinor!) &&
+      openingTreatment != WorkspaceOpeningBillInclusion.unknown &&
+      !acceptedAt.isBefore(copy.savedAt) &&
+      copy.draft.goods.isNotEmpty &&
+      copy.draft.goods.every((line) =>
+        (line['name'] ?? '').trim().isNotEmpty &&
+        (line['pack'] ?? '').trim().isNotEmpty &&
+        RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(line['quantity'] ?? '') &&
+        RegExp(r'[1-9]').hasMatch(line['quantity'] ?? '') &&
+        WorkspacePurchaseEntryDraft.printedPaise(line['cost']) != null &&
+        WorkspacePurchaseEntryDraft.printedPaise(line['cost'])! >= 0) &&
+      WorkspacePurchaseEntryDraft.reviewAmounts(copy.draft.details).isEmpty;
+
+  Map<String, Object?> toJson() => {
+    'copy': copy.toJson(), 'acceptedAt': acceptedAt.toUtc().toIso8601String(),
+    'openingTreatment': openingTreatment.name,
+  };
+  static WorkspaceSupplierBillAcceptance fromJson(Object? raw) {
+    const keys = {'copy', 'acceptedAt', 'openingTreatment'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid accepted purchase bill');
+    }
+    final result = WorkspaceSupplierBillAcceptance(
+      copy: WorkspacePurchaseSavedCopy.fromJson(raw['copy']),
+      acceptedAt: DateTime.parse(raw['acceptedAt'] as String),
+      openingTreatment: WorkspaceOpeningBillInclusion.values.byName(
+        raw['openingTreatment'] as String),
+    );
+    if (!result.valid) {
+      throw const FormatException('Invalid accepted purchase bill');
+    }
+    return result;
+  }
 }
 
 /// A supplier-scoped projection, supplied independently of fulfilment facts.
@@ -2683,7 +2764,10 @@ class WorkspaceSupplierLedger {
     required List<WorkspaceSupplierLedgerEntry> entries,
     required this.historyComplete,
     this.openingBalanceMinor,
-  }) : entries = List.unmodifiable(entries);
+    this.openingRecord,
+    Map<String, WorkspaceSupplierBillAcceptance> purchaseBills = const {},
+  }) : entries = List.unmodifiable(entries),
+       purchaseBills = Map.unmodifiable(purchaseBills);
 
   final String accountScope, workspaceId, supplierId, supplierName;
   final int revision;
@@ -2691,6 +2775,44 @@ class WorkspaceSupplierLedger {
   final List<WorkspaceSupplierLedgerEntry> entries;
   final bool historyComplete;
   final int? openingBalanceMinor;
+  /// Exact reviewed evidence retained by a confirmed opening, not a mutable
+  /// pointer to the supplier's newest unposted record.
+  final WorkspaceSupplierOpeningRecord? openingRecord;
+  final Map<String, WorkspaceSupplierBillAcceptance> purchaseBills;
+
+  static WorkspaceSupplierLedger? confirmedOpening(
+    WorkspaceSupplierOpeningRecord record, {
+    required String accountScope,
+    required String workspaceId,
+    required String supplierId,
+    required String supplierName,
+    required bool qa,
+    required DateTime confirmedAt,
+  }) {
+    if (!record.valid ||
+        record.amountMinor == null ||
+        record.account != accountScope ||
+        record.store != workspaceId ||
+        record.supplierId != supplierId ||
+        record.qa != qa ||
+        confirmedAt.isBefore(record.savedAt)) {
+      return null;
+    }
+    final result = WorkspaceSupplierLedger(
+      accountScope: accountScope,
+      workspaceId: workspaceId,
+      supplierId: supplierId,
+      supplierName: supplierName,
+      revision: 1,
+      asOf: confirmedAt,
+      historyComplete: true,
+      openingBalanceMinor:
+          record.supplierCredit ? -record.amountMinor! : record.amountMinor!,
+      openingRecord: record,
+      entries: const [],
+    );
+    return result.valid ? result : null;
+  }
 
   Map<String, Object?> toJson() => {
     'accountScope': accountScope,
@@ -2700,6 +2822,9 @@ class WorkspaceSupplierLedger {
     'revision': revision,
     'asOf': asOf.toUtc().toIso8601String(),
     'openingBalanceMinor': openingBalanceMinor,
+    if (openingRecord != null) 'openingRecord': openingRecord!.toJson(),
+    if (purchaseBills.isNotEmpty) 'purchaseBills': purchaseBills.map(
+      (id, bill) => MapEntry(id, bill.toJson())),
     'historyComplete': historyComplete,
     'entries': entries.map((entry) => entry.toJson()).toList(),
   };
@@ -2709,6 +2834,9 @@ class WorkspaceSupplierLedger {
       return null;
     }
     try {
+      if (value.containsKey('purchaseBills') && value['purchaseBills'] is! Map) {
+        return null;
+      }
       final result = WorkspaceSupplierLedger(
         accountScope: value['accountScope'] as String,
         workspaceId: value['workspaceId'] as String,
@@ -2717,12 +2845,25 @@ class WorkspaceSupplierLedger {
         revision: value['revision'] as int,
         asOf: DateTime.parse(value['asOf'] as String),
         openingBalanceMinor: value['openingBalanceMinor'] as int?,
+        openingRecord: value.containsKey('openingRecord')
+            ? WorkspaceSupplierOpeningRecord.fromJson(value['openingRecord'])
+            : null,
         historyComplete: value['historyComplete'] as bool,
+        purchaseBills: {
+          for (final entry in ((value['purchaseBills'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceSupplierBillAcceptance.fromJson(entry.value),
+        },
         entries: [
           for (final entry in value['entries'] as List)
             WorkspaceSupplierLedgerEntry(
               operationId: entry['operationId'] as String,
-              orderId: entry['orderId'] as String,
+              orderId: entry['orderId'] as String?,
+              purchaseId: entry['purchaseId'] as String?,
+              origin: entry.containsKey('origin')
+                  ? WorkspaceSupplierEntryOrigin.values.byName(
+                      entry['origin'] as String,
+                    )
+                  : WorkspaceSupplierEntryOrigin.moolSocialOrder,
               reference: entry['reference'] as String,
               billId: entry['billId'] as String?,
               paymentMethod: entry['paymentMethod'] as String?,
@@ -2749,6 +2890,8 @@ class WorkspaceSupplierLedger {
       ].every((value) => value.trim().isNotEmpty) &&
       revision > 0 &&
       _amountsValid &&
+      _openingProofValid &&
+      _purchaseBillsValid &&
       entries.every((entry) => entry.valid && !entry.postedAt.isAfter(asOf)) &&
       entries.map((entry) => entry.operationId).toSet().length ==
           entries.length &&
@@ -2760,6 +2903,40 @@ class WorkspaceSupplierLedger {
           entries
               .where((entry) => entry.kind == WorkspaceSupplierEntryKind.bill)
               .length;
+
+  bool get _openingProofValid {
+    final opening = openingRecord;
+    if (opening == null) return true; // Preserve legacy projections as-is.
+    return opening.valid &&
+        opening.amountMinor != null &&
+        opening.account == accountScope &&
+        opening.store == workspaceId &&
+        opening.supplierId == supplierId &&
+        historyComplete &&
+        !opening.savedAt.isAfter(asOf) &&
+        openingBalanceMinor ==
+            (opening.supplierCredit
+                ? -opening.amountMinor!
+                : opening.amountMinor!) &&
+        opening.bills.every(
+          (bill) =>
+              bill.copyId.trim().isNotEmpty &&
+              bill.draftId.trim().isNotEmpty &&
+              bill.copyRevision > 0 &&
+              bill.inclusion != WorkspaceOpeningBillInclusion.unknown,
+        ) &&
+        !entries.any(
+          (entry) =>
+              entry.kind == WorkspaceSupplierEntryKind.bill &&
+              entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
+              opening.bills.any(
+                (bill) =>
+                    (bill.copyId == entry.purchaseId ||
+                        bill.draftId == entry.billId) &&
+                    bill.inclusion == WorkspaceOpeningBillInclusion.included,
+              ),
+        );
+  }
 
   bool get _amountsValid {
     if (openingBalanceMinor != null &&
@@ -2774,6 +2951,90 @@ class WorkspaceSupplierLedger {
       }
     }
     return true;
+  }
+
+  bool get _purchaseBillsValid {
+    if (purchaseBills.isEmpty) {
+      return true; // Preserve pre-acceptance checkpoint bytes and projections.
+    }
+    final opening = openingRecord;
+    if (opening == null || !historyComplete || purchaseBills.length > 1000) {
+      return false;
+    }
+    final parsedCutoff = DateTime.parse(opening.asOfDate);
+    final cutoff = DateTime.utc(parsedCutoff.year, parsedCutoff.month, parsedCutoff.day);
+    final references = purchaseBills.values.map((bill) => (
+      bill.copy.draft.invoiceFinancialYear,
+      bill.copy.draft.invoiceReference.trim().toUpperCase(),
+    ));
+    if (references.toSet().length != purchaseBills.length) {
+      return false;
+    }
+    return purchaseBills.entries.every((item) {
+      final bill = item.value;
+      if (item.key != bill.billId || !bill.valid ||
+          bill.copy.supplier.id != supplierId || bill.acceptedAt.isAfter(asOf)) {
+        return false;
+      }
+      final links = opening.bills.where((link) => link.draftId == bill.billId);
+      final exactLink = links.length == 1 &&
+          links.single.copyId == bill.copy.id &&
+          links.single.copyRevision == bill.copy.revision &&
+          links.single.inclusion == bill.openingTreatment;
+      final historical = !bill.copy.draft.invoiceIssuedDay!.isAfter(cutoff);
+      final acceptedLocal = bill.acceptedAt.toLocal();
+      if (bill.copy.draft.invoiceIssuedDay!.isAfter(DateTime.utc(
+          acceptedLocal.year, acceptedLocal.month, acceptedLocal.day))) {
+        return false;
+      }
+      // On/before the starting date needs an exact, explicit opening assertion.
+      // A date alone never proves the bill is included in the starting amount.
+      if ((historical && !exactLink) ||
+          (!historical && bill.openingTreatment != WorkspaceOpeningBillInclusion.excluded) ||
+          (links.isNotEmpty && !exactLink)) {
+        return false;
+      }
+      final financial = entries.where((entry) =>
+        entry.kind == WorkspaceSupplierEntryKind.bill && entry.billId == bill.billId);
+      if (!bill.addsLiability) {
+        return financial.isEmpty;
+      }
+      return financial.length == 1 &&
+          financial.single.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
+          financial.single.purchaseId == bill.copy.id &&
+          financial.single.amountMinor == bill.amountMinor &&
+          financial.single.reference == bill.copy.draft.invoiceReference &&
+          financial.single.postedAt == bill.acceptedAt;
+    });
+  }
+
+  WorkspaceSupplierLedger? acceptReviewedBill(
+    WorkspaceSupplierBillAcceptance bill, {required int expectedRevision}) {
+    if (!valid || !bill.valid || bill.copy.supplier.id != supplierId) {
+      return null;
+    }
+    final previous = purchaseBills[bill.billId];
+    if (previous != null) {
+      return jsonEncode(previous.toJson()) == jsonEncode(bill.toJson()) ? this : null;
+    }
+    if (expectedRevision != revision) {
+      return null;
+    }
+    final next = WorkspaceSupplierLedger(accountScope: accountScope,
+      workspaceId: workspaceId, supplierId: supplierId, supplierName: supplierName,
+      revision: revision + 1,
+      asOf: bill.acceptedAt.isAfter(asOf) ? bill.acceptedAt : asOf,
+      historyComplete: historyComplete, openingBalanceMinor: openingBalanceMinor,
+      openingRecord: openingRecord, purchaseBills: {...purchaseBills, bill.billId: bill},
+      entries: [...entries, if (bill.addsLiability) WorkspaceSupplierLedgerEntry(
+        operationId: 'manual-bill:${bill.billId}',
+        reference: bill.copy.draft.invoiceReference,
+        origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+        purchaseId: bill.copy.id, billId: bill.billId,
+        kind: WorkspaceSupplierEntryKind.bill,
+        amountMinor: bill.amountMinor!, postedAt: bill.acceptedAt)],
+    );
+    return next.valid && next.canFollow(this) ? next : null;
   }
 
   int? get balanceMinor =>
@@ -2825,6 +3086,8 @@ class WorkspaceSupplierLedger {
       entries: [...entries, entry],
       historyComplete: historyComplete,
       openingBalanceMinor: openingBalanceMinor,
+      openingRecord: openingRecord,
+      purchaseBills: purchaseBills,
     );
     return next.valid && next.canFollow(this) ? next : null;
   }
@@ -2838,6 +3101,8 @@ class WorkspaceSupplierLedger {
         revision < previous.revision ||
         asOf.isBefore(previous.asOf) ||
         openingBalanceMinor != previous.openingBalanceMinor ||
+        jsonEncode(openingRecord?.toJson()) !=
+            jsonEncode(previous.openingRecord?.toJson()) ||
         (previous.historyComplete && !historyComplete) ||
         entries.length < previous.entries.length) {
       return false;
@@ -2848,8 +3113,14 @@ class WorkspaceSupplierLedger {
         return false;
       }
     }
+    for (final entry in previous.purchaseBills.entries) {
+      if (jsonEncode(purchaseBills[entry.key]?.toJson()) != jsonEncode(entry.value.toJson())) {
+        return false;
+      }
+    }
     return revision > previous.revision ||
         (entries.length == previous.entries.length &&
+            purchaseBills.length == previous.purchaseBills.length &&
             historyComplete == previous.historyComplete &&
             asOf == previous.asOf &&
             supplierName == previous.supplierName);
@@ -6013,7 +6284,7 @@ class WorkspacePurchaseEntryDraft {
         printedTaxRows = List.unmodifiable(printedTaxRows.map((row) => Map<String, String>.unmodifiable(row)));
   final String id, supplierId, invoiceReference, invoiceDate;
   /// Parsed only for bill-identity checks; the printed date stays unchanged.
-  int? get invoiceFinancialYear {
+  DateTime? get invoiceIssuedDay {
     final value = invoiceDate.trim();
     final indian = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(value);
     final iso = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
@@ -6025,7 +6296,11 @@ class WorkspacePurchaseEntryDraft {
     if (year < 1900 || year > 9999 || date.year != year || date.month != month || date.day != day) {
       return null;
     }
-    return month < 4 ? year - 1 : year;
+    return date;
+  }
+  int? get invoiceFinancialYear {
+    final date = invoiceIssuedDay;
+    return date == null ? null : (date.month < 4 ? date.year - 1 : date.year);
   }
   final DateTime createdAt, updatedAt;
   final List<Map<String, String>> goods;

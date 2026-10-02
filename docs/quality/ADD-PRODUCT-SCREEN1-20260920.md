@@ -3565,3 +3565,65 @@ checkpoint does not qualify them. Backend portability and cloud retention remain
 unverified. Next device session must restore persisted scope/IDs; model-shape
 changes may require a debug restart, not a nullable fallback or app-data clear.
 No phone inspection, tap, attach or reload while its reported call remains open.
+
+### Purchase end-to-end bounded goal — founder authority, 3 October 2026
+
+Actor: Retailer/Grocery Store owner recording an existing supplier balance,
+goods and supplier bills in either order, then payments or supplier returns.
+Classification: mvp_supporting, necessary to make the existing purchase journey
+usable rather than stopping at a Not posted record. Latest explicit founder
+goal supersedes the earlier unposted-only restriction for this scope only.
+Authority and complete31-source decision remain in the founder task workspace:
+outputs/founder-purchase-end-to-end-goal-20261003.json and
+work/purchase-end-to-end-decision-20261003.json. This paragraph is not acceptance.
+
+Reuse verified current owners: work_models.dart supplier ledger/opening records,
+purchase book and stock-entry provenance; work_session.dart scoped purchase
+CAS and stock/financial checkpoints; work_services.dart encrypted purchase and
+inventory stores; existing Purchases, opening editor and purchase form; existing
+atomic and layout-safety tests. No new route, separate supplier app or backend.
+
+Source-confirmed gaps: purchase book and inventory have separate encrypted keys
+and serialization queues; purchase CAS alone does not atomically post Stock.
+Supplier ledger entries currently require a genuine orderId, so manual purchase
+records cannot reuse that restriction by inventing a MoolSocial order identity.
+Saved opening evidence is not posted; unknown amount cannot become zero.
+
+Implementation dependency order and acceptance units:
+
+1. P04 posting foundation: durable scoped operation identity and recovery; explicit
+   confirmation of known opening dues/advance and exact historical bill inclusion.
+   Same-content retry posts once; changed-content operation reuse rejects.
+2. P05/P08: accept a reviewed manual bill independently of receipt; full/partial
+   accepted goods, shortages, damage and pending quantities. Catalogue/manual/CSV
+   stock entered earlier must link exact original quantities/movements and cannot
+   add stock again. Bill later must not create another liability already included
+   in an opening position. Unknown overlap requires review, not silent posting.
+3. P09: record supplier payment or advance separately from actual money transfer;
+   apply available advance/credit to exact bills without a second balance effect.
+   Outstanding amount and next action remain visible when goods are pending.
+4. P10: supplier goods return, supplier credit and received refund have distinct
+   stock/accounting effects. Partial limits and prior allocations remain linked.
+5. P11: supplier account and purchase statement reconcile posted originals,
+   corrections, allocations and remaining goods/money; reopen/restart continuity.
+
+Money uses bounded integer minor units. Bill, Goods and Payment states derive
+from durable facts, not optimistic UI success. Unknown legacy values stay unknown.
+Scope is account/Store/QA; original copies, opening versions, stock-entry facts
+and evaluation identities remain unchanged. Corrections retain history and linked
+references. A durable interrupted-posting strategy is required before enabling
+stock and financial writes; concurrent sales cannot be overwritten by recovery.
+
+Tests: explicit zero/unknown/owed/advance openings, excluded/included/unconfirmed
+historical bills, goods-before-bill/bill-before-goods, all three stock entry paths,
+partial/damaged receiving, payments/advance reuse, supplier returns/credits/refunds,
+duplicate/retry/collision, failed saves/lost replies/restart, wrong-scope rejection
+and exact reconciliation. Host fixtures never count as real-user device evidence.
+
+Bounded review sequence: implement and test; restore latest debug preview on free
+OPPO; capture every impacted parent/child; assess visual and technical defects;
+register children; one bounded correction cycle; reload/retest; safe local Git
+checkpoint; stop for founder review. Existing approved layouts stay intact.
+No APK/native OCR, auth bypass, backend/integration, actual money transfer, other
+worktree mutation, broad merge, release or push. Integration/native-dependent
+checks remain explicitly parked, not passed. Current goal is active/incomplete.

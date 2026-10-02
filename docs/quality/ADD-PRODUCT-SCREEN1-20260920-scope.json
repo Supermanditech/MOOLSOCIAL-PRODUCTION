@@ -80,6 +80,24 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Retailer completes opening supplier position, bill/receipt linkage, payment/advance and supplier return reconciliation without duplicate stock or debt.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "719AFF302CBF47A1B5DB865DBFF709D0EEC7D0D1D1CED1DC9FF12DB1F6EBD547",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "newScreens": [], "newRoutes": [], "newBackendOwners": [],
+      "necessityProof": "Existing purchase book saves unposted copies/openings; inventory uses a separate encrypted key. Existing supplier financial entries require genuine orderId. Add scoped durable posting/recovery to existing owners, allowing explicit manual bill identities and exact prior-stock allocations, not fake platform orders or duplicate ledger/screen owners.",
+      "robustnessCoverage": ["Unknown/zero and confirmed opening owed/advance", "Exact historical inclusion and bill identity/revisions", "Goods-before-bill/bill-before-goods and all three previous stock-entry paths", "Partial/short/damaged goods and payment/credit/refund limits", "Idempotent retry, changed-content collision, failed save/lost reply/restart and scope isolation", "Supplier reconciliation and impacted UI/keyboard/large-text/landscape device checks"],
+      "adjustments": ["Preserve old unposted records; enable posting only after explicit confirmation", "Durable recovery before cross-store stock/accounting effects", "Reuse existing Purchases/editor and approved layouts"],
+      "explicitExclusions": ["No APK/native OCR, backend/account integration, real transfer, broad merge or release", "No other-tree mutation, push or runtime injection for acceptance"],
+      "dependenciesAndApprovals": ["Founder bounded active goal 3 October; complete31-source decision and fresh Check", "Architect plan review and repeated-preflight review; independent local/device/founder evidence"],
+      "timelineImpactDays": 1, "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "priorP04C01SelectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "P04-C01: retailer saves, reopens and explicitly corrects an unposted supplier opening record with exact supporting bill-copy assertions; no duplicate stock or payable.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
       "manifestSha256": "908212D34C46CD2EB364EF549F089B85A778E8F5B9456AB64EAD09F47282E883",
@@ -138,10 +156,17 @@
   },
   "ticket": {
     "id": "UAW-ADD-PRODUCT-SCREEN1-20260920",
-    "customerOutcome": "P04-C01: saved/reviewable/correctable supplier opening record, Not posted, with exact supporting bill-copy revisions; no duplicate stock or debt.",
+    "customerOutcome": "Retailer completes confirmed opening supplier dues/advance, bills and goods in either order, supplier payments and returns with exact reconciliation and no duplicate stock/debt.",
     "classification": "mvp_supporting",
-    "classificationReason": "Necessary onboarding and late-bill evidence dependency using existing encrypted purchase owners; not a financial posting engine or release.",
+    "classificationReason": "Necessary complete purchase bookkeeping journey behind existing frontend owners; current explicit founder goal permits bounded posting, not backend integration or release.",
     "minimumCompleteScope": [
+      "Durable scoped posting identity/recovery; explicitly confirmed opening position and exact bill inclusion",
+      "Reviewed manual bill identity, partial/short/damaged receiving and exact already-stocked allocation across Catalogue/manual/CSV",
+      "Supplier payment, advance/credit allocations, goods returns and monetary credits/refunds as separate effects",
+      "Bill/Goods/Payment next actions, supplier account/reconciliation and restart continuity on existing approved screens",
+      "Local tests, OPPO reload/screenshots, defect listing and bounded fixes, reload/retest and safe checkpoint then founder review"
+    ],
+    "priorP04C01MinimumCompleteScope": [
       "Reuse Purchases inline supplier context, encrypted purchase book/CAS/write lock; no new route or service",
       "Capture cutoff, known or unknown INR magnitude, owed/credit direction and source note separately from bill payments/stock",
       "Save/reopen/correct with one current supplier basis and immutable revisions plus exact reviewed-copy relationships",
@@ -161,7 +186,7 @@
       "2 October founder continuation P05-R12 only: immutable reviewed purchase-copy snapshots in existing encrypted scoped book; existing Purchases/preview/download; draft-save and legacy compatibility; local tests then OPPO hot reload. No posting, backend or new APK authority."
     ],
     "explicitExclusions": [
-      "No financial/receipt posting, full P04 reconciliation or P08/P09 implementation, global release replacement or new ownership",
+      "No global release replacement, unclaimed owners, fabricated platform identities or unconfirmed legacy posting; old unposted-only restriction retained in prior P04 assessment and superseded only by the 3 October explicit goal",
       "No device interaction during OPPO call, APK, backend, other-tree change or push",
       "CSV batch-review redesign pending its screenwise approval",
       "Backend",
@@ -169,12 +194,12 @@
       "Counter Sale work unrelated to the 31 grouped r66.38 findings, directly related child defects, or founder bounded extension v1 printing/history/photos"
     ],
     "dependenciesAndApprovals": [
-      "Founder CONTINUE NEXT; exact P04-C01 reuse and architect review complete, fresh thirty-source founder-input Check before source edits",
+      "Founder bounded active end-to-end purchase goal 3 October; exact reuse and architect review complete, fresh31-source founder-input Check before source edits",
       "C11/P03 actual device variants remain open until observed; latest connection is not acceptance"
     ],
     "testAndEvidencePlan": [
       "Explicit Store scope, continuation/incremental/regression-memory gates; unchanged global release and owner claims",
-      "Opening-record codec, retained revisions/exact copy assertions, unknown/zero, retry/restart/stale/scope and no stock/money effects; focused analysis",
+      "Unknown/zero and opening inclusion; partial receipts/exact prior stock, payment/advance/return/refund reconciliation; durable interrupted-save recovery, retry/collision/restart/stale/scope; focused analysis",
       "Actual three-path and late-bill unchanged quantity checks on free OPPO; scoped local Git checkpoint, no false closure"
     ]
   },
@@ -197,6 +222,14 @@
     "externalServiceWriteAuthorized": false
   },
   "nextCandidate": {
+    "id": "P04-P11-BOUNDED-PURCHASE-JOURNEY",
+    "state": "selected_frontend_goal_implementation_and_device_review_pending",
+    "customerOutcome": "Complete supplier opening, bill/goods timing, payments and returns without duplicate stock/debt; reload/audit/fix/reload then founder review.",
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "deferred": ["Backend/account/Restock integration", "Native OCR next APK", "Actual money transfer and production promotion"]
+  },
+  "priorP04C01NextCandidate": {
     "id": "P04-C01",
     "state": "selected_unposted_frontend_dependency_device_acceptance_pending",
     "customerOutcome": "Save/reopen/correct unposted supplier opening records and exact reviewed-bill assertions without stock/dues posting.",

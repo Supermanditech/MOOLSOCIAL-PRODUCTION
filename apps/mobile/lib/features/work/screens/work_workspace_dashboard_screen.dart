@@ -13186,6 +13186,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
       _busy = false,
       _leaving = false;
   String _baseline = '';
+  bool _postingRecovered = false;
   WorkspaceSupplierOpeningRecord? _viewed, _attempt;
   WorkSession get session => widget.session;
   bool get _current =>
@@ -13206,6 +13207,76 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     _scope = session.workspaceSupplierScope;
     _revision = session.workspacePurchaseEntryRevision;
     _baseline = _input;
+    if (session.workspaceSupplierOpeningConfirmationAvailable) {
+      unawaited(_recoverPosting());
+    }
+  }
+
+  Future<void> _recoverPosting() async {
+    final recovered = await session.recoverCustomerLedger();
+    if (!mounted || !_current) {
+      return;
+    }
+    setState(() {
+      _postingRecovered = recovered;
+      if (recovered && !_editing) {
+        _error = null;
+      }
+      if (!recovered) {
+        _error = session.customerLedgerRecoveryError ??
+            'Supplier account could not be opened. Saved records are kept; try again.';
+      }
+    });
+  }
+
+  bool get _posted {
+    final proof = _supplierId == null ? null :
+        session.workspaceSupplierLedger(_supplierId!)?.openingRecord;
+    return _postingRecovered && proof != null && _viewed != null &&
+        jsonEncode(proof.toJson()) == jsonEncode(_viewed!.toJson());
+  }
+
+  Future<void> _confirmOpening() async {
+    final record = _viewed;
+    if (_busy || _editing || !_current || record == null || _revision == null ||
+        !session.workspaceSupplierOpeningConfirmationAvailable) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    try {
+      final confirmed = await showDialog<bool>(context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm opening balance?'),
+          content: Text('${record.amountMinor == null ? 'Amount not known' : _purchaseAmount(record.amountMinor!)} · '
+            '${record.supplierCredit ? 'Advance / credit with supplier' : 'You owe the supplier'}\n'
+            'This adds the starting balance to the supplier account. It does not add Stock or record a payment.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+            FilledButton(key: const Key('work-opening-confirm-accept'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm balance')),
+          ],
+        ));
+      if (confirmed != true || !mounted || !_current) {
+        return;
+      }
+      final saved = await session.confirmWorkspaceSupplierOpeningRecord(record,
+        scope: _scope!, expectedRevision: _revision!, confirmedAt: DateTime.now());
+      if (!mounted || !_current) {
+        return;
+      }
+      setState(() {
+        _postingRecovered = session.workspaceInvoiceHistoryLoaded;
+        _error = saved ? null : session.workspaceSupplierError ??
+          'Balance confirmation was not completed. Reopen the saved supplier account before trying again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   @override
@@ -13426,9 +13497,10 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 color: MoolColors.navy,
               ),
             ),
-            const Text(
-              'Not posted',
-              style: TextStyle(
+            Text(
+              _posted ? 'Confirmed in supplier account' : 'Not posted',
+              key: const Key('work-opening-posting-status'),
+              style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: MoolColors.ink,
@@ -13445,9 +13517,10 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
             ),
           ],
         ),
-        const Text(
-          'Record your starting amount with a supplier. Saving does not change current dues, Stock or payments.',
-          style: TextStyle(fontSize: 12, color: MoolColors.ink),
+        Text(
+          _posted ? 'The confirmed starting balance is kept in the supplier account. Stock and payments are unchanged.' :
+          'Save the starting amount, check supporting bills, then confirm the balance in the supplier account. Saving alone does not change dues, Stock or payments.',
+          style: const TextStyle(fontSize: 12, color: MoolColors.ink),
         ),
         if (!_current)
           const Text(
@@ -13496,7 +13569,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
               initialValue: _viewed?.revision,
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Saved version · Not posted',
+                labelText: 'Saved version',
                 filled: false,
               ),
               items: [
@@ -13684,7 +13757,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                         : 'Save opening record',
                   ),
                 )
-              else if (_viewed ==
+              else if (!_posted && _viewed ==
                   session.workspaceSupplierOpeningRecord(_supplierId!))
                 TextButton(
                   key: const Key('work-opening-correct'),
@@ -13699,8 +13772,28 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                         }),
                   child: const Text('Correct record'),
                 ),
+              if (!_editing && !_posted && _viewed != null &&
+                  _viewed == session.workspaceSupplierOpeningRecord(_supplierId!) &&
+                  session.workspaceSupplierOpeningConfirmationAvailable)
+                FilledButton(
+                  key: const Key('work-opening-confirm'),
+                  onPressed: usable && _postingRecovered && _known &&
+                      _viewed == session.workspaceSupplierOpeningRecord(_supplierId!) &&
+                      _viewed!.bills.every((b) => b.inclusion != WorkspaceOpeningBillInclusion.unknown)
+                      ? _confirmOpening : null,
+                  child: Text(_busy ? 'Confirming…' : 'Confirm opening balance'),
+                ),
+              if (!_postingRecovered && session.workspaceSupplierOpeningConfirmationAvailable)
+                TextButton(key: const Key('work-opening-recover'),
+                  onPressed: usable ? _recoverPosting : null,
+                  child: const Text('Reopen supplier account')),
             ],
           ),
+          if (!_editing && !_posted && _viewed != null &&
+              session.workspaceSupplierOpeningConfirmationAvailable &&
+              (!_known || _viewed!.bills.any((b) => b.inclusion == WorkspaceOpeningBillInclusion.unknown)))
+            const Text('Choose Correct record to check the amount and which bills are included before confirming.',
+              style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         ],
       ],
     );

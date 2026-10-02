@@ -1341,6 +1341,16 @@ abstract interface class WorkPurchaseEntryStore {
   Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision});
 }
 
+/// Local confirmation must share the purchase writer's serialization boundary.
+/// Production needs equivalent authoritative transaction semantics, not this lock.
+abstract interface class WorkPurchaseEntryRevisionGuard {
+  Future<bool> withReviewedBook(String account, String store, {
+    required bool qa,
+    required int expectedRevision,
+    required Future<bool> Function(WorkspacePurchaseEntryBook book) action,
+  });
+}
+
 /// App-private originals. No public upload, product-photo identity or accounting effect.
 class WorkPurchaseInvoiceCapture {
   WorkPurchaseInvoiceCapture({required this.currentScope, WorkProofPicker? picker,
@@ -1736,7 +1746,8 @@ class WorkPurchaseInvoiceSuggestions {
 
 /// Uses the existing encrypted, serialized, revision-checked checkpoint pattern.
 /// Contacts never share an inventory or financial-journal key.
-class SecureWorkPurchaseEntryStore implements WorkPurchaseEntryStore {
+class SecureWorkPurchaseEntryStore
+    implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
   final String? Function() accountScope;
@@ -1775,6 +1786,20 @@ class SecureWorkPurchaseEntryStore implements WorkPurchaseEntryStore {
   @override
   Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) =>
     _serial(_key(account, store, qa), () => _read(account, store, qa));
+  @override
+  Future<bool> withReviewedBook(String account, String store, {
+    required bool qa,
+    required int expectedRevision,
+    required Future<bool> Function(WorkspacePurchaseEntryBook book) action,
+  }) => _serial(_key(account, store, qa), () async {
+    final book = await _read(account, store, qa);
+    if (book == null || book.revision != expectedRevision) return false;
+    // action may write the separate ledger checkpoint, but must not recursively
+    // read/save this purchase store. Other instances' purchase writes queue here.
+    final saved = await action(book);
+    _check(account, store);
+    return saved;
+  });
   @override
   Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision}) async {
     final bytes = jsonEncode(directory.toJson());

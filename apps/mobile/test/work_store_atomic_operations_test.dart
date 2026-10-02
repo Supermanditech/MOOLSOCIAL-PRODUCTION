@@ -3752,6 +3752,633 @@ void main() {
     );
   });
 
+  // Automated contract evidence only. No evaluation records are injected into
+  // the phone, and these cases do not qualify the actual purchase-entry flow.
+  WorkspaceSupplierLedger? confirmedOpeningFixture(
+    WorkspaceSupplierOpeningRecord record, {
+    String account = 'account-A',
+    String store = 'store-A',
+    String supplier = 'private-supplier-A',
+    bool qa = true,
+    DateTime? at,
+  }) => WorkspaceSupplierLedger.confirmedOpening(
+    record,
+    accountScope: account,
+    workspaceId: store,
+    supplierId: supplier,
+    supplierName: 'Automated supplier fixture',
+    qa: qa,
+    confirmedAt: at ?? DateTime.utc(2026, 10, 3),
+  );
+
+  test('PURCHASEPOST confirmed opening distinguishes zero dues and advance', () {
+    for (final (amount, credit, balance) in [
+      (0, false, 0),
+      (50000, false, 50000),
+      (50000, true, -50000),
+    ]) {
+      final record = openingFixture(amount: amount, credit: credit);
+      final ledger = confirmedOpeningFixture(record)!;
+      expect(ledger.valid, isTrue);
+      expect(ledger.balanceMinor, balance);
+      expect(ledger.entries, isEmpty);
+      expect(ledger.openingRecord!.toJson(), record.toJson());
+      final restored = WorkspaceSupplierLedger.fromJson(
+        jsonDecode(jsonEncode(ledger.toJson())),
+      )!;
+      expect(restored.toJson(), ledger.toJson());
+      expect(restored.payableMinor, credit ? 0 : amount);
+      expect(restored.creditMinor, credit ? amount : 0);
+    }
+  });
+
+  test('PURCHASEPOST unknown opening and unreviewed inclusion cannot post', () {
+    expect(confirmedOpeningFixture(openingFixture()), isNull);
+    final known = openingFixture(amount: 50000);
+    expect(confirmedOpeningFixture(known, account: 'account-B'), isNull);
+    expect(confirmedOpeningFixture(known, store: 'store-B'), isNull);
+    expect(confirmedOpeningFixture(known, supplier: 'supplier-B'), isNull);
+    expect(confirmedOpeningFixture(known, qa: false), isNull);
+    expect(confirmedOpeningFixture(known, at: DateTime.utc(2026, 10, 1)), isNull);
+    final unreviewed = openingFixture(amount: 50000, bills: [
+      const WorkspaceOpeningBillLink(
+        copyId: 'reviewed-copy-A', copyRevision: 2,
+        draftId: 'manual-draft-A',
+        inclusion: WorkspaceOpeningBillInclusion.unknown,
+      ),
+    ]);
+    expect(confirmedOpeningFixture(unreviewed), isNull);
+  });
+
+  test('PURCHASEPOST opening proof prevents duplicate liability and rewriting', () {
+    final record = openingFixture(amount: 50000);
+    final opening = confirmedOpeningFixture(record)!;
+    final bill = WorkspaceSupplierLedgerEntry(
+      operationId: 'included-bill-operation',
+      origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+      purchaseId: 'reviewed-copy-A',
+      billId: 'supplier-bill-A', reference: 'SUPPLIER-INV-A',
+      kind: WorkspaceSupplierEntryKind.bill,
+      amountMinor: 50000, postedAt: DateTime.utc(2026, 10, 3),
+    );
+    expect(opening.appendConfirmed(bill, expectedRevision: 1), isNull);
+    final duplicate = {...opening.toJson(), 'entries': [bill.toJson()]};
+    expect(WorkspaceSupplierLedger.fromJson(duplicate), isNull);
+    final excluded = openingFixture(amount: 50000, bills: [
+      const WorkspaceOpeningBillLink(copyId: 'reviewed-copy-A',
+        copyRevision: 2, draftId: 'manual-draft-A',
+        inclusion: WorkspaceOpeningBillInclusion.excluded),
+    ]);
+    final separate = confirmedOpeningFixture(excluded)!;
+    final posted = separate.appendConfirmed(bill, expectedRevision: 1)!;
+    expect(posted.balanceMinor, 100000);
+    expect(posted.openingRecord!.toJson(), excluded.toJson());
+    expect(posted.appendConfirmed(bill, expectedRevision: 1), same(posted));
+    final lostProof = WorkspaceSupplierLedger.fromJson({
+      ...posted.toJson(), 'openingRecord': null,
+    });
+    expect(lostProof, isNull);
+    final legacyWithoutProof = WorkspaceSupplierLedger.fromJson({
+      for (final entry in posted.toJson().entries)
+        if (entry.key != 'openingRecord') entry.key: entry.value,
+    })!;
+    expect(legacyWithoutProof.canFollow(posted), isFalse);
+    final changedProof = WorkspaceSupplierLedger.fromJson({
+      ...posted.toJson(),
+      'openingRecord': {...excluded.toJson(), 'sourceNote': 'Changed later'},
+    })!;
+    expect(changedProof.canFollow(posted), isFalse);
+    expect(WorkspaceSupplierLedger.fromJson({
+      ...opening.toJson(), 'openingBalanceMinor': 0,
+    }), isNull);
+  });
+
+  test('PURCHASEPOST later copy cannot repost a bill included in opening balance', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000))!;
+    final laterCopy = WorkspaceSupplierLedgerEntry(
+      operationId: 'later-copy-operation',
+      origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+      purchaseId: 'reviewed-copy-A-revision-3',
+      billId: 'manual-draft-A',
+      reference: 'SUPPLIER-INV-A',
+      kind: WorkspaceSupplierEntryKind.bill,
+      amountMinor: 50000,
+      postedAt: DateTime.utc(2026, 10, 3),
+    );
+    expect(opening.appendConfirmed(laterCopy, expectedRevision: 1), isNull);
+    expect(WorkspaceSupplierLedger.fromJson({
+      ...opening.toJson(), 'entries': [laterCopy.toJson()],
+    }), isNull);
+    final excluded = confirmedOpeningFixture(openingFixture(amount: 50000,
+      bills: [const WorkspaceOpeningBillLink(copyId: 'reviewed-copy-A',
+        copyRevision: 2, draftId: 'manual-draft-A',
+        inclusion: WorkspaceOpeningBillInclusion.excluded)]))!;
+    final posted = excluded.appendConfirmed(laterCopy, expectedRevision: 1)!;
+    expect(posted.balanceMinor, 100000);
+    final nextCopy = WorkspaceSupplierLedgerEntry(
+      operationId: 'next-copy-operation',
+      origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+      purchaseId: 'reviewed-copy-A-revision-4',
+      billId: laterCopy.billId, reference: laterCopy.reference,
+      kind: laterCopy.kind, amountMinor: laterCopy.amountMinor,
+      postedAt: laterCopy.postedAt,
+    );
+    expect(posted.appendConfirmed(nextCopy, expectedRevision: 2), isNull);
+    expect(posted.appendConfirmed(laterCopy, expectedRevision: 1), same(posted));
+    expect(posted.openingRecord!.toJson(), excluded.openingRecord!.toJson());
+  });
+
+  WorkspaceSupplierBillAcceptance acceptanceFixture({
+    String id = 'reviewed-copy-A', String draftId = 'manual-draft-A',
+    String date = '2026-09-30', String total = '500.00',
+    String reference = 'EVAL-P-001',
+    WorkspaceOpeningBillInclusion treatment = WorkspaceOpeningBillInclusion.included,
+  }) {
+    final base = copyFixture();
+    final draft = WorkspacePurchaseEntryDraft.fromJson({...base.draft.toJson(),
+      'id': draftId, 'invoiceDate': date, 'invoiceReference': reference,
+      'details': {'invoiceTotal': total}});
+    return WorkspaceSupplierBillAcceptance(copy: WorkspacePurchaseSavedCopy(
+      id: id, storeName: base.storeName, revision: base.revision,
+      savedAt: base.savedAt, supplier: base.supplier, draft: draft, labels: base.labels),
+      acceptedAt: DateTime.utc(2026, 10, 3), openingTreatment: treatment);
+  }
+
+  test('PURCHASEPOST included and zero bills retain acceptance without new debt', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000))!;
+    final bill = acceptanceFixture();
+    final posted = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    expect(posted.balanceMinor, 50000);
+    expect(posted.entries, isEmpty);
+    expect(posted.purchaseBills.values.single.copy.toJson(), bill.copy.toJson());
+    expect(posted.acceptReviewedBill(bill, expectedRevision: 1), same(posted));
+    final zero = acceptanceFixture(id: 'free-copy', draftId: 'free-bill',
+      date: '2026-10-02', total: '0', reference: 'FREE-1',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    final next = posted.acceptReviewedBill(zero, expectedRevision: 2)!;
+    expect(next.entries, isEmpty);
+    expect(next.purchaseBills.length, 2);
+    expect(next.balanceMinor, 50000);
+    expect(WorkspaceSupplierLedger.fromJson(next.toJson())!.toJson(), next.toJson());
+  });
+
+  test('PURCHASEPOST excluded bill posts exact debt and newer copy cannot repost', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final bill = acceptanceFixture(id: 'new-copy', draftId: 'new-bill',
+      date: '02/10/2026', total: '2840.75',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    final posted = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    expect(posted.balanceMinor, 284075);
+    expect(posted.entries.single.purchaseId, 'new-copy');
+    expect(posted.entries.single.billId, 'new-bill');
+    expect(posted.entries.single.orderId, isNull);
+    final changed = acceptanceFixture(id: 'newer-copy', draftId: 'new-bill',
+      date: '02/10/2026', total: '2840.75',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    expect(posted.acceptReviewedBill(changed, expectedRevision: 2), isNull);
+    final duplicateNumber = acceptanceFixture(id: 'another-copy', draftId: 'another-bill',
+      date: '02/10/2026', total: '2840.75',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    expect(posted.acceptReviewedBill(duplicateNumber, expectedRevision: 2), isNull);
+    expect(opening.acceptReviewedBill(bill, expectedRevision: 2), isNull);
+  });
+
+  test('PURCHASEPOST acceptance cannot omit or change its linked debt', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final bill = acceptanceFixture(id: 'new-copy', draftId: 'new-bill',
+      date: '2026-10-02', treatment: WorkspaceOpeningBillInclusion.excluded);
+    final posted = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    expect(WorkspaceSupplierLedger.fromJson({...posted.toJson(), 'entries': []}), isNull);
+    expect(WorkspaceSupplierLedger.fromJson({...posted.toJson(),
+      'entries': [{...posted.entries.single.toJson(), 'amountMinor': 49999}]}), isNull);
+    final dropped = WorkspaceSupplierLedger.fromJson({
+      for (final entry in posted.toJson().entries)
+        if (entry.key != 'purchaseBills') entry.key: entry.value,
+    })!;
+    expect(dropped.canFollow(posted), isFalse);
+    final payment = WorkspaceSupplierLedgerEntry(operationId: 'supplier-payment',
+      reference: 'PAY-1', origin: WorkspaceSupplierEntryOrigin.supplierAccount,
+      kind: WorkspaceSupplierEntryKind.payment, amountMinor: 1000,
+      postedAt: DateTime.utc(2026, 10, 3));
+    final next = posted.appendConfirmed(payment, expectedRevision: 2)!;
+    expect(next.purchaseBills['new-bill']!.toJson(), bill.toJson());
+    expect(next.balanceMinor, 49000);
+  });
+
+  test('PURCHASEPOST old bills need exact cutoff proof; unknown is not zero', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    expect(opening.acceptReviewedBill(acceptanceFixture(), expectedRevision: 1), isNull);
+    expect(opening.acceptReviewedBill(acceptanceFixture(date: '2026-10-01',
+      treatment: WorkspaceOpeningBillInclusion.excluded), expectedRevision: 1), isNull);
+    expect(opening.acceptReviewedBill(acceptanceFixture(date: '2026-10-02'),
+      expectedRevision: 1), isNull);
+    expect(opening.acceptReviewedBill(acceptanceFixture(date: '2026-10-04',
+      treatment: WorkspaceOpeningBillInclusion.excluded), expectedRevision: 1), isNull);
+    expect(acceptanceFixture(total: '').valid, isFalse);
+    expect(acceptanceFixture(total: '-1').valid, isFalse);
+    expect(acceptanceFixture(date: '31/02/2026').valid, isFalse);
+    expect(acceptanceFixture(treatment: WorkspaceOpeningBillInclusion.unknown).valid, isFalse);
+  });
+
+  test('PURCHASEPOST manual bill and supplier advance need no invented order', () {
+    final at = DateTime.utc(2026, 10, 3);
+    final bill = WorkspaceSupplierLedgerEntry(
+      operationId: 'manual-bill-operation',
+      purchaseId: 'reviewed-manual-copy',
+      origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+      billId: 'manual-bill',
+      reference: 'SUPPLIER-INV-1',
+      kind: WorkspaceSupplierEntryKind.bill,
+      amountMinor: 200000,
+      postedAt: at,
+    );
+    final advance = WorkspaceSupplierLedgerEntry(
+      operationId: 'advance-operation',
+      origin: WorkspaceSupplierEntryOrigin.supplierAccount,
+      reference: 'ADVANCE-1',
+      paymentMethod: 'Cash',
+      kind: WorkspaceSupplierEntryKind.advance,
+      amountMinor: 50000,
+      postedAt: at,
+    );
+    final ledger = WorkspaceSupplierLedger(
+      accountScope: 'account-A',
+      workspaceId: 'store-A',
+      supplierId: 'supplier-A',
+      supplierName: 'Automated supplier fixture',
+      revision: 1,
+      asOf: at,
+      historyComplete: true,
+      openingBalanceMinor: 0,
+      entries: [bill, advance],
+    );
+    expect(ledger.valid, isTrue);
+    expect(ledger.payableMinor, 150000);
+    expect(bill.orderId, isNull);
+    expect(advance.orderId, isNull);
+    final restored = WorkspaceSupplierLedger.fromJson(
+      jsonDecode(jsonEncode(ledger.toJson())),
+    )!;
+    expect(restored.toJson(), ledger.toJson());
+    expect(restored.entries.first.purchaseId, 'reviewed-manual-copy');
+    expect(restored.entries.last.origin,
+        WorkspaceSupplierEntryOrigin.supplierAccount);
+    expect(restored.appendConfirmed(bill, expectedRevision: 1), same(restored));
+    final changedSource = WorkspaceSupplierLedgerEntry(
+      operationId: bill.operationId,
+      orderId: 'unrelated-platform-order',
+      billId: bill.billId,
+      reference: bill.reference,
+      kind: bill.kind,
+      amountMinor: bill.amountMinor,
+      postedAt: at,
+    );
+    expect(restored.appendConfirmed(changedSource, expectedRevision: 1), isNull);
+  });
+
+  test('PURCHASEPOST source identity cannot be ambiguous or silently inferred', () {
+    final at = DateTime.utc(2026, 10, 3);
+    WorkspaceSupplierLedgerEntry entry({
+      WorkspaceSupplierEntryOrigin origin =
+          WorkspaceSupplierEntryOrigin.moolSocialOrder,
+      String? order,
+      String? purchase,
+      WorkspaceSupplierEntryKind kind = WorkspaceSupplierEntryKind.bill,
+    }) => WorkspaceSupplierLedgerEntry(
+      operationId: 'operation',
+      origin: origin,
+      orderId: order,
+      purchaseId: purchase,
+      billId: 'bill',
+      reference: 'REF-1',
+      kind: kind,
+      amountMinor: 100,
+      postedAt: at,
+    );
+    expect(entry().valid, isFalse);
+    expect(entry(order: 'order').valid, isTrue);
+    expect(entry(order: 'order', purchase: 'copy').valid, isFalse);
+    expect(entry(origin: WorkspaceSupplierEntryOrigin.manualPurchase).valid,
+        isFalse);
+    expect(entry(origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+        purchase: 'copy', order: 'order').valid, isFalse);
+    expect(entry(origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+        purchase: ' ').valid, isFalse);
+    expect(entry(origin: WorkspaceSupplierEntryOrigin.supplierAccount).valid,
+        isFalse);
+    expect(entry(origin: WorkspaceSupplierEntryOrigin.supplierAccount,
+        kind: WorkspaceSupplierEntryKind.advance).valid, isTrue);
+    expect(entry(origin: WorkspaceSupplierEntryOrigin.supplierAccount,
+        kind: WorkspaceSupplierEntryKind.advance, purchase: 'copy').valid,
+        isFalse);
+    final legacy = WorkspaceSupplierLedger(
+      accountScope: 'account-A', workspaceId: 'store-A',
+      supplierId: 'supplier-A', supplierName: 'Automated supplier fixture',
+      revision: 1, asOf: at, historyComplete: true, openingBalanceMinor: 0,
+      entries: [entry(order: 'order')],
+    );
+    final legacyBytes = legacy.toJson();
+    expect(legacy.entries.single.toJson().containsKey('origin'), isFalse);
+    expect(legacy.entries.single.toJson().containsKey('purchaseId'), isFalse);
+    expect(WorkspaceSupplierLedger.fromJson(legacyBytes)!.toJson(), legacyBytes);
+    final invalidSource = {...legacy.entries.single.toJson(), 'origin': 'guessed'};
+    expect(WorkspaceSupplierLedger.fromJson({...legacyBytes,
+      'entries': [invalidSource]}), isNull);
+    final unlabelledManual = {...legacy.entries.single.toJson(),
+      'orderId': null, 'purchaseId': 'copy'};
+    expect(WorkspaceSupplierLedger.fromJson({...legacyBytes,
+      'entries': [unlabelledManual]}), isNull);
+  });
+
+  // Automated session fixtures only, not injected device acceptance records.
+  Future<WorkSession> openingPostingSession(_OrderJournalStorage storage,
+      {WorkspaceSupplierOpeningRecord? initialRecord}) async {
+    final account = _CommandAccountStore();
+    final purchaseStore = SecureWorkPurchaseEntryStore(
+      accountScope: () => account.accountScope, storage: storage);
+    if (initialRecord != null) {
+      await purchaseStore.save(entryFixture(), expectedRevision: null);
+      await purchaseStore.save(copyBook(), expectedRevision: 1);
+      await purchaseStore.save(openingBook(records: [initialRecord]), expectedRevision: 2);
+    }
+    final session = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: account, purchaseEntryStore: purchaseStore)
+      ..activeWorkspace = _commandStore;
+    addTearDown(session.dispose);
+    final finance = WorkspaceFinanceSnapshot(accountScope: 'account-A',
+      workspaceId: 'store-A', revision: 1, asOf: DateTime.utc(2026, 10, 3),
+      salesTodayMinor: 0, duesMinor: 0, availableMinor: 0, heldMinor: 0,
+      requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
+      deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payments: const [], payouts: const [], historyComplete: true);
+    expect(session.applyWorkspaceFinance(finance), isTrue);
+    expect(session.bindCustomerCollectionGateway(accountScope: 'account-A',
+      storeId: 'store-A', adapter: StoreReviewCustomerCollectionGateway(finance),
+      checkpointStore: SecureWorkLedgerCheckpointStore(
+        accountScope: () => account.accountScope, storage: storage)), isTrue);
+    expect(await session.loadWorkspaceSuppliers(), isTrue);
+    return session;
+  }
+
+  test('PURCHASEPOST opening confirmation saves once and reopens without stock changes', () async {
+    final storage = _OrderJournalStorage();
+    final record = openingFixture(amount: 50000);
+    final session = await openingPostingSession(storage, initialRecord: record);
+    final scope = session.workspaceSupplierScope!;
+    final stock = session.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    final finance = session.workspaceFinance;
+    storage.holdWrite = Completer<void>();
+    final posting = session.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: scope, expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3));
+    await Future<void>.delayed(Duration.zero);
+    expect(session.workspaceSupplierSaving, isTrue);
+    expect(await session.saveWorkspaceSupplierOpeningRecord(
+      openingFixture(revision: 4, amount: 60000), scope: scope,
+      expectedRevision: 3), isFalse);
+    storage.holdWrite!.complete();
+    expect(await posting, isTrue);
+    storage.holdWrite = null;
+    expect(session.workspaceSupplierLedger(record.supplierId)!.payableMinor, 50000);
+    expect(session.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+    expect(session.workspaceFinance, same(finance));
+    final writes = storage.writes.length;
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: scope, expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 4)), isTrue);
+    expect(storage.writes.length, writes);
+    final reopened = await openingPostingSession(storage);
+    expect(await reopened.recoverCustomerLedger(), isTrue);
+    expect(reopened.workspaceSupplierLedger(record.supplierId)!.openingRecord!.toJson(), record.toJson());
+    expect(reopened.workspaceSupplierLedger(record.supplierId)!.payableMinor, 50000);
+    final base = entryFixture();
+    expect(await reopened.saveWorkspacePurchaseEntry(base.profiles.single,
+      scope: scope, draft: base.draft!, expectedRevision: 3), isTrue);
+    final afterNewBook = storage.writes.length;
+    expect(await reopened.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: scope, expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 4)), isTrue);
+    expect(storage.writes.length, afterNewBook);
+  });
+
+  test('PURCHASEPOST separate sessions cannot confirm a superseded purchase book', () async {
+    final storage = _OrderJournalStorage();
+    final record = openingFixture(amount: 50000);
+    final first = await openingPostingSession(storage, initialRecord: record);
+    final second = await openingPostingSession(storage);
+    final corrected = openingFixture(revision: 4, amount: 60000);
+    expect(await second.saveWorkspaceSupplierOpeningRecord(corrected,
+      scope: second.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+    expect(await first.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: first.workspaceSupplierScope!, expectedRevision: 3,
+      confirmedAt: DateTime.utc(2026, 10, 3)), isFalse);
+    expect(first.workspaceSupplierLedger(record.supplierId), isNull);
+    expect(await second.confirmWorkspaceSupplierOpeningRecord(corrected,
+      scope: second.workspaceSupplierScope!, expectedRevision: 4,
+      confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    expect(second.workspaceSupplierLedger(record.supplierId)!.payableMinor, 60000);
+  });
+
+  test('PURCHASEPOST opening failure and lost response recover without duplicate balance', () async {
+    final storage = _OrderJournalStorage();
+    final record = openingFixture(amount: 25000, credit: true);
+    final session = await openingPostingSession(storage, initialRecord: record);
+    Future<bool> post(WorkSession owner) => owner.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: owner.workspaceSupplierScope!, expectedRevision: 3,
+      confirmedAt: DateTime.utc(2026, 10, 3));
+    storage.failWrite = true;
+    expect(await post(session), isFalse);
+    expect(session.workspaceSupplierLedger(record.supplierId), isNull);
+    storage.failWrite = false;
+    storage.loseWriteResponseOnce = true;
+    expect(await post(session), isFalse);
+    final reopened = await openingPostingSession(storage);
+    expect(await post(reopened), isTrue);
+    final ledger = reopened.workspaceSupplierLedger(record.supplierId)!;
+    expect(ledger.creditMinor, 25000);
+    expect(ledger.entries, isEmpty);
+    expect(ledger.revision, 1);
+  });
+
+  test('PURCHASEPOST opening rejects unknown stale and unreviewed evidence', () async {
+    for (final record in [openingFixture(), openingFixture(amount: 0, bills: const [])]) {
+      final storage = _OrderJournalStorage();
+      final session = await openingPostingSession(storage, initialRecord: record);
+      final writes = storage.writes.length;
+      expect(await session.confirmWorkspaceSupplierOpeningRecord(record,
+        scope: session.workspaceSupplierScope!, expectedRevision: 3,
+        confirmedAt: DateTime.utc(2026, 10, 3)), isFalse);
+      expect(session.workspaceSupplierLedger(record.supplierId), isNull);
+      expect(storage.writes.length, writes);
+    }
+    final storage = _OrderJournalStorage();
+    final record = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: record);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: session.workspaceSupplierScope!, expectedRevision: 2,
+      confirmedAt: DateTime.utc(2026, 10, 3)), isFalse);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: session.workspaceSupplierScope!, expectedRevision: 3,
+      confirmedAt: DateTime.utc(2026, 9, 30)), isFalse);
+    expect(session.workspaceSupplierLedger(record.supplierId), isNull);
+  });
+
+  Future<WorkSession> billPostingSession(_OrderJournalStorage storage,
+      WorkspaceSupplierBillAcceptance bill) async {
+    final record = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: record);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(record,
+      scope: session.workspaceSupplierScope!, expectedRevision: 3,
+      confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    final old = (await owner.read('account-A', 'store-A', qa: true))!;
+    final next = WorkspacePurchaseEntryBook.fromJson({...old.toJson(),
+      'revision': 4, 'copies': [...old.copies.map((copy) => copy.toJson()), bill.copy.toJson()]});
+    await owner.save(next, expectedRevision: 3);
+    expect(await session.loadWorkspaceSuppliers(retry: true), isTrue);
+    return session;
+  }
+
+  WorkspaceSupplierBillAcceptance newBillFixture() => acceptanceFixture(
+    id: 'new-copy', draftId: 'new-bill', date: '2026-10-02',
+    reference: 'SUP-NEW-1', total: '2840.75',
+    treatment: WorkspaceOpeningBillInclusion.excluded);
+
+  Future<bool> confirmBill(WorkSession session, WorkspaceSupplierBillAcceptance bill,
+      {int bookRevision = 4, int ledgerRevision = 1}) =>
+    session.confirmWorkspacePurchaseBill(bill.copy,
+      scope: session.workspaceSupplierScope!, expectedPurchaseRevision: bookRevision,
+      expectedLedgerRevision: ledgerRevision, openingTreatment: bill.openingTreatment,
+      confirmedAt: bill.acceptedAt);
+
+  test('PURCHASEPOST bill confirmation restart and retry preserve stock and customer finance', () async {
+    final storage = _OrderJournalStorage();
+    final bill = newBillFixture();
+    final session = await billPostingSession(storage, bill);
+    final stock = session.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    final dues = session.workspaceFinance!.duesMinor;
+    expect(await confirmBill(session, bill), isTrue);
+    final ledger = session.workspaceSupplierLedger(bill.copy.supplier.id)!;
+    expect(ledger.payableMinor, 284075);
+    expect(ledger.purchaseBills['new-bill']!.copy.toJson(), bill.copy.toJson());
+    final writes = storage.writes.length;
+    expect(await confirmBill(session, bill), isTrue);
+    expect(storage.writes.length, writes);
+    final reopened = await openingPostingSession(storage);
+    expect(await reopened.recoverCustomerLedger(), isTrue);
+    expect(reopened.workspaceSupplierLedger(bill.copy.supplier.id)!.toJson(), ledger.toJson());
+    expect(await confirmBill(reopened, bill, bookRevision: 1), isTrue);
+    expect(storage.writes.length, writes);
+    expect(session.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+    expect(session.workspaceFinance!.duesMinor, dues);
+  });
+
+  test('PURCHASEPOST failed bill save and lost reply recover without another liability', () async {
+    final storage = _OrderJournalStorage();
+    final bill = newBillFixture();
+    final session = await billPostingSession(storage, bill);
+    storage.failWrite = true;
+    expect(await confirmBill(session, bill), isFalse);
+    storage.failWrite = false;
+    expect(await session.recoverCustomerLedger(), isTrue);
+    expect(session.workspaceSupplierLedger(bill.copy.supplier.id)!.payableMinor, 0);
+    storage.loseWriteResponseOnce = true;
+    expect(await confirmBill(session, bill), isFalse);
+    final writes = storage.writes.length;
+    final reopened = await openingPostingSession(storage);
+    expect(await confirmBill(reopened, bill), isTrue);
+    expect(storage.writes.length, writes);
+    final ledger = reopened.workspaceSupplierLedger(bill.copy.supplier.id)!;
+    expect(ledger.entries.length, 1);
+    expect(ledger.purchaseBills.length, 1);
+    expect(ledger.payableMinor, 284075);
+  });
+
+  test('PURCHASEPOST bill checkpoint cannot duplicate a draft across suppliers', () async {
+    final storage = _OrderJournalStorage();
+    final bill = newBillFixture();
+    final session = await billPostingSession(storage, bill);
+    expect(await confirmBill(session, bill), isTrue);
+    final first = session.workspaceSupplierLedger(bill.copy.supplier.id)!;
+    final supplier = WorkspaceSupplierProfile.fromJson({
+      ...bill.copy.supplier.toJson(), 'id': 'supplier-B'});
+    final copy = WorkspacePurchaseSavedCopy.fromJson({...bill.copy.toJson(),
+      'supplier': supplier.toJson(),
+      'draft': {...bill.copy.draft.toJson(), 'supplierId': supplier.id}});
+    final record = WorkspaceSupplierOpeningRecord.fromJson({
+      ...openingFixture(amount: 0, bills: const []).toJson(), 'supplierId': supplier.id});
+    final second = confirmedOpeningFixture(record, supplier: supplier.id)!
+      .acceptReviewedBill(WorkspaceSupplierBillAcceptance(copy: copy,
+        acceptedAt: bill.acceptedAt, openingTreatment: bill.openingTreatment),
+        expectedRevision: 1)!;
+    expect(first.valid, isTrue);
+    expect(second.valid, isTrue);
+    expect(WorkspaceLedgerCheckpoint(revision: 3, finance: session.workspaceFinance!,
+      supplierLedgers: {first.supplierId: first, second.supplierId: second}).valid, isFalse);
+    expect(WorkspaceSupplierLedger.fromJson({...first.toJson(), 'purchaseBills': null}), isNull);
+  });
+
+  test('PURCHASEPOST concurrent bill confirmations cannot overwrite the checkpoint', () async {
+    final storage = _OrderJournalStorage();
+    final bill = newBillFixture();
+    final first = await billPostingSession(storage, bill);
+    final second = await openingPostingSession(storage);
+    expect(await second.recoverCustomerLedger(), isTrue);
+    expect(second.workspaceSupplierLedger(bill.copy.supplier.id)!.revision, 1);
+    expect(await confirmBill(first, bill), isTrue);
+    final writes = storage.writes.length;
+    expect(await confirmBill(second, bill), isTrue,
+      reason: 'Identical persisted checkpoint is acknowledged without rewriting.');
+    expect(storage.writes.length, writes);
+    expect(await second.recoverCustomerLedger(), isTrue);
+    expect(await confirmBill(second, bill), isTrue);
+    expect(storage.writes.length, writes);
+    expect(second.workspaceSupplierLedger(bill.copy.supplier.id)!.purchaseBills.length, 1);
+    expect(second.workspaceSupplierLedger(bill.copy.supplier.id)!.payableMinor, 284075);
+  });
+
+  test('PURCHASEPOST different stale bill cannot erase another accepted bill', () async {
+    final storage = _OrderJournalStorage();
+    final bill = newBillFixture();
+    final first = await billPostingSession(storage, bill);
+    final otherBill = acceptanceFixture(id: 'other-copy', draftId: 'other-bill',
+      date: '2026-10-02', reference: 'SUP-NEW-2', total: '100',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    final old = (await owner.read('account-A', 'store-A', qa: true))!;
+    await owner.save(WorkspacePurchaseEntryBook.fromJson({...old.toJson(),
+      'revision': 5, 'copies': [...old.copies.map((copy) => copy.toJson()), otherBill.copy.toJson()]}),
+      expectedRevision: 4);
+    expect(await first.loadWorkspaceSuppliers(retry: true), isTrue);
+    final second = await openingPostingSession(storage);
+    expect(await second.recoverCustomerLedger(), isTrue);
+    expect(await confirmBill(first, bill, bookRevision: 5), isTrue);
+    final writes = storage.writes.length;
+    expect(await confirmBill(second, otherBill, bookRevision: 5), isFalse);
+    expect(storage.writes.length, writes);
+    expect(await second.recoverCustomerLedger(), isTrue);
+    final recovered = second.workspaceSupplierLedger(bill.copy.supplier.id)!;
+    expect(recovered.purchaseBills.keys, ['new-bill']);
+    expect(await confirmBill(second, otherBill, bookRevision: 5,
+      ledgerRevision: recovered.revision), isTrue);
+    final saved = second.workspaceSupplierLedger(bill.copy.supplier.id)!;
+    expect(saved.purchaseBills.length, 2);
+    expect(saved.entries.length, 2);
+    expect(saved.payableMinor, 294075);
+  });
+
+  test('PURCHASEPOST stale bill book and wrong scope cannot confirm', () async {
+    final storage = _OrderJournalStorage();
+    final bill = newBillFixture();
+    final session = await billPostingSession(storage, bill);
+    final writes = storage.writes.length;
+    expect(await confirmBill(session, bill, bookRevision: 3), isFalse);
+    expect(await confirmBill(session, bill, ledgerRevision: 2), isFalse);
+    expect(await session.confirmWorkspacePurchaseBill(bill.copy,
+      scope: ('other-account', 'store-A', true), expectedPurchaseRevision: 4,
+      expectedLedgerRevision: 1, openingTreatment: bill.openingTreatment,
+      confirmedAt: bill.acceptedAt), isFalse);
+    expect(storage.writes.length, writes);
+    expect(session.workspaceSupplierLedger(bill.copy.supplier.id)!.purchaseBills, isEmpty);
+  });
+
   test(
     'LEDGER02 supplier save failure and lost reply recover without another payment',
     () async {

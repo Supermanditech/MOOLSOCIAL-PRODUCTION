@@ -4475,6 +4475,77 @@ void main() {
     await tester.tap(find.text(name).last);
     await tester.pumpAndSettle();
   }
+  WorkSession postingOpeningFixture(_OpeningPostingFixtureStore entry,
+      _LedgerCheckpointFixtureStore checkpoint) {
+    final work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!;
+    final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1,
+      workspaceId: scope.$2, revision: 1, asOf: DateTime.now(),
+      salesTodayMinor: 0, duesMinor: 0, availableMinor: 0, heldMinor: 0,
+      requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
+      deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payments: const [], payouts: const [], historyComplete: true);
+    expect(work.applyWorkspaceFinance(finance), isTrue);
+    expect(work.bindCustomerCollectionGateway(accountScope: scope.$1,
+      storeId: scope.$2, adapter: StoreReviewCustomerCollectionGateway(finance),
+      checkpointStore: checkpoint), isTrue);
+    return work;
+  }
+
+  for (final display in [const Size(320, 568), const Size(915, 412)]) {
+    testWidgets('PURCHASEPOST opening form cancel confirm and posted status $display', (tester) async {
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display, textScale: display.width > 500 ? 2 : 1.4);
+      final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      await saveOpeningSupplier(tester);
+      await revealOpening(tester, find.byKey(const Key('work-opening-date')));
+      await tester.enterText(find.byKey(const Key('work-opening-date')),
+        DateTime.now().toIso8601String().substring(0, 10));
+      final known = find.byType(DropdownButtonFormField<bool>).first;
+      await revealOpening(tester, known);
+      await tester.tap(known);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Amount confirmed').last);
+      await tester.pumpAndSettle();
+      await revealOpening(tester, find.byKey(const Key('work-opening-amount')));
+      await tester.enterText(find.byKey(const Key('work-opening-amount')), '1500');
+      await revealOpening(tester, find.byKey(const Key('work-opening-note')));
+      await tester.enterText(find.byKey(const Key('work-opening-note')), 'Evaluation supplier statement checked');
+      await revealOpening(tester, find.byKey(const Key('work-opening-save')));
+      await tester.tap(find.byKey(const Key('work-opening-save')));
+      await tester.pumpAndSettle();
+      expect(checkpoint.saveAttempts, 0, reason: 'Saving evidence alone never posts.');
+      final confirm = find.byKey(const Key('work-opening-confirm'));
+      await revealOpening(tester, confirm);
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm opening balance?'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(checkpoint.saveAttempts, 0);
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      final accept = find.byKey(const Key('work-opening-confirm-accept'));
+      await tester.ensureVisible(accept);
+      expect(accept.hitTestable(), findsOneWidget);
+      await tester.tap(accept);
+      await tester.pumpAndSettle();
+      final supplierId = entry.value!.profiles.single.id;
+      expect(work.workspaceSupplierLedger(supplierId)!.payableMinor, 150000);
+      expect(checkpoint.saveAttempts, 1);
+      await revealOpening(tester, find.byKey(const Key('work-opening-posting-status')), delta: -120);
+      expect(find.text('Confirmed in supplier account'), findsOneWidget);
+      expect(find.byKey(const Key('work-opening-confirm')), findsNothing);
+      expect(find.byKey(const Key('work-opening-correct')), findsNothing);
+      expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P04 actual form supplier-only draft unknown save correction history and reopen', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -46669,6 +46740,24 @@ class _ReceiptDraftFixtureStore implements WorkReceiptDraftStore {
       throw StateError('Fixture revision conflict');
     }
     values[draft.key] = WorkspaceReceiptDraft.fromJson(draft.toJson())!;
+  }
+}
+
+// Test-only guard double; real secure-store serialization has separate host tests.
+class _OpeningPostingFixtureStore extends _PurchaseEntryFixtureStore
+    implements WorkPurchaseEntryRevisionGuard {
+  @override
+  Future<bool> withReviewedBook(String account, String store, {
+    required bool qa,
+    required int expectedRevision,
+    required Future<bool> Function(WorkspacePurchaseEntryBook book) action,
+  }) async {
+    final book = value;
+    if (book == null || book.account != account || book.store != store ||
+        book.qa != qa || book.revision != expectedRevision) {
+      return false;
+    }
+    return action(book);
   }
 }
 
