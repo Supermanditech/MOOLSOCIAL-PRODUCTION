@@ -359,6 +359,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       MoolGlobalNavigationController();
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
+  bool _supplierPolicySheetOpen = false;
   Timer? _quickTrackerCollapseTimer;
   final _quickTrackerPointers = <int>{};
   int _quickTrackerNavigationSequence = 0;
@@ -487,6 +488,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant BuyV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.accountIdentity != widget.accountIdentity ||
+        oldWidget.accountAuthenticated != widget.accountAuthenticated) {
+      if (oldWidget.session.pendingSupplierPolicyAdd != null) {
+        oldWidget.session.cancelSupplierPolicyAdd();
+      }
+    }
     var restoreState = false;
     if (oldWidget.session != widget.session ||
         oldWidget.deliveryArrivalSound != widget.deliveryArrivalSound ||
@@ -676,6 +684,33 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       });
       setState(() {});
       return;
+    }
+    final policyIntent = session.pendingSupplierPolicyAdd;
+    if (policyIntent != null && !_supplierPolicySheetOpen) {
+      _supplierPolicySheetOpen = true;
+      final account = _arrivalIdentity;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          if (!mounted ||
+              widget.session != session ||
+              account != _arrivalIdentity ||
+              !identical(session.pendingSupplierPolicyAdd, policyIntent)) {
+            return;
+          }
+          await showBuyV2SupplierPolicySheet(
+            context,
+            session,
+            intent: policyIntent,
+          );
+        } finally {
+          _supplierPolicySheetOpen = false;
+          if (mounted &&
+              widget.session == session &&
+              session.pendingSupplierPolicyAdd != null) {
+            _sessionChanged();
+          }
+        }
+      });
     }
     final searchReturn = _searchProductReturn;
     if (searchReturn != null &&

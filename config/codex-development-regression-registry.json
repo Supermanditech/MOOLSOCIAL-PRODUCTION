@@ -108867,6 +108867,526 @@
           "detection": "AssertionError on first evidence owner literal; no source modified.",
           "prevention": "Read the bounded actual coordinator diff; assert added literal path set and zero removed/nonliteral lines independently of indentation. Do not infer validation changes from this failed formatting assertion.",
           "evidence": "Tool chunk e71e9e; helper did not write an owner."
+        },
+        "supplierPolicyCartCorrection20261003": {
+          "status": "admitted_call_path_review_before_runtime_edits",
+          "authority": "Founder explicitly defers live-provider recovery while continuing Cart and repeats product/sheet-only supplier terms; Add-triggered unchecked affirmative acceptance adds exact intent once. Existing supplierTermsNextSweep20261002 authorizes frontend contracts and isolated fixtures.",
+          "actor": "Public Shop consumer, Wholesale or Bulk purchaser adding an exact Store listing to Cart",
+          "classification": "mvp_required",
+          "reason": "Pre-purchase supplier disclosure and truthful affirmative consent where current publication requires it; remove obsolete blanket Cart supplier-policy presentation.",
+          "outcome": "Supplier policy is readable from product surface; required acceptance is one Accept-and-add action from Add intent. Cart/Checkout have no Supplier terms gate or policy panel. Actual financial agreement validation and T07 payment holds remain.",
+          "owners": [
+            "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+            "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart"
+          ],
+          "reuse": "Existing product content adapter, owner-scoped state codec, guarded Add/cart session, native modal sheet and product/Checkout presentation. No new screen, route, service, dependency or backend. Root sole editor under existing claims.",
+          "safety": "Bind buyer/supplier/policy revision/applicability; freeze product/variant/quantity intent. Changed/unavailable required publication fails closed. Cancel/double taps/account changes/stale callbacks never add. Retained receipt is local evidence, not backend acceptance authority.",
+          "verification": "Focused consent/state/persistence/duplicate/stale-owner tests and absence of Cart terms panel; affected then cumulative selected checks, normal/200percent visual proof, authorized Redmi full refresh, safe scoped Git checkpoint.",
+          "dependencies": [
+            "Live payment recovery deferred",
+            "Supplier policy Store publication/receipt enforcement Codex after integration",
+            "Backend deferred",
+            "Google/Maps separate",
+            "T08 next public order-status/balance scope after correction qualification"
+          ],
+          "architectReview": "Astra confirms boundary; preserve real financial obligations and T03/T07 validation, no generic consent substitute.",
+          "projectionIncident": {
+            "incident": "Recursive policy projection matched task=/root in other lane registration metadata, exceeding output token budget. No edits or ownership transfer occurred.",
+            "rootCause": "Filtered generic task identity recursively instead of exact activeClaims root claim; no count cap on matching records.",
+            "detection": "Tool chunk848fa3 reported truncation.",
+            "prevention": "Read exact activeClaims entry by task and role; whitelist requested literal owners, bound both record count and text size before emission. Do not repeat broad walk."
+          }
+        },
+        "supplierPolicyExpression20261003": {
+          "status": "self_review_registered_before_correction",
+          "incident": "Root noticed a newly written current-intent Boolean helper used if-case pattern syntax outside an if statement. No analyzer/test pass was claimed.",
+          "rootCause": "Used Dart pattern-condition syntax as an expression while combining several guards.",
+          "prevention": "Use a block helper with an observed nullable product and explicit Boolean comparisons; analyze before dependent tests.",
+          "evidence": "Retained source patch; self-review before first analysis."
+        },
+        "supplierPolicyWordingProof20261003": {
+          "status": "registered_before_follow_up",
+          "incident": "A wording edit helper guessed an exact occurrence count from prior search output and refused before writing. Root then formatted the five already changed owners without checking that helper exit first; formatter exited0 but no successful wording edit was claimed.",
+          "rootCause": "Used a guessed count and failed to guard sequential dependent tool results.",
+          "prevention": "Use observed bounded matches to scope literal financial-notice replacements; explicitly require exitCode0 before every dependent edit/analyzer/test. Do not infer success from a later formatter.",
+          "evidence": "Retained failed helper chunk e5d1b8 and format result c9ce22; no tests launched."
+        },
+        "supplierPolicyAnalysis1Failure20261003": {
+          "status": "registered_before_retry",
+          "incident": "First five-owner analysis failed with two undefined getter errors for guessed BuyV2Colors.surface. No tests launched or technical pass claimed.",
+          "rootCause": "Root selected an unobserved palette token rather than reading existing native sheet background tokens.",
+          "detection": {
+            "session": 76711,
+            "exitCode": 1,
+            "sourceSha256": "50e5ef522a07d05aa739348d6ccb46228a97399182abedcec819a00d04aece76",
+            "log": "apps/mobile/build/supplier-policy-20261003/analysis-1.log",
+            "sha256": "23e2b46a3ba94d7bc9f03427251a0e1787e0a5060a1f10c25d8563a96e00fc02",
+            "errors": 2
+          },
+          "prevention": "Inspect exact existing palette/standard sheet convention; reuse a defined neutral background. Stable immutable intent class before retry. Analysis must close0 before tests; failed log retained."
+        },
+        "supplierPolicyReadAnchorFailure20261003": {
+          "rootCause": "Unobserved variable anchor used in bounded source projection; Python failed but following rg masked shell status.",
+          "detection": "ValueError substring not found in retained tool output; outer exit 0 not accepted as Python success.",
+          "prevention": "Discover literal source line via rg first; independent commands and explicit LASTEXITCODE guard.",
+          "state": "registered before retry; no source mutation"
+        },
+        "supplierPolicyBindingAnchorFailure20261003": {
+          "rootCause": "Guessed trailing comma in policy SHA binding patch.",
+          "detection": "apply_patch rejected with zero policy changes.",
+          "prevention": "Use observed exact line including punctuation; reconstruct binding then gate before source retry.",
+          "state": "registered before retry"
+        },
+        "supplierPolicyTestProjectionTruncation20261003": {
+          "rootCause": "Combined broad test search exceeded output budget.",
+          "detection": "Tool returned truncated output; not used as complete helper discovery.",
+          "prevention": "Read one exact test owner bounded pages; targeted search at most 20 matches, conservative output budget.",
+          "state": "registered before narrower read"
+        },
+        "supplierPolicyConsentTests1Failure20261003": {
+          "state": "failed; blocked before retry",
+          "rootCause": "Not yet diagnosed; first isolated consent run +2/-11 and widget build/No element errors require exact failure projection.",
+          "detection": "Closed consent-tests-1 exit1, SHA43deddc1b74e75009b81e465c3278fd185c102aececa8d4b34abc4fcea1b0659.",
+          "evidence": "apps/mobile/build/supplier-policy-20261003/consent-tests-1.log",
+          "prevention": "Project earliest errors before changing implementation or fixtures; no passing receipt claimed."
+        },
+        "supplierPolicyConsentTests1Diagnosis20261003": {
+          "rootCause": "Legacy default s-milk has null Store ID; new test policy adapter forced product.storeId! and failed before it could publish acceptance-required metadata. Valid supplier policy tests need isolated Store-bound commerce publications, not anonymous defaults.",
+          "prevention": "Reuse existing TestPaymentCommerce/testPaymentProducts fixture with explicit Store IDs; await restoreCommerce before policy test assertions. Retain first failed log and separate frontend fixtures from device/live producers.",
+          "state": "diagnosed; no runtime qualification"
+        },
+        "supplierPolicyConsentTests2Failure20261003": {
+          "rootCause": "TestPaymentCommerce injection alone did not replace anonymous product in active catalogue; exact restoration/selection path needs inspection.",
+          "detection": "consent-tests-2 closed exit1 SHA08a7a622dfd8c0bcf5e65dd90129a740e8f8b11f350993147ce793da72f5a0b6; repeated original Store identity symptoms.",
+          "prevention": "Architect consulted on repeated error; inspect active catalogue and fixture product copyWith before retry. No reduced assertions.",
+          "evidence": "apps/mobile/build/supplier-policy-20261003/consent-tests-2.log",
+          "state": "blocked before retry"
+        },
+        "supplierPolicyFixtureModeDiagnosis20261003": {
+          "rootCause": "BuyV2Session default reviewDataEnabled is true; restoreCommerce bypasses injected provider and leaves anonymous review catalogue. Existing qualified fixture harness explicitly sets false.",
+          "prevention": "Use observed reviewDataEnabled:false in both policy sessions; assert bound product Store ID, await explicit customer-state restoration independently, and guard all fixture assertions.",
+          "state": "diagnosed prior retry; no production review mode changed"
+        },
+        "supplierPolicyTestRunnerStdinFailure20261003": {
+          "rootCause": "Python here-string command omitted '-' before numeric script argument.",
+          "detection": "Python attempted to open file 3; exit1 before Flutter launch.",
+          "prevention": "Explicit python -X utf8 -B - 3 for stdin scripts with argv; no app/test mutation from failed invocation.",
+          "state": "registered before corrected invocation"
+        },
+        "supplierPolicyConsentTests3Failure20261003": {
+          "rootCause": "Store-bound non-review fixture now reaches existing availability guards before policy; exact notice/facts eligibility must be supplied through established test adapter.",
+          "detection": "consent-tests-3 closed exit1 SHA5d8caedc79705367995322fc58c1ab24dde5eb39e4822387b20f399b437fb934; no pending consent for expected-valid product.",
+          "prevention": "Reuse complete qualified fixture including eligibility facts; assert preconditions and Add notices before policy assertions. No weakening production guards.",
+          "state": "registered before diagnosis/retry"
+        },
+        "supplierPolicyRgGlobFailure20261003": {
+          "rootCause": "Passed Windows literal path glob to rg rather than -g filter and directory.",
+          "detection": "rg exit1 IO error123 after first independent search output.",
+          "prevention": "Use rg -g '*.dart' directory; guards after each independent command.",
+          "state": "registered before retry"
+        },
+        "supplierPolicyConsentTests4Failure20261003": {
+          "rootCause": "Confirmed cancelled failed save leaves reusable in-memory receipt; two landscape widget failures require exact diagnostic.",
+          "detection": "consent-tests-4 closed exit1 SHA26b62214d5ac16d5b8f35afedd8893376c5141d361400ccc1d0dfb54898158d9; remaining11 tests pass including portrait1x/2x.",
+          "prevention": "Rollback failed writes independent of pending intent sequence, with owner and exact fingerprint guards; inspect landscape exception and preserve bounded sheet scrolling.",
+          "state": "registered before fixes",
+          "evidence": "apps/mobile/build/supplier-policy-20261003/consent-tests-4.log"
+        },
+        "supplierPolicyOrderPanelTestAdmission20261003": {
+          "owner": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "claim": "already exact root264 owner; no other lane edits",
+          "reason": "Existing six D17 financial approval cases mount legacy expanded panel directly. Keep standalone financial coverage with compact:false and test public Checkout opens compact Review sheet while supplier policy absent.",
+          "acceptance": "Amount/payment agreement issue/refresh/reconciliation remain checked; initially public Checkout no Supplier terms/body/full PO form; route Back returns same total gate.",
+          "state": "authorized existing parent frontend regression adjustment"
+        },
+        "supplierPolicySourceReaderCommandFailure20261003": {
+          "rootCause": "Source owner passed to Python interpreter instead of bounded-reader helper.",
+          "detection": "SyntaxError exit1 before any app action; no source mutation.",
+          "prevention": "Use exact observed read-bounded.py PATH START END command for source reads.",
+          "state": "registered before retry"
+        },
+        "supplierPolicyQueuedSaveDefect20261003": {
+          "rootCause": "Concurrent delivery-note save captures active receipts before consent receipt becomes reusable; queued snapshot can erase newly saved receipt before subsequent Cart save.",
+          "detection": "Architect requested concrete interleaving; tests6 +16/-1, queued receipt assertion fails. Closed exit1 SHA1c460ac0b4ee456df51df16244acbe7eeb3262b3f8397f85be979f21d1a93401.",
+          "prevention": "Maintain separate owner-scoped in-flight candidate receipt map for snapshots queued while consent save runs; reusable receipts remain published only after successful save. Clear candidate on cancel/owner change/completion; preserve duplicate and failed-save protections.",
+          "evidence": "apps/mobile/build/supplier-policy-20261003/consent-tests-6.log",
+          "state": "registered before scoped source correction"
+        },
+        "supplierPolicyCasePatchPlacementFailure20261003": {
+          "rootCause": "Generated diff with three lines of repeated case-list closing context applied new cases at another ticket; readback caught parent remained208 though metadata updated.",
+          "detection": "Semantic readback assertion expected225 actual208; no tests launched against wrong placement.",
+          "prevention": "Find exact receiving ticket by new case IDs, restore that unintended list only; reapply with unique full case-ID/testName context and assert whole JSON equals intended projection before gates.",
+          "state": "registered before correction",
+          "evidence": "apps/mobile/build/supplier-policy-20261003/cases-admission.patch"
+        },
+        "supplierPolicyCoverageProjectionFailure20261003": {
+          "rootCause": "Historical machine log includes a JSON list alongside dict events; coverage projection assumed every parsed line supported .get.",
+          "detection": "AttributeError exit1 before any comparison result; no test/app mutation.",
+          "prevention": "Use the existing runner's isinstance(event,dict) guard. Hold registry movement until the running source-frozen regression completes, then register before retrying projection or starting device action.",
+          "state": "registered after source-frozen selected run closed, before projection retry/device action"
+        },
+        "supplierPolicyNativeCaptureFailure20261003": {
+          "rootCause": "First UIAutomator dump after hot restart returned process exit0 but its requested XML did not exist; actual dump cause not retained by inherited helper.",
+          "detection": "Capture closed exit1 at adb cat missing file; no screenshot/XML qualification claimed. Hot restart itself closed60702 exit0 restartCode0 detachedtrue.",
+          "prevention": "Retain dump stdout/stderr, verify exact XML file existence before cat, capture screen state separately and retry only after refreshed device/memory gates and UI settled. Do not infer offline from capture failure.",
+          "state": "registered before native retry"
+        },
+        "supplierPolicyNativeOrderSheetDefect20261003": {
+          "rootCause": "New compact order Review modal paints lower than nested Buy accessibility viewport; settled Check order agreement node has zero bounds despite visible text near system navigation. Modal lacks root navigator/bottom safe-area treatment.",
+          "detection": "Repeated normal/settled native screenshots+XML order-approval-sheet-normal/settled both title1392..1422, bodyclipped1438, Checknode[0,0][0,0]. No agreement query or Pay tapped.",
+          "prevention": "Architect review requested; inspect existing native Buy root-overlay conventions, apply smallest modal inset/navigation fix to two new sheets, verify native action positive usable bounds, then refresh final source qualification.",
+          "state": "registered before scoped fix; current source not complete",
+          "evidence": "apps/mobile/build/supplier-policy-20261003/native/order-approval-sheet-settled.xml"
+        },
+        "supplierPolicyReaderBound20261003": {
+          "failure": "Bounded helper rejected requested end line beyond actual EOF; read-only failure, no source mutation.",
+          "correction": "Read same exact helper using bounded Get-Content TotalCount; no guessed EOF.",
+          "refresh": {
+            "label": "supplier-policy-root-hot-restart-20261003",
+            "exitCode": 0,
+            "restartCode": 0,
+            "detached": true
+          },
+          "financialTests2": {
+            "exitCode": 0,
+            "logSha256": "b231f4e2e349fb3b9bdae083417949f2b72df6984724a62df6d7cb355f22d4d9"
+          },
+          "sourceSha256": "15a6a677dfd848ea5f3a31373a5216fad0616f13b49ed9ca55fcac2ba5252db9"
+        },
+        "supplierPolicyNativeQualification20261003": {
+          "sourceSha256": "15a6a677dfd848ea5f3a31373a5216fad0616f13b49ed9ca55fcac2ba5252db9",
+          "device": "TG8HCYTGGQT885OF",
+          "package": "com.moolsocial.app.cursorreview",
+          "installedApkSha256": "7D2E95B6A3D7BE9136457D9103DBF262CECA306788C904E4170E85F16F70C4D5",
+          "refreshExit": 0,
+          "screenshotsDirectory": "apps/mobile/build/supplier-policy-20261003/native",
+          "verified": [
+            "root-cart-normal: 2 products, 3 items, total837, Checkout reachable; no Supplier terms",
+            "root-checkout-normal: compact Order approval, shared Call on arrival, total837, Pay disabled",
+            "root-order-review-normal: Check order agreement bounds[58,1352][350,1438], clickabletrue",
+            "root-order-review-large: font_scale2.0, Check order agreement bounds[58,1352][602,1438], clickabletrue",
+            "root-checkout-return-restored: Back returns, total837/instruction intact; font_scale restored1.0"
+          ],
+          "limitations": [
+            "Published supplier-policy popup uses isolated nested host fixtures; authoritative Store producer and live receipt enforcement deferred",
+            "No financial agreement issued, no payment, no APK/install/data clear",
+            "Inherited T10 wholesale punctuation defect retained as child"
+          ],
+          "admissionPrefix": "supplier-policy-root-final-native-20261003",
+          "admissionAllExitCodes": 0
+        },
+        "supplierPolicyStaleCallbackReview20261003": {
+          "finding": "Architect review of supplied exact source found displayed intent A checkbox invokes parameterless session accept; could consume newer pending B before old sheet closes.",
+          "classification": "Consent identity binding defect; source fix and stale captured-callback regression required.",
+          "selectedRun": {
+            "label": "supplier-policy-final-selected-20261003",
+            "status": "intentionally_stopped_before_source_fix",
+            "sessionExitCode": 1,
+            "batch1Passed": 142,
+            "terminalSuccess": false,
+            "logSha256": "1f092c48de72324bef2eeda4af820e141c9e09dd50b281902a559c343b112851",
+            "notQualification": true,
+            "ownedProcessRoot": 5036,
+            "ownedProcessesStopped": 6
+          },
+          "pendingReadIncident": {
+            "failure": "Read-only Get-Content requested guessed T07 evidence filename that does not exist; no mutation or gate bypass.",
+            "correction": "Resolved exact existing T07 evidence paths through scoped rg --files before reading."
+          },
+          "processProjectionIncident": "Child process commandLine output exceeded budget; no data/source mutation. Subsequent exact PID/parent/type assertions used bounded receipt before terminating only owned test subtree.",
+          "smallestFix": "Require expected displayed Add intent in session acceptance; synchronously reject stale identity. UI passes captured intent, tests explicitly pass current/captured intents; add stale UI callback test.",
+          "sourceBefore": "15a6a677dfd848ea5f3a31373a5216fad0616f13b49ed9ca55fcac2ba5252db9",
+          "ownersAlreadyClaimed": true
+        },
+        "supplierPolicyPatchRoot20261003": {
+          "failure": "Generated test-call patch used repository-relative path while apply_patch resolves workspace root; rejected before any test mutation.",
+          "correction": "Use observed absolute assigned-worktree owner paths in every patch.",
+          "runtimeChangeAlreadyReadBack": "Expected intent is required and synchronously identity-checked; UI passes displayed intent.",
+          "sourceTestingHeld": true
+        },
+        "supplierPolicyPatchFormat20261003": {
+          "failure": "Generated standard unified-diff line-number headers are unsupported by apply_patch custom grammar; patch rejected before mutation.",
+          "correction": "Convert each unified-diff hunk header to bare @@ and keep absolute exact owner path.",
+          "testingHeld": true,
+          "scopeUnchanged": true
+        },
+        "supplierPolicyDisplayedIntentFix20261003": {
+          "implemented": "Acceptance requires expected captured intent and rejects mismatches synchronously before any save. UI supplies displayed intent; 15 direct test callers supply explicit intent.",
+          "newCase": "BUY-ACTION-POLISH-20260926-01/product/supplier-policy/18",
+          "testName": "supplier policy Add consent stale popup tick cannot accept a replacement Add intent",
+          "testBehavior": "Capture A Checkbox callback, cancel A, request tomato B, invoke old A callback before sheet rebuild; neither A/B added nor acceptance written and B stays pending.",
+          "ledgerWholeSemanticReadback": true,
+          "parentCases": 226,
+          "selectedDistinctExpected": 983,
+          "selectedReferencesExpected": 1043,
+          "testsRequired": "Analyze seven owners; consent18 + financial6; fresh native refresh and final selected983/affected141 on final source"
+        },
+        "supplierPolicyFinalFocused20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "analysis": {
+            "owners": 7,
+            "exitCode": 0,
+            "sha256": "25a399dc69d5c7d14f7371be77aedfdadc15594c7a79ea6634039d7abe8bc6b5",
+            "log": "apps/mobile/build/supplier-policy-20261003/analysis-5.log"
+          },
+          "consent": {
+            "passed": 18,
+            "exitCode": 0,
+            "sha256": "f83f7b6f42f09ecbe7c61cbce709a690e9f36700d465f4bdec0f25d6b526af86",
+            "log": "apps/mobile/build/supplier-policy-20261003/consent-tests-9.log"
+          },
+          "financial": {
+            "passed": 6,
+            "exitCode": 0,
+            "sha256": "4249c4a20bb3ad0504512bfd27a1fcc3fd2ef7980eb837f001e52878b2a4634c",
+            "log": "apps/mobile/build/supplier-policy-20261003/financial-panel-tests-3.log"
+          },
+          "architectReview": "Supplied exact fix and direct stale callback regression close identified identity-binding gap; no direct seven-file diff review claimed.",
+          "remaining": "Re-refresh Redmi at final source; selected983 + affected141; durable evidence and safe Git checkpoint. Previous15a native modal fix remains unchanged."
+        },
+        "supplierPolicyFinalNativeDumpFailure20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "refresh": {
+            "label": "supplier-policy-final-source-hot-restart-20261003",
+            "exitCode": 0,
+            "restartCode": 0,
+            "detached": true
+          },
+          "failure": "final-home native capture screenshot retained; Android uiautomator returned0 but remote XML absent; helper rejected shell test -s, no qualification claimed.",
+          "observed": "Same vendor dump timing failure previously recorded; bounded single retry after new generation gates, no guessed UI tap or missing XML used.",
+          "preserve": [
+            "apps/mobile/build/supplier-policy-20261003/native/final-home.png",
+            "apps/mobile/build/supplier-policy-20261003/native/final-home-dump.log"
+          ],
+          "architectReview": "Required displayed intent identity closes consent gap; new18-case focused suite passes; supplied excerpts review limitation retained.",
+          "hostVisuals": "visual-9 portrait1x/2x and landscape2x inspected; initially unchecked tick and cancellation reachable"
+        },
+        "supplierPolicyTransitionFrame20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "observation": "final-cart-normal PNG captured during route transition is blank while later XML contains full Cart. Screenshot is retained as transition evidence and cannot qualify visual layout.",
+          "correction": "Capture settled Cart and Checkout again from observed current route, then inspect matching PNG/XML; no runtime change.",
+          "nativeFinalIdentity": {
+            "fontScale": "1.0",
+            "installedSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+            "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19"
+          },
+          "verifiedAtFinalSource": [
+            "final-review-normal positive accessible Check action",
+            "final-review-large 200percent full accessible Check action inspected",
+            "Back and fontrestore retain837/shared Callonarrival"
+          ],
+          "policyNativeAcceptance": false
+        },
+        "supplierPolicyFinalNativeVerified20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "hotRestart": {
+            "label": "supplier-policy-final-source-hot-restart-20261003",
+            "exitCode": 0,
+            "restartCode": 0,
+            "detached": true
+          },
+          "verifiedScreens": [
+            "final-cart-settled.png/xml",
+            "final-checkout-settled.png/xml",
+            "final-review-normal.png/xml",
+            "final-review-large.png/xml",
+            "final-checkout-return.png/xml"
+          ],
+          "visualInspection": "Settled Cart2products/3items837, reachable Checkout, no Supplierterms. CheckoutcompactOrderapproval/sharedCallonarrival/837. Normal and200percent financialreviewaction accessible and visible; Back restored. No live policy injected or accepted.",
+          "identity": "native-final-identity.json: APK checksum retained, versionr66.36/code2026092701, finalsource6716bfc, fontscale1.0",
+          "superseded": "final-home missingXML/splash and final-cart-normal transitionPNG retained as unqualified artifacts",
+          "liveProviderRecovery": "deferred",
+          "workspace": "Codex after integration",
+          "backend": "deferred",
+          "google": "separately listed",
+          "next": "T08 after this checkpoint"
+        },
+        "supplierPolicyFinalSelectedClosed20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "session": 55780,
+          "exitCode": 0,
+          "distinctCases": 983,
+          "references": 1043,
+          "files": 53,
+          "batches": [
+            {
+              "passed": 431,
+              "exitCode": 0,
+              "sha256": "d8fdce90ed055660842f4f7679580c557000680cd490bba6936dc563984423ee"
+            },
+            {
+              "passed": 488,
+              "exitCode": 0,
+              "sha256": "fc0201cf0f48f39a328e47870e382c9b5ea19b0002d9382a40f77a840a09b78a"
+            },
+            {
+              "passed": 64,
+              "exitCode": 0,
+              "sha256": "58071870f1c4f8156c6c58a170f4c02cc34b18cac1592b9ce557c70b34ff8211"
+            }
+          ],
+          "failures": 0,
+          "warnings": 0,
+          "sourceUnchanged": true,
+          "logDirectory": "apps/mobile/build/t06-t07-cart-20261002/supplier-policy-final-selected-2-20261003",
+          "readIncident": {
+            "failure": "Scoped rg included guessed absent buy_v2_purchase_order.dart; it returned error2 while confirming the financial controller exists in already-read buy_v2_session.dart. No source change.",
+            "correction": "Read only observed controller definition and identity-reset paths in the exact session owner; no new file assumption."
+          },
+          "financialIdentityReview": "Existing controller identity listener clears review/address/lines/reconciliation and epoch-bound responses; no new account logic changed.",
+          "remaining": "Affected141 final source; preserve actual seven literal evidence paths, admit them without wildcard/placeholder, final metadata/gates/checkpoint."
+        },
+        "supplierPolicyClosedEvidenceAdmission20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "affected": {
+            "session": 24853,
+            "exitCode": 0,
+            "passed": 141,
+            "failures": 0,
+            "warnings": 0,
+            "sha256": "c2a60c7e337bbad99dec5c1cc0c0088e08dffebe99125662fc8e86a15c1d1c3d"
+          },
+          "selected": {
+            "exitCode": 0,
+            "passed": 983,
+            "references": 1043,
+            "unchangedSource": true
+          },
+          "qualificationDryRun": {
+            "session": 37140,
+            "exitCode": 0,
+            "closedReceipts": 4
+          },
+          "literalEvidenceOwners": [
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.json",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip"
+          ],
+          "preservationOrder": "Closed ignored proof exists; primary preserves actual new evidence with absent-target assertions, then admits seven exact literal owners and coordinator allowlist before fresh gates. No placeholders/wildcards/check weakening.",
+          "evidenceCheckoutChild": {
+            "observedOwner": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-1.jsonl",
+            "rawSha256": "61add0fe6bbdba700554065ec9d925f98f9ab6e4d2e91042be8fd60303a00cac",
+            "gitCheckoutFilteredSha256": "bb04c89b1d195535d9bad83d6f474707ae3271aad6445e6eb9cdce5d7978214d",
+            "coreAutocrlf": true,
+            "workingCrLf": 0,
+            "filteredCrLf": 1091,
+            "status": "open_integration_child",
+            "handling": "Preserve authentic raw receipts in ZIP and verify staged Git blob hashes before this checkpoint. Codex after integration must correct evidence checkout handling without weakening byte/hash checks; do not change global/shared Git settings or historical proofs here.",
+            "noEvidenceLost": true
+          },
+          "remaining": "Preserve/admit artifacts, current founder receipts/status and byte-preserving handoffs, memory/pre_commit, exact20-owner checkpoint/push/readback. T08 follows fresh scope gate."
+        },
+        "supplierPolicyFinancialCountReadback20261003": {
+          "failure": "Archive dry run rejected financial reporter count6; actual R6633 D17 selection passes26:6 changed UI cases plus20 controller/correlation cases. No new contract/report/archive was written.",
+          "correction": "Bind total26 and explicit UI6/controller20 subset; source/tests unchanged so no rerun needed.",
+          "financialLogSha256": "4249c4a20bb3ad0504512bfd27a1fcc3fd2ef7980eb837f001e52878b2a4634c",
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "actualReceiptsPreserved": 4,
+          "closedSelectedLocalBindings": 1043,
+          "atomicOwnerAdmission": "Four actual JSONL proofs now exist and match closed logs. Admit these exact literal root claims/allowlist before the fresh coordinator boundary; remaining three evidence owners admitted only after real artifact creation. No placeholders or gate weakening.",
+          "fourOwners": [
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl"
+          ]
+        },
+        "supplierPolicySevenEvidenceOwners20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "state": "all_actual_closed_evidence_preserved_literal_admission",
+          "owners": [
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.json",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip"
+          ],
+          "rootClaimExpected": 271,
+          "archiveMembers": 200,
+          "archiveReadback": "Every member SHA verified after write; raw contract and receipt bytes preserved; raw attach/VM/session logs excluded.",
+          "financialTotalPassed": 26,
+          "financialUiPassed": 6,
+          "financialControllerPassed": 20,
+          "selected983Passed": true,
+          "affected141Passed": true,
+          "backend": "deferred",
+          "workspace": "Codex after integration",
+          "google": "separately listed",
+          "evidenceCheckoutPortability": "open integration child; no shared Git config/history/check changes"
+        },
+        "supplierPolicyFinalCheckpointReady20261003": {
+          "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "evidenceSha256": "d753fe1425e910ce5732ed947f5c29ef53def9b8e26cbdad4453be98db2ae196",
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip",
+            "sha256": "9b99f4d350a9e2777cf7763bef0d77770219a665cb4fb9cc834d7f7fb738548e",
+            "members": 200
+          },
+          "contract": {
+            "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+            "sha256": "ca39d72592a86151dc152e6d3b747b77ae5010998fd9066850a0fa66dde58e0d"
+          },
+          "handoffPrefixesPreserved": [
+            {
+              "path": "docs/quality/CURSOR-BUY-READY-20260921.md",
+              "originalBytes": 83085,
+              "originalSha256": "79667086484796d42c8ea86edef2e689591cb6777172fbe2a306c47cb702598e",
+              "prefixPreserved": true
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+              "originalBytes": 894010,
+              "originalSha256": "0f18949aca790f808b568a28a55427fa3b8cb93fab5d0a8921dbd725c9815028",
+              "prefixPreserved": true
+            }
+          ],
+          "financialPassed": 26,
+          "next": "Founder-authorized T08 frontend after this exact checkpoint; same open parent/lane",
+          "architectFinalReview": "Facts-only no new implementation blocker; staged raw proof Git blob hashes must match original receipts; feature checkpoint not formal closure/live acceptance; T08 fresh gates required.",
+          "checkpointOwners": [
+            "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+            "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+            "config/buy-founder-regression.json",
+            "config/codex-development-regression-registry.json",
+            "config/codex-subagent-coordination-policy.json",
+            "scripts/check-codex-subagent-coordination-policy.ps1",
+            "docs/quality/CURSOR-BUY-READY-20260921.md",
+            "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.json",
+            "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip"
+          ],
+          "ordinaryFeatureCommitSubject": "ui(buy-ready-20260921): move supplier policy consent to Add",
+          "evidenceCheckoutChild": "Open; archive preservation does not establish fresh-checkout reproducibility. Correct during integration without weakening checks.",
+          "formalTicketClosure": false,
+          "livePolicyAcceptance": false,
+          "liveProviderRecovery": "deferred",
+          "backend": "deferred",
+          "workspace": "Codex after integration",
+          "google": "separately listed",
+          "checkpoint": "pending memory/pre_commit + commit/push/exact clean remote readback; no success pre-claimed"
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

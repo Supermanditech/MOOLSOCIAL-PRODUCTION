@@ -139,6 +139,8 @@ class BuyV2CustomerStateSnapshot {
     this.excludedCartProductIds = const {},
     this.productIdentityKeys = const {},
     this.reviewDrafts = const {},
+    this.supplierPolicyAcceptances = const {},
+    this.supplierPolicyRequiredProductKeys = const {},
     this.procurementDraft,
     this.addresses = const [],
     this.selectedAddressId,
@@ -179,6 +181,10 @@ class BuyV2CustomerStateSnapshot {
   /// Retained identity constraints only, never listing or purchase authority.
   final Map<String, String> productIdentityKeys;
   final Map<String, BuyV2ProductReviewDraft> reviewDrafts;
+
+  /// Local buyer-scoped evidence only; never backend acceptance authority.
+  final Map<String, String> supplierPolicyAcceptances;
+  final Set<String> supplierPolicyRequiredProductKeys;
   // Persist selection identifiers, not Google response labels or coordinates.
   final String? shoppingRegionId;
   final String? shoppingGooglePlaceId;
@@ -301,6 +307,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
       growable: false,
     ),
     'productIdentityKeys': snapshot.productIdentityKeys,
+    'supplierPolicyAcceptances': snapshot.supplierPolicyAcceptances,
+    'supplierPolicyRequiredProductKeys': snapshot
+        .supplierPolicyRequiredProductKeys
+        .toList(),
     'reviewDrafts': {
       for (final entry in snapshot.reviewDrafts.entries)
         if (entry.key.isNotEmpty && entry.value.valid)
@@ -380,82 +390,85 @@ final class BuyV2SharedPreferencesCustomerStateStore
     return Map.unmodifiable(drafts);
   }
 
-  BuyV2CustomerStateSnapshot _decodeSnapshot(Map<String, Object?> source) =>
-      BuyV2CustomerStateSnapshot(
-        shoppingRegionId: _string(source['shoppingRegionId']),
-        shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
-        shoppingAreaScope: _string(source['shoppingAreaScope']),
-        cartQuantities: _stringIntMap(source['cartQuantities']),
-        excludedCartProductIds: _stringList(
-          source['excludedCartProductIds'],
-        ).toSet(),
-        productIdentityKeys: _stringMap(source['productIdentityKeys']),
-        reviewDrafts: _decodeReviewDrafts(source['reviewDrafts']),
-        procurementDraft: _decodeProcurementDraft(source['procurementDraft']),
-        addresses: _objectList(
-          source['addresses'],
-        ).map(_decodeAddress).whereType<BuyV2Address>().toList(growable: false),
-        selectedAddressId: _string(source['selectedAddressId']),
-        savedProductKeys: _stringList(source['savedProductKeys']).toSet(),
-        publicDeliveryInstruction: source['publicDeliveryInstruction'] is String
-            ? source['publicDeliveryInstruction'] as String
-            : null,
-        customDeliveryInstructions: _destinationStringMap(
-          source['customDeliveryInstructions'],
-        ),
-        deliveryInstructionIds: _destinationStringMap(
-          source['deliveryInstructionIds'],
-        ),
-        selectedPayment: _string(source['selectedPayment']),
-        purchaseOrderReference: _string(source['purchaseOrderReference']),
-        pendingPurchaseOrderAccountId: _string(
-          source['pendingPurchaseOrderAccountId'],
-        ),
-        pendingPurchaseOrderRequestId: _string(
-          source['pendingPurchaseOrderRequestId'],
-        ),
-        pendingPurchaseOrderRevision: _string(
-          source['pendingPurchaseOrderRevision'],
-        ),
-        checkoutIdempotencyKey: _string(source['checkoutIdempotencyKey']),
-        checkoutPaymentAttempt: _decodePaymentAttempt(
-          source['checkoutPaymentAttempt'],
-        ),
-        legacyCheckoutAttempt: _decodeLegacyAttempt(
-          source['legacyCheckoutAttempt'],
-        ),
-        retainedLegacyCheckoutAttempts:
-            _objectList(source['retainedLegacyCheckoutAttempts'])
-                .map(_decodeLegacyAttempt)
-                .whereType<BuyV2LegacyCheckoutAttempt>()
-                .toList(growable: false),
-        retainedCheckoutPaymentAttempts:
-            _objectList(source['retainedCheckoutPaymentAttempts'])
-                .map(_decodePaymentAttempt)
-                .whereType<BuyV2CheckoutPaymentAttempt>()
-                .toList(growable: false),
-        paymentRecoveryIncomplete: _paymentRecoveryIncomplete(source),
-        paymentReference: _string(source['paymentReference']),
-        paymentActionUri: _uri(source['paymentActionUri']),
-        bankTransferInstructions: _decodeTransfer(
-          source['bankTransferInstructions'],
-        ),
-        shoppingIntent: _string(source['shoppingIntent']),
-        checkoutSubmissionState: _string(source['checkoutSubmissionState']),
-        selectedBrands: _stringList(source['selectedBrands']).toSet(),
-        maximumPrice: _integer(source['maximumPrice']),
-        packFilter: _string(source['packFilter']),
-        fulfilmentMode: _string(source['fulfilmentMode']),
-        productSort: _string(source['productSort']),
-        availableOnly: source['availableOnly'] == true,
-        recentlyViewedProductIds: _stringList(
-          source['recentlyViewedProductIds'],
-        ),
-        recentSearches: _destinationStringListMap(source['recentSearches']),
-        orders: _objectList(
-          source['orders'],
-        ).map(_decodeOrder).whereType<BuyV2Order>().toList(growable: false),
-      );
+  BuyV2CustomerStateSnapshot _decodeSnapshot(
+    Map<String, Object?> source,
+  ) => BuyV2CustomerStateSnapshot(
+    shoppingRegionId: _string(source['shoppingRegionId']),
+    shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
+    shoppingAreaScope: _string(source['shoppingAreaScope']),
+    cartQuantities: _stringIntMap(source['cartQuantities']),
+    excludedCartProductIds: _stringList(
+      source['excludedCartProductIds'],
+    ).toSet(),
+    productIdentityKeys: _stringMap(source['productIdentityKeys']),
+    supplierPolicyAcceptances: _stringMap(source['supplierPolicyAcceptances']),
+    supplierPolicyRequiredProductKeys: _stringList(
+      source['supplierPolicyRequiredProductKeys'],
+    ).toSet(),
+    reviewDrafts: _decodeReviewDrafts(source['reviewDrafts']),
+    procurementDraft: _decodeProcurementDraft(source['procurementDraft']),
+    addresses: _objectList(
+      source['addresses'],
+    ).map(_decodeAddress).whereType<BuyV2Address>().toList(growable: false),
+    selectedAddressId: _string(source['selectedAddressId']),
+    savedProductKeys: _stringList(source['savedProductKeys']).toSet(),
+    publicDeliveryInstruction: source['publicDeliveryInstruction'] is String
+        ? source['publicDeliveryInstruction'] as String
+        : null,
+    customDeliveryInstructions: _destinationStringMap(
+      source['customDeliveryInstructions'],
+    ),
+    deliveryInstructionIds: _destinationStringMap(
+      source['deliveryInstructionIds'],
+    ),
+    selectedPayment: _string(source['selectedPayment']),
+    purchaseOrderReference: _string(source['purchaseOrderReference']),
+    pendingPurchaseOrderAccountId: _string(
+      source['pendingPurchaseOrderAccountId'],
+    ),
+    pendingPurchaseOrderRequestId: _string(
+      source['pendingPurchaseOrderRequestId'],
+    ),
+    pendingPurchaseOrderRevision: _string(
+      source['pendingPurchaseOrderRevision'],
+    ),
+    checkoutIdempotencyKey: _string(source['checkoutIdempotencyKey']),
+    checkoutPaymentAttempt: _decodePaymentAttempt(
+      source['checkoutPaymentAttempt'],
+    ),
+    legacyCheckoutAttempt: _decodeLegacyAttempt(
+      source['legacyCheckoutAttempt'],
+    ),
+    retainedLegacyCheckoutAttempts:
+        _objectList(source['retainedLegacyCheckoutAttempts'])
+            .map(_decodeLegacyAttempt)
+            .whereType<BuyV2LegacyCheckoutAttempt>()
+            .toList(growable: false),
+    retainedCheckoutPaymentAttempts:
+        _objectList(source['retainedCheckoutPaymentAttempts'])
+            .map(_decodePaymentAttempt)
+            .whereType<BuyV2CheckoutPaymentAttempt>()
+            .toList(growable: false),
+    paymentRecoveryIncomplete: _paymentRecoveryIncomplete(source),
+    paymentReference: _string(source['paymentReference']),
+    paymentActionUri: _uri(source['paymentActionUri']),
+    bankTransferInstructions: _decodeTransfer(
+      source['bankTransferInstructions'],
+    ),
+    shoppingIntent: _string(source['shoppingIntent']),
+    checkoutSubmissionState: _string(source['checkoutSubmissionState']),
+    selectedBrands: _stringList(source['selectedBrands']).toSet(),
+    maximumPrice: _integer(source['maximumPrice']),
+    packFilter: _string(source['packFilter']),
+    fulfilmentMode: _string(source['fulfilmentMode']),
+    productSort: _string(source['productSort']),
+    availableOnly: source['availableOnly'] == true,
+    recentlyViewedProductIds: _stringList(source['recentlyViewedProductIds']),
+    recentSearches: _destinationStringListMap(source['recentSearches']),
+    orders: _objectList(
+      source['orders'],
+    ).map(_decodeOrder).whereType<BuyV2Order>().toList(growable: false),
+  );
 
   Map<String, Object?> _encodePaymentAttempt(
     BuyV2CheckoutPaymentAttempt attempt,

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "CURSOR-BUY-SUPPLIER-POLICY-20261003",
+  "parentTicket": "BUY-ACTION-POLISH-20260926-01",
+  "scope": "mvp_required frontend pre-purchase disclosure and conditional affirmative Add consent",
+  "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+  "actor": "Public Shop consumer, Wholesale/Bulk buyer adding an exact Store-bound listing",
+  "founderRequirement": "Remove supplier policy from Cart. Show supplier-specific disclosure on product page/sheet. Only when required, Add opens an unchecked tick; the affirmative tick saves the current owned policy and adds exactly the intended quantity without another completion tap.",
+  "productPublication": [
+    "Store ID",
+    "policy ID and revision",
+    "title and actual body",
+    "applicable listing IDs",
+    "explicit requiresAcceptance decision independent of body availability",
+    "optional expiry"
+  ],
+  "receipt": "Local buyer-owner scoped SHA-256 fingerprint binds Store, policy ID, revision, body, applicability, acceptance requirement and expiry. Immutable Add intent binds exact product identity, initial quantity, increment and account instance. Local receipt is frontend persistence evidence, not backend enforcement or integrated supplier acceptance.",
+  "guards": [
+    "No pre-ticked consent",
+    "Disclosure alone adds nothing",
+    "Cancel adds nothing",
+    "Required missing/expired/wrong-owner/wrong-product/contradictory/backwards publication blocks Add",
+    "Fresh policy checked before and after awaited save and final Add",
+    "Duplicate tick/Add does not duplicate quantity",
+    "Failed write cannot create reusable acceptance",
+    "Queued customer saves retain in-flight tick without publishing reusable receipt until success",
+    "Buyer change, cancelled intent and stale callbacks cannot add",
+    "Unchanged owned policy can be reused; changed text at same ID/revision requires new choice",
+    "Old customer-state records decode with empty policy fields",
+    "Acceptance requires the exact displayed intent synchronously; stale popup A callbacks cannot accept replacement B"
+  ],
+  "cart": "No supplier-policy disclosure, acceptance section or expanded financial form in Cart. Checkout retains compact Order approval for actual amount/payment schedule; Review opens existing validated financial agreement sheet. Changed order-dependent agreements still block commitment/payment.",
+  "reuse": "Existing content snapshot, session, owner-scoped customer persistence, shared native product and Checkout surfaces; no route/service/dependency/backend additions",
+  "exclusions": [
+    "Backend deferred",
+    "Store/workspace publication and receipt enforcement: Codex after integration",
+    "Live-provider recovery: deferred until integration",
+    "Google/Maps dependencies remain separate",
+    "No APK build/install, live payment, provider action or other worktree edit",
+    "Historic formal ticket_close blocker retained"
+  ],
+  "legalInterpretation": "Frontend UX choice, not a claim that Indian law mandates a policy popup on every Add. Explicit consent remains unchecked and supplier disclosures stay pre-purchase. Commercial/resale applicability and enforceable live policy mapping need integrated authoritative Store contracts.",
+  "next": "T08 order status and later balances after scoped correction checkpoint",
+  "modal": "Existing root navigator with safe area and scrollable content; exact session dependency passed; dismiss only own route."
+}

@@ -588,6 +588,131 @@ List<_BuyV2PurchaseGroup> _purchaseGroupsFor(List<BuyV2Order> orders) {
 typedef BuyV2PartnerCatalogueHandler =
     void Function(BuyV2Product product, {bool brandOnly});
 
+Future<void> showBuyV2SupplierPolicySheet(
+  BuildContext context,
+  BuyV2Session session, {
+  BuyV2Product? product,
+  BuyV2SupplierPolicyAddIntent? intent,
+}) async {
+  final item = intent?.product ?? product;
+  if (item == null) return;
+  final policy = intent?.policy ?? session.publishedSupplierPolicyFor(item);
+  if (policy == null) return;
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: AnimatedBuilder(
+          animation: session,
+          builder: (context, _) {
+            if (intent != null &&
+                !identical(session.pendingSupplierPolicyAdd, intent)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (sheetContext.mounted &&
+                    (ModalRoute.of(sheetContext)?.isCurrent ?? false)) {
+                  Navigator.of(sheetContext).pop();
+                }
+              });
+              return const SizedBox.shrink();
+            }
+            return ConstrainedBox(
+              key: const ValueKey('buy-supplier-policy-sheet'),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .85,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            policy.title,
+                            style: context.buyBody.copyWith(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      buyV2CustomerStoreName(item.seller, item.storeId ?? ''),
+                      style: context.buyMeta,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(policy.body, style: context.buyBody),
+                    if (intent != null) ...[
+                      const SizedBox(height: 16),
+                      CheckboxListTile(
+                        key: const ValueKey(
+                          'buy-supplier-policy-accept-and-add',
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: session.supplierPolicyConsentBusy,
+                        title: Text(
+                          'I accept this policy and add ${intent.quantity} × ${item.customerTitle}',
+                          style: context.buyBody,
+                        ),
+                        onChanged: session.supplierPolicyConsentBusy
+                            ? null
+                            : (checked) async {
+                                if (checked != true) return;
+                                final added = await session
+                                    .acceptSupplierPolicyAndAdd(intent);
+                                if (sheetContext.mounted &&
+                                    (ModalRoute.of(sheetContext)?.isCurrent ??
+                                        false) &&
+                                    (added ||
+                                        !identical(
+                                          session.pendingSupplierPolicyAdd,
+                                          intent,
+                                        ))) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                              },
+                      ),
+                      if (session.supplierPolicyConsentBusy)
+                        const LinearProgressIndicator(minHeight: 2),
+                      if (session.notice case final message?)
+                        Text(message, style: context.buyMeta),
+                    ],
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: BuyV2Colors.ink,
+                      ),
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      child: Text(intent == null ? 'Close' : 'Cancel'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  } finally {
+    if (intent != null && identical(session.pendingSupplierPolicyAdd, intent)) {
+      session.cancelSupplierPolicyAdd();
+    }
+  }
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({
     super.key,
@@ -627,6 +752,7 @@ class BuyV2ProductView extends StatelessWidget {
     final review = session.customerReviewFor(product.id);
     final facts = session.productFactsFor(product);
     final content = session.productContentFor(product);
+    final supplierPolicy = session.publishedSupplierPolicyFor(product);
     final trust = session.marketplaceTrustFor(product);
     final productBenefits = session.productBenefitsFor(product);
     final productBenefitsState = session.productBenefitsStateFor(product);
@@ -1339,6 +1465,22 @@ class BuyV2ProductView extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (supplierPolicy != null)
+                        TextButton.icon(
+                          key: ValueKey(
+                            'buy-product-supplier-policy-${product.id}',
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: BuyV2Colors.ink,
+                          ),
+                          icon: const Icon(Icons.policy_outlined, size: 18),
+                          label: Text(supplierPolicy.title),
+                          onPressed: () => showBuyV2SupplierPolicySheet(
+                            context,
+                            session,
+                            product: product,
+                          ),
+                        ),
                       if (variants.length > 1 ||
                           sizeChart != null ||
                           product.hasStructuredVariants) ...[
@@ -11221,7 +11363,7 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
       return ('Check payment', session.reconcileCollectionPurchase);
     }
     if (session.purchaseOrderReviewRequired) {
-      return ('Check supplier terms', null);
+      return ('Check order agreement', null);
     }
     final basket = session.currentCollectionBasket;
     if (basket != null && controller?.canPlace(basket) == true) {
@@ -12492,14 +12634,55 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
 
 /// PO approval uses the existing checkout surface; it is not a payment method.
 class BuyV2PurchaseOrderPanel extends StatelessWidget {
-  const BuyV2PurchaseOrderPanel({super.key, required this.session});
+  const BuyV2PurchaseOrderPanel({
+    super.key,
+    required this.session,
+    this.compact = true,
+  });
   final BuyV2Session session;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: session,
     builder: (context, _) {
       if (!session.purchaseOrderRequired) return const SizedBox.shrink();
+      if (session.checkoutRequiresResolution) return const SizedBox.shrink();
+      if (compact) {
+        return _CheckoutCard(
+          key: const ValueKey('buy-checkout-order-agreement'),
+          icon: Icons.receipt_long_outlined,
+          title: 'Order approval',
+          detail: session.purchaseOrderReviewRequired
+              ? 'Review this order’s amount and payment schedule.'
+              : 'Approved for this order.',
+          action: 'Review',
+          onTap: session.checkoutBusy
+              ? null
+              : () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  useRootNavigator: true,
+                  backgroundColor: Colors.white,
+                  builder: (context) => SafeArea(
+                    top: false,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(context).height * .85,
+                      ),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: BuyV2PurchaseOrderPanel(
+                          session: session,
+                          compact: false,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        );
+      }
       final controller = session.purchaseOrder;
       final review = controller?.review;
       final busy = controller?.busy ?? false;
@@ -12524,14 +12707,14 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Supplier terms', style: context.buyBody),
+            Text('Order agreement', style: context.buyBody),
             Text(
-              'For your Wholesale items. Payment follows the agreed terms.',
+              'Review the amount and payment schedule for this order.',
               style: context.buyMeta,
             ),
             if (controller == null || controller.identity.value == null)
               Text(
-                'Supplier terms are unavailable right now.',
+                'Order approval is unavailable right now.',
                 style: context.buyMeta,
               ),
             if (review != null) ...[
@@ -12599,7 +12782,7 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                             busy
                         ? null
                         : session.reviewPurchaseOrder,
-                    child: const Text('Check supplier terms'),
+                    child: const Text('Check order agreement'),
                   ),
                 if (review != null &&
                     review.documents.every(
@@ -12611,7 +12794,7 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                         busy || !current || controller.needsReconciliation
                         ? null
                         : session.issuePurchaseOrder,
-                    child: const Text('Confirm supplier terms'),
+                    child: const Text('Confirm this order'),
                   ),
                 if (review != null &&
                     (!current ||
@@ -12629,7 +12812,7 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                     onPressed: busy || controller!.needsReconciliation
                         ? null
                         : session.reviewPurchaseOrder,
-                    child: const Text('Refresh supplier terms'),
+                    child: const Text('Refresh order agreement'),
                   ),
               ],
             ),

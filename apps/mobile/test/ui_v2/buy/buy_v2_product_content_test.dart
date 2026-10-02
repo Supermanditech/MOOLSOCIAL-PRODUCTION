@@ -1,14 +1,19 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_customer_copy.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show showBuyV2ShoppingHelp;
@@ -16,8 +21,473 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
     show buyV2BuyerDeliveryPromise, BuyV2ActionStyle;
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_qualified_provider_fixture.dart' show TestPaymentCommerce;
+import 'buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 
 void main() {
+  group('supplier policy Add consent', () {
+    late BuySession core;
+    late BuyV2Session session;
+    late _SupplierPolicyContent content;
+    late _SupplierPolicyState store;
+
+    setUp(() async {
+      core = BuySession();
+      content = _SupplierPolicyContent();
+      store = _SupplierPolicyState();
+      session = BuyV2Session(
+        core: core,
+        productContentAdapter: content,
+        customerStateStore: store,
+        commerceAdapter: TestPaymentCommerce(),
+        reviewDataEnabled: false,
+        productFactsAdapter: const BuyTestEligibilityFacts(),
+      );
+      await session.restoreCommerce();
+      expect(session.product('s-milk').storeId, isNotNull);
+      await session.restoreCustomerState();
+    });
+    tearDown(() {
+      session.dispose();
+      core.dispose();
+    });
+
+    test('normal Add and disclosure-only policy need no consent', () {
+      content.required = false;
+      expect(session.addProduct('s-milk'), isTrue, reason: session.notice);
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      expect(store.snapshot?.supplierPolicyAcceptances ?? {}, isEmpty);
+    });
+
+    test('required policy freezes quantity and cancel adds nothing', () {
+      expect(session.addProduct('s-milk', quantity: 2), isFalse);
+      expect(session.quantityFor('s-milk'), 0);
+      expect(
+        session.pendingSupplierPolicyAdd,
+        isNotNull,
+        reason: session.notice,
+      );
+      final intent = session.pendingSupplierPolicyAdd!;
+      expect(intent.quantity, 2);
+      expect(session.addProduct('s-milk'), isFalse);
+      expect(identical(session.pendingSupplierPolicyAdd, intent), isTrue);
+      session.cancelSupplierPolicyAdd();
+      expect(session.quantityFor('s-milk'), 0);
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      expect(store.snapshot?.supplierPolicyAcceptances ?? {}, isEmpty);
+    });
+
+    test('tick persists exact policy and duplicate ticks add once', () async {
+      expect(session.addProduct('s-milk', quantity: 2), isFalse);
+      store.pending = Completer<void>();
+      final first = session.acceptSupplierPolicyAndAdd(
+        session.pendingSupplierPolicyAdd,
+      );
+      expect(session.supplierPolicyConsentBusy, isTrue);
+      expect(
+        await session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        ),
+        isFalse,
+      );
+      store.pending!.complete();
+      expect(await first, isTrue);
+      expect(session.quantityFor('s-milk'), 2);
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      expect(store.snapshot!.supplierPolicyAcceptances, hasLength(1));
+      expect(session.addProduct('s-milk'), isTrue);
+      expect(session.quantityFor('s-milk'), 3);
+    });
+
+    test(
+      'same ID and revision with changed body requires a new tick',
+      () async {
+        session.addProduct('s-milk');
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isTrue,
+        );
+        content.body = 'Delivery and returns policy has changed.';
+        expect(session.addProduct('s-milk'), isFalse);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.pendingSupplierPolicyAdd!.policy.body, content.body);
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isTrue,
+        );
+        expect(session.quantityFor('s-milk'), 2);
+      },
+    );
+
+    test('policy change before tick or during save never adds', () async {
+      session.addProduct('s-milk');
+      content.body = 'Changed before consent';
+      expect(
+        await session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        ),
+        isFalse,
+      );
+      expect(session.quantityFor('s-milk'), 0);
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      session.addProduct('s-milk');
+      store.pending = Completer<void>();
+      final saved = session.acceptSupplierPolicyAndAdd(
+        session.pendingSupplierPolicyAdd,
+      );
+      content.body = 'Changed while saving';
+      store.pending!.complete();
+      expect(await saved, isFalse);
+      expect(session.quantityFor('s-milk'), 0);
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      expect(session.addProduct('s-milk'), isFalse);
+      expect(session.pendingSupplierPolicyAdd!.policy.body, content.body);
+    });
+
+    test('missing expired wrong Store and wrong product policies hold Add', () {
+      for (final mode in ['missing', 'expired', 'store', 'product']) {
+        content.mode = mode;
+        expect(session.addProduct('s-milk'), isFalse, reason: mode);
+        expect(session.quantityFor('s-milk'), 0, reason: mode);
+        expect(session.pendingSupplierPolicyAdd, isNull, reason: mode);
+      }
+    });
+
+    test(
+      'failed and throwing receipt writes hold Add and allow retry',
+      () async {
+        session.addProduct('s-milk');
+        store.reject = true;
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isFalse,
+        );
+        expect(session.quantityFor('s-milk'), 0);
+        expect(session.pendingSupplierPolicyAdd, isNotNull);
+        store.reject = false;
+        store.throwWrite = true;
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isFalse,
+        );
+        expect(session.quantityFor('s-milk'), 0);
+        store.throwWrite = false;
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isTrue,
+        );
+        expect(session.quantityFor('s-milk'), 1);
+      },
+    );
+
+    test(
+      'cancel during save and changed buyer never apply a stale Add',
+      () async {
+        session.addProduct('s-milk');
+        store.pending = Completer<void>();
+        final first = session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        );
+        session.cancelSupplierPolicyAdd();
+        store.pending!.complete();
+        expect(await first, isFalse);
+        expect(session.quantityFor('s-milk'), 0);
+        store.ownerScope = 'buyer-b';
+        expect(session.addProduct('s-milk'), isFalse);
+        final second = session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        );
+        store.ownerScope = 'buyer-c';
+        expect(await second, isFalse);
+        expect(session.quantityFor('s-milk'), 0);
+        expect(session.pendingSupplierPolicyAdd, isNull);
+      },
+    );
+
+    test('queued delivery-note save preserves the consent receipt', () async {
+      content.required = false;
+      expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+      await Future<void>.delayed(Duration.zero);
+      final baseline = store.writes.length;
+      content.required = true;
+      expect(session.addProduct('s-milk'), isFalse);
+      store.pending = Completer<void>();
+      final accept = session.acceptSupplierPolicyAndAdd(
+        session.pendingSupplierPolicyAdd,
+      );
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Call on arrival',
+        ),
+        isTrue,
+      );
+      store.pending!.complete();
+      expect(await accept, isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.writes.length, greaterThan(baseline + 1));
+      for (final write in store.writes.skip(baseline)) {
+        expect(write.supplierPolicyAcceptances, isNotEmpty);
+      }
+      expect(store.snapshot!.supplierPolicyAcceptances, isNotEmpty);
+      expect(store.snapshot!.publicDeliveryInstruction, 'Call on arrival');
+    });
+
+    test('cancelled failed save never leaves reusable consent', () async {
+      session.addProduct('s-milk');
+      store.pending = Completer<void>();
+      store.reject = true;
+      final save = session.acceptSupplierPolicyAndAdd(
+        session.pendingSupplierPolicyAdd,
+      );
+      session.cancelSupplierPolicyAdd();
+      store.pending!.complete();
+      expect(await save, isFalse);
+      expect(session.quantityFor('s-milk'), 0);
+      expect(session.addProduct('s-milk'), isFalse);
+      expect(session.pendingSupplierPolicyAdd, isNotNull);
+    });
+
+    test(
+      'cold restore reuses owned receipt and missing required policy holds',
+      () async {
+        session.addProduct('s-milk');
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isTrue,
+        );
+        final otherCore = BuySession();
+        final restored = BuyV2Session(
+          core: otherCore,
+          productContentAdapter: content,
+          customerStateStore: store,
+          commerceAdapter: TestPaymentCommerce(),
+          reviewDataEnabled: false,
+          productFactsAdapter: const BuyTestEligibilityFacts(),
+        );
+        addTearDown(restored.dispose);
+        addTearDown(otherCore.dispose);
+        await restored.restoreCommerce();
+        await restored.restoreCustomerState();
+        expect(restored.addProduct('s-milk'), isTrue);
+        expect(restored.pendingSupplierPolicyAdd, isNull);
+        content.mode = 'missing';
+        final quantity = restored.quantityFor('s-milk');
+        expect(restored.addProduct('s-milk'), isFalse);
+        expect(restored.quantityFor('s-milk'), quantity);
+      },
+    );
+
+    test(
+      'policy receipt codec preserves owner isolation and legacy state',
+      () async {
+        final preferences = _SupplierPolicyPreferences();
+        final a = BuyV2SharedPreferencesCustomerStateStore(
+          preferences,
+          ownerScope: 'buyer-a',
+        );
+        final b = BuyV2SharedPreferencesCustomerStateStore(
+          preferences,
+          ownerScope: 'buyer-b',
+        );
+        expect(
+          await a.write(
+            const BuyV2CustomerStateSnapshot(
+              supplierPolicyAcceptances: {
+                'supplier-policy': 'owned-fingerprint',
+              },
+              supplierPolicyRequiredProductKeys: {'store-listing-identity'},
+            ),
+          ),
+          isTrue,
+        );
+        final restored = (await a.read())!;
+        expect(restored.supplierPolicyAcceptances, {
+          'supplier-policy': 'owned-fingerprint',
+        });
+        expect(restored.supplierPolicyRequiredProductKeys, {
+          'store-listing-identity',
+        });
+        expect(await b.read(), isNull);
+        final key = preferences.values.keys.single;
+        final legacy =
+            jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+        legacy.remove('supplierPolicyAcceptances');
+        legacy.remove('supplierPolicyRequiredProductKeys');
+        preferences.values[key] = jsonEncode(legacy);
+        expect((await a.read())!.supplierPolicyAcceptances, isEmpty);
+        expect((await a.read())!.supplierPolicyRequiredProductKeys, isEmpty);
+      },
+    );
+
+    testWidgets('stale popup tick cannot accept a replacement Add intent', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session, productId: 's-milk'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(session.addProduct('s-milk'), isFalse);
+      await tester.pumpAndSettle();
+      final oldTick = tester
+          .widget<CheckboxListTile>(
+            find.byKey(const ValueKey('buy-supplier-policy-accept-and-add')),
+          )
+          .onChanged!;
+      session.cancelSupplierPolicyAdd();
+      expect(session.addProduct('s-tomato'), isFalse);
+      final replacement = session.pendingSupplierPolicyAdd!;
+      expect(replacement.product.id, 's-tomato');
+      final writesBefore = store.writes.length;
+      oldTick(true);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('s-milk'), 0);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(store.writes.length, writesBefore);
+      expect(store.snapshot?.supplierPolicyAcceptances ?? {}, isEmpty);
+      expect(identical(session.pendingSupplierPolicyAdd, replacement), isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Cart has no supplier policy section after affirmative Add', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      session.addProduct('s-milk');
+      expect(
+        await session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        ),
+        isTrue,
+      );
+      session.openCart();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(session: session, initialView: BuyV2View.cart),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Supplier terms'), findsNothing);
+      expect(find.text(content.body), findsNothing);
+      expect(find.text('Delivery and returns policy'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-supplier-policy-sheet')),
+        findsNothing,
+      );
+      expect(session.quantityFor('s-milk'), 1);
+      await captureR66Visual(tester, 'supplier-policy-cart-no-terms');
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final viewport in [const Size(360, 800), const Size(800, 360)]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('popup unchecked cancel and tick at $viewport text $scale', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => r66VisualCaptureRoot(
+                MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!,
+                ),
+              ),
+              home: viewport.width == 360
+                  ? Scaffold(
+                      bottomNavigationBar: const SizedBox(height: 48),
+                      body: Navigator(
+                        onGenerateRoute: (_) => MaterialPageRoute<void>(
+                          builder: (_) => BuyV2Screen(
+                            session: session,
+                            productId: 's-milk',
+                          ),
+                        ),
+                      ),
+                    )
+                  : BuyV2Screen(session: session, productId: 's-milk'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final disclosure = find.byKey(
+            const ValueKey('buy-product-supplier-policy-s-milk'),
+          );
+          if (disclosure.evaluate().isEmpty) {
+            await tester.scrollUntilVisible(
+              disclosure,
+              140,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const PageStorageKey('buy-product-s-milk')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+          }
+          await tester.ensureVisible(disclosure);
+          await tester.tap(disclosure);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-supplier-policy-accept-and-add')),
+            findsNothing,
+          );
+          expect(session.quantityFor('s-milk'), 0);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          session.addProduct('s-milk', quantity: 2);
+          await tester.pumpAndSettle();
+          final tick = find.byKey(
+            const ValueKey('buy-supplier-policy-accept-and-add'),
+          );
+          expect(tester.widget<CheckboxListTile>(tick).value, isFalse);
+          expect(find.byType(BottomSheet), findsOneWidget);
+          expect(session.quantityFor('s-milk'), 0);
+          await captureR66Visual(
+            tester,
+            'supplier-policy-${viewport.width.toInt()}-text${(scale * 100).toInt()}',
+          );
+          await tester.ensureVisible(find.text('Cancel'));
+          await tester.tap(find.text('Cancel'));
+          await tester.pumpAndSettle();
+          expect(session.pendingSupplierPolicyAdd, isNull);
+          expect(session.quantityFor('s-milk'), 0);
+          session.addProduct('s-milk', quantity: 2);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(tick);
+          await tester.tap(tick);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('s-milk'), 2);
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  });
+
   test(
     'CAT01 category facts preserve applicability false zero and unknown',
     () {
@@ -4003,6 +4473,72 @@ final class _ReferenceMediaAdapter implements BuyV2ProductContentAdapter {
         ),
     ],
   );
+}
+
+final class _SupplierPolicyPreferences implements SharedPreferencesAsync {
+  final Map<String, String> values = {};
+  @override
+  Future<String?> getString(String key) async => values[key];
+  @override
+  Future<void> setString(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected supplier policy preferences operation');
+}
+
+final class _SupplierPolicyState implements BuyV2CustomerStateStore {
+  @override
+  String? ownerScope = 'buyer-a';
+  BuyV2CustomerStateSnapshot? snapshot;
+  final List<BuyV2CustomerStateSnapshot> writes = [];
+  Completer<void>? pending;
+  bool reject = false;
+  bool throwWrite = false;
+
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    writes.add(value);
+    if (pending case final wait?) await wait.future;
+    if (throwWrite) throw StateError('isolated receipt write failure');
+    if (reject) return false;
+    snapshot = value;
+    return true;
+  }
+}
+
+final class _SupplierPolicyContent implements BuyV2ProductContentAdapter {
+  bool required = true;
+  String body = 'Delivery and returns follow the published Store policy.';
+  String mode = 'valid';
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) =>
+      BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.ready,
+        sourceId: 'isolated-supplier-policy-contract',
+        supplierPolicyAcceptanceRequired: required,
+        supplierPolicy: mode == 'missing'
+            ? null
+            : BuyV2SupplierPolicy(
+                id: 'policy-1',
+                storeId: mode == 'store' ? 'different-store' : product.storeId!,
+                revision: 'r1',
+                title: 'Delivery and returns policy',
+                body: body,
+                productIds: {
+                  mode == 'product' ? 'different-product' : product.id,
+                },
+                requiresAcceptance: required,
+                validUntil: mode == 'expired' ? DateTime(2000) : null,
+              ),
+      );
 }
 
 final class _ContentAdapter implements BuyV2ProductContentAdapter {

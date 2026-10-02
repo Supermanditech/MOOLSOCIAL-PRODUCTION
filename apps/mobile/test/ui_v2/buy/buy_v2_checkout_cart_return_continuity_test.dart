@@ -4288,7 +4288,10 @@ void _purchaseOrderPanelCases() {
             theme: MoolTheme.light(),
             home: Scaffold(
               body: SingleChildScrollView(
-                child: BuyV2PurchaseOrderPanel(session: session),
+                child: BuyV2PurchaseOrderPanel(
+                  session: session,
+                  compact: false,
+                ),
               ),
             ),
           ),
@@ -4309,7 +4312,7 @@ void _purchaseOrderPanelCases() {
         expect(find.text('Previous terms · review required'), findsNothing);
         expect(
           find.text(
-            'Supplier terms status needs checking. Do not submit again.',
+            'Order agreement status needs checking. Do not submit again.',
           ),
           findsOneWidget,
         );
@@ -4363,9 +4366,14 @@ void _purchaseOrderPanelCases() {
             theme: MoolTheme.light(),
             builder: (context, child) => r66VisualCaptureRoot(child!),
             home: Scaffold(
-              body: BuyV2CheckoutView(
-                session: session,
-                gstInvoiceController: gst,
+              bottomNavigationBar: const SizedBox(height: 48),
+              body: Navigator(
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (_) => BuyV2CheckoutView(
+                    session: session,
+                    gstInvoiceController: gst,
+                  ),
+                ),
               ),
             ),
           ),
@@ -4387,11 +4395,18 @@ void _purchaseOrderPanelCases() {
 
         Future<void> captureCollection(String state) async {
           if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
-          await tester.ensureVisible(find.text('Supplier terms'));
+          await tester.ensureVisible(find.text('Order agreement'));
           await tester.pumpAndSettle();
           await captureR66Visual(tester, 'po-collection-$state-text$scale');
         }
 
+        expect(find.text('Supplier terms'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-purchase-order-panel')),
+          findsNothing,
+        );
+        await tap('buy-checkout-order-agreement');
+        expect(find.byType(BottomSheet), findsOneWidget);
         await tap('buy-po-review');
         await captureCollection('draft');
         source.state = BuyV2PurchaseOrderState.awaitingSupplier;
@@ -4401,6 +4416,8 @@ void _purchaseOrderPanelCases() {
         source.state = BuyV2PurchaseOrderState.accepted;
         await tap('buy-po-refresh');
         await captureCollection('accepted');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
         expect(session.purchaseOrderReviewRequired, isFalse);
         expect(find.text('Check total'), findsOneWidget);
         // No collection gateway is installed in this fixture: approval alone
@@ -4434,7 +4451,7 @@ void _purchaseOrderPanelCases() {
           key: const ValueKey('r66-cart-capture'),
           child: Scaffold(
             body: SingleChildScrollView(
-              child: BuyV2PurchaseOrderPanel(session: session),
+              child: BuyV2PurchaseOrderPanel(session: session, compact: false),
             ),
           ),
         ),
@@ -4449,13 +4466,13 @@ void _purchaseOrderPanelCases() {
         await tester.pumpAndSettle();
         expect(scroll.position.pixels, 0);
         expect(
-          tester.getTopLeft(find.text('Supplier terms')).dy,
+          tester.getTopLeft(find.text('Order agreement')).dy,
           greaterThanOrEqualTo(0),
         );
         await captureR66Visual(tester, 'po-$state-text$scale');
         expect(scroll.position.pixels, 0);
         expect(
-          tester.getTopLeft(find.text('Supplier terms')).dy,
+          tester.getTopLeft(find.text('Order agreement')).dy,
           greaterThanOrEqualTo(0),
         );
       }

@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "2EAD0C8DA6C32A4A336C4C2C181C96CFFDAE6257CF8AAD849CC6BB290CB02D6F"
+    "sha256": "893CF62A7CE18531CA93B6E66A740DA1C8ED4BCF4E23D496DD8225407456AA07"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -297,7 +297,14 @@
         "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-2.jsonl",
         "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-3.jsonl",
         "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.json",
-        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip"
+        "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.json",
+        "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip"
       ]
     },
     {

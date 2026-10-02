@@ -1193,6 +1193,64 @@ class BuyV2ProductPriceHistory {
       validUntil.isAfter(now);
 }
 
+/// Published pre-purchase policy. This is separate from an order's price,
+/// advance, balance and due-date agreement; it grants no payment authority.
+@immutable
+class BuyV2SupplierPolicy {
+  BuyV2SupplierPolicy({
+    required this.id,
+    required this.storeId,
+    required this.revision,
+    required this.title,
+    required this.body,
+    required Set<String> productIds,
+    required this.requiresAcceptance,
+    this.validUntil,
+  }) : productIds = Set.unmodifiable(productIds);
+
+  final String id;
+  final String storeId;
+  final String revision;
+  final String title;
+  final String body;
+  final Set<String> productIds;
+  final bool requiresAcceptance;
+  final DateTime? validUntil;
+
+  bool appliesTo(BuyV2Product product, DateTime now) =>
+      id.trim().isNotEmpty &&
+      revision.trim().isNotEmpty &&
+      storeId.trim().isNotEmpty &&
+      storeId == product.storeId &&
+      productIds.contains(product.id) &&
+      productIds.every((id) => id.trim().isNotEmpty) &&
+      title.trim().isNotEmpty &&
+      body.trim().isNotEmpty &&
+      (validUntil == null || validUntil!.isAfter(now));
+
+  String get receiptKey => jsonEncode([storeId, id]);
+
+  // Content and applicability are bound too: reusing an ID/revision while
+  // changing the actual policy cannot silently reuse a previous acceptance.
+  String acceptanceFingerprint(String ownerScope) => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            ownerScope,
+            storeId,
+            id,
+            revision,
+            title,
+            body,
+            productIds.toList()..sort(),
+            requiresAcceptance,
+            validUntil?.toUtc().toIso8601String(),
+          ]),
+        ),
+      )
+      .toString();
+}
+
 @immutable
 class BuyV2ProductContentSnapshot {
   const BuyV2ProductContentSnapshot({
@@ -1209,6 +1267,8 @@ class BuyV2ProductContentSnapshot {
     this.observedAt,
     this.sizeChart,
     this.priceHistory,
+    this.supplierPolicy,
+    this.supplierPolicyAcceptanceRequired,
     this.retryable = false,
   });
 
@@ -1249,6 +1309,11 @@ class BuyV2ProductContentSnapshot {
   final DateTime? observedAt;
   final BuyV2ProductSizeChart? sizeChart;
   final BuyV2ProductPriceHistory? priceHistory;
+  final BuyV2SupplierPolicy? supplierPolicy;
+
+  /// Publication can require consent while the policy body is unavailable.
+  /// Null means this producer has not supplied the decision, not new consent.
+  final bool? supplierPolicyAcceptanceRequired;
   final bool retryable;
 }
 

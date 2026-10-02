@@ -2950,8 +2950,8 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
     } on Object {
       if (!_current(epoch, owner)) return false;
       message = needsReconciliation
-          ? 'Supplier terms status needs checking. Do not submit again.'
-          : 'Supplier terms could not be checked. Try again.';
+          ? 'Order agreement status needs checking. Do not submit again.'
+          : 'Order agreement could not be checked. Try again.';
       return false;
     } finally {
       if (_current(epoch, owner)) {
@@ -3124,6 +3124,26 @@ class _BuyV2DeviceReviewPurchaseOrderAdapter
     _revision++;
     return _snapshot();
   }
+}
+
+class BuyV2SupplierPolicyAddIntent {
+  const BuyV2SupplierPolicyAddIntent({
+    required this.product,
+    required this.productIdentity,
+    required this.quantity,
+    required this.initialQuantity,
+    required this.policy,
+    required this.ownerScope,
+    required this.accountIdentity,
+  });
+
+  final BuyV2Product product;
+  final String productIdentity;
+  final int quantity;
+  final int initialQuantity;
+  final BuyV2SupplierPolicy policy;
+  final String? ownerScope;
+  final Object? accountIdentity;
 }
 
 class BuyV2Session extends ChangeNotifier {
@@ -5845,6 +5865,13 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
   final Map<String, BuyV2ProductContentSnapshot> _productContent = {};
   final Map<String, List<Object?>> _productContentMediaInputs = {};
+  final Map<String, String> _supplierPolicyAcceptances = {};
+  Map<String, String>? _supplierPolicyAcceptancesInFlight;
+  final Set<String> _requiredSupplierPolicyProducts = {};
+  String? _supplierPolicyOwnerScope;
+  BuyV2SupplierPolicyAddIntent? _pendingSupplierPolicyAdd;
+  bool _supplierPolicyConsentBusy = false;
+  int _supplierPolicyConsentSequence = 0;
   final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
@@ -7677,6 +7704,13 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2CustomerStateSnapshot snapshot, {
     bool retainUnknownProducts = false,
   }) {
+    _ensureSupplierPolicyOwner();
+    _supplierPolicyAcceptances
+      ..clear()
+      ..addAll(snapshot.supplierPolicyAcceptances);
+    _requiredSupplierPolicyProducts
+      ..clear()
+      ..addAll(snapshot.supplierPolicyRequiredProductKeys);
     if (_shoppingAreaRevision == 0) {
       final region = snapshot.shoppingRegionId;
       final place = snapshot.shoppingGooglePlaceId;
@@ -8048,7 +8082,9 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool>? _persistCustomerState() {
+  Future<bool>? _persistCustomerState({
+    Map<String, String>? supplierPolicyAcceptances,
+  }) {
     if (!procurementScopeCurrent ||
         (customerStateRecoveryPending &&
             (!_customerStateSnapshotLoaded ||
@@ -8066,8 +8102,17 @@ class BuyV2Session extends ChangeNotifier {
       _unresolvedCustomerCart.removeWhere((id, _) => _cart.containsKey(id));
     }
     _ensureReviewDraftOwner();
+    _ensureSupplierPolicyOwner();
     final snapshot = BuyV2CustomerStateSnapshot(
       reviewDrafts: Map.unmodifiable(_reviewDrafts),
+      supplierPolicyAcceptances: Map.unmodifiable(
+        supplierPolicyAcceptances ??
+            _supplierPolicyAcceptancesInFlight ??
+            _supplierPolicyAcceptances,
+      ),
+      supplierPolicyRequiredProductKeys: Set.unmodifiable(
+        _requiredSupplierPolicyProducts,
+      ),
       shoppingRegionId: _catalogueRegionId,
       shoppingGooglePlaceId: _shoppingGooglePlaceId,
       shoppingAreaScope: _catalogueAreaScope.name,
@@ -8444,7 +8489,7 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> submitCollectionPurchase() async {
     if (purchaseOrderReviewRequired) {
-      notice = 'Supplier terms for collection need checking before payment.';
+      notice = 'Order agreement for collection need checking before payment.';
       notifyListeners();
       return false;
     }
@@ -13372,7 +13417,172 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
+  void _ensureSupplierPolicyOwner() {
+    final owner = customerStateStore?.ownerScope;
+    if (_supplierPolicyOwnerScope == owner) return;
+    _supplierPolicyOwnerScope = owner;
+    _supplierPolicyAcceptances.clear();
+    _supplierPolicyAcceptancesInFlight = null;
+    _requiredSupplierPolicyProducts.clear();
+    _pendingSupplierPolicyAdd = null;
+    _supplierPolicyConsentBusy = false;
+    _supplierPolicyConsentSequence++;
+  }
+
+  BuyV2SupplierPolicyAddIntent? get pendingSupplierPolicyAdd {
+    _ensureSupplierPolicyOwner();
+    return _pendingSupplierPolicyAdd;
+  }
+
+  bool get supplierPolicyConsentBusy => _supplierPolicyConsentBusy;
+
+  BuyV2SupplierPolicy? publishedSupplierPolicyFor(BuyV2Product product) {
+    final content = productContentFor(product);
+    final policy = content.supplierPolicy;
+    return content.state == BuyV2ProductContentState.ready &&
+            policy?.appliesTo(product, catalogueNow()) == true
+        ? policy
+        : null;
+  }
+
+  BuyV2ProductContentSnapshot? _freshSupplierPolicyContent(
+    BuyV2Product product,
+  ) {
+    final identity = _buyV2ProductIdentityKey(product);
+    try {
+      final previous = productContentFor(product);
+      if (previous.supplierPolicy?.requiresAcceptance == true ||
+          previous.supplierPolicyAcceptanceRequired == true) {
+        _requiredSupplierPolicyProducts.add(identity);
+      }
+      final next = productContentAdapter.snapshotFor(product);
+      if (next.supplierPolicy?.requiresAcceptance == true ||
+          next.supplierPolicyAcceptanceRequired == true) {
+        _requiredSupplierPolicyProducts.add(identity);
+      }
+      if (!_validProductContent(product, next) ||
+          next.state != BuyV2ProductContentState.ready ||
+          (next.supplierPolicy != null &&
+              next.supplierPolicyAcceptanceRequired != null &&
+              next.supplierPolicyAcceptanceRequired !=
+                  next.supplierPolicy!.requiresAcceptance) ||
+          (previous.observedAt != null &&
+              next.observedAt != null &&
+              next.observedAt!.isBefore(previous.observedAt!))) {
+        return null;
+      }
+      _productContent[product.id] = next;
+      _productContentMediaInputs[product.id] = _productContentInput(product);
+      if ((next.supplierPolicy?.appliesTo(product, catalogueNow()) == true &&
+              next.supplierPolicy!.requiresAcceptance == false) ||
+          (next.supplierPolicy == null &&
+              next.supplierPolicyAcceptanceRequired == false)) {
+        _requiredSupplierPolicyProducts.remove(identity);
+      }
+      return next;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void cancelSupplierPolicyAdd() {
+    _pendingSupplierPolicyAdd = null;
+    _supplierPolicyAcceptancesInFlight = null;
+    _supplierPolicyConsentBusy = false;
+    _supplierPolicyConsentSequence++;
+    if (!_collectionDisposed) notifyListeners();
+  }
+
+  Future<bool> acceptSupplierPolicyAndAdd(
+    BuyV2SupplierPolicyAddIntent? expectedIntent,
+  ) async {
+    final intent = pendingSupplierPolicyAdd;
+    if (intent == null ||
+        !identical(intent, expectedIntent) ||
+        _supplierPolicyConsentBusy ||
+        _collectionDisposed) {
+      return false;
+    }
+    final owner = intent.ownerScope;
+    if (owner == null || owner.trim().isEmpty) {
+      notice = 'Sign in to save and accept this Store policy.';
+      notifyListeners();
+      return false;
+    }
+    bool currentIntent() {
+      final current = findProduct(intent.product.id);
+      return !_collectionDisposed &&
+          identical(_pendingSupplierPolicyAdd, intent) &&
+          customerStateStore?.ownerScope == owner &&
+          identical(collectionIdentity?.value, intent.accountIdentity) &&
+          procurementScopeCurrent &&
+          quantityFor(intent.product.id) == intent.initialQuantity &&
+          current != null &&
+          _buyV2ProductIdentityKey(current) == intent.productIdentity;
+    }
+
+    // Do not accept cached content, a changed variant, or a stale account.
+    if (!currentIntent()) return false;
+    final fresh = _freshSupplierPolicyContent(intent.product)?.supplierPolicy;
+    final fingerprint = intent.policy.acceptanceFingerprint(owner);
+    if (fresh?.appliesTo(intent.product, catalogueNow()) != true ||
+        fresh!.acceptanceFingerprint(owner) != fingerprint) {
+      cancelSupplierPolicyAdd();
+      notice = 'Store policy changed. Open the product and check it again.';
+      notifyListeners();
+      return false;
+    }
+    final sequence = ++_supplierPolicyConsentSequence;
+    _supplierPolicyConsentBusy = true;
+    final acceptedPolicies = {
+      ..._supplierPolicyAcceptances,
+      intent.policy.receiptKey: fingerprint,
+    };
+    // Other queued customer-state snapshots must retain the affirmative tick,
+    // but this candidate is not reusable until its own save succeeds.
+    _supplierPolicyAcceptancesInFlight = acceptedPolicies;
+    notifyListeners();
+    try {
+      final saved =
+          await (_persistCustomerState(
+                    supplierPolicyAcceptances: acceptedPolicies,
+                  ) ??
+                  Future<bool>.value(false))
+              .catchError((Object _) => false);
+      if (sequence != _supplierPolicyConsentSequence || !currentIntent()) {
+        return false;
+      }
+      if (!saved) {
+        notice = 'Your acceptance could not be saved. Try again.';
+        return false;
+      }
+      _supplierPolicyAcceptances[intent.policy.receiptKey] = fingerprint;
+      final currentPolicy = _freshSupplierPolicyContent(
+        intent.product,
+      )?.supplierPolicy;
+      if (currentPolicy?.appliesTo(intent.product, catalogueNow()) != true ||
+          currentPolicy!.acceptanceFingerprint(owner) != fingerprint) {
+        _pendingSupplierPolicyAdd = null;
+        notice = 'Store policy changed. Open the product and check it again.';
+        return false;
+      }
+      _pendingSupplierPolicyAdd = null;
+      _supplierPolicyConsentBusy = false;
+      return addProduct(intent.product.id, quantity: intent.quantity);
+    } finally {
+      if (sequence == _supplierPolicyConsentSequence) {
+        _supplierPolicyAcceptancesInFlight = null;
+        _supplierPolicyConsentBusy = false;
+        if (!_collectionDisposed) notifyListeners();
+      }
+    }
+  }
+
   bool addProduct(String id, {int? quantity}) {
+    _ensureSupplierPolicyOwner();
+    if (_pendingSupplierPolicyAdd != null || _supplierPolicyConsentBusy) {
+      return false;
+    }
     if (_holdCartForPaymentResolution()) return false;
     final item = findProduct(id);
     if (item == null) {
@@ -13461,6 +13671,33 @@ class BuyV2Session extends ChangeNotifier {
       notice = 'Prescription quantity reached for ${item.title}.';
       notifyListeners();
       return false;
+    }
+    final content = _freshSupplierPolicyContent(item);
+    final policy = content?.supplierPolicy;
+    final identity = _buyV2ProductIdentityKey(item);
+    if (_requiredSupplierPolicyProducts.contains(identity)) {
+      if (policy?.appliesTo(item, catalogueNow()) != true) {
+        notice = 'Store policy could not be confirmed. Refresh this product.';
+        notifyListeners();
+        return false;
+      }
+      final owner = customerStateStore?.ownerScope;
+      if (owner == null ||
+          _supplierPolicyAcceptances[policy!.receiptKey] !=
+              policy.acceptanceFingerprint(owner)) {
+        _pendingSupplierPolicyAdd = BuyV2SupplierPolicyAddIntent(
+          product: item,
+          productIdentity: identity,
+          quantity: addedQuantity,
+          initialQuantity: current?.quantity ?? 0,
+          policy: policy!,
+          ownerScope: owner,
+          accountIdentity: collectionIdentity?.value,
+        );
+        notice = null;
+        notifyListeners();
+        return false;
+      }
     }
     _cart[id] = BuyV2CartLine(
       product: pricedItem,
@@ -14110,7 +14347,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (purchaseOrderReviewRequired) {
-      notice = 'Supplier terms changed. Check them before payment.';
+      notice = 'Order agreement changed. Check them before payment.';
       notifyListeners();
       return false;
     }
@@ -14399,7 +14636,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (!_checkoutEligibilityCurrent(placingOrder: true)) return false;
     if (purchaseOrderReviewRequired) {
-      notice = 'Supplier terms changed. Check them before payment.';
+      notice = 'Order agreement changed. Check them before payment.';
       notifyListeners();
       return false;
     }
@@ -14529,7 +14766,7 @@ class BuyV2Session extends ChangeNotifier {
       _checkoutIdempotencyKey = null;
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
       notice = retained
-          ? 'Supplier terms changed. Check them before payment.'
+          ? 'Order agreement changed. Check them before payment.'
           : 'Order recovery could not be saved. No payment was started.';
       _persistCustomerState();
       notifyListeners();
