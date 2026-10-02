@@ -682,6 +682,8 @@ class WorkSession extends ChangeNotifier {
   String newWorkspacePurchaseDraftId() => _newCounterIdentity('manual-purchase-draft');
   WorkspacePurchaseEntryDraft? get workspacePurchaseEntryDraft =>
       _supplierDirectories[_supplierKey]?.draft;
+  bool get workspacePurchaseDraftReviewed =>
+      _supplierDirectories[_supplierKey]?.draftHasReviewedCopy == true;
   bool get workspaceSupplierSaving => _supplierWrites.contains(_supplierKey);
   String? get workspaceSupplierError => _supplierErrors[_supplierKey];
   List<WorkspaceSupplierProfile> get workspaceSuppliers =>
@@ -719,6 +721,7 @@ class WorkSession extends ChangeNotifier {
     required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft,
     required int? expectedRevision,
     WorkspacePurchaseSavedCopy? reviewedCopy,
+    String? replaceReviewedDraftId,
   }) async {
     final key = _supplierKey;
     if (key == null || key != scope || !workspaceSuppliersLoaded || workspaceSupplierSaving ||
@@ -742,9 +745,24 @@ class WorkSession extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+      if (draft.invoiceFinancialYear == null) {
+        _supplierErrors[key] = 'Check Invoice date. Enter a valid date as DD/MM/YYYY before saving the purchase copy. Your entries are kept.';
+        notifyListeners();
+        return false;
+      }
+      final duplicateBill = old?.duplicateInvoice(draft);
+      if (duplicateBill != null) {
+        _supplierErrors[key] = 'Bill ${duplicateBill.draft.invoiceReference} dated ${duplicateBill.draft.invoiceDate} is already saved for ${duplicateBill.supplier.name}. Check the bill number, or cancel to reopen its saved copy in Purchases. Your entries are kept.';
+        notifyListeners();
+        return false;
+      }
     }
+    final replacesReviewedDraft = replaceReviewedDraftId != null &&
+      old?.draft?.id == replaceReviewedDraftId && old?.draftHasReviewedCopy == true &&
+      draft.id != replaceReviewedDraftId;
     if (old?.revision != expectedRevision || !draft.valid || draft.supplierId != profile.id ||
-        (old?.draft != null && (old!.draft!.id != draft.id ||
+        (replaceReviewedDraftId != null && !replacesReviewedDraft) ||
+        (old?.draft != null && !replacesReviewedDraft && (old!.draft!.id != draft.id ||
           old.draft!.createdAt != draft.createdAt))) {
       _supplierErrors[key] = 'This purchase draft changed. Reopen it before saving again.';
       notifyListeners();

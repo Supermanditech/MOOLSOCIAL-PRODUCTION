@@ -614,6 +614,58 @@ void main() {
     expect(() => book.copies.single.draft.goods.single['cost'] = '0', throwsUnsupportedError);
     expect(book.toJson(), copyBook().toJson());
   });
+  for (final pair in <(String, int?)>[
+    ('31/03/2026', 2025), ('01/04/2026', 2026), ('2026-04-01', 2026),
+    ('29/02/2024', 2023), ('29/02/2026', null), ('31/04/2026', null),
+    ('01/13/2026', null), ('2026/09/30', null), ('', null),
+  ]) {
+    test('P05-NEXT invoice financial year validates ${pair.$1}', () {
+      final draft = WorkspacePurchaseEntryDraft.fromJson({...entryFixture().draft!.toJson(),
+        'invoiceDate': pair.$1});
+      expect(draft.invoiceFinancialYear, pair.$2);
+      expect(draft.invoiceDate, pair.$1); // Preserve printed/raw content.
+    });
+  }
+  test('P05-NEXT duplicate key preserves supplier year punctuation and revisions', () {
+    final book = copyBook();
+    WorkspacePurchaseEntryDraft candidate({String id = 'new-draft', String? supplier,
+        String reference = 'EVAL-P-001', String date = '30/09/2026'}) =>
+      WorkspacePurchaseEntryDraft.fromJson({...book.draft!.toJson(), 'id': id,
+        'supplierId': supplier ?? book.draft!.supplierId, 'invoiceReference': reference, 'invoiceDate': date});
+    expect(book.draftHasReviewedCopy, isTrue);
+    expect(book.duplicateInvoice(candidate(reference: ' eval-p-001 ', date: '31/03/2027')), isNotNull);
+    expect(book.duplicateInvoice(candidate(date: '01/04/2027')), isNull);
+    expect(book.duplicateInvoice(candidate(supplier: 'other-supplier')), isNull);
+    expect(book.duplicateInvoice(candidate(reference: 'EVAL/P/001')), isNull);
+    expect(book.duplicateInvoice(candidate(reference: 'EVAL-P-01')), isNull);
+    expect(book.duplicateInvoice(candidate(reference: 'EVAL- P-001')), isNull);
+    expect(book.duplicateInvoice(candidate(id: book.draft!.id)), isNull);
+    expect(book.duplicateInvoice(candidate(date: '31/02/2026')), isNull);
+    final correctedDraft = candidate(id: book.draft!.id, reference: 'CORRECTED-P-001');
+    final correctedCopy = WorkspacePurchaseSavedCopy(id: 'corrected-copy', storeName: book.copies.single.storeName,
+      revision: 3, savedAt: correctedDraft.updatedAt, supplier: book.profiles.single,
+      draft: correctedDraft, labels: const {});
+    final correctedBook = WorkspacePurchaseEntryBook(account: book.account, store: book.store, qa: book.qa,
+      revision: 3, profiles: book.profiles, draft: correctedDraft, copies: [...book.copies, correctedCopy]);
+    expect(correctedBook.duplicateInvoice(candidate()), isNull);
+    expect(correctedBook.duplicateInvoice(candidate(reference: 'CORRECTED-P-001')), isNotNull);
+    final edited = WorkspacePurchaseEntryDraft.fromJson({...correctedDraft.toJson(),
+      'goods': [const {'productId': '', 'name': 'Changed unsaved working goods',
+        'pack': '', 'quantity': '', 'cost': ''}]});
+    final unfinished = WorkspacePurchaseEntryBook(account: book.account, store: book.store, qa: book.qa,
+      revision: 4, profiles: book.profiles, draft: edited, copies: correctedBook.copies);
+    expect(unfinished.draftHasReviewedCopy, isFalse);
+    expect(WorkspacePurchaseEntryBook.fromJson(correctedBook.toJson()).copies, hasLength(2));
+    final conflicting = WorkspacePurchaseSavedCopy(id: 'conflicting-copy',
+      storeName: correctedCopy.storeName, revision: 3, savedAt: correctedCopy.savedAt,
+      supplier: correctedCopy.supplier, draft: book.draft!, labels: const {});
+    final ambiguous = WorkspacePurchaseEntryBook(account: book.account, store: book.store, qa: book.qa,
+      revision: 3, profiles: book.profiles, draft: correctedDraft,
+      copies: [...correctedBook.copies, conflicting]);
+    expect(ambiguous.draftHasReviewedCopy, isFalse);
+    expect(ambiguous.duplicateInvoice(candidate()), isNotNull);
+    expect(ambiguous.duplicateInvoice(candidate(reference: 'CORRECTED-P-001')), isNotNull);
+  });
   test('P05-R12 strict copy validation scope duplicate identity and posted data', () {
     for (final mutate in <void Function(Map<String, dynamic>)>[
       (r) => (r['copies'] as List).add((r['copies'] as List).single),

@@ -3431,6 +3431,153 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final geometry in [(const Size(360, 806), 1.0), (const Size(806, 360), 1.6)]) {
+    testWidgets('P05-NEXT reviewed purchase starts blank without losing saved bill ${geometry.$1}', (tester) async {
+      // Isolated host fixture, not device user-flow acceptance data.
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 9, 30);
+      final supplier = WorkspaceSupplierProfile(id: 'p05-next-supplier', name: 'Evaluation next supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      final draft = WorkspacePurchaseEntryDraft(id: 'p05-reviewed-draft', supplierId: supplier.id,
+        invoiceReference: 'EVAL-NEXT-01', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: [{'productId': '', 'name': 'Evaluation rice', 'pack': '1 kg', 'quantity': '2', 'cost': '50'}],
+        details: {'invoiceTotal': '100', 'receiptStatus': 'Already added to Stock'});
+      final copy = WorkspacePurchaseSavedCopy(id: 'p05-reviewed-copy', storeName: 'Evaluation Store',
+        revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+      expect(copy.valid, isTrue);
+      entry.value = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
+        account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier], draft: draft, copies: [copy]).toJson());
+      await work.loadWorkspaceSuppliers(retry: true);
+      await tester.pumpAndSettle();
+      final prior = jsonEncode(entry.value!.toJson());
+      final next = find.byKey(const Key('work-purchase-new'));
+      expect(next, findsOneWidget);
+      await Scrollable.ensureVisible(tester.element(next));
+      await tester.pumpAndSettle();
+      expect(next.hitTestable(), findsOneWidget);
+      expect(tester.getSize(next).height, greaterThanOrEqualTo(48));
+      final edit = find.byKey(const Key('work-purchase-record'));
+      expect(find.text('Edit entry'), findsOneWidget);
+      expect(tester.getSize(edit).height, greaterThanOrEqualTo(48));
+      if (geometry.$2 == 1.0) {
+        expect(tester.getTopLeft(next).dy, closeTo(tester.getTopLeft(edit).dy, .1));
+      }
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      await expandPurchasePrimarySections(tester);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference'))).controller!.text, isEmpty);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-supplier-name'))).controller!.text, isEmpty);
+      expect(jsonEncode(entry.value!.toJson()), prior);
+      final cancel = find.widgetWithText(TextButton, 'Cancel');
+      await revealPurchaseInput(tester, cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(jsonEncode(entry.value!.toJson()), prior);
+      final savedRow = find.byKey(ValueKey('work-purchase-copy-${copy.id}'));
+      final purchaseScroll = find.descendant(of: find.byKey(const Key('work-store-track-stock')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+          widget.axisDirection == AxisDirection.down)).first;
+      await tester.scrollUntilVisible(savedRow, 100, scrollable: purchaseScroll);
+      await tester.pumpAndSettle();
+      expect(savedRow.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('P05-NEXT scoped save rejects duplicate bill and retains history on failure', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 9, 30);
+    final supplier = WorkspaceSupplierProfile(id: 'p05-next-supplier', name: 'Evaluation next supplier',
+      phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+    WorkspacePurchaseEntryDraft bill(String id, String reference, {String date = '30/09/2026'}) =>
+      WorkspacePurchaseEntryDraft(id: id, supplierId: supplier.id, invoiceReference: reference,
+        invoiceDate: date, createdAt: at, updatedAt: at,
+        goods: [{'productId': '', 'name': 'Evaluation rice', 'pack': '1 kg', 'quantity': '2', 'cost': '50'}]);
+    WorkspacePurchaseSavedCopy copy(WorkspacePurchaseEntryDraft draft, int revision) =>
+      WorkspacePurchaseSavedCopy(id: '${draft.id}-r$revision', storeName: 'Evaluation Store',
+        revision: revision, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    final original = bill('original-draft', 'EVAL-NEXT-01');
+    expect(copy(original, 1).valid, isTrue);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [supplier], draft: original, copies: [copy(original, 1)]);
+    await work.loadWorkspaceSuppliers(retry: true);
+    final before = jsonEncode(entry.value!.toJson());
+    final inventoryBefore = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    final duplicate = bill('next-draft', ' eval-next-01 ', date: '01/10/2026');
+    expect(copy(duplicate, 2).valid, isTrue);
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: duplicate,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: copy(duplicate, 2)), isFalse);
+    expect(work.workspaceSupplierError, contains('already saved'));
+    expect(jsonEncode(entry.value!.toJson()), before);
+    final invalidDate = bill('next-draft', 'EVAL-NEXT-02', date: '31/02/2026');
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: invalidDate,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: copy(invalidDate, 2)), isFalse);
+    expect(work.workspaceSupplierError, contains('Invoice date'));
+    final next = bill('next-draft', 'EVAL-NEXT-02');
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: next,
+      expectedRevision: 1, reviewedCopy: copy(next, 2)), isFalse);
+    expect(jsonEncode(entry.value!.toJson()), before);
+    entry.failSave = true;
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: next,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: copy(next, 2)), isFalse);
+    expect(jsonEncode(entry.value!.toJson()), before);
+    entry.failSave = false;
+    await work.loadWorkspaceSuppliers(retry: true);
+    final accepted = copy(next, 2);
+    final saving = work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: next,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: accepted);
+    expect(work.workspaceSupplierSaving, isTrue);
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: next,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: accepted), isFalse);
+    expect(await saving, isTrue);
+    expect(entry.value!.copies, hasLength(2));
+    expect(entry.value!.copies.first.toJson(), copy(original, 1).toJson());
+    final saved = jsonEncode(entry.value!.toJson());
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: next,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: accepted), isTrue);
+    expect(jsonEncode(entry.value!.toJson()), saved);
+    final corrected = bill(next.id, 'EVAL-NEXT-02-CORRECTED');
+    entry.failSave = true;
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: corrected,
+      expectedRevision: 2, reviewedCopy: copy(corrected, 3)), isFalse);
+    expect(entry.value!.duplicateInvoice(bill('third-draft', next.invoiceReference)), isNotNull);
+    expect(entry.value!.duplicateInvoice(bill('third-draft', corrected.invoiceReference)), isNull);
+    entry.failSave = false;
+    await work.loadWorkspaceSuppliers(retry: true);
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: corrected,
+      expectedRevision: 2, reviewedCopy: copy(corrected, 3)), isTrue);
+    expect(entry.value!.duplicateInvoice(bill('third-draft', next.invoiceReference)), isNull);
+    expect(entry.value!.duplicateInvoice(bill('third-draft', corrected.invoiceReference)), isNotNull);
+    final later = jsonEncode(entry.value!.toJson());
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: next,
+      expectedRevision: 1, replaceReviewedDraftId: original.id, reviewedCopy: accepted), isTrue);
+    expect(jsonEncode(entry.value!.toJson()), later);
+    final reusedIdentity = WorkspacePurchaseSavedCopy(id: accepted.id, storeName: accepted.storeName,
+      revision: accepted.revision, savedAt: accepted.savedAt, supplier: supplier,
+      draft: corrected, labels: const {});
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: corrected,
+      expectedRevision: 3, reviewedCopy: reusedIdentity), isFalse);
+    expect(work.workspaceSupplierError, contains('different details'));
+    expect(jsonEncode(entry.value!.toJson()), later);
+    final third = bill('third-draft', 'EVAL-NEXT-03');
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope, draft: third,
+      expectedRevision: 3, replaceReviewedDraftId: original.id, reviewedCopy: copy(third, 4)), isFalse);
+    expect(jsonEncode(entry.value!.toJson()), later);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), inventoryBefore);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('P05-R12-C04 saved copy download wording preserves readonly state', (tester) async {
     // Labelled host fixture only, never runtime acceptance data.
     final entry = _PurchaseEntryFixtureStore();

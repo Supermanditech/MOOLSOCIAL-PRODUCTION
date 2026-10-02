@@ -6012,6 +6012,21 @@ class WorkspacePurchaseEntryDraft {
         additionalFields = List.unmodifiable(additionalFields),
         printedTaxRows = List.unmodifiable(printedTaxRows.map((row) => Map<String, String>.unmodifiable(row)));
   final String id, supplierId, invoiceReference, invoiceDate;
+  /// Parsed only for bill-identity checks; the printed date stays unchanged.
+  int? get invoiceFinancialYear {
+    final value = invoiceDate.trim();
+    final indian = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(value);
+    final iso = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
+    if (indian == null && iso == null) return null;
+    final year = int.parse(indian?.group(3) ?? iso!.group(1)!);
+    final month = int.parse(indian?.group(2) ?? iso!.group(2)!);
+    final day = int.parse(indian?.group(1) ?? iso!.group(3)!);
+    final date = DateTime.utc(year, month, day);
+    if (year < 1900 || year > 9999 || date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
+    return month < 4 ? year - 1 : year;
+  }
   final DateTime createdAt, updatedAt;
   final List<Map<String, String>> goods;
   final Map<String, String> details;
@@ -6228,6 +6243,33 @@ class WorkspacePurchaseEntryBook {
   final List<WorkspaceSupplierProfile> profiles;
   final WorkspacePurchaseEntryDraft? draft;
   final List<WorkspacePurchaseSavedCopy> copies;
+  /// Older revisions remain in history, but do not reserve corrected bill keys.
+  List<WorkspacePurchaseSavedCopy> get latestReviewedCopies {
+    final latest = <String, List<WorkspacePurchaseSavedCopy>>{};
+    for (final copy in copies) {
+      final previous = latest[copy.draft.id];
+      if (previous == null || copy.revision > previous.first.revision) {
+        latest[copy.draft.id] = [copy];
+      } else if (copy.revision == previous.first.revision) {
+        // Ambiguous legacy records retain both keys and cannot unlock replacement.
+        previous.add(copy);
+      }
+    }
+    return List.unmodifiable(latest.values.expand((copies) => copies));
+  }
+  bool get draftHasReviewedCopy {
+    if (draft == null) return false;
+    final latest = latestReviewedCopies.where((copy) => copy.draft.id == draft!.id).toList();
+    return latest.length == 1 && jsonEncode(latest.single.draft.toJson()) == jsonEncode(draft!.toJson());
+  }
+  WorkspacePurchaseSavedCopy? duplicateInvoice(WorkspacePurchaseEntryDraft candidate) {
+    final reference = candidate.invoiceReference.trim().toLowerCase();
+    final year = candidate.invoiceFinancialYear;
+    if (reference.isEmpty || year == null) return null;
+    return latestReviewedCopies.where((copy) => copy.draft.id != candidate.id &&
+      copy.draft.supplierId == candidate.supplierId && copy.draft.invoiceFinancialYear == year &&
+      copy.draft.invoiceReference.trim().toLowerCase() == reference).firstOrNull;
+  }
   Map<String, Object?> toJson() => {'version': 1, 'account': account, 'store': store,
     'qa': qa, 'revision': revision, 'profiles': profiles.map((p) => p.toJson()).toList(),
     'draft': draft?.toJson(), if (copies.isNotEmpty) 'copies': copies.map((c) => c.toJson()).toList()};

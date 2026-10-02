@@ -11377,10 +11377,12 @@ class _PurchaseAdditionalInput {
 }
 
 class _StoreRecordPurchaseSurface extends StatefulWidget {
-  const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack, this.savedCopy});
+  const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack, this.savedCopy,
+    this.startNew = false});
   final WorkSession session;
   final VoidCallback onBack;
   final WorkspacePurchaseSavedCopy? savedCopy;
+  final bool startNew;
   @override
   State<_StoreRecordPurchaseSurface> createState() => _StoreRecordPurchaseState();
 }
@@ -11435,6 +11437,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   String? _recordedNotice;
   int? _revision;
   String _supplierId = '', _draftId = '', _baseline = '';
+  String? _replaceReviewedDraftId;
   bool _loading = true, _busy = false, _leaving = false;
   String? _error, _notice;
   final _expandedSections = <String>{};
@@ -11462,7 +11465,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       setState(() { _loading = false; _error = 'This saved purchase copy is unavailable. Return to Purchases and retry.'; });
       return;
     }
-    _original = copy?.draft ?? session.workspacePurchaseEntryDraft;
+    if (widget.startNew && copy == null && !session.workspacePurchaseDraftReviewed) {
+      setState(() { _loading = false; _error = 'Finish and save the current purchase copy before starting another bill. Return to Purchases to resume it.'; });
+      return;
+    }
+    _replaceReviewedDraftId = widget.startNew && copy == null ? session.workspacePurchaseEntryDraft?.id : null;
+    _original = copy?.draft ?? (widget.startNew ? null : session.workspacePurchaseEntryDraft);
     _revision = copy?.revision ?? session.workspacePurchaseEntryRevision;
     _draftId = _original?.id ?? session.newWorkspacePurchaseDraftId();
     _supplier = copy?.supplier ?? session.workspaceSuppliers.where((p) => p.id == _original?.supplierId).firstOrNull;
@@ -11617,7 +11625,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       return;
     }
     final saved = await widget.session.saveWorkspacePurchaseEntry(profile, scope: _scope!,
-      draft: draft, expectedRevision: _revision, reviewedCopy: reviewed ? _copyAttempt : null);
+      draft: draft, expectedRevision: _revision, reviewedCopy: reviewed ? _copyAttempt : null,
+      replaceReviewedDraftId: _replaceReviewedDraftId);
     if (!mounted) return;
     setState(() => _busy = false);
     if (saved && _current) {
@@ -11649,12 +11658,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       return;
     }
     final latest = widget.session.workspacePurchaseEntryDraft;
-    if (latest != null && latest.id != _draftId) {
+    final retainedReviewedDraft = _replaceReviewedDraftId != null &&
+      latest?.id == _replaceReviewedDraftId && widget.session.workspacePurchaseDraftReviewed;
+    if (latest != null && latest.id != _draftId && !retainedReviewedDraft) {
       setState(() => _error = 'Another purchase draft is saved. Your entries are kept; return to Purchases to choose it.');
       return;
     }
     setState(() {
-      _original = latest;
+      _original = retainedReviewedDraft ? null : latest;
+      if (!retainedReviewedDraft) _replaceReviewedDraftId = null;
       _supplier = widget.session.workspaceSuppliers.where((p) => p.id == _supplierId).firstOrNull;
       _revision = widget.session.workspacePurchaseEntryRevision;
       _copyAttempt = null;
@@ -13147,6 +13159,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   List<String>? _purchaseHistory;
   String _purchaseFilter = 'All';
   bool _recordPurchase = false;
+  bool _newPurchase = false;
   WorkspacePurchaseSavedCopy? _savedCopy;
 
   @override
@@ -13196,13 +13209,15 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       _purchaseSearch.clear();
       _purchaseFilter = 'All';
       _recordPurchase = false;
+      _newPurchase = false;
       _savedCopy = null;
     }
     if ((_recordPurchase || _savedCopy != null) && !statement) {
       return _StoreRecordPurchaseSurface(
         key: widget.purchaseEntryKey ?? ValueKey(('record-purchase', session.workspaceSupplierScope, _savedCopy?.id)), session: session,
         savedCopy: _savedCopy,
-        onBack: () => setState(() { _recordPurchase = false; _savedCopy = null; }));
+        startNew: _newPurchase,
+        onBack: () => setState(() { _recordPurchase = false; _newPurchase = false; _savedCopy = null; }));
     }
     final selected = session.focusedWorkspacePurchase;
     final returning =
@@ -13478,17 +13493,27 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              const Expanded(child: Text('Purchases', style: TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w800, color: MoolColors.navy))),
+            Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              const Text('Purchases', style: TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w800, color: MoolColors.navy)),
+              if (session.workspacePurchaseDraftReviewed) TextButton.icon(
+                key: const Key('work-purchase-new'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                  foregroundColor: MoolColors.navy, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                onPressed: () { _purchaseSearchFocus.unfocus();
+                  setState(() { _newPurchase = true; _recordPurchase = true; }); },
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('New purchase', style: TextStyle(fontSize: 12))),
               TextButton.icon(key: const Key('work-purchase-record'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48),
-                  foregroundColor: MoolColors.navy),
+                  foregroundColor: MoolColors.navy, padding: const EdgeInsets.symmetric(horizontal: 8)),
                 onPressed: () { _purchaseSearchFocus.unfocus();
-                  setState(() => _recordPurchase = true); },
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text(session.workspacePurchaseEntryDraft == null
-                  ? 'Record purchase' : 'Resume purchase', style: const TextStyle(fontSize: 12))),
+                  setState(() { _newPurchase = false; _recordPurchase = true; }); },
+                icon: Icon(session.workspacePurchaseDraftReviewed ? Icons.edit_outlined : Icons.add_rounded,
+                  size: 16),
+                label: Text(session.workspacePurchaseEntryDraft == null ? 'Record purchase'
+                  : session.workspacePurchaseDraftReviewed ? 'Edit entry' : 'Resume purchase',
+                  style: const TextStyle(fontSize: 12))),
             ]),
             StoreRecentSearches(
               controller: _purchaseSearch,
