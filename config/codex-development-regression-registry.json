@@ -107652,6 +107652,565 @@
           "prevention": "Add those five exact PNG paths to existing selected parent owners, retaining all historical paths. Keep policy ownership, route ledger and tracked-input qualification aligned; do not weaken the checker. Source fingerprint and successful receipts remain unchanged because this is metadata only."
         }
       },
+      "t05PaymentEligibilityAutonomous20261002": {
+        "status": "frontend_locally_verified_integration_deferred_formal_handoff_blocked",
+        "authority": "Founder next on 2 October 2026 authorizes the next bounded frontend subworkflow T05 under existing BUY-ACTION-POLISH-20260926-01 and UAW-CURSOR-BUY-READY-20260921. No new ticket/branch or handoff acceptance is inferred.",
+        "baseline": "74b70873a89b72b785f6e3184f1c9f50476e29aa",
+        "initialGit": {
+          "branch": "work/cursor-ui/buy-ready-20260921",
+          "porcelainBytes": 0,
+          "porcelainRecords": 0,
+          "porcelainExitCode": 0,
+          "porcelainSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "scope": "T05 frontend payment method eligibility, supported due-now min/max boundaries and collection recipient/fee disclosure; exact reuse/owner assessment remains pending source audit before execution.",
+        "carryForward": {
+          "formalHandoff": "blocked by preserved 0e90a6ca commit title; no history rewrite, baseline change or historical exception expansion",
+          "children": [
+            "BUY-ACTION-POLISH-20260926-01-A08",
+            "BUY-ACTION-POLISH-20260926-01-A09"
+          ],
+          "pendingAmount": "A09 request32/display37 remains unresolved; recalculated pending display must not become an authoritative new payment basis."
+        },
+        "architectPlanReview": "Read-only existing architect confirmed informed next may proceed as same-ticket subworkflow, conditional on unchanged gates, not a new ticket or handoff waiver.",
+        "initialAdmission": "Unchanged coordinator implementation passed on current branch/HEAD, root242, claims3, registry4618; founder implementation passed.",
+        "reconstructionReadRecovery": {
+          "incident": "Initial combined mandatory-owner tool result was truncated; it was rejected as complete reading evidence. A PowerShell physical-line projection also landed outside the T05 heading due retained CR line structure. Neither authorized source change, test or device action.",
+          "rootCause": "Oversized combined emission and differing retained line delimiters.",
+          "correction": "Central and local AGENTS independently re-read in bounded non-overlapping pages through EOF; exact T05 heading/context read with rg. Subsequent mandatory-owner output remains bounded and independent.",
+          "prevention": "Use independent bounded mandatory owner reads; find exact heading rather than assuming reported line offsets match PowerShell arrays."
+        },
+        "deferred": [
+          "Backend execution",
+          "Workspace provider mapping: Codex after integration",
+          "Google shopping area/current-location and separately gated delivery Maps source, key and permission work"
+        ],
+        "stopRule": "After scoped audit/fixes/tests/native review, record verified scope or actual unresolved child, safe normal prefixed feature checkpoint and stop. Existing failed formal handoff remains explicit.",
+        "narrowInventoryReadRecovery": {
+          "incident": "Substring-only rg --files patterns over the relevant Buy roots also matched archived screenshot PNGs; the output was truncated and rejected as complete inventory.",
+          "rootCause": "File globs did not constrain the extension; preserved screenshot archives matched payment/cart names.",
+          "correction": "Constrain every discovery glob to relevant .dart filenames, count before bounded emission, and bound content characters as well as lines.",
+          "architectRepeatedErrorReview": "Existing read-only architect confirmed narrow output-boundary correction; no broader scan or weakened evidence.",
+          "runtimeTestDeviceActions": 0
+        },
+        "admissionPreparationRecovery": {
+          "incident": "Ignored admission helper used an unverified parent ownerPaths property; the actual parent schema has no such key. Preparation raised KeyError before any contract, claim/checker, scope or ledger patch artifact was written or applied.",
+          "rootCause": "Assumed a metadata property name instead of checking the selected parent schema.",
+          "correction": "Inspect only the exact parent key names and use its established owners field; regenerate once after strict source/branch/known-dirt checks and current generation gate.",
+          "prevention": "Read exact metadata schema before modifying it; retain nested command/session output on every failure.",
+          "runtimeChanged": false
+        },
+        "admissionReadbackPathRecovery": {
+          "incident": "Five intended admission patches applied, but the final ledger readback embedded a Windows path in a non-raw Python literal. Its backslash-b became a backspace and read_bytes failed for a nonexistent path; earlier path literals also emitted SyntaxWarnings.",
+          "rootCause": "Generated Python code did not normalize Windows path separators.",
+          "correction": "Retain applied patches; reread the actual ledger by known repository-relative path and use forward-slash or structured paths in future readbacks. Validate every JSON owner, actual243 paired ownership, contract SHA and registry binding before admission.",
+          "noWrongPathMutation": true,
+          "runtimeChanged": false
+        },
+        "contract": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json",
+        "contractSha256": "335946EB0BB839B2F58E391BDA1B449C215E96F2752AA57F4B1A5D8400198B44",
+        "baselineSourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9",
+        "baselineGit": {
+          "remoteExact": true,
+          "initialRawStatusBytes": 0,
+          "initialRawStatusRecords": 0,
+          "exitCode": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "owners": [
+          "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart"
+        ],
+        "registeredContractOwner": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json",
+        "reservedUnclaimedProofs": [
+          "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl",
+          "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl",
+          "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl"
+        ],
+        "sharedContractHandoff": "Optional CommerceSnapshot capability model only; Store/backend publication and mapper execution assigned Codex after integration; unchanged legacy method declarations remain unknown metadata rather than invented limits.",
+        "architectImplementationReview": "Preserve declared legacy availability as unknown metadata; explicit current capability evidence for new methods/stronger claims; one evaluation for UI/choice/final preflight; fees only from applicable quote; pending attempt held.",
+        "assessment": "Exact current selection updated; all historical checkpoint text preserved. Seven reused existing source/test owners, one real contract owner, no speculative screen/route/service/backend or future receipt claim.",
+        "postAdmissionGates20261002": {
+          "coordination": "implementation passed, root 243 actual owners, registry 4618",
+          "memory": "implementation and device passed, BuildMode none",
+          "mvp": "authorized",
+          "incremental": "implementation passed"
+        },
+        "nativeBaseline20261002": {
+          "refresh": "baseline-1: full Dart restart code 0, detached, exit 0",
+          "evidence": [
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-checkout.png",
+              "sha256": "27010f93f49e2e1ce07cd5639e3b75a9644d31babf4460727d6fb4f902c14422"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-checkout.xml",
+              "sha256": "a060d6efb6b3e3c89d575c043d7c811e213f0d6f3888e125821b4b3595a9faba"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-cart.png",
+              "sha256": "aa3e5caf87479eb0032700d8434bcc44b1bc904712376472c0720c94640bd9f5"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-cart.xml",
+              "sha256": "670302d4ab410740aac1d724a70223980c2229a0e7a6cbdf22ec826f2b82cf37"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-checkout-top.png",
+              "sha256": "02331e22bb4e9e5f69c31365349a540a84bee306d9582947aaa526e8fd2a14c0"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-checkout-top.xml",
+              "sha256": "d06f6cb74e0b92bc385227daeb20d85a9fc258dbf428d17187521cb82d954404"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-payment.png",
+              "sha256": "10354c42620a4e8b3a13f4a9cbdb12217e8529710466b71f972c208cb7ff68fa"
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/baseline-payment.xml",
+              "sha256": "d3bca9bb0a8e782b8a96f30ac2799e59de37ba6e53cb0d611b03713b57da4957"
+            }
+          ],
+          "observed": "All Cart 2 products/3 items INR837; retained shared Call on arrival instruction; saved Card; no published live payment bounds or receiver. First post-restart capture was Shop home (scoped badge INR37), then actual All Cart and Checkout inspected. No purchase/payment performed."
+        },
+        "implementationToolFailures20261002": {
+          "unappliedAtomicPatches": [
+            {
+              "owner": "buy_v2_session.dart",
+              "reason": "incorrect assumed void choosePayment versus bool; rejected whole patch"
+            },
+            {
+              "owner": "buy_v2_session.dart",
+              "reason": "incorrect assumed adjacent fields; rejected whole patch"
+            },
+            {
+              "owner": "buy_v2_qualified_provider_fixture.dart",
+              "reason": "missing intervening comment line; rejected whole patch"
+            }
+          ],
+          "missingReadTargets": [
+            "guessed buy_v2_collection_checkout_controller.dart: actual controller in admitted session owner",
+            "guessed buy_v2_checkout_commercial_terms_test.dart: not used; actual quote interface and implementation read from admitted owners"
+          ],
+          "truncatedOptionalReads": "Combined quote/qualification and broad capture function results were truncated; not completion evidence. Helpers requiring full reads will be read independently before reuse.",
+          "architectRepeatedErrorReview": "Use exact bounded current owner contexts; preserve boolean API; inspect partial diffs; no broader scan or abstraction."
+        },
+        "testAttemptAuditBeforeFinalQualification": {
+          "attempts": [
+            {
+              "exitCode": 1,
+              "passed": 0,
+              "failed": 8,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "231ad2a6bef32ba243c5151b7afa90320665cb5e6a7026dd8334e90764b05b98",
+              "unchangedSource": true,
+              "sha256": "d1b671458be1bdba8a19f01dc589f2f2df9d84cbc087199051721c850e09bd71",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-1-result.json",
+              "qualification": false
+            },
+            {
+              "exitCode": 1,
+              "passed": 5,
+              "failed": 40,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "e33c8e9de29fc74fdec20df9170b649c730400c9bd9c84418208bda09ea641e7",
+              "unchangedSource": true,
+              "sha256": "3d5377ce4fb1997ca1cce57360bc6b98965b5464bc179bd358e1154f63e6520f",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-2-result.json",
+              "qualification": false
+            },
+            {
+              "exitCode": 1,
+              "passed": 1,
+              "failed": 48,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "525e66073bde663bda5e0d4b6d5cfcbf1cb29ed88f1e006b5830428865389a70",
+              "unchangedSource": true,
+              "sha256": "9ca18908dc092b46e06d05b013ca6bb176ab0b11ef4573d9563c7b4d67ad8d45",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-3-result.json",
+              "qualification": false
+            },
+            {
+              "exitCode": 1,
+              "passed": 1,
+              "failed": 48,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "92f98c29918b4d813f927a8aacdabf838f37fa32d062b6b3aef099e7c1d3d26f",
+              "unchangedSource": true,
+              "sha256": "dcbb2aa3ed48c80d47f30e8a8e2ec089a5ce14dcdce9bbffd21c9757845e130f",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-4-result.json",
+              "qualification": false
+            },
+            {
+              "exitCode": 1,
+              "passed": 23,
+              "failed": 4,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "de789aa423f8d677220da213739cd849efc53c62d734a21f5cdb96804a2972ff",
+              "unchangedSource": true,
+              "sha256": "4798a362bb77168659be8ada0e49e5fa91d01d5b11571ffc2dcf4ed1e7d0ae81",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-5-result.json",
+              "qualification": false
+            },
+            {
+              "exitCode": 1,
+              "passed": 23,
+              "failed": 4,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "32d538060da35de34f0707b9009ac96de7cc5a6d6c8b71ec657b8d6c4b87c538",
+              "unchangedSource": true,
+              "sha256": "ec2e8ca7d75efaa285e9850f1fb887261ce330ba7228857791bf2c037a2561bf",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-6-result.json",
+              "qualification": false
+            },
+            {
+              "exitCode": 1,
+              "passed": 23,
+              "failed": 4,
+              "warnings": 0,
+              "terminalSuccess": false,
+              "sourceSha256": "730150c6788cdf00f0b65f91c593f91e9f86b626b702262de378d19202fa5851",
+              "unchangedSource": true,
+              "sha256": "d731d07acf41ff8fb0173fdbfc0241c023f47a74b5360c6b77819dab53e2d898",
+              "path": "apps/mobile/build/t05-payments-20261002/focused-7-result.json",
+              "qualification": false
+            }
+          ],
+          "analysis1": {
+            "exitCode": 1,
+            "path": "apps/mobile/build/t05-payments-20261002/analysis-1.log",
+            "sha256": "6b89a69e80d1d80ba90b8f6d8b5f62ffced77c06d0f3347e0eefddbc0eb5ab65",
+            "diagnosis": "Duplicate UPI in constant union; corrected to standard runtime set union. Existing inline-if formatter lint fixed with braces."
+          },
+          "analysis2": {
+            "exitCode": 0,
+            "path": "apps/mobile/build/t05-payments-20261002/analysis-2.log",
+            "sha256": "1030f5e2c0bbebe8aca3a4375fe1544df8a9a0efee6e565dc82d50dc38170fbe",
+            "result": "No issues found for that source generation, not final evidence."
+          },
+          "fixtureFailures": "Review default bypassed commerce adapter; explicit production flag requires awaited initial restoration plus current eligibility and explicit non-null Store identity. Address publication also needed selectedAddressId. All failed JSONL/stderr/source summaries retained, no production checks weakened. Wholesale and subsequent successful payment fixture admission still under diagnosis."
+        },
+        "additionalToolIncidents": {
+          "unappliedPatches": [
+            "Formatted paymentFixture declaration no longer matched assumed one-line declaration; whole patch rejected, no mutation",
+            "Generated relative apply_patch header resolved against authorized root instead of worktree; target absent, rejected without mutation"
+          ],
+          "readFailure": "One rg expression for multiline helper declaration was malformed; successful exact name bounded read used instead.",
+          "truncatedOptionalDebugRead": "Unbounded focused-3 error debug result was truncated; discarded and narrowed to first five error records. Existing fixture helper separately read completely before reuse."
+        },
+        "testAttemptAuditFinal20261002": {
+          "attempts": [
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-1-result.json",
+              "artifactSha256": "784e4d7b8dde109eff8bf1fee41ea51f342e4b5ea1dbfa0089f0a26a967c3905",
+              "result": {
+                "exitCode": 1,
+                "passed": 0,
+                "failed": 8,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "231ad2a6bef32ba243c5151b7afa90320665cb5e6a7026dd8334e90764b05b98",
+                "unchangedSource": true,
+                "sha256": "d1b671458be1bdba8a19f01dc589f2f2df9d84cbc087199051721c850e09bd71"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-2-result.json",
+              "artifactSha256": "a9f5f5ea79c724c312fcc6d674f0d1d3f8f953647f092ff13e33f3e88e9af9b4",
+              "result": {
+                "exitCode": 1,
+                "passed": 5,
+                "failed": 40,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "e33c8e9de29fc74fdec20df9170b649c730400c9bd9c84418208bda09ea641e7",
+                "unchangedSource": true,
+                "sha256": "3d5377ce4fb1997ca1cce57360bc6b98965b5464bc179bd358e1154f63e6520f"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-3-result.json",
+              "artifactSha256": "14f1e1c01a396e858978908923bbc86122f1212d61fb4c8eeb848e60ea58b992",
+              "result": {
+                "exitCode": 1,
+                "passed": 1,
+                "failed": 48,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "525e66073bde663bda5e0d4b6d5cfcbf1cb29ed88f1e006b5830428865389a70",
+                "unchangedSource": true,
+                "sha256": "9ca18908dc092b46e06d05b013ca6bb176ab0b11ef4573d9563c7b4d67ad8d45"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-4-result.json",
+              "artifactSha256": "90072a19b76f4b253ef589b3d95c7206b3f68c964bf884ca78c1bddd18bdb104",
+              "result": {
+                "exitCode": 1,
+                "passed": 1,
+                "failed": 48,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "92f98c29918b4d813f927a8aacdabf838f37fa32d062b6b3aef099e7c1d3d26f",
+                "unchangedSource": true,
+                "sha256": "dcbb2aa3ed48c80d47f30e8a8e2ec089a5ce14dcdce9bbffd21c9757845e130f"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-5-result.json",
+              "artifactSha256": "5527f10db35efdafadfd6ab156bec5b743a9e489b92f75bed95c8cc91a7d3426",
+              "result": {
+                "exitCode": 1,
+                "passed": 23,
+                "failed": 4,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "de789aa423f8d677220da213739cd849efc53c62d734a21f5cdb96804a2972ff",
+                "unchangedSource": true,
+                "sha256": "4798a362bb77168659be8ada0e49e5fa91d01d5b11571ffc2dcf4ed1e7d0ae81"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-6-result.json",
+              "artifactSha256": "8e1d66fa3856539591725055758f5800a4c519111567370a92edc45b2d6d5d69",
+              "result": {
+                "exitCode": 1,
+                "passed": 23,
+                "failed": 4,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "32d538060da35de34f0707b9009ac96de7cc5a6d6c8b71ec657b8d6c4b87c538",
+                "unchangedSource": true,
+                "sha256": "ec2e8ca7d75efaa285e9850f1fb887261ce330ba7228857791bf2c037a2561bf"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-7-result.json",
+              "artifactSha256": "a9d5cb9cb1470c5e1b1593d8147ecf56d91eeffd4f0f9e715df0db74dafc19cf",
+              "result": {
+                "exitCode": 1,
+                "passed": 23,
+                "failed": 4,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "730150c6788cdf00f0b65f91c593f91e9f86b626b702262de378d19202fa5851",
+                "unchangedSource": true,
+                "sha256": "d731d07acf41ff8fb0173fdbfc0241c023f47a74b5360c6b77819dab53e2d898"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-8-result.json",
+              "artifactSha256": "7b52eea93c752ec3dab085a3276011f46acc1fda50d016879ebd8669a3b288b2",
+              "result": {
+                "exitCode": 1,
+                "passed": 23,
+                "failed": 4,
+                "warnings": 0,
+                "terminalSuccess": false,
+                "sourceSha256": "221afcae85b09294e96227ed0f788ceb858ac3ee1f7689d934b0e83b96b3ccc3",
+                "unchangedSource": true,
+                "sha256": "7c022c668d1683fb42c71f732b1cccb2a77ce6fcbbc1987a0167bbcc83b41542"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-9-result.json",
+              "artifactSha256": "26d51555b1541235668a56c3ee234a0b3fb6643bc3d9cdf5d440c2abcb590574",
+              "result": {
+                "exitCode": 0,
+                "passed": 25,
+                "failed": 0,
+                "warnings": 0,
+                "terminalSuccess": true,
+                "sourceSha256": "74306a5cf76793220caa892772c79d23b965f27ab47b407992f5d3ec8b27d351",
+                "unchangedSource": true,
+                "sha256": "e032d77a9ac0f73a4d2a4c264db31f25254ec13ca7769d593c797307b23aea86"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-10-result.json",
+              "artifactSha256": "08d0062ee67c3b6ed7a270d7639e1bcbd732b255634e5cc1ce972e3e453d5a8a",
+              "result": {
+                "exitCode": 0,
+                "passed": 31,
+                "failed": 0,
+                "warnings": 0,
+                "terminalSuccess": true,
+                "sourceSha256": "b63fc98de3933626a69dfe516cd0fccecae5146470b21391de851834fd51b7da",
+                "unchangedSource": true,
+                "sha256": "6f692febfa30b97e14d4caf6b18166d9344c1797acda317b52d0c88f48349640"
+              },
+              "finalQualification": false
+            },
+            {
+              "path": "apps/mobile/build/t05-payments-20261002/focused-11-result.json",
+              "artifactSha256": "8338ff1b8208660accb686a52c97a42f104d670ad0bc362dfeae170c146c9ab3",
+              "result": {
+                "exitCode": 0,
+                "passed": 31,
+                "failed": 0,
+                "warnings": 0,
+                "terminalSuccess": true,
+                "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e",
+                "unchangedSource": true,
+                "sha256": "52f054f276676ffa324d19dd8ca07f44822c7d5457fe783ca7de9a3b6e2cba4a"
+              },
+              "finalQualification": true
+            }
+          ],
+          "rootCauses": {
+            "focused1": "Duplicate UPI in constant union; corrected to static final standard set union.",
+            "focused2": "Default reviewDataEnabled bypassed the adapter. Isolated test now explicitly uses production path.",
+            "focused3": "Production fixture also required awaited initial restoration and current eligibility facts.",
+            "focused4": "Fixture products also needed explicit current Store identity; existing eligibility checks preserved.",
+            "focused5to8": "Calling addAddress after grant creation changed location revision from ||0 to ||1. Publish the initial selected address before add; no production guard weakened.",
+            "focused9": "25-case earlier source success retained; not final qualification.",
+            "focused10": "31-case earlier source success retained before final test-only braces and restart; not final qualification.",
+            "analysis3": "One test-only inline if style issue; fixed with braces before final source freeze.",
+            "focused11analysis4": "Current exact source bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e: 31 focused pass and clean analysis of seven owners. No raw failed run deleted or rebound as passing."
+          },
+          "architectRepeatedErrorReview": "Exact fixture authority and source-ordered patch correction reviewed conceptually by existing architect; no production admission weakened."
+        },
+        "additionalFinalToolIncidents20261002": {
+          "unappliedTestPatch": "Large session-test patch supplied QR-later hunk before collection-earlier hunk; rejected atomically. Regenerated ascending source-order hunks; no partial mutation.",
+          "progressRead": "One debug Python one-liner had mismatched parentheses; no source/process mutation. Replaced with bounded multiline JSON projection.",
+          "deviceEvidencePreparation": "Expected fourteen final image/XML pairs but actual native journey produced thirteen. Assertion failed before artifact write; corrected to the actual thirteen and verified all twenty-six hashes.",
+          "auditRead": "First audit projection duplicated sha256 keyword from an existing summary and raised TypeError before any mutation. Corrected to nested result plus artifactSha256. Combined handoff tail/stat read was truncated and excluded; relevant final heading reread bounded before editing.",
+          "restartRecovery": "Founder reported laptop accidental shutdown. Assigned branch and HEAD74b, all expected dirt, contract SHA and closed trial records survived. ADB reconnected. Final runtime source reviewed and refreshed; no APK/install authority inferred.",
+          "actualProofPlan": "Selected name-trie command partition produced three actual disjoint batches rather than the earlier two anticipated receipts. Claim only the four closed actual focused/selected proofs after successful completion; root243 becomes247. Immutable contract and historical proof text preserved."
+        },
+        "preservedExecutionLimits20261002": {
+          "a08": "Current collection basket and identity required for Check total; qualify only after selected matrix terminal proof.",
+          "a09": "Pending request32/display37 remains unresolved frontend T07 child. Submitted intent remains frozen; no provider charge drift claimed.",
+          "backend": "Execution deferred.",
+          "workspace": "Payment capabilities, recipient, quote and supplier mapping: Codex after integration.",
+          "google": "Shopping-area/current-location and separately gated Maps source/key/permission work remain listed.",
+          "supplierPopup": "Published-policy/add-to-cart acceptance frontend remains queued separately under T03.",
+          "handoff": "Known earlier0e90 commit-prefix coordinator failure remains blocked; no history rewrite, gate exception or ticket_close."
+        },
+        "finalQualification20261002": {
+          "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e",
+          "focused": 31,
+          "selectedDistinct": 924,
+          "selectedReferences": 983,
+          "selectedFiles": 53,
+          "selectedBatches": 3,
+          "failed": 0,
+          "skipped": 0,
+          "terminalSuccess": true,
+          "unchangedSource": true,
+          "receipts": [
+            {
+              "path": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl",
+              "sha256": "52f054f276676ffa324d19dd8ca07f44822c7d5457fe783ca7de9a3b6e2cba4a",
+              "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl",
+              "sha256": "86c2fce9f49d6ccde33d7ca04a01a0bea5d1ded79b0fc79275ac1ffc545bf8fc",
+              "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl",
+              "sha256": "2104498d3f0cca861492828d23c19767266b10ab026da71860e148d990b78c3c",
+              "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e"
+            },
+            {
+              "path": "docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl",
+              "sha256": "958b9cb80561052b268e1a9d10f8a641b8fae23a7a80e9539ed8d9095e5560ec",
+              "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e"
+            }
+          ],
+          "nativeEvidencePath": "apps/mobile/build/t05-payments-20261002/device-review.json",
+          "nativeEvidenceSha256": "31d69489ee79f12bbba122ea249d121085eb219144256da37bffba797c1204f3",
+          "nativePairs": 13,
+          "rootActualOwners": 247,
+          "regressionEntries": 4618,
+          "a08": "local_passed",
+          "a09": "open_T07",
+          "integration": "workspace Codex after integration; backend deferred; Google listed; T03 supplier popup separately queued",
+          "formalHandoff": "blocked by preserved earlier0e90 missing prefix; no ticket_close"
+        },
+        "finalArchitectReview20261002": "Existing conceptual architect found no material additional concern; local frontend only; new bounds/payee states isolated fixtures, native legacy flow; A09 and integration remain open; unchanged precommit and exact subject-prefix/contents/clean/remote checks required; stop before T06.",
+        "closedProofLineEndings20261002": "Existing owned .gitattributes receives only five exact LF rules for the actual immutable T05 contract and four closed proofs. No bytes/hashes changed; prevents later checkout normalization from altering immutable evidence.",
+        "finalPreparationReadIncident20261002": "A guessed production-workflow-policy.json read target did not exist. No mutation or authority inferred. Exact existing coordination policy productionGitDiscipline.lanes cursor_ui readback provides commitPrefix ui; no separate policy created.",
+        "postQualificationImplementationGates20261002": {
+          "coordinator": "passed root247 activeTasks3 registry4618",
+          "memory": "passed implementation BuildMode none",
+          "founder": "passed implementation"
+        },
+        "checkpointInvocationRecovery20261002": {
+          "failedAttempt": {
+            "sourceSha256": "bb61d2be54b8974d71f55301002db7f88320c0fed86718200e4574fe21958f7e",
+            "unchangedSource": true,
+            "allPassed": false,
+            "results": [
+              {
+                "gate": "coordinator",
+                "exitCode": 1,
+                "path": "apps/mobile/build/t05-payments-20261002/precommit-coordinator.log",
+                "sha256": "e5bd2ea29db8f5f3d0a82831e02b69eb7a8ef457b4152881303b59b976f394ae"
+              },
+              {
+                "gate": "memory",
+                "exitCode": 1,
+                "path": "apps/mobile/build/t05-payments-20261002/precommit-memory.log",
+                "sha256": "b85351392e10ef6d1fb2e34e42f051de621d7b78b823197c7e978428895ece24"
+              },
+              {
+                "gate": "mvp",
+                "exitCode": 0,
+                "path": "apps/mobile/build/t05-payments-20261002/precommit-mvp.log",
+                "sha256": "931bcf9d31e2ade57e3d1d64f8528b59a2dec20cd955b373d315f3863e0daff5"
+              },
+              {
+                "gate": "incremental",
+                "exitCode": 1,
+                "path": "apps/mobile/build/t05-payments-20261002/precommit-incremental.log",
+                "sha256": "0b2615d8a6a37d677bfc2ad8981da6b20aa39d9a42748c6c26e1432cd124778e"
+              },
+              {
+                "gate": "founder",
+                "exitCode": 0,
+                "path": "apps/mobile/build/t05-payments-20261002/precommit-founder.log",
+                "sha256": "3eb03a0d29459f399f8effba9d9b0da3094f9bbcb0669b10422fb26acb610e4c"
+              },
+              {
+                "gate": "diff",
+                "exitCode": 0,
+                "path": "apps/mobile/build/t05-payments-20261002/precommit-diff.log",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              }
+            ]
+          },
+          "rootCause": "Wrapper selected legacy powershell.exe rather than the active verified PowerShell7.6.6 host. Coordinator Get-FileHash unavailable and incremental JSON parser incompatible. Memory also used unsupported pre_commit instead of the documented applicable implementation phase.",
+          "detection": "Actual nonzero exits/raw logs; no commit and no pass claim for these failed invocations. MVP, staged diff and founder actual passes retained, not a fully passed checkpoint.",
+          "correction": "Use exact active PowerShell7.6.6 WindowsApps pwsh.exe for wrapper/children; memory implementation with BuildMode none for this source/test implementation, alongside retained device phase already passed. No gate-code or validation change.",
+          "prevention": "Read actual ValidateSet and verify host path/version before subprocess gate wrappers. Parse real closed exits; preserve attempts with unique names; stage only owned audit metadata before rerun.",
+          "architectReview": "Existing architect confirmed bounded recovery; applicable memory stage confirmed from AGENTS implementation/device requirement and actual script; unchanged required gate coverage; no runtime requalification needed while bb61 stays exact.",
+          "retryBoundary": "All required final gates rerun against restaged metadata in compatible host. Known earlier0e90 formal handoff remains blocked."
+        }
+      },
       "gstToggleContinuation20261001": {
         "finding": "Resumed approved T02 colour correction used task_start, whose unchanged gate requires the original work base; current clean continuation is 4fba6ccd. No implementation followed that rejection. Register this exact amendment and use the established implementation continuation phase. Two guessed theme/GST-test paths returned missing-file errors; exact rg discovery established real owners before edits.",
         "prevention": "Do not change base/gate policy. Preserve clean HEAD, bounded source reads and immutable old reference/proof owners. Admit and stage all five new draft app/test PNGs before freezing the test input list, then bind fresh receipts. No new regression IDs.",

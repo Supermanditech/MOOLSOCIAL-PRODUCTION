@@ -72,3 +72,9 @@ docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json text eol=lf
 docs/quality/CURSOR-BUY-T03-20261001-FOCUSED.jsonl text eol=lf
 docs/quality/CURSOR-BUY-T03-20261001-SELECTED-1.jsonl text eol=lf
 docs/quality/CURSOR-BUY-T03-20261001-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl text eol=lf

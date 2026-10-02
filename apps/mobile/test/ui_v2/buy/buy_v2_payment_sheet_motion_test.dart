@@ -1,6 +1,10 @@
 import 'dart:ui' show SemanticsAction, Tristate;
+import 'dart:ui' as ui;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -10,6 +14,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_payment_sheet_motion.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'buy_v2_qualified_provider_fixture.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +68,137 @@ void main() {
     if (settle) await tester.pumpAndSettle();
   }
 
+  for (final size in [const Size(320, 800), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'T05 crore payment bounds fit ${size.width.toInt()}x${size.height.toInt()} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final commerce = TestPaymentCommerce();
+          final product = testPaymentProducts
+              .firstWhere((p) => p.id == 's-tomato')
+              .copyWith(price: 10000000);
+          commerce.snapshot = BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            paymentMethods: const {'UPI', 'Card'},
+          );
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: commerce,
+            reviewDataEnabled: false,
+            productFactsAdapter: const QualifiedTestProductFacts({'s-tomato'}),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          expect(session.addProduct(product.id), isTrue);
+          session.openCart();
+          session.openCheckout();
+          commerce.snapshot = BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            paymentMethods: const {'UPI', 'Card'},
+            paymentCapabilities: [
+              testPaymentCapability(
+                session,
+                minimumMinor: 1000,
+                maximumMinor: 10000000,
+              ),
+              testPaymentCapability(
+                session,
+                method: 'Card',
+                minimumMinor: 0,
+                maximumMinor: 1000000000,
+              ),
+            ],
+          );
+          await session.restoreCommerce();
+          expect(session.choosePayment('Card'), isTrue);
+          expect(session.checkoutPaymentAmountMinor, 1000000000);
+          await openSheet(
+            tester,
+            session,
+            textScale: scale,
+            disableAnimations: scale == 2,
+          );
+          final card = find.byKey(const ValueKey('buy-payment-Card'));
+          final upi = find.byKey(const ValueKey('buy-payment-UPI'));
+          expect(tester.widget<InkWell>(card).onTap, isNotNull);
+          expect(tester.widget<InkWell>(upi).onTap, isNull);
+          expect(
+            tester.getTopLeft(card).dy,
+            lessThan(tester.getTopLeft(upi).dy),
+          );
+          expect(
+            find.textContaining('Pay to: Test purchase recipient.'),
+            findsNWidgets(2),
+          );
+          expect(find.textContaining('Maximum: ₹1,00,00,000.'), findsOneWidget);
+          expect(
+            find.textContaining('Amount exceeds this method’s payment limit.'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('Remaining limit:'), findsNothing);
+          expect(find.textContaining('Quoted payment charge:'), findsNothing);
+          expect(tester.takeException(), isNull);
+          const directory = String.fromEnvironment('BUY_T05_VISUAL_DIRECTORY');
+          if (directory.isNotEmpty) {
+            final boundary = tester.renderObject<RenderRepaintBoundary>(
+              find.byKey(const ValueKey('buy-payment-sheet-repaint-boundary')),
+            );
+            await tester.runAsync(() async {
+              final image = await boundary.toImage(pixelRatio: 2);
+              try {
+                final bytes = await image.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                final folder = Directory(directory);
+                await folder.create(recursive: true);
+                final file = File(
+                  '${folder.path}/payment-${size.width.toInt()}x${size.height.toInt()}-$scale.png',
+                );
+                expect(await file.exists(), isFalse);
+                await file.writeAsBytes(bytes!.buffer.asUint8List());
+              } finally {
+                image.dispose();
+              }
+            });
+          }
+          commerce.snapshot = BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            paymentMethods: const {'UPI', 'Card'},
+            paymentCapabilities: [
+              testPaymentCapability(
+                session,
+                method: 'Card',
+                maximumMinor: 100,
+                revision: 'test-v2',
+              ),
+            ],
+          );
+          await session.restoreCommerce();
+          await tester.pumpAndSettle();
+          expect(tester.widget<InkWell>(card).onTap, isNull);
+          expect(session.selectedPayment, 'Card');
+          await tester.tap(find.byKey(const ValueKey('buy-payment-close')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-payment-sheet-route')),
+            findsNothing,
+          );
+          expect(session.cartLines, hasLength(1));
+          expect(commerce.requests, isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('UPI QR transport and navy GST fit at $scale text', (
       tester,
@@ -96,7 +232,10 @@ void main() {
       final button = tester.widget<FilledButton>(gst);
       expect(button.style!.foregroundColor!.resolve({}), BuyV2Colors.navy);
       final request = find.byKey(const ValueKey('buy-gst-request-shop'));
-      final toggle = find.descendant(of: request, matching: find.byType(Switch));
+      final toggle = find.descendant(
+        of: request,
+        matching: find.byType(Switch),
+      );
       var control = tester.widget<Switch>(toggle);
       expect(control.value, isTrue);
       expect(control.activeTrackColor, BuyV2Colors.navy);

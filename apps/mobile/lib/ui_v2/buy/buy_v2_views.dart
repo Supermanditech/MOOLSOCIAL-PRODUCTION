@@ -11167,12 +11167,18 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
     }
     return (
       'Check total',
-      controller?.available == true ? session.prepareCollectionCheckout : null,
+      basket != null &&
+              controller?.available == true &&
+              session.paymentEligibilityFor(session.selectedPayment).selectable
+          ? session.prepareCollectionCheckout
+          : null,
     );
   }
-  final selectedPaymentAvailable = _buyV2CustomerPaymentChoices(
-    session,
-  ).any((choice) => choice.$1 == session.selectedPayment);
+  final selectedPaymentAvailable =
+      _buyV2CustomerPaymentChoices(
+        session,
+      ).any((choice) => choice.$1 == session.selectedPayment) &&
+      session.paymentEligibilityFor(session.selectedPayment).selectable;
   switch (session.checkoutSubmissionState) {
     case BuyV2CheckoutSubmissionState.paymentActionRequired:
       return (
@@ -11659,46 +11665,90 @@ class _CheckoutAddressChoice extends StatelessWidget {
 
 List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
   BuyV2Session session,
-) =>
-    (session.isStoreProcurement
-            ? <(String, IconData, String)>[
-                (
-                  'UPI',
-                  Icons.phone_android_rounded,
-                  'Pay using an eligible UPI app. Bank limits apply.',
-                ),
-                (
-                  'Cheque',
-                  Icons.receipt_long_outlined,
-                  'Payment remains pending until the cheque clears.',
-                ),
-                (
-                  'Bank transfer',
-                  Icons.account_balance_outlined,
-                  'Use the verified bank instructions for this purchase.',
-                ),
-                (
-                  'NEFT',
-                  Icons.account_balance_outlined,
-                  'Transfer with the purchase reference; confirmation follows reconciliation.',
-                ),
-                (
-                  'RTGS',
-                  Icons.account_balance_outlined,
-                  'Available subject to bank amount limits and supplier acceptance.',
-                ),
-                (
-                  'Cash',
-                  Icons.payments_outlined,
-                  'Payment requires a confirmed supplier receipt.',
-                ),
-              ]
-            : [
-                ('UPI', Icons.phone_android_rounded, 'Pay with any UPI app'),
-                ('Card', Icons.credit_card_rounded, 'Debit or credit card'),
-              ])
-        .where((choice) => session.availablePaymentMethods.contains(choice.$1))
-        .toList(growable: false);
+) {
+  final choices =
+      (session.supportedPaymentMethods.length > 2
+              ? <(String, IconData, String)>[
+                  (
+                    'UPI',
+                    Icons.phone_android_rounded,
+                    'Pay using an eligible UPI app. Bank limits apply.',
+                  ),
+                  (
+                    'Cheque',
+                    Icons.receipt_long_outlined,
+                    'Payment remains pending until the cheque clears.',
+                  ),
+                  (
+                    'Bank transfer',
+                    Icons.account_balance_outlined,
+                    'Use the verified bank instructions for this purchase.',
+                  ),
+                  (
+                    'NEFT',
+                    Icons.account_balance_outlined,
+                    'Transfer with the purchase reference; confirmation follows reconciliation.',
+                  ),
+                  (
+                    'RTGS',
+                    Icons.account_balance_outlined,
+                    'Available subject to bank amount limits and supplier acceptance.',
+                  ),
+                  (
+                    'Cash',
+                    Icons.payments_outlined,
+                    'Payment requires a confirmed supplier receipt.',
+                  ),
+                ]
+              : [
+                  ('UPI', Icons.phone_android_rounded, 'Pay with any UPI app'),
+                  ('Card', Icons.credit_card_rounded, 'Debit or credit card'),
+                ])
+          .followedBy(
+            session.isStoreProcurement ||
+                    session.supportedPaymentMethods.length <= 2
+                ? const <(String, IconData, String)>[]
+                : [('Card', Icons.credit_card_rounded, 'Debit or credit card')],
+          )
+          .where(
+            (choice) => session.availablePaymentMethods.contains(choice.$1),
+          )
+          .map((choice) {
+            final eligibility = session.paymentEligibilityFor(choice.$1);
+            final cap = eligibility.capability;
+            final details = <String>[
+              choice.$3,
+              if (eligibility.reason != null) eligibility.reason!,
+              if (cap?.recipientName != null) 'Pay to: ${cap!.recipientName}.',
+              if (cap?.minimumMinor != null)
+                'Minimum: ${_comparisonMoney(cap!.minimumMinor!)}.',
+              if (cap?.maximumMinor != null)
+                'Maximum: ${_comparisonMoney(cap!.maximumMinor!)}.',
+              if (cap?.remainingMinor != null)
+                'Remaining limit: ${_comparisonMoney(cap!.remainingMinor!)}.',
+              if (cap != null &&
+                  (cap.minimumMinor == null || cap.maximumMinor == null))
+                'Bank/provider limits apply.',
+              if (session.selectedPayment == choice.$1 &&
+                  session.currentPaymentChargeMinor != null)
+                'Quoted payment charge: ${_comparisonMoney(session.currentPaymentChargeMinor!)}.',
+            ];
+            return (choice.$1, choice.$2, details.join(' '));
+          })
+          .toList(growable: false);
+  return [
+    ...choices.where(
+      (choice) =>
+          choice.$1 == session.selectedPayment &&
+          session.paymentEligibilityFor(choice.$1).selectable,
+    ),
+    ...choices.where(
+      (choice) =>
+          choice.$1 != session.selectedPayment ||
+          !session.paymentEligibilityFor(choice.$1).selectable,
+    ),
+  ];
+}
 
 class _CheckoutPaymentStage extends StatefulWidget {
   const _CheckoutPaymentStage({
@@ -11761,7 +11811,9 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
               _BuyV2PaymentChoice(
                 choice: choice,
                 selected: session.selectedPayment == choice.$1,
-                onTap: locked
+                onTap:
+                    locked ||
+                        !session.paymentEligibilityFor(choice.$1).selectable
                     ? null
                     : () {
                         HapticFeedback.selectionClick();
@@ -11804,10 +11856,10 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
           ),
         if (session.upiQrAction case final qr?)
           _CheckoutUpiQr(session: session, action: qr),
-        if (session.checkoutQuotedPaymentCharge > 0)
+        if ((session.currentPaymentChargeMinor ?? 0) > 0)
           _CheckoutPaymentFact(
             label: 'Payment charge',
-            value: buyV2Money(session.checkoutQuotedPaymentCharge),
+            value: _comparisonMoney(session.currentPaymentChargeMinor!),
           ),
         if (session.checkoutBalanceDue > 0)
           _CheckoutPaymentFact(
@@ -18510,8 +18562,6 @@ Future<void> showBuyV2PaymentSheet(
 ) async {
   final destination = session.destination;
   final view = session.view;
-  final selectedPayment = session.selectedPayment;
-  final choices = _buyV2CustomerPaymentChoices(session);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -18526,109 +18576,123 @@ Future<void> showBuyV2PaymentSheet(
     ),
     clipBehavior: Clip.antiAlias,
     sheetAnimationStyle: BuyV2PaymentSheetMotion.resolve(context),
-    builder: (sheetContext) => Semantics(
-      key: const ValueKey('buy-payment-sheet-route'),
-      container: true,
-      scopesRoute: true,
-      namesRoute: true,
-      explicitChildNodes: true,
-      label: 'Payment methods',
-      child: RepaintBoundary(
-        key: const ValueKey('buy-payment-sheet-repaint-boundary'),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight:
-                MediaQuery.sizeOf(sheetContext).height *
-                BuyV2PaymentSheetMotion.maxHeightFactor,
-          ),
-          child: ListView(
-            key: const ValueKey('buy-payment-sheet-list'),
-            shrinkWrap: true,
-            padding: EdgeInsets.fromLTRB(
-              16,
-              0,
-              16,
-              18 +
-                  BuyV2AddressSheetMotion.resolveModalActionBottomInset(
-                    sheetContext,
-                  ),
-            ),
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (sheetContext) => ListenableBuilder(
+      listenable: session,
+      builder: (sheetContext, _) {
+        final choices = _buyV2CustomerPaymentChoices(session);
+        return Semantics(
+          key: const ValueKey('buy-payment-sheet-route'),
+          container: true,
+          scopesRoute: true,
+          namesRoute: true,
+          explicitChildNodes: true,
+          label: 'Payment methods',
+          child: RepaintBoundary(
+            key: const ValueKey('buy-payment-sheet-repaint-boundary'),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight:
+                    MediaQuery.sizeOf(sheetContext).height *
+                    BuyV2PaymentSheetMotion.maxHeightFactor,
+              ),
+              child: ListView(
+                key: const ValueKey('buy-payment-sheet-list'),
+                shrinkWrap: true,
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  16,
+                  18 +
+                      BuyV2AddressSheetMotion.resolveModalActionBottomInset(
+                        sheetContext,
+                      ),
+                ),
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Payment methods',
-                          key: const ValueKey('buy-payment-sheet-title'),
-                          style: sheetContext.buyTitle,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Payment methods',
+                              key: const ValueKey('buy-payment-sheet-title'),
+                              style: sheetContext.buyTitle,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Choose a payment method for this purchase.',
+                              style: sheetContext.buyMeta,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Choose how you want to pay MoolSocial for this purchase.',
-                          style: sheetContext.buyMeta,
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        key: const ValueKey('buy-payment-close'),
+                        tooltip: 'Close payment methods',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          maximumSize: const Size(44, 44),
+                          foregroundColor: BuyV2Colors.navy,
+                          backgroundColor: BuyV2Colors.softBlue,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    key: const ValueKey('buy-payment-close'),
-                    tooltip: 'Close payment methods',
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(44, 44),
-                      maximumSize: const Size(44, 44),
-                      foregroundColor: BuyV2Colors.navy,
-                      backgroundColor: BuyV2Colors.softBlue,
+                  const SizedBox(height: 12),
+                  if (choices.isEmpty)
+                    Container(
+                      key: const ValueKey('buy-payment-unavailable'),
+                      padding: const EdgeInsets.all(12),
+                      decoration: buyV2CardDecoration(
+                        color: BuyV2Colors.softOrange,
+                        border: BuyV2Colors.orange,
+                        radius: 14,
+                      ),
+                      child: Text(
+                        'Payment methods are unavailable right now. Return to Checkout and try again.',
+                        style: sheetContext.buyMeta,
+                      ),
                     ),
-                  ),
+                  for (final choice in choices)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _BuyV2PaymentChoice(
+                        choice: choice,
+                        selected: session.selectedPayment == choice.$1,
+                        onTap:
+                            session.checkoutBusy ||
+                                !session
+                                    .paymentEligibilityFor(choice.$1)
+                                    .selectable
+                            ? null
+                            : () async {
+                                HapticFeedback.selectionClick();
+                                final routeCompleted = ModalRoute.of(
+                                  sheetContext,
+                                )?.completed;
+                                Navigator.of(sheetContext).pop();
+                                if (routeCompleted != null) {
+                                  await routeCompleted;
+                                }
+                                if (session.destination != destination ||
+                                    session.view != view) {
+                                  return;
+                                }
+                                session.choosePayment(choice.$1);
+                              },
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 12),
-              if (choices.isEmpty)
-                Container(
-                  key: const ValueKey('buy-payment-unavailable'),
-                  padding: const EdgeInsets.all(12),
-                  decoration: buyV2CardDecoration(
-                    color: BuyV2Colors.softOrange,
-                    border: BuyV2Colors.orange,
-                    radius: 14,
-                  ),
-                  child: Text(
-                    'Payment methods are unavailable right now. Return to Checkout and try again.',
-                    style: sheetContext.buyMeta,
-                  ),
-                ),
-              for (final choice in choices)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _BuyV2PaymentChoice(
-                    choice: choice,
-                    selected: selectedPayment == choice.$1,
-                    onTap: () async {
-                      HapticFeedback.selectionClick();
-                      final routeCompleted = ModalRoute.of(
-                        sheetContext,
-                      )?.completed;
-                      Navigator.of(sheetContext).pop();
-                      if (routeCompleted != null) await routeCompleted;
-                      if (session.destination != destination ||
-                          session.view != view) {
-                        return;
-                      }
-                      session.choosePayment(choice.$1);
-                    },
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     ),
   );
 }

@@ -1148,6 +1148,12 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-2.jsonl',
   'docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json',
   # Exact founder-authorized T04 contract; receipts are admitted when closed.
+  # Exact T05 frontend contract; future proofs remain unclaimed.
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl',
   'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl',

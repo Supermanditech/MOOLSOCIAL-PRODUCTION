@@ -1719,6 +1719,60 @@ abstract interface class BuyV2CollectionPurchaseStore {
 bool _collectionText(String? value) =>
     value != null && value.isNotEmpty && value.trim() == value;
 
+/// Current payment-route publication from the authenticated commerce adapter.
+/// Bounds are inclusive INR minor units. A missing bound is unknown.
+@immutable
+class BuyV2PaymentCapability {
+  BuyV2PaymentCapability({
+    required this.method,
+    required this.sourceId,
+    required this.revision,
+    required Set<String> fulfilmentKeys,
+    required this.validFrom,
+    required this.validUntil,
+    this.currency = 'INR',
+    this.collectionStoreId,
+    this.recipientName,
+    this.minimumMinor,
+    this.maximumMinor,
+    this.remainingMinor,
+  }) : fulfilmentKeys = Set.unmodifiable(fulfilmentKeys);
+
+  final String method, sourceId, revision, currency;
+  final Set<String> fulfilmentKeys;
+  final DateTime validFrom, validUntil;
+  final String? collectionStoreId, recipientName;
+  final int? minimumMinor, maximumMinor, remainingMinor;
+
+  bool get valid =>
+      method.trim().isNotEmpty &&
+      sourceId.trim().isNotEmpty &&
+      revision.trim().isNotEmpty &&
+      currency == 'INR' &&
+      fulfilmentKeys.isNotEmpty &&
+      fulfilmentKeys.every((key) => key.trim().isNotEmpty) &&
+      validFrom.isBefore(validUntil) &&
+      (collectionStoreId == null || collectionStoreId!.trim().isNotEmpty) &&
+      (recipientName == null || recipientName!.trim().isNotEmpty) &&
+      [minimumMinor, maximumMinor, remainingMinor].every(
+        (bound) => bound == null || (bound >= 0 && bound <= 9007199254740991),
+      ) &&
+      (minimumMinor == null ||
+          maximumMinor == null ||
+          minimumMinor! <= maximumMinor!);
+}
+
+enum BuyV2PaymentEligibilityState { eligible, ineligible, unknown }
+
+@immutable
+class BuyV2PaymentEligibility {
+  const BuyV2PaymentEligibility(this.state, {this.reason, this.capability});
+  final BuyV2PaymentEligibilityState state;
+  final String? reason;
+  final BuyV2PaymentCapability? capability;
+  bool get selectable => state != BuyV2PaymentEligibilityState.ineligible;
+}
+
 @immutable
 class BuyV2CommerceSnapshot {
   const BuyV2CommerceSnapshot({
@@ -1727,6 +1781,7 @@ class BuyV2CommerceSnapshot {
     this.addresses = const [],
     this.orders = const [],
     this.paymentMethods = const {},
+    this.paymentCapabilities,
     this.upiQrAvailable = false,
     this.selectedAddressId,
     this.businessVerified = false,
@@ -1743,6 +1798,10 @@ class BuyV2CommerceSnapshot {
   final List<BuyV2Address> addresses;
   final List<BuyV2Order> orders;
   final Set<String> paymentMethods;
+
+  /// Null retains legacy provider validation without claiming known limits.
+  /// An empty publication explicitly offers no current payment routes.
+  final List<BuyV2PaymentCapability>? paymentCapabilities;
 
   /// True only when the authenticated merchant connector supports order QR.
   final bool upiQrAvailable;

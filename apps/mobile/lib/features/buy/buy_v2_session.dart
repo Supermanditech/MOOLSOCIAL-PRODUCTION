@@ -1901,6 +1901,7 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
     this.pendingStore,
     this.collectionGateway,
     this.acceptPaidOrder,
+    this.canSubmitPayment,
     this.now = DateTime.now,
     this.timeout = const Duration(seconds: 15),
   }) {
@@ -1913,6 +1914,7 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
   final ScanPickGateway? collectionGateway;
   final bool Function(BuyV2CollectionPurchaseIntent, ScanPickSnapshot)?
   acceptPaidOrder;
+  final bool Function(BuyV2CollectionPurchaseIntent)? canSubmitPayment;
   final DateTime Function() now;
   final Duration timeout;
   BuyV2CollectionCheckoutPhase phase = BuyV2CollectionCheckoutPhase.idle;
@@ -2091,6 +2093,7 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
       basket: currentBasket,
       quote: quote!,
     );
+    if (canSubmitPayment?.call(reserved) == false) return false;
     intent = reserved;
     _begin();
     try {
@@ -2100,7 +2103,8 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
         _unknown();
         return false;
       }
-      if (!reserved.quote.isCurrentFor(reserved.basket, now()) ||
+      if (canSubmitPayment?.call(reserved) == false ||
+          !reserved.quote.isCurrentFor(reserved.basket, now()) ||
           !reserved.quote.isCurrentFor(
             reserved.basket,
             _quoteReceivedAt!.add(_quoteElapsed.elapsed),
@@ -3264,6 +3268,12 @@ class BuyV2Session extends ChangeNotifier {
         pendingStore: collectionPurchaseStore,
         collectionGateway: collectionGateway,
         acceptPaidOrder: _canAdmitCollectionPurchase,
+        canSubmitPayment: (intent) =>
+            intent.basket.paymentMethod == selectedPayment &&
+            _evaluatePayment(
+              intent.basket.paymentMethod,
+              intent.quote.totalMinor,
+            ).selectable,
         now: catalogueNow,
       )..addListener(_onCollectionCheckoutChanged);
     }
@@ -5068,13 +5078,135 @@ class BuyV2Session extends ChangeNotifier {
     'Cash',
   };
 
-  Set<String> get supportedPaymentMethods =>
-      isStoreProcurement ? storePaymentMethods : paymentMethods;
+  static final Set<String> _knownPaymentMethods = {
+    ...paymentMethods,
+    ...storePaymentMethods,
+  };
+  List<BuyV2PaymentCapability>? _paymentCapabilities;
+  int _commerceRefreshSequence = 0;
+
+  Set<String> get supportedPaymentMethods => isStoreProcurement
+      ? storePaymentMethods
+      : {
+          ...paymentMethods,
+          if (_paymentCapabilities != null &&
+              checkoutLines.isNotEmpty &&
+              checkoutLines.every(
+                (line) =>
+                    line.product.destination == BuyV2Destination.wholesale,
+              ))
+            ...storePaymentMethods,
+        };
 
   BuyV2CommerceLoadState commerceLoadState = BuyV2CommerceLoadState.ready;
   BuyV2CheckoutSubmissionState checkoutSubmissionState =
       BuyV2CheckoutSubmissionState.idle;
   Set<String> availablePaymentMethods = paymentMethods;
+
+  int get checkoutPaymentAmountMinor {
+    if (collectionCheckoutSelected) {
+      final basket = currentCollectionBasket;
+      final quote = collectionCheckoutQuote;
+      if (basket != null &&
+          quote?.isCurrentFor(basket, catalogueNow()) == true) {
+        return quote!.totalMinor;
+      }
+      return checkoutLines.fold(0, (total, line) => total + line.total * 100);
+    }
+    return checkoutAmountDueNow * 100;
+  }
+
+  BuyV2PaymentEligibility paymentEligibilityFor(String method) {
+    if (checkoutRequiresResolution) {
+      return const BuyV2PaymentEligibility(
+        BuyV2PaymentEligibilityState.ineligible,
+        reason: 'Check the existing payment before choosing again.',
+      );
+    }
+    return _evaluatePayment(method, checkoutPaymentAmountMinor);
+  }
+
+  BuyV2PaymentEligibility _evaluatePayment(String method, int amountMinor) {
+    BuyV2PaymentEligibility blocked(
+      String reason, [
+      BuyV2PaymentCapability? cap,
+    ]) => BuyV2PaymentEligibility(
+      BuyV2PaymentEligibilityState.ineligible,
+      reason: reason,
+      capability: cap,
+    );
+    if (!supportedPaymentMethods.contains(method) ||
+        !availablePaymentMethods.contains(method)) {
+      return blocked('This payment method is unavailable for this purchase.');
+    }
+    final published = _paymentCapabilities;
+    BuyV2PaymentCapability? cap;
+    if (published != null) {
+      final matching = published
+          .where((candidate) => candidate.method == method)
+          .toList();
+      if (commerceLoadState != BuyV2CommerceLoadState.ready ||
+          matching.length != 1) {
+        return blocked(
+          'Current payment details could not be confirmed. Try again.',
+        );
+      }
+      cap = matching.single;
+      final keys = checkoutFulfilmentGroups.map((group) => group.key).toSet();
+      final now = catalogueNow();
+      if (!cap.valid ||
+          keys.isEmpty ||
+          !setEquals(keys, cap.fulfilmentKeys) ||
+          cap.collectionStoreId !=
+              (collectionCheckoutSelected
+                  ? collectionCheckoutStore?.id
+                  : null) ||
+          now.isBefore(cap.validFrom) ||
+          !now.isBefore(cap.validUntil)) {
+        return blocked(
+          'Payment details changed. Refresh Checkout and choose again.',
+        );
+      }
+    }
+    if (amountMinor < 0 || amountMinor > 9007199254740991) {
+      return blocked('The payment amount could not be confirmed.', cap);
+    }
+    if (method == 'RTGS' && amountMinor < 20000000) {
+      return blocked('RTGS requires at least ₹2,00,000.', cap);
+    }
+    if (cap?.minimumMinor != null && amountMinor < cap!.minimumMinor!) {
+      return blocked('Amount is below this method’s minimum.', cap);
+    }
+    if (cap?.maximumMinor != null && amountMinor > cap!.maximumMinor!) {
+      return blocked('Amount exceeds this method’s payment limit.', cap);
+    }
+    if (cap?.remainingMinor != null && amountMinor > cap!.remainingMinor!) {
+      return blocked('Amount exceeds the remaining payment limit.', cap);
+    }
+    return BuyV2PaymentEligibility(
+      cap?.minimumMinor != null && cap?.maximumMinor != null
+          ? BuyV2PaymentEligibilityState.eligible
+          : BuyV2PaymentEligibilityState.unknown,
+      capability: cap,
+    );
+  }
+
+  /// Quote charges are disclosed only for the current selected payment route.
+  int? get currentPaymentChargeMinor {
+    if (checkoutRequiresResolution) return null;
+    if (collectionCheckoutSelected) {
+      final basket = currentCollectionBasket;
+      final quote = collectionCheckoutQuote;
+      return basket != null &&
+              quote?.isCurrentFor(basket, catalogueNow()) == true
+          ? quote!.paymentChargeMinor
+          : null;
+    }
+    return checkoutQuoteEnabled && !checkoutQuoteReviewRequired
+        ? checkoutQuotedPaymentCharge * 100
+        : null;
+  }
+
   String? commerceMessage;
   String? _pendingPurchaseOrderAccountId;
   String? _pendingPurchaseOrderRequestId;
@@ -6439,6 +6571,7 @@ class BuyV2Session extends ChangeNotifier {
   String? get selectedAddressId => _selectedAddressId;
 
   Future<void> restoreCommerce() async {
+    final refreshSequence = ++_commerceRefreshSequence;
     if (!procurementScopeCurrent) {
       commerceLoadState = BuyV2CommerceLoadState.unavailable;
       commerceMessage = procurementUnavailableMessage;
@@ -6459,7 +6592,8 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
     try {
       final snapshot = await commerceAdapter.refresh();
-      if (_collectionDisposed ||
+      if (refreshSequence != _commerceRefreshSequence ||
+          _collectionDisposed ||
           procurementEpoch != _procurementEpoch ||
           !procurementScopeCurrent) {
         return;
@@ -6530,8 +6664,15 @@ class BuyV2Session extends ChangeNotifier {
           _ratingTargets[target.id] = target;
         }
       }
+      _paymentCapabilities = snapshot.paymentCapabilities == null
+          ? null
+          : List.unmodifiable(snapshot.paymentCapabilities!);
       availablePaymentMethods = Set.unmodifiable(
-        snapshot.paymentMethods.where(supportedPaymentMethods.contains),
+        snapshot.paymentMethods.where(
+          _paymentCapabilities == null
+              ? supportedPaymentMethods.contains
+              : _knownPaymentMethods.contains,
+        ),
       );
       upiQrAvailable =
           !isStoreProcurement &&
@@ -6543,14 +6684,17 @@ class BuyV2Session extends ChangeNotifier {
           !_addresses.any((address) => address.id == _selectedAddressId)) {
         _selectedAddressId = null;
       }
-      if (!checkoutRequiresResolution &&
+      if (_paymentCapabilities == null &&
+          !checkoutBusy &&
+          !checkoutRequiresResolution &&
           !availablePaymentMethods.contains(selectedPayment)) {
         selectedPayment = availablePaymentMethods.firstOrNull ?? '';
       }
       commerceLoadState = snapshot.state;
       commerceMessage = snapshot.customerMessage;
     } on Object {
-      if (_collectionDisposed ||
+      if (refreshSequence != _commerceRefreshSequence ||
+          _collectionDisposed ||
           procurementEpoch != _procurementEpoch ||
           !procurementScopeCurrent) {
         return;
@@ -8000,6 +8144,7 @@ class BuyV2Session extends ChangeNotifier {
         view == BuyV2View.checkout &&
         collectionCheckoutSelected &&
         currentCollectionBasket?.fingerprint == basket.fingerprint) {
+      if (!_requirePaymentEligible()) return false;
       checkoutStep = BuyV2CheckoutStep.confirm;
       notifyListeners();
       return true;
@@ -11392,11 +11537,7 @@ class BuyV2Session extends ChangeNotifier {
   bool continueCheckoutFromPayment() {
     if (view != BuyV2View.checkout || checkoutBusy) return false;
     if (collectionCheckoutSelected) return false;
-    if (!availablePaymentMethods.contains(selectedPayment)) {
-      notice = 'Choose an available payment method to continue.';
-      notifyListeners();
-      return false;
-    }
+    if (!_requirePaymentEligible()) return false;
     if (selectedPayment == 'Purchase order' &&
         !purchaseOrderEligibleForCheckout) {
       notice = purchaseOrderEligibilityMessage;
@@ -13465,9 +13606,9 @@ class BuyV2Session extends ChangeNotifier {
         const {'Cash on Delivery', 'Purchase order'}.contains(value)) {
       return false;
     }
-    if (!supportedPaymentMethods.contains(value) ||
-        !availablePaymentMethods.contains(value)) {
-      notice = 'This payment method is not available.';
+    final eligibility = paymentEligibilityFor(value);
+    if (!eligibility.selectable) {
+      notice = eligibility.reason;
       notifyListeners();
       return false;
     }
@@ -13521,7 +13662,19 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _requirePaymentEligible() {
+    final eligibility = _evaluatePayment(
+      selectedPayment,
+      checkoutPaymentAmountMinor,
+    );
+    if (eligibility.selectable) return true;
+    notice = eligibility.reason;
+    notifyListeners();
+    return false;
+  }
+
   bool _checkoutEligibilityCurrent({bool placingOrder = false}) {
+    if (placingOrder && !_requirePaymentEligible()) return false;
     if (placingOrder &&
         !collectionCheckoutSelected &&
         publicDeliveryInstructionReviewRequired) {
@@ -13819,6 +13972,7 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> _placeOrderAfterPreflight() async {
     if (!_allowProcurementLines(checkoutLines)) return false;
+    final consentedAmountMinor = checkoutPaymentAmountMinor;
     final procurementEpoch = _procurementEpoch;
     final previous = _navigationSurfaceIdentity;
     final lines = checkoutLines;
@@ -13919,6 +14073,12 @@ class BuyV2Session extends ChangeNotifier {
     if (!_checkoutEligibilityCurrent(placingOrder: true)) return false;
     if (purchaseOrderReviewRequired) {
       notice = 'Supplier terms changed. Check them before payment.';
+      notifyListeners();
+      return false;
+    }
+    if (checkoutPaymentAmountMinor != consentedAmountMinor) {
+      notice =
+          'The amount due now changed. Review the updated total before paying.';
       notifyListeners();
       return false;
     }

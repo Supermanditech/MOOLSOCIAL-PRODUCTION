@@ -21,6 +21,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show showBuyV2CatalogueArea;
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_qualified_provider_fixture.dart';
 import 'buy_v2_discovery_refinement_test.dart'
     show R669BrandCommerce, r669BrandedSession, BuyTestEligibilityFacts;
 
@@ -972,15 +973,18 @@ class _CollectionPurchaseHarness
     );
   }
 
-  BuyV2CollectionCheckoutController controller({Duration? timeout}) =>
-      BuyV2CollectionCheckoutController(
-        identity: identity,
-        gateway: this,
-        pendingStore: this,
-        collectionGateway: this,
-        now: () => clock,
-        timeout: timeout ?? const Duration(seconds: 15),
-      );
+  BuyV2CollectionCheckoutController controller({
+    Duration? timeout,
+    bool Function(BuyV2CollectionPurchaseIntent)? canSubmitPayment,
+  }) => BuyV2CollectionCheckoutController(
+    identity: identity,
+    gateway: this,
+    pendingStore: this,
+    collectionGateway: this,
+    now: () => clock,
+    canSubmitPayment: canSubmitPayment,
+    timeout: timeout ?? const Duration(seconds: 15),
+  );
 
   @override
   Future<BuyV2CollectionCheckoutQuote> quote(
@@ -1998,6 +2002,355 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  Future<(BuyV2Session, TestPaymentCommerce)> paymentFixture({
+    TestPaymentQuote? quote,
+  }) async {
+    final core = BuySession();
+    final commerce = TestPaymentCommerce();
+    commerce.snapshot = testPaymentSnapshot(
+      null,
+      addresses: [_instructionAddress],
+    );
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      productFactsAdapter: BuyTestEligibilityFacts(
+        delegate: _T01CDeliveryFactsAdapter(),
+      ),
+      reviewDataEnabled: false,
+      checkoutQuoteAdapter: quote,
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(session.commerceLoadState, BuyV2CommerceLoadState.ready);
+    expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    return (session, commerce);
+  }
+
+  Future<void> publishPayments(
+    BuyV2Session session,
+    TestPaymentCommerce commerce,
+    List<BuyV2PaymentCapability>? caps, {
+    Set<String> methods = const {'UPI', 'Card'},
+  }) async {
+    commerce.snapshot = testPaymentSnapshot(
+      caps,
+      methods: methods,
+      addresses: [_instructionAddress],
+    );
+    await session.restoreCommerce();
+  }
+
+  for (final boundary in <(String, int?, int?, int?, bool)>[
+    ('minimum below', 3701, null, null, false),
+    ('minimum equal', 3700, null, null, true),
+    ('maximum above', null, 3699, null, false),
+    ('maximum equal', null, 3700, null, true),
+    ('remaining above', null, null, 3699, false),
+    ('remaining equal', null, null, 3700, true),
+    ('closed range equal', 3700, 3700, null, true),
+  ]) {
+    test('T05 inclusive amount boundary ${boundary.$1}', () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(session, commerce, [
+        testPaymentCapability(
+          session,
+          minimumMinor: boundary.$2,
+          maximumMinor: boundary.$3,
+          remainingMinor: boundary.$4,
+        ),
+      ]);
+      final eligibility = session.paymentEligibilityFor('UPI');
+      expect(session.checkoutPaymentAmountMinor, 3700);
+      expect(eligibility.selectable, boundary.$5);
+      expect(session.choosePayment('UPI'), boundary.$5);
+      expect(session.continueCheckoutFromPayment(), boundary.$5);
+      if (!boundary.$5) expect(commerce.requests, isEmpty);
+    });
+  }
+
+  test(
+    'T05 unknown legacy limits and explicit empty publication differ',
+    () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(session, commerce, null);
+      expect(
+        session.paymentEligibilityFor('UPI').state,
+        BuyV2PaymentEligibilityState.unknown,
+      );
+      expect(session.choosePayment('Card'), isTrue);
+      expect(session.currentPaymentChargeMinor, isNull);
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, method: 'Card'),
+      ]);
+      expect(
+        session.paymentEligibilityFor('Card').state,
+        BuyV2PaymentEligibilityState.unknown,
+      );
+      expect(session.choosePayment('Card'), isTrue);
+      await publishPayments(session, commerce, []);
+      expect(session.selectedPayment, 'Card');
+      expect(session.choosePayment('Card'), isFalse);
+      expect(session.continueCheckoutFromPayment(), isFalse);
+    },
+  );
+
+  for (final invalid in [
+    'currency',
+    'expired',
+    'future',
+    'scope',
+    'duplicate',
+    'revision',
+    'negative',
+    'inverted',
+    'collection',
+  ]) {
+    test('T05 rejects invalid payment publication $invalid', () async {
+      final (session, commerce) = await paymentFixture();
+      final cap = testPaymentCapability(
+        session,
+        currency: invalid == 'currency' ? 'USD' : 'INR',
+        validUntil: invalid == 'expired' ? session.catalogueNow() : null,
+        validFrom: invalid == 'future'
+            ? session.catalogueNow().add(const Duration(minutes: 1))
+            : null,
+        fulfilmentKeys: invalid == 'scope' ? {'another-purchase'} : null,
+        revision: invalid == 'revision' ? '' : 'test-current-v2',
+        minimumMinor: invalid == 'negative'
+            ? -1
+            : invalid == 'inverted'
+            ? 5000
+            : 0,
+        maximumMinor: invalid == 'inverted' ? 4000 : 1000000,
+        collectionStoreId: invalid == 'collection' ? 'another-store' : null,
+      );
+      await publishPayments(session, commerce, [
+        cap,
+        if (invalid == 'duplicate') cap,
+      ]);
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.continueCheckoutFromPayment(), isFalse);
+      expect(commerce.requests, isEmpty);
+    });
+  }
+
+  test(
+    'T05 newest refresh wins and invalid preference requires a new choice',
+    () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, maximumMinor: 10000),
+      ]);
+      final earlier = Completer<BuyV2CommerceSnapshot>();
+      commerce.refreshGate = earlier;
+      final first = session.restoreCommerce();
+      final latest = Completer<BuyV2CommerceSnapshot>();
+      commerce.refreshGate = latest;
+      final second = session.restoreCommerce();
+      latest.complete(
+        testPaymentSnapshot(
+          [
+            testPaymentCapability(
+              session,
+              revision: 'test-v2',
+              maximumMinor: 100,
+            ),
+            testPaymentCapability(
+              session,
+              method: 'Card',
+              minimumMinor: 0,
+              maximumMinor: 10000,
+            ),
+          ],
+          addresses: [_instructionAddress],
+        ),
+      );
+      await second;
+      earlier.complete(
+        testPaymentSnapshot([
+          testPaymentCapability(session, maximumMinor: 10000),
+        ]),
+      );
+      await first;
+      expect(session.selectedPayment, 'UPI');
+      expect(session.paymentEligibilityFor('UPI').selectable, isFalse);
+      expect(session.continueCheckoutFromPayment(), isFalse);
+      expect(session.choosePayment('Card'), isTrue);
+      commerce.refreshGate = null;
+      await publishPayments(session, commerce, [
+        testPaymentCapability(
+          session,
+          method: 'Card',
+          revision: 'test-v3',
+          maximumMinor: 10000,
+        ),
+      ]);
+      expect(session.selectedPayment, 'Card');
+      expect(session.paymentEligibilityFor('Card').selectable, isTrue);
+    },
+  );
+
+  test(
+    'T05 public trade methods require scoped wholesale capability and exclude mixed retail COD',
+    () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(
+        session,
+        commerce,
+        [testPaymentCapability(session, method: 'Bank transfer')],
+        methods: {'Bank transfer', 'Cash on Delivery'},
+      );
+      expect(session.choosePayment('Bank transfer'), isFalse);
+      expect(session.choosePayment('Cash on Delivery'), isFalse);
+      session.openCart();
+      session.remove('s-tomato');
+      expect(
+        session.addProduct('w-notebook'),
+        isTrue,
+        reason:
+            '${session.notice}; ${session.product('w-notebook').offerClass}; ${session.productFactsFor(session.product('w-notebook')).eligibility?.toJson()}',
+      );
+      session.openCart(scope: BuyV2CartScope.all);
+      expect(session.openCheckout(), isTrue);
+      await publishPayments(
+        session,
+        commerce,
+        [testPaymentCapability(session, method: 'Bank transfer')],
+        methods: {'Bank transfer'},
+      );
+      expect(session.choosePayment('Bank transfer'), isTrue);
+      session.openCart();
+      session.addProduct('s-tomato');
+      session.openCart(scope: BuyV2CartScope.all);
+      session.openCheckout();
+      await publishPayments(
+        session,
+        commerce,
+        [testPaymentCapability(session, method: 'Bank transfer')],
+        methods: {'Bank transfer'},
+      );
+      expect(session.choosePayment('Bank transfer'), isFalse);
+    },
+  );
+
+  test(
+    'T05 refreshed quoted fee rechecks final due amount before placement',
+    () async {
+      final quote = TestPaymentQuote();
+      final (session, commerce) = await paymentFixture(quote: quote);
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, maximumMinor: 3800),
+        testPaymentCapability(session, method: 'Card', maximumMinor: 10000),
+      ]);
+      await session.refreshCheckoutQuote();
+      expect(session.currentPaymentChargeMinor, 0);
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      quote.charge = 2;
+      expect(await session.submitOrder(), isFalse);
+      expect(session.checkoutPaymentAmountMinor, 3900);
+      expect(session.currentPaymentChargeMinor, 200);
+      expect(commerce.requests, isEmpty);
+      expect(session.cartLines, hasLength(1));
+      expect(session.choosePayment('Card'), isTrue);
+      await session.refreshCheckoutQuote();
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(
+        commerce.requests,
+        hasLength(1),
+        reason:
+            '${session.notice}; ${session.eligibilityLocationKey}; ${session.productFactsFor(session.checkoutLines.first.product).eligibility?.toJson()}; ${session.checkoutLines.first.product.offerClass}',
+      );
+      expect(commerce.requests.single.amountDueNow, 39);
+      expect(session.checkoutRequiresResolution, isTrue);
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, method: 'Card', maximumMinor: 100),
+      ]);
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.paymentEligibilityFor('Card').selectable, isFalse);
+      expect(commerce.requests.single.amountDueNow, 39);
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  for (final increase in [false, true]) {
+    test(
+      'T05 fee amount review and same total retry increase $increase',
+      () async {
+        final quote = TestPaymentQuote()..charge = increase ? 0 : 2;
+        final (session, commerce) = await paymentFixture(quote: quote);
+        await publishPayments(session, commerce, [
+          testPaymentCapability(session, minimumMinor: 0, maximumMinor: 10000),
+        ]);
+        await session.refreshCheckoutQuote();
+        expect(session.continueCheckoutFromPayment(), isTrue);
+        quote.charge = 1;
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests, isEmpty);
+        expect(session.checkoutBusy, isFalse);
+        expect(session.checkoutAmountDueNow, 38);
+        expect(
+          session.notice,
+          'The amount due now changed. Review the updated total before paying.',
+        );
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests, hasLength(1), reason: session.notice);
+        expect(commerce.requests.single.amountDueNow, 38);
+        expect(session.checkoutRequiresResolution, isTrue);
+      },
+    );
+  }
+
+  for (final amount in [199999, 200000, 10000000]) {
+    test('T05 RTGS statutory minimum and crore route amount $amount', () async {
+      final core = BuySession();
+      final commerce = TestPaymentCommerce();
+      final product = testPaymentProducts
+          .firstWhere((p) => p.id == 'w-notebook')
+          .copyWith(price: amount);
+      BuyV2CommerceSnapshot publication(List<BuyV2PaymentCapability>? caps) =>
+          BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            businessVerified: true,
+            paymentMethods: const {'RTGS'},
+            paymentCapabilities: caps,
+          );
+      commerce.snapshot = publication(null);
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        reviewDataEnabled: false,
+        productFactsAdapter: const QualifiedTestProductFacts({'w-notebook'}),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      expect(session.addProduct(product.id), isTrue, reason: session.notice);
+      session.openCart(scope: BuyV2CartScope.all);
+      session.openCheckout();
+      commerce.snapshot = publication([
+        testPaymentCapability(
+          session,
+          method: 'RTGS',
+          minimumMinor: 0,
+          maximumMinor: 1000000000,
+        ),
+      ]);
+      await session.restoreCommerce();
+      expect(session.checkoutPaymentAmountMinor, amount * 100);
+      expect(session.choosePayment('RTGS'), amount >= 200000);
+      if (amount < 200000) {
+        expect(session.notice, 'RTGS requires at least ₹2,00,000.');
+      }
+      expect(commerce.requests, isEmpty);
+    });
+  }
+
   final qrClock = DateTime.utc(2026, 10, 1, 10);
   final validQrUri = Uri.parse(
     'upi://pay?pa=test-merchant%40bank&pn=Test%20merchant&cu=INR&am=37.00&tr=txn-1',
@@ -6048,6 +6401,39 @@ void main() {
       checkout.dispose();
       harness.identity.dispose();
     });
+
+    test(
+      'T05 collection validates exact quote before and after reservation',
+      () async {
+        checkout.dispose();
+        var allowed = false;
+        final checkedAmounts = <int>[];
+        checkout = harness.controller(
+          canSubmitPayment: (intent) {
+            checkedAmounts.add(intent.quote.totalMinor);
+            return allowed;
+          },
+        );
+        final basket = harness.basket();
+        expect(await checkout.prepare(basket), isTrue);
+        final expectedMinor =
+            basket.lines.fold(0, (total, line) => total + line.total * 100) +
+            25;
+        expect(await checkout.place(basket), isFalse);
+        expect(harness.pending, isNull);
+        allowed = true;
+        harness.reservationGate = Completer<bool>();
+        final placing = checkout.place(basket);
+        await Future<void>.delayed(Duration.zero);
+        allowed = false;
+        harness.reservationGate!.complete(true);
+        expect(await placing, isFalse);
+        expect(harness.placements, 0);
+        expect(checkout.unresolved, isTrue);
+        expect(harness.pending!.quote.totalMinor, expectedMinor);
+        expect(checkedAmounts, [expectedMinor, expectedMinor, expectedMinor]);
+      },
+    );
 
     Future<BuyV2Session> checkoutSession({
       bool openCheckout = true,
