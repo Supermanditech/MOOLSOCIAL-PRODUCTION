@@ -804,7 +804,7 @@ class WorkSession extends ChangeNotifier {
     final saved = WorkspacePurchaseEntryBook(account: key.$1, store: key.$2,
       qa: key.$3, revision: (old?.revision ?? 0) + 1,
       profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft,
-      copies: [...?old?.copies, ?reviewedCopy]);
+      copies: [...?old?.copies, ?reviewedCopy], openingRecords: old?.openingRecords ?? const []);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -828,9 +828,98 @@ class WorkSession extends ChangeNotifier {
       if (_supplierKey == key) notifyListeners();
     }
   }
+  String newWorkspaceSupplierOpeningId() =>
+      _newCounterIdentity('supplier-opening');
+  List<WorkspaceSupplierOpeningRecord> get workspaceSupplierOpeningRecords =>
+      _supplierDirectories[_supplierKey]?.openingRecords ?? const [];
+  WorkspaceSupplierOpeningRecord? workspaceSupplierOpeningRecord(
+    String supplierId,
+  ) => _supplierDirectories[_supplierKey]?.openingRecordFor(supplierId);
+  Future<bool> saveWorkspaceSupplierOpeningRecord(
+    WorkspaceSupplierOpeningRecord record, {
+    required (String, String, bool) scope,
+    required int? expectedRevision,
+  }) async {
+    final key = _supplierKey;
+    if (key == null ||
+        key != scope ||
+        !workspaceSuppliersLoaded ||
+        workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key) ||
+        record.account != key.$1 ||
+        record.store != key.$2 ||
+        record.qa != key.$3) {
+      return false;
+    }
+    final old = _supplierDirectories[key];
+    final previous = old?.openingRecords
+        .where((r) => r.id == record.id)
+        .firstOrNull;
+    if (previous != null &&
+        jsonEncode(previous.toJson()) == jsonEncode(record.toJson())) {
+      dismissWorkspacePurchaseValidation(key);
+      return true;
+    }
+    if (old == null ||
+        previous != null ||
+        _supplierNeedsReload.contains(key) ||
+        old.revision != expectedRevision ||
+        record.revision != old.revision + 1) {
+      _supplierValidationErrors[key] =
+          'Opening records changed. Reopen this supplier before saving again. Your entries are kept.';
+      notifyListeners();
+      return false;
+    }
+    WorkspacePurchaseEntryBook next;
+    try {
+      next = WorkspacePurchaseEntryBook.fromJson(
+        WorkspacePurchaseEntryBook(
+          account: old.account,
+          store: old.store,
+          qa: old.qa,
+          revision: old.revision + 1,
+          profiles: old.profiles,
+          draft: old.draft,
+          copies: old.copies,
+          openingRecords: [...old.openingRecords, record],
+        ).toJson(),
+      );
+    } on Object {
+      _supplierValidationErrors[key] =
+          'Check the supplier, date, amount and supporting bills. Your entries are kept.';
+      notifyListeners();
+      return false;
+    }
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      await _supplierStorage.save(next, expectedRevision: old.revision);
+      if (_supplierKey != key) {
+        _supplierNeedsReload.add(key);
+        return false;
+      }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (_supplierKey == key) {
+        _supplierErrors[key] =
+            'Opening record could not be saved. Your entries are kept. Retry, or reopen the saved record.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (_supplierKey == key) notifyListeners();
+    }
+  }
+
   int? get workspacePurchaseEntryRevision => _supplierDirectories[_supplierKey]?.revision;
   List<WorkspacePurchaseSavedCopy> get workspacePurchaseCopies =>
     _supplierDirectories[_supplierKey]?.copies ?? const [];
+  List<WorkspacePurchaseSavedCopy> get workspaceLatestPurchaseCopies =>
+      _supplierDirectories[_supplierKey]?.latestReviewedCopies ?? const [];
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
 

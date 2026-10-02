@@ -1793,6 +1793,30 @@ class SecureWorkPurchaseEntryStore implements WorkPurchaseEntryStore {
           throw const WorkGatewayException('Earlier purchase copies must be kept unchanged. Reopen Purchases.');
         }
       }
+      final retainedOpeningIds = <String>{};
+      for (final record
+          in previous?.openingRecords ??
+              const <WorkspaceSupplierOpeningRecord>[]) {
+        final retained = frozen.openingRecords
+            .where((r) => r.id == record.id)
+            .firstOrNull;
+        if (retained == null ||
+            jsonEncode(retained.toJson()) != jsonEncode(record.toJson())) {
+          throw const WorkGatewayException(
+            'Earlier opening records must be kept unchanged. Reopen Purchases.',
+          );
+        }
+        retainedOpeningIds.add(record.id);
+      }
+      final additions = frozen.openingRecords
+          .where((r) => !retainedOpeningIds.contains(r.id))
+          .toList();
+      if (additions.length > 1 ||
+          additions.any((r) => r.revision != frozen.revision)) {
+        throw const WorkGatewayException(
+          'Save one reviewed opening record at a time. Reopen Purchases.',
+        );
+      }
       if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
         throw const WorkGatewayException('Purchase storage is full. Your saved records are kept; do not clear app data.');
       }

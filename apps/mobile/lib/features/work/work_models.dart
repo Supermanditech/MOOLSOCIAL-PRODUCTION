@@ -6232,17 +6232,186 @@ class WorkspacePurchaseSavedCopy {
   }
 }
 
+enum WorkspaceOpeningBillInclusion { unknown, included, excluded }
+
+/// Retailer assertion about one exact reviewed bill; not an amount allocation.
+class WorkspaceOpeningBillLink {
+  const WorkspaceOpeningBillLink({
+    required this.copyId,
+    required this.copyRevision,
+    required this.draftId,
+    required this.inclusion,
+  });
+  final String copyId, draftId;
+  final int copyRevision;
+  final WorkspaceOpeningBillInclusion inclusion;
+  Map<String, Object?> toJson() => {
+    'copyId': copyId,
+    'copyRevision': copyRevision,
+    'draftId': draftId,
+    'inclusion': inclusion.name,
+  };
+  static WorkspaceOpeningBillLink fromJson(Object? raw) {
+    const keys = {'copyId', 'copyRevision', 'draftId', 'inclusion'};
+    if (raw is! Map ||
+        raw.length != keys.length ||
+        !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid opening bill link');
+    }
+    final result = WorkspaceOpeningBillLink(
+      copyId: raw['copyId'] as String,
+      copyRevision: raw['copyRevision'] as int,
+      draftId: raw['draftId'] as String,
+      inclusion: WorkspaceOpeningBillInclusion.values.byName(
+        raw['inclusion'] as String,
+      ),
+    );
+    if (result.copyId.isEmpty ||
+        result.draftId.isEmpty ||
+        result.copyRevision < 1) {
+      throw const FormatException('Invalid opening bill identity');
+    }
+    return result;
+  }
+}
+
+/// Saved, unposted starting-balance evidence. Never a current payable projection.
+class WorkspaceSupplierOpeningRecord {
+  WorkspaceSupplierOpeningRecord({
+    required this.id,
+    required this.basisId,
+    required this.account,
+    required this.store,
+    required this.qa,
+    required this.supplierId,
+    required this.revision,
+    required this.asOfDate,
+    required this.savedAt,
+    required this.amountMinor,
+    required this.supplierCredit,
+    required this.sourceNote,
+    List<WorkspaceOpeningBillLink> bills = const [],
+  }) : bills = List.unmodifiable(bills);
+  final String id, basisId, account, store, supplierId, asOfDate, sourceNote;
+  final bool qa, supplierCredit;
+  final int revision;
+  final DateTime savedAt;
+  final int? amountMinor;
+  final List<WorkspaceOpeningBillLink> bills;
+  bool get valid {
+    final date = DateTime.tryParse(asOfDate);
+    return [
+          id,
+          basisId,
+          account,
+          store,
+          supplierId,
+        ].every((v) => v.trim().isNotEmpty && v.length <= 240) &&
+        revision >= 1 &&
+        RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(asOfDate) &&
+        date != null &&
+        date.toIso8601String().substring(0, 10) == asOfDate &&
+        (amountMinor == null ||
+            (amountMinor! >= 0 && amountMinor! <= 999999999999)) &&
+        sourceNote.trim().isNotEmpty &&
+        sourceNote.length <= 4000 &&
+        bills.length <= 1000 &&
+        bills.map((b) => b.copyId).toSet().length == bills.length;
+  }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'basisId': basisId,
+    'account': account,
+    'store': store,
+    'qa': qa,
+    'supplierId': supplierId,
+    'revision': revision,
+    'asOfDate': asOfDate,
+    'savedAt': savedAt.toIso8601String(),
+    'currency': 'INR',
+    'amountMinor': amountMinor,
+    'supplierCredit': supplierCredit,
+    'sourceNote': sourceNote,
+    'bills': bills.map((b) => b.toJson()).toList(),
+  };
+  static WorkspaceSupplierOpeningRecord fromJson(Object? raw) {
+    const keys = {
+      'id',
+      'basisId',
+      'account',
+      'store',
+      'qa',
+      'supplierId',
+      'revision',
+      'asOfDate',
+      'savedAt',
+      'currency',
+      'amountMinor',
+      'supplierCredit',
+      'sourceNote',
+      'bills',
+    };
+    try {
+      if (raw is! Map ||
+          raw.length != keys.length ||
+          !raw.keys.every(keys.contains) ||
+          raw['currency'] != 'INR' ||
+          raw['bills'] is! List ||
+          (raw['bills'] as List).length > 1000) {
+        throw const FormatException('Invalid opening record');
+      }
+      final result = WorkspaceSupplierOpeningRecord(
+        id: raw['id'] as String,
+        basisId: raw['basisId'] as String,
+        account: raw['account'] as String,
+        store: raw['store'] as String,
+        qa: raw['qa'] as bool,
+        supplierId: raw['supplierId'] as String,
+        revision: raw['revision'] as int,
+        asOfDate: raw['asOfDate'] as String,
+        savedAt: DateTime.parse(raw['savedAt'] as String),
+        amountMinor: raw['amountMinor'] as int?,
+        supplierCredit: raw['supplierCredit'] as bool,
+        sourceNote: raw['sourceNote'] as String,
+        bills: [
+          for (final b in raw['bills'] as List)
+            WorkspaceOpeningBillLink.fromJson(b),
+        ],
+      );
+      if (!result.valid) throw const FormatException('Invalid opening record');
+      return result;
+    } on Object {
+      throw const FormatException(
+        'Opening records need recovery. Records have been kept.',
+      );
+    }
+  }
+}
+
 class WorkspacePurchaseEntryBook {
-  WorkspacePurchaseEntryBook({required this.account, required this.store,
-    required this.qa, required this.revision, required List<WorkspaceSupplierProfile> profiles,
-    this.draft, List<WorkspacePurchaseSavedCopy> copies = const []})
-      : profiles = List.unmodifiable(profiles), copies = List.unmodifiable(copies);
+  WorkspacePurchaseEntryBook({
+    required this.account,
+    required this.store,
+    required this.qa,
+    required this.revision,
+    required List<WorkspaceSupplierProfile> profiles,
+    this.draft,
+    List<WorkspacePurchaseSavedCopy> copies = const [],
+    List<WorkspaceSupplierOpeningRecord> openingRecords = const [],
+  }) : profiles = List.unmodifiable(profiles),
+       copies = List.unmodifiable(copies),
+       openingRecords = List.unmodifiable(openingRecords);
   final String account, store;
   final bool qa;
   final int revision;
   final List<WorkspaceSupplierProfile> profiles;
   final WorkspacePurchaseEntryDraft? draft;
   final List<WorkspacePurchaseSavedCopy> copies;
+  final List<WorkspaceSupplierOpeningRecord> openingRecords;
+  WorkspaceSupplierOpeningRecord? openingRecordFor(String supplierId) =>
+      openingRecords.where((r) => r.supplierId == supplierId).lastOrNull;
+
   /// Older revisions remain in history, but do not reserve corrected bill keys.
   List<WorkspacePurchaseSavedCopy> get latestReviewedCopies {
     final latest = <String, List<WorkspacePurchaseSavedCopy>>{};
@@ -6257,52 +6426,169 @@ class WorkspacePurchaseEntryBook {
     }
     return List.unmodifiable(latest.values.expand((copies) => copies));
   }
+
   bool get draftHasReviewedCopy {
     if (draft == null) return false;
-    final latest = latestReviewedCopies.where((copy) => copy.draft.id == draft!.id).toList();
-    return latest.length == 1 && jsonEncode(latest.single.draft.toJson()) == jsonEncode(draft!.toJson());
+    final latest = latestReviewedCopies
+        .where((copy) => copy.draft.id == draft!.id)
+        .toList();
+    return latest.length == 1 &&
+        jsonEncode(latest.single.draft.toJson()) == jsonEncode(draft!.toJson());
   }
-  WorkspacePurchaseSavedCopy? duplicateInvoice(WorkspacePurchaseEntryDraft candidate) {
+
+  WorkspacePurchaseSavedCopy? duplicateInvoice(
+    WorkspacePurchaseEntryDraft candidate,
+  ) {
     final reference = candidate.invoiceReference.trim().toLowerCase();
     final year = candidate.invoiceFinancialYear;
     if (reference.isEmpty || year == null) return null;
-    return latestReviewedCopies.where((copy) => copy.draft.id != candidate.id &&
-      copy.draft.supplierId == candidate.supplierId && copy.draft.invoiceFinancialYear == year &&
-      copy.draft.invoiceReference.trim().toLowerCase() == reference).firstOrNull;
+    return latestReviewedCopies
+        .where(
+          (copy) =>
+              copy.draft.id != candidate.id &&
+              copy.draft.supplierId == candidate.supplierId &&
+              copy.draft.invoiceFinancialYear == year &&
+              copy.draft.invoiceReference.trim().toLowerCase() == reference,
+        )
+        .firstOrNull;
   }
-  Map<String, Object?> toJson() => {'version': 1, 'account': account, 'store': store,
-    'qa': qa, 'revision': revision, 'profiles': profiles.map((p) => p.toJson()).toList(),
-    'draft': draft?.toJson(), if (copies.isNotEmpty) 'copies': copies.map((c) => c.toJson()).toList()};
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': account,
+    'store': store,
+    'qa': qa,
+    'revision': revision,
+    'profiles': profiles.map((p) => p.toJson()).toList(),
+    'draft': draft?.toJson(),
+    if (copies.isNotEmpty) 'copies': copies.map((c) => c.toJson()).toList(),
+    if (openingRecords.isNotEmpty)
+      'openingRecords': openingRecords.map((r) => r.toJson()).toList(),
+  };
   static WorkspacePurchaseEntryBook fromJson(Object? raw) {
-    const keys = {'version', 'account', 'store', 'qa', 'revision', 'profiles', 'draft', 'copies'};
+    const keys = {
+      'version',
+      'account',
+      'store',
+      'qa',
+      'revision',
+      'profiles',
+      'draft',
+      'copies',
+      'openingRecords',
+    };
     try {
-      if (raw is! Map || !keys.difference({'copies'}).every(raw.containsKey) ||
+      if (raw is! Map ||
+          !keys
+              .difference({'copies', 'openingRecords'})
+              .every(raw.containsKey) ||
           !raw.keys.every(keys.contains) ||
-          raw['version'] != 1 || raw['profiles'] is! List ||
+          raw['version'] != 1 ||
+          raw['profiles'] is! List ||
           (raw['profiles'] as List).length > 10000 ||
-          (raw.containsKey('copies') && (raw['copies'] is! List || (raw['copies'] as List).length > 1000))) {
+          (raw.containsKey('copies') &&
+              (raw['copies'] is! List ||
+                  (raw['copies'] as List).length > 1000)) ||
+          (raw.containsKey('openingRecords') &&
+              (raw['openingRecords'] is! List ||
+                  (raw['openingRecords'] as List).length > 1000))) {
         throw const FormatException('Invalid supplier directory');
       }
-      final result = WorkspacePurchaseEntryBook(account: raw['account'] as String,
-        store: raw['store'] as String, qa: raw['qa'] as bool, revision: raw['revision'] as int,
-        profiles: [for (final p in raw['profiles'] as List) WorkspaceSupplierProfile.fromJson(p)],
-        draft: raw['draft'] == null ? null : WorkspacePurchaseEntryDraft.fromJson(raw['draft']),
-        copies: [for (final c in (raw['copies'] as List? ?? const [])) WorkspacePurchaseSavedCopy.fromJson(c)]);
+      final result = WorkspacePurchaseEntryBook(
+        account: raw['account'] as String,
+        store: raw['store'] as String,
+        qa: raw['qa'] as bool,
+        revision: raw['revision'] as int,
+        profiles: [
+          for (final p in raw['profiles'] as List)
+            WorkspaceSupplierProfile.fromJson(p),
+        ],
+        draft: raw['draft'] == null
+            ? null
+            : WorkspacePurchaseEntryDraft.fromJson(raw['draft']),
+        copies: [
+          for (final c in (raw['copies'] as List? ?? const []))
+            WorkspacePurchaseSavedCopy.fromJson(c),
+        ],
+        openingRecords: [
+          for (final r in (raw['openingRecords'] as List? ?? const []))
+            WorkspaceSupplierOpeningRecord.fromJson(r),
+        ],
+      );
       final ids = <String>{};
       final copyIds = <String>{};
-      if (result.account.trim().isEmpty || result.store.trim().isEmpty || result.revision < 1 ||
+      if (result.account.trim().isEmpty ||
+          result.store.trim().isEmpty ||
+          result.revision < 1 ||
           result.profiles.any((p) => !ids.add(p.id)) ||
-          (result.draft != null && (!ids.contains(result.draft!.supplierId) ||
-            result.draft!.attachments.any((a) => a.owner !=
-              jsonEncode([result.account, result.store, result.qa, result.draft!.id])))) ||
-          result.copies.any((c) => !copyIds.add(c.id) || c.revision > result.revision ||
-            c.draft.attachments.any((a) => a.owner !=
-              jsonEncode([result.account, result.store, result.qa, c.draft.id])))) {
+          (result.draft != null &&
+              (!ids.contains(result.draft!.supplierId) ||
+                  result.draft!.attachments.any(
+                    (a) =>
+                        a.owner !=
+                        jsonEncode([
+                          result.account,
+                          result.store,
+                          result.qa,
+                          result.draft!.id,
+                        ]),
+                  ))) ||
+          result.copies.any(
+            (c) =>
+                !copyIds.add(c.id) ||
+                c.revision > result.revision ||
+                c.draft.attachments.any(
+                  (a) =>
+                      a.owner !=
+                      jsonEncode([
+                        result.account,
+                        result.store,
+                        result.qa,
+                        c.draft.id,
+                      ]),
+                ),
+          )) {
         throw const FormatException('Invalid supplier scope');
+      }
+      final openingIds = <String>{};
+      final basisBySupplier = <String, String>{};
+      final supplierByBasis = <String, String>{};
+      var previousRevision = 0;
+      for (final r in result.openingRecords) {
+        if (!openingIds.add(r.id) ||
+            r.account != result.account ||
+            r.store != result.store ||
+            r.qa != result.qa ||
+            !ids.contains(r.supplierId) ||
+            r.revision <= previousRevision ||
+            r.revision > result.revision ||
+            (basisBySupplier[r.supplierId] != null &&
+                basisBySupplier[r.supplierId] != r.basisId) ||
+            (supplierByBasis[r.basisId] != null &&
+                supplierByBasis[r.basisId] != r.supplierId)) {
+          throw const FormatException(
+            'Invalid opening record scope or revision',
+          );
+        }
+        for (final b in r.bills) {
+          final copy = result.copies.where((c) => c.id == b.copyId).firstOrNull;
+          if (copy == null ||
+              copy.revision != b.copyRevision ||
+              copy.draft.id != b.draftId ||
+              copy.draft.supplierId != r.supplierId ||
+              copy.revision >= r.revision) {
+            throw const FormatException('Invalid opening bill relationship');
+          }
+        }
+        previousRevision = r.revision;
+        basisBySupplier[r.supplierId] = r.basisId;
+        supplierByBasis[r.basisId] = r.supplierId;
       }
       return result;
     } on Object {
-      throw const FormatException('Saved suppliers need recovery. Records have been kept.');
+      throw const FormatException(
+        'Saved suppliers need recovery. Records have been kept.',
+      );
     }
   }
 }

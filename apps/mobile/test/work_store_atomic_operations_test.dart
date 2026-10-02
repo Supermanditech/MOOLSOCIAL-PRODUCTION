@@ -605,6 +605,175 @@ void main() {
       revision: revision, profiles: book.profiles, draft: book.draft,
       copies: copies ?? [copyFixture()]);
   }
+  // P04 labelled host fixtures only; no runtime records or financial posting.
+  WorkspaceSupplierOpeningRecord openingFixture({int revision = 3, int? amount,
+      bool credit = false, List<WorkspaceOpeningBillLink>? bills}) =>
+    WorkspaceSupplierOpeningRecord(id: 'opening-A-r$revision', basisId: 'opening-A',
+      account: 'account-A', store: 'store-A', qa: true, supplierId: 'private-supplier-A',
+      revision: revision, asOfDate: '2026-10-01', savedAt: DateTime.utc(2026, 10, 2),
+      amountMinor: amount, supplierCredit: credit, sourceNote: 'Supplier opening statement reviewed',
+      bills: bills ?? [const WorkspaceOpeningBillLink(copyId: 'reviewed-copy-A',
+        copyRevision: 2, draftId: 'manual-draft-A', inclusion: WorkspaceOpeningBillInclusion.included)]);
+  WorkspacePurchaseEntryBook openingBook({int revision = 3,
+      List<WorkspaceSupplierOpeningRecord>? records, List<WorkspacePurchaseSavedCopy>? copies}) {
+    final base = copyBook();
+    return WorkspacePurchaseEntryBook(account: base.account, store: base.store, qa: base.qa,
+      revision: revision, profiles: base.profiles, draft: base.draft,
+      copies: copies ?? base.copies, openingRecords: records ?? [openingFixture()]);
+  }
+  test('P04 unknown is not zero and correction history keeps one supplier basis', () {
+    expect(WorkspacePurchaseEntryBook.fromJson(entryFixture().toJson()).openingRecords, isEmpty);
+    final unknown = openingFixture();
+    final zero = openingFixture(revision: 4, amount: 0, credit: true);
+    final restored = WorkspacePurchaseEntryBook.fromJson(openingBook(revision: 4,
+      records: [unknown, zero]).toJson());
+    expect(restored.openingRecords.first.amountMinor, isNull);
+    expect(restored.openingRecordFor(unknown.supplierId)!.amountMinor, 0);
+    expect(restored.openingRecordFor(unknown.supplierId)!.supplierCredit, isTrue);
+    expect(restored.openingRecords.map((r) => r.basisId).toSet(), {'opening-A'});
+    expect(() => restored.openingRecords.clear(), throwsUnsupportedError);
+    expect(() => restored.openingRecords.first.bills.clear(), throwsUnsupportedError);
+  });
+  for (final invalid in <(String, Object?)>[
+    ('currency', 'USD'), ('amountMinor', -1), ('amountMinor', 1.5),
+    ('amountMinor', 1000000000000), ('asOfDate', '2026-02-30'),
+    ('sourceNote', ''), ('supplierCredit', 'true'), ('qa', false),
+    ('store', 'foreign-store'), ('account', 'foreign-account'),
+    ('supplierId', 'missing-supplier'), ('revision', 2), ('posted', true),
+  ]) {
+    test('P04 strict record rejects ${invalid.$1} ${invalid.$2}', () {
+      final raw = jsonDecode(jsonEncode(openingBook().toJson())) as Map<String, dynamic>;
+      ((raw['openingRecords'] as List).single as Map)[invalid.$1] = invalid.$2;
+      expect(() => WorkspacePurchaseEntryBook.fromJson(raw), throwsFormatException);
+    });
+  }
+  test('P04 bill assertions bind exact reviewed revisions not corrected latest copies', () {
+    final corrected = copyFixture(id: 'reviewed-copy-B', revision: 4);
+    final book = WorkspacePurchaseEntryBook.fromJson(openingBook(revision: 4,
+      copies: [copyFixture(), corrected]).toJson());
+    expect(book.latestReviewedCopies.single.id, corrected.id);
+    expect(book.openingRecords.single.bills.single.copyId, 'reviewed-copy-A');
+    expect(book.openingRecords.single.bills.single.copyRevision, 2);
+    for (final change in <Map<String, Object?>>[
+      {'copyId': 'missing'}, {'copyRevision': 4}, {'draftId': 'foreign-draft'},
+      {'inclusion': 'allocation'},
+    ]) {
+      final raw = jsonDecode(jsonEncode(openingBook().toJson())) as Map<String, dynamic>;
+      final link = (((raw['openingRecords'] as List).single as Map)['bills'] as List).single as Map;
+      link.addAll(change);
+      expect(() => WorkspacePurchaseEntryBook.fromJson(raw), throwsFormatException);
+    }
+    final replacement = WorkspaceSupplierOpeningRecord.fromJson({...openingFixture(revision: 4).toJson(),
+      'basisId': 'replacement-basis'});
+    expect(() => WorkspacePurchaseEntryBook.fromJson(openingBook(revision: 4,
+      records: [openingFixture(), replacement]).toJson()), throwsFormatException);
+  });
+  test('P04 secure restart preserves records and rejects old-writer drop or mutation', () async {
+    final device = _OrderJournalStorage();
+    SecureWorkPurchaseEntryStore owner() => SecureWorkPurchaseEntryStore(
+      accountScope: () => 'account-A', storage: device);
+    await owner().save(entryFixture(), expectedRevision: null);
+    await owner().save(copyBook(), expectedRevision: 1);
+    await owner().save(openingBook(), expectedRevision: 2);
+    final before = Map.of(device.values);
+    await expectLater(owner().save(copyBook(revision: 4), expectedRevision: 3),
+      throwsA(isA<WorkGatewayException>()));
+    await expectLater(owner().save(openingBook(revision: 4,
+      records: [openingFixture(amount: 900)]), expectedRevision: 3),
+      throwsA(isA<WorkGatewayException>()));
+    expect(device.values, before);
+    final correction = openingFixture(revision: 4, amount: 900, credit: true);
+    await owner().save(openingBook(revision: 4,
+      records: [openingFixture(), correction]), expectedRevision: 3);
+    final saved = await owner().read('account-A', 'store-A', qa: true);
+    expect(saved!.openingRecords, hasLength(2));
+    expect(saved.openingRecordFor(correction.supplierId)!.toJson(), correction.toJson());
+    expect(saved.draft!.toJson(), copyBook().draft!.toJson());
+    expect(saved.copies.single.toJson(), copyFixture().toJson());
+    expect(await owner().read('account-A', 'other-store', qa: true), isNull);
+    expect(await owner().read('account-A', 'store-A', qa: false), isNull);
+  });
+  test('P04 failed write read and lost response retain one stable record', () async {
+    final device = _OrderJournalStorage();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: device);
+    await owner.save(entryFixture(), expectedRevision: null);
+    await owner.save(copyBook(), expectedRevision: 1);
+    final before = Map.of(device.values);
+    device.failWrite = true;
+    await expectLater(owner.save(openingBook(), expectedRevision: 2), throwsA(isA<Object>()));
+    expect(device.values, before);
+    device.failWrite = false;
+    device.failRead = true;
+    await expectLater(owner.save(openingBook(), expectedRevision: 2), throwsA(isA<Object>()));
+    expect(device.values, before);
+    device.failRead = false;
+    device.loseWriteResponseOnce = true;
+    await owner.save(openingBook(), expectedRevision: 2);
+    final writes = device.writes.length;
+    await owner.save(openingBook(), expectedRevision: 2);
+    expect(device.writes.length, writes, reason: 'Lost-response retry must not append a second record.');
+    await expectLater(owner.save(openingBook(revision: 4,
+      records: [openingFixture(), openingFixture(revision: 4, amount: 1)]), expectedRevision: 2),
+      throwsA(isA<WorkGatewayException>()));
+    expect((await owner.read('account-A', 'store-A', qa: true))!.openingRecords, hasLength(1));
+  });
+  test('P04 session serializes saves preserves working bill and scopes restart', () async {
+    final device = _OrderJournalStorage();
+    final account = _CommandAccountStore();
+    WorkSession fresh() => WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account,
+      purchaseEntryStore: SecureWorkPurchaseEntryStore(accountScope: () => account.accountScope,
+        storage: device))..activeWorkspace = _commandStore;
+    final work = fresh();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceSuppliers(), isTrue);
+    final base = entryFixture();
+    final supplier = base.profiles.single;
+    final scope = work.workspaceSupplierScope!;
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope,
+      draft: base.draft!, expectedRevision: null), isTrue);
+    WorkspaceSupplierOpeningRecord record(int rev, {int? amount}) =>
+      WorkspaceSupplierOpeningRecord(id: 'session-opening-r$rev', basisId: 'session-opening',
+        account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id,
+        revision: rev, asOfDate: '2026-10-01', savedAt: DateTime.utc(2026, 10, 2),
+        amountMinor: amount, supplierCredit: false, sourceNote: 'Evaluation statement', bills: const []);
+    final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    final finance = work.workspaceFinance;
+    device.holdWrite = Completer<void>();
+    final pending = work.saveWorkspaceSupplierOpeningRecord(record(2), scope: scope, expectedRevision: 1);
+    await Future<void>.delayed(Duration.zero);
+    expect(work.workspaceSupplierSaving, isTrue);
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope,
+      draft: base.draft!, expectedRevision: 1), isFalse);
+    expect(await work.saveWorkspaceSupplierOpeningRecord(record(2), scope: scope,
+      expectedRevision: 1), isFalse);
+    device.holdWrite!.complete();
+    expect(await pending, isTrue);
+    device.holdWrite = null;
+    final writes = device.writes.length;
+    expect(await work.saveWorkspaceSupplierOpeningRecord(record(2), scope: scope,
+      expectedRevision: 1), isTrue);
+    expect(device.writes.length, writes);
+    expect(await work.saveWorkspaceSupplierOpeningRecord(record(3, amount: 200),
+      scope: (scope.$1, 'foreign-store', scope.$3), expectedRevision: 2), isFalse);
+    expect(await work.saveWorkspaceSupplierOpeningRecord(record(3, amount: 200),
+      scope: scope, expectedRevision: 1), isFalse);
+    expect(await work.saveWorkspacePurchaseEntry(supplier, scope: scope,
+      draft: base.draft!, expectedRevision: 2), isTrue);
+    expect(work.workspaceSupplierOpeningRecords.single.amountMinor, isNull);
+    expect(await work.saveWorkspaceSupplierOpeningRecord(record(4, amount: 0),
+      scope: scope, expectedRevision: 3), isTrue);
+    expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+    expect(work.workspaceFinance, same(finance));
+    expect(work.workspacePurchases, isEmpty);
+    final restarted = fresh();
+    addTearDown(restarted.dispose);
+    expect(await restarted.loadWorkspaceSuppliers(), isTrue);
+    expect(restarted.workspaceSupplierOpeningRecords, hasLength(2));
+    expect(restarted.workspaceSupplierOpeningRecord(supplier.id)!.amountMinor, 0);
+    expect(restarted.workspacePurchaseEntryDraft!.id, base.draft!.id);
+    expect(restarted.workspacePurchaseEntryRevision, 4);
+    expect(restarted.workspaceFinance, isNull);
+  });
   test('P05-R12 legacy history empty and saved copies defensively immutable', () {
     expect(WorkspacePurchaseEntryBook.fromJson(entryFixture().toJson()).copies, isEmpty);
     final book = WorkspacePurchaseEntryBook.fromJson(copyBook().toJson());

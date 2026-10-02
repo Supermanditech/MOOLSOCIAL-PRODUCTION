@@ -3483,3 +3483,85 @@ all entry paths/downstream posting and private task-folder cleanup remain open.
 Architect reviewed supplied diff/results and required ordered section comparison
 in addition to token counts; that check passes. Local checkpoint is exactly six
 owners, not the seven-owner preceding C04 batch.
+
+## P04-C01 — unposted supplier opening record, 2 October 2026
+
+Founder CONTINUE NEXT selects the existing older-bill/opening-dues journey.
+MVP supporting: preserve a retailer's supplier-wide starting amount and exact
+supporting bill-copy relationships without posting debt or adding stock twice.
+This is a frontend dependency, not full P04 accounting or current dues.
+
+Reuse assessment: P02 saved suppliers exist inside Purchase entry; there is no
+separate Suppliers manager. Save draft accepts supplier name with blank invoice
+fields. P05/R12 already captures historical bills, payment observations and
+Already added to Stock with immutable reviewed-copy history. Reuse those owners,
+not a second invoice form. Existing supplier ledger projections require genuine
+order links and cannot be fabricated for manual bills. Existing purchase book,
+encrypted CAS and session write lock are the correct unposted storage owners.
+
+Smallest complete P04-C01: contextual Opening dues action within Purchases,
+inline supplier selection, cutoff, known/unknown starting amount, owed/credit
+direction, evidence note and exact saved-copy inclusion assertions. Save/reopen
+and explicit correction retain prior revisions; one current basis per supplier.
+Amount and linked bills always say Not posted. Inclusion is an assertion, not a
+numerical allocation; do not sum invoice totals into the starting amount.
+No new route, service, invoice screen, backend owner or primary Quick action.
+This narrow editor reuses the existing Purchase-entry host and its global dirty
+navigation key; there is no second route or separate supplier manager. Its
+header, keyboard, large-text and cancellation need separate qualification.
+
+Invariants: bind account/Store/QA, stable supplier/basis identity and exact copy
+revision. Unknown is not zero. Corrections append immutable history, with explicit
+relationship review; later corrected bills do not retarget existing assertions.
+Preserve working draft/profiles/all saved copies and opening history on every
+write. Old writers cannot drop history. Stable save attempt, CAS, failed-write
+and lost-reply recovery; no stock, finance, payable, payment or fake order writes.
+
+Architect reviewed both data contract and exact source topology. Host fixtures
+remain automated evidence only. Test codec/strict validation, exact links,
+append-only history, retry/stale/scope/restart and compact/enlarged editor.
+P03-C02/C11 OPPO checks remain open. OPPO busy: no capture, tap, attach or hot
+reload until founder reports free. Device user-flow/visual approval and backend
+reuse remain unverified. No APK, native OCR, integration, other tree or push.
+
+### P04-C01 local implementation checkpoint
+
+Purchases has a contextual Opening dues action. Choose a saved supplier, record
+the as-on date and source note, leave an unknown amount unknown or confirm a
+rupee amount and owed/credit direction. Save, reopen and explicitly correct a
+record; older versions stay read-only. Correcting amount/cutoff/source resets
+bill assertions for review. Bill inclusion binds the exact immutable reviewed
+copy/revision; a later corrected bill does not rewrite earlier assertions.
+The existing supplier-only Save draft works without a fabricated invoice.
+
+Storage retains working drafts, supplier profiles, purchase copies and opening
+history; scoped CAS/write serialization and lost-response retry preserve one
+record. Earlier opening records cannot be overwritten or dropped by old writers.
+All records are Not posted; no Stock, payable, receipt, payment or ledger write.
+
+Local terminal results: 458 atomic passed with 11 unchanged skips; the 18 focused
+P04 atomic cases are a subset, not additional passes. Four P04 UI checks passed,
+73 existing P05 purchase checks and six P02 supplier checks passed. All six
+changed Dart owners analyze clean. Enlarged UI cases retain portrait 320x568 at
+1.4 with inset 240 and landscape 915x412 at 2.0 with inset 160. Programmatic
+reveal plus hit-testing proves host reachability, not automatic visibility or
+physical floating-keyboard behaviour. Fixture failures and tooling mistakes
+remain in successor-version logs; assertions and production contracts retained.
+
+Architect source review found no substantive blocker and performed no tests or
+device actions. No production/evaluation phone data was injected or changed.
+Retained task evidence: outputs/p04-c01-implementation-handoff-20261002.json,
+p04-c01-atomic-full-20261002.log, p04-c01-ui-v3-20261002.log,
+p04-c01-purchase-regression-20261002.log, p04-c01-supplier-regression-20261002.log
+and p04-c01-analysis-final-20261002.log in the founder task workspace.
+
+Still open: P04 physical save/reopen/restart, readable header/long supplier/bill
+variants, confirmed credit and exact bill-inclusion device journeys, dirty Back
+and supplier/version cancellation, floating keyboard, and founder visual review.
+P03-C02/C11 device checks and three baseline AP030 Home finder failures remain
+separate and open. Full P04 historical-payment classification, overlap accounting
+and current supplier dues/posting require their owning follow-up contract; this
+checkpoint does not qualify them. Backend portability and cloud retention remain
+unverified. Next device session must restore persisted scope/IDs; model-shape
+changes may require a debug restart, not a nullable fallback or app-data clear.
+No phone inspection, tap, attach or reload while its reported call remains open.

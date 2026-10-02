@@ -11378,16 +11378,17 @@ class _PurchaseAdditionalInput {
 
 class _StoreRecordPurchaseSurface extends StatefulWidget {
   const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack, this.savedCopy,
-    this.startNew = false});
+    this.startNew = false, this.openingOnly = false});
   final WorkSession session;
   final VoidCallback onBack;
   final WorkspacePurchaseSavedCopy? savedCopy;
-  final bool startNew;
+  final bool startNew, openingOnly;
   @override
   State<_StoreRecordPurchaseSurface> createState() => _StoreRecordPurchaseState();
 }
 
 class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
+  final _openingKey = GlobalKey<_StoreSupplierOpeningState>();
   static const _paperInk = Color(0xff202124);
   static const _paperMuted = Color(0xff59616d);
   static const _paperRule = Color(0xff92958f);
@@ -11512,6 +11513,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     }
   }
   Future<bool> confirmLeave() async {
+    if (widget.openingOnly) {
+      return await (_openingKey.currentState?.confirmLeave() ?? Future.value(true));
+    }
     if (_busy || _leaving) return false;
     _leaving = true;
     FocusScope.of(context).unfocus();
@@ -12770,6 +12774,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     ])));
   @override
   Widget build(BuildContext context) {
+    if (widget.openingOnly) {
+      return _StoreSupplierOpeningSurface(key: _openingKey, session: widget.session, onBack: widget.onBack);
+    }
     final suppliers = widget.session.workspaceSuppliers.where((p) =>
       '${p.name} ${p.phone} ${p.gstin}'.toLowerCase().contains(_name.text.trim().toLowerCase())).take(5);
     final invoiceSummary = [if (_reference.text.isNotEmpty) _reference.text,
@@ -13151,6 +13158,555 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
 }
 
+class _StoreSupplierOpeningSurface extends StatefulWidget {
+  const _StoreSupplierOpeningSurface({
+    super.key,
+    required this.session,
+    required this.onBack,
+  });
+  final WorkSession session;
+  final VoidCallback onBack;
+  @override
+  State<_StoreSupplierOpeningSurface> createState() =>
+      _StoreSupplierOpeningState();
+}
+
+class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
+  final _date = TextEditingController(),
+      _amount = TextEditingController(),
+      _note = TextEditingController();
+  final _relations = <String, WorkspaceOpeningBillInclusion>{};
+  (String, String, bool)? _scope;
+  String? _supplierId, _basisId, _error;
+  int? _revision;
+  int _selectionEpoch = 0;
+  bool _known = false,
+      _credit = false,
+      _editing = true,
+      _busy = false,
+      _leaving = false;
+  String _baseline = '';
+  WorkspaceSupplierOpeningRecord? _viewed, _attempt;
+  WorkSession get session => widget.session;
+  bool get _current =>
+      _scope != null && _scope == session.workspaceSupplierScope;
+  String get _input => jsonEncode([
+    _supplierId,
+    _date.text,
+    _amount.text,
+    _note.text,
+    _known,
+    _credit,
+    _relations.map((k, v) => MapEntry(k, v.name)),
+  ]);
+  bool get _dirty => _editing && _input != _baseline;
+  @override
+  void initState() {
+    super.initState();
+    _scope = session.workspaceSupplierScope;
+    _revision = session.workspacePurchaseEntryRevision;
+    _baseline = _input;
+  }
+
+  @override
+  void dispose() {
+    _date.dispose();
+    _amount.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<bool> confirmLeave() async {
+    if (_busy || _leaving || session.workspaceSupplierSaving) return false;
+    if (!_dirty) return true;
+    _leaving = true;
+    FocusScope.of(context).unfocus();
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave opening dues?'),
+        content: const Text(
+          'Discard only these unsaved changes? Saved purchases and opening records stay available.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard changes'),
+          ),
+        ],
+      ),
+    );
+    _leaving = false;
+    return mounted && discard == true;
+  }
+
+  List<WorkspacePurchaseSavedCopy> get _bills {
+    return session.workspaceLatestPurchaseCopies
+        .where((c) => c.supplier.id == _supplierId)
+        .toList()
+      ..sort((a, b) => b.savedAt.compareTo(a.savedAt));
+  }
+
+  void _show(String supplierId, {WorkspaceSupplierOpeningRecord? version}) {
+    _supplierId = supplierId;
+    _revision = session.workspacePurchaseEntryRevision;
+    _viewed = version ?? session.workspaceSupplierOpeningRecord(supplierId);
+    _basisId = _viewed?.basisId ?? session.newWorkspaceSupplierOpeningId();
+    _date.text = _viewed?.asOfDate ?? '';
+    _amount.text = _viewed?.amountMinor == null
+        ? ''
+        : (_viewed!.amountMinor! / 100).toStringAsFixed(2);
+    _note.text = _viewed?.sourceNote ?? '';
+    _known = _viewed?.amountMinor != null;
+    _credit = _viewed?.supplierCredit ?? false;
+    _relations.clear();
+    _editing = _viewed == null;
+    _attempt = null;
+    _error = null;
+    _baseline = _input;
+  }
+
+  void _changed({bool clearBills = true}) {
+    setState(() {
+      if (clearBills) _relations.clear();
+      _attempt = null;
+      _error = null;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_busy || !_editing || !_current || _supplierId == null) return;
+    final amount = _known
+        ? WorkspacePurchaseEntryDraft.printedPaise(_amount.text)
+        : null;
+    if (_known && (amount == null || amount < 0)) {
+      setState(
+        () => _error =
+            'Enter the confirmed amount in rupees, or choose Amount not known.',
+      );
+      return;
+    }
+    final scope = _scope!;
+    _attempt ??= WorkspaceSupplierOpeningRecord(
+      id: '$_basisId-r${(_revision ?? 0) + 1}',
+      basisId: _basisId!,
+      account: scope.$1,
+      store: scope.$2,
+      qa: scope.$3,
+      supplierId: _supplierId!,
+      revision: (_revision ?? 0) + 1,
+      asOfDate: _date.text.trim(),
+      savedAt: DateTime.now(),
+      amountMinor: amount,
+      supplierCredit: _credit,
+      sourceNote: _note.text.trim(),
+      bills: [
+        for (final b in _bills)
+          WorkspaceOpeningBillLink(
+            copyId: b.id,
+            copyRevision: b.revision,
+            draftId: b.draft.id,
+            inclusion:
+                _relations[b.id] ?? WorkspaceOpeningBillInclusion.unknown,
+          ),
+      ],
+    );
+    if (!_attempt!.valid) {
+      setState(
+        () => _error =
+            'Choose the supplier, enter a valid date (YYYY-MM-DD) and explain where this starting amount comes from.',
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    if (session.workspaceSupplierRecoveryError != null) {
+      await session.loadWorkspaceSuppliers(retry: true);
+    }
+    final saved = await session.saveWorkspaceSupplierOpeningRecord(
+      _attempt!,
+      scope: scope,
+      expectedRevision: _revision,
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (saved && _current) {
+        _show(_supplierId!);
+      } else {
+        _error =
+            session.workspaceSupplierError ??
+            'Return to the Store where you started. Your entries are kept.';
+      }
+    });
+  }
+
+  Widget _field(
+    String label,
+    TextEditingController controller,
+    String key, {
+    bool money = false,
+    int lines = 1,
+  }) => TextField(
+    key: Key(key),
+    controller: controller,
+    readOnly: !_editing || _busy || !_current,
+    maxLines: lines,
+    maxLength: lines > 1 ? 4000 : 40,
+    keyboardType: money
+        ? const TextInputType.numberWithOptions(decimal: true)
+        : TextInputType.text,
+    style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+    onChanged: (_) => _changed(),
+    decoration: InputDecoration(
+      labelText: label,
+      filled: false,
+      counterText: '',
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      labelStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
+    ),
+  );
+  @override
+  Widget build(BuildContext context) {
+    if (!_current) {
+      return ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          const Text(
+            'Return to the Store where you started. Unsaved opening entries are kept.',
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () async {
+                    if (await confirmLeave() && mounted) widget.onBack();
+                  },
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    }
+    final usable =
+        _current &&
+        !_busy &&
+        session.workspaceSuppliersLoaded &&
+        !session.workspaceSupplierSaving;
+    final history = session.workspaceSupplierOpeningRecords
+        .where((r) => r.supplierId == _supplierId)
+        .toList();
+    return ListView(
+      key: const Key('work-opening-dues-form'),
+      primary: false,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.fromLTRB(
+        12,
+        0,
+        12,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      children: [
+        Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Text(
+              'Opening dues record',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: MoolColors.navy,
+              ),
+            ),
+            const Text(
+              'Not posted',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: MoolColors.ink,
+              ),
+            ),
+            TextButton(
+              key: const Key('work-opening-close'),
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      if (await confirmLeave() && mounted) widget.onBack();
+                    },
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+        const Text(
+          'Record your starting amount with a supplier. Saving does not change current dues, Stock or payments.',
+          style: TextStyle(fontSize: 12, color: MoolColors.ink),
+        ),
+        if (!_current)
+          const Text(
+            'Return to the Store where you started. Unsaved entries are kept.',
+          ),
+        if (session.workspaceSuppliers.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'No saved supplier yet. Close, choose Record purchase, enter the supplier name and Save draft. Invoice details can be added later.',
+            ),
+          ),
+        DropdownButtonFormField<String>(
+          key: ValueKey(('work-opening-supplier', _supplierId, _selectionEpoch)),
+          initialValue: _supplierId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Supplier',
+            filled: false,
+          ),
+          items: [
+            for (final p in session.workspaceSuppliers)
+              DropdownMenuItem(
+                value: p.id,
+                child: Text(p.name, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: !usable
+              ? null
+              : (id) async {
+                  final change = id != null &&
+                      id != _supplierId &&
+                      await confirmLeave() &&
+                      mounted;
+                  if (!mounted) return;
+                  setState(() {
+                    _selectionEpoch++;
+                    if (change) _show(id);
+                  });
+                },
+        ),
+        if (_supplierId != null) ...[
+          if (history.isNotEmpty)
+            DropdownButtonFormField<int>(
+              key: ValueKey(('opening-version', _viewed?.id, _selectionEpoch)),
+              initialValue: _viewed?.revision,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Saved version · Not posted',
+                filled: false,
+              ),
+              items: [
+                for (final r in history)
+                  DropdownMenuItem(
+                    value: r.revision,
+                    child: Text(
+                      '${r.asOfDate} · ${r.amountMinor == null ? 'Amount unknown' : _purchaseAmount(r.amountMinor!)} · v${r.revision}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: !usable
+                  ? null
+                  : (rev) async {
+                      final change = await confirmLeave();
+                      if (!mounted) return;
+                      setState(() {
+                        _selectionEpoch++;
+                        if (change && rev != null) {
+                          _show(_supplierId!, version: history.firstWhere((r) => r.revision == rev));
+                        }
+                      });
+                    },
+            ),
+          _field('As on date (YYYY-MM-DD)', _date, 'work-opening-date'),
+          DropdownButtonFormField<bool>(
+            key: ValueKey(('opening-known', _known, _viewed?.id)),
+            initialValue: _known,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Starting amount',
+              filled: false,
+            ),
+            items: const [
+              DropdownMenuItem(value: false, child: Text('Amount not known')),
+              DropdownMenuItem(value: true, child: Text('Amount confirmed')),
+            ],
+            onChanged: !usable || !_editing
+                ? null
+                : (v) {
+                    if (v != null) {
+                      _known = v;
+                      _changed();
+                    }
+                  },
+          ),
+          if (_known) ...[
+            _field('Amount ₹', _amount, 'work-opening-amount', money: true),
+            DropdownButtonFormField<bool>(
+              key: ValueKey(('opening-credit', _credit, _viewed?.id)),
+              initialValue: _credit,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Who owes this amount?',
+                filled: false,
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: false,
+                  child: Text('You owe the supplier'),
+                ),
+                DropdownMenuItem(
+                  value: true,
+                  child: Text('Supplier owes you / credit available'),
+                ),
+              ],
+              onChanged: !usable || !_editing
+                  ? null
+                  : (v) {
+                      if (v != null) {
+                        _credit = v;
+                        _changed();
+                      }
+                    },
+            ),
+          ],
+          _field(
+            'Where is this amount from? / Notes',
+            _note,
+            'work-opening-note',
+            lines: 2,
+          ),
+          const Text(
+            'Supporting bills',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: MoolColors.navy,
+            ),
+          ),
+          if (_editing) ...[
+            const Text(
+              'Check each bill. Included means already counted in this starting amount; bill totals are not added again.',
+              style: TextStyle(fontSize: 12, color: MoolColors.ink),
+            ),
+            if (_bills.isEmpty)
+              const Text(
+                'No saved purchase copies for this supplier. The starting record can be saved without a bill.',
+              ),
+            for (final b in _bills)
+              DropdownButtonFormField<WorkspaceOpeningBillInclusion>(
+                key: ValueKey((
+                  'opening-bill',
+                  b.id,
+                  _basisId,
+                  _editing,
+                  _relations[b.id],
+                )),
+                initialValue:
+                    _relations[b.id] ?? WorkspaceOpeningBillInclusion.unknown,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText:
+                      '${b.draft.invoiceReference} · ${b.draft.invoiceDate} · v${b.revision}',
+                  filled: false,
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: WorkspaceOpeningBillInclusion.unknown,
+                    child: Text('Inclusion not confirmed'),
+                  ),
+                  DropdownMenuItem(
+                    value: WorkspaceOpeningBillInclusion.included,
+                    child: Text('Already included'),
+                  ),
+                  DropdownMenuItem(
+                    value: WorkspaceOpeningBillInclusion.excluded,
+                    child: Text('Not included'),
+                  ),
+                ],
+                onChanged: !usable
+                    ? null
+                    : (v) {
+                        if (v != null) {
+                          _relations[b.id] = v;
+                          _changed(clearBills: false);
+                        }
+                      },
+              ),
+          ] else ...[
+            if (_viewed!.bills.isEmpty)
+              const Text('No supporting bills recorded.'),
+            for (final link in _viewed!.bills)
+              Text(
+                '${session.workspacePurchaseCopies.firstWhere((c) => c.id == link.copyId).draft.invoiceReference} · v${link.copyRevision} · '
+                '${switch (link.inclusion) {
+                  WorkspaceOpeningBillInclusion.included => 'Already included',
+                  WorkspaceOpeningBillInclusion.excluded => 'Not included',
+                  _ => 'Inclusion not confirmed',
+                }}',
+                style: const TextStyle(fontSize: 12, color: MoolColors.ink),
+              ),
+          ],
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                _error!,
+                key: const Key('work-opening-error'),
+                style: const TextStyle(fontSize: 12, color: MoolColors.ink),
+              ),
+            ),
+          Wrap(
+            spacing: 8,
+            children: [
+              if (_editing)
+                FilledButton(
+                  key: const Key('work-opening-save'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    backgroundColor: MoolColors.navy,
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                    ),
+                  ),
+                  onPressed: usable ? _save : null,
+                  child: Text(
+                    _busy
+                        ? 'Saving…'
+                        : _attempt != null && _error != null
+                        ? 'Retry save'
+                        : 'Save opening record',
+                  ),
+                )
+              else if (_viewed ==
+                  session.workspaceSupplierOpeningRecord(_supplierId!))
+                TextButton(
+                  key: const Key('work-opening-correct'),
+                  onPressed: !usable
+                      ? null
+                      : () => setState(() {
+                          _editing = true;
+                          _relations.clear();
+                          _attempt = null;
+                          _baseline = '';
+                          _error = null;
+                        }),
+                  child: const Text('Correct record'),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _StorePurchasesSurface extends StatefulWidget {
   const _StorePurchasesSurface({
     required this.session,
@@ -13179,7 +13735,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   final _purchaseSearchFocus = FocusNode(debugLabel: 'purchase-search');
   List<String>? _purchaseHistory;
   String _purchaseFilter = 'All';
-  bool _recordPurchase = false;
+  bool _recordPurchase = false, _openingOnly = false;
   bool _newPurchase = false;
   WorkspacePurchaseSavedCopy? _savedCopy;
 
@@ -13230,6 +13786,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       _purchaseSearch.clear();
       _purchaseFilter = 'All';
       _recordPurchase = false;
+      _openingOnly = false;
       _newPurchase = false;
       _savedCopy = null;
     }
@@ -13237,8 +13794,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       return _StoreRecordPurchaseSurface(
         key: widget.purchaseEntryKey ?? ValueKey(('record-purchase', session.workspaceSupplierScope, _savedCopy?.id)), session: session,
         savedCopy: _savedCopy,
+        openingOnly: _openingOnly,
         startNew: _newPurchase,
-        onBack: () => setState(() { _recordPurchase = false; _newPurchase = false; _savedCopy = null; }));
+        onBack: () => setState(() { _recordPurchase = false; _openingOnly = false; _newPurchase = false; _savedCopy = null; }));
     }
     final selected = session.focusedWorkspacePurchase;
     final returning =
@@ -13522,19 +14080,47 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48),
                   foregroundColor: MoolColors.navy, padding: const EdgeInsets.symmetric(horizontal: 8)),
                 onPressed: () { _purchaseSearchFocus.unfocus();
-                  setState(() { _newPurchase = true; _recordPurchase = true; }); },
+                  setState(() { _openingOnly = false; _newPurchase = true; _recordPurchase = true; }); },
                 icon: const Icon(Icons.add_rounded, size: 16),
                 label: const Text('New purchase', style: TextStyle(fontSize: 12))),
               TextButton.icon(key: const Key('work-purchase-record'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48),
                   foregroundColor: MoolColors.navy, padding: const EdgeInsets.symmetric(horizontal: 8)),
                 onPressed: () { _purchaseSearchFocus.unfocus();
-                  setState(() { _newPurchase = false; _recordPurchase = true; }); },
+                  setState(() { _openingOnly = false; _newPurchase = false; _recordPurchase = true; }); },
                 icon: Icon(session.workspacePurchaseDraftReviewed ? Icons.edit_outlined : Icons.add_rounded,
                   size: 16),
                 label: Text(session.workspacePurchaseEntryDraft == null ? 'Record purchase'
                   : session.workspacePurchaseDraftReviewed ? 'Edit entry' : 'Resume purchase',
                   style: const TextStyle(fontSize: 12))),
+                    if (!statement)
+                      TextButton.icon(
+                        key: const Key('work-purchase-opening'),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          foregroundColor: MoolColors.navy,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        onPressed: !session.workspaceSuppliersLoaded
+                            ? null
+                            : () {
+                                _purchaseSearchFocus.unfocus();
+                                setState(() {
+                                  _openingOnly = true;
+                                  _newPurchase = false;
+                                  _savedCopy = null;
+                                  _recordPurchase = true;
+                                });
+                              },
+                        icon: const Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 16,
+                        ),
+                        label: const Text(
+                          'Opening dues',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
             ]),
             StoreRecentSearches(
               controller: _purchaseSearch,

@@ -4442,6 +4442,201 @@ void main() {
     });
   }
 
+  // P04 automated UI evidence only; physical OPPO/user-flow acceptance remains separate.
+  Future<void> revealOpening(WidgetTester tester, Finder target, {double delta = 120}) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(target, delta,
+        scrollable: find.descendant(of: find.byKey(const Key('work-opening-dues-form')),
+          matching: find.byType(Scrollable)).first);
+    }
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    expect(target.hitTestable(), findsOneWidget, reason: 'Opening record control must be reachable by touch.');
+  }
+  Future<void> saveOpeningSupplier(WidgetTester tester, {String name = 'Evaluation opening supplier'}) async {
+    await openPurchaseList(tester);
+    await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-supplier-section')));
+    await tester.tap(find.byKey(const Key('work-purchase-supplier-section')));
+    await tester.pumpAndSettle();
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-supplier-name')));
+    await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), name);
+    await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
+    await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('work-purchase-opening')));
+    await tester.tap(find.byKey(const Key('work-purchase-opening')));
+    await tester.pumpAndSettle();
+    await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(name).last);
+    await tester.pumpAndSettle();
+  }
+  testWidgets('P04 actual form supplier-only draft unknown save correction history and reopen', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    final finance = work.workspaceFinance;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await saveOpeningSupplier(tester);
+    final supplierId = entry.value!.profiles.single.id;
+    final draftId = entry.value!.draft!.id;
+    expect(entry.value!.draft!.invoiceReference, isEmpty,
+      reason: 'Supplier-only setup must not require a fabricated invoice.');
+    await revealOpening(tester, find.byKey(const Key('work-opening-date')));
+    await tester.enterText(find.byKey(const Key('work-opening-date')), '2026-10-01');
+    await revealOpening(tester, find.byKey(const Key('work-opening-note')));
+    await tester.enterText(find.byKey(const Key('work-opening-note')), 'Evaluation supplier statement');
+    await revealOpening(tester, find.byKey(const Key('work-opening-save')));
+    await tester.tap(find.byKey(const Key('work-opening-save')));
+    await tester.pumpAndSettle();
+    expect(entry.value!.openingRecords.single.amountMinor, isNull);
+    expect(entry.value!.openingRecords.single.bills, isEmpty);
+    expect(find.text('Not posted'), findsOneWidget);
+    final basis = entry.value!.openingRecords.single.basisId;
+    await revealOpening(tester, find.byKey(const Key('work-opening-correct')));
+    await tester.tap(find.byKey(const Key('work-opening-correct')));
+    await tester.pumpAndSettle();
+    final known = find.byType(DropdownButtonFormField<bool>).first;
+    await revealOpening(tester, known, delta: -120);
+    await tester.tap(known);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Amount confirmed').last);
+    await tester.pumpAndSettle();
+    await revealOpening(tester, find.byKey(const Key('work-opening-amount')));
+    await tester.enterText(find.byKey(const Key('work-opening-amount')), '0');
+    await revealOpening(tester, find.byKey(const Key('work-opening-save')));
+    await tester.tap(find.byKey(const Key('work-opening-save')));
+    await tester.pumpAndSettle();
+    expect(entry.value!.openingRecords, hasLength(2));
+    expect(entry.value!.openingRecords.first.amountMinor, isNull);
+    expect(entry.value!.openingRecordFor(supplierId)!.amountMinor, 0);
+    expect(entry.value!.openingRecords.map((r) => r.basisId).toSet(), {basis});
+    expect(entry.value!.draft!.id, draftId);
+    expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+    expect(work.workspaceFinance, same(finance));
+    expect(work.workspacePurchases, isEmpty);
+    await revealOpening(tester, find.byKey(const Key('work-opening-close')), delta: -120);
+    await tester.tap(find.byKey(const Key('work-opening-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-search')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    final fresh = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: fresh);
+    await openPurchaseList(tester);
+    await tester.ensureVisible(find.byKey(const Key('work-purchase-opening')));
+    await tester.tap(find.byKey(const Key('work-purchase-opening')));
+    await tester.pumpAndSettle();
+    await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Evaluation opening supplier').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-opening-amount'))).controller!.text, '0.00');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-opening-amount'))).readOnly, isTrue);
+    await revealOpening(tester, find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('2026-10-01 · Amount unknown · v2').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-opening-amount')), findsNothing);
+    expect(find.byKey(const Key('work-opening-correct')), findsNothing);
+    expect(entry.value!.revision, 3);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final display in [(320.0, 568.0, 1.4, 240.0), (915.0, 412.0, 2.0, 160.0)]) {
+    testWidgets('P04 enlarged layout failed-save Keep Discard retains exact input $display', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+      await saveOpeningSupplier(tester);
+      await revealOpening(tester, find.byKey(const Key('work-opening-date')));
+      await tester.enterText(find.byKey(const Key('work-opening-date')), '2026-10-01');
+      await revealOpening(tester, find.byKey(const Key('work-opening-note')));
+      await tester.enterText(find.byKey(const Key('work-opening-note')), 'Evaluation source retained after failure');
+      entry.failSave = true;
+      await revealOpening(tester, find.byKey(const Key('work-opening-save')));
+      await tester.tap(find.byKey(const Key('work-opening-save')));
+      await tester.pumpAndSettle();
+      expect(entry.value!.openingRecords, isEmpty);
+      await revealOpening(tester, find.byKey(const Key('work-opening-error')));
+      expect(find.textContaining('could not be saved'), findsOneWidget);
+      await revealOpening(tester, find.byKey(const Key('work-opening-close')), delta: -120);
+      await tester.tap(find.byKey(const Key('work-opening-close')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      await revealOpening(tester, find.byKey(const Key('work-opening-note')));
+      expect(tester.widget<TextField>(find.byKey(const Key('work-opening-note'))).controller!.text,
+        'Evaluation source retained after failure');
+      entry.failSave = false;
+      await revealOpening(tester, find.byKey(const Key('work-opening-save')));
+      await tester.tap(find.byKey(const Key('work-opening-save')));
+      await tester.pumpAndSettle();
+      expect(entry.value!.openingRecords, hasLength(1));
+      await revealOpening(tester, find.byKey(const Key('work-opening-correct')));
+      await tester.tap(find.byKey(const Key('work-opening-correct')));
+      await tester.pumpAndSettle();
+      await revealOpening(tester, find.byKey(const Key('work-opening-note')));
+      await tester.enterText(find.byKey(const Key('work-opening-note')), 'Discard this correction only');
+      await revealOpening(tester, find.byKey(const Key('work-opening-close')), delta: -120);
+      await tester.tap(find.byKey(const Key('work-opening-close')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+      expect(entry.value!.openingRecords.single.sourceNote, 'Evaluation source retained after failure');
+      expect(find.byKey(const Key('work-purchase-opening')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  testWidgets('P04 cancelling supplier switch restores visible selection and unsaved input', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 10, 2);
+    // Explicit local layout fixture, not injected OPPO/user-flow acceptance data.
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [
+        WorkspaceSupplierProfile(id: 'test-A', name: 'Evaluation supplier A', createdAt: at, updatedAt: at),
+        WorkspaceSupplierProfile(id: 'test-B', name: 'Evaluation supplier B', createdAt: at, updatedAt: at),
+      ]);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.ensureVisible(find.byKey(const Key('work-purchase-opening')));
+    await tester.tap(find.byKey(const Key('work-purchase-opening')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Evaluation supplier A').last);
+    await tester.pumpAndSettle();
+    await revealOpening(tester, find.byKey(const Key('work-opening-date')));
+    await tester.enterText(find.byKey(const Key('work-opening-date')), '2026-10-01');
+    await revealOpening(tester, find.byKey(const Key('work-opening-note')));
+    await tester.enterText(find.byKey(const Key('work-opening-note')), 'Retain supplier A input');
+    await revealOpening(tester, find.byType(DropdownButtonFormField<String>), delta: -120);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Evaluation supplier B').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byType(DropdownButtonFormField<String>)).initialValue, 'test-A');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-opening-note'))).controller!.text,
+      'Retain supplier A input');
+    await revealOpening(tester, find.byKey(const Key('work-opening-save')));
+    await tester.tap(find.byKey(const Key('work-opening-save')));
+    await tester.pumpAndSettle();
+    expect(entry.value!.openingRecords.single.supplierId, 'test-A');
+    expect(entry.value!.openingRecordFor('test-B'), isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('P02 record purchase draft saves and resumes without stock or money posting', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
