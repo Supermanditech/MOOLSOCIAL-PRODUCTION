@@ -55,6 +55,34 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-StoreRetentionMaintenanceOwner([hashtable]$Facts) {
+  # Separately approved Store maintenance. Never mix Cursor and Store identities.
+  $expected = @{
+    Role='primary'; Task='/root'; ClaimTask='/root'; ClaimRole='primary'
+    Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920'
+    Branch='work/codex-ui/add-product-screen1-20260920'; Lane='codex_ui'
+    WorkId='add-product-screen1-20260920'; TicketId='UAW-ADD-PRODUCT-SCREEN1-20260920'
+    AdmissionSha256='1EFBB8814D7372032AEDA16238D1C71A7FE91D4A5091DFF4AB06E12C340ADE50'
+    ProofSha256='70F6FE4BAB84B29D9A0C323B6B48CC2CFC2515E25761431AEF2F69E186138370'
+    HelperSha256='4B2DBB76952E2A2B826CB3D267FA9CE3ABF3663055111843E1176DAC4B0C1A00'
+    PublishedCommit='1a66f12c4153d98962cc639945af215d44b1d7c1'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
+  }
+  return $Facts.GenerationVerified -eq $true -and $Facts.BaselineVerified -eq $true -and
+    $Facts.Phase -cin @('implementation','pre_commit','handoff') -and
+    $Facts.Owner -cin @(
+      '.gitattributes',
+      'docs/quality/STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json',
+      'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json',
+      'scripts/check-codex-development-regression-memory.ps1',
+      'scripts/artifact-evidence-retention.ps1',
+      'scripts/check-cleanup-artifact-retention.ps1',
+      'scripts/test-artifact-evidence-retention.ps1'
+    )
+}
+
 function Test-CounterSaleR6636Evidence([hashtable]$Facts) {
   # Exact founder-approved successor only; all earlier pins stay immutable.
   $expected = @{
@@ -2898,6 +2926,28 @@ if ($ProductionLane -ceq 'baseline') {
           $effectiveOwner -ceq 'scripts/check-approved-ui-locks.ps1')
       )
       $allowedOwner = $false
+      $storeRetentionOwner = $false
+      $storeAdmissionPath = Join-Path $root 'docs/quality/STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json'
+      if ($addProductBinding.branch -ceq $branch -and
+          $addProductBinding.worktreePath -ceq $rootForward -and
+          (Test-Path -LiteralPath $storeAdmissionPath -PathType Leaf)) {
+        $storeProofPath = Join-Path $root 'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json'
+        $storeHelperPath = Join-Path $root 'scripts/artifact-evidence-retention.ps1'
+        $storeAdmission = Get-Content -Raw -LiteralPath $storeAdmissionPath | ConvertFrom-Json
+        & git -C $root merge-base --is-ancestor '93dd9fb04f38d05cdb03320aab027e3709570d6d' $head
+        $storeBaselineExit = $LASTEXITCODE
+        $storeRetentionOwner = Test-StoreRetentionMaintenanceOwner @{
+          Role=$AgentRole; Task=$AgentTask; ClaimTask=$currentClaim[0].task; ClaimRole=$currentClaim[0].role
+          Root=$rootForward; Branch=$branch; Lane=$ProductionLane; WorkId=$ProductionWorkId
+          TicketId=$ProductionTicketId; Phase=$ProductionPhase; Owner=$effectiveOwner
+          AdmissionSha256=(Get-Sha256 $storeAdmissionPath)
+          ProofSha256=(Get-Sha256 $storeProofPath); HelperSha256=(Get-Sha256 $storeHelperPath)
+          PublishedCommit=[string]$storeAdmission.publishedRepairCommit
+          BaselineVerified=($storeBaselineExit -eq 0)
+          GenerationVerified=([int]$policy.registryBinding.entryCount -eq $ExpectedRegistryEntryCount -and
+            [string]$policy.registryBinding.sha256 -ceq $ExpectedRegistrySha256)
+        }
+      }
       # Founder requested completion of dialog-free Stock downloads, frontend only.
       # Admit exactly its bridge and registration; no auth, manifest or release changes.
       $addProductStockDownloadOwner = (
@@ -3033,7 +3083,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($storeRetentionOwner -or $addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -3041,11 +3091,31 @@ if ($ProductionLane -ceq 'baseline') {
           $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or $counterSaleCoordinationOwner) {
         $allowedOwner = $true
       }
+      if ($storeRetentionOwner -and $effectiveOwner -ceq '.gitattributes') {
+        $storeAttributesBase = @(& git -C $root show '93dd9fb04f38d05cdb03320aab027e3709570d6d:.gitattributes')
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Store retention attribute baseline missing.'
+        $storeAttributesOriginal = ($storeAttributesBase -join "`n").TrimEnd("`n")
+        $storeAttributesSuffix = @'
+
+
+# Exact Store retention admission and published proof are raw-byte hash bound.
+docs/quality/STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json text eol=lf
+docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json text eol=lf
+scripts/artifact-evidence-retention.ps1 text eol=lf
+scripts/check-cleanup-artifact-retention.ps1 text eol=lf
+scripts/check-codex-development-regression-memory.ps1 text eol=lf
+scripts/test-artifact-evidence-retention.ps1 text eol=lf
+'@
+        $storeAttributesLive = [IO.File]::ReadAllText((Join-Path $root $effectiveOwner)).Replace("`r`n", "`n").TrimEnd("`n")
+        Assert-Coordination ($storeAttributesLive -ceq $storeAttributesOriginal -or
+          $storeAttributesLive -ceq ($storeAttributesOriginal + $storeAttributesSuffix.Replace("`r`n", "`n"))) `
+          'Store retention may change only exact LF rules, not APK/LFS or other attributes.'
+      }
       Assert-Coordination $allowedOwner `
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
-          $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
+          $storeRetentionOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
           $addProductPhotoRouteOwner -or $addProductApprovedFrontendOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or

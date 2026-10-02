@@ -22,3 +22,11 @@ apps/mobile/assets/fonts/OFL.txt -whitespace
 # Review APKs exceed GitHub's ordinary-blob limit. Keep checksum-addressed
 # binaries recoverable through Git LFS while source and evidence stay in Git.
 *.apk filter=lfs diff=lfs merge=lfs -text
+
+# Exact Store retention admission and published proof are raw-byte hash bound.
+docs/quality/STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json text eol=lf
+docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json text eol=lf
+scripts/artifact-evidence-retention.ps1 text eol=lf
+scripts/check-cleanup-artifact-retention.ps1 text eol=lf
+scripts/check-codex-development-regression-memory.ps1 text eol=lf
+scripts/test-artifact-evidence-retention.ps1 text eol=lf

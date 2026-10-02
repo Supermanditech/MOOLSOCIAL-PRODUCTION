@@ -1,5 +1,40 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## 2 October — Store-only retention maintenance admission
+
+Founder explicitly approved Store-only admission of published repair
+`1a66f12c4153d98962cc639945af215d44b1d7c1`; no Cart/T07, broad merge,
+APK or release changes. Exact authority is in
+`STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json`. Only the memory checker
+transferred from the historical repair claim; its other three owners remain.
+Primary now has 89 exact owners, not overlapping claims. No other tree changed.
+
+Published proof, helper, cleanup guard and memory checker are reused from that
+pinned commit. Original three lost binaries, five references, checksums and
+rejection history remain intact; this is evidence retirement, not restoration.
+Store permission is a separate exact identity conjunction, with immutable
+authority/proof/helper hashes, original Store baseline ancestry and generation
+checks. The attribute exception admits only the exact six LF rules; APK/LFS
+rules remain unchanged. Original Cursor admission tests remain present.
+
+Independent local qualification: 71 distinct retention controls pass on both
+PowerShell 7 and Windows PowerShell 5.1. Use explicit `-RepositoryRoot`; the
+first PS5.1 default-parameter invocation failed before tests and is retained.
+Task evidence: `outputs/store-retention-powershell7-20261002.log` and
+`outputs/store-retention-powershell51-explicit-root-20261002.log` in the original
+restock-testing task, not application/runtime fixtures or a device acceptance.
+Store memory implementation/device, scoped MVP and explicit incremental gates
+pass; only three historical artifacts/five references are retired. Architect
+conceptual review finds no blocker to a scoped local maintenance checkpoint,
+subject to exact staged diff and terminal pre_commit. No independent architect
+execution audit is claimed.
+
+This closes the governance bootstrap only after the safe checkpoint. P03-C02,
+private-photo variants, actual Catalogue/manual/CSV provenance/restart, late-bill
+no-double-stock and C11 OPPO checks remain open. Normal fresh founder and other
+gates still apply before subsequent app edits. No saved Store data, runtime,
+backend, APK, global release state, push or Cart code changed in this admission.
+
 ## 2 October — P03 opening-stock provenance continuation
 
 Founder: go ahead with the next ticket; OPPO device checks may carry to the next

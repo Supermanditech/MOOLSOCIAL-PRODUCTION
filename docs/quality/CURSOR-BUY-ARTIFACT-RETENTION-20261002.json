@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "authority": "Founder authorized fixing the cleanup-caused evidence loss with production-grade discipline, observation and subagent review on2October2026. This records loss and retires only these three rejected historical physical binary requirements; it grants no build/install/reuse/promotion authority.",
+  "baseline": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+  "incidentRegistryEntry": "REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES",
+  "cleanupJournalSha256": "9C5327B00F59119A1BA6F6E7FA786CD7283120503716FD5B6F67AF051896859B",
+  "cleanupJournalSource": "C:\\Users\\jisal\\Documents\\Codex\\2026-10-02\\ch\\outputs\\cleanup-journal-20261002-173002.jsonl",
+  "artifactCount": 3,
+  "artifacts": [
+    {
+      "path": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/MoolSocial-1.0.0-r60.52-2026081352-release.aab",
+      "artifactSha256": "E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3",
+      "bytes": 94797520,
+      "registryEntryIds": [
+        "REG-20260816-2611-C33N-POSTBUILD-EVIDENCE-LOOKUP-GUESSED-NONEXISTENT-RELEASE-DIRECTORY"
+      ],
+      "state": "deleted_historical_rejected_non_reusable",
+      "releaseAuthority": false,
+      "provenance": [
+        {
+          "path": "config/successor-aab-regression-hard-gate-state-c33n.json",
+          "normalizedSha256": "6294A74856F02F03FC5238EB80667393D41B7211B22C7C1DFE1EE25B58859EA6",
+          "preCleanupCommit": "bea9412b85322679fb4efc39ac5c1af3ae53d920",
+          "preCleanupCommitTime": "2026-08-23T19:31:04+05:30",
+          "assertions": {
+            "/buildResult/artifactSha256": "E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3",
+            "/buildResult/artifactBytes": 94797520
+          }
+        },
+        {
+          "path": "config/successor-aab-regression-hard-gate-aggregate-c33n.json",
+          "normalizedSha256": "62B32161A7DAE455CBC9B3DA9AA4627EB22E2EF65F40CE638903F2F466A95A55",
+          "preCleanupCommit": "bea9412b85322679fb4efc39ac5c1af3ae53d920",
+          "preCleanupCommitTime": "2026-08-23T19:31:04+05:30",
+          "assertions": {
+            "/candidate/aabSha256": "E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3",
+            "/candidate/disposition": "rejected",
+            "/candidate/artifactReusable": false,
+            "/candidate/installCount": 0,
+            "/candidate/deviceAcceptanceCount": 0
+          }
+        }
+      ],
+      "deletion": {
+        "journalLine": 85581,
+        "rawLineSha256": "C4D28FF0E4251DD37254E0ADC8F9A797FF61BA2AD98A80D27180F9DB19AC3165",
+        "row": {
+          "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION\\artifacts\\quality\\uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01\\MoolSocial-1.0.0-r60.52-2026081352-release.aab",
+          "modifiedUtc": "2026-08-16T07:26:15.0483074Z",
+          "bytes": 94797520,
+          "action": "deleting-obsolete-binary"
+        }
+      }
+    },
+    {
+      "path": "artifacts/quality/uaw-c34p-fix10-full-social-oppo-successor-r60-84-20260823-05/uaw-c34p-fix8-global-social-login-oppo-successor-audit-repair-device-review-release.apk",
+      "artifactSha256": "261B9E14E01FBA5BFB3D1021FCAD5AD2DA15538E7D814F4E22B86822D203D227",
+      "bytes": 104588128,
+      "registryEntryIds": [
+        "REG-20260823-3467-FIX10-R60-84-POSTBUILD-INTEGRITY-MISSING-MAPPING-FOLDER",
+        "REG-20260823-3472-FIX10-R60-84-POSTINSTALL-JOURNAL-HISTORY-INDENT-CONTEXT-RECURRENCE",
+        "REG-20260823-3488-R60-84-APK-FIREBASE-CORE-PLUGIN-CLASS-NOT-FOUND"
+      ],
+      "state": "deleted_historical_rejected_non_reusable",
+      "releaseAuthority": false,
+      "provenance": [
+        {
+          "path": "config/uaw-c34p-fix8-global-social-login-oppo-successor-audit-repair-ticket.json",
+          "normalizedSha256": "13D9AA1BA165FDDCE85DCF343EDCA163A6596C45D29EDF2DAD91E72BF875B648",
+          "preCleanupCommit": "bea9412b85322679fb4efc39ac5c1af3ae53d920",
+          "preCleanupCommitTime": "2026-08-23T19:31:04+05:30",
+          "assertions": {
+            "/currentBuildQualification/artifactSha256": "261B9E14E01FBA5BFB3D1021FCAD5AD2DA15538E7D814F4E22B86822D203D227",
+            "/currentBuildQualification/artifactBytes": 104588128,
+            "/currentBuildQualification/state": "r60_84_built_postbuild_qualified_installed_in_place_then_founder_rejected_all_five_provider_sign_in_paths_non_reusable",
+            "/currentBuildQualification/rebuildAuthorized": false
+          }
+        }
+      ],
+      "deletion": {
+        "journalLine": 85582,
+        "rawLineSha256": "CC56FB965BD225BD46CDD7F9EF44EC544DB3E13E3F81E51CC3B7D07595850CE2",
+        "row": {
+          "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION\\artifacts\\quality\\uaw-c34p-fix10-full-social-oppo-successor-r60-84-20260823-05\\uaw-c34p-fix8-global-social-login-oppo-successor-audit-repair-device-review-release.apk",
+          "modifiedUtc": "2026-08-22T19:42:59.8864263Z",
+          "bytes": 104588128,
+          "action": "deleting-obsolete-binary"
+        }
+      }
+    },
+    {
+      "path": "artifacts/quality/uaw-c34p-fix11-google-sign-in-oppo-successor-r60-85-20260823-03/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-device-review-release.apk",
+      "artifactSha256": "D777CDF166A156912ED30E494B526B0C56A2487D58B8449AE2FD3B9F317C287D",
+      "bytes": 104047340,
+      "registryEntryIds": [
+        "REG-20260823-3550-R60-85-V1-SIGNER-ABSENCE-FALSE-API-KEY-MISMATCH"
+      ],
+      "state": "deleted_historical_rejected_non_reusable",
+      "releaseAuthority": false,
+      "provenance": [
+        {
+          "path": "config/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-ticket.json",
+          "normalizedSha256": "1DB3D993DAD2D5F802B8C22EE16849D446D7CF4D410590CA4595A8B42B2C9215",
+          "preCleanupCommit": "f105195ba505dcc9f25a35ab64aab104dadb47c2",
+          "preCleanupCommitTime": "2026-08-23T16:55:38+05:30",
+          "assertions": {
+            "/forensicFindings/successorApkSha256": "D777CDF166A156912ED30E494B526B0C56A2487D58B8449AE2FD3B9F317C287D",
+            "/forensicFindings/successorApkBytes": 104047340,
+            "/forensicFindings/r60_85Rejected": true,
+            "/forensicFindings/founderGoogleAccepted": false
+          }
+        }
+      ],
+      "deletion": {
+        "journalLine": 85584,
+        "rawLineSha256": "EE2F69BEC57C8A78076B8FB9EDCE6CE52937AA4ECC66933BB0364D3EE8263F2F",
+        "row": {
+          "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION\\artifacts\\quality\\uaw-c34p-fix11-google-sign-in-oppo-successor-r60-85-20260823-03\\uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-device-review-release.apk",
+          "modifiedUtc": "2026-08-23T07:11:27.6564061Z",
+          "bytes": 104047340,
+          "action": "deleting-obsolete-binary"
+        }
+      }
+    }
+  ],
+  "preservation": {
+    "ownedRecordsArchiveSha256": "29bd53cfc30fecaf13d9be50c455a699dd75ca65098a048c7564c3208cdcc3c3",
+    "priorUncommittedFileCount": 9,
+    "runtimeChanges": 0
+  },
+  "ownership": {
+    "maintenanceAuthority": "Founder explicitly authorizes primary governance/cleanup repair outside ordinary Buy UI ownership.",
+    "writer": "/root",
+    "serializedOwnerTransfer": {
+      "owner": "scripts/check-codex-development-regression-memory.ps1",
+      "previousRecordedTask": "/root/repair_store_buy_conflict_v3_20260904",
+      "reason": "Fresh root maintenance claim under this authority; previous claim is retained for its other owners. No old claim is borrowed and no other worktree is mutated."
+    },
+    "reviewers": [
+      "retention_architect",
+      "retention_provenance"
+    ]
+  },
+  "limits": [
+    "Original registry incidents and original evidence path arrays remain intact.",
+    "Two other referenced binary identities retain surviving copies and receive no retirement.",
+    "All unlisted missing evidence, tampered proof/retirement data and changed original IDs/paths fail closed.",
+    "Historical release gates retain physical identity/rejection checks; no candidate can use retirement as payment/provider/device acceptance.",
+    "No new APK, release promotion, history rewrite or other-worktree mutation."
+  ]
+}
