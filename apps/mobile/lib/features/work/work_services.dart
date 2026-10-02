@@ -1352,6 +1352,15 @@ abstract interface class WorkPurchaseEntryRevisionGuard {
 }
 
 /// App-private originals. No public upload, product-photo identity or accounting effect.
+abstract interface class WorkPurchaseReceiptReviewAbandonment {
+  Future<WorkspacePurchaseEntryBook?> abandonReviewedReceipt(String account, String store, {
+    required bool qa, required int expectedRevision,
+    required WorkspaceGoodsReceiptReviewCancellation cancellation,
+    required Future<bool> Function(WorkspaceSupplierGoodsReceiptDraft review) verifyUncommitted,
+  });
+}
+
+/// App-private originals. No public upload, product-photo identity or accounting effect.
 class WorkPurchaseInvoiceCapture {
   WorkPurchaseInvoiceCapture({required this.currentScope, WorkProofPicker? picker,
     Future<Directory> Function()? supportDirectory,
@@ -1747,7 +1756,7 @@ class WorkPurchaseInvoiceSuggestions {
 /// Uses the existing encrypted, serialized, revision-checked checkpoint pattern.
 /// Contacts never share an inventory or financial-journal key.
 class SecureWorkPurchaseEntryStore
-    implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard {
+    implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
   final String? Function() accountScope;
@@ -1819,6 +1828,11 @@ class SecureWorkPurchaseEntryStore
         }
       }
       final retainedOpeningIds = <String>{};
+      if (frozen.goodsReceiptCancellations.length != (previous?.goodsReceiptCancellations.length ?? 0) ||
+          (previous?.goodsReceiptCancellations ?? const <WorkspaceGoodsReceiptReviewCancellation>[]).any((c) =>
+            !frozen.goodsReceiptCancellations.any((r) => jsonEncode(r.toJson()) == jsonEncode(c.toJson())))) {
+        throw const WorkGatewayException('Receiving cancellations require a verified status check. Keep their history unchanged.');
+      }
       final retainedReceiptIds = <String>{};
       for (final review in previous?.goodsReceiptDrafts ?? const <WorkspaceSupplierGoodsReceiptDraft>[]) {
         final retained = frozen.goodsReceiptDrafts.where((r) => r.receipt.id == review.receipt.id).firstOrNull;
@@ -1866,6 +1880,57 @@ class SecureWorkPurchaseEntryStore
       _check(frozen.account, frozen.store);
     });
   }
+  @override
+  Future<WorkspacePurchaseEntryBook?> abandonReviewedReceipt(String account, String store, {
+    required bool qa, required int expectedRevision,
+    required WorkspaceGoodsReceiptReviewCancellation cancellation,
+    required Future<bool> Function(WorkspaceSupplierGoodsReceiptDraft review) verifyUncommitted,
+  }) => _abandonReviewedReceipt(account, store, qa: qa, expectedRevision: expectedRevision,
+    cancellation: cancellation, verifyUncommitted: verifyUncommitted);
+}
+
+// The implementation is below the secure purchase store to keep this mutation
+// inside its existing scoped queue; it must not recursively call read/save.
+extension _PurchaseReviewCancellation on SecureWorkPurchaseEntryStore {
+  Future<WorkspacePurchaseEntryBook?> _abandonReviewedReceipt(String account, String store, {
+    required bool qa, required int expectedRevision,
+    required WorkspaceGoodsReceiptReviewCancellation cancellation,
+    required Future<bool> Function(WorkspaceSupplierGoodsReceiptDraft review) verifyUncommitted,
+  }) => _serial(_key(account, store, qa), () async {
+    final old = await _read(account, store, qa);
+    if (old == null || !cancellation.valid) return null;
+    final previous = old.goodsReceiptCancellations.where((c) => c.receiptId == cancellation.receiptId).firstOrNull;
+    final review = old.goodsReceiptDrafts.where((r) => r.receipt.id == cancellation.receiptId).firstOrNull;
+    if (previous != null) {
+      if (jsonEncode(previous.toJson()) != jsonEncode(cancellation.toJson()) ||
+          review == null || !await verifyUncommitted(review)) { return null; }
+      _check(account, store);
+      return old;
+    }
+    if (old.revision != expectedRevision || cancellation.revision != old.revision + 1 ||
+        review == null || review.supplierId != cancellation.supplierId ||
+        cancellation.cancelledAt.isBefore(review.receipt.recordedAt) ||
+        old.goodsReceiptCancellations.length >= 1000) { return null; }
+    if (!await verifyUncommitted(review)) return null;
+    _check(account, store);
+    final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
+      account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
+      profiles: old.profiles, draft: old.draft, copies: old.copies,
+      openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
+      goodsReceiptCancellations: [...old.goodsReceiptCancellations, cancellation]).toJson());
+    final bytes = jsonEncode(next.toJson());
+    if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
+      throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');
+    }
+    final key = _key(account, store, qa);
+    try { await _storage.write(key: key, value: bytes); }
+    on Object {
+      _check(account, store);
+      if (await _storage.read(key: key) != bytes) rethrow;
+    }
+    _check(account, store);
+    return next;
+  });
 }
 
 abstract interface class WorkInventoryStore {

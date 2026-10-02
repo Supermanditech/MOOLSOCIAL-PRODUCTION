@@ -816,7 +816,8 @@ class WorkSession extends ChangeNotifier {
       qa: key.$3, revision: (old?.revision ?? 0) + 1,
       profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft,
       copies: [...?old?.copies, ?reviewedCopy], openingRecords: old?.openingRecords ?? const [],
-      goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const []);
+      goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const [],
+      goodsReceiptCancellations: old?.goodsReceiptCancellations ?? const []);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -1206,12 +1207,26 @@ class WorkSession extends ChangeNotifier {
             });
       // Durable receipt evidence is independent of later bill-book revisions.
       final existingProof = data.supplierLedgers[(key.$1, supplierId)]?.goodsReceipts[frozen.id];
+      if (existingProof != null) {
+        // A known committed receipt must never become "not posted" when its
+        // separate review record is unavailable or contradictory.
+        attemptedCommit = true;
+        final freshBook = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+        if (!current() || freshBook == null ||
+            freshBook.goodsReceiptCancellations.any((c) => c.receiptId == frozen.id)) {
+          return reject('Receipt and cancellation records need review. Saved history is kept; no Stock reversal was made.');
+        }
+      }
       final complete = existingProof != null
           ? await projectReceipt()
           : await purchaseGuard.withReviewedBook(key.$1, key.$2, qa: key.$3,
               expectedRevision: expectedPurchaseRevision, action: (book) async {
                 if (!current() || !book.profiles.any((p) => p.id == supplierId)) return false;
                 final review = book.goodsReceiptDrafts.where((r) => r.receipt.id == frozen.id).firstOrNull;
+                if (book.goodsReceiptCancellations.any((c) => c.receiptId == frozen.id)) {
+                  projectionIssue = 'This receiving review was cancelled. Use the corrected saved review; no goods were posted by cancellation.';
+                  return false;
+                }
                 if ((requireSavedReview && review == null) || (review != null &&
                     (review.supplierId != supplierId ||
                       jsonEncode(review.receipt.toJson()) != jsonEncode(frozen.toJson())))) {
@@ -1346,6 +1361,7 @@ class WorkSession extends ChangeNotifier {
           copies: old.copies,
           openingRecords: [...old.openingRecords, record],
           goodsReceiptDrafts: old.goodsReceiptDrafts,
+          goodsReceiptCancellations: old.goodsReceiptCancellations,
         ).toJson(),
       );
     } on Object {
@@ -1384,6 +1400,53 @@ class WorkSession extends ChangeNotifier {
     _supplierDirectories[_supplierKey]?.copies ?? const [];
   List<WorkspaceSupplierGoodsReceiptDraft> get workspaceGoodsReceiptDrafts =>
       _supplierDirectories[_supplierKey]?.goodsReceiptDrafts ?? const [];
+  List<WorkspaceGoodsReceiptReviewCancellation> get workspaceGoodsReceiptCancellations =>
+      _supplierDirectories[_supplierKey]?.goodsReceiptCancellations ?? const [];
+
+  Future<bool> abandonWorkspaceGoodsReceiptReview(String receiptId, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision, required DateTime cancelledAt, required String reason,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving || data.inventoryReceiptBusy ||
+        _supplierNeedsReload.contains(key) || _supplierStorage is! WorkPurchaseReceiptReviewAbandonment ||
+        data.ledgerCheckpointStore == null) { return false; }
+    final cancellation = WorkspaceGoodsReceiptReviewCancellation(receiptId: receiptId,
+      supplierId: supplierId, revision: expectedRevision + 1, cancelledAt: cancelledAt, reason: reason);
+    if (!cancellation.valid) return false;
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    try {
+      final next = await (_supplierStorage as WorkPurchaseReceiptReviewAbandonment)
+        .abandonReviewedReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: expectedRevision,
+          cancellation: cancellation, verifyUncommitted: (review) async {
+            final journal = await data.ledgerCheckpointStore!.read(key.$1, key.$2);
+            return current() && review.supplierId == supplierId &&
+              !(journal?.supplierLedgers.values.any((ledger) => ledger.goodsReceipts.containsKey(receiptId)) ?? false);
+          });
+      if (!current()) { _supplierNeedsReload.add(key); return false; }
+      if (next == null) {
+        _supplierValidationErrors[key] = 'Review changed or goods are already recorded. Recover the saved delivery; cancellation cannot reverse received goods.';
+        return false;
+      }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (current()) {
+        _supplierErrors[key] = 'Cancellation status is unverified. Recover Purchases before changing or replacing this receiving review.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
 
   /// Freeze a receiving review before any Stock or accounting commit. An
   /// uncertain save must be recovered from this book before posting the receipt.
@@ -1399,6 +1462,11 @@ class WorkSession extends ChangeNotifier {
         !old.profiles.any((p) => p.id == supplierId)) { return false; }
     final previous = old.goodsReceiptDrafts.where((r) => r.receipt.id == receipt.id).firstOrNull;
     if (previous != null) {
+      if (old.goodsReceiptCancellations.any((c) => c.receiptId == receipt.id)) {
+        _supplierValidationErrors[key] = 'This review was cancelled. Start a corrected review with a new delivery reference; saved history is kept.';
+        notifyListeners();
+        return false;
+      }
       return previous.supplierId == supplierId &&
           jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson());
     }
@@ -1412,7 +1480,8 @@ class WorkSession extends ChangeNotifier {
     final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
       account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
       profiles: old.profiles, draft: old.draft, copies: old.copies,
-      openingRecords: old.openingRecords, goodsReceiptDrafts: [...old.goodsReceiptDrafts, review]).toJson());
+      openingRecords: old.openingRecords, goodsReceiptDrafts: [...old.goodsReceiptDrafts, review],
+      goodsReceiptCancellations: old.goodsReceiptCancellations).toJson());
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -1422,7 +1491,17 @@ class WorkSession extends ChangeNotifier {
           !identical(old, _supplierDirectories[key]) || _storeData.inventoryReceiptRecoveryPending) {
         return false;
       }
-      final previousReviews = old.goodsReceiptDrafts.where((r) => r.supplierId == supplierId).toList();
+      final previousReviews = old.goodsReceiptDrafts.where((r) => r.supplierId == supplierId &&
+        !old.goodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id)).toList();
+      if (old.goodsReceiptCancellations.isNotEmpty) {
+        final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
+        if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return false;
+        if (journal?.supplierLedgers.values.any((ledger) =>
+            old.goodsReceiptCancellations.any((c) => ledger.goodsReceipts.containsKey(c.receiptId))) ?? false) {
+          _supplierValidationErrors[key] = 'Receipt and cancellation records disagree. Recover the supplier account before starting another arrival; history is kept.';
+          return false;
+        }
+      }
       if (previousReviews.isNotEmpty) {
         final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
         final inventory = await _inventoryStorage.read(key.$1, key.$2, qa: key.$3);

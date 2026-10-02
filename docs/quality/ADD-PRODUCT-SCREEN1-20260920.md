@@ -3753,3 +3753,31 @@ of a definitively uncommitted review, practical unit/prior-movement selection,
 partial-arrival line identity and remaining-quantity guidance must be connected
 before exposing the full journey. No active attempt may be silently replaced.
 No OPPO/runtime transaction, APK, backend, push or production atomicity claimed.
+
+### Purchase receiving-review cancellation checkpoint — 3 October 2026
+
+Uncommitted receiving reviews can now be abandoned with an immutable reason,
+timestamp and revision. The dedicated mutation uses the same purchase queue as
+new receipt commits and checks the authoritative journal while holding it.
+Unknown/committed status cannot be cancelled. Exact cancellation retries recheck
+status; a changed request rejects. Old review history is never removed. Corrected
+goods use a new identity. Cancelled reviews cannot be resumed as active or posted;
+conflicting cancellation/receipt evidence blocks further work rather than implying
+a reversal. Cancellation changes neither Stock nor supplier money.
+
+Eight focused cancellation tests passed, including both queue orders, lost native
+reply, restart, old-writer retention, read failure, wrong supplier and cancelled
+receipt rejection. Four changed source/test owners analyze clean. Full atomic
+owner:528 passed,11 existing skips,zero failures, native exit0 and JSON
+done.success=true. Reporter `purchase-cancellation-atomic-20261003-v3.jsonl`, SHA256
+`DDF20C28791FFDD921FF67310AC011BEB62C8BCEAC579293422C86F8873650C5`.
+This is labelled automated contract evidence, not an actual device journey.
+Queue tests establish callback serialization, not full receipt-session concurrency.
+Architect review caught a known-commit contradiction incorrectly classified as
+unposted; the correction marks status unknown and locks Stock recovery. Both
+new session cases retain16 Stock, perform no new write and reject an update to99.
+Read-only follow-up found no further blocker in that narrow correction.
+
+The visible receiving workflow, supplier payment/return/statement journeys and
+OPPO screenshot/correction cycle remain pending. The full goal stays active;
+this checkpoint is not founder review readiness or production acceptance.

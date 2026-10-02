@@ -92,6 +92,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
   bool failRead = false, failWrite = false;
   bool loseWriteResponseOnce = false;
   String? failWriteKey;
+  String? failReadKey;
   Completer<void>? holdWrite;
   @override
   Future<String?> read({
@@ -103,7 +104,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
     AppleOptions? mOptions,
     WindowsOptions? wOptions,
   }) async {
-    if (failRead) throw StateError('test read failure');
+    if (failRead || key == failReadKey) throw StateError('test read failure');
     return values[key];
   }
 
@@ -4593,6 +4594,152 @@ void main() {
       expect(other.workspaceGoodsReceiptDrafts.length, 2);
       expect((await SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage)
         .read('account-A', 'store-A', qa: true))!.products.single.stock, 16);
+    });
+  }
+
+  test('PURCHASECANCEL native exact retry checks authoritative status and keeps history', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    final old = entryFixture();
+    await owner.save(old, expectedRevision: null);
+    final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: old.profiles.single.id,
+      revision: 2, receipt: goodsReceiptFixture());
+    final book = WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': 2,
+      'goodsReceiptDrafts': [review.toJson()]});
+    await owner.save(book, expectedRevision: 1);
+    final cancellation = WorkspaceGoodsReceiptReviewCancellation(receiptId: review.receipt.id,
+      supplierId: review.supplierId, revision: 3, cancelledAt: review.receipt.recordedAt,
+      reason: 'Correct quantities before receiving');
+    Future<WorkspacePurchaseEntryBook?> cancel(bool verified) => owner.abandonReviewedReceipt(
+      old.account, old.store, qa: old.qa, expectedRevision: 2,
+      cancellation: cancellation, verifyUncommitted: (_) async => verified);
+    expect(await cancel(false), isNull);
+    storage.loseWriteResponseOnce = true;
+    final saved = (await cancel(true))!;
+    expect(saved.goodsReceiptDrafts.single.toJson(), review.toJson());
+    final writes = storage.writes.length;
+    expect((await cancel(true))!.toJson(), saved.toJson());
+    expect(storage.writes.length, writes);
+    expect(await cancel(false), isNull, reason: 'Contradictory receipt evidence must not acknowledge cancellation.');
+    final reopened = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    expect((await reopened.read(old.account, old.store, qa: old.qa))!.toJson(), saved.toJson());
+    await expectLater(owner.save(WorkspacePurchaseEntryBook.fromJson({...book.toJson(), 'revision': 4}),
+      expectedRevision: 3), throwsA(isA<WorkGatewayException>()));
+    storage.failRead = true;
+    await expectLater(cancel(true), throwsA(isA<StateError>()));
+  });
+
+  for (final cancellationFirst in [true, false]) {
+    test('PURCHASECANCEL shared queue cancellation first $cancellationFirst', () async {
+      final storage = _OrderJournalStorage();
+      final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+      final other = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+      final old = entryFixture();
+      await owner.save(old, expectedRevision: null);
+      final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: old.profiles.single.id,
+        revision: 2, receipt: goodsReceiptFixture());
+      await owner.save(WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': 2,
+        'goodsReceiptDrafts': [review.toJson()]}), expectedRevision: 1);
+      final entered = Completer<void>(), release = Completer<void>();
+      bool committed = false;
+      Future<WorkspacePurchaseEntryBook?> cancel() => owner.abandonReviewedReceipt(
+        old.account, old.store, qa: old.qa, expectedRevision: 2,
+        cancellation: WorkspaceGoodsReceiptReviewCancellation(receiptId: review.receipt.id,
+          supplierId: review.supplierId, revision: 3, cancelledAt: review.receipt.recordedAt, reason: 'Correct quantity'),
+        verifyUncommitted: (_) async {
+          if (cancellationFirst) { entered.complete(); await release.future; }
+          return !committed;
+        });
+      Future<bool> commit() => other.withReviewedBook(old.account, old.store, qa: old.qa,
+        expectedRevision: 2, action: (book) async {
+          if (!cancellationFirst) { entered.complete(); await release.future; }
+          if (book.goodsReceiptCancellations.isNotEmpty) return false;
+          committed = true;
+          return true;
+        });
+      final first = cancellationFirst ? cancel() : commit();
+      await entered.future;
+      final second = cancellationFirst ? commit() : cancel();
+      release.complete();
+      final results = await Future.wait<Object?>([first, second]);
+      expect(committed, !cancellationFirst);
+      expect(results[0], cancellationFirst ? isA<WorkspacePurchaseEntryBook>() : isTrue);
+      expect(results[1], cancellationFirst ? isFalse : isNull);
+      final saved = (await owner.read(old.account, old.store, qa: old.qa))!;
+      expect(saved.goodsReceiptCancellations.length, cancellationFirst ? 1 : 0);
+      expect(saved.goodsReceiptDrafts.single.toJson(), review.toJson());
+    });
+  }
+
+  for (final failure in ['contradiction', 'book-read']) {
+    test('PURCHASECANCEL committed receipt $failure remains unresolved not unposted', () async {
+      final storage = _OrderJournalStorage();
+      final opening = openingFixture(amount: 0);
+      final owner = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+      expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: owner.workspaceSupplierScope!,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final receipt = sessionReceipt(owner);
+      expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+      Future<WorkspaceGoodsReceiptSaveResult> post() => owner.confirmWorkspaceSupplierGoodsReceipt(receipt,
+        supplierId: opening.supplierId, scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: 4,
+        expectedSupplierRevision: 1, requireSavedReview: true);
+      expect(await post(), WorkspaceGoodsReceiptSaveResult.saved);
+      final bookKey = storage.values.keys.singleWhere((key) => key.contains('workspace.purchase-entry.'));
+      if (failure == 'book-read') {
+        storage.failReadKey = bookKey;
+      } else {
+        // Labelled corrupt-storage fixture, never an actual runtime acceptance record.
+        final raw = jsonDecode(storage.values[bookKey]!) as Map<String, dynamic>;
+        storage.values[bookKey] = jsonEncode({...raw, 'revision': 5,
+          'goodsReceiptCancellations': [WorkspaceGoodsReceiptReviewCancellation(receiptId: receipt.id,
+            supplierId: opening.supplierId, revision: 5, cancelledAt: receipt.recordedAt,
+            reason: 'Deliberately contradictory automated fixture').toJson()]});
+      }
+      final writes = storage.writes.length;
+      expect(await post(), WorkspaceGoodsReceiptSaveResult.statusUnknown);
+      expect(storage.writes.length, writes);
+      expect(owner.workspaceCatalogueItems.single.stock, 16);
+      expect(owner.workspaceSupplierError, isNotNull);
+      expect(owner.updateWorkspaceStock(productId: owner.workspaceCatalogueItems.single.id,
+        quantity: 99, reason: 'Automated recovery lock check'), isFalse);
+      expect(owner.workspaceCatalogueItems.single.stock, 16);
+    });
+  }
+
+  for (final failure in ['none', 'read', 'wrong-supplier']) {
+    test('PURCHASECANCEL SESSION $failure never changes goods or money', () async {
+      final storage = _OrderJournalStorage();
+      final opening = openingFixture(amount: 0);
+      final owner = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+      final receipt = sessionReceipt(owner);
+      expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+      final stock = owner.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      final finance = owner.workspaceFinance;
+      storage.failRead = failure == 'read';
+      final cancelled = await owner.abandonWorkspaceGoodsReceiptReview(receipt.id,
+        supplierId: failure == 'wrong-supplier' ? 'other-supplier' : opening.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedRevision: 4,
+        cancelledAt: receipt.recordedAt, reason: 'Correct received quantity');
+      expect(cancelled, failure == 'none', reason: owner.workspaceSupplierError);
+      expect(owner.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+      expect(owner.workspaceFinance, same(finance));
+      storage.failRead = false;
+      final reopened = await openingPostingSession(storage, inventory: true);
+      expect(reopened.workspaceGoodsReceiptDrafts.single.receipt.toJson(), receipt.toJson());
+      expect(reopened.workspaceGoodsReceiptCancellations.length, failure == 'none' ? 1 : 0);
+      if (failure == 'none') {
+        expect(await reopened.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+          scope: reopened.workspaceSupplierScope!, expectedRevision: 5), isFalse);
+        expect(await reopened.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: opening.supplierId,
+          scope: reopened.workspaceSupplierScope!, expectedPurchaseRevision: 5,
+          expectedSupplierRevision: 0, requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.notPosted);
+        final corrected = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'id': 'corrected-arrival'});
+        expect(await reopened.saveWorkspaceGoodsReceiptDraft(corrected, supplierId: opening.supplierId,
+          scope: reopened.workspaceSupplierScope!, expectedRevision: 5), isTrue,
+          reason: reopened.workspaceSupplierError);
+      }
     });
   }
 

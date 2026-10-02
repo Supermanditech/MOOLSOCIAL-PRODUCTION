@@ -7097,6 +7097,32 @@ class WorkspaceSupplierGoodsReceiptDraft {
   }
 }
 
+/// Audit-only cancellation of a verified uncommitted receiving review. Never
+/// erases its snapshot or reverses a saved receipt, Stock movement or payment.
+class WorkspaceGoodsReceiptReviewCancellation {
+  const WorkspaceGoodsReceiptReviewCancellation({required this.receiptId,
+    required this.supplierId, required this.revision, required this.cancelledAt,
+    required this.reason});
+  final String receiptId, supplierId, reason;
+  final int revision;
+  final DateTime cancelledAt;
+  bool get valid => [receiptId, supplierId].every((v) => v.trim().isNotEmpty && v.length <= 240) &&
+      revision > 0 && reason.trim().isNotEmpty && reason.length <= 1000;
+  Map<String, Object?> toJson() => {'receiptId': receiptId, 'supplierId': supplierId,
+    'revision': revision, 'cancelledAt': cancelledAt.toUtc().toIso8601String(), 'reason': reason};
+  static WorkspaceGoodsReceiptReviewCancellation fromJson(Object? raw) {
+    const keys = {'receiptId', 'supplierId', 'revision', 'cancelledAt', 'reason'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid receiving review cancellation');
+    }
+    final value = WorkspaceGoodsReceiptReviewCancellation(receiptId: raw['receiptId'] as String,
+      supplierId: raw['supplierId'] as String, revision: raw['revision'] as int,
+      cancelledAt: DateTime.parse(raw['cancelledAt'] as String), reason: raw['reason'] as String);
+    if (!value.valid) throw const FormatException('Invalid receiving review cancellation');
+    return value;
+  }
+}
+
 class WorkspacePurchaseEntryBook {
   WorkspacePurchaseEntryBook({
     required this.account,
@@ -7108,10 +7134,12 @@ class WorkspacePurchaseEntryBook {
     List<WorkspacePurchaseSavedCopy> copies = const [],
     List<WorkspaceSupplierOpeningRecord> openingRecords = const [],
     List<WorkspaceSupplierGoodsReceiptDraft> goodsReceiptDrafts = const [],
+    List<WorkspaceGoodsReceiptReviewCancellation> goodsReceiptCancellations = const [],
   }) : profiles = List.unmodifiable(profiles),
        copies = List.unmodifiable(copies),
        openingRecords = List.unmodifiable(openingRecords),
-       goodsReceiptDrafts = List.unmodifiable(goodsReceiptDrafts);
+       goodsReceiptDrafts = List.unmodifiable(goodsReceiptDrafts),
+       goodsReceiptCancellations = List.unmodifiable(goodsReceiptCancellations);
   final String account, store;
   final bool qa;
   final int revision;
@@ -7120,6 +7148,7 @@ class WorkspacePurchaseEntryBook {
   final List<WorkspacePurchaseSavedCopy> copies;
   final List<WorkspaceSupplierOpeningRecord> openingRecords;
   final List<WorkspaceSupplierGoodsReceiptDraft> goodsReceiptDrafts;
+  final List<WorkspaceGoodsReceiptReviewCancellation> goodsReceiptCancellations;
   WorkspaceSupplierOpeningRecord? openingRecordFor(String supplierId) =>
       openingRecords.where((r) => r.supplierId == supplierId).lastOrNull;
 
@@ -7177,6 +7206,8 @@ class WorkspacePurchaseEntryBook {
       'openingRecords': openingRecords.map((r) => r.toJson()).toList(),
     if (goodsReceiptDrafts.isNotEmpty)
       'goodsReceiptDrafts': goodsReceiptDrafts.map((r) => r.toJson()).toList(),
+    if (goodsReceiptCancellations.isNotEmpty)
+      'goodsReceiptCancellations': goodsReceiptCancellations.map((r) => r.toJson()).toList(),
   };
   static WorkspacePurchaseEntryBook fromJson(Object? raw) {
     const keys = {
@@ -7190,11 +7221,12 @@ class WorkspacePurchaseEntryBook {
       'copies',
       'openingRecords',
       'goodsReceiptDrafts',
+      'goodsReceiptCancellations',
     };
     try {
       if (raw is! Map ||
           !keys
-              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts'})
+              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts', 'goodsReceiptCancellations'})
               .every(raw.containsKey) ||
           !raw.keys.every(keys.contains) ||
           raw['version'] != 1 ||
@@ -7208,7 +7240,10 @@ class WorkspacePurchaseEntryBook {
                   (raw['openingRecords'] as List).length > 1000)) ||
           (raw.containsKey('goodsReceiptDrafts') &&
             (raw['goodsReceiptDrafts'] is! List ||
-              (raw['goodsReceiptDrafts'] as List).length > 1000))) {
+              (raw['goodsReceiptDrafts'] as List).length > 1000)) ||
+          (raw.containsKey('goodsReceiptCancellations') &&
+            (raw['goodsReceiptCancellations'] is! List ||
+              (raw['goodsReceiptCancellations'] as List).length > 1000))) {
         throw const FormatException('Invalid supplier directory');
       }
       final result = WorkspacePurchaseEntryBook(
@@ -7233,6 +7268,8 @@ class WorkspacePurchaseEntryBook {
         ],
         goodsReceiptDrafts: [for (final r in (raw['goodsReceiptDrafts'] as List? ?? const []))
           WorkspaceSupplierGoodsReceiptDraft.fromJson(r)],
+        goodsReceiptCancellations: [for (final r in (raw['goodsReceiptCancellations'] as List? ?? const []))
+          WorkspaceGoodsReceiptReviewCancellation.fromJson(r)],
       );
       final ids = <String>{};
       final copyIds = <String>{};
@@ -7311,6 +7348,18 @@ class WorkspacePurchaseEntryBook {
           throw const FormatException('Invalid receiving review relationship');
         }
         receiptRevision = review.revision;
+      }
+      final cancelledIds = <String>{};
+      var cancellationRevision = 0;
+      for (final cancellation in result.goodsReceiptCancellations) {
+        final review = result.goodsReceiptDrafts.where((r) => r.receipt.id == cancellation.receiptId).firstOrNull;
+        if (!cancelledIds.add(cancellation.receiptId) || review == null ||
+            review.supplierId != cancellation.supplierId || cancellation.revision <= review.revision ||
+            cancellation.revision <= cancellationRevision || cancellation.revision > result.revision ||
+            cancellation.cancelledAt.isBefore(review.receipt.recordedAt)) {
+          throw const FormatException('Invalid receiving cancellation relationship');
+        }
+        cancellationRevision = cancellation.revision;
       }
       return result;
     } on Object {
