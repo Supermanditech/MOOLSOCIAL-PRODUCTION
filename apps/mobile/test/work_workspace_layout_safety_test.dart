@@ -3813,10 +3813,19 @@ void main() {
       await usePurchaseControl(tester,'work-purchase-invoice-section');
       final view=find.byKey(Key('work-purchase-view-${attachment.digest}'));
       await revealPurchaseInput(tester,view);expect(view.hitTestable(),findsOneWidget);
+      expect(find.text(attachment.fileName), findsNothing,
+        reason: 'The long source filename must not occupy a default entry row.');
+      final viewLabel = tester.widget<Text>(find.descendant(of: view,
+        matching: find.text('View')));
+      expect(viewLabel.semanticsLabel, 'View supplier bill: ${attachment.fileName}');
+      expect(find.byTooltip('Remove attached bill: ${attachment.fileName}'), findsOneWidget);
       await tester.tap(view);await tester.pumpAndSettle();
       expect(find.byKey(const Key('purchase-original-view')),findsOneWidget);
       expect(find.byKey(const Key('purchase-review-paper')),findsNothing);
       expect(find.text('Supplier copy · kept unchanged'),findsOneWidget);
+      expect(find.text(attachment.fileName), findsOneWidget,
+        reason: 'Complete source identity remains available in the supplier-copy view.');
+      expect(find.text('SHA-256: ${attachment.digest}'), findsOneWidget);
       expect(find.byKey(const Key('work-purchase-preview')), findsNothing,
         reason: 'Preview must not secretly switch documents when review is already open.');
       expect(find.byKey(Key('work-purchase-read-${attachment.digest}')),
@@ -4343,9 +4352,10 @@ void main() {
     await expandPurchasePrimarySections(tester);
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     expect(find.byKey(const Key('work-record-purchase-back')), findsNothing);
-    expect(find.text('Take photo'), findsOneWidget);
-    expect(find.text('Attach bill'), findsOneWidget);
-    expect(find.text('Enter from your supplier bill, or attach a copy to read and review.'), findsOneWidget);
+    expect(find.byTooltip('Take a clear photo of the full supplier bill'), findsOneWidget);
+    expect(find.byTooltip('Attach a supplier bill photo or PDF'), findsOneWidget);
+    expect(find.text('Keep a clear, full bill photo or PDF.'), findsOneWidget);
+    expect(find.text('PDF attached. Enter its details below.'), findsNothing);
     final paper = tester.widget<DecoratedBox>(find.byKey(const Key('work-purchase-paper'))).decoration as BoxDecoration;
     final backgrounds = (paper.gradient! as LinearGradient).colors;
     expect(find.text('Enter supplier details'), findsOneWidget, reason: 'The instruction headline groups supplier entry.');
@@ -4361,6 +4371,38 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final display in [(360.0, 800.0, 1.0), (800.0, 360.0, 1.6),
+      (320.0, 568.0, 2.0)]) {
+    testWidgets('P05-COMPACT attachment controls share the heading without clipping $display', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: Size(display.$1, display.$2), textScale: display.$3);
+      await openPurchaseList(tester);
+      await usePurchaseControl(tester, 'work-purchase-record');
+      final header = find.byKey(const Key('work-purchase-entry-header'));
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-camera')));
+      final bounds = tester.getRect(header);
+      for (final key in ['work-purchase-camera', 'work-purchase-attach']) {
+        final control = find.byKey(Key(key));
+        final rect = tester.getRect(control);
+        expect(rect.width, greaterThanOrEqualTo(48));
+        expect(rect.height, greaterThanOrEqualTo(48));
+        expect(bounds.contains(rect.center), isTrue,
+          reason: 'Attachment actions belong beside the heading, not in another lane.');
+        expect(control.hitTestable(), findsOneWidget);
+      }
+      expect(find.text('Purchase entry'), findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-attachment-purpose')), findsOneWidget);
+      expect(find.text('Take photo'), findsNothing);
+      expect(find.text('Attach bill'), findsNothing);
+      expect(entry.value, isNull);
+      expect(work.workspacePurchases, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets('P05-VISUAL header Back returns to Purchases and guards dirty input', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
@@ -4394,6 +4436,41 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final display in [(360.0, 800.0, 1.0), (800.0, 360.0, 1.6),
+      (320.0, 568.0, 2.0)]) {
+    testWidgets('P05-FLOATING enlarged invoice date is not placed beside the reference $display', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
+        viewport: Size(display.$1, display.$2), textScale: display.$3);
+      await openPurchaseList(tester);
+      await usePurchaseControl(tester, 'work-purchase-record');
+      await usePurchaseControl(tester, 'work-purchase-invoice-section');
+      final reference = find.byKey(const Key('work-purchase-reference'));
+      final date = find.byKey(const Key('work-purchase-date'));
+      await revealPurchaseInput(tester, reference);
+      await tester.enterText(reference, 'HOST-ONLY-INVOICE');
+      await revealPurchaseInput(tester, date);
+      await tester.enterText(date, '30/09/2026');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final referenceRect = tester.getRect(reference);
+      final dateRect = tester.getRect(date);
+      if (display.$3 > 1.3) {
+        expect(dateRect.left, closeTo(referenceRect.left, .1));
+        expect(dateRect.top, greaterThanOrEqualTo(referenceRect.bottom),
+          reason: 'Large-text dates must not start in the right floating-keyboard area.');
+      } else {
+        expect(dateRect.top, closeTo(referenceRect.top, .1),
+          reason: 'Normal-size compact inline dates remain approved and unchanged.');
+      }
+      expect(tester.widget<TextField>(date).controller!.text, '30/09/2026');
+      expect(tester.widget<TextField>(reference).controller!.text, 'HOST-ONLY-INVOICE');
+      expect(entry.value, isNull, reason: 'Presentation does not save or post this host-only draft.');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets('P05-VISUAL compact detail panels preserve entered fields', (tester) async {
     final entry = _PurchaseEntryFixtureStore();

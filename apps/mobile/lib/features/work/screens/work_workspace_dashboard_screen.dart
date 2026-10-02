@@ -12197,6 +12197,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 return AspectRatio(aspectRatio: ratio, child: child);
               }))),
         ],
+        _section('Bill file details', 'purchase-original-file-details', [
+          SelectableText(attachment.fileName, key: const Key('purchase-original-filename'),
+            style: const TextStyle(fontSize: 12, color: _paperInk)),
+          SelectableText('SHA-256: ${attachment.digest}',
+            style: const TextStyle(fontSize: 11, color: _paperMuted)),
+        ]),
       ])];
   }
   void _previewPurchase({bool recorded = true}) {
@@ -12670,12 +12676,17 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Widget _attachment(WorkspacePurchaseInvoiceAttachment a) => Column(
     key: Key('work-purchase-document-${a.digest}'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [Expanded(child: Tooltip(message: a.fileName, child: Text(a.fileName, maxLines: 1,
-        overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: _paperMuted)))),
+      Row(children: [Expanded(child: Semantics(label: 'Attached supplier bill: ${a.fileName}',
+        child: ExcludeSemantics(child: Text(a.contentType == 'application/pdf' ? 'Bill · PDF' : 'Bill · Photo',
+          key: Key('work-purchase-file-label-${a.digest}'),
+          style: const TextStyle(fontSize: 12, color: _paperMuted))))),
         TextButton.icon(key: Key('work-purchase-view-${a.digest}'),
+        style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          textStyle: const TextStyle(fontSize: 12)),
         onPressed: _sourceSaving ? null : () => _openSource(a), icon: const Icon(Icons.visibility_outlined, size: 18),
-        label: const Text('View copy')),
-        IconButton(tooltip: 'Remove attachment', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        label: Text('View', semanticsLabel: 'View supplier bill: ${a.fileName}')),
+        IconButton(tooltip: 'Remove attached bill: ${a.fileName}', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: () {
           if (_additional.any((f) => f.record.sourceDigest == a.digest)) {
             setState(() => _error = 'Extra details were read from this copy. Keep it attached, or remove those details before removing this copy.');
@@ -12745,10 +12756,25 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(12, 0, 12, pinned ? 12 : 24 + MediaQuery.viewInsetsOf(context).bottom),
         children: [
-          Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [
-            const Expanded(child: Text('Purchase entry', style: TextStyle(fontSize: 16,
-              fontWeight: FontWeight.w700, color: MoolColors.navy))),
-            const Text('Draft', style: TextStyle(fontSize: 12, color: MoolColors.muted))])),
+          Row(key: const Key('work-purchase-entry-header'), children: [
+            const Expanded(child: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text('Purchase entry', style: TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w700, color: MoolColors.navy)),
+              Text('Draft', style: TextStyle(fontSize: 12, color: _paperMuted)),
+            ])),
+            if (ready) ...[
+              IconButton(key: const Key('work-purchase-camera'),
+                tooltip: 'Take a clear photo of the full supplier bill',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                onPressed: _busy ? null : () => _capture(WorkProofSource.camera),
+                icon: const Icon(Icons.camera_alt_outlined, size: 20, color: MoolColors.navy)),
+              IconButton(key: const Key('work-purchase-attach'),
+                tooltip: 'Attach a supplier bill photo or PDF',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                onPressed: _busy ? null : () => _capture(WorkProofSource.upload),
+                icon: const Icon(Icons.attach_file_rounded, size: 20, color: MoolColors.navy)),
+            ],
+          ]),
           if (_loading) const Padding(padding: EdgeInsets.all(12), child: Text('Opening purchase draft…'))
           else if (!widget.session.workspaceSuppliersLoaded || !_current) ...[
             Text(_error ?? 'Return to the same Store to continue.'),
@@ -12757,28 +12783,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               setState(() => _loading = false); } : null, child: const Text('Retry')),
           ] else AbsorbPointer(absorbing: _busy, child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Wrap(spacing: 4, children: [
-                Tooltip(message: 'Keep a photo of the supplier invoice with this purchase', child: TextButton.icon(
-                  key: const Key('work-purchase-camera'), onPressed: () => _capture(WorkProofSource.camera),
-                  style: TextButton.styleFrom(minimumSize: const Size(48, 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                  icon: const Icon(Icons.camera_alt_outlined, size: 16), label: const Text('Take photo'))),
-                Tooltip(message: 'Keep an existing invoice photo or PDF with this purchase', child: TextButton.icon(
-                  key: const Key('work-purchase-attach'), onPressed: () => _capture(WorkProofSource.upload),
-                  style: TextButton.styleFrom(minimumSize: const Size(48, 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                  icon: const Icon(Icons.attach_file_rounded, size: 16), label: const Text('Attach bill')))]),
-              Text(_attachments.any((a) => a.detectedText.isNotEmpty)
-                ? 'Check the supplier copy, correct the details, then save draft.'
-                : _attachments.isNotEmpty
-                  ? _attachments.every((a) => a.contentType == 'application/pdf')
-                    ? 'PDF attached. Enter its details below.'
-                    : 'Enter details below, or try reading the attached photo.'
-                  : 'Enter from your supplier bill, or attach a copy to read and review.',
-                key: const Key('work-purchase-attachment-purpose'),
-                style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+              const Text('Keep a clear, full bill photo or PDF.',
+                key: Key('work-purchase-attachment-purpose'),
+                style: TextStyle(fontSize: 12, color: _paperMuted)),
               for (final a in _attachments) _attachment(a),
               _purchaseSection('Enter supplier details', 'work-purchase-supplier-section', [
                 _field('Supplier name or phone', _name, 'work-purchase-supplier-name',
@@ -12806,6 +12813,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 final fields = [_field('Supplier invoice No.', _reference, 'work-purchase-reference', limit: 120),
                   _field('Invoice date', _date, 'work-purchase-date', limit: 10, hint: 'DD/MM/YYYY',
                     keyboard: TextInputType.datetime)];
+                // Floating keyboards can cover the right-hand date without reporting
+                // an inset. Keep both enlarged inputs left-aligned on narrow forms.
+                if (constraints.maxWidth < 520 && MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                  return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [fields[0], const SizedBox(height: 6), fields[1]]);
+                }
                 if (constraints.maxWidth < 300 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
                   return _compactFields(fields, width: 150);
                 }
