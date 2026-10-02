@@ -3720,3 +3720,36 @@ confirmation remains explicitly blocked pending an accounting-correction journey
 it cannot silently amend the posted opening. Receiving independent of bills,
 unit/prior-Stock review, payments/advance allocation, returns/credits/refunds,
 statements and the complete device correction cycle remain open in this goal.
+
+### 3 October continuation: durable receiving review (host only)
+
+The existing encrypted purchase book now retains immutable receiving-review
+snapshots with supplier, stable receipt/group/line identities, recording time,
+quantity/unit conversions and prior-Stock allocations. This optional version1
+extension preserves old empty-book bytes. Saving a review is not goods posting,
+Stock movement, supplier liability or payment. All purchase-book writers retain
+review history; strict codecs and native CAS reject rewrites, deletion and broken
+relationships. Capacity is bounded to1000 reviews with truthful recovery guidance.
+
+New UI receiving submissions can require the exact persisted snapshot inside the
+purchase-book guard. Changed contents/ownership or a missing required review
+reject; legacy committed-receipt retries remain compatible. Before admitting
+another supplier arrival after a previous review, fresh durable receipt and Stock
+projection evidence is checked—not merely the current session's pending flag.
+The Stock marker must match the recovered journal revision; an unrelated later
+finance change conservatively requires re-verifying the previous receipt first.
+
+Eight focused PURCHASEREVIEW tests passed. Full atomic owner520 passed,11 existing
+skips,zero failures; native exit0 and JSON done.success=true. Four changed
+source/test owners analyze clean. Task reporter
+`purchase-receiving-review-atomic-20261003-v2.jsonl`, SHA256
+`31910ED1A165E3F4F70AEA1FF76D96B8595143CE3AD96C13CFD6BBAC13AA71CB`.
+Covers restart before posting, exact retry, native lost-reply reconciliation,
+failed save, missing/tampered review, old-writer preservation and another local
+session's committed-but-unprojected receipt followed by verified recovery.
+
+This remains a receiving-UI prerequisite, not device acceptance. Safe abandonment
+of a definitively uncommitted review, practical unit/prior-movement selection,
+partial-arrival line identity and remaining-quantity guidance must be connected
+before exposing the full journey. No active attempt may be silently replaced.
+No OPPO/runtime transaction, APK, backend, push or production atomicity claimed.

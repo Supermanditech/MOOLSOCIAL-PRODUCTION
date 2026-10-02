@@ -4469,6 +4469,133 @@ void main() {
         damagedMilli: 0, shortMilli: 0, expectedMilli: 12000, priorStockUnits: prior)]);
   }
 
+  test('PURCHASEREVIEW codec preserves legacy bytes and rejects broken relationships', () {
+    final old = entryFixture();
+    expect(old.toJson().containsKey('goodsReceiptDrafts'), isFalse);
+    expect(WorkspacePurchaseEntryBook.fromJson(old.toJson()).toJson(), old.toJson());
+    final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: old.profiles.single.id,
+      revision: 2, receipt: goodsReceiptFixture());
+    final raw = {...old.toJson(), 'revision': 2, 'goodsReceiptDrafts': [review.toJson()]};
+    expect(WorkspacePurchaseEntryBook.fromJson(raw).goodsReceiptDrafts.single.toJson(), review.toJson());
+    for (final bad in [
+      {...raw, 'goodsReceiptDrafts': null},
+      {...raw, 'goodsReceiptDrafts': [review.toJson(), review.toJson()]},
+      {...raw, 'revision': 1},
+      {...raw, 'goodsReceiptDrafts': [{...review.toJson(), 'supplierId': 'missing'}]},
+    ]) {
+      expect(() => WorkspacePurchaseEntryBook.fromJson(bad), throwsFormatException);
+    }
+  });
+
+  test('PURCHASEREVIEW secure storage forbids dropping or rewriting reviewed arrivals', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    final old = entryFixture();
+    await owner.save(old, expectedRevision: null);
+    final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: old.profiles.single.id,
+      revision: 2, receipt: goodsReceiptFixture());
+    final saved = WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': 2,
+      'goodsReceiptDrafts': [review.toJson()]});
+    await owner.save(saved, expectedRevision: 1);
+    final writes = storage.writes.length;
+    await owner.save(saved, expectedRevision: 1);
+    expect(storage.writes.length, writes);
+    await expectLater(owner.save(WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': 3}),
+      expectedRevision: 2), throwsA(isA<WorkGatewayException>()));
+    final changed = {...review.toJson(), 'receipt': {...review.receipt.toJson(), 'reference': 'changed'}};
+    await expectLater(owner.save(WorkspacePurchaseEntryBook.fromJson({...saved.toJson(),
+      'revision': 3, 'goodsReceiptDrafts': [changed]}), expectedRevision: 2), throwsA(isA<WorkGatewayException>()));
+    expect((await owner.read(old.account, old.store, qa: old.qa))!.toJson(), saved.toJson());
+  });
+
+  for (final mode in ['ordinary', 'lost-response', 'failed-save', 'competing']) {
+    test('PURCHASEREVIEW SESSION $mode retains operation without stock or debt', () async {
+      final storage = _OrderJournalStorage();
+      final opening = openingFixture(amount: 0);
+      final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+      final other = mode == 'competing' ? await openingPostingSession(storage, inventory: true) : null;
+      final receipt = sessionReceipt(session);
+      final stock = session.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      final finance = session.workspaceFinance;
+      if (mode == 'lost-response') storage.loseWriteResponseOnce = true;
+      if (mode == 'failed-save') storage.failWrite = true;
+      final saved = await session.saveWorkspaceGoodsReceiptDraft(receipt,
+        supplierId: opening.supplierId, scope: session.workspaceSupplierScope!, expectedRevision: 3);
+      expect(saved, mode != 'failed-save', reason: session.workspaceSupplierError);
+      if (mode == 'failed-save') {
+        expect(session.workspaceSupplierError, contains('unverified'));
+        storage.failWrite = false;
+        expect(await session.loadWorkspaceSuppliers(retry: true), isTrue);
+        expect(session.workspaceGoodsReceiptDrafts, isEmpty);
+        expect(await session.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+          scope: session.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+      }
+      if (other != null) {
+        expect(await other.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+          scope: other.workspaceSupplierScope!, expectedRevision: 3), isTrue,
+          reason: 'Secure writer acknowledges exact same snapshot before stale CAS.');
+      }
+      final writes = storage.writes.length;
+      expect(await session.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+        scope: session.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+      expect(storage.writes.length, writes);
+      final changed = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'reference': 'changed'});
+      expect(await session.saveWorkspaceGoodsReceiptDraft(changed, supplierId: opening.supplierId,
+        scope: session.workspaceSupplierScope!, expectedRevision: 4), isFalse);
+      final reopened = await openingPostingSession(storage, inventory: true);
+      expect(reopened.workspaceGoodsReceiptDrafts.single.receipt.toJson(), receipt.toJson());
+      final another = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'id': 'second-arrival'});
+      expect(await reopened.saveWorkspaceGoodsReceiptDraft(another, supplierId: opening.supplierId,
+        scope: reopened.workspaceSupplierScope!, expectedRevision: 4), isFalse);
+      expect(reopened.workspaceSupplierError, contains('Resume'));
+      expect(reopened.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+      expect(session.workspaceFinance, same(finance));
+      expect(reopened.workspaceSupplierLedger(opening.supplierId), isNull);
+    });
+  }
+
+  for (final projection in ['saved', 'pending']) {
+    test('PURCHASEREVIEW SESSION frozen commit and fresh projection admission $projection', () async {
+      final storage = _OrderJournalStorage();
+      final opening = openingFixture(amount: 0);
+      final owner = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+      expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: owner.workspaceSupplierScope!,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final receipt = sessionReceipt(owner);
+      Future<WorkspaceGoodsReceiptSaveResult> post(WorkspaceSupplierGoodsReceipt value, int bookRevision) =>
+        owner.confirmWorkspaceSupplierGoodsReceipt(value, supplierId: opening.supplierId,
+          scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: bookRevision,
+          expectedSupplierRevision: 1, requireSavedReview: true);
+      expect(await post(receipt, 3), WorkspaceGoodsReceiptSaveResult.notPosted);
+      expect(owner.workspaceSupplierLedger(opening.supplierId)!.goodsReceipts, isEmpty);
+      expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+      final other = await openingPostingSession(storage, inventory: true);
+      expect(await other.recoverCustomerLedger(), isTrue);
+      final changed = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'reference': 'tampered'});
+      expect(await post(changed, 4), WorkspaceGoodsReceiptSaveResult.notPosted);
+      expect(owner.workspaceCatalogueItems.single.stock, 10);
+      if (projection == 'pending') {
+        storage.failWriteKey = storage.values.keys.singleWhere((key) => key.contains('workspace.inventory.'));
+      }
+      expect(await post(receipt, 4), projection == 'pending'
+        ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending : WorkspaceGoodsReceiptSaveResult.saved);
+      final next = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'id': 'next-arrival'});
+      expect(await other.saveWorkspaceGoodsReceiptDraft(next, supplierId: opening.supplierId,
+        scope: other.workspaceSupplierScope!, expectedRevision: 4), projection == 'saved');
+      if (projection == 'pending') {
+        expect(other.workspaceSupplierError, contains('Stock recovery'));
+        storage.failWriteKey = null;
+        expect(await post(receipt, 4), WorkspaceGoodsReceiptSaveResult.saved);
+        expect(await other.saveWorkspaceGoodsReceiptDraft(next, supplierId: opening.supplierId,
+          scope: other.workspaceSupplierScope!, expectedRevision: 4), isTrue);
+      }
+      expect(other.workspaceGoodsReceiptDrafts.length, 2);
+      expect((await SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage)
+        .read('account-A', 'store-A', qa: true))!.products.single.stock, 16);
+    });
+  }
+
   for (final method in WorkspaceStockEntryMethod.values) {
     test('PURCHASERECEIVE SESSION ${method.name} prior Stock and restart preserve one receipt', () async {
       final storage = _OrderJournalStorage();

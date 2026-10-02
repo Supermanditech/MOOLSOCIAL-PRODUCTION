@@ -1819,6 +1819,18 @@ class SecureWorkPurchaseEntryStore
         }
       }
       final retainedOpeningIds = <String>{};
+      final retainedReceiptIds = <String>{};
+      for (final review in previous?.goodsReceiptDrafts ?? const <WorkspaceSupplierGoodsReceiptDraft>[]) {
+        final retained = frozen.goodsReceiptDrafts.where((r) => r.receipt.id == review.receipt.id).firstOrNull;
+        if (retained == null || jsonEncode(retained.toJson()) != jsonEncode(review.toJson())) {
+          throw const WorkGatewayException('Earlier receiving reviews must be kept unchanged. Reopen Purchases.');
+        }
+        retainedReceiptIds.add(review.receipt.id);
+      }
+      final receiptAdditions = frozen.goodsReceiptDrafts.where((r) => !retainedReceiptIds.contains(r.receipt.id));
+      if (receiptAdditions.length > 1 || receiptAdditions.any((r) => r.revision != frozen.revision)) {
+        throw const WorkGatewayException('Save one reviewed delivery at a time. Reopen Purchases.');
+      }
       for (final record
           in previous?.openingRecords ??
               const <WorkspaceSupplierOpeningRecord>[]) {

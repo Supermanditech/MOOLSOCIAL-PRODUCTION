@@ -815,7 +815,8 @@ class WorkSession extends ChangeNotifier {
     final saved = WorkspacePurchaseEntryBook(account: key.$1, store: key.$2,
       qa: key.$3, revision: (old?.revision ?? 0) + 1,
       profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft,
-      copies: [...?old?.copies, ?reviewedCopy], openingRecords: old?.openingRecords ?? const []);
+      copies: [...?old?.copies, ?reviewedCopy], openingRecords: old?.openingRecords ?? const [],
+      goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const []);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -1047,6 +1048,7 @@ class WorkSession extends ChangeNotifier {
     required (String, String, bool) scope,
     required int expectedPurchaseRevision,
     required int expectedSupplierRevision,
+    bool requireSavedReview = false,
   }) async {
     final data = _storeData;
     final key = _supplierKey;
@@ -1209,6 +1211,13 @@ class WorkSession extends ChangeNotifier {
           : await purchaseGuard.withReviewedBook(key.$1, key.$2, qa: key.$3,
               expectedRevision: expectedPurchaseRevision, action: (book) async {
                 if (!current() || !book.profiles.any((p) => p.id == supplierId)) return false;
+                final review = book.goodsReceiptDrafts.where((r) => r.receipt.id == frozen.id).firstOrNull;
+                if ((requireSavedReview && review == null) || (review != null &&
+                    (review.supplierId != supplierId ||
+                      jsonEncode(review.receipt.toJson()) != jsonEncode(frozen.toJson())))) {
+                  projectionIssue = 'Resume the exact saved receiving review. Changed receipt details cannot be posted.';
+                  return false;
+                }
                 return projectReceipt();
               });
       if (authoritative == null || !complete || projected == null || !current()) {
@@ -1336,6 +1345,7 @@ class WorkSession extends ChangeNotifier {
           draft: old.draft,
           copies: old.copies,
           openingRecords: [...old.openingRecords, record],
+          goodsReceiptDrafts: old.goodsReceiptDrafts,
         ).toJson(),
       );
     } on Object {
@@ -1372,6 +1382,77 @@ class WorkSession extends ChangeNotifier {
   int? get workspacePurchaseEntryRevision => _supplierDirectories[_supplierKey]?.revision;
   List<WorkspacePurchaseSavedCopy> get workspacePurchaseCopies =>
     _supplierDirectories[_supplierKey]?.copies ?? const [];
+  List<WorkspaceSupplierGoodsReceiptDraft> get workspaceGoodsReceiptDrafts =>
+      _supplierDirectories[_supplierKey]?.goodsReceiptDrafts ?? const [];
+
+  /// Freeze a receiving review before any Stock or accounting commit. An
+  /// uncertain save must be recovered from this book before posting the receipt.
+  Future<bool> saveWorkspaceGoodsReceiptDraft(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision,
+  }) async {
+    final key = _supplierKey;
+    final old = _supplierDirectories[key];
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierNeedsReload.contains(key) || old == null || !receipt.valid ||
+        !old.profiles.any((p) => p.id == supplierId)) { return false; }
+    final previous = old.goodsReceiptDrafts.where((r) => r.receipt.id == receipt.id).firstOrNull;
+    if (previous != null) {
+      return previous.supplierId == supplierId &&
+          jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson());
+    }
+    if (old.revision != expectedRevision || old.goodsReceiptDrafts.length >= 1000) {
+      _supplierValidationErrors[key] = 'Receiving reviews changed or storage is full. Recover saved Purchases; do not clear records.';
+      notifyListeners();
+      return false;
+    }
+    final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: supplierId,
+      revision: old.revision + 1, receipt: receipt);
+    final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
+      account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
+      profiles: old.profiles, draft: old.draft, copies: old.copies,
+      openingRecords: old.openingRecords, goodsReceiptDrafts: [...old.goodsReceiptDrafts, review]).toJson());
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(old, _supplierDirectories[key]) || _storeData.inventoryReceiptRecoveryPending) {
+        return false;
+      }
+      final previousReviews = old.goodsReceiptDrafts.where((r) => r.supplierId == supplierId).toList();
+      if (previousReviews.isNotEmpty) {
+        final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
+        final inventory = await _inventoryStorage.read(key.$1, key.$2, qa: key.$3);
+        if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return false;
+        final ledger = journal?.supplierLedgers[supplierId];
+        if (previousReviews.any((r) =>
+            jsonEncode(ledger?.goodsReceipts[r.receipt.id]?.toJson()) != jsonEncode(r.receipt.toJson()))) {
+          _supplierValidationErrors[key] = 'Resume this supplier’s saved delivery review before starting another arrival.';
+          return false;
+        }
+        if (journal == null || inventory?.manualReceiptCheckpointRevision != journal.revision) {
+          _supplierValidationErrors[key] = 'Verify the previous delivery’s saved Stock recovery before starting another arrival.';
+          return false;
+        }
+      }
+      await _supplierStorage.save(next, expectedRevision: old.revision);
+      if (_disposed || _supplierKey != key) { _supplierNeedsReload.add(key); return false; }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (!_disposed && _supplierKey == key) {
+        _supplierErrors[key] = 'Receiving review save status is unverified. Recover Purchases and reuse the saved delivery identity before posting goods.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) notifyListeners();
+    }
+  }
   List<WorkspacePurchaseSavedCopy> get workspaceLatestPurchaseCopies =>
       _supplierDirectories[_supplierKey]?.latestReviewedCopies ?? const [];
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;

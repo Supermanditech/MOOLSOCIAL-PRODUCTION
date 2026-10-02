@@ -7072,6 +7072,31 @@ class WorkspaceSupplierOpeningRecord {
   }
 }
 
+/// Frozen receiving review. Saving this is not a receipt commit or Stock update.
+/// Its original operation identity survives closing the editor and restarting.
+class WorkspaceSupplierGoodsReceiptDraft {
+  const WorkspaceSupplierGoodsReceiptDraft({required this.supplierId,
+    required this.revision, required this.receipt});
+  final String supplierId;
+  final int revision;
+  final WorkspaceSupplierGoodsReceipt receipt;
+  bool get valid => supplierId.trim().isNotEmpty && supplierId.length <= 240 &&
+      revision > 0 && receipt.valid;
+  Map<String, Object?> toJson() => {'supplierId': supplierId,
+    'revision': revision, 'receipt': receipt.toJson()};
+  static WorkspaceSupplierGoodsReceiptDraft fromJson(Object? raw) {
+    const keys = {'supplierId', 'revision', 'receipt'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid receiving review');
+    }
+    final result = WorkspaceSupplierGoodsReceiptDraft(supplierId: raw['supplierId'] as String,
+      revision: raw['revision'] as int,
+      receipt: WorkspaceSupplierGoodsReceipt.fromJson(raw['receipt']));
+    if (!result.valid) throw const FormatException('Invalid receiving review');
+    return result;
+  }
+}
+
 class WorkspacePurchaseEntryBook {
   WorkspacePurchaseEntryBook({
     required this.account,
@@ -7082,9 +7107,11 @@ class WorkspacePurchaseEntryBook {
     this.draft,
     List<WorkspacePurchaseSavedCopy> copies = const [],
     List<WorkspaceSupplierOpeningRecord> openingRecords = const [],
+    List<WorkspaceSupplierGoodsReceiptDraft> goodsReceiptDrafts = const [],
   }) : profiles = List.unmodifiable(profiles),
        copies = List.unmodifiable(copies),
-       openingRecords = List.unmodifiable(openingRecords);
+       openingRecords = List.unmodifiable(openingRecords),
+       goodsReceiptDrafts = List.unmodifiable(goodsReceiptDrafts);
   final String account, store;
   final bool qa;
   final int revision;
@@ -7092,6 +7119,7 @@ class WorkspacePurchaseEntryBook {
   final WorkspacePurchaseEntryDraft? draft;
   final List<WorkspacePurchaseSavedCopy> copies;
   final List<WorkspaceSupplierOpeningRecord> openingRecords;
+  final List<WorkspaceSupplierGoodsReceiptDraft> goodsReceiptDrafts;
   WorkspaceSupplierOpeningRecord? openingRecordFor(String supplierId) =>
       openingRecords.where((r) => r.supplierId == supplierId).lastOrNull;
 
@@ -7147,6 +7175,8 @@ class WorkspacePurchaseEntryBook {
     if (copies.isNotEmpty) 'copies': copies.map((c) => c.toJson()).toList(),
     if (openingRecords.isNotEmpty)
       'openingRecords': openingRecords.map((r) => r.toJson()).toList(),
+    if (goodsReceiptDrafts.isNotEmpty)
+      'goodsReceiptDrafts': goodsReceiptDrafts.map((r) => r.toJson()).toList(),
   };
   static WorkspacePurchaseEntryBook fromJson(Object? raw) {
     const keys = {
@@ -7159,11 +7189,12 @@ class WorkspacePurchaseEntryBook {
       'draft',
       'copies',
       'openingRecords',
+      'goodsReceiptDrafts',
     };
     try {
       if (raw is! Map ||
           !keys
-              .difference({'copies', 'openingRecords'})
+              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts'})
               .every(raw.containsKey) ||
           !raw.keys.every(keys.contains) ||
           raw['version'] != 1 ||
@@ -7174,7 +7205,10 @@ class WorkspacePurchaseEntryBook {
                   (raw['copies'] as List).length > 1000)) ||
           (raw.containsKey('openingRecords') &&
               (raw['openingRecords'] is! List ||
-                  (raw['openingRecords'] as List).length > 1000))) {
+                  (raw['openingRecords'] as List).length > 1000)) ||
+          (raw.containsKey('goodsReceiptDrafts') &&
+            (raw['goodsReceiptDrafts'] is! List ||
+              (raw['goodsReceiptDrafts'] as List).length > 1000))) {
         throw const FormatException('Invalid supplier directory');
       }
       final result = WorkspacePurchaseEntryBook(
@@ -7197,6 +7231,8 @@ class WorkspacePurchaseEntryBook {
           for (final r in (raw['openingRecords'] as List? ?? const []))
             WorkspaceSupplierOpeningRecord.fromJson(r),
         ],
+        goodsReceiptDrafts: [for (final r in (raw['goodsReceiptDrafts'] as List? ?? const []))
+          WorkspaceSupplierGoodsReceiptDraft.fromJson(r)],
       );
       final ids = <String>{};
       final copyIds = <String>{};
@@ -7266,6 +7302,15 @@ class WorkspacePurchaseEntryBook {
         previousRevision = r.revision;
         basisBySupplier[r.supplierId] = r.basisId;
         supplierByBasis[r.basisId] = r.supplierId;
+      }
+      final receiptIds = <String>{};
+      var receiptRevision = 0;
+      for (final review in result.goodsReceiptDrafts) {
+        if (!receiptIds.add(review.receipt.id) || !ids.contains(review.supplierId) ||
+            review.revision <= receiptRevision || review.revision > result.revision) {
+          throw const FormatException('Invalid receiving review relationship');
+        }
+        receiptRevision = review.revision;
       }
       return result;
     } on Object {
